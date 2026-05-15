@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v1.2 -->
+<!-- Tony's Recipes Collection v1.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -926,6 +926,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 <div id="loginScreen">
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:-20px;margin-bottom:20px;font-family:'DM Sans',sans-serif;">v1.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -944,7 +945,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
       Continue without Google Drive<br>
       <span style="font-size:11px;opacity:0.7">(data saved on this device only)</span>
     </button>
-    <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google Drive.<br>Tony's Recipes never stores your data on our servers.</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);">
+          <input type="checkbox" id="rememberMe" checked style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">
+          <label for="rememberMe" style="cursor:pointer;">Remember me on this device</label>
+        </div>
+        <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google Drive.<br>Tony's Recipes never stores your data on our servers.</div>
   </div>
 </div>
 
@@ -2395,6 +2400,7 @@ async function loadFromFirestore() {
 async function startGoogleSignIn() {
   var btn    = document.getElementById('googleSignInBtn');
   var errDiv = document.getElementById('loginError');
+  var remember = document.getElementById('rememberMe');
   if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
   errDiv.style.display = 'none';
 
@@ -2406,20 +2412,27 @@ async function startGoogleSignIn() {
   }
 
   try {
+    // Set persistence based on "Remember me" checkbox
+    var persistence = (remember && remember.checked)
+      ? firebase.auth.Auth.Persistence.LOCAL    // survives browser restart
+      : firebase.auth.Auth.Persistence.SESSION; // clears when tab closes
+    await _fbAuth.setPersistence(persistence);
     await _fbAuth.signInWithPopup(_fbProvider);
     // onAuthStateChanged handles everything after this
   } catch(err) {
     console.error('Sign in error:', err);
     var msg = 'Sign-in failed. ';
-    if (err.code === 'auth/popup-blocked')           msg += 'Please allow popups for this site in your browser settings.';
+    if (err.code === 'auth/popup-blocked')            msg += 'Please allow popups for this site.';
     else if (err.code === 'auth/popup-closed-by-user') msg += 'Sign-in was cancelled.';
-    else if (err.code === 'auth/unauthorized-domain')  msg += 'Domain not authorized. Add this domain in Firebase Console → Authentication → Settings → Authorised domains.';
+    else if (err.code === 'auth/unauthorized-domain')  msg += 'Domain not authorized in Firebase Console.';
     else msg += err.message;
     errDiv.textContent = msg;
     errDiv.style.display = 'block';
     if (btn) { btn.textContent = 'Try Again'; btn.disabled = false; }
   }
 }
+
+window.startGoogleSignIn = startGoogleSignIn;
 
 
 // signInWithPopup needs to be available globally (imported in module but called from onclick)
@@ -2553,37 +2566,79 @@ async function processCameraImage(event) {
 // PRINT RECIPE
 // ═══════════════════════════════════
 function printRecipe(id) {
-  const r = recipes.find(function(x){ return x.id === id; });
+  var r = recipes.find(function(x){ return x.id === id; });
   if (!r) return;
 
-  const printWin = window.open('', '_blank', 'width=800,height=600');
-  const ingsHtml = r.ingredients.map(function(i){
-    return '<tr><td style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;">' + escH(i.a) + '</td><td style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
-  }).join('');
-  const stepsHtml = r.steps.map(function(s, i){
-    return '<div style="display:flex;gap:12px;margin-bottom:10px;"><span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + (i+1) + '</span><span>' + escH(s) + '</span></div>';
+  var ingsHtml = r.ingredients.map(function(i){
+    return '<tr><td style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;">'
+      + escH(i.a) + '</td><td style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
   }).join('');
 
-  printWin.document.write(`<!DOCTYPE html><html><head>
-    <title>${escH(r.name)}</title>
-    <style>
-      body { font-family: Georgia, serif; max-width: 680px; margin: 40px auto; color: #1C1A18; }
-      h1 { font-size: 28px; color: #5C3D2E; margin-bottom: 4px; }
-      .meta { font-size: 13px; color: #8A8279; margin-bottom: 20px; }
-      h2 { font-size: 16px; color: #C1440E; border-bottom: 1px solid #E8E0D5; padding-bottom: 4px; margin-top: 24px; }
-      table { width: 100%; border-collapse: collapse; }
-      .source { font-size: 12px; color: #8A8279; margin-top: 24px; }
-      @media print { button { display: none; } }
-    </style>
-  </head><body>
-    <h1>${r.emoji} ${escH(r.name)}</h1>
-    <div class="meta">
-      ${escH(r.category)} &nbsp;|&nbsp; ${escH(r.difficulty)} &nbsp;|&nbsp; ⏱ ${escH(r.prep)} &nbsp;|&nbsp; 🍽 ${escH(r.servings)} servings
-    </div>
-    ${r.source ? '<div class="source">Source: <a href="' + escH(r.source) + '">' + escH(r.source) + '</a></div>' : ''}
-    <h2>Ingredients</h2>
-    <table>${ingsHtml}</table>
-    <h2>Method</h2>
-    ${stepsHtml}
-    <scr' + 'ipt>window.onload = function(){ window.print(); }</scr' + 'ipt>
-  </body></html>
+  var stepsHtml = r.steps.map(function(s, si){
+    return '<div style="display:flex;gap:12px;margin-bottom:10px;">'
+      + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;'
+      + 'display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">'
+      + (si + 1) + '</span><span>' + escH(s) + '</span></div>';
+  }).join('');
+
+  var sourceHtml = r.source
+    ? '<div class="source">Source: <a href="' + escH(r.source) + '">' + escH(r.source) + '</a></div>'
+    : '';
+
+  var printWin = window.open('', '_blank', 'width=800,height=600');
+  printWin.document.write(
+    '<!DOCTYPE html><html><head>'
+    + '<title>' + escH(r.name) + '</title>'
+    + '<style>'
+    + 'body{font-family:Georgia,serif;max-width:680px;margin:40px auto;color:#1C1A18;}'
+    + 'h1{font-size:28px;color:#5C3D2E;margin-bottom:4px;}'
+    + '.meta{font-size:13px;color:#8A8279;margin-bottom:20px;}'
+    + 'h2{font-size:16px;color:#C1440E;border-bottom:1px solid #E8E0D5;padding-bottom:4px;margin-top:24px;}'
+    + 'table{width:100%;border-collapse:collapse;}'
+    + '.source{font-size:12px;color:#8A8279;margin-top:24px;}'
+    + '@media print{button{display:none;}}'
+    + '</style>'
+    + '</head><body>'
+    + '<h1>' + r.emoji + ' ' + escH(r.name) + '</h1>'
+    + '<div class="meta">' + escH(r.category) + ' &nbsp;|&nbsp; ' + escH(r.difficulty)
+    + ' &nbsp;|&nbsp; ⏱ ' + escH(r.prep) + ' &nbsp;|&nbsp; 🍽 ' + escH(r.servings) + ' servings</div>'
+    + sourceHtml
+    + '<h2>Ingredients</h2><table>' + ingsHtml + '</table>'
+    + '<h2>Method</h2>' + stepsHtml
+    + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script>'
+    + '</body></html>'
+  );
+  printWin.document.close();
+}
+
+// ── Expose all onclick functions to global window scope ──────────────────────
+(function() {
+  var fns = [
+    'startGoogleSignIn','useOfflineMode','signOut','openExploreModal',
+    'openSuggestModal','openAddModal','openFreehandModal','openUrlImportModal',
+    'openCameraImport','openShareAppModal','openTranslate','setView','setCat',
+    'toggleFav','openView','toggleShare','setMult','setUnit','saveRecipe',
+    'runSuggest','runExplore','runTranslate','runFreehandImport','runUrlImport',
+    'clearAllData','addSuggestion','confirmImportParsed','saveTranslation',
+    'toggleChip','setSugCount','addIngTag','tagKey','toggleDietDD',
+    'expOneExcel','expOneWord','exportAllExcel','exportAllWord',
+    'doEmail','doWhatsApp','doCopy','heroPhotoChanged','changeHeroPhoto',
+    'printRecipe','processCameraImage','shareAppWhatsApp','copyAppLink',
+    'closeDrop','toggleDrop','bgClose','closeM','pickEmoji',
+    'onPhotoFile','removePhoto','setLang','renderFilters','renderGrid',
+  ];
+  fns.forEach(function(name) {
+    try {
+      var fn = eval(name);
+      if (typeof fn === 'function') window[name] = fn;
+    } catch(e) {}
+  });
+})();
+
+// Render initial state
+renderFilters();
+renderGrid();
+
+</script>
+</body>
+</html>
