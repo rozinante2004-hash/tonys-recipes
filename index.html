@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.0 -->
+<!-- Tony's Recipes Collection v3.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -693,7 +693,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.0</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.1</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1074,7 +1074,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2032,10 +2032,9 @@ async function runSuggest() {
 // ═══════════════════════════════════
 // ANTHROPIC API KEY
 // ═══════════════════════════════════
-// This key is used client-side via a CORS proxy.
-// It is visible in the page source — for a production app with many users,
-// use a server-side proxy instead. For personal use this is acceptable.
-const ANTHROPIC_API_KEY = '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';
+// The API key is stored securely in the Cloudflare Worker secret.
+// It is NOT stored here — the app calls the Worker, Worker calls Anthropic.
+const ANTHROPIC_API_KEY = ''; // unused — kept for compatibility only
 
 // Robustly extract JSON from an AI response that may contain extra text
 function extractJSON(raw) {
