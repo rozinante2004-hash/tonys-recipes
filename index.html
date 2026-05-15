@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.6 -->
+<!-- Tony's Recipes Collection v3.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -736,7 +736,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.7</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1117,7 +1117,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2789,11 +2789,11 @@ async function processCameraImage(event) {
     try {
       // Step 1: resize to 1200px
       res.innerHTML = spinner('Preparing image…');
-      // 2000px at 94% for maximum text legibility
-      var compressed = await resizeImageForVision(e.target.result, 2000, 0.94);
+      // 2500px at 95% — maximum resolution, clean downscale, no post-processing
+      var compressed = await resizeImageForVision(e.target.result, 2500, 0.95);
       var base64 = compressed.split(',')[1];
       var sizeKB = Math.round(base64.length * 0.75 / 1024);
-      res.innerHTML = spinner('Step 1: Reading text (2000px, ' + sizeKB + 'KB)…');
+      res.innerHTML = spinner('Step 1: Reading text (2500px, ' + sizeKB + 'KB)…');
 
       // Step 1: Ask Claude to transcribe the visible text ONLY — no extraction yet
       const step1 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
@@ -2883,6 +2883,7 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
     var img = new Image();
     img.onload = function() {
       var w = img.width, h = img.height;
+      // Only scale DOWN — never upscale
       if (w > maxDim || h > maxDim) {
         if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
         else        { w = Math.round(w * maxDim / h); h = maxDim; }
@@ -2890,51 +2891,13 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
+      // Use high-quality image smoothing for clean downscaling
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
-
-      // Step 1: Boost contrast to make text stand out from background
-      var imageData = ctx.getImageData(0, 0, w, h);
-      var data = imageData.data;
-      var factor = 1.4; // contrast factor
-      var intercept = 128 * (1 - factor);
-      for (var i = 0; i < data.length; i += 4) {
-        data[i]   = Math.min(255, Math.max(0, data[i]   * factor + intercept));
-        data[i+1] = Math.min(255, Math.max(0, data[i+1] * factor + intercept));
-        data[i+2] = Math.min(255, Math.max(0, data[i+2] * factor + intercept));
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      // Step 2: Strong sharpening kernel (edge enhance)
-      imageData = ctx.getImageData(0, 0, w, h);
-      data = imageData.data;
-      var kernel = [
-        -1, -1, -1,
-        -1,  9, -1,
-        -1, -1, -1
-      ];
-      var src = new Uint8ClampedArray(data);
-      for (var y = 1; y < h - 1; y++) {
-        for (var x = 1; x < w - 1; x++) {
-          var r = 0, g = 0, b = 0;
-          for (var ky = 0; ky < 3; ky++) {
-            for (var kx = 0; kx < 3; kx++) {
-              var off = ((y + ky - 1) * w + (x + kx - 1)) * 4;
-              var wt  = kernel[ky * 3 + kx];
-              r += src[off]   * wt;
-              g += src[off+1] * wt;
-              b += src[off+2] * wt;
-            }
-          }
-          var dst = (y * w + x) * 4;
-          data[dst]   = Math.min(255, Math.max(0, r));
-          data[dst+1] = Math.min(255, Math.max(0, g));
-          data[dst+2] = Math.min(255, Math.max(0, b));
-        }
-      }
-      ctx.putImageData(imageData, 0, 0);
-
+      // No sharpening or contrast — the raw downscaled image is better for OCR
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.src = dataUrl;
