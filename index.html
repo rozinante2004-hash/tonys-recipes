@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.5 -->
+<!-- Tony's Recipes Collection v3.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -674,6 +674,49 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .del-bar-cancel { background: rgba(255,255,255,0.2); color: white; }
 .del-bar-delete { background: white; color: var(--terracotta); }
 
+
+/* ── NUTRITION PANEL ── */
+.nutrition-panel {
+  background: #f5f0ea;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+}
+.nutrition-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+}
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+.nutrition-item { display: flex; flex-direction: column; gap: 2px; }
+.nutrition-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--warm-brown);
+}
+.nutrition-unit { font-size: 10px; color: var(--muted); }
+.nutrition-label { font-size: 11px; color: var(--ink); font-weight: 500; }
+.nutrition-loading { font-size: 12px; color: var(--muted); text-align: center; padding: 8px 0; }
+.nutrition-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: white;
+  cursor: pointer; color: var(--muted);
+  box-shadow: 0 2px 0 #c8c0b5;
+  transition: all 0.1s ease;
+}
+.nutrition-btn:hover { color: var(--terracotta); border-color: var(--terracotta); }
+.nutrition-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #c8c0b5; }
+
 </style>
 </head>
 <body>
@@ -693,7 +736,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.5</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.6</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1074,7 +1117,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1315,6 +1358,22 @@ function drawView(){
         <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
       </div>
       ${r.source ? `<div class="source-link" style="margin-bottom:8px;">🔗 <a href="${r.source.startsWith('http') ? r.source : '#'}" target="_blank">${escH(r.source)}</a></div>` : ''}
+      <div id="nutrition-${r.id}" class="nutrition-panel">
+        ${r.nutrition
+          ? `<div class="nutrition-title">Nutrition per 100g</div>
+             <div class="nutrition-grid">
+               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.calories}</span><span class="nutrition-unit">kcal</span><span class="nutrition-label">Calories</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.carbs}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Carbs</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.fat}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Fat</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.protein}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Protein</span></div>
+             </div>`
+          : `<div style="display:flex;align-items:center;justify-content:space-between;">
+               <span class="nutrition-title" style="margin:0;">Nutrition per 100g</span>
+               <button class="nutrition-btn" onclick="calcNutrition(${r.id})">✨ Calculate</button>
+             </div>`
+        }
+      </div>
+
       <div class="control-label">Scale ingredients</div>
       <div class="multiplier-row">
         ${[1,2,3,4,5,6].map(m=>`<button class="mult-btn${viewMult===m?' active':''}" onclick="setMult(${m})">×${m}</button>`).join('')}
@@ -2730,12 +2789,11 @@ async function processCameraImage(event) {
     try {
       // Step 1: resize to 1200px
       res.innerHTML = spinner('Preparing image…');
-      // 1500px at 92% gives sharp legible text for cookbook pages
-      // Apply unsharp mask to improve text clarity before sending
-      var compressed = await resizeImageForVision(e.target.result, 1500, 0.92);
+      // 2000px at 94% for maximum text legibility
+      var compressed = await resizeImageForVision(e.target.result, 2000, 0.94);
       var base64 = compressed.split(',')[1];
       var sizeKB = Math.round(base64.length * 0.75 / 1024);
-      res.innerHTML = spinner('Step 1: Reading text (1500px, ' + sizeKB + 'KB)…');
+      res.innerHTML = spinner('Step 1: Reading text (2000px, ' + sizeKB + 'KB)…');
 
       // Step 1: Ask Claude to transcribe the visible text ONLY — no extraction yet
       const step1 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
@@ -2829,7 +2887,6 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
         if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
         else        { w = Math.round(w * maxDim / h); h = maxDim; }
       }
-      // Draw image
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
@@ -2837,41 +2894,47 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
 
-      // Apply sharpening via convolution to improve text legibility
-      // Unsharp mask: sharpen = original + amount * (original - blurred)
+      // Step 1: Boost contrast to make text stand out from background
       var imageData = ctx.getImageData(0, 0, w, h);
       var data = imageData.data;
-      var sharpen = [
-         0, -1,  0,
-        -1,  5, -1,
-         0, -1,  0
+      var factor = 1.4; // contrast factor
+      var intercept = 128 * (1 - factor);
+      for (var i = 0; i < data.length; i += 4) {
+        data[i]   = Math.min(255, Math.max(0, data[i]   * factor + intercept));
+        data[i+1] = Math.min(255, Math.max(0, data[i+1] * factor + intercept));
+        data[i+2] = Math.min(255, Math.max(0, data[i+2] * factor + intercept));
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      // Step 2: Strong sharpening kernel (edge enhance)
+      imageData = ctx.getImageData(0, 0, w, h);
+      data = imageData.data;
+      var kernel = [
+        -1, -1, -1,
+        -1,  9, -1,
+        -1, -1, -1
       ];
-      var side = Math.round(Math.sqrt(sharpen.length));
-      var halfSide = Math.floor(side / 2);
       var src = new Uint8ClampedArray(data);
-      for (var y = 0; y < h; y++) {
-        for (var x = 0; x < w; x++) {
+      for (var y = 1; y < h - 1; y++) {
+        for (var x = 1; x < w - 1; x++) {
           var r = 0, g = 0, b = 0;
-          for (var cy = 0; cy < side; cy++) {
-            for (var cx = 0; cx < side; cx++) {
-              var scy = y + cy - halfSide;
-              var scx = x + cx - halfSide;
-              if (scy >= 0 && scy < h && scx >= 0 && scx < w) {
-                var srcOff = (scy * w + scx) * 4;
-                var wt = sharpen[cy * side + cx];
-                r += src[srcOff] * wt;
-                g += src[srcOff+1] * wt;
-                b += src[srcOff+2] * wt;
-              }
+          for (var ky = 0; ky < 3; ky++) {
+            for (var kx = 0; kx < 3; kx++) {
+              var off = ((y + ky - 1) * w + (x + kx - 1)) * 4;
+              var wt  = kernel[ky * 3 + kx];
+              r += src[off]   * wt;
+              g += src[off+1] * wt;
+              b += src[off+2] * wt;
             }
           }
-          var dstOff = (y * w + x) * 4;
-          data[dstOff]   = Math.min(255, Math.max(0, r));
-          data[dstOff+1] = Math.min(255, Math.max(0, g));
-          data[dstOff+2] = Math.min(255, Math.max(0, b));
+          var dst = (y * w + x) * 4;
+          data[dst]   = Math.min(255, Math.max(0, r));
+          data[dst+1] = Math.min(255, Math.max(0, g));
+          data[dst+2] = Math.min(255, Math.max(0, b));
         }
       }
       ctx.putImageData(imageData, 0, 0);
+
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.src = dataUrl;
@@ -3033,6 +3096,58 @@ window.toggleSelectMode  = toggleSelectMode;
 window.cancelSelectMode  = cancelSelectMode;
 window.toggleRecipeSelect = toggleRecipeSelect;
 window.deleteSelected    = deleteSelected;
+
+
+// ═══════════════════════════════════
+// NUTRITION CALCULATOR
+// ═══════════════════════════════════
+async function calcNutrition(id) {
+  var r = recipes.find(function(x){ return x.id === id; });
+  if (!r) return;
+  var panel = document.getElementById('nutrition-' + id);
+  if (!panel) return;
+  panel.innerHTML = '<div class="nutrition-loading">⏳ Calculating nutrition…</div>';
+
+  var ingredientList = r.ingredients.map(function(i){ return i.a + ' ' + i.n; }).join(', ');
+  var prompt = 'Estimate the nutritional content per 100g of the finished dish for this recipe. '
+    + 'Recipe name: ' + r.name + '. '
+    + 'Ingredients: ' + ingredientList + '. '
+    + 'Servings: ' + r.servings + '. '
+    + 'Return ONLY valid JSON: {"calories":123,"carbs":12,"fat":5,"protein":8} '
+    + 'All values should be numbers (per 100g of finished dish). No text, no explanation.';
+
+  try {
+    var raw = await aiCall(prompt, 300);
+    var nutrition = extractJSON(raw);
+    if (!nutrition.calories) throw new Error('Invalid response');
+
+    // Save to recipe
+    r.nutrition = {
+      calories: Math.round(nutrition.calories),
+      carbs:    Math.round(nutrition.carbs * 10) / 10,
+      fat:      Math.round(nutrition.fat * 10) / 10,
+      protein:  Math.round(nutrition.protein * 10) / 10
+    };
+    saveData();
+
+    // Re-render the panel
+    panel.innerHTML = '<div class="nutrition-title">Nutrition per 100g</div>'
+      + '<div class="nutrition-grid">'
+      + '<div class="nutrition-item"><span class="nutrition-value">' + r.nutrition.calories + '</span><span class="nutrition-unit">kcal</span><span class="nutrition-label">Calories</span></div>'
+      + '<div class="nutrition-item"><span class="nutrition-value">' + r.nutrition.carbs + 'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Carbs</span></div>'
+      + '<div class="nutrition-item"><span class="nutrition-value">' + r.nutrition.fat + 'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Fat</span></div>'
+      + '<div class="nutrition-item"><span class="nutrition-value">' + r.nutrition.protein + 'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Protein</span></div>'
+      + '</div>';
+    toast('✅ Nutrition calculated!');
+  } catch(err) {
+    panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;">'
+      + '<span class="nutrition-title" style="margin:0;">Nutrition per 100g</span>'
+      + '<button class="nutrition-btn" onclick="calcNutrition(' + id + ')">Retry</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:#B03030;margin-top:4px;">Could not calculate: ' + escH(err.message) + '</div>';
+  }
+}
+window.calcNutrition = calcNutrition;
 
 // Render immediately with local data so app feels instant
 // Firebase auth will update with cloud data when it's ready
