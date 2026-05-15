@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.4 -->
+<!-- Tony's Recipes Collection v3.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -693,7 +693,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.4</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.5</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1074,7 +1074,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2748,7 +2748,14 @@ async function processCameraImage(event) {
             role: 'user',
             content: [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-              { type: 'text', text: 'Please transcribe ALL the text you can see in this image, word for word, in the original language. Do not translate. Do not summarise. Just copy the text exactly as it appears. If you cannot read any text clearly, say so.' }
+              { type: 'text', text: 'Please transcribe ALL the text visible in this image, word for word, in the original language. '
+              + 'This is a Hebrew cookbook page. Pay close attention to: '
+              + '(1) similar Hebrew letters that are easily confused: ב/כ/מ/ס, ד/ר, ו/ז, ח/ה, ט/מ; '
+              + '(2) final letter forms: ך ם ן ף ץ vs their regular forms כ מ נ פ צ; '
+              + '(3) numbers and quantities written as digits or Hebrew letters; '
+              + '(4) ingredient amounts and units. '
+              + 'Do NOT translate. Do NOT summarise. Copy every word exactly as printed. '
+              + 'If a word is unclear, write your best guess followed by [?].' }
             ]
           }]
         })
