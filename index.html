@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v1.9 -->
+<!-- Tony's Recipes Collection v2.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,22 +35,20 @@
   const _fbDb       = firebase.firestore();
   const _fbProvider = new firebase.auth.GoogleAuthProvider();
 
-  // Set LOCAL persistence once at startup (so Remember Me works by default)
+  // Set LOCAL persistence once at startup
   _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
-  // Enable offline persistence for Firestore
+  // Enable Firestore offline persistence
   _fbDb.enablePersistence().catch(function(e) {
     if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
-      console.warn('Firestore persistence unavailable:', e.code);
+      console.warn('Firestore persistence error:', e.code);
   });
 
-  // onAuthStateChanged — primary auth handler
-  // Fires on page load if user is already signed in, and after every sign-in/sign-out
+  // Single auth state listener — handles auto-login and post-popup login
   _fbAuth.onAuthStateChanged(function(user) {
     if (user) {
       var isAutoLogin = !window._userInitiatedSignIn;
       window._userInitiatedSignIn = false;
-
       var delay = isAutoLogin ? 3000 : 0;
 
       if (isAutoLogin) {
@@ -61,9 +59,11 @@
       _autoLoginTimer = setTimeout(async function() {
         window._fbUser    = user;
         window._driveMode = true;
-        var nameEl = document.getElementById('driveUserName');
+        var nameEl  = document.getElementById('driveUserName');
         var signBtn = document.getElementById('signOutBtn');
-        if (nameEl) nameEl.textContent = user.displayName || user.email;
+        var loginSc = document.getElementById('loginScreen');
+        var notice2 = document.getElementById('autoLoginNotice');
+        if (nameEl)  nameEl.textContent = user.displayName || user.email;
         if (signBtn) signBtn.style.display = 'inline';
         if (typeof setDriveStatus === 'function') setDriveStatus('syncing', 'Loading your recipes…');
         try {
@@ -71,15 +71,14 @@
             var loaded = await loadFromFirestore();
             if (!loaded && typeof saveToFirestore === 'function') await saveToFirestore();
           }
-        } catch(e) { console.warn('Firestore load error:', e); }
-        var ls = document.getElementById('loginScreen');
-        if (ls) ls.style.display = 'none';
-        var n = document.getElementById('autoLoginNotice');
-        if (n) n.style.display = 'none';
+        } catch(e) { console.warn('Firestore error:', e); }
+        if (loginSc) loginSc.style.display = 'none';
+        if (notice2) notice2.style.display = 'none';
         _autoLoginTimer = null;
         if (typeof renderFilters === 'function') renderFilters();
         if (typeof renderGrid    === 'function') renderGrid();
-        if (typeof setDriveStatus === 'function') setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
+        if (typeof setDriveStatus === 'function')
+          setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
       }, delay);
 
     } else {
@@ -87,32 +86,8 @@
       window._driveMode = false;
     }
   });
-
-  // Handle redirect result AFTER the page is fully loaded
-  // (so main script functions like loadFromFirestore are available)
-  window.addEventListener('load', function() {
-    _fbAuth.getRedirectResult().then(function(result) {
-      if (result && result.user) {
-        // Redirect sign-in succeeded — onAuthStateChanged has already fired
-        // Just make sure the button is reset in case of any stale state
-        var btn = document.getElementById('googleSignInBtn');
-        if (btn) { btn.disabled = false; }
-        console.log('Redirect sign-in complete:', result.user.email);
-      }
-    }).catch(function(err) {
-      if (err.code && err.code !== 'auth/no-auth-event' && err.code !== 'auth/null-user') {
-        console.warn('Redirect error:', err.code, err.message);
-        var errDiv = document.getElementById('loginError');
-        if (errDiv) {
-          errDiv.textContent = 'Sign-in failed: ' + err.message;
-          errDiv.style.display = 'block';
-        }
-        var btn = document.getElementById('googleSignInBtn');
-        if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
-      }
-    });
-  });
 </script>
+
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -625,7 +600,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v1.9</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.0</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1003,7 +978,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v1.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2489,46 +2464,40 @@ async function startGoogleSignIn() {
   }
 
   errDiv.style.display = 'none';
+  if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
 
-  // Update persistence based on Remember Me checkbox
-  var persistence = (remember && !remember.checked)
-    ? firebase.auth.Auth.Persistence.SESSION
-    : firebase.auth.Auth.Persistence.LOCAL;
-  _fbAuth.setPersistence(persistence).catch(function(){});
-
-  // Detect mobile — use redirect; desktop — use popup
-  var isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  // Update persistence based on Remember Me (fire and forget — no await)
+  if (remember && !remember.checked) {
+    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+  }
 
   window._userInitiatedSignIn = true;
 
-  if (isMobile) {
-    if (btn) { btn.textContent = '⏳ Going to Google…'; btn.disabled = true; }
-    try {
-      await _fbAuth.signInWithRedirect(_fbProvider);
-    } catch(err) {
-      if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
-      if (errDiv) { errDiv.textContent = 'Redirect failed: ' + err.message; errDiv.style.display = 'block'; }
+  try {
+    // signInWithPopup works on ALL devices when called directly from a user gesture
+    await _fbAuth.signInWithPopup(_fbProvider);
+    // onAuthStateChanged fires and handles the rest
+    if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+  } catch(err) {
+    window._userInitiatedSignIn = false;
+    console.error('Sign in error:', err.code, err.message);
+
+    if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+
+    var msg = '';
+    if (err.code === 'auth/popup-blocked') {
+      msg = 'Popup was blocked by your browser. Please allow popups for this site and try again.';
+    } else if (err.code === 'auth/popup-closed-by-user') {
+      msg = 'Sign-in was cancelled.';
+    } else if (err.code === 'auth/unauthorized-domain') {
+      msg = 'This domain is not authorized. Please add rozinante2004-hash.github.io to Firebase → Authentication → Settings → Authorised domains.';
+    } else if (err.code === 'auth/network-request-failed') {
+      msg = 'Network error. Please check your connection and try again.';
+    } else {
+      msg = err.message;
     }
-  } else {
-    if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
-    try {
-      await _fbAuth.signInWithPopup(_fbProvider);
-      // onAuthStateChanged fires and handles the rest — re-enable button
-      if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
-    } catch(err) {
-      if (err.code === 'auth/popup-blocked') {
-        // Auto-fallback to redirect
-        if (btn) btn.textContent = '⏳ Going to Google…';
-        _fbAuth.signInWithRedirect(_fbProvider);
-        return;
-      }
-      window._userInitiatedSignIn = false;
-      var msg = err.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' :
-                err.code === 'auth/unauthorized-domain'  ? 'Domain not authorized in Firebase Console.' :
-                err.message;
-      if (errDiv) { errDiv.textContent = msg; errDiv.style.display = 'block'; }
-      if (btn) { btn.textContent = 'Try Again'; btn.disabled = false; }
-    }
+
+    if (errDiv && msg) { errDiv.textContent = msg; errDiv.style.display = 'block'; }
   }
 }
 
