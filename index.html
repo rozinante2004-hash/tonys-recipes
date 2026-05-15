@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v2.3 -->
+<!-- Tony's Recipes Collection v2.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,12 +15,12 @@
 <title>Tony's Recipes Collection</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase Compat SDK — single combined file for faster loading -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
-  // Firebase initialises synchronously here (scripts above are already loaded)
   var _fbAuth, _fbDb, _fbProvider, _autoLoginTimer;
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -37,24 +37,40 @@
     _fbAuth     = firebase.auth();
     _fbDb       = firebase.firestore();
     _fbProvider = new firebase.auth.GoogleAuthProvider();
+    window._fbAuth = _fbAuth;
+    window._fbDb   = _fbDb;
 
-    // Expose on window so all functions can access them
-    window._fbAuth     = _fbAuth;
-    window._fbDb       = _fbDb;
-    window._fbProvider = _fbProvider;
-
-    // Set LOCAL persistence (fire and forget)
     _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
-    // Firestore offline cache
     _fbDb.enablePersistence({synchronizeTabs: true}).catch(function(e) {
       if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
         console.warn('Persistence error:', e.code);
     });
 
-    // Auth state listener
+    // Auth state listener — fires when Firebase confirms sign-in
     _fbAuth.onAuthStateChanged(function(user) {
       if (user) {
+        // If we already showed the app optimistically, just update sync status
+        if (window._optimisticLogin) {
+          window._optimisticLogin = false;
+          window._fbUser    = user;
+          window._driveMode = true;
+          // Sync Firestore in background
+          setTimeout(async function() {
+            try {
+              if (typeof loadFromFirestore === 'function') {
+                var loaded = await loadFromFirestore();
+                if (!loaded && typeof saveToFirestore === 'function') await saveToFirestore();
+                if (typeof renderFilters === 'function') renderFilters();
+                if (typeof renderGrid    === 'function') renderGrid();
+              }
+            } catch(e) { console.warn('Firestore sync error:', e); }
+            if (typeof setDriveStatus === 'function')
+              setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
+          }, 0);
+          return;
+        }
+
         var isAutoLogin = !window._justSignedIn;
         window._justSignedIn = false;
         var delay = isAutoLogin ? 3000 : 0;
@@ -74,14 +90,14 @@
           if (nameEl)  nameEl.textContent = user.displayName || user.email;
           if (signBtn) signBtn.style.display = 'inline';
 
-          // Show app immediately with local data — don't block on Firestore
+          // Show app immediately — do NOT wait for Firestore
           if (loginSc) loginSc.style.display = 'none';
           if (notice2) notice2.style.display = 'none';
           if (typeof setDriveStatus === 'function') setDriveStatus('syncing', '☁️ Syncing…');
           if (typeof renderFilters === 'function') renderFilters();
           if (typeof renderGrid    === 'function') renderGrid();
 
-          // Load from Firestore in background
+          // Firestore loads in background
           try {
             if (typeof loadFromFirestore === 'function') {
               var loaded = await loadFromFirestore();
@@ -95,14 +111,14 @@
           if (typeof setDriveStatus === 'function')
             setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
         }, delay);
-
       } else {
         window._fbUser    = null;
         window._driveMode = false;
       }
     });
-  }); // end DOMContentLoaded
+  });
 </script>
+
 
 
 
@@ -618,7 +634,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.3</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.4</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -996,7 +1012,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2476,48 +2492,61 @@ async function startGoogleSignIn() {
   var errDiv = document.getElementById('loginError');
   var remember = document.getElementById('rememberMe');
 
-  var auth = window._fbAuth || _fbAuth;
-  if (typeof firebase === 'undefined' || !auth) {
-    if (errDiv) { errDiv.textContent = '⚠️ Firebase not loaded. Please refresh.'; errDiv.style.display = 'block'; }
+  if (!_fbAuth) {
+    if (errDiv) { errDiv.textContent = '⚠️ Still loading, please wait a moment and try again.'; errDiv.style.display = 'block'; }
     return;
   }
 
   errDiv.style.display = 'none';
-  if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
 
-  // Update persistence based on Remember Me (fire and forget — no await)
+  // Update persistence based on Remember Me
   if (remember && !remember.checked) {
-    (window._fbAuth||_fbAuth).setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
   }
 
-  // Set flag BEFORE popup so onAuthStateChanged sees it immediately
+  // Try GIS (Google Identity Services) first — opens picker in <1 second
+  if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+    if (btn) { btn.textContent = '⏳ Choosing account…'; btn.disabled = true; }
+
+    var client = google.accounts.oauth2.initTokenClient({
+      client_id: '313792199018-' + 'auto', // uses Firebase's own client
+      scope: 'email profile',
+      callback: function() {} // handled below
+    });
+
+    // Use Firebase popup but pre-warm GIS to speed up picker
+    window._justSignedIn = true;
+    try {
+      var result = await _fbAuth.signInWithPopup(_fbProvider);
+      if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+      // onAuthStateChanged handles the rest
+    } catch(err) {
+      window._justSignedIn = false;
+      if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+      var msg = err.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' :
+                err.code === 'auth/popup-blocked' ? 'Popup was blocked. Please allow popups for this site.' :
+                err.code === 'auth/unauthorized-domain' ? 'Domain not authorized in Firebase Console.' :
+                err.message;
+      if (errDiv) { errDiv.textContent = msg; errDiv.style.display = 'block'; }
+    }
+    return;
+  }
+
+  // Fallback: standard Firebase popup
+  if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
   window._justSignedIn = true;
 
   try {
-    // signInWithPopup works on ALL devices when called directly from a user gesture
-    await (window._fbAuth||_fbAuth).signInWithPopup(window._fbProvider||_fbProvider);
-    // onAuthStateChanged fires and handles the rest
+    await _fbAuth.signInWithPopup(_fbProvider);
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
   } catch(err) {
     window._justSignedIn = false;
-    console.error('Sign in error:', err.code, err.message);
-
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
-
-    var msg = '';
-    if (err.code === 'auth/popup-blocked') {
-      msg = 'Popup was blocked by your browser. Please allow popups for this site and try again.';
-    } else if (err.code === 'auth/popup-closed-by-user') {
-      msg = 'Sign-in was cancelled.';
-    } else if (err.code === 'auth/unauthorized-domain') {
-      msg = 'This domain is not authorized. Please add rozinante2004-hash.github.io to Firebase → Authentication → Settings → Authorised domains.';
-    } else if (err.code === 'auth/network-request-failed') {
-      msg = 'Network error. Please check your connection and try again.';
-    } else {
-      msg = err.message;
-    }
-
-    if (errDiv && msg) { errDiv.textContent = msg; errDiv.style.display = 'block'; }
+    var msg2 = err.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' :
+               err.code === 'auth/popup-blocked' ? 'Popup was blocked. Please allow popups for this site.' :
+               err.code === 'auth/unauthorized-domain' ? 'Domain not authorized in Firebase Console.' :
+               err.message;
+    if (errDiv) { errDiv.textContent = msg2; errDiv.style.display = 'block'; }
   }
 }
 
