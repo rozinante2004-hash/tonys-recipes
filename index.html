@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v1.0 -->
+<!-- Tony's Recipes Collection v1.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,6 +48,7 @@
   window._fbGetDoc = getDoc;
   window._fbSetDoc = setDoc;
   window._fbSignOut = fbSignOut;
+  window._fbSignInWithPopup = signInWithPopup;  // expose to regular script
 
   // Listen for auth state changes
   onAuthStateChanged(auth, async (user) => {
@@ -575,7 +576,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 <!-- HEADER -->
 <div class="header">
   <div class="logo">Tony's <span>Recipes</span> Collection</div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v1.0</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v1.1</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -2422,7 +2423,7 @@ async function startGoogleSignIn() {
     return;
   }
   try {
-    await signInWithPopup(window._fbAuth, window._fbGoogleProvider);
+    await window._fbSignInWithPopup(window._fbAuth, window._fbGoogleProvider);
     // onAuthStateChanged in the Firebase module script handles the rest
   } catch(err) {
     console.error('Sign in error:', err);
@@ -2438,10 +2439,7 @@ async function startGoogleSignIn() {
 }
 
 // signInWithPopup needs to be available globally (imported in module but called from onclick)
-function signInWithPopup(auth, provider) {
-  return import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')
-    .then(m => m.signInWithPopup(auth, provider));
-}
+// signInWithPopup is exposed via window._fbSignInWithPopup from the module script
 
 function signOut() {
   if (!confirm('Sign out? Your recipes are saved in the cloud and will reload next time.')) return;
