@@ -2189,23 +2189,10 @@ async function runUrlImport() {
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
           messages: [{
             role: 'user',
-            content: `Fetch the recipe from this EXACT URL: ${url}
-
-STRICT RULES:
-1. You MUST search for and retrieve content from this exact URL only.
-2. Do NOT invent, guess, or substitute with any other recipe.
-3. If you cannot access this exact URL, reply with the word CANNOT_ACCESS and nothing else.
-4. If you can access it, return ONLY valid JSON (no markdown) with this structure:
-{
-  "name": "exact recipe name from the page",
-  "category": "one of: Breakfast, Lunch, Dinner, Snack, Dessert, Vegetarian, Pasta, Soup",
-  "difficulty": "Easy, Medium, or Hard",
-  "prep": "prep time from page",
-  "servings": "servings from page",
-  "ingredients": [{"a": "exact amount+unit", "n": "ingredient name"}],
-  "steps": ["exact step 1", "exact step 2"]
-}
-Translate all content to English if the page is in another language.`
+            content: 'Visit this URL and extract the recipe: ' + url + '. '
+          + 'Page may be in Hebrew or another language — keep original language. '
+          + 'Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. '
+          + 'If truly cannot access, return {"error":"CANNOT_ACCESS"}.'
           }]
         })
       });
@@ -2256,24 +2243,14 @@ Translate all content to English if the page is in another language.`
   // ── Step 3: extract structured recipe from page text ─────────────────────
   res.innerHTML = spinner('Extracting recipe from page…');
   try {
-    const prompt = `Extract the recipe from the following webpage content.
-Return ONLY valid JSON (no markdown fences) with this exact structure:
-{
-  "name": "Recipe Name",
-  "category": "one of: Breakfast, Lunch, Dinner, Snack, Dessert, Vegetarian, Pasta, Soup",
-  "difficulty": "Easy, Medium, or Hard",
-  "prep": "e.g. 30 min",
-  "servings": "e.g. 4",
-  "ingredients": [{"a": "amount including unit", "n": "ingredient name"}],
-  "steps": ["step 1", "step 2"]
-}
-STRICT RULES:
-- Only use information present in the content below. Do NOT invent or guess.
-- Keep the original language of the recipe — do NOT translate anything.
-- If the content does not appear to contain a recipe, return {"error": "no recipe found"}.
-
-Content:
-${pageText}`;
+    const prompt = 'Extract the recipe from the following webpage text. '
+    + 'The text may be in Hebrew, English, or any other language — keep the original language, do NOT translate. '
+    + 'Look for: a recipe title/name, a list of ingredients with amounts, and preparation steps. '
+    + 'Return ONLY a valid JSON object (no markdown, no explanation) with this structure: '
+    + '{"name":"recipe name","category":"one of: Breakfast,Lunch,Dinner,Snack,Dessert,Vegetarian,Pasta,Soup","difficulty":"Easy, Medium, or Hard","prep":"time if found or empty string","servings":"number if found or empty string","ingredients":[{"a":"amount","n":"ingredient name"}],"steps":["step 1","step 2"]} '
+    + 'IMPORTANT: Even if the recipe is very simple or has no amounts listed, still extract what is there. '
+    + 'Only return {"error":"no recipe found"} if there are absolutely no ingredients or steps anywhere in the text. '
+    + 'Webpage content: ' + pageText;
 
     const raw = await aiCall(prompt, 2000);
     const parsed = extractJSON(raw);
@@ -2629,17 +2606,4 @@ function printRecipe(id) {
     <h2>Method</h2>
     ${stepsHtml}
     <scr' + 'ipt>window.onload = function(){ window.print(); }</scr' + 'ipt>
-  </body></html>`);
-  printWin.document.close();
-}
-
-// INIT
-// Show login screen — Firebase onAuthStateChanged handles loading data.
-// Only render grid with empty/local data if user chooses offline mode.
-// Do NOT pre-load local data here as it overwrites Firestore data on sign-in.
-renderFilters();
-renderGrid();
-
-</script>
-</body>
-</html>
+  </body></html>
