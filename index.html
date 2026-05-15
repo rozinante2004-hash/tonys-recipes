@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.3 -->
+<!-- Tony's Recipes Collection v3.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -693,7 +693,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.3</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.4</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1074,7 +1074,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2730,22 +2730,12 @@ async function processCameraImage(event) {
     try {
       // Step 1: resize to 1200px
       res.innerHTML = spinner('Preparing image…');
-      // Try multiple sizes — start small, increase if Claude can't read it
-      // Printed cookbook text is large so 600px is plenty
-      var sizes = [
-        {dim: 600, q: 0.75, label: '600px'},
-        {dim: 900, q: 0.75, label: '900px'},
-        {dim: 1200, q: 0.70, label: '1200px'},
-      ];
-      var compressed, base64, sizeKB, chosenLabel;
-      for (var si = 0; si < sizes.length; si++) {
-        compressed = await resizeImageForVision(e.target.result, sizes[si].dim, sizes[si].q);
-        base64 = compressed.split(',')[1];
-        sizeKB = Math.round(base64.length * 0.75 / 1024);
-        chosenLabel = sizes[si].label;
-        if (sizeKB <= 150) break; // Stop at first size under 150KB
-      }
-      res.innerHTML = spinner('Step 1: Reading text (' + chosenLabel + ', ' + sizeKB + 'KB)…');
+      // 1500px at 92% gives sharp legible text for cookbook pages
+      // Apply unsharp mask to improve text clarity before sending
+      var compressed = await resizeImageForVision(e.target.result, 1500, 0.92);
+      var base64 = compressed.split(',')[1];
+      var sizeKB = Math.round(base64.length * 0.75 / 1024);
+      res.innerHTML = spinner('Step 1: Reading text (1500px, ' + sizeKB + 'KB)…');
 
       // Step 1: Ask Claude to transcribe the visible text ONLY — no extraction yet
       const step1 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
@@ -2832,12 +2822,49 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
         if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
         else        { w = Math.round(w * maxDim / h); h = maxDim; }
       }
+      // Draw image
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
+
+      // Apply sharpening via convolution to improve text legibility
+      // Unsharp mask: sharpen = original + amount * (original - blurred)
+      var imageData = ctx.getImageData(0, 0, w, h);
+      var data = imageData.data;
+      var sharpen = [
+         0, -1,  0,
+        -1,  5, -1,
+         0, -1,  0
+      ];
+      var side = Math.round(Math.sqrt(sharpen.length));
+      var halfSide = Math.floor(side / 2);
+      var src = new Uint8ClampedArray(data);
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var r = 0, g = 0, b = 0;
+          for (var cy = 0; cy < side; cy++) {
+            for (var cx = 0; cx < side; cx++) {
+              var scy = y + cy - halfSide;
+              var scx = x + cx - halfSide;
+              if (scy >= 0 && scy < h && scx >= 0 && scx < w) {
+                var srcOff = (scy * w + scx) * 4;
+                var wt = sharpen[cy * side + cx];
+                r += src[srcOff] * wt;
+                g += src[srcOff+1] * wt;
+                b += src[srcOff+2] * wt;
+              }
+            }
+          }
+          var dstOff = (y * w + x) * 4;
+          data[dstOff]   = Math.min(255, Math.max(0, r));
+          data[dstOff+1] = Math.min(255, Math.max(0, g));
+          data[dstOff+2] = Math.min(255, Math.max(0, b));
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.src = dataUrl;
