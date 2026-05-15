@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.7 -->
+<!-- Tony's Recipes Collection v3.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -717,6 +717,94 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .nutrition-btn:hover { color: var(--terracotta); border-color: var(--terracotta); }
 .nutrition-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #c8c0b5; }
 
+
+/* ── MEASUREMENT CALCULATOR ── */
+.calc-overlay {
+  position: fixed; inset: 0;
+  background: rgba(28,26,24,0.55);
+  z-index: 600;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.calc-overlay.open { opacity: 1; pointer-events: all; }
+.calc-modal {
+  background: var(--card-bg);
+  border-radius: 16px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+.calc-header {
+  background: linear-gradient(135deg, var(--warm-brown), #3a2419);
+  padding: 16px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.calc-header-title { font-family: 'Playfair Display',serif; font-size: 18px; color: #FAF7F2; }
+.calc-close {
+  background: none; border: none; color: rgba(255,255,255,0.7);
+  font-size: 20px; cursor: pointer; padding: 0; line-height: 1;
+}
+.calc-close:hover { color: white; }
+.calc-body { padding: 16px 20px 20px; }
+.calc-category-row {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.calc-cat-btn {
+  padding: 5px 12px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: white; font-size: 12px;
+  cursor: pointer; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.calc-cat-btn.active {
+  background: var(--warm-brown); border-color: var(--warm-brown);
+  color: white;
+}
+.calc-input-row {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.calc-input {
+  width: 100%; padding: 10px 12px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  font-size: 18px; font-family: 'DM Sans',sans-serif;
+  color: var(--ink); background: white;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+  transition: border-color 0.15s;
+}
+.calc-input:focus { outline: none; border-color: var(--terracotta); }
+.calc-arrow { font-size: 20px; color: var(--muted); text-align: center; }
+.calc-unit-select {
+  width: 100%; padding: 8px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: white;
+  font-size: 13px; font-family: 'DM Sans',sans-serif;
+  color: var(--ink); cursor: pointer;
+}
+.calc-unit-select:focus { outline: none; border-color: var(--terracotta); }
+.calc-result-box {
+  background: #f5f0ea; border-radius: 10px;
+  padding: 12px 16px; text-align: center;
+  margin-top: 6px; min-height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 2px;
+}
+.calc-result-value { font-size: 26px; font-weight: 700; color: var(--warm-brown); font-family: 'Playfair Display',serif; }
+.calc-result-unit  { font-size: 12px; color: var(--muted); }
+.calc-common-row {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px;
+}
+.calc-quick-btn {
+  padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: white;
+  font-size: 11px; cursor: pointer; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.calc-quick-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
+
 </style>
 </head>
 <body>
@@ -736,7 +824,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.7</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.8</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -744,6 +832,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="header-actions">
     <button class="btn btn-secondary" onclick="openShareAppModal()">📲 Share App</button>
+    <button class="btn btn-secondary" onclick="openCalcModal()">⚖️ Convert</button>
     <button class="btn btn-gold" onclick="openExploreModal()">🔭 Explore</button>
     <button class="btn btn-gold" onclick="openSuggestModal()">✨ Suggest</button>
 
@@ -804,10 +893,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
       <button class="view-toggle-btn" id="selectModeBtn" onclick="toggleSelectMode()" title="Select recipes to delete">
         ☑ Select
       </button>
-      <button class="view-toggle-btn active-view" id="viewBtnGrid" onclick="setView('grid')" title="Grid view">
+      <button class="view-toggle-btn" id="viewBtnGrid" onclick="setView('grid')" title="Grid view">
         ▦ Grid
       </button>
-      <button class="view-toggle-btn" id="viewBtnList" onclick="setView('list')" title="List view">
+      <button class="view-toggle-btn active-view" id="viewBtnList" onclick="setView('list')" title="List view">
         ≡ List
       </button>
     </div>
@@ -1117,7 +1206,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1214,6 +1303,34 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
 </div>
 
+
+<!-- MEASUREMENT CALCULATOR -->
+<div class="calc-overlay" id="calcOverlay" onclick="bgClose(event,'calcOverlay')">
+  <div class="calc-modal">
+    <div class="calc-header">
+      <div class="calc-header-title">⚖️ Measurement Converter</div>
+      <button class="calc-close" onclick="closeM('calcOverlay')">✕</button>
+    </div>
+    <div class="calc-body">
+      <div class="calc-category-row" id="calcCatRow"></div>
+      <div class="calc-input-row">
+        <input class="calc-input" id="calcFrom" type="number" placeholder="0" oninput="doCalc()">
+        <div class="calc-arrow">→</div>
+        <input class="calc-input" id="calcTo" type="number" placeholder="0" oninput="doCalcReverse()">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <select class="calc-unit-select" id="calcUnitFrom" onchange="doCalc()"></select>
+        <select class="calc-unit-select" id="calcUnitTo" onchange="doCalc()"></select>
+      </div>
+      <div class="calc-result-box" id="calcResultBox">
+        <span class="calc-result-value" id="calcResultVal">—</span>
+        <span class="calc-result-unit" id="calcResultUnit">Enter a value above</span>
+      </div>
+      <div class="calc-common-row" id="calcQuickRow"></div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1256,7 +1373,7 @@ function renderFilters(){
 }
 function setCat(c){activeCat=c;renderFilters();renderGrid();}
 
-let viewMode = 'grid';
+let viewMode = 'list';
 
 function setView(mode) {
   viewMode = mode;
@@ -3111,6 +3228,188 @@ async function calcNutrition(id) {
   }
 }
 window.calcNutrition = calcNutrition;
+
+
+// ═══════════════════════════════════
+// MEASUREMENT CALCULATOR
+// ═══════════════════════════════════
+var CALC_CATS = {
+  'Weight': {
+    units: {
+      'Grams (g)':        1,
+      'Kilograms (kg)':   1000,
+      'Ounces (oz)':      28.3495,
+      'Pounds (lb)':      453.592,
+      'Milligrams (mg)':  0.001,
+    },
+    quick: [
+      {label:'100g → oz', from:'Grams (g)', to:'Ounces (oz)', val:100},
+      {label:'1 lb → g',  from:'Pounds (lb)', to:'Grams (g)', val:1},
+      {label:'1 kg → lb', from:'Kilograms (kg)', to:'Pounds (lb)', val:1},
+    ]
+  },
+  'Volume': {
+    units: {
+      'Millilitres (ml)': 1,
+      'Litres (l)':       1000,
+      'Teaspoons (tsp)':  4.92892,
+      'Tablespoons (tbsp)': 14.7868,
+      'Cups':             236.588,
+      'Fluid oz (fl oz)': 29.5735,
+      'Pints (pt)':       473.176,
+      'Quarts (qt)':      946.353,
+      'Gallons (gal)':    3785.41,
+    },
+    quick: [
+      {label:'1 cup → ml',  from:'Cups', to:'Millilitres (ml)', val:1},
+      {label:'1 l → qt',    from:'Litres (l)', to:'Quarts (qt)', val:1},
+      {label:'1 tbsp → ml', from:'Tablespoons (tbsp)', to:'Millilitres (ml)', val:1},
+      {label:'1 fl oz → ml',from:'Fluid oz (fl oz)', to:'Millilitres (ml)', val:1},
+    ]
+  },
+  'Temperature': {
+    units: {
+      'Celsius (°C)':    'C',
+      'Fahrenheit (°F)': 'F',
+      'Gas Mark':        'G',
+    },
+    quick: [
+      {label:'180°C → °F', from:'Celsius (°C)', to:'Fahrenheit (°F)', val:180},
+      {label:'200°C → °F', from:'Celsius (°C)', to:'Fahrenheit (°F)', val:200},
+      {label:'350°F → °C', from:'Fahrenheit (°F)', to:'Celsius (°C)', val:350},
+      {label:'180°C → Gas', from:'Celsius (°C)', to:'Gas Mark', val:180},
+    ]
+  },
+  'Length': {
+    units: {
+      'Centimetres (cm)': 1,
+      'Millimetres (mm)': 0.1,
+      'Metres (m)':       100,
+      'Inches (in)':      2.54,
+      'Feet (ft)':        30.48,
+    },
+    quick: [
+      {label:'1 in → cm', from:'Inches (in)', to:'Centimetres (cm)', val:1},
+      {label:'30cm → in', from:'Centimetres (cm)', to:'Inches (in)', val:30},
+    ]
+  }
+};
+
+var calcActiveCat = 'Weight';
+
+function openCalcModal() {
+  // Build category buttons
+  var catRow = document.getElementById('calcCatRow');
+  catRow.innerHTML = Object.keys(CALC_CATS).map(function(cat) {
+    return '<button class="calc-cat-btn' + (cat === calcActiveCat ? ' active' : '') + '" onclick="setCalcCat(&quot;' + cat + '&quot;)">' + cat + '</button>';
+  }).join('');
+  buildCalcUnits();
+  document.getElementById('calcOverlay').classList.add('open');
+}
+window.openCalcModal = openCalcModal;
+
+function setCalcCat(cat) {
+  calcActiveCat = cat;
+  document.querySelectorAll('.calc-cat-btn').forEach(function(b) {
+    b.classList.toggle('active', b.textContent === cat);
+  });
+  buildCalcUnits();
+  document.getElementById('calcFrom').value = '';
+  document.getElementById('calcTo').value = '';
+  document.getElementById('calcResultVal').textContent = '—';
+  document.getElementById('calcResultUnit').textContent = 'Enter a value above';
+}
+window.setCalcCat = setCalcCat;
+
+function buildCalcUnits() {
+  var cat = CALC_CATS[calcActiveCat];
+  var units = Object.keys(cat.units);
+  var fromSel = document.getElementById('calcUnitFrom');
+  var toSel   = document.getElementById('calcUnitTo');
+  fromSel.innerHTML = units.map(function(u) { return '<option>' + u + '</option>'; }).join('');
+  toSel.innerHTML   = units.map(function(u) { return '<option>' + u + '</option>'; }).join('');
+  // Default second unit to something different
+  if (units.length > 1) toSel.selectedIndex = 1;
+  // Quick buttons
+  var quickRow = document.getElementById('calcQuickRow');
+  quickRow.innerHTML = cat.quick.map(function(q) {
+    return '<button class="calc-quick-btn" onclick="applyQuick(&quot;' + q.from + '&quot;,&quot;' + q.to + '&quot;,' + q.val + ')">' + q.label + '</button>';
+  }).join('');
+}
+
+function applyQuick(from, to, val) {
+  var fromSel = document.getElementById('calcUnitFrom');
+  var toSel   = document.getElementById('calcUnitTo');
+  Array.from(fromSel.options).forEach(function(o,i){ if(o.value===from) fromSel.selectedIndex=i; });
+  Array.from(toSel.options).forEach(function(o,i){ if(o.value===to) toSel.selectedIndex=i; });
+  document.getElementById('calcFrom').value = val;
+  doCalc();
+}
+window.applyQuick = applyQuick;
+
+function convertTemp(val, fromUnit, toUnit) {
+  // Convert to Celsius first
+  var c;
+  if (fromUnit === 'C') c = val;
+  else if (fromUnit === 'F') c = (val - 32) * 5 / 9;
+  else if (fromUnit === 'G') c = val * 25 + 121; // approx gas mark to C
+  // Convert from Celsius to target
+  if (toUnit === 'C') return c;
+  if (toUnit === 'F') return c * 9 / 5 + 32;
+  if (toUnit === 'G') return Math.round((c - 121) / 25);
+}
+
+function doConvert(val, fromKey, toKey) {
+  var cat = CALC_CATS[calcActiveCat];
+  var fromFactor = cat.units[fromKey];
+  var toFactor   = cat.units[toKey];
+  if (fromKey === toKey) return val;
+  if (calcActiveCat === 'Temperature') {
+    return convertTemp(val, fromFactor, toFactor);
+  }
+  // Standard: convert via base unit
+  return val * fromFactor / toFactor;
+}
+
+function formatResult(val) {
+  if (Math.abs(val) >= 1000) return Math.round(val).toLocaleString();
+  if (Math.abs(val) >= 10)   return Math.round(val * 10) / 10;
+  if (Math.abs(val) >= 1)    return Math.round(val * 100) / 100;
+  return Math.round(val * 10000) / 10000;
+}
+
+function doCalc() {
+  var val = parseFloat(document.getElementById('calcFrom').value);
+  var fromKey = document.getElementById('calcUnitFrom').value;
+  var toKey   = document.getElementById('calcUnitTo').value;
+  if (isNaN(val)) {
+    document.getElementById('calcTo').value = '';
+    document.getElementById('calcResultVal').textContent = '—';
+    document.getElementById('calcResultUnit').textContent = 'Enter a value above';
+    return;
+  }
+  var result = doConvert(val, fromKey, toKey);
+  var fmt = formatResult(result);
+  document.getElementById('calcTo').value = fmt;
+  document.getElementById('calcResultVal').textContent = fmt;
+  document.getElementById('calcResultUnit').textContent = val + ' ' + fromKey + ' = ' + fmt + ' ' + toKey;
+}
+window.doCalc = doCalc;
+
+function doCalcReverse() {
+  var val = parseFloat(document.getElementById('calcTo').value);
+  var fromKey = document.getElementById('calcUnitFrom').value;
+  var toKey   = document.getElementById('calcUnitTo').value;
+  if (isNaN(val)) {
+    document.getElementById('calcFrom').value = '';
+    return;
+  }
+  var result = doConvert(val, toKey, fromKey);
+  document.getElementById('calcFrom').value = formatResult(result);
+  document.getElementById('calcResultVal').textContent = formatResult(result);
+  document.getElementById('calcResultUnit').textContent = val + ' ' + toKey + ' = ' + formatResult(result) + ' ' + fromKey;
+}
+window.doCalcReverse = doCalcReverse;
 
 // Render immediately with local data so app feels instant
 // Firebase auth will update with cloud data when it's ready
