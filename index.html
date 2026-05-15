@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v1.7 -->
+<!-- Tony's Recipes Collection v1.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#5C3D2E">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
 <title>Tony's Recipes Collection</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -610,8 +611,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 <!-- HEADER -->
 <div class="header">
-  <div class="logo">Tony's <span>Recipes</span> Collection</div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v1.7</div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <svg width="32" height="32" viewBox="0 0 80 80">
+      <circle cx="40" cy="40" r="38" fill="#5C3D2E"/>
+      <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" stroke-width="1.5"/>
+      <line x1="28" y1="18" x2="28" y2="58" stroke="#FAF7F2" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="23" y1="18" x2="23" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+      <line x1="28" y1="18" x2="28" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+      <line x1="33" y1="18" x2="33" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+      <path d="M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z" fill="#C1440E"/>
+      <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
+    </svg>
+    <div class="logo">Tony's <span>Recipes</span> Collection</div>
+  </div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v1.8</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -973,9 +986,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 <!-- LOGIN / STORAGE SCREEN -->
 <div id="loginScreen">
+  <div style="margin-bottom:6px;">
+    <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
+      <circle cx="40" cy="40" r="38" fill="#5C3D2E"/>
+      <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" stroke-width="1.5"/>
+      <!-- Fork -->
+      <line x1="28" y1="18" x2="28" y2="58" stroke="#FAF7F2" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="23" y1="18" x2="23" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+      <line x1="28" y1="18" x2="28" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+      <line x1="33" y1="18" x2="33" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+      <!-- Flame -->
+      <path d="M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z" fill="#C1440E"/>
+      <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
+    </svg>
+  </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v1.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v1.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2461,38 +2488,44 @@ async function startGoogleSignIn() {
     return;
   }
 
+  // Set persistence synchronously before sign-in attempt
+  var persistence = (remember && remember.checked)
+    ? firebase.auth.Auth.Persistence.LOCAL
+    : firebase.auth.Auth.Persistence.SESSION;
+
+  // Detect any mobile device (not just Safari) — use redirect on all mobiles
+  var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || window.innerWidth <= 768;
+
   try {
-    // Set persistence based on "Remember me" checkbox
-    var persistence = (remember && remember.checked)
-      ? firebase.auth.Auth.Persistence.LOCAL
-      : firebase.auth.Auth.Persistence.SESSION;
     await _fbAuth.setPersistence(persistence);
 
-    // Detect mobile Safari — use redirect (popup blocked on iOS)
-    var isMobileSafari = /iP(hone|ad|od)/.test(navigator.userAgent) ||
-      (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome') &&
-       'ontouchend' in document);
-
-    if (isMobileSafari) {
-      // Redirect flow — page will reload after Google sign-in
+    if (isMobile) {
       if (btn) { btn.textContent = '⏳ Redirecting to Google…'; btn.disabled = true; }
       window._userInitiatedSignIn = true;
       await _fbAuth.signInWithRedirect(_fbProvider);
-      // Page reloads — execution stops here
     } else {
-      // Popup flow — works on desktop browsers
       if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
       window._userInitiatedSignIn = true;
       await _fbAuth.signInWithPopup(_fbProvider);
-      // onAuthStateChanged handles the rest
     }
   } catch(err) {
     console.error('Sign in error:', err);
     var msg = 'Sign-in failed. ';
-    if (err.code === 'auth/popup-blocked')             msg += 'Please allow popups, or try again on mobile.';
-    else if (err.code === 'auth/popup-closed-by-user') msg += 'Sign-in was cancelled.';
-    else if (err.code === 'auth/unauthorized-domain')  msg += 'Domain not authorized. Add this domain in Firebase → Authentication → Settings → Authorised domains.';
-    else msg += err.message;
+    if (err.code === 'auth/popup-blocked') {
+      // Popup blocked — fall back to redirect automatically
+      msg = '';
+      if (btn) btn.textContent = '⏳ Redirecting…';
+      window._userInitiatedSignIn = true;
+      _fbAuth.signInWithRedirect(_fbProvider);
+      return;
+    } else if (err.code === 'auth/popup-closed-by-user') {
+      msg += 'Sign-in was cancelled.';
+    } else if (err.code === 'auth/unauthorized-domain') {
+      msg += 'This domain is not authorized. Please add it in Firebase → Authentication → Settings → Authorised domains.';
+    } else {
+      msg += err.message;
+    }
     errDiv.textContent = msg;
     errDiv.style.display = 'block';
     if (btn) { btn.textContent = 'Try Again'; btn.disabled = false; }
