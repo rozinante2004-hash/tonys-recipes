@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v2.5 -->
+<!-- Tony's Recipes Collection v2.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -634,7 +634,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.5</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.6</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1012,7 +1012,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2656,21 +2656,20 @@ async function processCameraImage(event) {
     res.innerHTML = spinner('Preparing image…');
 
     try {
-      // ── Resize image in browser before sending ──────────────────────────
-      // Phone photos are 3-8MB. Cloudflare Worker free plan has a 100MB body
-      // limit but Claude vision works best with images under 1MB.
-      // We resize to max 1024px and compress to JPEG quality 0.82.
-      const compressed = await resizeImageForVision(e.target.result, 1024, 0.82);
+      // Resize to max 1600px (high enough to read text clearly) at 90% quality
+      const compressed = await resizeImageForVision(e.target.result, 1600, 0.90);
       const base64 = compressed.split(',')[1];
 
-      res.innerHTML = spinner('Extracting recipe from image…');
+      // Show compressed size to help debug
+      const sizeKB = Math.round(base64.length * 0.75 / 1024);
+      res.innerHTML = spinner('Sending to AI (' + sizeKB + ' KB)…');
 
       const response = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 2000,
+          max_tokens: 3000,
           messages: [{
             role: 'user',
             content: [
@@ -2680,16 +2679,17 @@ async function processCameraImage(event) {
               },
               {
                 type: 'text',
-                text: 'This image contains a recipe. Please extract ALL the recipe information you can see. '
-                    + 'Return ONLY a valid JSON object (no markdown, no explanation) with this exact structure: '
-                    + '{"name":"recipe name","category":"one of: Breakfast,Lunch,Dinner,Snack,Dessert,Vegetarian,Pasta,Soup",'
-                    + '"difficulty":"Easy or Medium or Hard","prep":"cooking time e.g. 30 min","servings":"number e.g. 4",'
-                    + '"ingredients":[{"a":"amount and unit","n":"ingredient name"}],'
-                    + '"steps":["step 1 instructions","step 2 instructions"]}. '
-                    + 'Keep the original language of the recipe — do NOT translate anything. '
-                    + 'If you can see any food-related text at all, extract what you can. '
-                    + 'Only return {"error":"no recipe found"} if the image contains absolutely no recipe content.'
-              }
+                text: "Look carefully at this image and read ONLY the text that is actually printed/written in it.\n\n"
+                    + "RULES:\n"
+                    + "1. ONLY use text VISIBLE in the image. Do NOT invent or guess anything.\n"
+                    + "2. Keep the EXACT original language - if Hebrew, write Hebrew.\n"
+                    + "3. If you cannot read the text clearly, return {\"error\":\"cannot read\"}.\n"
+                    + "4. Do NOT make up a recipe if you cannot see one.\n\n"
+                    + "If a recipe is visible return ONLY this JSON:\n"
+                    + "{\"name\":\"name from image\",\"category\":\"Dinner\",\"difficulty\":\"Easy\","
+                    + "\"prep\":\"time or empty\",\"servings\":\"number or empty\","
+                    + "\"ingredients\":[{\"a\":\"amount\",\"n\":\"ingredient\"}],"
+                    + "\"steps\":[\"step 1\",\"step 2\"]}"              }
             ]
           }]
         })
@@ -2701,19 +2701,27 @@ async function processCameraImage(event) {
       }
       const data = await response.json();
       const text = (data.content || []).map(function(b){ return b.text || ''; }).join('\n');
+      console.log('Camera API response:', text.slice(0, 200));
+
       const parsed = extractJSON(text);
-      if (parsed.error) throw new Error('No recipe content found in this image.');
+      if (parsed.error) {
+        res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
+          + '<strong>Could not read the recipe text.</strong><br><br>'
+          + 'The image may be too blurry or the text too small. Try:<br>'
+          + '&bull; Move closer so the text fills the frame<br>'
+          + '&bull; Make sure the image is in focus<br>'
+          + '&bull; Photograph one page at a time<br>'
+          + '&bull; Or use <strong>Paste free-hand text</strong> instead'
+          + '</div>';
+        return;
+      }
       applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay');
 
     } catch(err) {
       console.error('Camera import error:', err);
       res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
-        + '<strong>Could not extract recipe.</strong><br><br>'
-        + 'Error: ' + escH(err.message) + '<br><br>'
-        + 'Tips:<br>'
-        + '&bull; Make sure the recipe text fills most of the frame<br>'
-        + '&bull; Photograph one page at a time<br>'
-        + '&bull; Alternatively, use “Paste free-hand text” and type the recipe manually'
+        + '<strong>Error: ' + escH(err.message) + '</strong><br><br>'
+        + 'Try photographing the recipe again, or use Paste free-hand text.'
         + '</div>';
     }
   };
@@ -2721,13 +2729,12 @@ async function processCameraImage(event) {
   event.target.value = '';
 }
 
-// Resize an image to max dimension and compress to JPEG
+// Resize image to max dimension and compress to JPEG
 function resizeImageForVision(dataUrl, maxDim, quality) {
   return new Promise(function(resolve) {
     var img = new Image();
     img.onload = function() {
       var w = img.width, h = img.height;
-      // Scale down if larger than maxDim
       if (w > maxDim || h > maxDim) {
         if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
         else        { w = Math.round(w * maxDim / h); h = maxDim; }
@@ -2736,7 +2743,6 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
       canvas.width  = w;
       canvas.height = h;
       var ctx = canvas.getContext('2d');
-      // White background (handles transparent PNGs)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
@@ -2745,6 +2751,7 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
     img.src = dataUrl;
   });
 }
+
 
 
 // ═══════════════════════════════════
