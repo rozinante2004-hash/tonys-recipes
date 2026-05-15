@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v2.1 -->
+<!-- Tony's Recipes Collection v2.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,11 +15,17 @@
 <title>Tony's Recipes Collection</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- Firebase Compat SDK (works in regular scripts, no ES module scoping issues) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- Firebase Compat SDK — single combined file for faster loading -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js" defer></script>
 <script>
+window.addEventListener('load', function() {
+  if (typeof firebase === 'undefined') {
+    console.error('Firebase SDK not loaded');
+    return;
+  }
+
   const firebaseConfig = {
     apiKey:            "AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4",
     authDomain:        "recipes-f379d.firebaseapp.com",
@@ -31,29 +37,27 @@
 
   firebase.initializeApp(firebaseConfig);
 
-  const _fbAuth     = firebase.auth();
-  const _fbDb       = firebase.firestore();
-  const _fbProvider = new firebase.auth.GoogleAuthProvider();
+  window._fbAuth     = firebase.auth();
+  window._fbDb       = firebase.firestore();
+  window._fbProvider = new firebase.auth.GoogleAuthProvider();
 
-  // Set LOCAL persistence once at startup
-  _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+  // Expose to global non-window variables for compatibility
+  Object.defineProperty(window, '_fbAuth',     {get: function(){ return window._fbAuth; }});
 
-  // Enable Firestore offline persistence
-  _fbDb.enablePersistence().catch(function(e) {
+  // Set LOCAL persistence
+  window._fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
+  // Enable Firestore offline persistence (allows instant load from cache)
+  window._fbDb.enablePersistence({synchronizeTabs: true}).catch(function(e) {
     if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
       console.warn('Firestore persistence error:', e.code);
   });
 
-  // Single auth state listener — handles auto-login and post-popup login
-  _fbAuth.onAuthStateChanged(function(user) {
+  // Auth state listener
+  window._fbAuth.onAuthStateChanged(function(user) {
     if (user) {
-      // _justSignedIn is set by the popup BEFORE it resolves,
-      // so it's reliably true for manual logins and false for auto-logins.
       var isAutoLogin = !window._justSignedIn;
       window._justSignedIn = false;
-
-      // Auto-login (remembered session): show 3s notice so user can cancel
-      // Manual login (just clicked button): proceed immediately with no delay
       var delay = isAutoLogin ? 3000 : 0;
 
       if (isAutoLogin) {
@@ -70,18 +74,26 @@
         var notice2 = document.getElementById('autoLoginNotice');
         if (nameEl)  nameEl.textContent = user.displayName || user.email;
         if (signBtn) signBtn.style.display = 'inline';
-        if (typeof setDriveStatus === 'function') setDriveStatus('syncing', 'Loading your recipes…');
+        if (typeof setDriveStatus === 'function') setDriveStatus('syncing', 'Loading…');
+
+        // Show app immediately with local data, then sync from Firestore in background
+        if (loginSc) loginSc.style.display = 'none';
+        if (notice2) notice2.style.display = 'none';
+        if (typeof renderFilters === 'function') renderFilters();
+        if (typeof renderGrid    === 'function') renderGrid();
+
+        // Load from Firestore in background — don't block UI
         try {
           if (typeof loadFromFirestore === 'function') {
             var loaded = await loadFromFirestore();
             if (!loaded && typeof saveToFirestore === 'function') await saveToFirestore();
+            // Re-render with cloud data
+            if (typeof renderFilters === 'function') renderFilters();
+            if (typeof renderGrid    === 'function') renderGrid();
           }
         } catch(e) { console.warn('Firestore error:', e); }
-        if (loginSc) loginSc.style.display = 'none';
-        if (notice2) notice2.style.display = 'none';
+
         _autoLoginTimer = null;
-        if (typeof renderFilters === 'function') renderFilters();
-        if (typeof renderGrid    === 'function') renderGrid();
         if (typeof setDriveStatus === 'function')
           setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
       }, delay);
@@ -91,7 +103,9 @@
       window._driveMode = false;
     }
   });
+}); // end window.onload
 </script>
+
 
 
 <style>
@@ -605,7 +619,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.1</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.2</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -983,7 +997,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2463,7 +2477,7 @@ async function startGoogleSignIn() {
   var errDiv = document.getElementById('loginError');
   var remember = document.getElementById('rememberMe');
 
-  if (typeof firebase === 'undefined' || !_fbAuth) {
+  if (typeof firebase === 'undefined' || !window._fbAuth) {
     if (errDiv) { errDiv.textContent = '⚠️ Firebase not loaded. Please refresh.'; errDiv.style.display = 'block'; }
     return;
   }
@@ -2473,7 +2487,7 @@ async function startGoogleSignIn() {
 
   // Update persistence based on Remember Me (fire and forget — no await)
   if (remember && !remember.checked) {
-    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+    window._fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
   }
 
   // Set flag BEFORE popup so onAuthStateChanged sees it immediately
@@ -2481,7 +2495,7 @@ async function startGoogleSignIn() {
 
   try {
     // signInWithPopup works on ALL devices when called directly from a user gesture
-    await _fbAuth.signInWithPopup(_fbProvider);
+    await window._fbAuth.signInWithPopup(window._fbProvider);
     // onAuthStateChanged fires and handles the rest
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
   } catch(err) {
@@ -2532,7 +2546,7 @@ window.cancelAutoLogin = cancelAutoLogin;
 
 function signOut() {
   if (!confirm('Sign out? Your recipes are saved in the cloud and will reload next time.')) return;
-  if (typeof _fbAuth !== 'undefined') _fbAuth.signOut().catch(function(){});
+  if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser    = null;
   window._driveMode = false;
   document.getElementById('signOutBtn').style.display = 'none';
@@ -2727,7 +2741,9 @@ function printRecipe(id) {
   });
 })();
 
-// Render initial state
+// Render immediately with local data so app feels instant
+// Firebase auth will update with cloud data when it's ready
+loadLocal();
 renderFilters();
 renderGrid();
 // Re-enable sign-in button in case page reloaded mid-flow
