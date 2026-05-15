@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v2.6 -->
+<!-- Tony's Recipes Collection v2.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -615,6 +615,65 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   body { background: white !important; }
 }
 
+
+/* ── MULTI-SELECT DELETE ── */
+.recipe-card.selected,
+.recipe-list-item.selected {
+  outline: 2.5px solid var(--terracotta);
+  outline-offset: 2px;
+}
+.recipe-card .select-check,
+.recipe-list-item .select-check {
+  display: none;
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--terracotta);
+  background: white;
+  cursor: pointer;
+  z-index: 10;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.select-mode .recipe-card .select-check,
+.select-mode .recipe-list-item .select-check { display: flex; }
+.recipe-card { position: relative; }
+.recipe-list-item { position: relative; }
+.recipe-card.selected .select-check,
+.recipe-list-item.selected .select-check {
+  background: var(--terracotta);
+  color: white;
+  border-color: var(--terracotta);
+}
+#deleteSelBar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--terracotta);
+  color: white;
+  padding: 14px 20px;
+  z-index: 500;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+}
+#deleteSelBar.visible { display: flex; }
+.del-bar-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+}
+.del-bar-cancel { background: rgba(255,255,255,0.2); color: white; }
+.del-bar-delete { background: white; color: var(--terracotta); }
+
 </style>
 </head>
 <body>
@@ -634,7 +693,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.7</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -699,6 +758,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
     <div class="section-label" id="sectionLabel" style="margin-bottom:0;">All Recipes</div>
     <div style="display:flex;gap:6px;">
+      <button class="view-toggle-btn" id="selectModeBtn" onclick="toggleSelectMode()" title="Select recipes to delete">
+        ☑ Select
+      </button>
       <button class="view-toggle-btn active-view" id="viewBtnGrid" onclick="setView('grid')" title="Grid view">
         ▦ Grid
       </button>
@@ -1012,7 +1074,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1099,6 +1161,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
 </div>
 
+
+<!-- MULTI-SELECT DELETE BAR -->
+<div id="deleteSelBar">
+  <span id="deleteSelCount">0 recipes selected</span>
+  <div style="display:flex;gap:8px;">
+    <button class="del-bar-btn del-bar-cancel" onclick="cancelSelectMode()">Cancel</button>
+    <button class="del-bar-btn del-bar-delete" onclick="deleteSelected()">🗑️ Delete</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1172,7 +1244,8 @@ function renderGrid() {
   if (viewMode === 'list') {
     g.className = 'recipe-list';
     g.innerHTML = list.map(r => `
-      <div class="recipe-list-item" onclick="openView(${r.id})">
+      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+        <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${r.bg}">
           ${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${r.emoji}</span>`}
         </div>
@@ -1192,7 +1265,8 @@ function renderGrid() {
   } else {
     g.className = 'recipe-grid';
     g.innerHTML = list.map(r => `
-      <div class="recipe-card" onclick="openView(${r.id})">
+      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+        <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${r.bg}">
           ${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${r.emoji}</span>`}
         </div>
@@ -2656,80 +2730,49 @@ async function processCameraImage(event) {
     res.innerHTML = spinner('Preparing image…');
 
     try {
-      // Resize to max 1600px (high enough to read text clearly) at 90% quality
-      const compressed = await resizeImageForVision(e.target.result, 1600, 0.90);
+      // Resize aggressively: 800px max, 75% quality → ~100KB base64
+      // This is necessary to pass through the Cloudflare WAF size limits
+      const compressed = await resizeImageForVision(e.target.result, 800, 0.75);
       const base64 = compressed.split(',')[1];
-
-      // Show compressed size to help debug
       const sizeKB = Math.round(base64.length * 0.75 / 1024);
-      res.innerHTML = spinner('Sending to AI (' + sizeKB + ' KB)…');
+      res.innerHTML = spinner('Sending to AI (' + sizeKB + 'KB)…');
 
       const response = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 3000,
+          max_tokens: 2000,
           messages: [{
             role: 'user',
             content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: 'image/jpeg', data: base64 }
-              },
-              {
-                type: 'text',
-                text: "Look carefully at this image and read ONLY the text that is actually printed/written in it.\n\n"
-                    + "RULES:\n"
-                    + "1. ONLY use text VISIBLE in the image. Do NOT invent or guess anything.\n"
-                    + "2. Keep the EXACT original language - if Hebrew, write Hebrew.\n"
-                    + "3. If you cannot read the text clearly, return {\"error\":\"cannot read\"}.\n"
-                    + "4. Do NOT make up a recipe if you cannot see one.\n\n"
-                    + "If a recipe is visible return ONLY this JSON:\n"
-                    + "{\"name\":\"name from image\",\"category\":\"Dinner\",\"difficulty\":\"Easy\","
-                    + "\"prep\":\"time or empty\",\"servings\":\"number or empty\","
-                    + "\"ingredients\":[{\"a\":\"amount\",\"n\":\"ingredient\"}],"
-                    + "\"steps\":[\"step 1\",\"step 2\"]}"              }
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+              { type: 'text', text: 'Extract the recipe from this image. Read ONLY the text actually visible. Keep the original language (Hebrew stays Hebrew). Return ONLY valid JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"amount","n":"ingredient"}],"steps":["step 1"]}. If no recipe text is visible, return {"error":"no recipe"}. Do NOT invent anything not in the image.' }
             ]
           }]
         })
       });
 
-      if (!response.ok) {
-        const errText = await response.text().catch(function(){ return ''; });
-        throw new Error('API error ' + response.status + (errText ? ': ' + errText.slice(0,100) : ''));
-      }
+      if (!response.ok) throw new Error('Worker error ' + response.status);
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
       const text = (data.content || []).map(function(b){ return b.text || ''; }).join('\n');
-      console.log('Camera API response:', text.slice(0, 200));
-
       const parsed = extractJSON(text);
       if (parsed.error) {
-        res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
-          + '<strong>Could not read the recipe text.</strong><br><br>'
-          + 'The image may be too blurry or the text too small. Try:<br>'
-          + '&bull; Move closer so the text fills the frame<br>'
-          + '&bull; Make sure the image is in focus<br>'
-          + '&bull; Photograph one page at a time<br>'
-          + '&bull; Or use <strong>Paste free-hand text</strong> instead'
-          + '</div>';
+        res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>No recipe text found.</strong><br><br>The image may be too blurry or the text too small. Try:<br>&bull; Move closer so the text fills the frame<br>&bull; Use <strong>Paste free-hand text</strong> instead — copy the recipe text and paste it there</div>';
         return;
       }
       applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay');
 
     } catch(err) {
-      console.error('Camera import error:', err);
-      res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
-        + '<strong>Error: ' + escH(err.message) + '</strong><br><br>'
-        + 'Try photographing the recipe again, or use Paste free-hand text.'
-        + '</div>';
+      console.error('Camera error:', err);
+      res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>Error:</strong> ' + escH(err.message) + '<br><br>Try using <strong>Paste free-hand text</strong> instead.</div>';
     }
   };
   reader.readAsDataURL(file);
   event.target.value = '';
 }
 
-// Resize image to max dimension and compress to JPEG
 function resizeImageForVision(dataUrl, maxDim, quality) {
   return new Promise(function(resolve) {
     var img = new Image();
@@ -2740,8 +2783,7 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
         else        { w = Math.round(w * maxDim / h); h = maxDim; }
       }
       var canvas = document.createElement('canvas');
-      canvas.width  = w;
-      canvas.height = h;
+      canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
@@ -2751,6 +2793,7 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
     img.src = dataUrl;
   });
 }
+
 
 
 
@@ -2826,6 +2869,82 @@ function printRecipe(id) {
     } catch(e) {}
   });
 })();
+
+
+// ═══════════════════════════════════
+// MULTI-SELECT DELETE
+// ═══════════════════════════════════
+var selectMode = false;
+var selectedIds = new Set();
+
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+  var grid = document.getElementById('recipeGrid');
+  var btn  = document.getElementById('selectModeBtn');
+  if (selectMode) {
+    grid.classList.add('select-mode');
+    btn.classList.add('active-view');
+    btn.textContent = '✕ Cancel';
+  } else {
+    grid.classList.remove('select-mode');
+    btn.classList.remove('active-view');
+    btn.textContent = '☑ Select';
+    document.getElementById('deleteSelBar').classList.remove('visible');
+  }
+  renderGrid();
+}
+
+function cancelSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+  var grid = document.getElementById('recipeGrid');
+  var btn  = document.getElementById('selectModeBtn');
+  grid.classList.remove('select-mode');
+  btn.classList.remove('active-view');
+  btn.textContent = '☑ Select';
+  document.getElementById('deleteSelBar').classList.remove('visible');
+  renderGrid();
+}
+
+function toggleRecipeSelect(event, id) {
+  event.stopPropagation();
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateDeleteBar();
+  renderGrid();
+}
+
+function updateDeleteBar() {
+  var bar = document.getElementById('deleteSelBar');
+  var count = document.getElementById('deleteSelCount');
+  if (selectedIds.size > 0) {
+    bar.classList.add('visible');
+    count.textContent = selectedIds.size + ' recipe' + (selectedIds.size > 1 ? 's' : '') + ' selected';
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function deleteSelected() {
+  if (selectedIds.size === 0) return;
+  var names = recipes.filter(function(r){ return selectedIds.has(r.id); }).map(function(r){ return r.name; });
+  var msg = selectedIds.size === 1
+    ? 'Delete "' + names[0] + '"?'
+    : 'Delete these ' + selectedIds.size + ' recipes?\n\n' + names.join('\n');
+  if (!confirm(msg)) return;
+  recipes = recipes.filter(function(r){ return !selectedIds.has(r.id); });
+  saveData();
+  cancelSelectMode();
+  toast('🗑️ ' + (selectedIds.size > 0 ? 'Recipes' : 'Recipe') + ' deleted');
+  selectedIds.clear();
+  renderGrid();
+}
+
+window.toggleSelectMode  = toggleSelectMode;
+window.cancelSelectMode  = cancelSelectMode;
+window.toggleRecipeSelect = toggleRecipeSelect;
+window.deleteSelected    = deleteSelected;
 
 // Render immediately with local data so app feels instant
 // Firebase auth will update with cloud data when it's ready
