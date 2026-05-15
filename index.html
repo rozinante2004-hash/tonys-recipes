@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v1.1 -->
+<!-- Tony's Recipes Collection v1.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,15 +14,11 @@
 <title>Tony's Recipes Collection</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- Firebase SDKs -->
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, onAuthStateChanged }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import { getFirestore, doc, getDoc, setDoc, enableIndexedDbPersistence }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
+<!-- Firebase Compat SDK (works in regular scripts, no ES module scoping issues) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
   const firebaseConfig = {
     apiKey:            "AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4",
     authDomain:        "recipes-f379d.firebaseapp.com",
@@ -31,39 +27,29 @@
     messagingSenderId: "313792199018",
     appId:             "1:313792199018:web:9e5fe1df28b94bb031cd13"
   };
-  // ─────────────────────────────────────────────────────────────────────────
 
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
+  firebase.initializeApp(firebaseConfig);
+
+  const _fbAuth     = firebase.auth();
+  const _fbDb       = firebase.firestore();
+  const _fbProvider = new firebase.auth.GoogleAuthProvider();
 
   // Enable offline persistence
-  enableIndexedDbPersistence(db).catch(() => {});
+  _fbDb.enablePersistence().catch(function(e) {
+    console.warn('Firestore persistence unavailable:', e.code);
+  });
 
-  // Expose to global scope so the rest of the app can use them
-  window._fbAuth = auth;
-  window._fbDb   = db;
-  window._fbGoogleProvider = new GoogleAuthProvider();
-  window._fbDoc  = doc;
-  window._fbGetDoc = getDoc;
-  window._fbSetDoc = setDoc;
-  window._fbSignOut = fbSignOut;
-  window._fbSignInWithPopup = signInWithPopup;  // expose to regular script
-
-  // Listen for auth state changes
-  onAuthStateChanged(auth, async (user) => {
+  // Auth state listener — runs when user signs in or out
+  _fbAuth.onAuthStateChanged(async function(user) {
     if (user) {
-      window._fbUser = user;
-      window._driveMode = true;  // signal to saveData() to use Firestore
+      window._fbUser    = user;
+      window._driveMode = true;
       document.getElementById('driveUserName').textContent = user.displayName || user.email;
       document.getElementById('signOutBtn').style.display = 'inline';
       setDriveStatus('syncing', 'Loading your recipes…');
       try {
-        const loaded = await loadFromFirestore();
-        if (!loaded) {
-          // No cloud data yet — save local data to cloud on first sign-in
-          await saveToFirestore();
-        }
+        var loaded = await loadFromFirestore();
+        if (!loaded) await saveToFirestore();
       } catch(e) {
         console.warn('Firestore load error:', e);
       }
@@ -72,7 +58,7 @@
       renderGrid();
       setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
     } else {
-      window._fbUser = null;
+      window._fbUser    = null;
       window._driveMode = false;
     }
   });
@@ -2366,14 +2352,13 @@ function flashSaveStatus() {
 
 // ── Firestore save ────────────────────────────────────────────────────────────
 async function saveToFirestore() {
-  const user = window._fbUser;
-  if (!user || !window._fbDb || !window._driveMode) return;
+  var user = window._fbUser;
+  if (!user || !window._driveMode) return;
   setDriveStatus('syncing', 'Saving…');
   try {
-    const docRef = window._fbDoc(window._fbDb, 'users', user.uid);
-    await window._fbSetDoc(docRef, {
+    await _fbDb.collection('users').doc(user.uid).set({
       recipes: JSON.stringify(recipes),
-      nextId,
+      nextId: nextId,
       updatedAt: new Date().toISOString()
     });
     setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
@@ -2385,18 +2370,17 @@ async function saveToFirestore() {
 
 // ── Firestore load ────────────────────────────────────────────────────────────
 async function loadFromFirestore() {
-  const user = window._fbUser;
-  if (!user || !window._fbDb) return false;
+  var user = window._fbUser;
+  if (!user) return false;
   try {
-    const docRef = window._fbDoc(window._fbDb, 'users', user.uid);
-    const snap = await window._fbGetDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      const parsed = JSON.parse(data.recipes || '[]');
+    var snap = await _fbDb.collection('users').doc(user.uid).get();
+    if (snap.exists) {
+      var data = snap.data();
+      var parsed = JSON.parse(data.recipes || '[]');
       if (Array.isArray(parsed) && parsed.length > 0) {
         recipes = parsed;
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
-        saveLocal(); // cache locally
+        saveLocal();
         return true;
       }
     }
@@ -2409,45 +2393,43 @@ async function loadFromFirestore() {
 
 // ── Google Sign In ────────────────────────────────────────────────────────────
 async function startGoogleSignIn() {
-  const btn = document.getElementById('googleSignInBtn');
-  const errDiv = document.getElementById('loginError');
-  if (btn) btn.textContent = '⏳ Signing in…';
+  var btn    = document.getElementById('googleSignInBtn');
+  var errDiv = document.getElementById('loginError');
+  if (btn) { btn.textContent = '⏳ Signing in…'; btn.disabled = true; }
   errDiv.style.display = 'none';
 
-  // Check Firebase is loaded
-  if (!window._fbAuth || !window._fbGoogleProvider) {
-    errDiv.textContent = '⚠️ Firebase not configured yet. See SETUP.md. Using offline mode.';
+  if (typeof firebase === 'undefined' || !_fbAuth) {
+    errDiv.textContent = '⚠️ Firebase not loaded. Please refresh the page.';
     errDiv.style.display = 'block';
-    if (btn) btn.innerHTML = '🔄 Sign in with Google';
-    setTimeout(useOfflineMode, 2000);
+    if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
     return;
   }
+
   try {
-    await window._fbSignInWithPopup(window._fbAuth, window._fbGoogleProvider);
-    // onAuthStateChanged in the Firebase module script handles the rest
+    await _fbAuth.signInWithPopup(_fbProvider);
+    // onAuthStateChanged handles everything after this
   } catch(err) {
     console.error('Sign in error:', err);
-    let msg = 'Sign-in failed. ';
-    if (err.code === 'auth/popup-blocked')      msg += 'Please allow popups for this site.';
+    var msg = 'Sign-in failed. ';
+    if (err.code === 'auth/popup-blocked')           msg += 'Please allow popups for this site in your browser settings.';
     else if (err.code === 'auth/popup-closed-by-user') msg += 'Sign-in was cancelled.';
-    else if (err.code === 'auth/invalid-api-key') msg += 'Firebase API key not configured — see SETUP.md.';
+    else if (err.code === 'auth/unauthorized-domain')  msg += 'Domain not authorized. Add this domain in Firebase Console → Authentication → Settings → Authorised domains.';
     else msg += err.message;
     errDiv.textContent = msg;
     errDiv.style.display = 'block';
-    if (btn) btn.innerHTML = '<svg class="google-icon" viewBox="0 0 48 48"><path fill="#4285F4" d="M45.5 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h12.1c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.9 6.7-9.6 6.7-16.1z"/><path fill="#34A853" d="M24 46c6.5 0 11.9-2.1 15.9-5.8l-7.1-5.4c-2.1 1.4-4.8 2.2-8.8 2.2-6.8 0-12.5-4.6-14.6-10.7H2.1v5.6C6 40.8 14.4 46 24 46z"/><path fill="#FBBC05" d="M9.4 26.3c-.5-1.4-.8-3-.8-4.3s.3-2.9.8-4.3v-5.6H2.1C.8 14.8 0 19.3 0 24s.8 9.2 2.1 11.9l7.3-9.6z"/><path fill="#EA4335" d="M24 9.5c3.8 0 7.1 1.3 9.8 3.8l7.3-7.3C37.9 2.1 31.5 0 24 0 14.4 0 6 5.2 2.1 12.4l7.3 5.6C11.5 14.1 17.2 9.5 24 9.5z"/></svg> Try Again';
+    if (btn) { btn.textContent = 'Try Again'; btn.disabled = false; }
   }
 }
+
 
 // signInWithPopup needs to be available globally (imported in module but called from onclick)
 // signInWithPopup is exposed via window._fbSignInWithPopup from the module script
 
 function signOut() {
   if (!confirm('Sign out? Your recipes are saved in the cloud and will reload next time.')) return;
-  if (window._fbSignOut && window._fbAuth) {
-    window._fbSignOut(window._fbAuth).catch(() => {});
-  }
-  window._fbUser = null;
-  driveMode = false;
+  if (typeof _fbAuth !== 'undefined') _fbAuth.signOut().catch(function(){});
+  window._fbUser    = null;
+  window._driveMode = false;
   document.getElementById('signOutBtn').style.display = 'none';
   document.getElementById('driveUserName').textContent = '';
   setDriveStatus('', '💾 Offline mode');
