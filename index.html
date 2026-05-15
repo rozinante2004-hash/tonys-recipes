@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v2.8 -->
+<!-- Tony's Recipes Collection v2.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -693,7 +693,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.8</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v2.9</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1074,7 +1074,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v2.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2730,65 +2730,87 @@ async function processCameraImage(event) {
     res.innerHTML = spinner('Preparing image…');
 
     try {
-      // Resize to 1600px max — high enough to read recipe text clearly.
-      // We call Anthropic DIRECTLY (not via Worker) so there are no WAF size limits.
-      const compressed = await resizeImageForVision(e.target.result, 1600, 0.88);
+      // Resize to 1200px at 85% — good balance of quality vs size (~200-300KB base64)
+      const compressed = await resizeImageForVision(e.target.result, 1200, 0.85);
       const base64 = compressed.split(',')[1];
       const sizeKB = Math.round(base64.length * 0.75 / 1024);
       res.innerHTML = spinner('Sending to AI (' + sizeKB + 'KB)…');
 
-      // Direct Anthropic call with the browser CORS header
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 2000,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-              { type: 'text', text: 'Read the recipe text visible in this image carefully. '
-                + 'Extract ONLY what is written in the image — do not invent or add anything. '
-                + 'Keep the original language exactly as written (Hebrew stays Hebrew, do not translate). '
-                + 'Return ONLY valid JSON with no markdown: '
-                + '{"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"",'
-                + '"ingredients":[{"a":"amount","n":"ingredient name"}],"steps":["step 1"]}. '
-                + 'If no recipe is visible, return {"error":"no recipe found"}.' }
-            ]
-          }]
-        })
-      });
+      // Try direct Anthropic call first (works on Chrome/Firefox)
+      // Fall back to Worker if that fails (Safari blocks direct calls)
+      var response;
+      var usedDirect = false;
+      try {
+        response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5-20250929',
+            max_tokens: 2000,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+                { type: 'text', text: 'Read ALL the text in this recipe image carefully. Extract only what is actually written — never invent or add content. Keep the exact original language (Hebrew stays Hebrew). Return ONLY valid JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"amount","n":"ingredient"}],"steps":["step 1"]}. Return {"error":"no recipe"} only if no recipe text is visible at all.' }
+              ]
+            }]
+          })
+        });
+        usedDirect = true;
+      } catch(directErr) {
+        // Safari blocks direct cross-origin fetch — fall back to Worker
+        console.log('Direct call failed (' + directErr.message + '), trying Worker...');
+        response = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5-20250929',
+            max_tokens: 2000,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+                { type: 'text', text: 'Read ALL the text in this recipe image carefully. Extract only what is actually written — never invent or add content. Keep the exact original language (Hebrew stays Hebrew). Return ONLY valid JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"amount","n":"ingredient"}],"steps":["step 1"]}. Return {"error":"no recipe"} only if no recipe text is visible at all.' }
+              ]
+            }]
+          })
+        });
+      }
 
       if (!response.ok) {
         const errData = await response.json().catch(function(){ return {}; });
-        throw new Error(errData.error ? errData.error.message : 'API error ' + response.status);
+        throw new Error(errData.error ? (errData.error.message || JSON.stringify(errData.error)) : 'API error ' + response.status);
       }
+
       const data = await response.json();
       const text = (data.content || []).map(function(b){ return b.text || ''; }).join('\n');
       const parsed = extractJSON(text);
+
       if (parsed.error) {
         res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
-          + '<strong>No recipe text found in this image.</strong><br><br>'
+          + '<strong>No recipe text found.</strong><br><br>'
           + 'Tips:<br>'
-          + '&bull; Make sure the recipe text fills most of the frame<br>'
-          + '&bull; Hold the camera steady and wait for focus<br>'
-          + '&bull; Try <strong>Paste free-hand text</strong> — copy the recipe text and paste it there'
+          + '&bull; Make sure the recipe text fills the frame and is in focus<br>'
+          + '&bull; Photograph one page at a time<br>'
+          + '&bull; Alternatively use <strong>✍️ Paste free-hand text</strong> — copy the recipe and paste it there'
           + '</div>';
         return;
       }
+
       applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay');
 
     } catch(err) {
       console.error('Camera error:', err);
       res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
         + '<strong>Error:</strong> ' + escH(err.message) + '<br><br>'
-        + 'Try using <strong>Paste free-hand text</strong> instead.'
+        + 'The camera scan may not work on this browser. Try using '
+        + '<strong>✍️ Paste free-hand text</strong> instead — '
+        + 'copy the recipe text and paste it there.'
         + '</div>';
     }
   };
@@ -2816,6 +2838,7 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
     img.src = dataUrl;
   });
 }
+
 
 
 
