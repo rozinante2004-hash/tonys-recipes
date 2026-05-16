@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v4.6 -->
+<!-- Tony's Recipes Collection v4.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -848,7 +848,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.7</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1229,7 +1229,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2577,4 +2577,386 @@ async function runUrlImport() {
   }
 }
 
->
+
+function spinner(msg) {
+  return '<div class="explore-loading"><div class="ai-spinner"></div><br>' + msg + '</div>';
+}
+
+function applyParsedRecipe(parsed, resultDivId, overlayId) {
+  var ingsHtml = (parsed.ingredients||[]).map(function(i) {
+    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
+  }).join('');
+  var stepsHtml = (parsed.steps||[]).map(function(s,i) {
+    return '<div class="translate-step"><span class="translate-step-num">' + (i+1) + '</span><span>' + escH(s) + '</span></div>';
+  }).join('');
+  var encodedParsed = JSON.stringify(parsed).replace(/"/g,'&quot;');
+  document.getElementById(resultDivId).innerHTML =
+    '<div class="translate-block" style="margin-top:12px;">'
+    + '<div class="translate-block-title">' + escH(parsed.name||'Untitled') + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + escH(parsed.category||'') + ' &middot; ' + escH(parsed.difficulty||'') + ' &middot; ' + escH(parsed.prep||'') + ' &middot; ' + escH(parsed.servings||'') + '</div>'
+    + '<div class="translate-section-label">Ingredients</div>' + ingsHtml
+    + '<div class="translate-section-label" style="margin-top:14px;">Method</div>' + stepsHtml
+    + '</div>'
+    + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encodedParsed + ',\'' + overlayId + '\')">&#10003; Add to My Collection</button>';
+}
+
+function confirmImportParsed(parsed, overlayId) {
+  recipes.unshift({
+    id: nextId++, name: parsed.name || 'Imported Recipe', emoji: rndEmoji(), photo: '',
+    category: CATS.includes(parsed.category) ? parsed.category : 'Dinner',
+    difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
+    prep: parsed.prep || '-', servings: parsed.servings || '-',
+    source: parsed.source || '',
+    bg: rndBg(), fav: false,
+    ingredients: parsed.ingredients || [],
+    steps: parsed.steps || []
+  });
+  closeM(overlayId);
+  activeCat = 'All'; renderFilters(); renderGrid();
+  saveData();
+  toast('Recipe imported!');
+}
+
+const STORAGE_KEY = 'tonys_recipes_v1';
+const NEXTID_KEY  = 'tonys_nextId_v1';
+
+function saveLocal() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+    localStorage.setItem(NEXTID_KEY, String(nextId));
+  } catch(e) { console.warn('localStorage save failed:', e); }
+}
+
+function migrateRecipes(list) {
+  return list.map(function(r) {
+    if (r.source === undefined) r.source = '';
+    if (r.nutrition === undefined) r.nutrition = null;
+    return r;
+  });
+}
+
+function loadLocal() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        recipes = migrateRecipes(parsed);
+        const sid = localStorage.getItem(NEXTID_KEY);
+        if (sid) nextId = Math.max(nextId, parseInt(sid) || 10);
+        return true;
+      }
+    }
+  } catch(e) { console.warn('localStorage load failed:', e); }
+  return false;
+}
+
+let saveTimer = null;
+function saveData() {
+  saveLocal();
+  if (window._driveMode && window._fbUser) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveToFirestore, 1500);
+  }
+}
+
+async function saveToFirestore() {
+  var user = window._fbUser;
+  if (!user || !window._driveMode) return;
+  setDriveStatus('syncing', 'Saving...');
+  try {
+    await _fbDb.collection('users').doc(user.uid).set({
+      recipes: JSON.stringify(recipes), nextId: nextId,
+      updatedAt: new Date().toISOString()
+    });
+    setDriveStatus('synced', 'Synced: ' + (user.displayName || user.email));
+  } catch(err) {
+    setDriveStatus('error', 'Sync failed');
+    console.warn('Firestore save failed:', err);
+  }
+}
+
+async function loadFromFirestore() {
+  var user = window._fbUser;
+  if (!user) return false;
+  try {
+    var snap = await _fbDb.collection('users').doc(user.uid).get();
+    if (snap.exists) {
+      var data = snap.data();
+      var parsed = JSON.parse(data.recipes || '[]');
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        recipes = migrateRecipes(parsed);
+        if (data.nextId) nextId = Math.max(nextId, data.nextId);
+        saveLocal();
+        return true;
+      }
+    }
+    return false;
+  } catch(err) {
+    console.warn('Firestore load failed:', err);
+    return false;
+  }
+}
+
+async function startGoogleSignIn() {
+  var btn = document.getElementById('googleSignInBtn');
+  var errDiv = document.getElementById('loginError');
+  var remember = document.getElementById('rememberMe');
+  if (!_fbAuth) {
+    if (errDiv) { errDiv.textContent = 'Still loading, please try again.'; errDiv.style.display = 'block'; }
+    return;
+  }
+  errDiv.style.display = 'none';
+  if (remember && !remember.checked) {
+    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+  }
+  window._justSignedIn = true;
+  if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
+  try {
+    await _fbAuth.signInWithPopup(_fbProvider);
+    if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+  } catch(err) {
+    window._justSignedIn = false;
+    if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+    var msg = err.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' :
+              err.code === 'auth/popup-blocked' ? 'Popup was blocked. Please allow popups.' :
+              err.code === 'auth/unauthorized-domain' ? 'Domain not authorized in Firebase.' :
+              err.message;
+    if (errDiv) { errDiv.textContent = msg; errDiv.style.display = 'block'; }
+  }
+}
+window.startGoogleSignIn = startGoogleSignIn;
+
+var _autoLoginTimer = null;
+function cancelAutoLogin() {
+  if (_autoLoginTimer) { clearTimeout(_autoLoginTimer); _autoLoginTimer = null; }
+  document.getElementById('autoLoginNotice').style.display = 'none';
+  _fbAuth.signOut().then(function() { document.getElementById('rememberMe').checked = false; });
+}
+window.cancelAutoLogin = cancelAutoLogin;
+
+function signOut() {
+  if (!confirm('Sign out? Your recipes are saved in the cloud.')) return;
+  if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
+  window._fbUser = null; window._driveMode = false;
+  document.getElementById('signOutBtn').style.display = 'none';
+  setDriveStatus('', 'Offline mode');
+  toast('Signed out.');
+}
+
+function useOfflineMode() {
+  window._driveMode = false;
+  document.getElementById('loginScreen').style.display = 'none';
+  loadLocal(); setDriveStatus('', 'Offline mode');
+  renderFilters(); renderGrid();
+}
+
+function setDriveStatus(state, text) {
+  const el = document.getElementById('driveStatus');
+  const textEl = document.getElementById('dsText');
+  if (!el || !textEl) return;
+  el.className = state; textEl.textContent = text;
+}
+
+function clearAllData() {
+  if (!confirm('Delete all LOCAL data? Cloud data is unaffected.')) return;
+  localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(NEXTID_KEY);
+  location.reload();
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/tonys-recipes/sw.js')
+      .then(function(r) { console.log('SW:', r.scope); })
+      .catch(function(e) { console.warn('SW failed:', e); });
+  });
+}
+
+function openShareAppModal() {
+  const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  document.getElementById('shareAppUrl').textContent = url;
+  document.getElementById('shareAppOverlay').classList.add('open');
+}
+function shareAppWhatsApp() {
+  const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  window.open('https://wa.me/?text=' + encodeURIComponent("Tony's Recipes Collection\n\n" + url));
+}
+function copyAppLink() {
+  const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  navigator.clipboard.writeText(url).then(function() { toast('Link copied!'); });
+}
+
+function openCameraImport() {
+  document.getElementById('cameraChoiceOverlay').classList.add('open');
+}
+
+async function processCameraImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const res = document.getElementById('cameraResult');
+  document.getElementById('cameraResultOverlay').classList.add('open');
+  res.innerHTML = spinner('Reading image...');
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const imgEl = document.getElementById('cameraPreviewImg');
+    imgEl.src = e.target.result; imgEl.style.display = 'block';
+    try {
+      var compressed = await resizeImageForVision(e.target.result, 2500, 0.95);
+      var base64 = compressed.split(',')[1];
+      var sizeKB = Math.round(base64.length * 0.75 / 1024);
+      res.innerHTML = spinner('Step 1: Reading text (2500px, ' + sizeKB + 'KB)...');
+      const step1 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-5-20250929', max_tokens: 1500,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: 'Transcribe ALL text visible in this image word for word in the original language. Watch for similar Hebrew letters. Do NOT translate. If unclear write [?].' }
+          ]}]
+        })
+      });
+      if (!step1.ok) throw new Error('Worker error ' + step1.status);
+      const d1 = await step1.json();
+      const transcription = (d1.content||[]).map(function(b){ return b.text||''; }).join('\n').trim();
+      res.innerHTML = '<div class="explore-result" style="background:#f5f0ea;border:1px solid #e0d5c5;margin-bottom:12px;">'
+        + '<strong style="font-size:12px;color:var(--muted);">What Claude read:</strong>'
+        + '<div style="font-size:13px;margin-top:6px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">' + escH(transcription) + '</div></div>'
+        + spinner('Step 2: Extracting recipe...');
+      const step2 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-5-20250929', max_tokens: 2000,
+          messages: [{ role: 'user', content: 'Extract recipe from this text. Keep original language. Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. If no recipe return {"error":"no recipe"}. Text:\n\n' + transcription }]
+        })
+      });
+      if (!step2.ok) throw new Error('Worker error ' + step2.status);
+      const d2 = await step2.json();
+      const recipeText = (d2.content||[]).map(function(b){ return b.text||''; }).join('\n');
+      const parsed = extractJSON(recipeText);
+      if (parsed.error) { res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>No recipe found.</strong></div>'; return; }
+      applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay');
+    } catch(err) {
+      res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>Error:</strong> ' + escH(err.message) + '</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function resizeImageForVision(dataUrl, maxDim, quality) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h*maxDim/w); w = maxDim; }
+        else { w = Math.round(w*maxDim/h); h = maxDim; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+function printRecipe(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  var ings = r.ingredients.map(function(i){ return '<tr><td style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;">' + escH(i.a) + '</td><td>' + escH(i.n) + '</td></tr>'; }).join('');
+  var steps = r.steps.map(function(s,si){ return '<div style="display:flex;gap:12px;margin-bottom:10px;"><span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + (si+1) + '</span><span>' + escH(s) + '</span></div>'; }).join('');
+  var pw = window.open('','_blank','width=800,height=600');
+  pw.document.write('<!DOCTYPE html><html><head><title>' + escH(r.name) + '</title><style>body{font-family:Georgia,serif;max-width:680px;margin:40px auto;color:#1C1A18;}h1{font-size:28px;color:#5C3D2E;}h2{font-size:16px;color:#C1440E;border-bottom:1px solid #E8E0D5;padding-bottom:4px;margin-top:24px;}table{width:100%;border-collapse:collapse;}.source{font-size:12px;color:#888;margin-top:12px;}@media print{button{display:none;}}</style></head><body>'
+    + '<h1>' + r.emoji + ' ' + escH(r.name) + '</h1>'
+    + '<div style="font-size:13px;color:#8A8279;margin-bottom:16px;">' + escH(r.category) + ' | ' + escH(r.difficulty) + ' | ' + escH(r.prep) + ' | ' + escH(r.servings) + ' servings</div>'
+    + (r.source ? '<div class="source">Source: ' + escH(r.source) + '</div>' : '')
+    + '<h2>Ingredients</h2><table>' + ings + '</table>'
+    + '<h2>Method</h2>' + steps
+    + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script></body></html>');
+  pw.document.close();
+}
+
+async function calcNutrition(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  var panel = document.getElementById('nutrition-'+id);
+  if (!panel) return;
+  panel.innerHTML = '<div class="nutrition-loading">Calculating...</div>';
+  var ings = r.ingredients.map(function(i){ return i.a+' '+i.n; }).join(', ');
+  try {
+    var raw = await aiCall('Estimate nutrition per 100g of finished dish. Recipe: '+r.name+'. Ingredients: '+ings+'. Return ONLY JSON: {"calories":0,"carbs":0,"fat":0,"protein":0}', 300);
+    var n = extractJSON(raw);
+    if (!n.calories) throw new Error('Invalid');
+    r.nutrition = { calories:Math.round(n.calories), carbs:Math.round(n.carbs*10)/10, fat:Math.round(n.fat*10)/10, protein:Math.round(n.protein*10)/10 };
+    saveData();
+    panel.innerHTML = '<div class="nutrition-title">Nutrition per 100g</div><div class="nutrition-grid">'
+      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.calories+'</span><span class="nutrition-unit">kcal</span><span class="nutrition-label">Calories</span></div>'
+      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.carbs+'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Carbs</span></div>'
+      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.fat+'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Fat</span></div>'
+      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.protein+'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Protein</span></div></div>';
+    toast('Nutrition calculated!');
+  } catch(err) {
+    panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="nutrition-title" style="margin:0;">Nutrition per 100g</span><button class="nutrition-btn" onclick="calcNutrition('+id+')">Retry</button></div>';
+  }
+}
+window.calcNutrition = calcNutrition;
+
+var CALC_CATS = {
+  'Weight':{ units:{'Grams (g)':1,'Kilograms (kg)':1000,'Ounces (oz)':28.3495,'Pounds (lb)':453.592,'Milligrams (mg)':0.001}, quick:[{label:'100g to oz',from:'Grams (g)',to:'Ounces (oz)',val:100},{label:'1 lb to g',from:'Pounds (lb)',to:'Grams (g)',val:1},{label:'1 kg to lb',from:'Kilograms (kg)',to:'Pounds (lb)',val:1}] },
+  'Volume':{ units:{'Millilitres (ml)':1,'Litres (l)':1000,'Teaspoons (tsp)':4.929,'Tablespoons (tbsp)':14.787,'Cups':236.588,'Fluid oz (fl oz)':29.574,'Pints (pt)':473.176,'Quarts (qt)':946.353,'Gallons (gal)':3785.41}, quick:[{label:'1 cup to ml',from:'Cups',to:'Millilitres (ml)',val:1},{label:'1 l to qt',from:'Litres (l)',to:'Quarts (qt)',val:1},{label:'1 tbsp to ml',from:'Tablespoons (tbsp)',to:'Millilitres (ml)',val:1}] },
+  'Temperature':{ units:{'Celsius (C)':'C','Fahrenheit (F)':'F','Gas Mark':'G'}, quick:[{label:'180C to F',from:'Celsius (C)',to:'Fahrenheit (F)',val:180},{label:'200C to F',from:'Celsius (C)',to:'Fahrenheit (F)',val:200},{label:'350F to C',from:'Fahrenheit (F)',to:'Celsius (C)',val:350}] },
+  'Length':{ units:{'Centimetres (cm)':1,'Millimetres (mm)':0.1,'Metres (m)':100,'Inches (in)':2.54,'Feet (ft)':30.48}, quick:[{label:'1 in to cm',from:'Inches (in)',to:'Centimetres (cm)',val:1},{label:'30cm to in',from:'Centimetres (cm)',to:'Inches (in)',val:30}] }
+};
+var calcActiveCat = 'Weight';
+function openCalcModal() {
+  var catRow = document.getElementById('calcCatRow');
+  catRow.innerHTML = Object.keys(CALC_CATS).map(function(cat) {
+    return '<button class="calc-cat-btn' + (cat===calcActiveCat?' active':'') + '" onclick="setCalcCat(&quot;' + cat + '&quot;)">' + cat + '</button>';
+  }).join('');
+  buildCalcUnits();
+  document.getElementById('calcOverlay').classList.add('open');
+}
+window.openCalcModal = openCalcModal;
+function setCalcCat(cat) { calcActiveCat=cat; document.querySelectorAll('.calc-cat-btn').forEach(function(b){b.classList.toggle('active',b.textContent===cat);}); buildCalcUnits(); document.getElementById('calcFrom').value=''; document.getElementById('calcTo').value=''; document.getElementById('calcResultVal').textContent='-'; document.getElementById('calcResultUnit').textContent='Enter a value above'; }
+window.setCalcCat = setCalcCat;
+function buildCalcUnits() { var cat=CALC_CATS[calcActiveCat]; var units=Object.keys(cat.units); var fs=document.getElementById('calcUnitFrom'); var ts=document.getElementById('calcUnitTo'); fs.innerHTML=units.map(function(u){return '<option>'+u+'</option>';}).join(''); ts.innerHTML=units.map(function(u){return '<option>'+u+'</option>';}).join(''); if(units.length>1)ts.selectedIndex=1; var qr=document.getElementById('calcQuickRow'); qr.innerHTML=cat.quick.map(function(q){return '<button class="calc-quick-btn" onclick="applyQuick(&quot;'+q.from+'&quot;,&quot;'+q.to+'&quot;,'+q.val+')">'+q.label+'</button>';}).join(''); }
+function applyQuick(from,to,val) { var fs=document.getElementById('calcUnitFrom'); var ts=document.getElementById('calcUnitTo'); Array.from(fs.options).forEach(function(o,i){if(o.value===from)fs.selectedIndex=i;}); Array.from(ts.options).forEach(function(o,i){if(o.value===to)ts.selectedIndex=i;}); document.getElementById('calcFrom').value=val; doCalc(); }
+window.applyQuick = applyQuick;
+function convertTemp(val,f,t) { var c=f==='C'?val:f==='F'?(val-32)*5/9:val*25+121; return t==='C'?c:t==='F'?c*9/5+32:Math.round((c-121)/25); }
+function doConvert(val,fk,tk) { var cat=CALC_CATS[calcActiveCat]; if(fk===tk)return val; if(calcActiveCat==='Temperature')return convertTemp(val,cat.units[fk],cat.units[tk]); return val*cat.units[fk]/cat.units[tk]; }
+function formatResult(v) { if(Math.abs(v)>=1000)return Math.round(v).toLocaleString(); if(Math.abs(v)>=10)return Math.round(v*10)/10; if(Math.abs(v)>=1)return Math.round(v*100)/100; return Math.round(v*10000)/10000; }
+function doCalc() { var val=parseFloat(document.getElementById('calcFrom').value); var fk=document.getElementById('calcUnitFrom').value; var tk=document.getElementById('calcUnitTo').value; if(isNaN(val)){document.getElementById('calcTo').value='';document.getElementById('calcResultVal').textContent='-';return;} var r=doConvert(val,fk,tk); var fmt=formatResult(r); document.getElementById('calcTo').value=fmt; document.getElementById('calcResultVal').textContent=fmt; document.getElementById('calcResultUnit').textContent=val+' '+fk+' = '+fmt+' '+tk; }
+window.doCalc = doCalc;
+function doCalcReverse() { var val=parseFloat(document.getElementById('calcTo').value); var fk=document.getElementById('calcUnitFrom').value; var tk=document.getElementById('calcUnitTo').value; if(isNaN(val)){document.getElementById('calcFrom').value='';return;} var r=doConvert(val,tk,fk); document.getElementById('calcFrom').value=formatResult(r); document.getElementById('calcResultVal').textContent=formatResult(r); document.getElementById('calcResultUnit').textContent=val+' '+tk+' = '+formatResult(r)+' '+fk; }
+window.doCalcReverse = doCalcReverse;
+
+function editSource(id) { document.getElementById('srcDisplay-'+id).parentElement.style.display='none'; var ed=document.getElementById('srcEdit-'+id); var inp=document.getElementById('srcInput-'+id); var r=recipes.find(function(x){return x.id===id;}); if(inp&&r)inp.value=r.source||''; if(ed)ed.style.display='block'; if(inp){inp.focus();inp.select();} }
+function saveSource(id) { var inp=document.getElementById('srcInput-'+id); var r=recipes.find(function(x){return x.id===id;}); if(!inp||!r)return; r.source=inp.value.trim(); saveData(); var ds=document.getElementById('srcDisplay-'+id); if(ds){if(r.source){var isUrl=r.source.startsWith('http');ds.innerHTML=isUrl?'<a href="'+escH(r.source)+'" target="_blank" style="color:var(--terracotta);">'+escH(r.source)+'</a>':'<span style="color:var(--ink);">'+escH(r.source)+'</span>';}else{ds.innerHTML='<span style="color:var(--muted);font-style:italic;">Not specified</span>';}} cancelSource(id); toast('Source updated!'); }
+function cancelSource(id) { var ed=document.getElementById('srcEdit-'+id); var ds=document.getElementById('srcDisplay-'+id); if(ed)ed.style.display='none'; if(ds)ds.parentElement.style.display='flex'; }
+window.editSource=editSource; window.saveSource=saveSource; window.cancelSource=cancelSource;
+
+var selectMode=false, selectedIds=new Set();
+function toggleSelectMode(){selectMode=!selectMode;selectedIds.clear();var grid=document.getElementById('recipeGrid');var btn=document.getElementById('selectModeBtn');if(selectMode){grid.classList.add('select-mode');btn.classList.add('active-view');btn.textContent='Cancel';}else{grid.classList.remove('select-mode');btn.classList.remove('active-view');btn.textContent='Select';document.getElementById('deleteSelBar').classList.remove('visible');}renderGrid();}
+function cancelSelectMode(){selectMode=false;selectedIds.clear();var grid=document.getElementById('recipeGrid');var btn=document.getElementById('selectModeBtn');grid.classList.remove('select-mode');btn.classList.remove('active-view');btn.textContent='Select';document.getElementById('deleteSelBar').classList.remove('visible');renderGrid();}
+function toggleRecipeSelect(event,id){event.stopPropagation();if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);updateDeleteBar();renderGrid();}
+function updateDeleteBar(){var bar=document.getElementById('deleteSelBar');var count=document.getElementById('deleteSelCount');if(selectedIds.size>0){bar.classList.add('visible');count.textContent=selectedIds.size+' recipe'+(selectedIds.size>1?'s':'')+' selected';}else{bar.classList.remove('visible');}}
+function deleteSelected(){if(!selectedIds.size)return;var names=recipes.filter(function(r){return selectedIds.has(r.id);}).map(function(r){return r.name;});if(!confirm(selectedIds.size===1?'Delete "'+names[0]+'"?':'Delete '+selectedIds.size+' recipes?\n\n'+names.join('\n')))return;recipes=recipes.filter(function(r){return!selectedIds.has(r.id);});saveData();cancelSelectMode();toast('Deleted');selectedIds.clear();renderGrid();}
+function getSelectedRecipes(){return recipes.filter(function(r){return selectedIds.has(r.id);});}
+function exportSelWord(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}downloadBlob(makeDocxBlob(sel),sel.length===1?sel[0].name.replace(/[^a-z0-9]/gi,'_')+'.docx':'Selected_'+sel.length+'_Recipes.docx');toast('Exported to Word!');cancelSelectMode();}
+function exportSelExcel(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var wb=XLSX.utils.book_new();if(sel.length>1){var rows=[['Selected Recipes'],[],['Name','Category','Difficulty','Prep','Servings']].concat(sel.map(function(r){return[r.name,r.category,r.difficulty,r.prep,r.servings];}));var sw=XLSX.utils.aoa_to_sheet(rows);sw['!cols']=[{wch:28},{wch:14},{wch:12},{wch:12},{wch:10}];XLSX.utils.book_append_sheet(wb,sw,'Summary');}sel.forEach(function(r){var ws=XLSX.utils.aoa_to_sheet(sheetRows(r));ws['!cols']=[{wch:18},{wch:60}];XLSX.utils.book_append_sheet(wb,ws,r.name.slice(0,31));});downloadExcelWb(wb,sel.length===1?sel[0].name.replace(/[^a-z0-9]/gi,'_')+'.xlsx':'Selected_'+sel.length+'_Recipes.xlsx');toast('Exported!');cancelSelectMode();}
+function shareSelected(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var text=sel.map(function(r){var ings=r.ingredients.map(function(i){return'  - '+i.a+' '+i.n;}).join('\n');var steps=r.steps.map(function(s,i){return(i+1)+'. '+s;}).join('\n');return r.name+'\n\nIngredients:\n'+ings+'\n\nMethod:\n'+steps+(r.source?'\n\nSource: '+r.source:'');}).join('\n\n---\n\n');var full=(sel.length===1?sel[0].name:sel.length+' recipes')+'\n\n'+text;if(confirm('Share via:\n[OK]=WhatsApp  [Cancel]=Clipboard')){window.open('https://wa.me/?text='+encodeURIComponent(full));}else{navigator.clipboard.writeText(full).then(function(){toast('Copied!');});}}
+function printSelected(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var pw=window.open('','_blank','width=900,height=700');var pages=sel.map(function(r){var ings=r.ingredients.map(function(i){return'<tr><td style="padding:3px 14px 3px 0;color:#C1440E;font-weight:600;">'+escH(i.a)+'</td><td>'+escH(i.n)+'</td></tr>';}).join('');var steps=r.steps.map(function(s,si){return'<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="min-width:24px;height:24px;background:#C1440E;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;">'+(si+1)+'</span><span>'+escH(s)+'</span></div>';}).join('');return'<div style="page-break-after:always;padding:40px 48px;"><h1 style="font-family:Georgia,serif;font-size:24px;color:#5C3D2E;margin:0 0 4px;">'+r.emoji+' '+escH(r.name)+'</h1><div style="font-size:12px;color:#888;margin-bottom:12px;">'+escH(r.category)+' | '+escH(r.difficulty)+' | '+escH(r.prep)+' | '+escH(r.servings)+' servings</div>'+(r.source?'<div style="font-size:11px;color:#aaa;margin-bottom:8px;">Source: '+escH(r.source)+'</div>':'')+'<h2 style="font-family:Georgia,serif;font-size:15px;color:#C1440E;border-bottom:1px solid #eee;padding-bottom:4px;margin:0 0 8px;">Ingredients</h2><table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'+ings+'</table><h2 style="font-family:Georgia,serif;font-size:15px;color:#C1440E;border-bottom:1px solid #eee;padding-bottom:4px;margin:0 0 8px;">Method</h2>'+steps+'</div>';}).join('');pw.document.write('<!DOCTYPE html><html><head><title>Recipes</title><style>body{font-family:Georgia,serif;color:#1C1A18;margin:0;}</style></head><body>'+pages+'<scr'+'ipt>window.onload=function(){window.print();}</'+'script></body></html>');pw.document.close();toast('Printing...');cancelSelectMode();}
+
+window.toggleSelectMode=toggleSelectMode; window.cancelSelectMode=cancelSelectMode; window.toggleRecipeSelect=toggleRecipeSelect; window.deleteSelected=deleteSelected; window.getSelectedRecipes=getSelectedRecipes; window.exportSelWord=exportSelWord; window.exportSelExcel=exportSelExcel; window.shareSelected=shareSelected; window.printSelected=printSelected;
+
+(function(){var fns=['startGoogleSignIn','useOfflineMode','signOut','openExploreModal','openSuggestModal','openAddModal','openFreehandModal','openUrlImportModal','openCameraImport','openShareAppModal','openTranslate','setView','setCat','toggleFav','openView','toggleShare','setMult','setUnit','saveRecipe','runSuggest','runExplore','runTranslate','runFreehandImport','runUrlImport','clearAllData','addSuggestion','confirmImportParsed','saveTranslation','toggleChip','setSugCount','addIngTag','tagKey','toggleDietDD','expOneExcel','expOneWord','exportAllExcel','exportAllWord','doEmail','doWhatsApp','doCopy','heroPhotoChanged','changeHeroPhoto','printRecipe','processCameraImage','shareAppWhatsApp','copyAppLink','closeDrop','toggleDrop','bgClose','closeM','pickEmoji','onPhotoFile','removePhoto','setLang','renderFilters','renderGrid','openCalcModal','setCalcCat','applyQuick','doCalc','doCalcReverse','calcNutrition','editSource','saveSource','cancelSource','cancelAutoLogin','toggleSelectMode','cancelSelectMode','toggleRecipeSelect','deleteSelected','exportSelWord','exportSelExcel','shareSelected','printSelected'];fns.forEach(function(name){try{var fn=eval(name);if(typeof fn==='function')window[name]=fn;}catch(e){}});})();
+
+loadLocal();
+renderFilters();
+renderGrid();
+
+</script>
+</body>
+</html>
