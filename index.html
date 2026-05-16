@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v4.2 -->
+<!-- Tony's Recipes Collection v4.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -848,7 +848,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.2</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.3</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -986,8 +986,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
         <textarea class="form-textarea" id="f-steps" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
       <div class="form-group">
-        <label class="form-label">Source (URL or reference — optional)</label>
-        <input class="form-input" id="f-source" placeholder="e.g. https://www.example.com/recipe or 'Grandma's cookbook'">
+        <label class="form-label">Source</label>
+        <input class="form-input" id="f-source" placeholder="e.g. https://www.example.com/recipe or 'AI generated'">
       </div>
       <button class="btn-submit" id="editSubmitBtn" onclick="saveRecipe()">Save Recipe</button>
     </div>
@@ -1229,7 +1229,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1501,7 +1501,7 @@ function drawView(){
         <span>⏱ ${r.prep}</span><span>🍽 ${r.servings} servings</span>
         <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
       </div>
-      ${r.source ? `<div class="source-link" style="margin-bottom:8px;">🔗 <a href="${r.source.startsWith('http') ? r.source : '#'}" target="_blank">${escH(r.source)}</a></div>` : ''}
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;"><span style="color:var(--muted);font-weight:500;">Source: </span>${r.source ? `<a href="${r.source.startsWith('http') ? r.source : '#'}" target="_blank" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</div>
       <div id="nutrition-${r.id}" class="nutrition-panel">
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -2102,7 +2102,7 @@ async function runExplore() {
   const res = document.getElementById("exploreResult");
   res.innerHTML = spinner("Finding meal ideas\u2026");
   const dietLine = selDiets.length ? " Diet requirements (ALL must apply): " + selDiets.join(", ") + "." : "";
-  const jsonShape = "[{\"name\":\"\",\"cuisine\":\"\",\"category\":\"Dinner\",\"difficulty\":\"Easy\",\"prep\":\"20 min\",\"servings\":\"2\",\"why\":\"uses your ingredients\",\"source\":\"URL if known or empty string\",\"ingredients\":[{\"a\":\"200g\",\"n\":\"chicken\"}],\"steps\":[\"Step 1\"]}]";
+  const jsonShape = "[{\"name\":\"\",\"cuisine\":\"\",\"category\":\"Dinner\",\"difficulty\":\"Easy\",\"prep\":\"20 min\",\"servings\":\"2\",\"why\":\"uses your ingredients\",\"source\":\"URL if from a specific site, otherwise empty\",\"ingredients\":[{\"a\":\"200g\",\"n\":\"chicken\"}],\"steps\":[\"Step 1\"]}]";
   const prompt = "I have these ingredients: " + ingTags.join(", ") + "." + dietLine
     + " My existing recipes: " + recipes.map(r => r.name).join(", ") + "."
     + " Suggest exactly 5 meal ideas using my ingredients."
@@ -2138,7 +2138,7 @@ function renderSuggestions(suggestions, containerId) {
       <div class="sug-card-body">
         <em>${escH(s.why||'')}</em><br><br>
         <strong>Key ingredients:</strong> ${(s.ingredients||[]).slice(0,5).map(i=>escH(i.n)).join(', ')}${(s.ingredients||[]).length>5?' &amp; more':''}
-        ${s.source ? `<br><br><span style="font-size:11px;color:var(--muted);">🔗 Source: <a href="${s.source.startsWith('http') ? s.source : '#'}" target="_blank" style="color:var(--terracotta);">${escH(s.source)}</a></span>` : ''}
+        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${s.source.startsWith('http') ? s.source : '#'}" target="_blank" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
       </div>
       <div class="sug-card-footer">
         <button class="sug-add-btn" id="sugadd-${containerId}-${i}" onclick="addSuggestion(${i},'${containerId}')">+ Add to My Recipes</button>
@@ -2161,7 +2161,7 @@ function addSuggestion(idx, containerId) {
     difficulty: ['Easy','Medium','Hard'].includes(s.difficulty) ? s.difficulty : 'Medium',
     prep: s.prep || '—',
     servings: s.servings || '—',
-    source: s.source || '',
+    source: s.source || 'AI generated',
     bg: rndBg(),
     fav: false,
     ingredients: Array.isArray(s.ingredients) && s.ingredients.length ? s.ingredients : [{a:'',n:'See full recipe'}],
@@ -2210,7 +2210,7 @@ async function runSuggest() {
   res.innerHTML = spinner("Analysing your collection\u2026");
   var summary = recipes.map(function(r){return r.name+" ("+r.category+", "+r.difficulty+")";}).join("; ");
   var filterLine = filters.length ? " Strictly follow these filters: "+filters.join("; ")+"." : "";
-  var jsonShape = '[{"name":"","cuisine":"","category":"Dinner","difficulty":"Easy","prep":"30 min","servings":"4","why":"","source":"URL if known or empty string","ingredients":[{"a":"200g","n":"pasta"}],"steps":["Step 1"]}]';
+  var jsonShape = '[{"name":"","cuisine":"","category":"Dinner","difficulty":"Easy","prep":"30 min","servings":"4","why":"","source":"URL if from a specific site, otherwise leave empty","ingredients":[{"a":"200g","n":"pasta"}],"steps":["Step 1"]}]';
   var prompt = "My recipe collection: "+summary+"."+filterLine
     +" Suggest exactly "+sugCount+" new recipes NOT in my collection."
     +(filters.length ? " All must match the filters." : " Be diverse and exciting.")
@@ -2685,13 +2685,22 @@ function saveLocal() {
   } catch(e) { console.warn('localStorage save failed:', e); }
 }
 
+function migrateRecipes(list) {
+  // Add missing fields to recipes saved before these features existed
+  return list.map(function(r) {
+    if (r.source === undefined) r.source = '';
+    if (r.nutrition === undefined) r.nutrition = null;
+    return r;
+  });
+}
+
 function loadLocal() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        recipes = parsed;
+        recipes = migrateRecipes(parsed);
         const sid = localStorage.getItem(NEXTID_KEY);
         if (sid) nextId = Math.max(nextId, parseInt(sid) || 10);
         return true;
@@ -2751,7 +2760,7 @@ async function loadFromFirestore() {
       var data = snap.data();
       var parsed = JSON.parse(data.recipes || '[]');
       if (Array.isArray(parsed) && parsed.length > 0) {
-        recipes = parsed;
+        recipes = migrateRecipes(parsed);
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
         return true;
