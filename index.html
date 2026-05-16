@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v3.8 -->
+<!-- Tony's Recipes Collection v3.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -671,8 +671,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   cursor: pointer;
   box-shadow: 0 2px 0 rgba(0,0,0,0.2);
 }
-.del-bar-cancel { background: rgba(255,255,255,0.2); color: white; }
+.del-bar-cancel { background: rgba(255,255,255,0.15); color: white; }
 .del-bar-delete { background: white; color: var(--terracotta); }
+.del-bar-action  { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); }
+.del-bar-action:hover { background: rgba(255,255,255,0.32); }
 
 
 /* ── NUTRITION PANEL ── */
@@ -824,7 +826,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.8</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v3.9</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <span id="driveUserName" style="font-size:11px;color:rgba(255,255,255,0.6);margin-left:4px;"></span>
@@ -1206,7 +1208,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v3.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1294,12 +1296,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 </div>
 
 
-<!-- MULTI-SELECT DELETE BAR -->
+<!-- MULTI-SELECT ACTION BAR -->
 <div id="deleteSelBar">
-  <span id="deleteSelCount">0 recipes selected</span>
-  <div style="display:flex;gap:8px;">
-    <button class="del-bar-btn del-bar-cancel" onclick="cancelSelectMode()">Cancel</button>
+  <span id="deleteSelCount" style="font-size:13px;font-weight:600;">0 selected</span>
+  <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">
+    <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
+    <button class="del-bar-btn del-bar-action" onclick="exportSelExcel()">📊 Excel</button>
+    <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
+    <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
     <button class="del-bar-btn del-bar-delete" onclick="deleteSelected()">🗑️ Delete</button>
+    <button class="del-bar-btn del-bar-cancel" onclick="cancelSelectMode()">✕</button>
   </div>
 </div>
 
@@ -3171,6 +3177,101 @@ function deleteSelected() {
   selectedIds.clear();
   renderGrid();
 }
+
+function getSelectedRecipes() {
+  return recipes.filter(function(r){ return selectedIds.has(r.id); });
+}
+
+function exportSelWord() {
+  var sel = getSelectedRecipes();
+  if (!sel.length) { toast("No recipes selected"); return; }
+  var fname = sel.length === 1
+    ? sel[0].name.replace(/[^a-z0-9]/gi,"_") + ".docx"
+    : "Selected_" + sel.length + "_Recipes.docx";
+  downloadBlob(makeDocxBlob(sel), fname);
+  toast("Exported " + sel.length + " recipe(s) to Word!");
+  cancelSelectMode();
+}
+
+function exportSelExcel() {
+  var sel = getSelectedRecipes();
+  if (!sel.length) { toast("No recipes selected"); return; }
+  var wb = XLSX.utils.book_new();
+  if (sel.length > 1) {
+    var rows = [["Selected Recipes"],[],["Name","Category","Difficulty","Prep","Servings"]].concat(
+      sel.map(function(r){ return [r.name,r.category,r.difficulty,r.prep,r.servings]; })
+    );
+    var sumWs = XLSX.utils.aoa_to_sheet(rows);
+    sumWs["!cols"] = [{wch:28},{wch:14},{wch:12},{wch:12},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, sumWs, "Summary");
+  }
+  sel.forEach(function(r) {
+    var ws = XLSX.utils.aoa_to_sheet(sheetRows(r));
+    ws["!cols"] = [{wch:18},{wch:60}];
+    XLSX.utils.book_append_sheet(wb, ws, r.name.slice(0,31));
+  });
+  var fname = sel.length === 1
+    ? sel[0].name.replace(/[^a-z0-9]/gi,"_") + ".xlsx"
+    : "Selected_" + sel.length + "_Recipes.xlsx";
+  downloadExcelWb(wb, fname);
+  toast("Exported " + sel.length + " recipe(s) to Excel!");
+  cancelSelectMode();
+}
+
+function shareSelected() {
+  var sel = getSelectedRecipes();
+  if (!sel.length) { toast("No recipes selected"); return; }
+  var text = sel.map(function(r) {
+    var ings  = r.ingredients.map(function(i){ return "  - " + i.a + " " + i.n; }).join("\n");
+    var steps = r.steps.map(function(s,i){ return (i+1) + ". " + s; }).join("\n");
+    return r.name + "\n\nIngredients:\n" + ings + "\n\nMethod:\n" + steps
+      + (r.source ? "\n\nSource: " + r.source : "");
+  }).join("\n\n---\n\n");
+  var subject = sel.length === 1 ? sel[0].name : sel.length + " recipes";
+  var full = subject + "\n\n" + text;
+  if (confirm("Share " + sel.length + " recipe(s) via:\n\n[OK] = WhatsApp\n[Cancel] = Copy to clipboard")) {
+    window.open("https://wa.me/?text=" + encodeURIComponent(full));
+  } else {
+    navigator.clipboard.writeText(full)
+      .then(function(){ toast(sel.length + " recipe(s) copied to clipboard!"); })
+      .catch(function(){ toast("Could not copy — try WhatsApp"); });
+  }
+}
+
+function printSelected() {
+  var sel = getSelectedRecipes();
+  if (!sel.length) { toast("No recipes selected"); return; }
+  var pw = window.open("", "_blank", "width=900,height=700");
+  var pages = sel.map(function(r) {
+    var ings = r.ingredients.map(function(i){
+      return "<tr><td style=\"padding:3px 14px 3px 0;color:#C1440E;font-weight:600;white-space:nowrap;\">" + escH(i.a) + "</td><td>" + escH(i.n) + "</td></tr>";
+    }).join("");
+    var steps = r.steps.map(function(s,si){
+      return "<div style=\"display:flex;gap:10px;margin-bottom:8px;\"><span style=\"min-width:24px;height:24px;background:#C1440E;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;\">" + (si+1) + "</span><span style=\"padding-top:3px;\">" + escH(s) + "</span></div>";
+    }).join("");
+    return "<div style=\"page-break-after:always;padding:40px 48px;\">"
+      + "<h1 style=\"font-family:Georgia,serif;font-size:24px;color:#5C3D2E;margin:0 0 4px;\">" + r.emoji + " " + escH(r.name) + "</h1>"
+      + "<div style=\"font-size:12px;color:#888;margin-bottom:12px;\">" + escH(r.category) + " | " + escH(r.difficulty) + " | " + escH(r.prep) + " | " + escH(r.servings) + " servings</div>"
+      + (r.source ? "<div style=\"font-size:11px;color:#aaa;margin-bottom:8px;\">Source: " + escH(r.source) + "</div>" : "")
+      + "<h2 style=\"font-family:Georgia,serif;font-size:15px;color:#C1440E;border-bottom:1px solid #eee;padding-bottom:4px;margin:0 0 8px;\">Ingredients</h2>"
+      + "<table style=\"width:100%;border-collapse:collapse;margin-bottom:16px;\">" + ings + "</table>"
+      + "<h2 style=\"font-family:Georgia,serif;font-size:15px;color:#C1440E;border-bottom:1px solid #eee;padding-bottom:4px;margin:0 0 8px;\">Method</h2>"
+      + steps + "</div>";
+  }).join("");
+  pw.document.write("<!DOCTYPE html><html><head><title>" + sel.length + " Recipes</title>"
+    + "<style>body{font-family:Georgia,serif;color:#1C1A18;margin:0;}</style>"
+    + "</head><body>" + pages
+    + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>");
+  pw.document.close();
+  toast("Printing " + sel.length + " recipe(s)...");
+  cancelSelectMode();
+}
+
+window.exportSelWord      = exportSelWord;
+window.exportSelExcel     = exportSelExcel;
+window.shareSelected      = shareSelected;
+window.printSelected      = printSelected;
+window.getSelectedRecipes = getSelectedRecipes;
 
 window.toggleSelectMode  = toggleSelectMode;
 window.cancelSelectMode  = cancelSelectMode;
