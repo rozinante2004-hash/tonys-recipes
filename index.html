@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v4.3 -->
+<!-- Tony's Recipes Collection v4.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -848,7 +848,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.3</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.4</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1229,7 +1229,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1501,7 +1501,7 @@ function drawView(){
         <span>⏱ ${r.prep}</span><span>🍽 ${r.servings} servings</span>
         <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;"><span style="color:var(--muted);font-weight:500;">Source: </span>${r.source ? `<a href="${r.source.startsWith('http') ? r.source : '#'}" target="_blank" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${r.source.startsWith('http') ? r.source : '#'}" target="_blank" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escH(r.source||'')} " placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel">
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -3543,6 +3543,51 @@ function doCalcReverse() {
   document.getElementById('calcResultUnit').textContent = val + ' ' + toKey + ' = ' + formatResult(result) + ' ' + fromKey;
 }
 window.doCalcReverse = doCalcReverse;
+
+
+// ─── Inline source editing ───────────────────────────────────────────────────
+function editSource(id) {
+  document.getElementById('srcDisplay-' + id).parentElement.style.display = 'none';
+  var editDiv = document.getElementById('srcEdit-' + id);
+  var inp = document.getElementById('srcInput-' + id);
+  var r = recipes.find(function(x){ return x.id === id; });
+  if (inp && r) inp.value = r.source || '';
+  if (editDiv) editDiv.style.display = 'block';
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function saveSource(id) {
+  var inp = document.getElementById('srcInput-' + id);
+  var r = recipes.find(function(x){ return x.id === id; });
+  if (!inp || !r) return;
+  r.source = inp.value.trim();
+  saveData();
+  // Re-render the display span
+  var displaySpan = document.getElementById('srcDisplay-' + id);
+  if (displaySpan) {
+    if (r.source) {
+      var isUrl = r.source.startsWith('http');
+      displaySpan.innerHTML = isUrl
+        ? '<a href="' + escH(r.source) + '" target="_blank" style="color:var(--terracotta);">' + escH(r.source) + '</a>'
+        : '<span style="color:var(--ink);">' + escH(r.source) + '</span>';
+    } else {
+      displaySpan.innerHTML = '<span style="color:var(--muted);font-style:italic;">Not specified</span>';
+    }
+  }
+  cancelSource(id);
+  toast('Source updated!');
+}
+
+function cancelSource(id) {
+  var editDiv = document.getElementById('srcEdit-' + id);
+  var displayDiv = document.getElementById('srcDisplay-' + id);
+  if (editDiv) editDiv.style.display = 'none';
+  if (displayDiv) displayDiv.parentElement.style.display = 'flex';
+}
+
+window.editSource   = editSource;
+window.saveSource   = saveSource;
+window.cancelSource = cancelSource;
 
 // Render immediately with local data so app feels instant
 // Firebase auth will update with cloud data when it's ready
