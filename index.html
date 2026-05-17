@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v4.7 -->
+<!-- Tony's Recipes Collection v4.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -829,6 +829,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .calc-quick-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 
+
+/* ── BIDIRECTIONAL TEXT (Hebrew / RTL support) ── */
+/* dir=auto makes browser auto-detect text direction per element */
+.modal-title, .translate-block-title,
+.translate-ing-row, .translate-step,
+.ing-amount, .recipe-list-name,
+.card-name, .card-category,
+.view-title { direction: auto; unicode-bidi: plaintext; }
+
+/* Recipe view: ingredients and steps auto-direction */
+.recipe-ingredients li,
+.recipe-steps li,
+.recipe-step span { direction: auto; unicode-bidi: plaintext; text-align: start; }
+
+/* Source field */
+.source-link { direction: auto; unicode-bidi: plaintext; }
+
 </style>
 </head>
 <body>
@@ -848,7 +865,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.7</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.8</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -940,7 +957,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Recipe name</label>
-        <input class="form-input" id="f-name" placeholder="e.g. Grandma's Lasagna">
+        <input class="form-input" id="f-name" dir="auto" placeholder="e.g. Grandma's Lasagna">
       </div>
       <div class="form-group">
         <label class="form-label">Photo (optional)</label>
@@ -979,15 +996,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
       </div>
       <div class="form-group">
         <label class="form-label">Ingredients — one per line: "200g — pasta"</label>
-        <textarea class="form-textarea" id="f-ings" placeholder="200g — pasta&#10;2 — eggs&#10;1 cup — flour"></textarea>
+        <textarea class="form-textarea" id="f-ings" dir="auto" placeholder="200g — pasta&#10;2 — eggs&#10;1 cup — flour"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Steps — one per line</label>
-        <textarea class="form-textarea" id="f-steps" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
+        <textarea class="form-textarea" id="f-steps" dir="auto" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Source</label>
-        <input class="form-input" id="f-source" placeholder="e.g. https://www.example.com/recipe or 'AI generated'">
+        <input class="form-input" id="f-source" dir="auto" placeholder="e.g. https://www.example.com/recipe or 'AI generated'">
       </div>
       <button class="btn-submit" id="editSubmitBtn" onclick="saveRecipe()">Save Recipe</button>
     </div>
@@ -1182,7 +1199,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Paste your recipe text</label>
-        <textarea class="freehand-textarea" id="freehandText" placeholder="Paste any recipe here — copied from a website, a book, a WhatsApp message, in any language or format…"></textarea>
+        <textarea class="freehand-textarea" id="freehandText" dir="auto" placeholder="Paste any recipe here — copied from a website, a book, a WhatsApp message, in any language or format…"></textarea>
       </div>
       <button class="btn-submit" onclick="runFreehandImport()">🤖 Parse &amp; Import Recipe</button>
       <div id="freehandResult"></div>
@@ -1229,7 +1246,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1485,7 +1502,7 @@ function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
   const ings=r.ingredients.map(i=>{
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
-    return `<li><span>${i.n}</span><span class="ing-amount">${sc}</span></li>`;
+    return `<li dir="auto"><span>${i.n}</span><span class="ing-amount">${sc}</span></li>`;
   }).join('');
   document.getElementById('viewModal').innerHTML=`
     <button class="modal-close" onclick="closeM('viewOverlay')">✕</button>
@@ -2134,8 +2151,8 @@ function renderSuggestions(suggestions, containerId) {
   res.innerHTML = suggestions.map((s, i) => `
     <div class="sug-card" id="sugcard-${containerId}-${i}">
       <div class="sug-card-meta">${escH(s.cuisine||s.category||'')} &bull; ${escH(s.difficulty||'')} &bull; &#9200; ${escH(s.prep||'')}</div>
-      <div class="sug-card-title">${escH(s.name||'Untitled')}</div>
-      <div class="sug-card-body">
+      <div class="sug-card-title" dir="auto">${escH(s.name||'Untitled')}</div>
+      <div class="sug-card-body" dir="auto">
         <em>${escH(s.why||'')}</em><br><br>
         <strong>Key ingredients:</strong> ${(s.ingredients||[]).slice(0,5).map(i=>escH(i.n)).join(', ')}${(s.ingredients||[]).length>5?' &amp; more':''}
         <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${s.source.startsWith('http') ? s.source : '#'}" target="_blank" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
