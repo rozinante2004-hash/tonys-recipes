@@ -1,19 +1,82 @@
-const CACHE = 'tonys-recipes-v2';
-const PRECACHE = ['/', '/index.html', '/manifest.json'];
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+// Tony's Recipes — Service Worker v2
+// Strategy: Network first, fall back to cache
+// This ensures updates appear immediately on all devices
+
+const CACHE_NAME = 'tonys-recipes-v5';
+const URLS_TO_CACHE = [
+  '/tonys-recipes/',
+  '/tonys-recipes/index.html',
+  '/tonys-recipes/manifest.json',
+  '/tonys-recipes/icons/icon-192.png',
+  '/tonys-recipes/icons/icon-512.png',
+];
+
+// Install: pre-cache core files
+self.addEventListener('install', function(event) {
+  // Skip waiting so the new SW activates immediately
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(function(cache) {
+      return cache.addAll(URLS_TO_CACHE);
+    })
+  );
 });
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+
+// Activate: delete old caches immediately
+self.addEventListener('activate', function(event) {
+  event.waitUntil(
+    Promise.all([
+      // Take control of all open pages immediately
+      self.clients.claim(),
+      // Delete any old cache versions
+      caches.keys().then(function(cacheNames) {
+        return Promise.all(
+          cacheNames
+            .filter(function(name) { return name !== CACHE_NAME; })
+            .map(function(name) { return caches.delete(name); })
+        );
+      })
+    ])
+  );
 });
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (url.hostname==='api.anthropic.com'||url.hostname.includes('googleapis')||url.hostname.includes('gstatic')||url.hostname.includes('firestore')) {
-    e.respondWith(fetch(e.request).catch(()=>new Response('{"error":"offline"}',{headers:{'Content-Type':'application/json'}})));
+
+// Fetch: network first, cache fallback
+self.addEventListener('fetch', function(event) {
+  // Only handle same-origin requests for our app files
+  if (!event.request.url.includes('/tonys-recipes/')) return;
+
+  // For HTML (the main app): always try network first
+  if (event.request.destination === 'document' ||
+      event.request.url.endsWith('/tonys-recipes/') ||
+      event.request.url.endsWith('/tonys-recipes/index.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(function(response) {
+          // Got a fresh response — update the cache
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, clone);
+          });
+          return response;
+        })
+        .catch(function() {
+          // Network failed — serve from cache (offline support)
+          return caches.match(event.request);
+        })
+    );
     return;
   }
-  e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(res=>{
-    if(e.request.method==='GET'&&res.ok){const r=res.clone();caches.open(CACHE).then(c=>c.put(e.request,r));}
-    return res;
-  }).catch(()=>e.request.mode==='navigate'?caches.match('/index.html'):new Response('Offline',{status:503}))));
+
+  // For other assets (icons, manifest): cache first, network fallback
+  event.respondWith(
+    caches.match(event.request).then(function(cached) {
+      return cached || fetch(event.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+        return response;
+      });
+    })
+  );
 });
