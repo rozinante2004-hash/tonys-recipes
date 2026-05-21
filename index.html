@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v5.5 -->
+<!-- Tony's Recipes Collection v5.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -92,8 +92,18 @@
             if (typeof renderGrid    === 'function') renderGrid();
             try {
               if (typeof loadFromFirestore === 'function') {
+                var hadLocalData = recipes.length > 5; // more than default samples
                 var loaded = await loadFromFirestore();
-                if (!loaded && typeof saveToFirestore === 'function') await saveToFirestore();
+                if (!loaded) {
+                  // Nothing in Firestore yet
+                  if (hadLocalData) {
+                    // We have local recipes not yet in cloud - save them now
+                    toast('Saving your local recipes to cloud...');
+                    if (typeof saveToFirestore === 'function') await saveToFirestore();
+                  } else {
+                    if (typeof saveToFirestore === 'function') await saveToFirestore();
+                  }
+                }
                 if (typeof renderFilters === 'function') renderFilters();
                 if (typeof renderGrid    === 'function') renderGrid();
               }
@@ -860,7 +870,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v5.5</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v5.6</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1225,6 +1235,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 <!-- LOGIN / STORAGE SCREEN -->
 <div id="refreshBanner" onclick="applyRemoteUpdate()">New changes available — tap to refresh</div>
+<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#8A8279;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
     <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
@@ -1242,7 +1253,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v5.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v5.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1554,7 +1565,10 @@ function drawView(){
         <button class="action-btn" onclick="expOneWord(${r.id})">📄 Word</button>
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
+        ${r.originalPhoto ? `<button class="action-btn" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
+        ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
+      ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><img src="${r.originalPhoto}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
       <div class="share-panel" id="sp${r.id}">
         <div style="font-size:12px;color:var(--muted);margin-bottom:5px;">Share this recipe:</div>
         <div class="share-links">
@@ -1655,11 +1669,19 @@ function cvtIng(amt,targetUnit){
   }
   return amt;
 }
+function parseFraction(s) {
+  // Safe fraction parser - no eval() needed
+  if (s.includes('/')) {
+    var parts = s.split('/');
+    return parseFloat(parts[0]) / parseFloat(parts[1]);
+  }
+  return parseFloat(s);
+}
 function scaleAmt(amt,mult){
   if(mult===1)return amt;
   const m=amt.match(/^([\d./]+)\s*(.*)/);
   if(!m)return amt;
-  let n=m[1].includes('/')?eval(m[1]):parseFloat(m[1]);
+  let n=parseFraction(m[1]);
   const scaled=n*mult;
   return`${scaled%1===0?scaled:parseFloat(scaled.toFixed(2))}${m[2]?' '+m[2]:''}`;
 }
@@ -2060,8 +2082,11 @@ function openAddModal(id){
   document.getElementById('editOverlay').classList.add('open');
 }
 
+var photoUploadInProgress = false;
 function onPhotoFile(event){
   const file=event.target.files[0];if(!file)return;
+  photoUploadInProgress = true;
+  pendingPhoto = '';
   // Show preview immediately from local file
   var localRd=new FileReader();
   localRd.onload=function(e){
@@ -2071,15 +2096,15 @@ function onPhotoFile(event){
     document.getElementById('photoRemove').style.display='flex';
   };
   localRd.readAsDataURL(file);
-  // Upload to Storage in background — use temp id -1 for new recipes
-  var recipeId = editingId || ('new_' + Date.now());
-  uploadPhotoToStorage(file, recipeId).then(function(url){
+  // Compress and store result
+  uploadPhotoToStorage(file, 'form').then(function(url){
     pendingPhoto = url;
+    photoUploadInProgress = false;
   }).catch(function(err){
-    console.warn('Photo upload failed:', err.message);
-    // Fall back: keep base64 from local read
+    console.warn('Photo compress failed:', err.message);
+    // Fall back: read as base64
     var rd=new FileReader();
-    rd.onload=function(e){ pendingPhoto=e.target.result; };
+    rd.onload=function(e){ pendingPhoto=e.target.result; photoUploadInProgress=false; };
     rd.readAsDataURL(file);
   });
 }
@@ -2094,7 +2119,7 @@ function removePhoto(e){
 }
 function pickEmoji(e,el){selEmoji=e;document.querySelectorAll('.emoji-opt').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');}
 
-function saveRecipe(){
+async function saveRecipe(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){toast('Please enter a recipe name');return;}
   const rawIngs=document.getElementById('f-ings').value.trim().split('\n').filter(Boolean);
@@ -2647,14 +2672,21 @@ function spinner(msg) {
   return '<div class="explore-loading"><div class="ai-spinner"></div><br>' + msg + '</div>';
 }
 
-function applyParsedRecipe(parsed, resultDivId, overlayId) {
+function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   var ingsHtml = (parsed.ingredients||[]).map(function(i) {
     return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
   }).join('');
   var stepsHtml = (parsed.steps||[]).map(function(s,i) {
     return '<div class="translate-step"><span class="translate-step-num">' + (i+1) + '</span><span>' + escH(s) + '</span></div>';
   }).join('');
+  if (originalPhoto) parsed._originalPhoto = originalPhoto;
   var encodedParsed = JSON.stringify(parsed).replace(/"/g,'&quot;');
+  var origPhotoHtml = originalPhoto
+    ? '<div style="margin-top:8px;">'
+      + '<button class="action-btn" onclick="showOriginalPhotoPreview(this)">📸 Show Original</button>'
+      + '<div style="display:none;margin-top:6px;"><img src="' + originalPhoto + '" style="width:100%;border-radius:8px;border:1px solid var(--border);"></div>'
+      + '</div>'
+    : '';
   document.getElementById(resultDivId).innerHTML =
     '<div class="translate-block" style="margin-top:12px;">'
     + '<div class="translate-block-title">' + escH(parsed.name||'Untitled') + '</div>'
@@ -2662,8 +2694,18 @@ function applyParsedRecipe(parsed, resultDivId, overlayId) {
     + '<div class="translate-section-label">Ingredients</div>' + ingsHtml
     + '<div class="translate-section-label" style="margin-top:14px;">Method</div>' + stepsHtml
     + '</div>'
-    + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encodedParsed + ',\'' + overlayId + '\')">&#10003; Add to My Collection</button>';
+    + origPhotoHtml
+    + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encodedParsed + ',&quot;' + overlayId + '&quot;)">&#10003; Add to My Collection</button>';
 }
+
+function showOriginalPhotoPreview(btn) {
+  var box = btn.nextElementSibling;
+  if (!box) return;
+  var visible = box.style.display !== 'none';
+  box.style.display = visible ? 'none' : 'block';
+  btn.textContent = visible ? '📸 Show Original' : '📸 Hide Original';
+}
+window.showOriginalPhotoPreview = showOriginalPhotoPreview;
 
 function confirmImportParsed(parsed, overlayId) {
   recipes.unshift({
@@ -2672,6 +2714,7 @@ function confirmImportParsed(parsed, overlayId) {
     difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
     prep: parsed.prep || '-', servings: parsed.servings || '-',
     source: parsed.source || '',
+    originalPhoto: parsed._originalPhoto || '',
     bg: rndBg(), fav: false,
     ingredients: parsed.ingredients || [],
     steps: parsed.steps || []
@@ -2696,6 +2739,7 @@ function migrateRecipes(list) {
   return list.map(function(r) {
     if (r.source === undefined) r.source = '';
     if (r.nutrition === undefined) r.nutrition = null;
+    if (r.originalPhoto === undefined) r.originalPhoto = '';
     return r;
   });
 }
@@ -2720,6 +2764,11 @@ let saveTimer = null;
 function saveData() {
   saveLocal();
   if (window._driveMode && window._fbUser) {
+    if (!navigator.onLine) {
+      _offlineQueue = true;
+      setDriveStatus('syncing', 'Offline — will sync when online');
+      return;
+    }
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveToFirestore, 1500);
   }
@@ -2740,7 +2789,8 @@ async function saveToFirestore() {
   } catch(err) {
     window._justSaved = false;
     setDriveStatus('error', 'Sync failed');
-    console.warn('Firestore save failed:', err);
+    console.error('Firestore save FAILED:', err.code, err.message);
+    toast('Cloud sync failed: ' + err.message);
   }
 }
 
@@ -2770,15 +2820,19 @@ async function loadFromFirestore() {
     var isFirstSnapshot = true;
     _firestoreUnsubscribe = _fbDb.collection('users').doc(user.uid)
       .onSnapshot({includeMetadataChanges: false}, function(docSnap) {
-        // Always skip the very first snapshot — it's just the initial state
+        // Skip the first snapshot — it always fires immediately with current data
         if (isFirstSnapshot) { isFirstSnapshot = false; return; }
         if (!docSnap.exists) return;
         if (docSnap.metadata.hasPendingWrites) return;
         if (window._justSaved) return;
-        // This is a genuine remote change from another device
+        // Genuine remote change from another device — show banner
         window._pendingRemoteData = docSnap.data();
         var banner = document.getElementById('refreshBanner');
-        if (banner) banner.style.display = 'block';
+        if (banner) {
+          banner.style.display = 'block';
+          // Auto-hide after 30 seconds if not tapped
+          setTimeout(function() { banner.style.display = 'none'; }, 30000);
+        }
       }, function(err) {
         console.warn('onSnapshot error:', err.message);
       });
@@ -2878,9 +2932,18 @@ function setDriveStatus(state, text) {
   el.className = state; textEl.textContent = text;
 }
 
-function clearAllData() {
-  if (!confirm('Delete all LOCAL data? Cloud data is unaffected.')) return;
-  localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(NEXTID_KEY);
+async function clearAllData() {
+  var msg = window._driveMode
+    ? 'Reset all data? This will delete ALL recipes from BOTH this device AND the cloud (Firestore). This cannot be undone.'
+    : 'Reset all data? This will delete all recipes from this device.';
+  if (!confirm(msg)) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(NEXTID_KEY);
+  if (window._driveMode && window._fbUser && _fbDb) {
+    try {
+      await _fbDb.collection('users').doc(window._fbUser.uid).delete();
+    } catch(e) { console.warn('Firestore delete failed:', e); }
+  }
   location.reload();
 }
 
@@ -2952,7 +3015,7 @@ async function processCameraImage(event) {
       const recipeText = (d2.content||[]).map(function(b){ return b.text||''; }).join('\n');
       const parsed = extractJSON(recipeText);
       if (parsed.error) { res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>No recipe found.</strong></div>'; return; }
-      applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay');
+      applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay', e.target.result);
     } catch(err) {
       res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>Error:</strong> ' + escH(err.message) + '</div>';
     }
@@ -3071,8 +3134,86 @@ function printSelected(){var sel=getSelectedRecipes();if(!sel.length){toast('No 
 
 window.toggleSelectMode=toggleSelectMode; window.cancelSelectMode=cancelSelectMode; window.toggleRecipeSelect=toggleRecipeSelect; window.deleteSelected=deleteSelected; window.getSelectedRecipes=getSelectedRecipes; window.exportSelWord=exportSelWord; window.exportSelExcel=exportSelExcel; window.shareSelected=shareSelected; window.printSelected=printSelected;
 
-(function(){var fns=['startGoogleSignIn','useOfflineMode','signOut','openExploreModal','openSuggestModal','openAddModal','openFreehandModal','openUrlImportModal','openCameraImport','openShareAppModal','openTranslate','setView','setCat','toggleFav','openView','toggleShare','setMult','setUnit','saveRecipe','runSuggest','runExplore','runTranslate','runFreehandImport','runUrlImport','clearAllData','addSuggestion','confirmImportParsed','saveTranslation','toggleChip','setSugCount','addIngTag','tagKey','toggleDietDD','expOneExcel','expOneWord','exportAllExcel','exportAllWord','doEmail','doWhatsApp','doCopy','heroPhotoChanged','changeHeroPhoto','printRecipe','processCameraImage','shareAppWhatsApp','copyAppLink','closeDrop','toggleDrop','bgClose','closeM','pickEmoji','onPhotoFile','removePhoto','setLang','renderFilters','renderGrid','openCalcModal','setCalcCat','applyQuick','doCalc','doCalcReverse','calcNutrition','editSource','saveSource','cancelSource','cancelAutoLogin','toggleSelectMode','cancelSelectMode','toggleRecipeSelect','deleteSelected','exportSelWord','exportSelExcel','shareSelected','printSelected'];fns.forEach(function(name){try{var fn=eval(name);if(typeof fn==='function')window[name]=fn;}catch(e){}});})();
+// Expose all functions on window directly (no eval needed)
+window.startGoogleSignIn=startGoogleSignIn;window.useOfflineMode=useOfflineMode;window.signOut=signOut;
+window.openExploreModal=openExploreModal;window.openSuggestModal=openSuggestModal;window.openAddModal=openAddModal;
+window.openFreehandModal=openFreehandModal;window.openUrlImportModal=openUrlImportModal;window.openCameraImport=openCameraImport;
+window.openShareAppModal=openShareAppModal;window.openTranslate=openTranslate;window.setView=setView;window.setCat=setCat;
+window.toggleFav=toggleFav;window.openView=openView;window.toggleShare=toggleShare;window.setMult=setMult;window.setUnit=setUnit;
+window.saveRecipe=saveRecipe;window.runSuggest=runSuggest;window.runExplore=runExplore;window.runTranslate=runTranslate;
+window.runFreehandImport=runFreehandImport;window.runUrlImport=runUrlImport;window.clearAllData=clearAllData;
+window.addSuggestion=addSuggestion;window.confirmImportParsed=confirmImportParsed;window.saveTranslation=saveTranslation;
+window.toggleChip=toggleChip;window.setSugCount=setSugCount;window.addIngTag=addIngTag;window.tagKey=tagKey;
+window.toggleDietDD=toggleDietDD;window.syncDiets=syncDiets;
+window.expOneExcel=expOneExcel;window.expOneWord=expOneWord;window.exportAllExcel=exportAllExcel;window.exportAllWord=exportAllWord;
+window.doEmail=doEmail;window.doWhatsApp=doWhatsApp;window.doCopy=doCopy;
+window.heroPhotoChanged=heroPhotoChanged;window.changeHeroPhoto=changeHeroPhoto;window.printRecipe=printRecipe;
+window.processCameraImage=processCameraImage;window.shareAppWhatsApp=shareAppWhatsApp;window.copyAppLink=copyAppLink;
+window.closeDrop=closeDrop;window.toggleDrop=toggleDrop;window.bgClose=bgClose;window.closeM=closeM;
+window.pickEmoji=pickEmoji;window.onPhotoFile=onPhotoFile;window.removePhoto=removePhoto;window.setLang=setLang;
+window.renderFilters=renderFilters;window.renderGrid=renderGrid;
+window.openCalcModal=openCalcModal;window.setCalcCat=setCalcCat;window.applyQuick=applyQuick;
+window.doCalc=doCalc;window.doCalcReverse=doCalcReverse;window.calcNutrition=calcNutrition;
+window.editSource=editSource;window.saveSource=saveSource;window.cancelSource=cancelSource;
+window.cancelAutoLogin=cancelAutoLogin;
+window.toggleSelectMode=toggleSelectMode;window.cancelSelectMode=cancelSelectMode;
+window.toggleRecipeSelect=toggleRecipeSelect;window.deleteSelected=deleteSelected;
+window.exportSelWord=exportSelWord;window.exportSelExcel=exportSelExcel;
+window.shareSelected=shareSelected;window.printSelected=printSelected;
+window.applyRemoteUpdate=applyRemoteUpdate;
 
+
+// ─── ONLINE / OFFLINE DETECTION ─────────────────────────────────────────────
+var _offlineQueue = false; // true = we have unsaved changes from offline period
+
+function handleOnline() {
+  var bar = document.getElementById('offlineBanner');
+  if (bar) bar.style.display = 'none';
+  if (_offlineQueue && window._driveMode && window._fbUser) {
+    _offlineQueue = false;
+    toast('Back online — syncing to cloud...');
+    saveToFirestore();
+  }
+}
+
+function handleOffline() {
+  var bar = document.getElementById('offlineBanner');
+  if (bar) bar.style.display = 'block';
+}
+
+window.addEventListener('online',  handleOnline);
+window.addEventListener('offline', handleOffline);
+
+// Override saveData to track offline queue
+var _origSaveData = null; // set after saveData is defined
+
+
+function toggleOriginalPhoto(id) {
+  var box = document.getElementById('origPhotoBox-' + id);
+  if (!box) return;
+  var visible = box.style.display !== 'none';
+  box.style.display = visible ? 'none' : 'block';
+  // Update button text
+  var btns = document.querySelectorAll('.action-btn');
+  btns.forEach(function(b) {
+    if (b.onclick && b.getAttribute('onclick') === 'toggleOriginalPhoto(' + id + ')') {
+      b.textContent = visible ? '📸 Show Original' : '📸 Hide Original';
+    }
+  });
+}
+
+function removeOriginalPhoto(id) {
+  if (!confirm('Remove the original scan photo from this recipe? The extracted recipe text will remain.')) return;
+  var r = recipes.find(function(x){ return x.id === id; });
+  if (!r) return;
+  r.originalPhoto = '';
+  saveData();
+  drawView(); // re-render to remove the buttons
+  toast('Original photo removed.');
+}
+
+window.toggleOriginalPhoto = toggleOriginalPhoto;
+window.removeOriginalPhoto  = removeOriginalPhoto;
 loadLocal();
 renderFilters();
 renderGrid();
