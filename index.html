@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v5.8 -->
+<!-- Tony's Recipes Collection v6.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,8 +84,10 @@
             var signBtn = document.getElementById('signOutBtn');
             var loginSc = document.getElementById('loginScreen');
             var notice2 = document.getElementById('autoLoginNotice');
-            if (signBtn) signBtn.style.display = 'inline';
-            if (loginSc) loginSc.style.display = 'none';
+            var signInBtn = document.getElementById('signInHeaderBtn');
+            if (signBtn)   signBtn.style.display   = 'inline';
+            if (signInBtn) signInBtn.style.display  = 'none';
+            if (loginSc)   loginSc.style.display   = 'none';
             if (notice2) notice2.style.display = 'none';
             if (typeof setDriveStatus === 'function') setDriveStatus('syncing', '☁️ Syncing…');
             if (typeof renderFilters === 'function') renderFilters();
@@ -858,6 +860,35 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* Source field */
 .source-link { direction: auto; unicode-bidi: plaintext; }
 
+
+/* ── REFRESH NOTIFICATION BUTTON ── */
+#refreshBanner {
+  display: none;
+  position: sticky;
+  top: 0; left: 0; right: 0;
+  background: var(--terracotta);
+  color: white;
+  text-align: center;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  z-index: 900;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  letter-spacing: 0.2px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  animation: slideDown 0.3s ease;
+  transition: background 0.15s;
+}
+#refreshBanner:hover  { background: #a83a0c; }
+#refreshBanner:active { background: #8a2e08; }
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
 </style>
 </head>
 <body>
@@ -877,10 +908,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v5.8</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.0</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
+    <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
   </div>
   <div class="header-actions">
     <button class="btn btn-secondary" onclick="openShareAppModal()">📲 Share App</button>
@@ -1241,7 +1273,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 
 <!-- LOGIN / STORAGE SCREEN -->
-<div id="refreshBanner" onclick="applyRemoteUpdate()">New changes available — tap to refresh</div>
+<button id="refreshBanner" onclick="applyRemoteUpdate()">🔄 New changes available — tap to refresh</button>
 <div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#8A8279;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
@@ -1260,7 +1292,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v5.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1642,7 +1674,7 @@ function heroPhotoChanged(event){
   if(!r)return;
   toast('Uploading photo...');
   uploadPhotoToStorage(file, r.id).then(function(url){
-    r.photo=url; drawView(); renderGrid(); saveData(); toast('Photo updated!');
+    r.photo=url; r.updatedAt=Date.now(); drawView(); renderGrid(); saveData(); toast('Photo updated!');
   }).catch(function(err){
     toast('Photo upload failed: ' + err.message);
   });
@@ -2141,7 +2173,8 @@ async function saveRecipe(){
     source:document.getElementById('f-source') ? document.getElementById('f-source').value.trim() : '',
     fav:false,
     ingredients:ings.length?ings:[{a:'',n:'See notes'}],
-    steps:rawSteps.length?rawSteps:['Enjoy!']
+    steps:rawSteps.length?rawSteps:['Enjoy!'],
+   updatedAt:Date.now()
   };
   if(editingId){
     const idx=recipes.findIndex(r=>r.id===editingId);
@@ -2747,6 +2780,7 @@ function migrateRecipes(list) {
     if (r.source === undefined) r.source = '';
     if (r.nutrition === undefined) r.nutrition = null;
     if (r.originalPhoto === undefined) r.originalPhoto = '';
+    if (r.updatedAt === undefined) r.updatedAt = 0;
     return r;
   });
 }
@@ -2773,7 +2807,7 @@ function saveData() {
   if (window._driveMode && window._fbUser) {
     if (!navigator.onLine) {
       _offlineQueue = true;
-      setDriveStatus('syncing', 'Offline — will sync when online');
+      setDriveStatus('syncing', 'Offline - changes saved locally');
       return;
     }
     clearTimeout(saveTimer);
@@ -2818,14 +2852,30 @@ async function loadFromFirestore() {
     var hasData = false;
     if (snap.exists) {
       var data = snap.data();
-      var parsed = JSON.parse(data.recipes || '[]');
-        if (Array.isArray(parsed) && parsed.length > 0) {
-        recipes = migrateRecipes(parsed);
+      var fsRecipes = JSON.parse(data.recipes || '[]');
+      if (Array.isArray(fsRecipes) && fsRecipes.length > 0) {
+        fsRecipes = migrateRecipes(fsRecipes);
+        if (_offlineQueue && recipes.length > 0) {
+          // Offline changes exist — merge: keep newer version of each recipe
+          var merged = fsRecipes.slice();
+          recipes.forEach(function(localR) {
+            var fsIdx = merged.findIndex(function(fsR){ return fsR.id === localR.id; });
+            if (fsIdx >= 0) {
+              if ((localR.updatedAt || 0) > (merged[fsIdx].updatedAt || 0)) {
+                merged[fsIdx] = localR; // local is newer
+              }
+            } else {
+              merged.unshift(localR); // added offline
+            }
+          });
+          recipes = merged;
+        } else {
+          recipes = fsRecipes; // normal load
+        }
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
         hasData = true;
       }
-    } else {
     }
 
     // Step 2: Set up listener for FUTURE remote changes only
@@ -2935,16 +2985,35 @@ function signOut() {
   var banner = document.getElementById('refreshBanner');
   if (banner) banner.style.display = 'none';
   document.getElementById('signOutBtn').style.display = 'none';
-  setDriveStatus('', 'Offline mode');
-  toast('Signed out.');
+  var signInBtn = document.getElementById('signInHeaderBtn');
+  if (signInBtn) signInBtn.style.display = 'inline';
+  setDriveStatus('', 'Signed out');
+  // Show login screen after short delay
+  setTimeout(function() {
+    var ls = document.getElementById('loginScreen');
+    if (ls) ls.style.display = 'flex';
+  }, 800);
 }
 
 function useOfflineMode() {
   window._driveMode = false;
   document.getElementById('loginScreen').style.display = 'none';
+  var signInBtn = document.getElementById('signInHeaderBtn');
+  if (signInBtn) signInBtn.style.display = 'inline';
   loadLocal(); setDriveStatus('', 'Offline mode');
   renderFilters(); renderGrid();
 }
+
+function showLoginScreen() {
+  // Show login screen so user can sign in
+  var ls = document.getElementById('loginScreen');
+  if (ls) {
+    ls.style.display = 'flex';
+    var signInBtn = document.getElementById('signInHeaderBtn');
+    if (signInBtn) signInBtn.style.display = 'none';
+  }
+}
+window.showLoginScreen = showLoginScreen;
 
 function setDriveStatus(state, text) {
   const el = document.getElementById('driveStatus');
@@ -3146,7 +3215,50 @@ function toggleSelectMode(){selectMode=!selectMode;selectedIds.clear();var grid=
 function cancelSelectMode(){selectMode=false;selectedIds.clear();var grid=document.getElementById('recipeGrid');var btn=document.getElementById('selectModeBtn');grid.classList.remove('select-mode');btn.classList.remove('active-view');btn.textContent='Select';document.getElementById('deleteSelBar').classList.remove('visible');renderGrid();}
 function toggleRecipeSelect(event,id){event.stopPropagation();if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);updateDeleteBar();renderGrid();}
 function updateDeleteBar(){var bar=document.getElementById('deleteSelBar');var count=document.getElementById('deleteSelCount');if(selectedIds.size>0){bar.classList.add('visible');count.textContent=selectedIds.size+' recipe'+(selectedIds.size>1?'s':'')+' selected';}else{bar.classList.remove('visible');}}
-function deleteSelected(){if(!selectedIds.size)return;var names=recipes.filter(function(r){return selectedIds.has(r.id);}).map(function(r){return r.name;});if(!confirm(selectedIds.size===1?'Delete "'+names[0]+'"?':'Delete '+selectedIds.size+' recipes?\n\n'+names.join('\n')))return;recipes=recipes.filter(function(r){return!selectedIds.has(r.id);});saveData();cancelSelectMode();toast('Deleted');selectedIds.clear();renderGrid();}
+function deleteSelected(){
+  if(!selectedIds.size)return;
+  var names=recipes.filter(function(r){return selectedIds.has(r.id);}).map(function(r){return r.name;});
+  var offlineWarn = !navigator.onLine ? '\n\n⚠️ You are offline. This will also delete from the cloud when you reconnect.' : '';
+  if(!confirm((selectedIds.size===1?'Delete "'+names[0]+'"?':'Delete '+selectedIds.size+' recipes?\n\n'+names.join('\n'))+offlineWarn))return;
+  var deleted=recipes.filter(function(r){return selectedIds.has(r.id);});
+  recipes=recipes.filter(function(r){return!selectedIds.has(r.id);});
+  saveData();
+  cancelSelectMode();
+  selectedIds.clear();
+  renderGrid();
+  // Show undo toast for 5 seconds
+  var undoMsg = deleted.length===1 ? '"'+deleted[0].name+'" deleted' : deleted.length+' recipes deleted';
+  showUndoToast(undoMsg, function(){
+    deleted.forEach(function(r){ recipes.unshift(r); });
+    recipes.sort(function(a,b){ return b.id-a.id; });
+    saveData(); renderGrid();
+  });
+}
+
+var _undoTimer = null;
+function showUndoToast(msg, undoFn) {
+  var t = document.getElementById('toast');
+  if (!t) return;
+  clearTimeout(_undoTimer);
+  t.innerHTML = escH(msg) + ' &nbsp; <span onclick="undoDelete()" style="text-decoration:underline;cursor:pointer;font-weight:700;color:var(--gold);">Undo</span>';
+  t.classList.add('show');
+  window._undoFn = undoFn;
+  _undoTimer = setTimeout(function() {
+    t.classList.remove('show');
+    t.textContent = '';
+    window._undoFn = null;
+  }, 5000);
+}
+
+function undoDelete() {
+  if (window._undoFn) {
+    window._undoFn();
+    window._undoFn = null;
+    clearTimeout(_undoTimer);
+    toast('Restored!');
+  }
+}
+window.undoDelete = undoDelete;
 function getSelectedRecipes(){return recipes.filter(function(r){return selectedIds.has(r.id);});}
 function exportSelWord(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}downloadBlob(makeDocxBlob(sel),sel.length===1?sel[0].name.replace(/[^a-z0-9]/gi,'_')+'.docx':'Selected_'+sel.length+'_Recipes.docx');toast('Exported to Word!');cancelSelectMode();}
 function exportSelExcel(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var wb=XLSX.utils.book_new();if(sel.length>1){var rows=[['Selected Recipes'],[],['Name','Category','Difficulty','Prep','Servings']].concat(sel.map(function(r){return[r.name,r.category,r.difficulty,r.prep,r.servings];}));var sw=XLSX.utils.aoa_to_sheet(rows);sw['!cols']=[{wch:28},{wch:14},{wch:12},{wch:12},{wch:10}];XLSX.utils.book_append_sheet(wb,sw,'Summary');}sel.forEach(function(r){var ws=XLSX.utils.aoa_to_sheet(sheetRows(r));ws['!cols']=[{wch:18},{wch:60}];XLSX.utils.book_append_sheet(wb,ws,r.name.slice(0,31));});downloadExcelWb(wb,sel.length===1?sel[0].name.replace(/[^a-z0-9]/gi,'_')+'.xlsx':'Selected_'+sel.length+'_Recipes.xlsx');toast('Exported!');cancelSelectMode();}
@@ -3191,9 +3303,10 @@ function handleOnline() {
   var bar = document.getElementById('offlineBanner');
   if (bar) bar.style.display = 'none';
   if (_offlineQueue && window._driveMode && window._fbUser) {
-    _offlineQueue = false;
-    toast('Back online — syncing to cloud...');
-    saveToFirestore();
+    toast('Back online - syncing changes to cloud...');
+    saveToFirestore().then(function() {
+      _offlineQueue = false;
+    });
   }
 }
 
