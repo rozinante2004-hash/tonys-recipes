@@ -1224,6 +1224,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 
 <!-- LOGIN / STORAGE SCREEN -->
+<div id="refreshBanner" onclick="applyRemoteUpdate()">New changes available — tap to refresh</div>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
     <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
@@ -2729,16 +2730,21 @@ async function saveToFirestore() {
   if (!user || !window._driveMode) return;
   setDriveStatus('syncing', 'Saving...');
   try {
+    window._justSaved = true;
     await _fbDb.collection('users').doc(user.uid).set({
       recipes: JSON.stringify(recipes), nextId: nextId,
       updatedAt: new Date().toISOString()
     });
-    setDriveStatus('synced', 'Synced: ' + (user.displayName || user.email));
+    setTimeout(function() { window._justSaved = false; }, 2000);
+    setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
   } catch(err) {
+    window._justSaved = false;
     setDriveStatus('error', 'Sync failed');
     console.warn('Firestore save failed:', err);
   }
 }
+
+var _firestoreUnsubscribe = null;
 
 async function loadFromFirestore() {
   var user = window._fbUser;
@@ -2752,15 +2758,50 @@ async function loadFromFirestore() {
         recipes = migrateRecipes(parsed);
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
-        return true;
       }
     }
-    return false;
+
+    // Start listening for remote changes from other devices
+    if (_firestoreUnsubscribe) _firestoreUnsubscribe();
+    _firestoreUnsubscribe = _fbDb.collection('users').doc(user.uid)
+      .onSnapshot({includeMetadataChanges: false}, function(docSnap) {
+        if (!docSnap.exists) return;
+        if (docSnap.metadata.hasPendingWrites) return; // our own write
+        if (window._justSaved) return;                  // echo of our own save
+        // Remote change detected — show tap-to-refresh banner
+        window._pendingRemoteData = docSnap.data();
+        var banner = document.getElementById('refreshBanner');
+        if (banner) banner.style.display = 'block';
+      }, function(err) {
+        console.warn('onSnapshot error:', err.message);
+      });
+
+    return snap.exists;
   } catch(err) {
     console.warn('Firestore load failed:', err);
     return false;
   }
 }
+
+function applyRemoteUpdate() {
+  var data = window._pendingRemoteData;
+  if (!data) { location.reload(); return; }
+  try {
+    var parsed = JSON.parse(data.recipes || '[]');
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      recipes = migrateRecipes(parsed);
+      if (data.nextId) nextId = Math.max(nextId, data.nextId);
+      saveLocal();
+      renderFilters();
+      renderGrid();
+      toast('Recipes updated!');
+    }
+  } catch(e) { console.warn('Remote update error:', e); }
+  window._pendingRemoteData = null;
+  var banner = document.getElementById('refreshBanner');
+  if (banner) banner.style.display = 'none';
+}
+window.applyRemoteUpdate = applyRemoteUpdate;
 
 async function startGoogleSignIn() {
   var btn = document.getElementById('googleSignInBtn');
@@ -2806,8 +2847,11 @@ window.cancelAutoLogin = cancelAutoLogin;
 
 function signOut() {
   if (!confirm('Sign out? Your recipes are saved in the cloud.')) return;
+  if (_firestoreUnsubscribe) { _firestoreUnsubscribe(); _firestoreUnsubscribe = null; }
   if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser = null; window._driveMode = false;
+  var banner = document.getElementById('refreshBanner');
+  if (banner) banner.style.display = 'none';
   document.getElementById('signOutBtn').style.display = 'none';
   setDriveStatus('', 'Offline mode');
   toast('Signed out.');
