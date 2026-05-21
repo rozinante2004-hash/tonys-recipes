@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v5.6 -->
+<!-- Tony's Recipes Collection v5.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -870,7 +870,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v5.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v5.7</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1253,7 +1253,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v5.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v5.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2763,6 +2763,7 @@ function loadLocal() {
 let saveTimer = null;
 function saveData() {
   saveLocal();
+  console.log('[saveData] _driveMode:', window._driveMode, '_fbUser:', !!window._fbUser, 'online:', navigator.onLine);
   if (window._driveMode && window._fbUser) {
     if (!navigator.onLine) {
       _offlineQueue = true;
@@ -2771,13 +2772,24 @@ function saveData() {
     }
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveToFirestore, 1500);
+    console.log('[saveData] Scheduled Firestore save in 1.5s');
   }
 }
 
 async function saveToFirestore() {
   var user = window._fbUser;
-  if (!user || !window._driveMode) return;
-  setDriveStatus('syncing', 'Saving...');
+  console.log('[Firestore] saveToFirestore called. user:', !!user, '_driveMode:', window._driveMode, '_fbDb:', !!_fbDb);
+  if (!user || !window._driveMode) {
+    console.warn('[Firestore] Save skipped - user:', !!user, '_driveMode:', window._driveMode);
+    return;
+  }
+  if (!_fbDb) {
+    console.error('[Firestore] _fbDb is not initialised!');
+    toast('Error: Database not ready. Please refresh.');
+    return;
+  }
+  setDriveStatus('syncing', '☁️ Saving...');
+  console.log('[Firestore] Writing', recipes.length, 'recipes to users/' + user.uid);
   try {
     window._justSaved = true;
     await _fbDb.collection('users').doc(user.uid).set({
@@ -2785,12 +2797,13 @@ async function saveToFirestore() {
       updatedAt: new Date().toISOString()
     });
     setTimeout(function() { window._justSaved = false; }, 2000);
+    console.log('[Firestore] Save SUCCESS -', recipes.length, 'recipes saved');
     setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
   } catch(err) {
     window._justSaved = false;
     setDriveStatus('error', 'Sync failed');
-    console.error('Firestore save FAILED:', err.code, err.message);
-    toast('Cloud sync failed: ' + err.message);
+    console.error('[Firestore] Save FAILED:', err.code, err.message, err);
+    toast('❌ Cloud sync failed: ' + err.message);
   }
 }
 
@@ -2798,20 +2811,26 @@ var _firestoreUnsubscribe = null;
 
 async function loadFromFirestore() {
   var user = window._fbUser;
+  console.log('[Firestore] loadFromFirestore called. user:', !!user, '_fbDb:', !!_fbDb);
   if (!user) return false;
   try {
     // Step 1: One-time load to get current data
+    console.log('[Firestore] Reading users/' + user.uid);
     var snap = await _fbDb.collection('users').doc(user.uid).get();
     var hasData = false;
+    console.log('[Firestore] Document exists:', snap.exists);
     if (snap.exists) {
       var data = snap.data();
       var parsed = JSON.parse(data.recipes || '[]');
+      console.log('[Firestore] Loaded', parsed.length, 'recipes from Firestore');
       if (Array.isArray(parsed) && parsed.length > 0) {
         recipes = migrateRecipes(parsed);
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
         hasData = true;
       }
+    } else {
+      console.log('[Firestore] No document found for this user');
     }
 
     // Step 2: Set up listener for FUTURE remote changes only
