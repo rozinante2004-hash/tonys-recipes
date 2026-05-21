@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v4.8 -->
+<!-- Tony's Recipes Collection v5.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,8 +37,8 @@
     _fbAuth     = firebase.auth();
     _fbDb       = firebase.firestore();
     _fbProvider = new firebase.auth.GoogleAuthProvider();
-    window._fbAuth = _fbAuth;
-    window._fbDb   = _fbDb;
+    window._fbAuth    = _fbAuth;
+    window._fbDb      = _fbDb;
 
     _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
@@ -865,7 +865,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v4.8</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v5.0</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1246,7 +1246,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v4.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v5.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1580,14 +1580,54 @@ function changeHeroPhoto(id){
   const inp=document.getElementById('heroPhotoIn');
   inp.value=''; inp.click();
 }
+// Compress photo for cross-device sync via Firestore
+// Targets under 60KB so it fits within Firestore's 1MB document limit
+async function uploadPhotoToStorage(file, recipeId) {
+  return new Promise(function(resolve) {
+    var rd = new FileReader();
+    rd.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var attempts = [
+          {dim:600,q:0.75},{dim:500,q:0.65},{dim:400,q:0.60},{dim:300,q:0.55}
+        ];
+        var result = e.target.result;
+        for (var i = 0; i < attempts.length; i++) {
+          var a = attempts[i];
+          var w = img.width, h = img.height;
+          if (w > a.dim || h > a.dim) {
+            if (w > h) { h = Math.round(h*a.dim/w); w = a.dim; }
+            else { w = Math.round(w*a.dim/h); h = a.dim; }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+          ctx.drawImage(img,0,0,w,h);
+          var dataUrl = canvas.toDataURL('image/jpeg', a.q);
+          result = dataUrl;
+          if (Math.round(dataUrl.length*0.75/1024) <= 60) break;
+        }
+        resolve(result);
+      };
+      img.src = e.target.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+function resizePhotoForStorage(file) { return uploadPhotoToStorage(file, 'tmp'); }
+
+
 function heroPhotoChanged(event){
   const file=event.target.files[0]; if(!file)return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    const r=recipes.find(x=>x.id===heroPhotoTargetId);
-    if(r){r.photo=e.target.result; drawView(); renderGrid(); saveData(); toast('📷 Photo updated!');}
-  };
-  rd.readAsDataURL(file);
+  const r=recipes.find(x=>x.id===heroPhotoTargetId);
+  if(!r)return;
+  toast('Uploading photo...');
+  uploadPhotoToStorage(file, r.id).then(function(url){
+    r.photo=url; drawView(); renderGrid(); saveData(); toast('Photo updated!');
+  }).catch(function(err){
+    toast('Photo upload failed: ' + err.message);
+  });
 }
 
 // ═══════════════════════════════════
@@ -2025,15 +2065,26 @@ function openAddModal(id){
 
 function onPhotoFile(event){
   const file=event.target.files[0];if(!file)return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    pendingPhoto=e.target.result;
+  // Show preview immediately from local file
+  var localRd=new FileReader();
+  localRd.onload=function(e){
     const img=document.getElementById('photoPreview');
-    img.src=pendingPhoto;img.style.display='block';
+    img.src=e.target.result;img.style.display='block';
     document.getElementById('photoHint').style.display='none';
     document.getElementById('photoRemove').style.display='flex';
   };
-  rd.readAsDataURL(file);
+  localRd.readAsDataURL(file);
+  // Upload to Storage in background — use temp id -1 for new recipes
+  var recipeId = editingId || ('new_' + Date.now());
+  uploadPhotoToStorage(file, recipeId).then(function(url){
+    pendingPhoto = url;
+  }).catch(function(err){
+    console.warn('Photo upload failed:', err.message);
+    // Fall back: keep base64 from local read
+    var rd=new FileReader();
+    rd.onload=function(e){ pendingPhoto=e.target.result; };
+    rd.readAsDataURL(file);
+  });
 }
 function removePhoto(e){
   e.stopPropagation();
