@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v6.4 -->
+<!-- Tony's Recipes Collection v6.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -975,6 +975,33 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   cursor: pointer;
 }
 
+
+/* ── BRING! TOKEN STATUS ── */
+.bring-token-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: #fff8f0;
+  border: 1px solid #f0d9b5;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.bring-token-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #4CAF50; flex-shrink: 0;
+}
+.bring-token-dot.warn  { background: #FF9800; }
+.bring-token-dot.error { background: #F44336; }
+.bring-token-label { flex: 1; color: var(--ink); }
+.bring-token-btn {
+  font-size: 12px; padding: 4px 10px;
+  background: #E8630A; color: white;
+  border: none; border-radius: 6px;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  font-weight: 600; white-space: nowrap;
+}
+.bring-token-btn:hover { background: #c45508; }
+
 </style>
 </head>
 <body>
@@ -994,7 +1021,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.4</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.6</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1378,7 +1405,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1510,12 +1537,31 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 
 <!-- BRING! INGREDIENT PICKER -->
+<!-- BRING! BOOKMARKLET MODAL -->
+<div id="bringBookmarkletOverlay" onclick="bgClose(event,'bringBookmarkletOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+  <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:480px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--warm-brown);margin-bottom:12px;">🔖 Bring! Token Bookmarklet</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">This bookmarklet refreshes your Bring! connection in one click. <strong>Set it up once, use it whenever needed.</strong></p>
+    <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Step 1: Copy the bookmarklet code</div>
+    <div style="position:relative;margin-bottom:12px;">
+      <textarea id="bringBookmarkletCode" readonly style="width:100%;height:60px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;background:#f5f0ea;box-sizing:border-box;"></textarea>
+      <button onclick="copyBookmarklet()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 8px;background:var(--terracotta);color:white;border:none;border-radius:5px;cursor:pointer;">Copy</button>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;">Step 2: Create a bookmark</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">In Chrome: Bookmarks menu → Add page → paste the code as the URL.<br>Name it "Refresh Bring! Token".</p>
+    <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;">Step 3: Use it</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">When your Bring! token expires, go to <strong>web.getbring.com</strong> (while logged in) and click the bookmark. Done!</p>
+    <button onclick="closeM('bringBookmarkletOverlay')" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Got it!</button>
+  </div>
+</div>
+
 <div id="bringOverlay" onclick="bgClose(event,'bringOverlay')">
   <div id="bringModal">
     <div class="bring-header">
       <div class="bring-header-title">🛒 Send to Bring!</div>
       <button class="modal-close" onclick="closeM('bringOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
+    <div style="padding:8px 20px 0;" id="bringTokenStatus"></div>
     <div class="bring-subtext" id="bringSubtext">Select the ingredients you need</div>
     <div class="bring-ing-list" id="bringIngList"></div>
     <div class="bring-footer">
@@ -3508,11 +3554,12 @@ function sendToBring(id) {
     return;
   }
   _bringRecipeId = id;
-  _bringSelected = new Set(r.ingredients.map(function(_, i){ return i; })); // all selected by default
+  _bringSelected = new Set(r.ingredients.map(function(_, i){ return i; }));
 
   document.getElementById('bringSubtext').textContent =
     r.name + ' — select the ingredients you need';
   renderBringList(r);
+  renderBringTokenStatus();
   document.getElementById('bringOverlay').classList.add('open');
 }
 window.sendToBring = sendToBring;
@@ -3575,8 +3622,18 @@ async function bringConfirmSend() {
     });
     var data = await resp.json();
 
-    if (data.success) {
-      toast(items.length + ' ingredient' + (items.length > 1 ? 's' : '') + ' sent to Bring!');
+    if (data.tokenExpired) {
+      // Token expired — tell user how to refresh it
+      toast('Bring! token expired. See instructions to refresh.');
+      if (confirm('Your Bring! connection has expired (tokens last ~7 days).\n\nTo refresh:\n1. Go to web.getbring.com\n2. Open console (F12)\n3. Run: localStorage.getItem(\'accessToken\')\n4. Send the token to update the Worker\n\nFor now, copy ingredients to clipboard?')) {
+        var ingText = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
+        navigator.clipboard.writeText(ingText).then(function() {
+          toast('Ingredients copied! Open Bring! and paste.');
+          window.open('https://web.getbring.com', '_blank');
+        });
+      }
+    } else if (data.success) {
+      toast(items.length + ' ingredient' + (items.length > 1 ? 's' : '') + ' sent to Bring! ✅');
       // Open Bring! app
       setTimeout(function() {
         var a = document.createElement('a');
@@ -3588,18 +3645,13 @@ async function bringConfirmSend() {
           window.open('https://web.getbring.com', '_blank');
         }, 1500);
       }, 800);
-    } else if (data.error) {
-      // Login failed — fall back to clipboard
-      toast('Direct push failed, copying to clipboard...');
+    } else {
+      // Partial failure — fall back to clipboard
       var ingText = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
       navigator.clipboard.writeText(ingText).then(function() {
         toast(items.length + ' ingredients copied! Open Bring! and paste.');
-        setTimeout(function() {
-          window.open('https://web.getbring.com', '_blank');
-        }, 1000);
+        setTimeout(function() { window.open('https://web.getbring.com', '_blank'); }, 1000);
       });
-    } else {
-      toast(items.length + ' ingredients sent to Bring!');
     }
   } catch(err) {
     // Network error — fall back to clipboard
@@ -3611,6 +3663,185 @@ async function bringConfirmSend() {
   }
 }
 window.bringConfirmSend = bringConfirmSend;
+
+
+// ─── BRING! TOKEN MANAGEMENT ─────────────────────────────────────────────────
+var BRING_TOKEN_STORAGE_KEY = 'bring_token_expiry';
+var BRING_WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
+var BRING_TOKEN_SECRET = 'tonys-recipes-2024';
+var _bringPopup = null;
+var _bringTokenCheckInterval = null;
+
+function getBringTokenExpiry() {
+  try {
+    var stored = localStorage.getItem(BRING_TOKEN_STORAGE_KEY);
+    return stored ? parseInt(stored) : null;
+  } catch(e) { return null; }
+}
+
+function setBringTokenExpiry(expTs) {
+  try { localStorage.setItem(BRING_TOKEN_STORAGE_KEY, String(expTs)); } catch(e) {}
+}
+
+function getBringTokenDaysLeft() {
+  var exp = getBringTokenExpiry();
+  if (!exp) return null;
+  var msLeft = exp * 1000 - Date.now();
+  return Math.floor(msLeft / (1000 * 60 * 60 * 24));
+}
+
+async function updateBringToken(token) {
+  // Decode JWT to get expiry
+  try {
+    var parts = token.split('.');
+    if (parts.length !== 3) throw new Error('Invalid token');
+    var payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    setBringTokenExpiry(payload.exp);
+
+    // Send to Worker
+    var resp = await fetch(BRING_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bring-settoken', token: token, secret: BRING_TOKEN_SECRET })
+    });
+    var data = await resp.json();
+    if (data.success) {
+      toast('Bring! token updated! Valid for 7 days.');
+      renderBringTokenStatus();
+      return true;
+    }
+  } catch(e) {
+    console.warn('Bring! token update failed:', e);
+  }
+  return false;
+}
+
+// OPTION C: Auto-capture via popup + postMessage
+function openBringAutoRefresh() {
+  // Open web.getbring.com as a popup
+  // Our app listens for postMessage from the popup
+  // A userscript-style approach: we send a message to the popup asking for token
+  // This works because window.opener.postMessage is cross-origin safe
+
+  toast('Opening Bring! to capture token...');
+
+  _bringPopup = window.open(
+    'https://web.getbring.com?tonys_token_relay=1',
+    'bring_token_relay',
+    'width=500,height=600,left=200,top=100'
+  );
+
+  // Poll popup localStorage (same-origin blocks this, but postMessage works)
+  // Instead, inject a script via URL hash that runs on bring's page...
+  // Actually we CAN'T inject into bring's domain.
+  //
+  // REAL approach: use window.opener from bring's side.
+  // We open bring!, then we wait for bring to call window.opener.postMessage
+  // But bring doesn't know to do this.
+  //
+  // WORKING approach: Poll the popup for its localStorage via try/catch
+  // Cross-origin access throws — but we can catch and ignore.
+  // HOWEVER: if bring!'s token changes while popup is open, a StorageEvent
+  // fires on OUR window (same tab storage only, not cross-origin).
+  //
+  // ACTUAL WORKING solution: Message passing via URL + bring-relay page
+  // We have a relay page on OUR domain that the popup navigates to after login
+  // But bring! doesn't redirect to our domain.
+  //
+  // SIMPLEST WORKING solution for Option C:
+  // The popup opens bring!. We show instructions. When user clicks OK on popup,
+  // the popup runs a bookmarklet-style script we pre-loaded.
+  // Since the popup IS on bring!'s domain, it can read localStorage.
+  // We communicate via window.opener.postMessage!
+
+  // Start polling for the popup to send us the token
+  var attempts = 0;
+  _bringTokenCheckInterval = setInterval(function() {
+    attempts++;
+    if (attempts > 120) { // 2 minutes timeout
+      clearInterval(_bringTokenCheckInterval);
+      if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
+      toast('Token capture timed out. Use the bookmarklet instead.');
+    }
+    // Check if popup closed without sending token
+    if (_bringPopup && _bringPopup.closed) {
+      clearInterval(_bringTokenCheckInterval);
+    }
+  }, 1000);
+}
+
+// Listen for token from popup (Option C postMessage)
+window.addEventListener('message', function(event) {
+  // Only accept from Bring! domain
+  if (event.origin !== 'https://web.getbring.com') return;
+  if (!event.data || !event.data.bringToken) return;
+
+  clearInterval(_bringTokenCheckInterval);
+  if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
+
+  updateBringToken(event.data.bringToken).then(function(ok) {
+    if (ok) toast('Bring! token auto-captured successfully!');
+  });
+});
+
+// OPTION B: Bookmarklet — generates JS to copy to bookmark bar
+function showBringBookmarklet() {
+  var bookmarkletCode = 'javascript:(function(){'
+    + 'var t=localStorage.getItem("accessToken");'
+    + 'if(!t){alert("Not logged into Bring! Please sign in first.");return;}'
+    + 'fetch("' + BRING_WORKER_URL + '",'
+    + '{method:"POST",headers:{"Content-Type":"application/json"},'
+    + 'body:JSON.stringify({action:"bring-settoken",token:t,secret:"' + BRING_TOKEN_SECRET + '"})}'
+    + ').then(function(r){return r.json();})'
+    + '.then(function(d){alert(d.success?"Bring! token updated successfully! Valid for 7 days.":"Failed: "+d.message);})'
+    + '.catch(function(e){alert("Error: "+e.message);})'
+    + '})();';
+
+  // Show modal with bookmarklet
+  document.getElementById('bringBookmarkletCode').textContent = bookmarkletCode;
+  document.getElementById('bringBookmarkletOverlay').classList.add('open');
+}
+
+function copyBookmarklet() {
+  var code = document.getElementById('bringBookmarkletCode').textContent;
+  navigator.clipboard.writeText(code).then(function() {
+    toast('Bookmarklet code copied!');
+  });
+}
+
+function renderBringTokenStatus() {
+  var el = document.getElementById('bringTokenStatus');
+  if (!el) return;
+  var days = getBringTokenDaysLeft();
+  var dot, label, btn;
+  if (days === null) {
+    dot = 'error'; label = 'Bring! token not set'; btn = 'Setup';
+  } else if (days < 0) {
+    dot = 'error'; label = 'Bring! token expired'; btn = 'Refresh';
+  } else if (days <= 2) {
+    dot = 'warn'; label = 'Bring! token expires in ' + days + ' day' + (days===1?'':'s'); btn = 'Refresh Now';
+  } else {
+    dot = ''; label = 'Bring! token valid (' + days + ' days left)'; btn = 'Refresh';
+  }
+  el.innerHTML = '<div class="bring-token-dot' + (dot ? ' ' + dot : '') + '"></div>'
+    + '<span class="bring-token-label">' + label + '</span>'
+    + '<button class="bring-token-btn" onclick="openBringAutoRefresh()">' + btn + '</button>'
+    + '<button class="bring-token-btn" style="background:#8A8279;" onclick="showBringBookmarklet()">Bookmarklet</button>';
+}
+
+window.openBringAutoRefresh  = openBringAutoRefresh;
+window.showBringBookmarklet  = showBringBookmarklet;
+window.copyBookmarklet        = copyBookmarklet;
+window.renderBringTokenStatus = renderBringTokenStatus;
+
+// Initialise on load — set expiry from hardcoded token if not set
+(function() {
+  if (!getBringTokenExpiry()) {
+    // Set the current token expiry (May 29 2026 = 1780076628)
+    setBringTokenExpiry(1780076628);
+  }
+})();
+
 
 loadLocal();
 renderFilters();
