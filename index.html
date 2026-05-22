@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v6.2 -->
+<!-- Tony's Recipes Collection v6.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -889,6 +889,92 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   to   { transform: translateY(0);     opacity: 1; }
 }
 
+
+/* ── BRING! INGREDIENT PICKER ── */
+#bringOverlay {
+  position: fixed; inset: 0;
+  background: rgba(28,26,24,0.55);
+  z-index: 700;
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+#bringOverlay.open { opacity: 1; pointer-events: all; }
+#bringModal {
+  background: var(--card-bg);
+  border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 480px;
+  max-height: 85vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+.bring-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.bring-header-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px; color: var(--warm-brown);
+  flex: 1;
+}
+.bring-subtext {
+  font-size: 12px; color: var(--muted);
+  padding: 8px 20px 4px;
+}
+.bring-ing-list {
+  overflow-y: auto; flex: 1;
+  padding: 6px 20px 12px;
+}
+.bring-ing-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.bring-ing-item:last-child { border-bottom: none; }
+.bring-ing-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 13px;
+  transition: all 0.15s;
+}
+.bring-ing-item.selected .bring-ing-check {
+  background: #E8630A; border-color: #E8630A; color: white;
+}
+.bring-ing-name { flex: 1; font-size: 14px; color: var(--ink); }
+.bring-ing-amt  { font-size: 13px; color: var(--muted); font-weight: 500; }
+.bring-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; gap: 8px;
+}
+.bring-select-all {
+  font-size: 12px; color: var(--muted); cursor: pointer;
+  padding: 8px 0; text-decoration: underline; background: none; border: none;
+  font-family: 'DM Sans', sans-serif;
+}
+.bring-send-btn {
+  flex: 1; padding: 12px;
+  background: #E8630A; color: white;
+  border: none; border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #b54a00;
+  transition: all 0.1s;
+}
+.bring-send-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b54a00; }
+.bring-cancel-btn {
+  padding: 12px 16px;
+  background: white; color: var(--muted);
+  border: 1.5px solid var(--border); border-radius: 10px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  cursor: pointer;
+}
+
 </style>
 </head>
 <body>
@@ -908,7 +994,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.2</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.4</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1292,7 +1378,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1418,6 +1504,24 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
         <span class="calc-result-unit" id="calcResultUnit">Enter a value above</span>
       </div>
       <div class="calc-common-row" id="calcQuickRow"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- BRING! INGREDIENT PICKER -->
+<div id="bringOverlay" onclick="bgClose(event,'bringOverlay')">
+  <div id="bringModal">
+    <div class="bring-header">
+      <div class="bring-header-title">🛒 Send to Bring!</div>
+      <button class="modal-close" onclick="closeM('bringOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+    </div>
+    <div class="bring-subtext" id="bringSubtext">Select the ingredients you need</div>
+    <div class="bring-ing-list" id="bringIngList"></div>
+    <div class="bring-footer">
+      <button class="bring-select-all" onclick="bringToggleAll()">Select all</button>
+      <button class="bring-cancel-btn" onclick="closeM('bringOverlay')">Cancel</button>
+      <button class="bring-send-btn" onclick="bringConfirmSend()">Send to Bring!</button>
     </div>
   </div>
 </div>
@@ -3394,51 +3498,119 @@ function handleShareTarget() {
 
 
 // ─── SEND TO BRING! ──────────────────────────────────────────────────────────
+var _bringRecipeId = null;
+var _bringSelected = new Set();
+
 function sendToBring(id) {
   var r = recipes.find(function(x){ return x.id === id; });
+  if (!r || !r.ingredients || !r.ingredients.length) {
+    toast('No ingredients found in this recipe');
+    return;
+  }
+  _bringRecipeId = id;
+  _bringSelected = new Set(r.ingredients.map(function(_, i){ return i; })); // all selected by default
+
+  document.getElementById('bringSubtext').textContent =
+    r.name + ' — select the ingredients you need';
+  renderBringList(r);
+  document.getElementById('bringOverlay').classList.add('open');
+}
+window.sendToBring = sendToBring;
+
+function renderBringList(r) {
+  var list = document.getElementById('bringIngList');
+  list.innerHTML = r.ingredients.map(function(ing, i) {
+    var sel = _bringSelected.has(i);
+    return '<div class="bring-ing-item' + (sel ? ' selected' : '') + '" onclick="bringToggleIng(' + i + ')">'
+      + '<div class="bring-ing-check">' + (sel ? '✓' : '') + '</div>'
+      + '<div class="bring-ing-name">' + escH(ing.n) + '</div>'
+      + '<div class="bring-ing-amt">' + escH(ing.a || '') + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function bringToggleIng(idx) {
+  if (_bringSelected.has(idx)) _bringSelected.delete(idx);
+  else _bringSelected.add(idx);
+  var r = recipes.find(function(x){ return x.id === _bringRecipeId; });
+  if (r) renderBringList(r);
+}
+window.bringToggleIng = bringToggleIng;
+
+function bringToggleAll() {
+  var r = recipes.find(function(x){ return x.id === _bringRecipeId; });
   if (!r) return;
+  var btn = document.querySelector('.bring-select-all');
+  if (_bringSelected.size === r.ingredients.length) {
+    _bringSelected.clear();
+    if (btn) btn.textContent = 'Select all';
+  } else {
+    r.ingredients.forEach(function(_, i){ _bringSelected.add(i); });
+    if (btn) btn.textContent = 'Deselect all';
+  }
+  renderBringList(r);
+}
+window.bringToggleAll = bringToggleAll;
 
-  var servings = parseInt(r.servings) || 4;
-
-  // If recipe has a source URL, use Bring!'s URL parser (best experience)
-  if (r.source && r.source.startsWith('http')) {
-    var bringUrl = 'https://api.getbring.com/rest/bringrecipes/deeplink'
-      + '?url=' + encodeURIComponent(r.source)
-      + '&source=web'
-      + '&baseQuantity=' + servings
-      + '&requestedQuantity=' + servings;
-    window.open(bringUrl, '_blank');
+async function bringConfirmSend() {
+  var r = recipes.find(function(x){ return x.id === _bringRecipeId; });
+  if (!r || _bringSelected.size === 0) {
+    toast('Please select at least one ingredient');
     return;
   }
 
-  // No source URL — build a simple text list and open Bring! with it
-  // Bring! can't parse raw ingredient text via deeplink, so we use
-  // the share sheet approach: copy ingredients and open Bring!
-  var ingList = r.ingredients.map(function(i) {
-    return (i.a ? i.a + ' ' : '') + i.n;
-  }).join('\n');
-
-  var msg = 'Ingredients for ' + r.name + ':\n\n' + ingList;
-
-  // Show a small dialog with copy + open Bring!
-  var confirmed = confirm('Send to Bring!\n\nIngredients will be copied to clipboard.\nClick OK, then paste into Bring!' + '\n\n' + r.name + ' (' + r.ingredients.length + ' items)');
-  if (!confirmed) return;
-
-  navigator.clipboard.writeText(ingList).then(function() {
-    toast('Ingredients copied! Opening Bring!...');
-    setTimeout(function() {
-      // Try to open Bring! app directly
-      window.location.href = 'bring://';
-      // Fallback to web version after 1.5s if app not installed
-      setTimeout(function() {
-        window.open('https://web.getbring.com', '_blank');
-      }, 1500);
-    }, 500);
-  }).catch(function() {
-    toast('Could not copy — please copy manually');
+  var selected = r.ingredients.filter(function(_, i){ return _bringSelected.has(i); });
+  var items = selected.map(function(ing) {
+    return { name: ing.n, spec: ing.a || '' };
   });
+
+  closeM('bringOverlay');
+  toast('Sending to Bring!...');
+
+  try {
+    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bring-add', items: items })
+    });
+    var data = await resp.json();
+
+    if (data.success) {
+      toast(items.length + ' ingredient' + (items.length > 1 ? 's' : '') + ' sent to Bring!');
+      // Open Bring! app
+      setTimeout(function() {
+        var a = document.createElement('a');
+        a.href = 'bring://';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() {
+          window.open('https://web.getbring.com', '_blank');
+        }, 1500);
+      }, 800);
+    } else if (data.error) {
+      // Login failed — fall back to clipboard
+      toast('Direct push failed, copying to clipboard...');
+      var ingText = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
+      navigator.clipboard.writeText(ingText).then(function() {
+        toast(items.length + ' ingredients copied! Open Bring! and paste.');
+        setTimeout(function() {
+          window.open('https://web.getbring.com', '_blank');
+        }, 1000);
+      });
+    } else {
+      toast(items.length + ' ingredients sent to Bring!');
+    }
+  } catch(err) {
+    // Network error — fall back to clipboard
+    toast('Copying to clipboard...');
+    var ingText2 = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
+    navigator.clipboard.writeText(ingText2).then(function() {
+      toast('Ingredients copied! Paste into Bring!');
+    });
+  }
 }
-window.sendToBring = sendToBring;
+window.bringConfirmSend = bringConfirmSend;
 
 loadLocal();
 renderFilters();
