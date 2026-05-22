@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v6.1 -->
+<!-- Tony's Recipes Collection v6.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -908,7 +908,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.1</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.2</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1292,7 +1292,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1604,6 +1604,7 @@ function drawView(){
         <button class="action-btn" onclick="expOneWord(${r.id})">📄 Word</button>
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
+        <button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" onclick="sendToBring(${r.id})">🛒 Send to Bring!</button>
         ${r.originalPhoto ? `<button class="action-btn" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
@@ -3348,9 +3349,101 @@ function removeOriginalPhoto(id) {
 
 window.toggleOriginalPhoto = toggleOriginalPhoto;
 window.removeOriginalPhoto  = removeOriginalPhoto;
+
+// ─── WEB SHARE TARGET ────────────────────────────────────────────────────────
+// Handles URLs shared to the app via iPhone Share Sheet
+// The manifest.json share_target sends shares to /?share-target&url=...
+function handleShareTarget() {
+  var params = new URLSearchParams(window.location.search);
+  if (!params.has('share-target')) return;
+
+  var sharedUrl  = params.get('url')  || '';
+  var sharedText = params.get('text') || '';
+  var sharedTitle = params.get('title') || '';
+
+  // Clean the URL so refreshing doesn't re-trigger
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  if (!sharedUrl && !sharedText) return;
+
+  // Wait for app to be ready then open import
+  setTimeout(function() {
+    if (sharedUrl && sharedUrl.startsWith('http')) {
+      // Open URL import with the shared URL pre-filled
+      openUrlImportModal();
+      setTimeout(function() {
+        var inp = document.getElementById('urlImportInput');
+        if (inp) {
+          inp.value = sharedUrl;
+          toast('URL ready to import — tap Import!');
+        }
+      }, 300);
+    } else {
+      // Open freehand import with shared text pre-filled
+      openFreehandModal();
+      setTimeout(function() {
+        var ta = document.getElementById('freehandText');
+        if (ta) {
+          ta.value = sharedText || sharedTitle;
+          toast('Text ready to import — tap Extract!');
+        }
+      }, 300);
+    }
+  }, 1000);
+}
+
+
+// ─── SEND TO BRING! ──────────────────────────────────────────────────────────
+function sendToBring(id) {
+  var r = recipes.find(function(x){ return x.id === id; });
+  if (!r) return;
+
+  var servings = parseInt(r.servings) || 4;
+
+  // If recipe has a source URL, use Bring!'s URL parser (best experience)
+  if (r.source && r.source.startsWith('http')) {
+    var bringUrl = 'https://api.getbring.com/rest/bringrecipes/deeplink'
+      + '?url=' + encodeURIComponent(r.source)
+      + '&source=web'
+      + '&baseQuantity=' + servings
+      + '&requestedQuantity=' + servings;
+    window.open(bringUrl, '_blank');
+    return;
+  }
+
+  // No source URL — build a simple text list and open Bring! with it
+  // Bring! can't parse raw ingredient text via deeplink, so we use
+  // the share sheet approach: copy ingredients and open Bring!
+  var ingList = r.ingredients.map(function(i) {
+    return (i.a ? i.a + ' ' : '') + i.n;
+  }).join('\n');
+
+  var msg = 'Ingredients for ' + r.name + ':\n\n' + ingList;
+
+  // Show a small dialog with copy + open Bring!
+  var confirmed = confirm('Send to Bring!\n\nIngredients will be copied to clipboard.\nClick OK, then paste into Bring!' + '\n\n' + r.name + ' (' + r.ingredients.length + ' items)');
+  if (!confirmed) return;
+
+  navigator.clipboard.writeText(ingList).then(function() {
+    toast('Ingredients copied! Opening Bring!...');
+    setTimeout(function() {
+      // Try to open Bring! app directly
+      window.location.href = 'bring://';
+      // Fallback to web version after 1.5s if app not installed
+      setTimeout(function() {
+        window.open('https://web.getbring.com', '_blank');
+      }, 1500);
+    }, 500);
+  }).catch(function() {
+    toast('Could not copy — please copy manually');
+  });
+}
+window.sendToBring = sendToBring;
+
 loadLocal();
 renderFilters();
 renderGrid();
+handleShareTarget();
 
 </script>
 </body>
