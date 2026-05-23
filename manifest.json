@@ -1,4 +1,5 @@
 {
+  "_version": "v2.0",
   "name": "Tony's Recipes Collection",
   "short_name": "Tony's Recipes",
   "start_url": "/tonys-recipes/",
