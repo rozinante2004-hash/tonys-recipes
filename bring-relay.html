@@ -2,83 +2,156 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Bring! Token Relay</title>
+<title>Bring! Token Relay — Tony's Recipes</title>
 <style>
-  body { font-family: sans-serif; display: flex; align-items: center; justify-content: center;
-         min-height: 100vh; margin: 0; background: #FAF7F2; }
-  .box { text-align: center; padding: 32px; max-width: 400px; }
-  h2 { color: #5C3D2E; }
-  p  { color: #8A8279; }
-  .btn { background: #C1440E; color: white; border: none; border-radius: 10px;
-         padding: 14px 28px; font-size: 16px; cursor: pointer; margin-top: 16px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #FAF7F2;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .card { background: white; border-radius: 16px; padding: 32px; max-width: 420px;
+          width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center; }
+  .icon { font-size: 48px; margin-bottom: 16px; }
+  h2 { color: #5C3D2E; font-size: 20px; margin-bottom: 8px; }
+  p  { color: #8A8279; font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+  .btn { display: block; width: 100%; padding: 14px;
+         background: #C1440E; color: white; border: none; border-radius: 10px;
+         font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+  .btn:hover { background: #a33a0c; }
+  .btn.secondary { background: #8A8279; }
+  .status { font-size: 13px; color: #5C3D2E; background: #f5f0ea;
+            padding: 10px; border-radius: 8px; margin-top: 12px; }
+  .success { color: #2e7d32; background: #e8f5e9; }
+  .error   { color: #c62828; background: #ffebee; }
 </style>
 </head>
 <body>
-<div class="box">
-  <div style="font-size:48px;">🛒</div>
-  <h2>Bring! Token Relay</h2>
-  <p>This page captures your Bring! login token and sends it back to Tony's Recipes.</p>
-  <p id="status">Waiting for Bring! to load...</p>
-  <button class="btn" onclick="captureToken()">Capture Token Now</button>
+<div class="card">
+  <div class="icon">🛒</div>
+  <h2>Refresh Bring! Connection</h2>
+  <p>This will update your Bring! token in Tony's Recipes so ingredients keep syncing automatically.</p>
+  <div id="status" class="status">Ready to capture token.</div>
+  <button class="btn" id="mainBtn" onclick="startCapture()">Connect to Bring!</button>
+  <button class="btn secondary" style="margin-top:8px;" onclick="window.close()">Cancel</button>
 </div>
+
 <script>
-function captureToken() {
-  document.getElementById('status').textContent = 'Opening Bring!...';
+var WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
+var SECRET     = 'tonys-recipes-2024';
 
-  // Open web.getbring.com as popup — user is already logged in
-  var popup = window.open('https://web.getbring.com', 'bring_auth',
-    'width=480,height=600,left=100,top=100');
+function setStatus(msg, type) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
 
+function startCapture() {
+  setStatus('Opening Bring! — please sign in if prompted...', '');
+  document.getElementById('mainBtn').disabled = true;
+  document.getElementById('mainBtn').textContent = 'Waiting...';
+
+  // Open web.getbring.com — user already signed in, token is in localStorage
+  // We use a named window so we can check if it loaded
+  var bringWin = window.open('https://web.getbring.com', 'bring_auth_window',
+    'width=480,height=620,scrollbars=yes');
+
+  if (!bringWin) {
+    setStatus('Popup blocked. Please allow popups for this site.', 'error');
+    document.getElementById('mainBtn').disabled = false;
+    document.getElementById('mainBtn').textContent = 'Try Again';
+    return;
+  }
+
+  // Poll until Bring! loads and we can read the token
+  // Cross-origin localStorage access will throw — we catch and wait
   var attempts = 0;
+  var maxAttempts = 30;
   var timer = setInterval(function() {
     attempts++;
-    if (attempts > 60) {
-      clearInterval(timer);
-      document.getElementById('status').textContent = 'Timed out. Make sure you are logged into Bring!';
-      return;
-    }
+    setStatus('Waiting for Bring! to load... (' + attempts + 's)', '');
+
     try {
-      // Try to read from popup localStorage — will throw if cross-origin
-      var token = popup.localStorage.getItem('accessToken');
+      // This will throw if cross-origin — which it will be
+      var token = bringWin.localStorage && bringWin.localStorage.getItem('accessToken');
       if (token) {
         clearInterval(timer);
-        popup.close();
-        sendTokenToApp(token);
+        bringWin.close();
+        sendToken(token);
+        return;
       }
     } catch(e) {
-      // Cross-origin — expected, keep waiting
-      document.getElementById('status').textContent = 'Waiting... (' + attempts + 's)';
+      // Expected — cross-origin blocks localStorage access
     }
-    if (popup.closed) {
+
+    if (bringWin.closed) {
       clearInterval(timer);
-      document.getElementById('status').textContent = 'Bring! window closed. Please try again.';
+      // Window closed without us getting token — try asking user to run script
+      setStatus('Bring! window was closed. Please use the manual method below.', 'error');
+      showManual();
+      return;
+    }
+
+    if (attempts >= maxAttempts) {
+      clearInterval(timer);
+      // Can't read cross-origin localStorage — show manual instructions
+      bringWin.close();
+      showManual();
     }
   }, 1000);
 }
 
-function sendTokenToApp(token) {
-  document.getElementById('status').textContent = 'Token captured! Sending to app...';
-  // Send to parent/opener
-  if (window.opener) {
-    window.opener.postMessage({ bringToken: token }, '*');
-    document.getElementById('status').textContent = 'Done! Token sent to Tony\'s Recipes.';
-    setTimeout(function() { window.close(); }, 2000);
-  } else {
-    // Send directly to Worker
-    fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'bring-settoken', token: token, secret: 'tonys-recipes-2024' })
-    }).then(r => r.json()).then(d => {
-      document.getElementById('status').textContent = d.success
-        ? 'Token updated! You can close this page.' : 'Failed: ' + d.message;
-    });
-  }
+function showManual() {
+  document.getElementById('mainBtn').style.display = 'none';
+  document.getElementById('status').innerHTML =
+    '<strong>Manual method:</strong><br><br>'
+    + '1. Go to <a href="https://web.getbring.com" target="_blank">web.getbring.com</a> (sign in if needed)<br>'
+    + '2. Press F12 → Console tab<br>'
+    + '3. Paste this and press Enter:<br><br>'
+    + '<code style="background:#eee;padding:4px 6px;border-radius:4px;font-size:11px;word-break:break-all;">'
+    + 'fetch("' + WORKER_URL + '",{method:"POST",headers:{"Content-Type":"application/json"},'
+    + 'body:JSON.stringify({action:"bring-settoken",token:localStorage.getItem("accessToken"),secret:"' + SECRET + '"})}).then(r=>r.json()).then(d=>alert(d.success?"Token updated!":"Failed: "+d.message))'
+    + '</code><br><br>'
+    + '4. You\'ll see an alert confirming success.';
 }
 
-// Auto-run if opened by the app
-if (document.referrer.includes('rozinante2004-hash.github.io')) {
-  captureToken();
+function sendToken(token) {
+  setStatus('Token captured! Sending to Tony\'s Recipes...', '');
+
+  // Decode to check expiry
+  try {
+    var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    var exp = new Date(payload.exp * 1000);
+    var days = Math.floor((payload.exp * 1000 - Date.now()) / 86400000);
+    setStatus('Token captured! Expires ' + exp.toLocaleDateString() + ' (' + days + ' days). Sending...', '');
+  } catch(e) {}
+
+  // Send to Worker
+  fetch(WORKER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'bring-settoken', token: token, secret: SECRET })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      setStatus('Token updated successfully! Bring! connection valid for 7 days.', 'success');
+      // Notify parent window (Tony's Recipes app)
+      if (window.opener) {
+        window.opener.postMessage({ bringToken: token }, 'https://rozinante2004-hash.github.io');
+      }
+      setTimeout(function() { window.close(); }, 2500);
+    } else {
+      setStatus('Worker update failed: ' + (d.message || d.error), 'error');
+      showManual();
+    }
+  })
+  .catch(function(err) {
+    setStatus('Network error: ' + err.message, 'error');
+    showManual();
+  });
+}
+
+// If this page was opened by the app, auto-start
+if (document.referrer && document.referrer.includes('rozinante2004-hash.github.io')) {
+  setTimeout(startCapture, 500);
 }
 </script>
 </body>

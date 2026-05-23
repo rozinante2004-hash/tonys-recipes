@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v6.6 -->
+<!-- Tony's Recipes Collection v6.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1021,7 +1021,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v6.9</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1405,7 +1405,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v6.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -3718,69 +3718,49 @@ async function updateBringToken(token) {
 
 // OPTION C: Auto-capture via popup + postMessage
 function openBringAutoRefresh() {
-  // Open web.getbring.com as a popup
-  // Our app listens for postMessage from the popup
-  // A userscript-style approach: we send a message to the popup asking for token
-  // This works because window.opener.postMessage is cross-origin safe
-
-  toast('Opening Bring! to capture token...');
-
+  toast('Opening Bring! relay...');
+  // Open our relay page (same domain — can talk to us via postMessage)
+  // The relay opens web.getbring.com and reads the token
   _bringPopup = window.open(
-    'https://web.getbring.com?tonys_token_relay=1',
-    'bring_token_relay',
-    'width=500,height=600,left=200,top=100'
+    'https://rozinante2004-hash.github.io/tonys-recipes/bring-relay.html',
+    'bring_relay',
+    'width=500,height=500,left=200,top=100'
   );
-
-  // Poll popup localStorage (same-origin blocks this, but postMessage works)
-  // Instead, inject a script via URL hash that runs on bring's page...
-  // Actually we CAN'T inject into bring's domain.
-  //
-  // REAL approach: use window.opener from bring's side.
-  // We open bring!, then we wait for bring to call window.opener.postMessage
-  // But bring doesn't know to do this.
-  //
-  // WORKING approach: Poll the popup for its localStorage via try/catch
-  // Cross-origin access throws — but we can catch and ignore.
-  // HOWEVER: if bring!'s token changes while popup is open, a StorageEvent
-  // fires on OUR window (same tab storage only, not cross-origin).
-  //
-  // ACTUAL WORKING solution: Message passing via URL + bring-relay page
-  // We have a relay page on OUR domain that the popup navigates to after login
-  // But bring! doesn't redirect to our domain.
-  //
-  // SIMPLEST WORKING solution for Option C:
-  // The popup opens bring!. We show instructions. When user clicks OK on popup,
-  // the popup runs a bookmarklet-style script we pre-loaded.
-  // Since the popup IS on bring!'s domain, it can read localStorage.
-  // We communicate via window.opener.postMessage!
-
-  // Start polling for the popup to send us the token
-  var attempts = 0;
-  _bringTokenCheckInterval = setInterval(function() {
-    attempts++;
-    if (attempts > 120) { // 2 minutes timeout
-      clearInterval(_bringTokenCheckInterval);
-      if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
-      toast('Token capture timed out. Use the bookmarklet instead.');
-    }
-    // Check if popup closed without sending token
-    if (_bringPopup && _bringPopup.closed) {
-      clearInterval(_bringTokenCheckInterval);
-    }
-  }, 1000);
+  if (!_bringPopup) {
+    // Popup blocked — fall back to bookmarklet
+    toast('Popup blocked. Use the bookmarklet instead.');
+    showBringBookmarklet();
+    return;
+  }
+  // Listen for token via postMessage (relay sends it back)
+  // postMessage listener is already set up globally
+  var timeout = setTimeout(function() {
+    if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
+    toast('Auto-capture timed out. Use the bookmarklet.');
+    showBringBookmarklet();
+  }, 120000);
+  window._bringRelayTimeout = timeout;
 }
 
 // Listen for token from popup (Option C postMessage)
 window.addEventListener('message', function(event) {
-  // Only accept from Bring! domain
-  if (event.origin !== 'https://web.getbring.com') return;
+  // Accept from our relay page (same GitHub domain) or Bring! domain
+  var allowed = [
+    'https://rozinante2004-hash.github.io',
+    'https://web.getbring.com'
+  ];
+  if (!allowed.includes(event.origin)) return;
   if (!event.data || !event.data.bringToken) return;
 
+  clearTimeout(window._bringRelayTimeout);
   clearInterval(_bringTokenCheckInterval);
   if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
 
   updateBringToken(event.data.bringToken).then(function(ok) {
-    if (ok) toast('Bring! token auto-captured successfully!');
+    if (ok) {
+      toast('✅ Bring! connection refreshed! Valid for 7 days.');
+      renderBringTokenStatus();
+    }
   });
 });
 
@@ -3809,24 +3789,42 @@ function copyBookmarklet() {
   });
 }
 
+function isMobile() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 function renderBringTokenStatus() {
   var el = document.getElementById('bringTokenStatus');
   if (!el) return;
   var days = getBringTokenDaysLeft();
-  var dot, label, btn;
+  var dot, label;
   if (days === null) {
-    dot = 'error'; label = 'Bring! token not set'; btn = 'Setup';
+    dot = 'error'; label = 'Bring! token not set';
   } else if (days < 0) {
-    dot = 'error'; label = 'Bring! token expired'; btn = 'Refresh';
+    dot = 'error'; label = 'Bring! token expired';
   } else if (days <= 2) {
-    dot = 'warn'; label = 'Bring! token expires in ' + days + ' day' + (days===1?'':'s'); btn = 'Refresh Now';
+    dot = 'warn'; label = 'Bring! token expires in ' + days + ' day' + (days===1?'':'s');
   } else {
-    dot = ''; label = 'Bring! token valid (' + days + ' days left)'; btn = 'Refresh';
+    dot = ''; label = 'Bring! connected (' + days + ' days left)';
   }
+
+  var buttons = '';
+  if (days === null || days <= 2) {
+    if (isMobile()) {
+      // On mobile — can't use web.getbring.com, show reminder
+      buttons = '<span style="font-size:11px;color:var(--muted);margin-left:4px;">Refresh on PC when needed</span>';
+    } else {
+      // On desktop — show refresh + bookmarklet buttons
+      buttons = '<button class="bring-token-btn" onclick="event.stopPropagation();openBringAutoRefresh()">'
+        + (days < 0 ? 'Refresh' : days <= 2 ? 'Refresh Now' : 'Refresh') + '</button>'
+        + '<button class="bring-token-btn" style="background:#8A8279;margin-left:4px;" '
+        + 'onclick="event.stopPropagation();showBringBookmarklet()">Bookmarklet</button>';
+    }
+  }
+
   el.innerHTML = '<div class="bring-token-dot' + (dot ? ' ' + dot : '') + '"></div>'
     + '<span class="bring-token-label">' + label + '</span>'
-    + '<button class="bring-token-btn" onclick="openBringAutoRefresh()">' + btn + '</button>'
-    + '<button class="bring-token-btn" style="background:#8A8279;" onclick="showBringBookmarklet()">Bookmarklet</button>';
+    + buttons;
 }
 
 window.openBringAutoRefresh  = openBringAutoRefresh;
