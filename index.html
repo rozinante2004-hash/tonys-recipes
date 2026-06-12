@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.3 -->
+<!-- Tony's Recipes Collection v9.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1196,7 +1196,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.3</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.4</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1591,7 +1591,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1612,8 +1612,8 @@ body.banner-shown .header {
     </div>
     <div class="login-divider">or</div>
     <button class="offline-btn" onclick="useOfflineMode()">
-      Continue without Google Drive<br>
-      <span style="font-size:11px;opacity:0.7">(data saved on this device only)</span>
+      Continue offline<br>
+      <span style="font-size:11px;opacity:0.7">(changes will sync to cloud when you sign in)</span>
     </button>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);">
           <input type="checkbox" id="rememberMe" checked style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">
@@ -3454,6 +3454,9 @@ async function loadFromFirestore() {
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
         hasData = true;
+        if (_offlineQueue) {
+          toast('✅ Offline changes merged with cloud data');
+        }
       }
     }
 
@@ -3583,15 +3586,20 @@ function signOut() {
 
 function useOfflineMode() {
   window._driveMode = false;
+  // Mark that we have local changes to protect when signing in later
+  _offlineQueue = true;
   document.getElementById('loginScreen').style.display = 'none';
   var signInBtn = document.getElementById('signInHeaderBtn');
   if (signInBtn) signInBtn.style.display = 'inline';
-  loadLocal(); setDriveStatus('', 'Offline mode');
+  loadLocal();
+  setDriveStatus('offline', '📶 Offline — tap Sign in when connected to sync');
   renderFilters(); renderGrid();
 }
 
 function showLoginScreen() {
-  // Show login screen so user can sign in
+  // Save current local data before showing login — protects offline changes
+  saveLocal();
+  _offlineQueue = true; // tell Firestore load to merge rather than overwrite
   var ls = document.getElementById('loginScreen');
   if (ls) {
     ls.style.display = 'flex';
