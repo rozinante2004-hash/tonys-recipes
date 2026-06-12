@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v7.9 -->
+<!-- Tony's Recipes Collection v8.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1125,7 +1125,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.9</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.0</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1510,7 +1510,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -4090,45 +4090,44 @@ async function useSelectedSearchPhoto() {
   toast('Downloading photo...');
 
   try {
-    // Fetch the full-size image and convert to blob
     var resp = await fetch(img.url);
+    if (!resp.ok) throw new Error('Could not download image: ' + resp.status);
     var blob = await resp.blob();
-    var file = new File([blob], 'web-photo.jpg', { type: 'image/jpeg' });
+    var file = new File([blob], 'web-photo.jpg', { type: blob.type || 'image/jpeg' });
 
-    // Reuse the existing photo upload pipeline
-    heroPhotoTargetId = heroPhotoTargetId;
     photoUploadInProgress = true;
-    pendingPhoto = '';
 
-    var localRd = new FileReader();
-    localRd.onload = function(e) {
-      var preview = document.getElementById('editPhotoPreview');
-      if (preview) preview.src = e.target.result;
-    };
-    localRd.readAsDataURL(file);
-
-    // Upload via existing pipeline
+    // Compress to base64
     var photoUrl = await uploadPhotoToStorage(file, heroPhotoTargetId);
-    if (photoUrl) {
-      pendingPhoto = photoUrl;
-      // Update recipe immediately if in view mode
-      var r = recipes.find(function(x){ return x.id === heroPhotoTargetId; });
-      if (r) {
-        r.photo = photoUrl;
-        saveRecipe(r, false);
-        // Refresh hero image in view modal
-        var heroImg = document.getElementById('viewHeroImg');
-        if (heroImg) heroImg.src = photoUrl;
-        toast('Photo updated!');
-      }
-    }
     photoUploadInProgress = false;
+
+    if (!photoUrl) throw new Error('Photo compression failed');
+
+    // Find recipe and update
+    var r = recipes.find(function(x){ return x.id === heroPhotoTargetId; });
+    if (!r) throw new Error('Recipe not found (id=' + heroPhotoTargetId + ')');
+
+    console.log('[PhotoSearch] Saving photo to recipe:', r.name, 'url length:', photoUrl.length);
+    r.photo = photoUrl;
+    r.updatedAt = Date.now();
+    pendingPhoto = photoUrl;
+
+    // Save to localStorage + Firestore
+    saveData();
+    console.log('[PhotoSearch] saveData() called');
+
+    // Refresh UI
+    var heroImg = document.getElementById('viewHeroImg');
+    if (heroImg) heroImg.src = photoUrl;
+    renderGrid();
+    toast('\u2705 Photo updated!');
+
   } catch(err) {
     photoUploadInProgress = false;
-    toast('Photo download failed: ' + err.message);
+    console.error('[PhotoSearch] Error:', err);
+    toast('Photo failed: ' + err.message);
   }
 }
-
 // ─── APP HELP / AI ASSISTANT ─────────────────────────────────────────────────
 var HELP_SYSTEM_PROMPT = [
   "You are a helpful assistant for Tony's Recipes Collection app.",
