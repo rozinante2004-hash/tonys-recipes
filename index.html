@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.1 -->
+<!-- Tony's Recipes Collection v9.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1196,7 +1196,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.1</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.3</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1591,7 +1591,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -3403,10 +3403,19 @@ async function saveToFirestore() {
     setDriveStatus('error', 'Sync failed');
     console.error('[Firestore] Save FAILED:', err.code, err.message, err);
     var fbErr = err.message || '';
+    // Queue for retry when back online
+    _offlineQueue = true;
     if (fbErr.includes('quota') || fbErr.includes('RESOURCE_EXHAUSTED')) {
       showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/project/recipes-f379d/firestore\n\nUpgrade at: https://console.firebase.google.com/project/recipes-f379d/overview');
     } else {
-      toast('❌ Cloud sync failed: ' + fbErr);
+      toast('❌ Cloud sync failed — will retry automatically when connection is restored');
+      // Schedule automatic retry in 30 seconds
+      setTimeout(function() {
+        if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) {
+          toast('🔄 Retrying cloud sync...');
+          saveToFirestore().then(function() { _offlineQueue = false; });
+        }
+      }, 30000);
     }
   }
 }
@@ -3597,6 +3606,19 @@ function setDriveStatus(state, text) {
   const textEl = document.getElementById('dsText');
   if (!el || !textEl) return;
   el.className = state; textEl.textContent = text;
+
+  // Update the bottom status bar with accurate storage info
+  var bar = document.getElementById('saveStatusBar');
+  if (!bar) return;
+  if (state === 'synced') {
+    bar.textContent = '☁️ Saved to your Google account (Firebase cloud)';
+  } else if (state === 'syncing') {
+    bar.textContent = '🔄 Saving to cloud...';
+  } else if (state === 'error') {
+    bar.textContent = '⚠️ Cloud sync failed — changes saved locally';
+  } else if (state === 'offline') {
+    bar.textContent = '📶 Offline — changes saved locally, will sync when reconnected';
+  }
 }
 
 async function clearAllData() {
