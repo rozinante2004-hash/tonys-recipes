@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v7.5 -->
+<!-- Tony's Recipes Collection v7.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -163,6 +163,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .drop-group { position: relative; }
 .drop-menu { display: none; position: absolute; top: calc(100% + 5px); right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 400; overflow: hidden; }
 .drop-menu.open { display: block; }
+#helpOverlay.open,
+#photoSearchOverlay.open,
+#bringTokenExpiredOverlay.open,
+#bringBookmarkletOverlay.open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
 .drop-item { padding: 10px 14px; font-size: 13px; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 8px; transition: background 0.1s; border: none; background: none; width: 100%; font-family: 'DM Sans', sans-serif; text-align: left; }
 .drop-item:hover { background: #FFF0E8; color: var(--terracotta); }
 
@@ -1118,7 +1125,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.5</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.6</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1503,7 +1510,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1636,7 +1643,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 <!-- BRING! INGREDIENT PICKER -->
 <!-- BRING! TOKEN EXPIRED MODAL -->
-<div id="bringTokenExpiredOverlay" onclick="bgClose(event,'bringTokenExpiredOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:900;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+<div id="bringTokenExpiredOverlay" onclick="bgClose(event,'bringTokenExpiredOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:420px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
     <div style="font-size:36px;text-align:center;margin-bottom:12px;">⏰</div>
     <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--warm-brown);margin-bottom:8px;text-align:center;">Bring! Token Expired</div>
@@ -1660,7 +1667,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 </div>
 
 <!-- PHOTO SEARCH MODAL -->
-<div id="photoSearchOverlay" onclick="bgClose(event,'photoSearchOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+<div id="photoSearchOverlay" onclick="bgClose(event,'photoSearchOverlay')" class="modal-overlay" style="z-index:800;">
   <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:480px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--warm-brown);">🔍 Search Photo</div>
@@ -1679,7 +1686,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 </div>
 
 <!-- HELP MODAL -->
-<div id="helpOverlay" onclick="bgClose(event,'helpOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+<div id="helpOverlay" onclick="bgClose(event,'helpOverlay')" class="modal-overlay" style="z-index:800;">
   <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:500px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--warm-brown);">💬 Ask About the App</div>
@@ -1704,7 +1711,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 </div>
 
 <!-- BRING! BOOKMARKLET MODAL -->
-<div id="bringBookmarkletOverlay" onclick="bgClose(event,'bringBookmarkletOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+<div id="bringBookmarkletOverlay" onclick="bgClose(event,'bringBookmarkletOverlay')" class="modal-overlay" style="z-index:800;">
   <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:480px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
     <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--warm-brown);margin-bottom:12px;">🔖 Bring! Token Bookmarklet</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">This bookmarklet refreshes your Bring! connection in one click. <strong>Set it up once, use it whenever needed.</strong></p>
