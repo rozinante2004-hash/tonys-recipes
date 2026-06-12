@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v7.2 -->
+<!-- Tony's Recipes Collection v7.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1021,7 +1021,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.2</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.4</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1405,7 +1405,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1537,6 +1537,30 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 
 <!-- BRING! INGREDIENT PICKER -->
+<!-- BRING! TOKEN EXPIRED MODAL -->
+<div id="bringTokenExpiredOverlay" onclick="bgClose(event,'bringTokenExpiredOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:900;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+  <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:420px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <div style="font-size:36px;text-align:center;margin-bottom:12px;">⏰</div>
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--warm-brown);margin-bottom:8px;text-align:center;">Bring! Token Expired</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;line-height:1.6;">Your Bring! connection needs refreshing. This takes 2 clicks and happens automatically after.</p>
+    <div style="background:#fff8f0;border:1px solid #f0d9b5;border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--warm-brown);margin-bottom:6px;">How to refresh:</div>
+      <div style="font-size:12px;color:var(--ink);line-height:1.8;">
+        <div>1️⃣ Click <strong>"Open Bring!"</strong> below</div>
+        <div>2️⃣ Click your <strong>🛒 Refresh Bring! Token</strong> bookmark</div>
+        <div>3️⃣ Ingredients will send automatically ✅</div>
+      </div>
+    </div>
+    <button onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+      🌐 Open Bring! to Refresh
+    </button>
+    <div id="bringTokenExpiredStatus" style="text-align:center;font-size:12px;color:var(--muted);min-height:20px;margin-bottom:8px;"></div>
+    <button onclick="closeM('bringTokenExpiredOverlay')" style="width:100%;padding:10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
+      Cancel
+    </button>
+  </div>
+</div>
+
 <!-- BRING! BOOKMARKLET MODAL -->
 <div id="bringBookmarkletOverlay" onclick="bgClose(event,'bringBookmarkletOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
   <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:480px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
@@ -2565,17 +2589,85 @@ async function aiCall(prompt, maxTokens=2000, tools=null) {
       }
       if (!r.ok) {
         const errText = await r.text().catch(function(){ return ''; });
+        let errData = {};
+        try { errData = JSON.parse(errText); } catch(e) {}
+        const errType = (errData.error && errData.error.type) || '';
+        if (r.status === 402 || errType === 'billing_error') {
+          throw new Error('BILLING: Your Anthropic API credits have run out.\n\nTo top up: https://console.anthropic.com/settings/billing\n\nAll AI features (translate, suggest, import, explore) will not work until credits are added.');
+        }
+        if (r.status === 403 || errType === 'permission_error') {
+          throw new Error('API_KEY: Anthropic API key is invalid or expired.\n\nCheck your key at: https://console.anthropic.com/settings/keys\n\nUpdate it in the Cloudflare Worker: https://dash.cloudflare.com/');
+        }
         throw new Error('API error ' + r.status + (errText ? ': ' + errText.slice(0,100) : ''));
       }
       const d = await r.json();
+      // Check for errors in the response body too
+      if (d.error) {
+        const errType = d.error.type || '';
+        if (errType === 'billing_error' || d.error.message && d.error.message.includes('credit')) {
+          throw new Error('BILLING: Your Anthropic API credits have run out.\n\nTo top up: https://console.anthropic.com/settings/billing');
+        }
+        throw new Error('API error: ' + (d.error.message || JSON.stringify(d.error)).slice(0,100));
+      }
       return (d.content || []).map(function(b){ return b.text || ''; }).join('\n');
     } catch(e) {
       if (attempt === MAX_RETRIES) throw e;
+      if (e.message && (e.message.startsWith('BILLING:') || e.message.startsWith('API_KEY:'))) throw e;
       if (e.message && e.message.includes('Rate limit')) throw e;
       await sleep(delay);
       delay *= 2;
     }
   }
+}
+
+// Show a service error modal with full details and links
+function showServiceError(message) {
+  // Parse multi-line messages with URLs into clickable links
+  var lines = message.split('\n').filter(function(l){ return l.trim(); });
+  var html = '';
+  var isError = false;
+
+  if (message.startsWith('BILLING:')) {
+    html = '<div style="font-size:24px;text-align:center;margin-bottom:8px;">💳</div>'
+      + '<div style="font-weight:600;color:#c62828;margin-bottom:12px;text-align:center;">Anthropic API — Credits Exhausted</div>';
+    isError = true;
+  } else if (message.startsWith('API_KEY:')) {
+    html = '<div style="font-size:24px;text-align:center;margin-bottom:8px;">🔑</div>'
+      + '<div style="font-weight:600;color:#c62828;margin-bottom:12px;text-align:center;">Anthropic API — Key Error</div>';
+    isError = true;
+  } else {
+    html = '<div style="font-size:24px;text-align:center;margin-bottom:8px;">⚠️</div>'
+      + '<div style="font-weight:600;color:#c62828;margin-bottom:12px;text-align:center;">Service Error</div>';
+  }
+
+  lines.forEach(function(line) {
+    // Remove prefix tags
+    line = line.replace(/^(BILLING:|API_KEY:)/, '').trim();
+    if (!line) return;
+    // Make URLs clickable
+    line = line.replace(/(https?:\/\/[^\s]+)/g, function(url) {
+      return '<a href="' + url + '" target="_blank" style="color:#1565C0;text-decoration:underline;">' + url + '</a>';
+    });
+    html += '<div style="font-size:13px;color:var(--ink);margin-bottom:6px;line-height:1.6;">' + line + '</div>';
+  });
+
+  // Show in a modal
+  var existing = document.getElementById('serviceErrorOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'serviceErrorOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;';
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = 'OK';
+  closeBtn.style.cssText = 'width:100%;padding:12px;background:#c62828;color:white;border:none;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;';
+  closeBtn.onclick = function() { overlay.remove(); };
+  var inner = document.createElement('div');
+  inner.style.cssText = 'background:var(--card-bg);border-radius:16px;width:90%;max-width:440px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
+  inner.innerHTML = html;
+  inner.appendChild(closeBtn);
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
 }
 
 // ═══════════════════════════════════
@@ -3000,7 +3092,12 @@ async function saveToFirestore() {
     window._justSaved = false;
     setDriveStatus('error', 'Sync failed');
     console.error('[Firestore] Save FAILED:', err.code, err.message, err);
-    toast('❌ Cloud sync failed: ' + err.message);
+    var fbErr = err.message || '';
+    if (fbErr.includes('quota') || fbErr.includes('RESOURCE_EXHAUSTED')) {
+      showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/project/recipes-f379d/firestore\n\nUpgrade at: https://console.firebase.google.com/project/recipes-f379d/overview');
+    } else {
+      toast('❌ Cloud sync failed: ' + fbErr);
+    }
   }
 }
 
@@ -3639,14 +3736,14 @@ async function bringConfirmSend() {
 
   closeM('bringOverlay');
   toast('Sending to Bring!...');
+  await sendItemsToBring(items);
+}
 
+async function bringConfirmSend_unused() {
+  var data = {};
   try {
-    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'bring-add', items: items })
-    });
-    var data = await resp.json();
+    var resp = await fetch('x');
+    data = await resp.json();
 
     if (data.tokenExpired) {
       // Token expired — tell user how to refresh it
@@ -3690,6 +3787,101 @@ async function bringConfirmSend() {
 }
 window.bringConfirmSend = bringConfirmSend;
 
+
+// ─── BRING! TOKEN REFRESH ────────────────────────────────────────────────────
+var _bringRetryItems = null;  // items to retry after token refresh
+var _bringTokenPollInterval = null;
+var _bringTokenPollAttempts = 0;
+
+function openBringForTokenRefresh() {
+  // Open web.getbring.com in a new tab
+  window.open('https://web.getbring.com', '_blank');
+  document.getElementById('bringTokenExpiredStatus').innerHTML =
+    '<span style="color:var(--terracotta);">⏳ Waiting for token refresh... click your 🛒 bookmark on that page</span>';
+
+  // Poll Worker every 3 seconds to detect when token is refreshed
+  _bringTokenPollAttempts = 0;
+  clearInterval(_bringTokenPollInterval);
+  _bringTokenPollInterval = setInterval(async function() {
+    _bringTokenPollAttempts++;
+    if (_bringTokenPollAttempts > 40) { // 2 minutes timeout
+      clearInterval(_bringTokenPollInterval);
+      document.getElementById('bringTokenExpiredStatus').innerHTML =
+        '<span style="color:#c62828;">Timed out. Please try again.</span>';
+      return;
+    }
+    try {
+      // Test if token is now valid by calling bring-lists
+      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bring-lists' })
+      });
+      var data = await resp.json();
+      if (data.ok || (data.lists && data.lists.length > 0)) {
+        // Token is valid!
+        clearInterval(_bringTokenPollInterval);
+        document.getElementById('bringTokenExpiredStatus').innerHTML =
+          '<span style="color:#2e7d32;">✅ Token refreshed!</span>';
+
+        // Update local expiry record
+        setBringTokenExpiry(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+        renderBringTokenStatus();
+
+        // Auto-retry sending ingredients after short delay
+        setTimeout(function() {
+          closeM('bringTokenExpiredOverlay');
+          if (_bringRetryItems && _bringRetryItems.length > 0) {
+            toast('Sending ingredients to Bring!...');
+            sendItemsToBring(_bringRetryItems);
+          }
+        }, 1200);
+      }
+    } catch(e) {}
+  }, 3000);
+}
+
+function showBringTokenExpired(items) {
+  _bringRetryItems = items;
+  clearInterval(_bringTokenPollInterval);
+  document.getElementById('bringTokenExpiredStatus').innerHTML = '';
+  document.getElementById('bringTokenExpiredOverlay').classList.add('open');
+}
+
+async function sendItemsToBring(items) {
+  try {
+    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bring-add', items: items })
+    });
+    var data = await resp.json();
+    if (data.tokenExpired) {
+      showBringTokenExpired(items);
+      return;
+    }
+    if (data.success) {
+      toast('\u2705 ' + items.length + ' ingredient' + (items.length > 1 ? 's' : '') + ' added to Bring!');
+      setTimeout(function() {
+        window.location.href = 'bring://';
+        setTimeout(function() { window.open('https://web.getbring.com', '_blank'); }, 1500);
+      }, 600);
+    } else {
+      var failed = (data.results || []).filter(function(r){ return !r.ok; });
+      toast('\u26a0\ufe0f ' + (items.length - failed.length) + ' of ' + items.length + ' items added to Bring!');
+      setTimeout(function() {
+        window.location.href = 'bring://';
+        setTimeout(function() { window.open('https://web.getbring.com', '_blank'); }, 1500);
+      }, 800);
+    }
+  } catch(err) {
+    if (err.message && err.message.includes('Failed to fetch')) {
+      showServiceError('WORKER_DOWN: Cannot reach the Cloudflare Worker.\n\nThis may mean:\n• Cloudflare Worker is disabled or over the free limit (100,000 requests/day)\n• Check your Worker at: https://dash.cloudflare.com/\n• Free tier: 100,000 requests/day. Paid: $5/month for 10M requests.');
+    } else {
+      toast('Connection error. Please try again.');
+    }
+  }
+}
 
 // ─── BRING! TOKEN MANAGEMENT ─────────────────────────────────────────────────
 var BRING_TOKEN_STORAGE_KEY = 'bring_token_expiry';
