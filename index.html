@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v7.4 -->
+<!-- Tony's Recipes Collection v7.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1002,6 +1002,103 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .bring-token-btn:hover { background: #c45508; }
 
+
+/* ── PHOTO SEARCH MODAL ── */
+.photo-search-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.photo-search-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+  position: relative;
+}
+.photo-search-item:hover { border-color: var(--terracotta); }
+.photo-search-item img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.photo-search-item.selected { border-color: var(--terracotta); }
+.photo-search-item.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 4px; right: 4px;
+  background: var(--terracotta);
+  color: white;
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ── HELP MODAL ── */
+.help-modal { max-width: 500px; }
+.help-input-row {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.help-input {
+  flex: 1; padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  background: var(--card-bg); color: var(--ink);
+}
+.help-input:focus { outline: none; border-color: var(--terracotta); }
+.help-btn {
+  padding: 10px 16px;
+  background: var(--terracotta); color: white;
+  border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+.help-answer {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+  max-height: 360px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+.help-suggestion {
+  display: inline-block;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  margin: 3px;
+  transition: border-color 0.15s;
+}
+.help-suggestion:hover { border-color: var(--terracotta); color: var(--ink); }
+.help-icon-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  border-radius: 50%;
+  width: 28px; height: 28px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.help-icon-btn:hover { background: rgba(255,255,255,0.3); }
+
 </style>
 </head>
 <body>
@@ -1021,10 +1118,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.4</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.5</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
+    <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app" style="margin-left:8px;">?</button>
     <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
   </div>
   <div class="header-actions">
@@ -1405,7 +1503,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1558,6 +1656,50 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     <button onclick="closeM('bringTokenExpiredOverlay')" style="width:100%;padding:10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
       Cancel
     </button>
+  </div>
+</div>
+
+<!-- PHOTO SEARCH MODAL -->
+<div id="photoSearchOverlay" onclick="bgClose(event,'photoSearchOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+  <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:480px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--warm-brown);">🔍 Search Photo</div>
+      <button class="modal-close" onclick="closeM('photoSearchOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <input id="photoSearchInput" class="help-input" placeholder="e.g. pasta carbonara" onkeydown="if(event.key==='Enter')searchPhotos()">
+      <button class="help-btn" onclick="searchPhotos()">Search</button>
+    </div>
+    <div id="photoSearchStatus" style="font-size:12px;color:var(--muted);margin-bottom:8px;min-height:18px;"></div>
+    <div id="photoSearchGrid" class="photo-search-grid"></div>
+    <div id="photoSearchUseBtn" style="display:none;margin-top:12px;">
+      <button onclick="useSelectedSearchPhoto()" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Use This Photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div id="helpOverlay" onclick="bgClose(event,'helpOverlay')" style="position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:800;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s ease;">
+  <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:500px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--warm-brown);">💬 Ask About the App</div>
+      <button class="modal-close" onclick="closeM('helpOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+    </div>
+    <div class="help-input-row">
+      <input id="helpInput" class="help-input" placeholder="e.g. How do I add a recipe?" onkeydown="if(event.key==='Enter')askHelp()">
+      <button class="help-btn" onclick="askHelp()">Ask</button>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Suggestions:</div>
+      <span class="help-suggestion" onclick="askHelpQ('How do I add a recipe?')">How do I add a recipe?</span>
+      <span class="help-suggestion" onclick="askHelpQ('Where is my data stored?')">Where is my data stored?</span>
+      <span class="help-suggestion" onclick="askHelpQ('How do I send ingredients to Bring?')">How do I send to Bring?</span>
+      <span class="help-suggestion" onclick="askHelpQ('How do I import from a URL?')">Import from URL?</span>
+      <span class="help-suggestion" onclick="askHelpQ('How do I export my recipes?')">Export recipes?</span>
+      <span class="help-suggestion" onclick="askHelpQ('What AI features are available?')">AI features?</span>
+    </div>
+    <div id="helpAnswer" style="display:none;" class="help-answer"></div>
+    <div id="helpLoading" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🤔 Thinking...</div>
   </div>
 </div>
 
@@ -1802,10 +1944,58 @@ function toggleShare(id){const p=document.getElementById('sp'+id);if(p)p.classLi
 // Photo change from inside view modal
 function changeHeroPhoto(id){
   heroPhotoTargetId=id;
-  const inp=document.getElementById('heroPhotoIn');
-  inp.value=''; inp.click();
+  // Show choice: upload or search web
+  var r = recipes.find(function(x){ return x.id===id; });
+  var recipeName = r ? r.name : '';
+  showPhotoSourcePicker(id, recipeName);
 }
-// Compress photo for cross-device sync via Firestore
+
+function showPhotoSourcePicker(id, recipeName) {
+  heroPhotoTargetId = id;
+  var existing = document.getElementById('photoSourcePicker');
+  if (existing) existing.remove();
+
+  var picker = document.createElement('div');
+  picker.id = 'photoSourcePicker';
+  picker.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.55);z-index:900;display:flex;align-items:flex-end;justify-content:center;';
+
+  var inner = document.createElement('div');
+  inner.style.cssText = 'background:var(--card-bg);border-radius:16px 16px 0 0;width:100%;max-width:500px;padding:20px 20px 32px;';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-family:Playfair Display,serif;font-size:16px;color:var(--warm-brown);margin-bottom:16px;text-align:center;';
+  title.textContent = 'Add Photo';
+
+  var uploadBtn = document.createElement('button');
+  uploadBtn.style.cssText = 'width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  uploadBtn.textContent = '📷 Upload from device';
+  uploadBtn.onclick = function() {
+    picker.remove();
+    var inp = document.getElementById('heroPhotoIn');
+    inp.value = ''; inp.click();
+  };
+
+  var searchBtn = document.createElement('button');
+  searchBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  searchBtn.textContent = '🔍 Search web for photo';
+  searchBtn.onclick = function() {
+    picker.remove();
+    openPhotoSearch(recipeName);
+  };
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.style.cssText = 'width:100%;padding:10px;background:transparent;color:var(--muted);border:none;font-family:DM Sans,sans-serif;font-size:14px;cursor:pointer;';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = function() { picker.remove(); };
+
+  inner.appendChild(title);
+  inner.appendChild(uploadBtn);
+  inner.appendChild(searchBtn);
+  inner.appendChild(cancelBtn);
+  picker.appendChild(inner);
+  picker.onclick = function(e) { if (e.target === picker) picker.remove(); };
+  document.body.appendChild(picker);
+}// Compress photo for cross-device sync via Firestore
 // Targets under 60KB so it fits within Firestore's 1MB document limit
 async function uploadPhotoToStorage(file, recipeId) {
   return new Promise(function(resolve) {
@@ -3787,6 +3977,194 @@ async function bringConfirmSend_unused() {
 }
 window.bringConfirmSend = bringConfirmSend;
 
+
+
+// ─── PHOTO WEB SEARCH ─────────────────────────────────────────────────────────
+var _photoSearchSelected = null;
+var _photoSearchResults  = [];
+
+function openPhotoSearch(recipeName) {
+  _photoSearchSelected = null;
+  _photoSearchResults  = [];
+  document.getElementById('photoSearchGrid').innerHTML = '';
+  document.getElementById('photoSearchUseBtn').style.display = 'none';
+  document.getElementById('photoSearchStatus').textContent = '';
+  document.getElementById('photoSearchInput').value = recipeName || '';
+  document.getElementById('photoSearchOverlay').classList.add('open');
+  if (recipeName) setTimeout(searchPhotos, 300);
+}
+
+async function searchPhotos() {
+  var query = document.getElementById('photoSearchInput').value.trim();
+  if (!query) { toast('Enter a search term'); return; }
+  var grid   = document.getElementById('photoSearchGrid');
+  var status = document.getElementById('photoSearchStatus');
+  grid.innerHTML   = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching...</div>';
+  status.textContent = '';
+  document.getElementById('photoSearchUseBtn').style.display = 'none';
+  _photoSearchSelected = null;
+
+  try {
+    // Use Unsplash Source API (free, no key needed for direct image URLs)
+    // Fetch multiple images by varying the sig parameter
+    var images = [];
+    var searchQuery = encodeURIComponent(query + ' food recipe');
+    var count = 9;
+    for (var i = 0; i < count; i++) {
+      images.push({
+        url: 'https://source.unsplash.com/400x400/?' + searchQuery + '&sig=' + (Date.now() + i),
+        thumb: 'https://source.unsplash.com/200x200/?' + searchQuery + '&sig=' + (Date.now() + i),
+        credit: 'Unsplash'
+      });
+    }
+    _photoSearchResults = images;
+    renderPhotoSearchGrid(images);
+    status.textContent = count + ' photos found — tap to select';
+  } catch(err) {
+    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: ' + err.message + '</div>';
+  }
+}
+
+function renderPhotoSearchGrid(images) {
+  var grid = document.getElementById('photoSearchGrid');
+  grid.innerHTML = '';
+  images.forEach(function(img, idx) {
+    var div = document.createElement('div');
+    div.className = 'photo-search-item';
+    div.onclick = function() { selectSearchPhoto(idx, div); };
+    var image = document.createElement('img');
+    image.src = img.thumb || img.url;
+    image.alt = 'Photo option ' + (idx+1);
+    image.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    image.onerror = function() { div.style.display = 'none'; };
+    div.appendChild(image);
+    grid.appendChild(div);
+  });
+}
+
+function selectSearchPhoto(idx, el) {
+  // Deselect all
+  document.querySelectorAll('.photo-search-item').forEach(function(d){ d.classList.remove('selected'); });
+  el.classList.add('selected');
+  _photoSearchSelected = idx;
+  document.getElementById('photoSearchUseBtn').style.display = 'block';
+}
+
+async function useSelectedSearchPhoto() {
+  if (_photoSearchSelected === null) { toast('Select a photo first'); return; }
+  var img = _photoSearchResults[_photoSearchSelected];
+  if (!img) return;
+
+  closeM('photoSearchOverlay');
+  toast('Downloading photo...');
+
+  try {
+    // Fetch the full-size image and convert to blob
+    var resp = await fetch(img.url);
+    var blob = await resp.blob();
+    var file = new File([blob], 'web-photo.jpg', { type: 'image/jpeg' });
+
+    // Reuse the existing photo upload pipeline
+    heroPhotoTargetId = heroPhotoTargetId;
+    photoUploadInProgress = true;
+    pendingPhoto = '';
+
+    var localRd = new FileReader();
+    localRd.onload = function(e) {
+      var preview = document.getElementById('editPhotoPreview');
+      if (preview) preview.src = e.target.result;
+    };
+    localRd.readAsDataURL(file);
+
+    // Upload via existing pipeline
+    var photoUrl = await uploadPhotoToStorage(file, heroPhotoTargetId);
+    if (photoUrl) {
+      pendingPhoto = photoUrl;
+      // Update recipe immediately if in view mode
+      var r = recipes.find(function(x){ return x.id === heroPhotoTargetId; });
+      if (r) {
+        r.photo = photoUrl;
+        saveRecipe(r, false);
+        // Refresh hero image in view modal
+        var heroImg = document.getElementById('viewHeroImg');
+        if (heroImg) heroImg.src = photoUrl;
+        toast('Photo updated!');
+      }
+    }
+    photoUploadInProgress = false;
+  } catch(err) {
+    photoUploadInProgress = false;
+    toast('Photo download failed: ' + err.message);
+  }
+}
+
+// ─── APP HELP / AI ASSISTANT ─────────────────────────────────────────────────
+var HELP_SYSTEM_PROMPT = [
+  "You are a helpful assistant for Tony's Recipes Collection app.",
+  "Answer questions about how to use the app clearly and concisely.",
+  "The app has these features:",
+  "- Browse recipes in grid or list view, filter by category or search",
+  "- Add/edit/delete recipes with emoji, photo, ingredients, steps, difficulty, prep time, servings",
+  "- Import recipes from URLs (paste a recipe website URL)",
+  "- Import from YouTube videos (paste a YouTube URL - extracts from description)",
+  "- Import by pasting free-hand text or taking a photo of a recipe (camera OCR)",
+  "- AI features: translate recipes (English and Hebrew), explore meal ideas, suggest new recipes, calculate nutrition",
+  "- Send ingredients to Bring! shopping list app",
+  "- Export recipes to Excel or Word, share via email/WhatsApp/copy",
+  "- Cloud sync via Firebase (linked to Google account), works offline",
+  "- Works on iPhone via Safari (add to home screen as PWA)",
+  "- Share any recipe URL from Safari using the Add to Tony's Recipes Shortcut",
+  "Keep answers brief, friendly, and practical. Use bullet points for lists."
+].join("\n");
+
+function openHelp() {
+  document.getElementById('helpAnswer').style.display = 'none';
+  document.getElementById('helpLoading').style.display = 'none';
+  document.getElementById('helpInput').value = '';
+  document.getElementById('helpOverlay').classList.add('open');
+  setTimeout(function(){ document.getElementById('helpInput').focus(); }, 200);
+}
+
+function askHelpQ(q) {
+  document.getElementById('helpInput').value = q;
+  askHelp();
+}
+
+async function askHelp() {
+  var q = document.getElementById('helpInput').value.trim();
+  if (!q) return;
+  var answerEl  = document.getElementById('helpAnswer');
+  var loadingEl = document.getElementById('helpLoading');
+  answerEl.style.display  = 'none';
+  loadingEl.style.display = 'block';
+
+  try {
+    var answer = await aiCall(
+      'System: ' + HELP_SYSTEM_PROMPT + '\n\nUser question: ' + q,
+      600
+    );
+    answerEl.textContent    = answer.trim();
+    answerEl.style.display  = 'block';
+    loadingEl.style.display = 'none';
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    if (err.message && (err.message.startsWith('BILLING:') || err.message.startsWith('API_KEY:'))) {
+      showServiceError(err.message);
+    } else {
+      answerEl.textContent   = 'Error: ' + err.message;
+      answerEl.style.display = 'block';
+    }
+  }
+}
+
+window.openHelp       = openHelp;
+window.askHelp        = askHelp;
+window.askHelpQ       = askHelpQ;
+window.openPhotoSearch       = openPhotoSearch;
+window.searchPhotos          = searchPhotos;
+window.selectSearchPhoto     = selectSearchPhoto;
+window.useSelectedSearchPhoto = useSelectedSearchPhoto;
+window.showPhotoSourcePicker = showPhotoSourcePicker;
 
 // ─── BRING! TOKEN REFRESH ────────────────────────────────────────────────────
 var _bringRetryItems = null;  // items to retry after token refresh
