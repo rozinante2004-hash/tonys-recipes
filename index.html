@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v8.0 -->
+<!-- Tony's Recipes Collection v8.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1125,7 +1125,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.0</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.1</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1510,7 +1510,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2487,8 +2487,7 @@ function openAddModal(id){
   document.getElementById('f-name').value=r?r.name:'';
   document.getElementById('f-prep').value=r?r.prep:'';
   document.getElementById('f-srv').value=r?r.servings:'';
-  document.getElementById('f-ings').value=r?r.ingredients.map(i=>`${i.a} — ${i.n}`).join('\n'):'';
-  document.getElementById('f-steps').value=r?r.steps.join('\n'):'';
+  document.getElementById('f-ings').value=r?r.ingredients.map(i=>i.a?`${i.a} — ${i.n}`:i.n).join('\n'):'';
   if(document.getElementById('f-source'))document.getElementById('f-source').value=r?(r.source||''):'';
   document.getElementById('editOverlay').classList.add('open');
 }
@@ -2535,7 +2534,18 @@ async function saveRecipe(){
   if(!name){toast('Please enter a recipe name');return;}
   const rawIngs=document.getElementById('f-ings').value.trim().split('\n').filter(Boolean);
   const rawSteps=document.getElementById('f-steps').value.trim().split('\n').filter(Boolean);
-  const ings=rawIngs.map(line=>{const[a,...rest]=line.split('\u2014');return{a:(a||'').trim(),n:(rest.join('\u2014')||a||'').trim()};});
+  const ings=rawIngs.map(line=>{
+    var parts=line.split('\u2014');
+    if(parts.length===1){
+      // No separator — treat whole line as name, no amount
+      return{a:'',n:line.trim()};
+    }
+    var a=parts[0].trim();
+    var n=parts.slice(1).join('\u2014').trim();
+    // If name is empty but amount isn't, swap them
+    if(!n && a){return{a:'',n:a};}
+    return{a:a,n:n};
+  });
   const data={
     name, emoji:selEmoji, photo:pendingPhoto,
     category:document.getElementById('f-category').value,
@@ -2557,6 +2567,8 @@ async function saveRecipe(){
     toast('\u2705 Recipe saved!');
   }
   closeM('editOverlay');activeCat='All';renderFilters();renderGrid();saveData();
+  // Refresh view modal if user edited from within it
+  if (editingId && viewId === editingId) { drawView(); }
 }
 
 // ═══════════════════════════════════
