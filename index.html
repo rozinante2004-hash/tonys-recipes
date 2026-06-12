@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v8.4 -->
+<!-- Tony's Recipes Collection v8.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -210,7 +210,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* MODALS */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 1.25rem; }
 .modal-overlay.open { display: flex; }
-.modal { background: var(--cream); border-radius: 16px; width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; position: relative; animation: slideUp 0.22s ease; }
+.modal { background: var(--cream); border-radius: 16px; width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.22s ease; }
+.modal::-webkit-scrollbar { width: 6px; }
+.modal::-webkit-scrollbar-track { background: transparent; }
+.modal::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+.modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
 @keyframes slideUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
 .modal-close {
   position: absolute; top: 10px; right: 10px;
@@ -1114,8 +1118,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   gap: 0;
   border-bottom: 1px solid var(--border);
   align-items: center;
+  min-height: 40px;
 }
-.ing-row:last-child { border-bottom: none; }
+.ing-row:first-child { border-radius: 8px 8px 0 0; }
+.ing-row:last-child { border-bottom: none; border-radius: 0 0 8px 8px; }
 .ing-row input {
   border: none;
   background: transparent;
@@ -1184,7 +1190,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.4</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.8</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1317,7 +1323,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
       </div>
       <div class="form-group">
         <label class="form-label">Ingredients</label>
-        <div id="ingsTable" style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px;">
+        <div id="ingsTable" style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:4px;">
           <div style="display:grid;grid-template-columns:24px 1fr 2fr 28px;background:var(--bg);padding:6px 10px;border-bottom:1px solid var(--border);">
             <div></div>
             <div style="font-size:11px;font-weight:600;color:var(--muted);">AMOUNT</div>
@@ -1580,7 +1586,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
