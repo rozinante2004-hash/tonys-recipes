@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v8.2 -->
+<!-- Tony's Recipes Collection v8.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1110,7 +1110,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* ── INGREDIENT TABLE ── */
 .ing-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 28px;
+  grid-template-columns: 24px 1fr 2fr 28px;
   gap: 0;
   border-bottom: 1px solid var(--border);
   align-items: center;
@@ -1145,6 +1145,26 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .ing-del:hover { color: #c62828; }
 
+
+/* ── INGREDIENT DRAG ── */
+.ing-row { cursor: default; transition: background 0.1s; }
+.ing-row.drag-over { background: rgba(193,68,14,0.08); border-top: 2px solid var(--terracotta); }
+.ing-row.dragging { opacity: 0.4; }
+.ing-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.ing-handle:active { cursor: grabbing; }
+
 </style>
 </head>
 <body>
@@ -1164,7 +1184,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.2</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.3</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1298,7 +1318,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
       <div class="form-group">
         <label class="form-label">Ingredients</label>
         <div id="ingsTable" style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px;">
-          <div style="display:grid;grid-template-columns:1fr 2fr 28px;background:var(--bg);padding:6px 10px;border-bottom:1px solid var(--border);">
+          <div style="display:grid;grid-template-columns:24px 1fr 2fr 28px;background:var(--bg);padding:6px 10px;border-bottom:1px solid var(--border);">
+            <div></div>
             <div style="font-size:11px;font-weight:600;color:var(--muted);">AMOUNT</div>
             <div style="font-size:11px;font-weight:600;color:var(--muted);">INGREDIENT</div>
             <div></div>
@@ -1559,7 +1580,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -2604,12 +2625,31 @@ async function saveRecipe(){
     source:document.getElementById('f-source') ? document.getElementById('f-source').value.trim() : '',
     fav:false,
     ingredients:ings.length?ings:[{a:'',n:'See notes'}],
-    steps:rawSteps.length?rawSteps:['Enjoy!'],
+    steps:(function(){
+      if(rawSteps.length) return rawSteps;
+      // Don't wipe existing steps if textarea is mysteriously empty
+      if(editingId){
+        var existing = recipes.find(function(r){return r.id===editingId;});
+        if(existing && existing.steps && existing.steps.length) return existing.steps;
+      }
+      return ['Enjoy!'];
+    })(),
    updatedAt:Date.now()
   };
   if(editingId){
     const idx=recipes.findIndex(r=>r.id===editingId);
-    if(idx>=0)recipes[idx]={...recipes[idx],...data};
+    if(idx>=0){
+      // Preserve fields not in the edit form
+      var existing = recipes[idx];
+      recipes[idx] = {
+        ...existing,
+        ...data,
+        fav: existing.fav,           // preserve favourite status
+        bg: existing.bg,             // preserve background colour
+        nutrition: existing.nutrition || null,  // preserve nutrition
+        originalPhoto: existing.originalPhoto || '',  // preserve original photo
+      };
+    }
     toast('\u2705 Recipe updated!');
   } else {
     recipes.unshift({id:nextId++,bg:rndBg(),...data});
@@ -4416,6 +4456,12 @@ function addIngRow(amount, name) {
   var row = document.createElement('div');
   row.className = 'ing-row';
 
+  // Drag handle
+  var handle = document.createElement('div');
+  handle.className = 'ing-handle';
+  handle.innerHTML = '⠿';
+  handle.title = 'Drag to reorder';
+
   var amtInput = document.createElement('input');
   amtInput.type = 'text';
   amtInput.placeholder = 'Amount';
@@ -4429,6 +4475,7 @@ function addIngRow(amount, name) {
   nameInput.value = name || '';
   nameInput.setAttribute('dir', 'auto');
   nameInput.oninput = syncIngsTextarea;
+
   // Tab from amount → name
   amtInput.onkeydown = function(e) {
     if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); nameInput.focus(); }
@@ -4438,9 +4485,8 @@ function addIngRow(amount, name) {
     if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       var rows = tbody.querySelectorAll('.ing-row');
-      var curRow = row;
       var rowArr = Array.from(rows);
-      var idx = rowArr.indexOf(curRow);
+      var idx = rowArr.indexOf(row);
       if (idx === rowArr.length - 1) { addIngRow(); }
       else { rowArr[idx+1].querySelector('input').focus(); }
     }
@@ -4458,6 +4504,76 @@ function addIngRow(amount, name) {
     if (!document.getElementById('ingsRows').children.length) addIngRow();
   };
 
+  // ── Drag to reorder (mouse + touch) ──────────────────────────────────────
+  var dragState = null;
+
+  function startDrag(clientY) {
+    dragState = { startY: clientY, row: row };
+    row.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+  }
+
+  function moveDrag(clientY) {
+    if (!dragState) return;
+    var tbody = document.getElementById('ingsRows');
+    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
+    var target = null;
+    rows.forEach(function(r) {
+      if (r === row) return;
+      var rect = r.getBoundingClientRect();
+      var mid = rect.top + rect.height / 2;
+      r.classList.remove('drag-over');
+      if (clientY < mid && !target) target = r;
+    });
+    if (target) target.classList.add('drag-over');
+    dragState.target = target;
+  }
+
+  function endDrag() {
+    if (!dragState) return;
+    row.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    var tbody = document.getElementById('ingsRows');
+    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
+    rows.forEach(function(r) { r.classList.remove('drag-over'); });
+    if (dragState.target) {
+      tbody.insertBefore(row, dragState.target);
+    } else {
+      tbody.appendChild(row);
+    }
+    dragState = null;
+    syncIngsTextarea();
+  }
+
+  // Mouse events on handle
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    startDrag(e.clientY);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+  function onMouseMove(e) { moveDrag(e.clientY); }
+  function onMouseUp(e) {
+    endDrag();
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
+
+  // Touch events on handle
+  handle.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    startDrag(e.touches[0].clientY);
+  }, { passive: false });
+  handle.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    moveDrag(e.touches[0].clientY);
+  }, { passive: false });
+  handle.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    endDrag();
+  }, { passive: false });
+
+  row.appendChild(handle);
   row.appendChild(amtInput);
   row.appendChild(nameInput);
   row.appendChild(delBtn);
