@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v8.8 -->
+<!-- Tony's Recipes Collection v8.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -875,8 +875,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* ── REFRESH NOTIFICATION BUTTON ── */
 #refreshBanner {
   display: none;
-  position: sticky;
+  position: fixed;
   top: 0; left: 0; right: 0;
+  z-index: 999;
   background: var(--terracotta);
   color: white;
   text-align: center;
@@ -1174,6 +1175,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 </style>
 </head>
 <body>
+<button id="refreshBanner" onclick="applyRemoteUpdate()">🔄 New changes available — tap to refresh</button>
 
 <!-- HEADER -->
 <div class="header">
@@ -1190,7 +1192,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.8</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v8.9</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1567,7 +1569,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 
 <!-- LOGIN / STORAGE SCREEN -->
-<button id="refreshBanner" onclick="applyRemoteUpdate()">🔄 New changes available — tap to refresh</button>
 <div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#8A8279;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
@@ -1586,7 +1587,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v8.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -3391,7 +3392,7 @@ async function saveToFirestore() {
       recipes: JSON.stringify(recipes), nextId: nextId,
       updatedAt: new Date().toISOString()
     });
-    setTimeout(function() { window._justSaved = false; }, 2000);
+    setTimeout(function() { window._justSaved = false; }, 5000);
       setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
   } catch(err) {
     window._justSaved = false;
@@ -3453,7 +3454,13 @@ async function loadFromFirestore() {
         if (isFirstSnapshot) { isFirstSnapshot = false; return; }
         if (!docSnap.exists) return;
         if (docSnap.metadata.hasPendingWrites) return;
-        if (window._justSaved) return;
+        // Only suppress if we just saved AND it's coming from server cache
+        // _justSaved alone is unreliable — Firestore can fire after save settles
+        if (window._justSaved && !docSnap.metadata.fromCache) {
+          // This is our own write settling — skip it
+          return;
+        }
+        if (docSnap.metadata.fromCache) return; // local cache, not a remote change
         // Genuine remote change from another device — show banner
         window._pendingRemoteData = docSnap.data();
         var banner = document.getElementById('refreshBanner');
