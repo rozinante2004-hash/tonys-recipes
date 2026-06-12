@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v7.6 -->
+<!-- Tony's Recipes Collection v7.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1125,7 +1125,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v7.7</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1510,7 +1510,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v7.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -4012,48 +4012,30 @@ async function searchPhotos() {
   _photoSearchSelected = null;
 
   try {
-    // Use Pixabay API — free, no credit card needed, 20K requests/hour
-    var PIXABAY_KEY = '49836978-d6c15c5c8f2e3a1b2d4e5f6a7';
-    var searchQuery = encodeURIComponent(query);
-    var apiUrl = 'https://pixabay.com/api/?key=' + PIXABAY_KEY
-      + '&q=' + searchQuery
-      + '&image_type=photo&category=food&per_page=9&safesearch=true';
-
-    var resp = await fetch(apiUrl);
+    // Search via Worker (keeps API key server-side, avoids CORS)
+    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'photo-search', query: query })
+    });
     if (!resp.ok) throw new Error('Search failed: ' + resp.status);
     var data = await resp.json();
 
-    if (!data.hits || !data.hits.length) {
-      // Try without food category restriction
-      apiUrl = 'https://pixabay.com/api/?key=' + PIXABAY_KEY
-        + '&q=' + searchQuery
-        + '&image_type=photo&per_page=9&safesearch=true';
-      resp = await fetch(apiUrl);
-      data = await resp.json();
+    if (data.error) {
+      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">' + data.error + '</div>';
+      return;
     }
-
-    if (!data.hits || !data.hits.length) {
+    if (!data.images || !data.images.length) {
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos found. Try a different search term.</div>';
       return;
     }
-
-    var images = data.hits.map(function(hit) {
-      return {
-        url: hit.largeImageURL || hit.webformatURL,
-        thumb: hit.previewURL || hit.webformatURL,
-        credit: hit.user,
-        creditUrl: 'https://pixabay.com/users/' + hit.user + '-' + hit.user_id + '/'
-      };
-    });
-
-    _photoSearchResults = images;
-    renderPhotoSearchGrid(images);
-    status.textContent = images.length + ' photos found — tap to select';
+    _photoSearchResults = data.images;
+    renderPhotoSearchGrid(data.images);
+    status.textContent = data.images.length + ' photos found — tap to select';
   } catch(err) {
     grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: ' + err.message + '</div>';
   }
 }
-
 function renderPhotoSearchGrid(images) {
   var grid = document.getElementById('photoSearchGrid');
   grid.innerHTML = '';
@@ -4197,29 +4179,50 @@ async function askHelp() {
     );
     answer = answer.trim();
 
-    // Render answer with Details button
+    // Parse answer into lines/items and add a Details button per item
     answerEl.innerHTML = '';
-    var answerText = document.createElement('div');
-    answerText.style.cssText = 'white-space:pre-wrap;margin-bottom:12px;';
-    answerText.textContent = answer;
-    answerEl.appendChild(answerText);
+    var lines = answer.split('\n');
+    lines.forEach(function(line) {
+      if (!line.trim()) return;
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;';
 
-    // Details button
-    var detailsBtn = document.createElement('button');
-    detailsBtn.style.cssText = 'padding:7px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--ink);cursor:pointer;margin-right:8px;';
-    detailsBtn.textContent = '🔍 More details';
-    detailsBtn.onclick = function() { askHelpDetails(q, answer); };
-    answerEl.appendChild(detailsBtn);
+      var lineText = document.createElement('div');
+      lineText.style.cssText = 'flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;';
+      lineText.textContent = line;
+      row.appendChild(lineText);
 
-    // Ask follow-up button
-    var followBtn = document.createElement('button');
-    followBtn.style.cssText = 'padding:7px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--ink);cursor:pointer;';
-    followBtn.textContent = '💬 Ask follow-up';
-    followBtn.onclick = function() {
-      document.getElementById('helpInput').value = '';
-      document.getElementById('helpInput').focus();
+      // Only add Details button for substantive lines (not short connectors)
+      if (line.trim().length > 15) {
+        var detailsBtn = document.createElement('button');
+        detailsBtn.style.cssText = 'flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;';
+        detailsBtn.textContent = '🔍 Details';
+        detailsBtn.title = 'Get more details about this';
+        (function(topic) {
+          detailsBtn.onclick = function() { showHelpDetail(topic, q); };
+        })(line.trim());
+        row.appendChild(detailsBtn);
+      }
+
+      answerEl.appendChild(row);
+    });
+
+    // Follow-up input at bottom
+    var followRow = document.createElement('div');
+    followRow.style.cssText = 'margin-top:12px;padding-top:10px;border-top:1px solid var(--border);';
+    followRow.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Ask a follow-up:</div>';
+    var followInp = document.createElement('input');
+    followInp.className = 'help-input';
+    followInp.placeholder = 'Ask more...';
+    followInp.style.cssText = 'width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--card-bg);color:var(--ink);box-sizing:border-box;';
+    followInp.onkeydown = function(e) {
+      if (e.key === 'Enter' && followInp.value.trim()) {
+        document.getElementById('helpInput').value = followInp.value.trim();
+        askHelp();
+      }
     };
-    answerEl.appendChild(followBtn);
+    followRow.appendChild(followInp);
+    answerEl.appendChild(followRow);
 
     answerEl.style.display  = 'block';
     loadingEl.style.display = 'none';
@@ -4232,6 +4235,60 @@ async function askHelp() {
       answerEl.style.display = 'block';
     }
   }
+}
+
+// Detail modal — opens on top of help modal without closing it
+function showHelpDetail(topic, context) {
+  var existing = document.getElementById('helpDetailOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'helpDetailOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+  var card = document.createElement('div');
+  card.style.cssText = 'background:var(--card-bg);border-radius:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);';
+
+  var header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'flex:1;font-family:Playfair Display,serif;font-size:15px;color:var(--warm-brown);line-height:1.4;';
+  title.textContent = topic;
+
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;color:var(--muted);display:flex;align-items:center;justify-content:center;';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = function() { overlay.remove(); };
+
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  var body = document.createElement('div');
+  body.style.cssText = 'font-size:13px;color:var(--muted);text-align:center;padding:16px 0;';
+  body.textContent = '🤔 Loading details...';
+
+  card.appendChild(header);
+  card.appendChild(body);
+  overlay.appendChild(card);
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+
+  // Fetch details from AI
+  aiCall(
+    'System: ' + HELP_SYSTEM_PROMPT
+    + '\n\nThe user is reading help about: "' + context + '"'
+    + '\n\nThey want details specifically about: "' + topic + '"'
+    + '\n\nProvide a focused, detailed explanation of JUST this specific item.'
+    + '\nUse numbered steps if it is a process. Keep it under 200 words. Be practical.',
+    500
+  ).then(function(detail) {
+    body.style.cssText = 'font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;';
+    body.textContent = detail.trim();
+  }).catch(function(err) {
+    body.style.cssText = 'font-size:13px;color:var(--terracotta);';
+    body.textContent = 'Error: ' + err.message;
+  });
 }
 
 async function askHelpDetails(originalQ, briefAnswer) {
