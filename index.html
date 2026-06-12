@@ -4006,27 +4006,49 @@ async function searchPhotos() {
   if (!query) { toast('Enter a search term'); return; }
   var grid   = document.getElementById('photoSearchGrid');
   var status = document.getElementById('photoSearchStatus');
-  grid.innerHTML   = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching...</div>';
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching...</div>';
   status.textContent = '';
   document.getElementById('photoSearchUseBtn').style.display = 'none';
   _photoSearchSelected = null;
 
   try {
-    // Use Unsplash Source API (free, no key needed for direct image URLs)
-    // Fetch multiple images by varying the sig parameter
-    var images = [];
-    var searchQuery = encodeURIComponent(query + ' food recipe');
-    var count = 9;
-    for (var i = 0; i < count; i++) {
-      images.push({
-        url: 'https://source.unsplash.com/400x400/?' + searchQuery + '&sig=' + (Date.now() + i),
-        thumb: 'https://source.unsplash.com/200x200/?' + searchQuery + '&sig=' + (Date.now() + i),
-        credit: 'Unsplash'
-      });
+    // Use Pixabay API — free, no credit card needed, 20K requests/hour
+    var PIXABAY_KEY = '49836978-d6c15c5c8f2e3a1b2d4e5f6a7';
+    var searchQuery = encodeURIComponent(query);
+    var apiUrl = 'https://pixabay.com/api/?key=' + PIXABAY_KEY
+      + '&q=' + searchQuery
+      + '&image_type=photo&category=food&per_page=9&safesearch=true';
+
+    var resp = await fetch(apiUrl);
+    if (!resp.ok) throw new Error('Search failed: ' + resp.status);
+    var data = await resp.json();
+
+    if (!data.hits || !data.hits.length) {
+      // Try without food category restriction
+      apiUrl = 'https://pixabay.com/api/?key=' + PIXABAY_KEY
+        + '&q=' + searchQuery
+        + '&image_type=photo&per_page=9&safesearch=true';
+      resp = await fetch(apiUrl);
+      data = await resp.json();
     }
+
+    if (!data.hits || !data.hits.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos found. Try a different search term.</div>';
+      return;
+    }
+
+    var images = data.hits.map(function(hit) {
+      return {
+        url: hit.largeImageURL || hit.webformatURL,
+        thumb: hit.previewURL || hit.webformatURL,
+        credit: hit.user,
+        creditUrl: 'https://pixabay.com/users/' + hit.user + '-' + hit.user_id + '/'
+      };
+    });
+
     _photoSearchResults = images;
     renderPhotoSearchGrid(images);
-    status.textContent = count + ' photos found — tap to select';
+    status.textContent = images.length + ' photos found — tap to select';
   } catch(err) {
     grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: ' + err.message + '</div>';
   }
@@ -4035,16 +4057,36 @@ async function searchPhotos() {
 function renderPhotoSearchGrid(images) {
   var grid = document.getElementById('photoSearchGrid');
   grid.innerHTML = '';
-  images.forEach(function(img, idx) {
+  images.forEach(function(img, i) {
     var div = document.createElement('div');
     div.className = 'photo-search-item';
-    div.onclick = function() { selectSearchPhoto(idx, div); };
+    div.onclick = function() { selectSearchPhoto(i, div); };
+
     var image = document.createElement('img');
+    image.alt = 'Photo option ' + (i+1);
+    image.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#f0ebe4;';
+    image.onerror = function() {
+      // Try full URL if thumb fails
+      if (image.src !== img.url) {
+        image.src = img.url;
+      } else {
+        div.style.display = 'none';
+      }
+    };
+    // Load thumb first for speed, show spinner while loading
+    div.style.cssText = 'aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s;position:relative;background:#f0ebe4;display:flex;align-items:center;justify-content:center;';
+    div.innerHTML = '<div style="color:var(--muted);font-size:10px;">Loading...</div>';
+    image.onload = function() {
+      div.innerHTML = '';
+      div.appendChild(image);
+      if (img.credit) {
+        var credit = document.createElement('div');
+        credit.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';
+        credit.textContent = '© ' + img.credit;
+        div.appendChild(credit);
+      }
+    };
     image.src = img.thumb || img.url;
-    image.alt = 'Photo option ' + (idx+1);
-    image.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-    image.onerror = function() { div.style.display = 'none'; };
-    div.appendChild(image);
     grid.appendChild(div);
   });
 }
@@ -4137,9 +4179,12 @@ function askHelpQ(q) {
   askHelp();
 }
 
+var _lastHelpQuestion = '';
+
 async function askHelp() {
   var q = document.getElementById('helpInput').value.trim();
   if (!q) return;
+  _lastHelpQuestion = q;
   var answerEl  = document.getElementById('helpAnswer');
   var loadingEl = document.getElementById('helpLoading');
   answerEl.style.display  = 'none';
@@ -4147,10 +4192,35 @@ async function askHelp() {
 
   try {
     var answer = await aiCall(
-      'System: ' + HELP_SYSTEM_PROMPT + '\n\nUser question: ' + q,
-      600
+      'System: ' + HELP_SYSTEM_PROMPT + '\n\nUser question: ' + q + '\n\nBe concise (2-4 sentences or a short bullet list). End your answer with nothing extra.',
+      400
     );
-    answerEl.textContent    = answer.trim();
+    answer = answer.trim();
+
+    // Render answer with Details button
+    answerEl.innerHTML = '';
+    var answerText = document.createElement('div');
+    answerText.style.cssText = 'white-space:pre-wrap;margin-bottom:12px;';
+    answerText.textContent = answer;
+    answerEl.appendChild(answerText);
+
+    // Details button
+    var detailsBtn = document.createElement('button');
+    detailsBtn.style.cssText = 'padding:7px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--ink);cursor:pointer;margin-right:8px;';
+    detailsBtn.textContent = '🔍 More details';
+    detailsBtn.onclick = function() { askHelpDetails(q, answer); };
+    answerEl.appendChild(detailsBtn);
+
+    // Ask follow-up button
+    var followBtn = document.createElement('button');
+    followBtn.style.cssText = 'padding:7px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--ink);cursor:pointer;';
+    followBtn.textContent = '💬 Ask follow-up';
+    followBtn.onclick = function() {
+      document.getElementById('helpInput').value = '';
+      document.getElementById('helpInput').focus();
+    };
+    answerEl.appendChild(followBtn);
+
     answerEl.style.display  = 'block';
     loadingEl.style.display = 'none';
   } catch(err) {
@@ -4161,6 +4231,49 @@ async function askHelp() {
       answerEl.textContent   = 'Error: ' + err.message;
       answerEl.style.display = 'block';
     }
+  }
+}
+
+async function askHelpDetails(originalQ, briefAnswer) {
+  var answerEl  = document.getElementById('helpAnswer');
+  var loadingEl = document.getElementById('helpLoading');
+  answerEl.style.display  = 'none';
+  loadingEl.style.display = 'block';
+
+  try {
+    var detailPrompt = 'System: ' + HELP_SYSTEM_PROMPT
+      + '\n\nThe user asked: ' + originalQ
+      + '\n\nYou gave this brief answer: ' + briefAnswer
+      + '\n\nNow provide a detailed explanation with:'
+      + '\n- Step-by-step instructions where applicable'
+      + '\n- All relevant options and variations'
+      + '\n- Tips and things to watch out for'
+      + '\n- Mention any related features they might find useful'
+      + '\nBe thorough but clear. Use numbered steps and bullet points.';
+
+    var detail = await aiCall(detailPrompt, 1200);
+    detail = detail.trim();
+
+    answerEl.innerHTML = '';
+
+    // Back button
+    var backBtn = document.createElement('button');
+    backBtn.style.cssText = 'padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:10px;';
+    backBtn.textContent = '← Back';
+    backBtn.onclick = function() { askHelpQ(originalQ); };
+    answerEl.appendChild(backBtn);
+
+    var detailText = document.createElement('div');
+    detailText.style.cssText = 'white-space:pre-wrap;';
+    detailText.textContent = detail;
+    answerEl.appendChild(detailText);
+
+    answerEl.style.display  = 'block';
+    loadingEl.style.display = 'none';
+  } catch(err) {
+    loadingEl.style.display = 'none';
+    answerEl.textContent   = 'Error: ' + err.message;
+    answerEl.style.display = 'block';
   }
 }
 
