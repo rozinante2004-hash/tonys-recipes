@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.4 -->
+<!-- Tony's Recipes Collection v9.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1196,7 +1196,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.4</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.5</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1591,7 +1591,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -3456,6 +3456,7 @@ async function loadFromFirestore() {
         hasData = true;
         if (_offlineQueue) {
           toast('✅ Offline changes merged with cloud data');
+          try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
         }
       }
     }
@@ -3524,18 +3525,78 @@ function applyRemoteUpdate() {
 }
 window.applyRemoteUpdate = applyRemoteUpdate;
 
+
+// Dynamically load Firebase if it wasn't available on startup (e.g. opened offline)
+function loadFirebaseDynamically() {
+  return new Promise(function(resolve, reject) {
+    var scripts = [
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
+    ];
+
+    function loadScript(src) {
+      return new Promise(function(res, rej) {
+        // Skip if already loaded
+        if (document.querySelector('script[src="' + src + '"]')) { res(); return; }
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = res;
+        s.onerror = function() { rej(new Error('Failed to load ' + src)); };
+        document.head.appendChild(s);
+      });
+    }
+
+    // Load scripts sequentially then re-init Firebase
+    loadScript(scripts[0])
+      .then(function() { return loadScript(scripts[1]); })
+      .then(function() { return loadScript(scripts[2]); })
+      .then(function() {
+        // Re-initialise Firebase
+        if (typeof firebase !== 'undefined' && !_fbAuth) {
+          try {
+            var app = firebase.apps.length
+              ? firebase.apps[0]
+              : firebase.initializeApp({
+                  apiKey: 'AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4',
+                  authDomain: 'recipes-f379d.firebaseapp.com',
+                  projectId: 'recipes-f379d'
+                });
+            _fbAuth = firebase.auth(app);
+            _fbProvider = new firebase.auth.GoogleAuthProvider();
+            _fbDb = firebase.firestore(app);
+            console.log('[Firebase] Dynamically loaded and initialised');
+          } catch(e) {
+            console.warn('[Firebase] Re-init error:', e);
+          }
+        }
+        resolve();
+      })
+      .catch(reject);
+  });
+}
+
 async function startGoogleSignIn() {
   var btn = document.getElementById('googleSignInBtn');
   var errDiv = document.getElementById('loginError');
   var remember = document.getElementById('rememberMe');
   if (typeof firebase === 'undefined' || !_fbAuth) {
-    if (errDiv) {
-      errDiv.textContent = 'Firebase is not loaded. Please check your internet connection and refresh the page.';
-      errDiv.style.display = 'block';
+    // Firebase not loaded (opened offline) — try loading it now
+    if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
+    if (errDiv) { errDiv.style.display = 'none'; }
+    try {
+      await loadFirebaseDynamically();
+      if (typeof firebase === 'undefined' || !_fbAuth) {
+        throw new Error('Still not loaded after attempt');
+      }
+    } catch(e) {
+      if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
+      if (errDiv) {
+        errDiv.textContent = 'Could not reach Google. Please check your internet connection.';
+        errDiv.style.display = 'block';
+      }
+      return;
     }
-    var fbErr = document.getElementById('firebaseError');
-    if (fbErr) fbErr.style.display = 'block';
-    return;
   }
   errDiv.style.display = 'none';
   if (remember && !remember.checked) {
@@ -3588,6 +3649,7 @@ function useOfflineMode() {
   window._driveMode = false;
   // Mark that we have local changes to protect when signing in later
   _offlineQueue = true;
+  try { localStorage.setItem('tonys_offline_queue', '1'); } catch(e) {}
   document.getElementById('loginScreen').style.display = 'none';
   var signInBtn = document.getElementById('signInHeaderBtn');
   if (signInBtn) signInBtn.style.display = 'inline';
@@ -3600,6 +3662,7 @@ function showLoginScreen() {
   // Save current local data before showing login — protects offline changes
   saveLocal();
   _offlineQueue = true; // tell Firestore load to merge rather than overwrite
+  try { localStorage.setItem('tonys_offline_queue', '1'); } catch(e) {}
   var ls = document.getElementById('loginScreen');
   if (ls) {
     ls.style.display = 'flex';
@@ -4938,6 +5001,13 @@ window.renderBringTokenStatus = renderBringTokenStatus;
 
 
 loadLocal();
+// Restore offline queue flag from localStorage (survives app restart)
+try {
+  if (localStorage.getItem('tonys_offline_queue') === '1') {
+    _offlineQueue = true;
+    console.log('[Offline] Restored offline queue flag — will merge on sign-in');
+  }
+} catch(e) {}
 renderFilters();
 renderGrid();
 handleShareTarget();
