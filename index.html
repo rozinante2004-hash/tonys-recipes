@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.7 -->
+<!-- Tony's Recipes Collection v9.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1195,7 +1195,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.7</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.8</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1590,10 +1590,10 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
-    <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
+    <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
     <button class="google-signin-btn" id="googleSignInBtn" onclick="startGoogleSignIn()">
       <svg class="google-icon" viewBox="0 0 48 48">
         <path fill="#4285F4" d="M45.5 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h12.1c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.9 6.7-9.6 6.7-16.1z"/>
@@ -1618,7 +1618,7 @@ body.banner-shown .header {
           <input type="checkbox" id="rememberMe" checked style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">
           <label for="rememberMe" style="cursor:pointer;">Remember me on this device</label>
         </div>
-        <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google Drive.<br>Tony's Recipes never stores your data on our servers.</div>
+        <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google account (Firebase cloud).<br>Tony's Recipes never stores your data on our servers.</div>
   </div>
 </div>
 
@@ -3590,21 +3590,17 @@ async function startGoogleSignIn() {
   if (errDiv) errDiv.style.display = 'none';
 
   if (typeof firebase === 'undefined' || !_fbAuth) {
-    // Firebase not loaded (opened offline) — try loading it now
-    if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
-    try {
-      await loadFirebaseDynamically();
-      if (typeof firebase === 'undefined' || !_fbAuth) {
-        throw new Error('Still not loaded after attempt');
-      }
-    } catch(e) {
-      if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
-      if (errDiv) {
-        errDiv.textContent = 'Could not reach Google. Please check your internet connection.';
-        errDiv.style.display = 'block';
-      }
-      return;
-    }
+    // Firebase not loaded — app was opened offline
+    // Best solution on mobile: reload the page now that we're online
+    if (btn) { btn.textContent = 'Reconnecting...'; btn.disabled = true; }
+    if (errDiv) { errDiv.style.display = 'none'; }
+    // Save any local changes before reloading
+    try { saveLocal(); } catch(e) {}
+    // Short delay then reload — service worker will serve fresh page with Firebase
+    setTimeout(function() {
+      window.location.reload(true);
+    }, 500);
+    return;
   }
   errDiv.style.display = 'none';
   if (remember && !remember.checked) {
