@@ -4010,6 +4010,69 @@ function printRecipe(id) {
 }
 
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
+// ─── DIET TAG FUNCTIONS ──────────────────────────────────────────────────────
+function renderDietButtons(selectedDiets) {
+  var container = document.getElementById('f-diets');
+  if (!container) return;
+  var diets = ['Keto','Carnivore','Vegetarian','Vegan','Omnivore'];
+  container.innerHTML = diets.map(function(d) {
+    var sel = selectedDiets && selectedDiets.indexOf(d) > -1;
+    return '<button type="button" class="diet-tag-btn' + (sel ? ' selected' : '') + '" data-diet="' + d + '" onclick="toggleDietTag(this)">' + d + '</button>';
+  }).join('');
+}
+
+function toggleDietTag(btn) {
+  var diet = btn.getAttribute('data-diet');
+  var container = document.getElementById('f-diets');
+  if (diet === 'Omnivore') {
+    container.querySelectorAll('.diet-tag-btn').forEach(function(b) { b.classList.remove('selected'); });
+    btn.classList.add('selected');
+  } else {
+    container.querySelectorAll('.diet-tag-btn').forEach(function(b) {
+      if (b.getAttribute('data-diet') === 'Omnivore') b.classList.remove('selected');
+    });
+    btn.classList.toggle('selected');
+  }
+}
+
+function getSelectedDiets() {
+  var selected = [];
+  document.querySelectorAll('#f-diets .diet-tag-btn.selected').forEach(function(b) {
+    selected.push(b.getAttribute('data-diet'));
+  });
+  return selected;
+}
+
+// ─── AI DIET TAGGING ─────────────────────────────────────────────────────────
+async function aiTagAllDiets() {
+  var untagged = recipes.filter(function(r) { return !r.diets || !r.diets.length; });
+  if (!untagged.length) { toast('All recipes already have diet tags!'); return; }
+  if (!confirm('Auto-tag ' + untagged.length + ' recipes with diet types using AI?\n\nThis will analyse each recipe and suggest diet tags.')) return;
+  toast('Tagging ' + untagged.length + ' recipes...');
+  var tagged = 0;
+  for (var i = 0; i < untagged.length; i++) {
+    var r = untagged[i];
+    try {
+      var prompt = 'Which diet tags apply to this recipe? Choose ALL that apply from: Keto, Carnivore, Vegetarian, Vegan, Omnivore.\n'
+        + 'Rules: Omnivore=no restrictions. Vegetarian=no meat/fish. Vegan=no animal products. Carnivore=meat-focused,minimal carbs. Keto=low carb,high fat.\n'
+        + 'Recipe: ' + r.name + '\nIngredients: ' + r.ingredients.map(function(i){ return (i.a?i.a+' ':'')+i.n; }).join(', ') + '\n'
+        + 'Respond ONLY with a JSON array e.g. ["Vegetarian","Keto"]';
+      var result = await aiCall(prompt, 80);
+      var clean = result.replace(/```json|```/g,'').trim();
+      var diets = JSON.parse(clean);
+      if (Array.isArray(diets)) { r.diets = diets; tagged++; toast('Tagged ' + tagged + '/' + untagged.length + ': ' + r.name.slice(0,20)); }
+    } catch(e) { console.warn('Failed to tag:', r.name, e); }
+    await new Promise(function(res){ setTimeout(res, 300); });
+  }
+  saveData(); renderGrid();
+  toast('\u2705 Tagged ' + tagged + ' recipes!');
+}
+
+window.renderDietButtons = renderDietButtons;
+window.toggleDietTag     = toggleDietTag;
+window.getSelectedDiets  = getSelectedDiets;
+window.aiTagAllDiets     = aiTagAllDiets;
+
 (function initApp() {
   var hasLocal = loadLocal();
   try {
