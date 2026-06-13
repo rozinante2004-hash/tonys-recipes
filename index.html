@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.9 -->
+<!-- Tony's Recipes Collection v10.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -182,9 +182,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* FILTERS */
 .filter-bar { padding: 1rem 1.5rem 0.5rem; display: flex; gap: 8px; flex-wrap: wrap; }
-.filter-btn { padding: 5px 13px; border-radius: 20px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; }
-.filter-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
-.filter-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; font-weight: 500; }
+.filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+.filter-btn:hover { border-color: var(--warm-brown); color: var(--warm-brown); }
+.filter-btn.active { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 500; }
+.filter-btn.fav-chip { background: #FFF0E8; border-color: #f0c8b0; color: var(--terracotta); }
+.filter-btn.fav-chip.active { background: var(--terracotta); border-color: var(--terracotta); color: white; }
 
 /* GRID */
 .grid-section { padding: 1rem 1.5rem 3rem; }
@@ -384,8 +386,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* EMPTY / TOAST */
 .empty-state { text-align: center; padding: 3rem 2rem; color: var(--muted); grid-column: 1/-1; }
 .empty-icon { font-size: 42px; margin-bottom: 0.75rem; }
-.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--warm-brown); color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform 0.3s; pointer-events: none; white-space: nowrap; }
+.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--card-bg); color: var(--ink); padding: 10px 16px 10px 10px; border-radius: 14px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; white-space: nowrap; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 10px; }
 .toast.show { transform: translateX(-50%) translateY(0); }
+.toast-icon-wrap { width: 28px; height: 28px; border-radius: 50%; background: #FFF0E8; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
 
 /* ── 3D BUTTON EFFECT ── */
 /* Primary (terracotta) */
@@ -1195,7 +1198,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.9</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v10.0</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1203,22 +1206,28 @@ body.banner-shown .header {
     <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
   </div>
   <div class="header-actions">
-    <button class="btn btn-secondary" onclick="openShareAppModal()">📲 Share App</button>
-    <button class="btn btn-secondary" onclick="openCalcModal()">⚖️ Convert</button>
-    <button class="btn btn-gold" onclick="openExploreModal()">🔭 Explore</button>
-    <button class="btn btn-gold" onclick="openSuggestModal()">✨ Suggest</button>
-
+    <div class="drop-group">
+      <button class="btn btn-secondary" onclick="toggleDrop('moreDrop')">··· More</button>
+      <div class="drop-menu" id="moreDrop">
+        <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
+        <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
+        <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
+        <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
+      </div>
+    </div>
     <div class="drop-group">
       <button class="btn btn-secondary" onclick="toggleDrop('importDrop')">📥 Import ▾</button>
       <div class="drop-menu" id="importDrop">
-        <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('xlsxIn').click()">📊 From Excel (.xlsx)</button>
-        <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('docxIn').click()">📄 From Word (.docx)</button>
+        <button class="drop-item" onclick="closeDrop('importDrop');openUrlImportModal()">🔗 From URL</button>
         <button class="drop-item" onclick="closeDrop('importDrop');openFreehandModal()">✍️ Free-hand text</button>
+        <button class="drop-item" onclick="closeDrop('importDrop');openCameraImport()">📷 Scan (camera)</button>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('xlsxIn').click()">📊 From Excel</button>
+        <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('docxIn').click()">📄 From Word</button>
       </div>
     </div>
-
     <div class="drop-group">
-      <button class="btn btn-secondary" onclick="toggleDrop('exportDrop')">📤 Export All ▾</button>
+      <button class="btn btn-secondary" onclick="toggleDrop('exportDrop')">📤 Export ▾</button>
       <div class="drop-menu" id="exportDrop">
         <button class="drop-item" onclick="closeDrop('exportDrop');exportAllExcel()">📊 All to Excel</button>
         <button class="drop-item" onclick="closeDrop('exportDrop');exportAllWord()">📄 All to Word</button>
@@ -1227,7 +1236,6 @@ body.banner-shown .header {
         <button class="drop-item" onclick="closeDrop('exportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
       </div>
     </div>
-
     <div class="drop-group">
       <button class="btn btn-primary" onclick="toggleDrop('addDrop')">+ Add Recipe ▾</button>
       <div class="drop-menu" id="addDrop">
@@ -1238,7 +1246,6 @@ body.banner-shown .header {
       </div>
     </div>
   </div>
-</div>
 
 <!-- Hidden file inputs -->
 <input type="file" id="backupRestoreInput" accept=".json" style="display:none" onchange="backupRestoreFile(event)">
@@ -1255,9 +1262,10 @@ body.banner-shown .header {
 </div>
 
 <!-- FILTERS -->
-<div style="background:#f5f0ea;border-bottom:1px solid var(--border);padding:4px 1.5rem;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);gap:8px;flex-wrap:wrap;">
-  <span id="saveStatusBar">💾 All changes saved automatically to this browser</span>
-  <button onclick="clearAllData()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans',sans-serif;" title="Remove all recipes and reset to defaults">Reset all data</button>
+<div style="background:var(--warm-brown);padding:3px 1.5rem 7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+  <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
+  <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.6);flex:1;">Sign in to sync across devices</span>
+  <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans',sans-serif;" title="Remove all recipes and reset to defaults">Reset</button>
 </div>
 <div class="filter-bar" id="filterBar"></div>
 
@@ -1594,7 +1602,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1829,7 +1837,7 @@ body.banner-shown .header {
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast"><div class="toast-icon-wrap" id="toastIcon"></div><span id="toastMsg"></span></div>
 
 <script>
 // ═══════════════════════════════════
@@ -1865,9 +1873,12 @@ let heroPhotoTargetId=null;
 // GRID
 // ═══════════════════════════════════
 function renderFilters(){
-  document.getElementById('filterBar').innerHTML=CATS.map(c=>
-    `<button class="filter-btn${c===activeCat?' active':''}" onclick="setCat('${c}')">${c}</button>`
-  ).join('');
+  var favActive = activeCat==='Favourites';
+  var favBtn = '<button class="filter-btn fav-chip' + (favActive?' active':'') + '" onclick="setCat(\u0027Favourites\u0027)">\u2764 Favourites</button>';
+  var catBtns = CATS.map(function(c){
+    return '<button class="filter-btn' + (c===activeCat?' active':'') + '" onclick="setCat(\u0027'+c+'\u0027)">'+c+'</button>';
+  }).join('');
+  document.getElementById('filterBar').innerHTML = favBtn + catBtns;
 }
 function setCat(c){activeCat=c;renderFilters();renderGrid();}
 
@@ -1883,7 +1894,8 @@ function setView(mode) {
 function renderGrid() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const list = recipes.filter(r => {
-    if (activeCat !== 'All' && r.category !== activeCat) return false;
+    if (activeCat === 'Favourites' && !r.fav) return false;
+    if (activeCat !== 'All' && activeCat !== 'Favourites' && r.category !== activeCat) return false;
     if (!q) return true;
     return r.name.toLowerCase().includes(q)
       || r.category.toLowerCase().includes(q)
@@ -1895,7 +1907,15 @@ function renderGrid() {
 
   if (!list.length) {
     g.className = '';
-    g.innerHTML = `<div class="empty-state"><div class="empty-icon">🍽️</div><p>No recipes found.</p></div>`;
+    var emptyIcon = activeCat === 'Favourites' ? '\u2764\ufe0f' : q ? '\ud83d\udd0d' : '\ud83c\udf7d\ufe0f';
+    var emptyTitle = activeCat === 'Favourites' ? 'No favourites yet' : q ? 'No recipes found' : 'No recipes yet';
+    var emptySub = activeCat === 'Favourites' ? 'Tap the heart on any recipe to save it here.' : q ? 'Try a different search term.' : 'Add your first recipe or import one from a website.';
+    var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
+    g.innerHTML = '<div class="empty-state">'
+      + '<div style="width:72px;height:72px;border-radius:50%;background:#FFF0E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">' + emptyIcon + '</div>'
+      + '<div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--warm-brown);margin-bottom:8px;">' + emptyTitle + '</div>'
+      + '<p style="font-size:13px;color:var(--muted);line-height:1.6;max-width:280px;margin:0 auto 12px;">' + emptySub + '</p>'
+      + emptyBtn + '</div>';
     return;
   }
 
@@ -1927,11 +1947,11 @@ function renderGrid() {
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${r.bg}">
           ${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${r.emoji}</span>`}
+          <div class="card-category-badge">${r.category}</div>
         </div>
         <div class="card-body">
-          <div class="card-category">${r.category}</div>
           <div class="card-title">${r.name}</div>
-          <div class="card-meta"><span>⏱ ${r.prep}</span><span>🍽 ${r.servings} srv</span></div>
+          <div class="card-meta"><span>⏱ ${r.prep}</span><div class="card-meta-dot"></div><span>${r.servings} srv</span></div>
         </div>
         <div class="card-footer">
           <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
@@ -3686,17 +3706,22 @@ function setDriveStatus(state, text) {
   if (!el || !textEl) return;
   el.className = state; textEl.textContent = text;
 
-  // Update the bottom status bar with accurate storage info
+  // Update integrated status bar
   var bar = document.getElementById('saveStatusBar');
+  var dot = document.getElementById('saveStatusDot');
   if (!bar) return;
   if (state === 'synced') {
-    bar.textContent = '☁️ Saved to your Google account (Firebase cloud)';
+    bar.textContent = '\u2713 Synced — ' + (text.replace('\u2601\ufe0f ','') || 'saved to cloud');
+    if (dot) dot.style.background = '#4ade80';
   } else if (state === 'syncing') {
-    bar.textContent = '🔄 Saving to cloud...';
+    bar.textContent = 'Saving to cloud…';
+    if (dot) dot.style.background = '#fbbf24';
   } else if (state === 'error') {
-    bar.textContent = '⚠️ Cloud sync failed — changes saved locally';
+    bar.textContent = 'Sync failed — changes saved locally';
+    if (dot) dot.style.background = '#f87171';
   } else if (state === 'offline') {
-    bar.textContent = '📶 Offline — changes saved locally, will sync when reconnected';
+    bar.textContent = 'Offline — will sync when reconnected';
+    if (dot) dot.style.background = 'rgba(255,255,255,0.25)';
   }
 }
 
@@ -3825,1367 +3850,4 @@ function printRecipe(id) {
     + (r.source ? '<div class="source">Source: ' + escH(r.source) + '</div>' : '')
     + '<h2>Ingredients</h2><table>' + ings + '</table>'
     + '<h2>Method</h2>' + steps
-    + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script></body></html>');
-  pw.document.close();
-}
-
-async function calcNutrition(id) {
-  var r = recipes.find(function(x){ return x.id===id; });
-  if (!r) return;
-  var panel = document.getElementById('nutrition-'+id);
-  if (!panel) return;
-  panel.innerHTML = '<div class="nutrition-loading">Calculating...</div>';
-  var ings = r.ingredients.map(function(i){ return i.a+' '+i.n; }).join(', ');
-  try {
-    var raw = await aiCall('Estimate nutrition per 100g of finished dish. Recipe: '+r.name+'. Ingredients: '+ings+'. Return ONLY JSON: {"calories":0,"carbs":0,"fat":0,"protein":0}', 300);
-    var n = extractJSON(raw);
-    if (!n.calories) throw new Error('Invalid');
-    r.nutrition = { calories:Math.round(n.calories), carbs:Math.round(n.carbs*10)/10, fat:Math.round(n.fat*10)/10, protein:Math.round(n.protein*10)/10 };
-    saveData();
-    panel.innerHTML = '<div class="nutrition-title">Nutrition per 100g</div><div class="nutrition-grid">'
-      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.calories+'</span><span class="nutrition-unit">kcal</span><span class="nutrition-label">Calories</span></div>'
-      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.carbs+'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Carbs</span></div>'
-      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.fat+'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Fat</span></div>'
-      + '<div class="nutrition-item"><span class="nutrition-value">'+r.nutrition.protein+'g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Protein</span></div></div>';
-    toast('Nutrition calculated!');
-  } catch(err) {
-    panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="nutrition-title" style="margin:0;">Nutrition per 100g</span><button class="nutrition-btn" onclick="calcNutrition('+id+')">Retry</button></div>';
-  }
-}
-window.calcNutrition = calcNutrition;
-
-var CALC_CATS = {
-  'Weight':{ units:{'Grams (g)':1,'Kilograms (kg)':1000,'Ounces (oz)':28.3495,'Pounds (lb)':453.592,'Milligrams (mg)':0.001}, quick:[{label:'100g to oz',from:'Grams (g)',to:'Ounces (oz)',val:100},{label:'1 lb to g',from:'Pounds (lb)',to:'Grams (g)',val:1},{label:'1 kg to lb',from:'Kilograms (kg)',to:'Pounds (lb)',val:1}] },
-  'Volume':{ units:{'Millilitres (ml)':1,'Litres (l)':1000,'Teaspoons (tsp)':4.929,'Tablespoons (tbsp)':14.787,'Cups':236.588,'Fluid oz (fl oz)':29.574,'Pints (pt)':473.176,'Quarts (qt)':946.353,'Gallons (gal)':3785.41}, quick:[{label:'1 cup to ml',from:'Cups',to:'Millilitres (ml)',val:1},{label:'1 l to qt',from:'Litres (l)',to:'Quarts (qt)',val:1},{label:'1 tbsp to ml',from:'Tablespoons (tbsp)',to:'Millilitres (ml)',val:1}] },
-  'Temperature':{ units:{'Celsius (C)':'C','Fahrenheit (F)':'F','Gas Mark':'G'}, quick:[{label:'180C to F',from:'Celsius (C)',to:'Fahrenheit (F)',val:180},{label:'200C to F',from:'Celsius (C)',to:'Fahrenheit (F)',val:200},{label:'350F to C',from:'Fahrenheit (F)',to:'Celsius (C)',val:350}] },
-  'Length':{ units:{'Centimetres (cm)':1,'Millimetres (mm)':0.1,'Metres (m)':100,'Inches (in)':2.54,'Feet (ft)':30.48}, quick:[{label:'1 in to cm',from:'Inches (in)',to:'Centimetres (cm)',val:1},{label:'30cm to in',from:'Centimetres (cm)',to:'Inches (in)',val:30}] }
-};
-var calcActiveCat = 'Weight';
-function openCalcModal() {
-  var catRow = document.getElementById('calcCatRow');
-  catRow.innerHTML = Object.keys(CALC_CATS).map(function(cat) {
-    return '<button class="calc-cat-btn' + (cat===calcActiveCat?' active':'') + '" onclick="setCalcCat(&quot;' + cat + '&quot;)">' + cat + '</button>';
-  }).join('');
-  buildCalcUnits();
-  document.getElementById('calcOverlay').classList.add('open');
-}
-window.openCalcModal = openCalcModal;
-function setCalcCat(cat) { calcActiveCat=cat; document.querySelectorAll('.calc-cat-btn').forEach(function(b){b.classList.toggle('active',b.textContent===cat);}); buildCalcUnits(); document.getElementById('calcFrom').value=''; document.getElementById('calcTo').value=''; document.getElementById('calcResultVal').textContent='-'; document.getElementById('calcResultUnit').textContent='Enter a value above'; }
-window.setCalcCat = setCalcCat;
-function buildCalcUnits() { var cat=CALC_CATS[calcActiveCat]; var units=Object.keys(cat.units); var fs=document.getElementById('calcUnitFrom'); var ts=document.getElementById('calcUnitTo'); fs.innerHTML=units.map(function(u){return '<option>'+u+'</option>';}).join(''); ts.innerHTML=units.map(function(u){return '<option>'+u+'</option>';}).join(''); if(units.length>1)ts.selectedIndex=1; var qr=document.getElementById('calcQuickRow'); qr.innerHTML=cat.quick.map(function(q){return '<button class="calc-quick-btn" onclick="applyQuick(&quot;'+q.from+'&quot;,&quot;'+q.to+'&quot;,'+q.val+')">'+q.label+'</button>';}).join(''); }
-function applyQuick(from,to,val) { var fs=document.getElementById('calcUnitFrom'); var ts=document.getElementById('calcUnitTo'); Array.from(fs.options).forEach(function(o,i){if(o.value===from)fs.selectedIndex=i;}); Array.from(ts.options).forEach(function(o,i){if(o.value===to)ts.selectedIndex=i;}); document.getElementById('calcFrom').value=val; doCalc(); }
-window.applyQuick = applyQuick;
-function convertTemp(val,f,t) { var c=f==='C'?val:f==='F'?(val-32)*5/9:val*25+121; return t==='C'?c:t==='F'?c*9/5+32:Math.round((c-121)/25); }
-function doConvert(val,fk,tk) { var cat=CALC_CATS[calcActiveCat]; if(fk===tk)return val; if(calcActiveCat==='Temperature')return convertTemp(val,cat.units[fk],cat.units[tk]); return val*cat.units[fk]/cat.units[tk]; }
-function formatResult(v) { if(Math.abs(v)>=1000)return Math.round(v).toLocaleString(); if(Math.abs(v)>=10)return Math.round(v*10)/10; if(Math.abs(v)>=1)return Math.round(v*100)/100; return Math.round(v*10000)/10000; }
-function doCalc() { var val=parseFloat(document.getElementById('calcFrom').value); var fk=document.getElementById('calcUnitFrom').value; var tk=document.getElementById('calcUnitTo').value; if(isNaN(val)){document.getElementById('calcTo').value='';document.getElementById('calcResultVal').textContent='-';return;} var r=doConvert(val,fk,tk); var fmt=formatResult(r); document.getElementById('calcTo').value=fmt; document.getElementById('calcResultVal').textContent=fmt; document.getElementById('calcResultUnit').textContent=val+' '+fk+' = '+fmt+' '+tk; }
-window.doCalc = doCalc;
-function doCalcReverse() { var val=parseFloat(document.getElementById('calcTo').value); var fk=document.getElementById('calcUnitFrom').value; var tk=document.getElementById('calcUnitTo').value; if(isNaN(val)){document.getElementById('calcFrom').value='';return;} var r=doConvert(val,tk,fk); document.getElementById('calcFrom').value=formatResult(r); document.getElementById('calcResultVal').textContent=formatResult(r); document.getElementById('calcResultUnit').textContent=val+' '+tk+' = '+formatResult(r)+' '+fk; }
-window.doCalcReverse = doCalcReverse;
-
-function editSource(id) { document.getElementById('srcDisplay-'+id).parentElement.style.display='none'; var ed=document.getElementById('srcEdit-'+id); var inp=document.getElementById('srcInput-'+id); var r=recipes.find(function(x){return x.id===id;}); if(inp&&r)inp.value=r.source||''; if(ed)ed.style.display='block'; if(inp){inp.focus();inp.select();} }
-function saveSource(id) { var inp=document.getElementById('srcInput-'+id); var r=recipes.find(function(x){return x.id===id;}); if(!inp||!r)return; r.source=inp.value.trim(); saveData(); var ds=document.getElementById('srcDisplay-'+id); if(ds){if(r.source){var isUrl=r.source.startsWith('http');ds.innerHTML=isUrl?'<a href="'+escH(r.source)+'" target="_blank" style="color:var(--terracotta);">'+escH(r.source)+'</a>':'<span style="color:var(--ink);">'+escH(r.source)+'</span>';}else{ds.innerHTML='<span style="color:var(--muted);font-style:italic;">Not specified</span>';}} cancelSource(id); toast('Source updated!'); }
-function cancelSource(id) { var ed=document.getElementById('srcEdit-'+id); var ds=document.getElementById('srcDisplay-'+id); if(ed)ed.style.display='none'; if(ds)ds.parentElement.style.display='flex'; }
-window.editSource=editSource; window.saveSource=saveSource; window.cancelSource=cancelSource;
-
-var selectMode=false, selectedIds=new Set();
-function toggleSelectMode(){selectMode=!selectMode;selectedIds.clear();var grid=document.getElementById('recipeGrid');var btn=document.getElementById('selectModeBtn');if(selectMode){grid.classList.add('select-mode');btn.classList.add('active-view');btn.textContent='Cancel';}else{grid.classList.remove('select-mode');btn.classList.remove('active-view');btn.textContent='Select';document.getElementById('deleteSelBar').classList.remove('visible');}renderGrid();}
-function cancelSelectMode(){selectMode=false;selectedIds.clear();var grid=document.getElementById('recipeGrid');var btn=document.getElementById('selectModeBtn');grid.classList.remove('select-mode');btn.classList.remove('active-view');btn.textContent='Select';document.getElementById('deleteSelBar').classList.remove('visible');renderGrid();}
-function toggleRecipeSelect(event,id){event.stopPropagation();if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);updateDeleteBar();renderGrid();}
-function updateDeleteBar(){var bar=document.getElementById('deleteSelBar');var count=document.getElementById('deleteSelCount');if(selectedIds.size>0){bar.classList.add('visible');count.textContent=selectedIds.size+' recipe'+(selectedIds.size>1?'s':'')+' selected';}else{bar.classList.remove('visible');}}
-function deleteSelected(){
-  if(!selectedIds.size)return;
-  var names=recipes.filter(function(r){return selectedIds.has(r.id);}).map(function(r){return r.name;});
-  var offlineWarn = !navigator.onLine ? '\n\n⚠️ You are offline. This will also delete from the cloud when you reconnect.' : '';
-  if(!confirm((selectedIds.size===1?'Delete "'+names[0]+'"?':'Delete '+selectedIds.size+' recipes?\n\n'+names.join('\n'))+offlineWarn))return;
-  var deleted=recipes.filter(function(r){return selectedIds.has(r.id);});
-  recipes=recipes.filter(function(r){return!selectedIds.has(r.id);});
-  saveData();
-  cancelSelectMode();
-  selectedIds.clear();
-  renderGrid();
-  // Show undo toast for 5 seconds
-  var undoMsg = deleted.length===1 ? '"'+deleted[0].name+'" deleted' : deleted.length+' recipes deleted';
-  showUndoToast(undoMsg, function(){
-    deleted.forEach(function(r){ recipes.unshift(r); });
-    recipes.sort(function(a,b){ return b.id-a.id; });
-    saveData(); renderGrid();
-  });
-}
-
-var _undoTimer = null;
-function showUndoToast(msg, undoFn) {
-  var t = document.getElementById('toast');
-  if (!t) return;
-  clearTimeout(_undoTimer);
-  t.innerHTML = escH(msg) + ' &nbsp; <span onclick="undoDelete()" style="text-decoration:underline;cursor:pointer;font-weight:700;color:var(--gold);">Undo</span>';
-  t.classList.add('show');
-  window._undoFn = undoFn;
-  _undoTimer = setTimeout(function() {
-    t.classList.remove('show');
-    t.textContent = '';
-    window._undoFn = null;
-  }, 5000);
-}
-
-function undoDelete() {
-  if (window._undoFn) {
-    window._undoFn();
-    window._undoFn = null;
-    clearTimeout(_undoTimer);
-    toast('Restored!');
-  }
-}
-window.undoDelete = undoDelete;
-function getSelectedRecipes(){return recipes.filter(function(r){return selectedIds.has(r.id);});}
-function exportSelWord(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}downloadBlob(makeDocxBlob(sel),sel.length===1?sel[0].name.replace(/[^a-z0-9]/gi,'_')+'.docx':'Selected_'+sel.length+'_Recipes.docx');toast('Exported to Word!');cancelSelectMode();}
-function exportSelExcel(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var wb=XLSX.utils.book_new();if(sel.length>1){var rows=[['Selected Recipes'],[],['Name','Category','Difficulty','Prep','Servings']].concat(sel.map(function(r){return[r.name,r.category,r.difficulty,r.prep,r.servings];}));var sw=XLSX.utils.aoa_to_sheet(rows);sw['!cols']=[{wch:28},{wch:14},{wch:12},{wch:12},{wch:10}];XLSX.utils.book_append_sheet(wb,sw,'Summary');}sel.forEach(function(r){var ws=XLSX.utils.aoa_to_sheet(sheetRows(r));ws['!cols']=[{wch:18},{wch:60}];XLSX.utils.book_append_sheet(wb,ws,r.name.slice(0,31));});downloadExcelWb(wb,sel.length===1?sel[0].name.replace(/[^a-z0-9]/gi,'_')+'.xlsx':'Selected_'+sel.length+'_Recipes.xlsx');toast('Exported!');cancelSelectMode();}
-function shareSelected(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var text=sel.map(function(r){var ings=r.ingredients.map(function(i){return'  - '+i.a+' '+i.n;}).join('\n');var steps=r.steps.map(function(s,i){return(i+1)+'. '+s;}).join('\n');return r.name+'\n\nIngredients:\n'+ings+'\n\nMethod:\n'+steps+(r.source?'\n\nSource: '+r.source:'');}).join('\n\n---\n\n');var full=(sel.length===1?sel[0].name:sel.length+' recipes')+'\n\n'+text;if(confirm('Share via:\n[OK]=WhatsApp  [Cancel]=Clipboard')){window.open('https://wa.me/?text='+encodeURIComponent(full));}else{navigator.clipboard.writeText(full).then(function(){toast('Copied!');});}}
-function printSelected(){var sel=getSelectedRecipes();if(!sel.length){toast('No recipes selected');return;}var pw=window.open('','_blank','width=900,height=700');var pages=sel.map(function(r){var ings=r.ingredients.map(function(i){return'<tr><td style="padding:3px 14px 3px 0;color:#C1440E;font-weight:600;">'+escH(i.a)+'</td><td>'+escH(i.n)+'</td></tr>';}).join('');var steps=r.steps.map(function(s,si){return'<div style="display:flex;gap:10px;margin-bottom:8px;"><span style="min-width:24px;height:24px;background:#C1440E;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;">'+(si+1)+'</span><span>'+escH(s)+'</span></div>';}).join('');return'<div style="page-break-after:always;padding:40px 48px;"><h1 style="font-family:Georgia,serif;font-size:24px;color:#5C3D2E;margin:0 0 4px;">'+r.emoji+' '+escH(r.name)+'</h1><div style="font-size:12px;color:#888;margin-bottom:12px;">'+escH(r.category)+' | '+escH(r.difficulty)+' | '+escH(r.prep)+' | '+escH(r.servings)+' servings</div>'+(r.source?'<div style="font-size:11px;color:#aaa;margin-bottom:8px;">Source: '+escH(r.source)+'</div>':'')+'<h2 style="font-family:Georgia,serif;font-size:15px;color:#C1440E;border-bottom:1px solid #eee;padding-bottom:4px;margin:0 0 8px;">Ingredients</h2><table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'+ings+'</table><h2 style="font-family:Georgia,serif;font-size:15px;color:#C1440E;border-bottom:1px solid #eee;padding-bottom:4px;margin:0 0 8px;">Method</h2>'+steps+'</div>';}).join('');pw.document.write('<!DOCTYPE html><html><head><title>Recipes</title><style>body{font-family:Georgia,serif;color:#1C1A18;margin:0;}</style></head><body>'+pages+'<scr'+'ipt>window.onload=function(){window.print();}</'+'script></body></html>');pw.document.close();toast('Printing...');cancelSelectMode();}
-
-window.toggleSelectMode=toggleSelectMode; window.cancelSelectMode=cancelSelectMode; window.toggleRecipeSelect=toggleRecipeSelect; window.deleteSelected=deleteSelected; window.getSelectedRecipes=getSelectedRecipes; window.exportSelWord=exportSelWord; window.exportSelExcel=exportSelExcel; window.shareSelected=shareSelected; window.printSelected=printSelected;
-
-// Expose all functions on window directly (no eval needed)
-window.startGoogleSignIn=startGoogleSignIn;window.useOfflineMode=useOfflineMode;window.signOut=signOut;
-window.openExploreModal=openExploreModal;window.openSuggestModal=openSuggestModal;window.openAddModal=openAddModal;
-window.openFreehandModal=openFreehandModal;window.openUrlImportModal=openUrlImportModal;window.openCameraImport=openCameraImport;
-window.openShareAppModal=openShareAppModal;window.openTranslate=openTranslate;window.setView=setView;window.setCat=setCat;
-window.toggleFav=toggleFav;window.openView=openView;window.toggleShare=toggleShare;window.setMult=setMult;window.setUnit=setUnit;
-window.saveRecipe=saveRecipe;window.runSuggest=runSuggest;window.runExplore=runExplore;window.runTranslate=runTranslate;
-window.runFreehandImport=runFreehandImport;window.runUrlImport=runUrlImport;window.clearAllData=clearAllData;
-window.addSuggestion=addSuggestion;window.confirmImportParsed=confirmImportParsed;window.saveTranslation=saveTranslation;
-window.toggleChip=toggleChip;window.setSugCount=setSugCount;window.addIngTag=addIngTag;window.tagKey=tagKey;
-window.toggleDietDD=toggleDietDD;window.syncDiets=syncDiets;
-window.expOneExcel=expOneExcel;window.expOneWord=expOneWord;window.exportAllExcel=exportAllExcel;window.exportAllWord=exportAllWord;
-window.doEmail=doEmail;window.doWhatsApp=doWhatsApp;window.doCopy=doCopy;
-window.heroPhotoChanged=heroPhotoChanged;window.changeHeroPhoto=changeHeroPhoto;window.printRecipe=printRecipe;
-window.processCameraImage=processCameraImage;window.shareAppWhatsApp=shareAppWhatsApp;window.copyAppLink=copyAppLink;
-window.closeDrop=closeDrop;window.toggleDrop=toggleDrop;window.bgClose=bgClose;window.closeM=closeM;
-window.pickEmoji=pickEmoji;window.onPhotoFile=onPhotoFile;window.removePhoto=removePhoto;window.setLang=setLang;
-window.renderFilters=renderFilters;window.renderGrid=renderGrid;
-window.openCalcModal=openCalcModal;window.setCalcCat=setCalcCat;window.applyQuick=applyQuick;
-window.doCalc=doCalc;window.doCalcReverse=doCalcReverse;window.calcNutrition=calcNutrition;
-window.editSource=editSource;window.saveSource=saveSource;window.cancelSource=cancelSource;
-window.cancelAutoLogin=cancelAutoLogin;
-window.toggleSelectMode=toggleSelectMode;window.cancelSelectMode=cancelSelectMode;
-window.toggleRecipeSelect=toggleRecipeSelect;window.deleteSelected=deleteSelected;
-window.exportSelWord=exportSelWord;window.exportSelExcel=exportSelExcel;
-window.shareSelected=shareSelected;window.printSelected=printSelected;
-window.applyRemoteUpdate=applyRemoteUpdate;
-
-
-// ─── ONLINE / OFFLINE DETECTION ─────────────────────────────────────────────
-var _offlineQueue = false; // true = we have unsaved changes from offline period
-
-function handleOnline() {
-  var bar = document.getElementById('offlineBanner');
-  if (bar) bar.style.display = 'none';
-  if (_offlineQueue && window._driveMode && window._fbUser) {
-    toast('Back online - syncing changes to cloud...');
-    saveToFirestore().then(function() {
-      _offlineQueue = false;
-    });
-  }
-}
-
-function handleOffline() {
-  var bar = document.getElementById('offlineBanner');
-  if (bar) bar.style.display = 'block';
-}
-
-window.addEventListener('online',  handleOnline);
-window.addEventListener('offline', handleOffline);
-
-// Override saveData to track offline queue
-var _origSaveData = null; // set after saveData is defined
-
-
-function toggleOriginalPhoto(id) {
-  var box = document.getElementById('origPhotoBox-' + id);
-  if (!box) return;
-  var visible = box.style.display !== 'none';
-  box.style.display = visible ? 'none' : 'block';
-  // Update button text
-  var btns = document.querySelectorAll('.action-btn');
-  btns.forEach(function(b) {
-    if (b.onclick && b.getAttribute('onclick') === 'toggleOriginalPhoto(' + id + ')') {
-      b.textContent = visible ? '📸 Show Original' : '📸 Hide Original';
-    }
-  });
-}
-
-function removeOriginalPhoto(id) {
-  if (!confirm('Remove the original scan photo from this recipe? The extracted recipe text will remain.')) return;
-  var r = recipes.find(function(x){ return x.id === id; });
-  if (!r) return;
-  r.originalPhoto = '';
-  saveData();
-  drawView(); // re-render to remove the buttons
-  toast('Original photo removed.');
-}
-
-window.toggleOriginalPhoto = toggleOriginalPhoto;
-window.removeOriginalPhoto  = removeOriginalPhoto;
-
-// ─── WEB SHARE TARGET ────────────────────────────────────────────────────────
-// Handles URLs shared to the app via iPhone Share Sheet
-// The manifest.json share_target sends shares to /?share-target&url=...
-function handleShareTarget() {
-  var search = window.location.search;
-  if (!search.includes('share-target')) return;
-
-  var params = new URLSearchParams(search);
-  var sharedUrl   = params.get('url')   || '';
-  var sharedText  = params.get('text')  || '';
-  var sharedTitle = params.get('title') || '';
-
-  // Handle double-encoded URLs (e.g. from iOS Shortcut with Hebrew chars)
-  // If the URL is encoded, decode it once
-  if (sharedUrl && !sharedUrl.startsWith('http')) {
-    try { sharedUrl = decodeURIComponent(sharedUrl); } catch(e) {}
-  }
-  // Also try extracting URL directly from raw search string as fallback
-  if (!sharedUrl) {
-    var rawMatch = search.match(/[?&]url=([^&]*)/);
-    if (rawMatch) {
-      try { sharedUrl = decodeURIComponent(rawMatch[1]); } catch(e) { sharedUrl = rawMatch[1]; }
-    }
-  }
-
-  // Clean the URL so refreshing doesn't re-trigger
-  window.history.replaceState({}, document.title, window.location.pathname);
-
-  if (!sharedUrl && !sharedText) return;
-
-  // Wait for app to be ready then open import
-  setTimeout(function() {
-    if (sharedUrl && sharedUrl.startsWith('http')) {
-      // Open URL import with the shared URL pre-filled
-      openUrlImportModal();
-      setTimeout(function() {
-        var inp = document.getElementById('urlImportInput');
-        if (inp) {
-          inp.value = sharedUrl;
-          toast('URL ready to import — tap Import!');
-        }
-      }, 300);
-    } else {
-      // Open freehand import with shared text pre-filled
-      openFreehandModal();
-      setTimeout(function() {
-        var ta = document.getElementById('freehandText');
-        if (ta) {
-          ta.value = sharedText || sharedTitle;
-          toast('Text ready to import — tap Extract!');
-        }
-      }, 300);
-    }
-  }, 1000);
-}
-
-
-// ─── SEND TO BRING! ──────────────────────────────────────────────────────────
-var _bringRecipeId = null;
-var _bringSelected = new Set();
-
-function sendToBring(id) {
-  var r = recipes.find(function(x){ return x.id === id; });
-  if (!r || !r.ingredients || !r.ingredients.length) {
-    toast('No ingredients found in this recipe');
-    return;
-  }
-  _bringRecipeId = id;
-  _bringSelected = new Set(r.ingredients.map(function(_, i){ return i; }));
-
-  document.getElementById('bringSubtext').textContent =
-    r.name + ' — select the ingredients you need';
-  renderBringList(r);
-  renderBringTokenStatus();
-  document.getElementById('bringOverlay').classList.add('open');
-}
-window.sendToBring = sendToBring;
-
-function renderBringList(r) {
-  var list = document.getElementById('bringIngList');
-  list.innerHTML = r.ingredients.map(function(ing, i) {
-    var sel = _bringSelected.has(i);
-    return '<div class="bring-ing-item' + (sel ? ' selected' : '') + '" onclick="bringToggleIng(' + i + ')">'
-      + '<div class="bring-ing-check">' + (sel ? '✓' : '') + '</div>'
-      + '<div class="bring-ing-name">' + escH(ing.n) + '</div>'
-      + '<div class="bring-ing-amt">' + escH(ing.a || '') + '</div>'
-      + '</div>';
-  }).join('');
-}
-
-function bringToggleIng(idx) {
-  if (_bringSelected.has(idx)) _bringSelected.delete(idx);
-  else _bringSelected.add(idx);
-  var r = recipes.find(function(x){ return x.id === _bringRecipeId; });
-  if (r) renderBringList(r);
-}
-window.bringToggleIng = bringToggleIng;
-
-function bringToggleAll() {
-  var r = recipes.find(function(x){ return x.id === _bringRecipeId; });
-  if (!r) return;
-  var btn = document.querySelector('.bring-select-all');
-  if (_bringSelected.size === r.ingredients.length) {
-    _bringSelected.clear();
-    if (btn) btn.textContent = 'Select all';
-  } else {
-    r.ingredients.forEach(function(_, i){ _bringSelected.add(i); });
-    if (btn) btn.textContent = 'Deselect all';
-  }
-  renderBringList(r);
-}
-window.bringToggleAll = bringToggleAll;
-
-async function bringConfirmSend() {
-  var r = recipes.find(function(x){ return x.id === _bringRecipeId; });
-  if (!r || _bringSelected.size === 0) {
-    toast('Please select at least one ingredient');
-    return;
-  }
-
-  var selected = r.ingredients.filter(function(_, i){ return _bringSelected.has(i); });
-  var items = selected.map(function(ing) {
-    return { name: ing.n, spec: ing.a || '' };
-  });
-
-  closeM('bringOverlay');
-  toast('Sending to Bring!...');
-  await sendItemsToBring(items);
-}
-
-async function bringConfirmSend_unused() {
-  var data = {};
-  try {
-    var resp = await fetch('x');
-    data = await resp.json();
-
-    if (data.tokenExpired) {
-      // Token expired — tell user how to refresh it
-      toast('Bring! token expired. See instructions to refresh.');
-      if (confirm('Your Bring! connection has expired (tokens last ~7 days).\n\nTo refresh:\n1. Go to web.getbring.com\n2. Open console (F12)\n3. Run: localStorage.getItem(\'accessToken\')\n4. Send the token to update the Worker\n\nFor now, copy ingredients to clipboard?')) {
-        var ingText = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
-        navigator.clipboard.writeText(ingText).then(function() {
-          toast('Ingredients copied! Open Bring! and paste.');
-          window.open('https://web.getbring.com', '_blank');
-        });
-      }
-    } else if (data.success) {
-      toast(items.length + ' ingredient' + (items.length > 1 ? 's' : '') + ' sent to Bring! ✅');
-      // Open Bring! app
-      setTimeout(function() {
-        var a = document.createElement('a');
-        a.href = 'bring://';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function() {
-          window.open('https://web.getbring.com', '_blank');
-        }, 1500);
-      }, 800);
-    } else {
-      // Partial failure — fall back to clipboard
-      var ingText = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
-      navigator.clipboard.writeText(ingText).then(function() {
-        toast(items.length + ' ingredients copied! Open Bring! and paste.');
-        setTimeout(function() { window.open('https://web.getbring.com', '_blank'); }, 1000);
-      });
-    }
-  } catch(err) {
-    // Network error — fall back to clipboard
-    toast('Copying to clipboard...');
-    var ingText2 = selected.map(function(i){ return (i.a ? i.a + ' ' : '') + i.n; }).join('\n');
-    navigator.clipboard.writeText(ingText2).then(function() {
-      toast('Ingredients copied! Paste into Bring!');
-    });
-  }
-}
-window.bringConfirmSend = bringConfirmSend;
-
-
-
-// ─── PHOTO WEB SEARCH ─────────────────────────────────────────────────────────
-var _photoSearchSelected = null;
-var _photoSearchResults  = [];
-
-function openPhotoSearch(recipeName) {
-  _photoSearchSelected = null;
-  _photoSearchResults  = [];
-  document.getElementById('photoSearchGrid').innerHTML = '';
-  document.getElementById('photoSearchUseBtn').style.display = 'none';
-  document.getElementById('photoSearchStatus').textContent = '';
-  document.getElementById('photoSearchInput').value = recipeName || '';
-  document.getElementById('photoSearchOverlay').classList.add('open');
-  if (recipeName) setTimeout(searchPhotos, 300);
-}
-
-async function searchPhotos() {
-  var query = document.getElementById('photoSearchInput').value.trim();
-  if (!query) { toast('Enter a search term'); return; }
-  var grid   = document.getElementById('photoSearchGrid');
-  var status = document.getElementById('photoSearchStatus');
-  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching...</div>';
-  status.textContent = '';
-  document.getElementById('photoSearchUseBtn').style.display = 'none';
-  _photoSearchSelected = null;
-
-  try {
-    // Search via Worker (keeps API key server-side, avoids CORS)
-    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'photo-search', query: query })
-    });
-    if (!resp.ok) throw new Error('Search failed: ' + resp.status);
-    var data = await resp.json();
-
-    if (data.error) {
-      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">' + data.error + '</div>';
-      return;
-    }
-    if (!data.images || !data.images.length) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos found. Try a different search term.</div>';
-      return;
-    }
-    _photoSearchResults = data.images;
-    renderPhotoSearchGrid(data.images);
-    status.textContent = data.images.length + ' photos found — tap to select';
-  } catch(err) {
-    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: ' + err.message + '</div>';
-  }
-}
-function renderPhotoSearchGrid(images) {
-  var grid = document.getElementById('photoSearchGrid');
-  grid.innerHTML = '';
-  images.forEach(function(img, i) {
-    var div = document.createElement('div');
-    div.className = 'photo-search-item';
-    div.onclick = function() { selectSearchPhoto(i, div); };
-
-    var image = document.createElement('img');
-    image.alt = 'Photo option ' + (i+1);
-    image.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#f0ebe4;';
-    image.onerror = function() {
-      // Try full URL if thumb fails
-      if (image.src !== img.url) {
-        image.src = img.url;
-      } else {
-        div.style.display = 'none';
-      }
-    };
-    // Load thumb first for speed, show spinner while loading
-    div.style.cssText = 'aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s;position:relative;background:#f0ebe4;display:flex;align-items:center;justify-content:center;';
-    div.innerHTML = '<div style="color:var(--muted);font-size:10px;">Loading...</div>';
-    image.onload = function() {
-      div.innerHTML = '';
-      div.appendChild(image);
-      if (img.credit) {
-        var credit = document.createElement('div');
-        credit.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';
-        credit.textContent = '© ' + img.credit;
-        div.appendChild(credit);
-      }
-    };
-    image.src = img.thumb || img.url;
-    grid.appendChild(div);
-  });
-}
-
-function selectSearchPhoto(idx, el) {
-  // Deselect all
-  document.querySelectorAll('.photo-search-item').forEach(function(d){ d.classList.remove('selected'); });
-  el.classList.add('selected');
-  _photoSearchSelected = idx;
-  document.getElementById('photoSearchUseBtn').style.display = 'block';
-}
-
-async function useSelectedSearchPhoto() {
-  if (_photoSearchSelected === null) { toast('Select a photo first'); return; }
-  var img = _photoSearchResults[_photoSearchSelected];
-  if (!img) return;
-
-  closeM('photoSearchOverlay');
-  toast('Downloading photo...');
-
-  try {
-    var resp = await fetch(img.url);
-    if (!resp.ok) throw new Error('Could not download image: ' + resp.status);
-    var blob = await resp.blob();
-    var file = new File([blob], 'web-photo.jpg', { type: blob.type || 'image/jpeg' });
-
-    photoUploadInProgress = true;
-
-    // Compress to base64
-    var photoUrl = await uploadPhotoToStorage(file, heroPhotoTargetId);
-    photoUploadInProgress = false;
-
-    if (!photoUrl) throw new Error('Photo compression failed');
-
-    // Find recipe and update
-    var r = recipes.find(function(x){ return x.id === heroPhotoTargetId; });
-    if (!r) throw new Error('Recipe not found (id=' + heroPhotoTargetId + ')');
-
-    console.log('[PhotoSearch] Saving photo to recipe:', r.name, 'url length:', photoUrl.length);
-    r.photo = photoUrl;
-    r.updatedAt = Date.now();
-    pendingPhoto = photoUrl;
-
-    // Save to localStorage + Firestore
-    saveData();
-    console.log('[PhotoSearch] saveData() called');
-
-    // Refresh UI
-    var heroImg = document.getElementById('viewHeroImg');
-    if (heroImg) heroImg.src = photoUrl;
-    renderGrid();
-    toast('\u2705 Photo updated!');
-
-  } catch(err) {
-    photoUploadInProgress = false;
-    console.error('[PhotoSearch] Error:', err);
-    toast('Photo failed: ' + err.message);
-  }
-}
-// ─── APP HELP / AI ASSISTANT ─────────────────────────────────────────────────
-var HELP_SYSTEM_PROMPT = [
-  "You are a helpful assistant for Tony's Recipes Collection app.",
-  "Answer questions about how to use the app clearly and concisely.",
-  "The app has these features:",
-  "- Browse recipes in grid or list view, filter by category or search",
-  "- Add/edit/delete recipes with emoji, photo, ingredients, steps, difficulty, prep time, servings",
-  "- Import recipes from URLs (paste a recipe website URL)",
-  "- Import from YouTube videos (paste a YouTube URL - extracts from description)",
-  "- Import by pasting free-hand text or taking a photo of a recipe (camera OCR)",
-  "- AI features: translate recipes (English and Hebrew), explore meal ideas, suggest new recipes, calculate nutrition",
-  "- Send ingredients to Bring! shopping list app",
-  "- Export recipes to Excel or Word, share via email/WhatsApp/copy",
-  "- Cloud sync via Firebase (linked to Google account), works offline",
-  "- Works on iPhone via Safari (add to home screen as PWA)",
-  "- Share any recipe URL from Safari using the Add to Tony's Recipes Shortcut",
-  "Keep answers brief, friendly, and practical. Use bullet points for lists."
-].join("\n");
-
-function openHelp() {
-  document.getElementById('helpAnswer').style.display = 'none';
-  document.getElementById('helpLoading').style.display = 'none';
-  document.getElementById('helpInput').value = '';
-  document.getElementById('helpOverlay').classList.add('open');
-  setTimeout(function(){ document.getElementById('helpInput').focus(); }, 200);
-}
-
-function askHelpQ(q) {
-  document.getElementById('helpInput').value = q;
-  askHelp();
-}
-
-var _lastHelpQuestion = '';
-
-async function askHelp() {
-  var q = document.getElementById('helpInput').value.trim();
-  if (!q) return;
-  _lastHelpQuestion = q;
-  var answerEl  = document.getElementById('helpAnswer');
-  var loadingEl = document.getElementById('helpLoading');
-  answerEl.style.display  = 'none';
-  loadingEl.style.display = 'block';
-
-  try {
-    var answer = await aiCall(
-      'System: ' + HELP_SYSTEM_PROMPT + '\n\nUser question: ' + q + '\n\nBe concise (2-4 sentences or a short bullet list). End your answer with nothing extra.',
-      400
-    );
-    answer = answer.trim();
-
-    // Parse answer into lines/items and add a Details button per item
-    answerEl.innerHTML = '';
-    var lines = answer.split('\n');
-    lines.forEach(function(line) {
-      if (!line.trim()) return;
-      var row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;';
-
-      var lineText = document.createElement('div');
-      lineText.style.cssText = 'flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;';
-      lineText.textContent = line;
-      row.appendChild(lineText);
-
-      // Only add Details button for substantive lines
-      // Skip: headers ending with ':', very short lines, lines starting with bullets that are just labels
-      var trimmed = line.trim();
-      var isHeader = trimmed.endsWith(':') || trimmed.endsWith('：');
-      var isShort = trimmed.length <= 20;
-      var isBulletHeader = /^[-•*]\s*.{0,40}:$/.test(trimmed);
-      if (!isHeader && !isShort && !isBulletHeader) {
-        var detailsBtn = document.createElement('button');
-        detailsBtn.style.cssText = 'flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;';
-        detailsBtn.textContent = '🔍 Details';
-        detailsBtn.title = 'Get more details about this';
-        (function(topic) {
-          detailsBtn.onclick = function() { showHelpDetail(topic, q); };
-        })(line.trim());
-        row.appendChild(detailsBtn);
-      }
-
-      answerEl.appendChild(row);
-    });
-
-    // Follow-up input at bottom
-    var followRow = document.createElement('div');
-    followRow.style.cssText = 'margin-top:12px;padding-top:10px;border-top:1px solid var(--border);';
-    followRow.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Ask a follow-up:</div>';
-    var followInp = document.createElement('input');
-    followInp.className = 'help-input';
-    followInp.placeholder = 'Ask more...';
-    followInp.style.cssText = 'width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--card-bg);color:var(--ink);box-sizing:border-box;';
-    followInp.onkeydown = function(e) {
-      if (e.key === 'Enter' && followInp.value.trim()) {
-        document.getElementById('helpInput').value = followInp.value.trim();
-        askHelp();
-      }
-    };
-    followRow.appendChild(followInp);
-    answerEl.appendChild(followRow);
-
-    answerEl.style.display  = 'block';
-    loadingEl.style.display = 'none';
-  } catch(err) {
-    loadingEl.style.display = 'none';
-    if (err.message && (err.message.startsWith('BILLING:') || err.message.startsWith('API_KEY:'))) {
-      showServiceError(err.message);
-    } else {
-      answerEl.textContent   = 'Error: ' + err.message;
-      answerEl.style.display = 'block';
-    }
-  }
-}
-
-// Detail modal — opens on top of help modal without closing it
-function showHelpDetail(topic, context) {
-  var existing = document.getElementById('helpDetailOverlay');
-  if (existing) existing.remove();
-
-  var overlay = document.createElement('div');
-  overlay.id = 'helpDetailOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
-
-  var card = document.createElement('div');
-  card.style.cssText = 'background:var(--card-bg);border-radius:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);';
-
-  var header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;';
-
-  var title = document.createElement('div');
-  title.style.cssText = 'flex:1;font-family:Playfair Display,serif;font-size:15px;color:var(--warm-brown);line-height:1.4;';
-  title.textContent = topic;
-
-  var closeBtn = document.createElement('button');
-  closeBtn.style.cssText = 'flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;color:var(--muted);display:flex;align-items:center;justify-content:center;';
-  closeBtn.textContent = '✕';
-  closeBtn.onclick = function() { overlay.remove(); };
-
-  header.appendChild(title);
-  header.appendChild(closeBtn);
-
-  var body = document.createElement('div');
-  body.style.cssText = 'font-size:13px;color:var(--muted);text-align:center;padding:16px 0;';
-  body.textContent = '🤔 Loading details...';
-
-  card.appendChild(header);
-  card.appendChild(body);
-  overlay.appendChild(card);
-  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-  document.body.appendChild(overlay);
-
-  // Fetch details from AI
-  aiCall(
-    'System: ' + HELP_SYSTEM_PROMPT
-    + '\n\nThe user is reading help about: "' + context + '"'
-    + '\n\nThey want details specifically about: "' + topic + '"'
-    + '\n\nProvide a focused, detailed explanation of JUST this specific item.'
-    + '\nUse numbered steps if it is a process. Keep it under 200 words. Be practical.',
-    500
-  ).then(function(detail) {
-    body.style.cssText = 'font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;';
-    body.textContent = detail.trim();
-  }).catch(function(err) {
-    body.style.cssText = 'font-size:13px;color:var(--terracotta);';
-    body.textContent = 'Error: ' + err.message;
-  });
-}
-
-async function askHelpDetails(originalQ, briefAnswer) {
-  var answerEl  = document.getElementById('helpAnswer');
-  var loadingEl = document.getElementById('helpLoading');
-  answerEl.style.display  = 'none';
-  loadingEl.style.display = 'block';
-
-  try {
-    var detailPrompt = 'System: ' + HELP_SYSTEM_PROMPT
-      + '\n\nThe user asked: ' + originalQ
-      + '\n\nYou gave this brief answer: ' + briefAnswer
-      + '\n\nNow provide a detailed explanation with:'
-      + '\n- Step-by-step instructions where applicable'
-      + '\n- All relevant options and variations'
-      + '\n- Tips and things to watch out for'
-      + '\n- Mention any related features they might find useful'
-      + '\nBe thorough but clear. Use numbered steps and bullet points.';
-
-    var detail = await aiCall(detailPrompt, 1200);
-    detail = detail.trim();
-
-    answerEl.innerHTML = '';
-
-    // Back button
-    var backBtn = document.createElement('button');
-    backBtn.style.cssText = 'padding:5px 12px;background:transparent;border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:10px;';
-    backBtn.textContent = '← Back';
-    backBtn.onclick = function() { askHelpQ(originalQ); };
-    answerEl.appendChild(backBtn);
-
-    var detailText = document.createElement('div');
-    detailText.style.cssText = 'white-space:pre-wrap;';
-    detailText.textContent = detail;
-    answerEl.appendChild(detailText);
-
-    answerEl.style.display  = 'block';
-    loadingEl.style.display = 'none';
-  } catch(err) {
-    loadingEl.style.display = 'none';
-    answerEl.textContent   = 'Error: ' + err.message;
-    answerEl.style.display = 'block';
-  }
-}
-
-window.openHelp       = openHelp;
-window.askHelp        = askHelp;
-window.askHelpQ       = askHelpQ;
-window.openPhotoSearch       = openPhotoSearch;
-window.searchPhotos          = searchPhotos;
-window.selectSearchPhoto     = selectSearchPhoto;
-window.useSelectedSearchPhoto = useSelectedSearchPhoto;
-window.showPhotoSourcePicker = showPhotoSourcePicker;
-
-
-// ─── INGREDIENT TABLE ─────────────────────────────────────────────────────────
-function addIngRow(amount, name) {
-  var tbody = document.getElementById('ingsRows');
-  if (!tbody) return;
-  var row = document.createElement('div');
-  row.className = 'ing-row';
-
-  // Drag handle
-  var handle = document.createElement('div');
-  handle.className = 'ing-handle';
-  handle.innerHTML = '⠿';
-  handle.title = 'Drag to reorder';
-
-  var amtInput = document.createElement('input');
-  amtInput.type = 'text';
-  amtInput.placeholder = 'Amount';
-  amtInput.value = amount || '';
-  amtInput.setAttribute('dir', 'auto');
-  amtInput.oninput = syncIngsTextarea;
-
-  var nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.placeholder = 'Ingredient name';
-  nameInput.value = name || '';
-  nameInput.setAttribute('dir', 'auto');
-  nameInput.oninput = syncIngsTextarea;
-
-  // Tab from amount → name
-  amtInput.onkeydown = function(e) {
-    if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); nameInput.focus(); }
-  };
-  // Tab from name → next row or add new
-  nameInput.onkeydown = function(e) {
-    if (e.key === 'Tab' && !e.shiftKey) {
-      e.preventDefault();
-      var rows = tbody.querySelectorAll('.ing-row');
-      var rowArr = Array.from(rows);
-      var idx = rowArr.indexOf(row);
-      if (idx === rowArr.length - 1) { addIngRow(); }
-      else { rowArr[idx+1].querySelector('input').focus(); }
-    }
-    if (e.key === 'Enter') { e.preventDefault(); addIngRow(); }
-  };
-
-  var delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'ing-del';
-  delBtn.textContent = '✕';
-  delBtn.title = 'Remove';
-  delBtn.onclick = function() {
-    row.remove();
-    syncIngsTextarea();
-    if (!document.getElementById('ingsRows').children.length) addIngRow();
-  };
-
-  // ── Drag to reorder (mouse + touch) ──────────────────────────────────────
-  var dragState = null;
-
-  function startDrag(clientY) {
-    dragState = { startY: clientY, row: row };
-    row.classList.add('dragging');
-    document.body.style.userSelect = 'none';
-  }
-
-  function moveDrag(clientY) {
-    if (!dragState) return;
-    var tbody = document.getElementById('ingsRows');
-    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
-    var target = null;
-    rows.forEach(function(r) {
-      if (r === row) return;
-      var rect = r.getBoundingClientRect();
-      var mid = rect.top + rect.height / 2;
-      r.classList.remove('drag-over');
-      if (clientY < mid && !target) target = r;
-    });
-    if (target) target.classList.add('drag-over');
-    dragState.target = target;
-  }
-
-  function endDrag() {
-    if (!dragState) return;
-    row.classList.remove('dragging');
-    document.body.style.userSelect = '';
-    var tbody = document.getElementById('ingsRows');
-    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
-    rows.forEach(function(r) { r.classList.remove('drag-over'); });
-    if (dragState.target) {
-      tbody.insertBefore(row, dragState.target);
-    } else {
-      tbody.appendChild(row);
-    }
-    dragState = null;
-    syncIngsTextarea();
-  }
-
-  // Mouse events on handle
-  handle.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    startDrag(e.clientY);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  });
-  function onMouseMove(e) { moveDrag(e.clientY); }
-  function onMouseUp(e) {
-    endDrag();
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  }
-
-  // Touch events on handle
-  handle.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    startDrag(e.touches[0].clientY);
-  }, { passive: false });
-  handle.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    moveDrag(e.touches[0].clientY);
-  }, { passive: false });
-  handle.addEventListener('touchend', function(e) {
-    e.preventDefault();
-    endDrag();
-  }, { passive: false });
-
-  row.appendChild(handle);
-  row.appendChild(amtInput);
-  row.appendChild(nameInput);
-  row.appendChild(delBtn);
-  tbody.appendChild(row);
-  syncIngsTextarea();
-
-  // Focus the name input if amount provided, else amount
-  if (amount) nameInput.focus();
-  return row;
-}
-
-function syncIngsTextarea() {
-  var rows = document.querySelectorAll('#ingsRows .ing-row');
-  var lines = [];
-  rows.forEach(function(row) {
-    var inputs = row.querySelectorAll('input');
-    var amt  = inputs[0] ? inputs[0].value.trim() : '';
-    var name = inputs[1] ? inputs[1].value.trim() : '';
-    if (amt || name) {
-      lines.push(amt ? amt + ' \u2014 ' + name : name);
-    }
-  });
-  var ta = document.getElementById('f-ings');
-  if (ta) ta.value = lines.join('\n');
-}
-
-function loadIngsTable(ingredients) {
-  var tbody = document.getElementById('ingsRows');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  if (!ingredients || !ingredients.length) {
-    addIngRow();
-    return;
-  }
-  ingredients.forEach(function(ing) {
-    addIngRow(ing.a || '', ing.n || '');
-  });
-}
-
-window.addIngRow          = addIngRow;
-window.syncIngsTextarea   = syncIngsTextarea;
-window.loadIngsTable      = loadIngsTable;
-
-
-// ─── BACKUP & RESTORE ────────────────────────────────────────────────────────
-function backupSave() {
-  try {
-    // Deduplicate photos: build a photo map so each unique photo is stored once
-    var photoMap = {}; // base64 → photoKey
-    var photoIndex = 0;
-
-    var exportRecipes = recipes.map(function(r) {
-      var rec = JSON.parse(JSON.stringify(r)); // deep clone
-
-      // Deduplicate photo
-      if (rec.photo && rec.photo.startsWith('data:')) {
-        if (photoMap[rec.photo] !== undefined) {
-          // Already stored — reference it
-          rec.photo = '__photo__' + photoMap[rec.photo];
-        } else {
-          var key = photoIndex++;
-          photoMap[rec.photo] = key;
-          rec.photo = '__photo__' + key;
-        }
-      }
-
-      // Deduplicate originalPhoto
-      if (rec.originalPhoto && rec.originalPhoto.startsWith('data:')) {
-        if (photoMap[rec.originalPhoto] !== undefined) {
-          rec.originalPhoto = '__photo__' + photoMap[rec.originalPhoto];
-        } else {
-          var key2 = photoIndex++;
-          photoMap[rec.originalPhoto] = key2;
-          rec.originalPhoto = '__photo__' + key2;
-        }
-      }
-
-      return rec;
-    });
-
-    // Build reverse map: key → base64
-    var photos = {};
-    Object.keys(photoMap).forEach(function(b64) {
-      photos[String(photoMap[b64])] = b64;
-    });
-
-    var backup = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      appVersion: document.getElementById('appVersion') ? document.getElementById('appVersion').textContent : 'unknown',
-      nextId: nextId,
-      recipes: exportRecipes,
-      photos: photos,
-      settings: {
-        viewMode: viewMode,
-        activeCat: activeCat
-      }
-    };
-
-    var json = JSON.stringify(backup, null, 2);
-    var blob = new Blob([json], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    var date = new Date().toISOString().slice(0, 10);
-    a.href = url;
-    a.download = 'tonys-recipes-backup-' + date + '.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    var photoCount = Object.keys(photos).length;
-    var sizeMB = (json.length / 1024 / 1024).toFixed(1);
-    toast('✅ Backup saved! ' + recipes.length + ' recipes, ' + photoCount + ' photos (' + sizeMB + ' MB)');
-  } catch(err) {
-    toast('❌ Backup failed: ' + err.message);
-    console.error('Backup error:', err);
-  }
-}
-
-function backupRestore() {
-  if (!confirm(
-    'Restore from backup?\n\n' +
-    'WARNING: This will REPLACE all your current recipes with the backup.\n\n' +
-    'Your current recipes will be overwritten. Make sure you have a recent backup before continuing.\n\n' +
-    'Continue?'
-  )) return;
-  document.getElementById('backupRestoreInput').click();
-}
-
-async function backupRestoreFile(event) {
-  var file = event.target.files[0];
-  event.target.value = '';
-  if (!file) return;
-
-  try {
-    toast('Reading backup file...');
-    var text = await file.text();
-    var backup = JSON.parse(text);
-
-    if (!backup.version || !Array.isArray(backup.recipes)) {
-      throw new Error('Invalid backup file format');
-    }
-
-    // Restore photos: replace __photo__N references with actual base64
-    var photos = backup.photos || {};
-    var restored = backup.recipes.map(function(r) {
-      var rec = JSON.parse(JSON.stringify(r));
-
-      if (rec.photo && rec.photo.startsWith('__photo__')) {
-        var key = rec.photo.replace('__photo__', '');
-        rec.photo = photos[key] || '';
-      }
-      if (rec.originalPhoto && rec.originalPhoto.startsWith('__photo__')) {
-        var key2 = rec.originalPhoto.replace('__photo__', '');
-        rec.originalPhoto = photos[key2] || '';
-      }
-
-      return rec;
-    });
-
-    // Apply
-    recipes = migrateRecipes(restored);
-    nextId = backup.nextId || (Math.max.apply(null, recipes.map(function(r){ return r.id || 0; })) + 1);
-    if (backup.settings) {
-      if (backup.settings.viewMode) viewMode = backup.settings.viewMode;
-    }
-
-    saveLocal();
-    renderFilters();
-    renderGrid();
-
-    // Sync to cloud if signed in
-    if (window._driveMode && window._fbUser) {
-      toast('Syncing restored recipes to cloud...');
-      await saveToFirestore();
-    }
-
-    toast('✅ Restored ' + recipes.length + ' recipes from backup (' + backup.exportedAt.slice(0,10) + ')');
-  } catch(err) {
-    toast('❌ Restore failed: ' + err.message);
-    console.error('Restore error:', err);
-  }
-}
-
-// Show/hide backup options based on device (desktop only)
-(function() {
-  function updateBackupVisibility() {
-    var isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    var saveBtn    = document.getElementById('backupSaveBtn');
-    var restoreBtn = document.getElementById('backupRestoreBtn');
-    if (isMobileDevice) {
-      if (saveBtn)    saveBtn.style.display    = 'none';
-      if (restoreBtn) restoreBtn.style.display = 'none';
-    }
-  }
-  // Run after DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', updateBackupVisibility);
-  } else {
-    updateBackupVisibility();
-  }
-})();
-
-window.backupSave        = backupSave;
-window.backupRestore     = backupRestore;
-window.backupRestoreFile = backupRestoreFile;
-
-
-// ─── BRING! TOKEN REFRESH ────────────────────────────────────────────────────
-var _bringRetryItems = null;  // items to retry after token refresh
-var _bringTokenPollInterval = null;
-var _bringTokenPollAttempts = 0;
-
-function openBringForTokenRefresh() {
-  // Open web.getbring.com in a new tab
-  window.open('https://web.getbring.com', '_blank');
-  document.getElementById('bringTokenExpiredStatus').innerHTML =
-    '<span style="color:var(--terracotta);">⏳ Waiting for token refresh... click your 🛒 bookmark on that page</span>';
-
-  // Poll Worker every 3 seconds to detect when token is refreshed
-  _bringTokenPollAttempts = 0;
-  clearInterval(_bringTokenPollInterval);
-  _bringTokenPollInterval = setInterval(async function() {
-    _bringTokenPollAttempts++;
-    if (_bringTokenPollAttempts > 40) { // 2 minutes timeout
-      clearInterval(_bringTokenPollInterval);
-      document.getElementById('bringTokenExpiredStatus').innerHTML =
-        '<span style="color:#c62828;">Timed out. Please try again.</span>';
-      return;
-    }
-    try {
-      // Test if token is now valid by calling bring-lists
-      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'bring-lists' })
-      });
-      var data = await resp.json();
-      if (data.ok || (data.lists && data.lists.length > 0)) {
-        // Token is valid!
-        clearInterval(_bringTokenPollInterval);
-        document.getElementById('bringTokenExpiredStatus').innerHTML =
-          '<span style="color:#2e7d32;">✅ Token refreshed!</span>';
-
-        // Update local expiry record
-        setBringTokenExpiry(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
-        renderBringTokenStatus();
-
-        // Auto-retry sending ingredients after short delay
-        setTimeout(function() {
-          closeM('bringTokenExpiredOverlay');
-          if (_bringRetryItems && _bringRetryItems.length > 0) {
-            toast('Sending ingredients to Bring!...');
-            sendItemsToBring(_bringRetryItems);
-          }
-        }, 1200);
-      }
-    } catch(e) {}
-  }, 3000);
-}
-
-function showBringTokenExpired(items) {
-  _bringRetryItems = items;
-  clearInterval(_bringTokenPollInterval);
-  document.getElementById('bringTokenExpiredStatus').innerHTML = '';
-  document.getElementById('bringTokenExpiredOverlay').classList.add('open');
-}
-
-async function sendItemsToBring(items) {
-  try {
-    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'bring-add', items: items })
-    });
-    var data = await resp.json();
-    if (data.tokenExpired) {
-      showBringTokenExpired(items);
-      return;
-    }
-    if (data.success) {
-      toast('\u2705 ' + items.length + ' ingredient' + (items.length > 1 ? 's' : '') + ' added to Bring!');
-      setTimeout(function() {
-        window.location.href = 'bring://';
-        setTimeout(function() { window.open('https://web.getbring.com', '_blank'); }, 1500);
-      }, 600);
-    } else {
-      var failed = (data.results || []).filter(function(r){ return !r.ok; });
-      toast('\u26a0\ufe0f ' + (items.length - failed.length) + ' of ' + items.length + ' items added to Bring!');
-      setTimeout(function() {
-        window.location.href = 'bring://';
-        setTimeout(function() { window.open('https://web.getbring.com', '_blank'); }, 1500);
-      }, 800);
-    }
-  } catch(err) {
-    if (err.message && err.message.includes('Failed to fetch')) {
-      showServiceError('WORKER_DOWN: Cannot reach the Cloudflare Worker.\n\nThis may mean:\n• Cloudflare Worker is disabled or over the free limit (100,000 requests/day)\n• Check your Worker at: https://dash.cloudflare.com/\n• Free tier: 100,000 requests/day. Paid: $5/month for 10M requests.');
-    } else {
-      toast('Connection error. Please try again.');
-    }
-  }
-}
-
-// ─── BRING! TOKEN MANAGEMENT ─────────────────────────────────────────────────
-var BRING_TOKEN_STORAGE_KEY = 'bring_token_expiry';
-var BRING_WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
-var BRING_TOKEN_SECRET = 'tonys-recipes-2024';
-var _bringPopup = null;
-var _bringTokenCheckInterval = null;
-
-function getBringTokenExpiry() {
-  try {
-    var stored = localStorage.getItem(BRING_TOKEN_STORAGE_KEY);
-    return stored ? parseInt(stored) : null;
-  } catch(e) { return null; }
-}
-
-function setBringTokenExpiry(expTs) {
-  try { localStorage.setItem(BRING_TOKEN_STORAGE_KEY, String(expTs)); } catch(e) {}
-}
-
-function getBringTokenDaysLeft() {
-  var exp = getBringTokenExpiry();
-  if (!exp) return null;
-  var msLeft = exp * 1000 - Date.now();
-  return Math.floor(msLeft / (1000 * 60 * 60 * 24));
-}
-
-async function updateBringToken(token) {
-  // Decode JWT to get expiry
-  try {
-    var parts = token.split('.');
-    if (parts.length !== 3) throw new Error('Invalid token');
-    var payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
-    setBringTokenExpiry(payload.exp);
-
-    // Send to Worker
-    var resp = await fetch(BRING_WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'bring-settoken', token: token, secret: BRING_TOKEN_SECRET })
-    });
-    var data = await resp.json();
-    if (data.success) {
-      toast('Bring! token updated! Valid for 7 days.');
-      renderBringTokenStatus();
-      return true;
-    }
-  } catch(e) {
-    console.warn('Bring! token update failed:', e);
-  }
-  return false;
-}
-
-// OPTION C: Auto-capture via popup + postMessage
-function openBringAutoRefresh() {
-  toast('Opening Bring! relay...');
-  // Open our relay page (same domain — can talk to us via postMessage)
-  // The relay opens web.getbring.com and reads the token
-  _bringPopup = window.open(
-    'https://rozinante2004-hash.github.io/tonys-recipes/bring-relay.html',
-    'bring_relay',
-    'width=500,height=500,left=200,top=100'
-  );
-  if (!_bringPopup) {
-    // Popup blocked — fall back to bookmarklet
-    toast('Popup blocked. Use the bookmarklet instead.');
-    showBringBookmarklet();
-    return;
-  }
-  // Listen for token via postMessage (relay sends it back)
-  // postMessage listener is already set up globally
-  var timeout = setTimeout(function() {
-    if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
-    toast('Auto-capture timed out. Use the bookmarklet.');
-    showBringBookmarklet();
-  }, 120000);
-  window._bringRelayTimeout = timeout;
-}
-
-// Listen for token from popup (Option C postMessage)
-window.addEventListener('message', function(event) {
-  // Accept from our relay page (same GitHub domain) or Bring! domain
-  var allowed = [
-    'https://rozinante2004-hash.github.io',
-    'https://web.getbring.com'
-  ];
-  if (!allowed.includes(event.origin)) return;
-  if (!event.data || !event.data.bringToken) return;
-
-  clearTimeout(window._bringRelayTimeout);
-  clearInterval(_bringTokenCheckInterval);
-  if (_bringPopup && !_bringPopup.closed) _bringPopup.close();
-
-  updateBringToken(event.data.bringToken).then(function(ok) {
-    if (ok) {
-      toast('✅ Bring! connection refreshed! Valid for 7 days.');
-      renderBringTokenStatus();
-    }
-  });
-});
-
-// OPTION B: Bookmarklet — generates JS to copy to bookmark bar
-function showBringBookmarklet() {
-  var bookmarkletCode = 'javascript:(function(){'
-    + 'var t=localStorage.getItem("accessToken");'
-    + 'if(!t){alert("Not logged into Bring! Please sign in first.");return;}'
-    + 'fetch("' + BRING_WORKER_URL + '",'
-    + '{method:"POST",headers:{"Content-Type":"application/json"},'
-    + 'body:JSON.stringify({action:"bring-settoken",token:t,secret:"' + BRING_TOKEN_SECRET + '"})}'
-    + ').then(function(r){return r.json();})'
-    + '.then(function(d){alert(d.success?"Bring! token updated successfully! Valid for 7 days.":"Failed: "+d.message);})'
-    + '.catch(function(e){alert("Error: "+e.message);})'
-    + '})();';
-
-  // Show modal with bookmarklet
-  document.getElementById('bringBookmarkletCode').textContent = bookmarkletCode;
-  document.getElementById('bringBookmarkletOverlay').classList.add('open');
-}
-
-function copyBookmarklet() {
-  var code = document.getElementById('bringBookmarkletCode').textContent;
-  navigator.clipboard.writeText(code).then(function() {
-    toast('Bookmarklet code copied!');
-  });
-}
-
-function isMobile() {
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-}
-
-function renderBringTokenStatus() {
-  var el = document.getElementById('bringTokenStatus');
-  if (!el) return;
-  var days = getBringTokenDaysLeft();
-  var dot, label;
-  if (days === null) {
-    dot = 'error'; label = 'Bring! token not set';
-  } else if (days < 0) {
-    dot = 'error'; label = 'Bring! token expired';
-  } else if (days <= 2) {
-    dot = 'warn'; label = 'Bring! token expires in ' + days + ' day' + (days===1?'':'s');
-  } else {
-    dot = ''; label = 'Bring! connected (' + days + ' days left)';
-  }
-
-  var buttons = '';
-  if (days === null || days <= 2) {
-    if (isMobile()) {
-      // On mobile — can't use web.getbring.com, show reminder
-      buttons = '<span style="font-size:11px;color:var(--muted);margin-left:4px;">Refresh on PC when needed</span>';
-    } else {
-      // On desktop — show refresh + bookmarklet buttons
-      buttons = '<button class="bring-token-btn" onclick="event.stopPropagation();openBringAutoRefresh()">'
-        + (days < 0 ? 'Refresh' : days <= 2 ? 'Refresh Now' : 'Refresh') + '</button>'
-        + '<button class="bring-token-btn" style="background:#8A8279;margin-left:4px;" '
-        + 'onclick="event.stopPropagation();showBringBookmarklet()">Bookmarklet</button>';
-    }
-  }
-
-  el.innerHTML = '<div class="bring-token-dot' + (dot ? ' ' + dot : '') + '"></div>'
-    + '<span class="bring-token-label">' + label + '</span>'
-    + buttons;
-}
-
-window.openBringAutoRefresh  = openBringAutoRefresh;
-window.showBringBookmarklet  = showBringBookmarklet;
-window.copyBookmarklet        = copyBookmarklet;
-window.renderBringTokenStatus = renderBringTokenStatus;
-
-// Initialise on load — set expiry from hardcoded token if not set
-(function() {
-  if (!getBringTokenExpiry()) {
-    // Set the current token expiry (May 29 2026 = 1780076628)
-    setBringTokenExpiry(1780076628);
-  }
-})();
-
-
-loadLocal();
-// Restore offline queue flag from localStorage (survives app restart)
-try {
-  if (localStorage.getItem('tonys_offline_queue') === '1') {
-    _offlineQueue = true;
-    console.log('[Offline] Restored offline queue flag — will merge on sign-in');
-  }
-} catch(e) {}
-renderFilters();
-renderGrid();
-handleShareTarget();
-
-</script>
-</body>
-</html>
+    + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script></body></html>
