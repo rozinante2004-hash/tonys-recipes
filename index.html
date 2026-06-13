@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v11.6 -->
+<!-- Tony's Recipes Collection v11.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1226,6 +1226,78 @@ body.banner-shown .header {
   background: #EAF5E9; color: #3A7D44; font-weight: 500;
 }
 
+
+/* ── MOBILE FILTER DROPDOWNS ── */
+@media (max-width: 700px) {
+  .filter-bar { gap: 6px; padding: 8px 12px; }
+  .filter-frame { display: none !important; }
+  .filter-bar-mobile { display: flex !important; }
+}
+@media (min-width: 701px) {
+  .filter-bar-mobile { display: none !important; }
+}
+.filter-bar-mobile {
+  display: none;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.mobile-filter-toggle {
+  padding: 5px 10px; border-radius: 20px;
+  border: 1.5px solid #D4C4B0; background: #F5EFE8;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; color: #6B5744; font-weight: 500;
+  transition: all 0.15s; white-space: nowrap;
+}
+.mobile-filter-toggle.active {
+  background: var(--warm-brown); border-color: var(--warm-brown);
+  color: white; font-weight: 600;
+}
+.mobile-filter-toggle.fav-active {
+  background: var(--terracotta); border-color: var(--terracotta); color: white;
+}
+.mobile-filter-toggle.clip-active {
+  background: #2E7D32; border-color: #2E7D32; color: white;
+}
+.mobile-dropdown-btn {
+  padding: 5px 12px; border-radius: 20px;
+  border: 1.5px solid #D4C4B0; background: #F5EFE8;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; color: #6B5744; font-weight: 500;
+  transition: all 0.15s; position: relative; white-space: nowrap;
+}
+.mobile-dropdown-btn.has-selection {
+  background: var(--warm-brown); border-color: var(--warm-brown);
+  color: white; font-weight: 600;
+}
+.mobile-dropdown-panel {
+  display: none; position: fixed; left: 12px; right: 12px;
+  background: white; border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  z-index: 500; padding: 12px; max-height: 60vh; overflow-y: auto;
+}
+.mobile-dropdown-panel.open { display: block; }
+.mobile-dropdown-panel .panel-title {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.mobile-check-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 4px; border-bottom: 1px solid var(--border);
+  font-size: 14px; color: var(--ink); cursor: pointer;
+}
+.mobile-check-item:last-child { border-bottom: none; }
+.mobile-check-item input[type=checkbox] {
+  width: 18px; height: 18px; accent-color: var(--terracotta); cursor: pointer;
+}
+.mobile-panel-done {
+  width: 100%; margin-top: 12px; padding: 10px;
+  background: var(--terracotta); color: white; border: none;
+  border-radius: 8px; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
+
 </style>
 </head>
 <body>
@@ -1246,7 +1318,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1324,6 +1396,41 @@ body.banner-shown .header {
 <!-- FILTERS -->
 <!-- status bar moved into header -->
 <div class="filter-bar" id="filterBar"></div>
+
+<!-- MOBILE FILTERS -->
+<div class="filter-bar filter-bar-mobile" id="mobileFilterBar">
+  <!-- Row 1: All + Fav + Clips + dropdowns -->
+  <button class="mobile-filter-toggle" id="mobileAllBtn" onclick="mobileResetFilters()">✦ All</button>
+  <button class="mobile-filter-toggle" id="mobileFavBtn" onclick="mobileFavToggle()">❤ Fav</button>
+  <button class="mobile-filter-toggle" id="mobileClipBtn" onclick="mobileClipToggle()">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:2px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips
+  </button>
+  <button class="mobile-dropdown-btn" id="mobileMealBtn" onclick="toggleMobilePanel('mobileMealPanel', 'mobileMealBtn')">🍽 Meal ▾</button>
+  <button class="mobile-dropdown-btn" id="mobileDietBtn" onclick="toggleMobilePanel('mobileDietPanel', 'mobileDietBtn')">🥗 Diet ▾</button>
+</div>
+
+<!-- Mobile Meal Panel -->
+<div class="mobile-dropdown-panel" id="mobileMealPanel">
+  <div class="panel-title">Meal type</div>
+  <label class="mobile-check-item"><input type="checkbox" value="Breakfast" onchange="mobileCatChange()">🌅 Breakfast</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Lunch" onchange="mobileCatChange()">☀️ Lunch</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Dinner" onchange="mobileCatChange()">🌙 Dinner</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Snack" onchange="mobileCatChange()">🍿 Snack</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Dessert" onchange="mobileCatChange()">🍰 Dessert</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Soup" onchange="mobileCatChange()">🍜 Soup</label>
+  <button class="mobile-panel-done" onclick="toggleMobilePanel('mobileMealPanel','mobileMealBtn')">Done</button>
+</div>
+
+<!-- Mobile Diet Panel -->
+<div class="mobile-dropdown-panel" id="mobileDietPanel">
+  <div class="panel-title">Diet type</div>
+  <label class="mobile-check-item"><input type="checkbox" value="Keto" onchange="mobileDietChange()">⚡ Keto</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Carnivore" onchange="mobileDietChange()">🥩 Carnivore</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Vegetarian" onchange="mobileDietChange()">🥦 Vegetarian</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Vegan" onchange="mobileDietChange()">🌱 Vegan</label>
+  <label class="mobile-check-item"><input type="checkbox" value="Omnivore" onchange="mobileDietChange()">🍽️ Omnivore</label>
+  <button class="mobile-panel-done" onclick="toggleMobilePanel('mobileDietPanel','mobileDietBtn')">Done</button>
+</div>
 
 <!-- GRID -->
 <div class="grid-section">
@@ -1672,7 +1779,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1999,6 +2106,8 @@ function resetFilters() {
   activeDiets.clear();
   showFavOnly   = false;
   showClipsOnly = false;
+  document.querySelectorAll('.mobile-dropdown-panel input[type=checkbox]').forEach(function(cb){ cb.checked=false; });
+  if(typeof updateMobileButtons==='function') updateMobileButtons();
   renderFilters();
   renderGrid();
 }
@@ -3204,15 +3313,17 @@ function showServiceError(message) {
 function toggleDrop(id){
   const menu=document.getElementById(id);
   const wasOpen=menu.classList.contains('open');
-  document.querySelectorAll('.drop-menu').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.drop-menu').forEach(m=>{ m.classList.remove('open'); m.style.left=''; m.style.right='0'; });
   if(!wasOpen){
     menu.classList.add('open');
-    // Reposition if overflowing viewport edges
-    menu.style.left=''; menu.style.right='0';
-    const rect=menu.getBoundingClientRect();
-    if(rect.left<8){ menu.style.right='auto'; menu.style.left='0'; }
-    if(rect.right>window.innerWidth-8){ menu.style.right='0'; menu.style.left='auto'; }
-    setTimeout(()=>document.addEventListener('click',()=>menu.classList.remove('open'),{once:true}),0);
+    // Reposition after paint so getBoundingClientRect is accurate
+    requestAnimationFrame(function(){
+      menu.style.left=''; menu.style.right='0';
+      const rect=menu.getBoundingClientRect();
+      if(rect.left<8){ menu.style.right='auto'; menu.style.left='0'; }
+      else if(rect.right>window.innerWidth-8){ menu.style.right='0'; menu.style.left='auto'; }
+    });
+    setTimeout(()=>document.addEventListener('click',()=>{ menu.classList.remove('open'); menu.style.left=''; menu.style.right='0'; },{once:true}),0);
   }
 }
 function closeDrop(id){document.getElementById(id).classList.remove('open');}
@@ -4640,6 +4751,111 @@ function clearUrlImportResult(){ var el=document.getElementById('urlImportResult
 window.clearUrlImportResult = clearUrlImportResult;
 window.showSaveAsVideoBookmark = showSaveAsVideoBookmark;
 window.saveAsVideoBookmark = saveAsVideoBookmark;
+
+
+// ─── MOBILE FILTERS ───────────────────────────────────────────────────────────
+function toggleMobilePanel(panelId, btnId) {
+  var panel = document.getElementById(panelId);
+  var isOpen = panel.classList.contains('open');
+  // Close all panels first
+  document.querySelectorAll('.mobile-dropdown-panel').forEach(function(p){ p.classList.remove('open'); });
+  if (!isOpen) {
+    panel.classList.add('open');
+    // Position panel below the filter bar
+    var filterBar = document.getElementById('mobileFilterBar');
+    if (filterBar) {
+      var rect = filterBar.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 6) + 'px';
+    }
+    // Close on outside tap
+    setTimeout(function(){
+      document.addEventListener('click', function closePanels(e) {
+        if (!panel.contains(e.target) && e.target.id !== btnId) {
+          panel.classList.remove('open');
+          document.removeEventListener('click', closePanels);
+        }
+      });
+    }, 0);
+  }
+}
+
+function mobileCatChange() {
+  activeCategories.clear();
+  document.querySelectorAll('#mobileMealPanel input:checked').forEach(function(cb){
+    activeCategories.add(cb.value);
+  });
+  updateMobileButtons();
+  renderGrid();
+}
+
+function mobileDietChange() {
+  activeDiets.clear();
+  document.querySelectorAll('#mobileDietPanel input:checked').forEach(function(cb){
+    activeDiets.add(cb.value);
+  });
+  updateMobileButtons();
+  renderGrid();
+}
+
+function mobileFavToggle() {
+  showFavOnly = !showFavOnly;
+  updateMobileButtons();
+  renderFilters();
+  renderGrid();
+}
+
+function mobileClipToggle() {
+  showClipsOnly = !showClipsOnly;
+  updateMobileButtons();
+  renderFilters();
+  renderGrid();
+}
+
+function mobileResetFilters() {
+  activeCategories.clear();
+  activeDiets.clear();
+  showFavOnly = false;
+  showClipsOnly = false;
+  // Uncheck all mobile checkboxes
+  document.querySelectorAll('.mobile-dropdown-panel input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  updateMobileButtons();
+  renderFilters();
+  renderGrid();
+}
+
+function updateMobileButtons() {
+  var allBtn  = document.getElementById('mobileAllBtn');
+  var favBtn  = document.getElementById('mobileFavBtn');
+  var clipBtn = document.getElementById('mobileClipBtn');
+  var mealBtn = document.getElementById('mobileMealBtn');
+  var dietBtn = document.getElementById('mobileDietBtn');
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly;
+  if (allBtn)  allBtn.classList.toggle('active', !hasSelection);
+  if (favBtn)  { favBtn.classList.remove('active','fav-active'); if(showFavOnly) favBtn.classList.add('fav-active'); }
+  if (clipBtn) { clipBtn.classList.remove('active','clip-active'); if(showClipsOnly) clipBtn.classList.add('clip-active'); }
+  if (mealBtn) mealBtn.classList.toggle('has-selection', activeCategories.size > 0);
+  if (dietBtn) dietBtn.classList.toggle('has-selection', activeDiets.size > 0);
+  // Update meal button label
+  if (mealBtn) {
+    if (activeCategories.size === 0) mealBtn.textContent = '🍽 Meal ▾';
+    else if (activeCategories.size === 1) mealBtn.textContent = '🍽 ' + Array.from(activeCategories)[0] + ' ▾';
+    else mealBtn.textContent = '🍽 ' + activeCategories.size + ' meals ▾';
+  }
+  // Update diet button label
+  if (dietBtn) {
+    if (activeDiets.size === 0) dietBtn.textContent = '🥗 Diet ▾';
+    else if (activeDiets.size === 1) dietBtn.textContent = '🥗 ' + Array.from(activeDiets)[0] + ' ▾';
+    else dietBtn.textContent = '🥗 ' + activeDiets.size + ' diets ▾';
+  }
+}
+
+window.toggleMobilePanel  = toggleMobilePanel;
+window.mobileCatChange    = mobileCatChange;
+window.mobileDietChange   = mobileDietChange;
+window.mobileFavToggle    = mobileFavToggle;
+window.mobileClipToggle   = mobileClipToggle;
+window.mobileResetFilters = mobileResetFilters;
+window.updateMobileButtons = updateMobileButtons;
 
 function updateFilterBarTop() {
   var header = document.querySelector('.header');
