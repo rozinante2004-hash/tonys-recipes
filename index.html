@@ -161,7 +161,8 @@
   --gold: #D4A843; --ink: #1C1A18; --muted: #8A8279;
   --card-bg: #FFFFFF; --border: #E8E0D5;
 }
-body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+html { overflow-x: hidden; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; overflow-x: hidden; }
 
 /* HEADER */
 .header { background: var(--warm-brown); position: sticky; top: 0; z-index: 200; }
@@ -179,7 +180,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* Dropdown menus */
 .drop-group { position: static; }
-.drop-menu { display: none; position: fixed; top: 0; left: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow: hidden; }
+.drop-menu { display: none; position: fixed; top: 0; left: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow: hidden; will-change: transform; }
 .drop-menu.open { display: block; }
 #helpOverlay.open,
 #photoSearchOverlay.open,
