@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v10.6 -->
+<!-- Tony's Recipes Collection v10.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1201,6 +1201,27 @@ body.banner-shown .header {
 }
 .ing-handle:active { cursor: grabbing; }
 
+
+/* ── DIET TAGS ── */
+.diet-tag-btn {
+  padding: 5px 12px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; color: var(--muted);
+  transition: all 0.15s;
+}
+.diet-tag-btn:hover { border-color: #3A7D44; color: #3A7D44; }
+.diet-tag-btn.selected {
+  background: #3A7D44; border-color: #3A7D44;
+  color: white; font-weight: 500;
+}
+.recipe-diet-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.recipe-diet-tag {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: #EAF5E9; color: #3A7D44; font-weight: 500;
+}
+
 </style>
 </head>
 <body>
@@ -1221,7 +1242,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1245,6 +1266,8 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         </div>
       </div>
       <div class="drop-group">
@@ -1356,6 +1379,10 @@ body.banner-shown .header {
             <option>Easy</option><option>Medium</option><option>Hard</option>
           </select>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Diet tags <span style="font-size:11px;color:var(--muted);font-weight:400;">(select all that apply)</span></label>
+        <div id="f-diets" style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0;"></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1631,7 +1658,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1967,8 +1994,18 @@ function toggleCatFilter(cat) {
 }
 
 function toggleDietFilter(diet) {
-  if (activeDiets.has(diet)) activeDiets.delete(diet);
-  else activeDiets.add(diet);
+  if (activeDiets.has(diet)) {
+    activeDiets.delete(diet);
+  } else {
+    if (diet === 'Omnivore') {
+      // Omnivore cancels all other diets
+      activeDiets.clear();
+    } else {
+      // Any specific diet cancels Omnivore
+      activeDiets.delete('Omnivore');
+    }
+    activeDiets.add(diet);
+  }
   renderFilters();
   renderGrid();
 }
@@ -1995,16 +2032,15 @@ function renderGrid() {
     if (showFavOnly && !r.fav) return false;
     // Frame 2: Category filter (any selected category matches)
     if (activeCategories.size > 0 && !activeCategories.has(r.category)) return false;
-    // Frame 3: Diet filter — match against recipe name, category, or tags
+    // Frame 3: Diet filter
     if (activeDiets.size > 0) {
-      var rText = (r.name + ' ' + r.category + ' ' + (r.tags||[]).join(' ')).toLowerCase();
-      var dietMatch = false;
-      activeDiets.forEach(function(d) {
-        if (rText.includes(d.toLowerCase())) dietMatch = true;
-        // Omnivore matches everything
-        if (d === 'Omnivore') dietMatch = true;
-      });
-      if (!dietMatch) return false;
+      // Omnivore matches everything — no filtering needed
+      if (!activeDiets.has('Omnivore')) {
+        // Recipe must have at least one of the selected diets tagged
+        var rDiets = r.diets || [];
+        var dietMatch = rDiets.some(function(d) { return activeDiets.has(d); });
+        if (!dietMatch) return false;
+      }
     }
     // Search query
     if (!q) return true;
@@ -2135,6 +2171,7 @@ function drawView(){
           <button class="conv-opt${viewUnit==='imperial'?' active':''}" onclick="setUnit('imperial')">Imperial</button>
         </div>
       </div>
+      ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + d + '</span>'; }).join('') + '</div>' : ''}
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
       <div class="modal-section-title">Method</div>
@@ -2707,6 +2744,7 @@ function openAddModal(id){
   document.getElementById('f-prep').value=r?r.prep:'';
   document.getElementById('f-srv').value=r?r.servings:'';
   loadIngsTable(r ? r.ingredients : []);
+  renderDietButtons(r ? (r.diets || []) : []);
   document.getElementById('f-steps').value = r ? r.steps.join('\n') : '';
   if(document.getElementById('f-source'))document.getElementById('f-source').value=r?(r.source||''):'';
   document.getElementById('editOverlay').classList.add('open');
@@ -2769,6 +2807,7 @@ async function saveRecipe(){
   const data={
     name, emoji:selEmoji, photo:pendingPhoto,
     category:document.getElementById('f-category').value,
+    diets: getSelectedDiets(),
     difficulty:document.getElementById('f-diff').value,
     prep:document.getElementById('f-prep').value||'\u2014',
     servings:document.getElementById('f-srv').value||'\u2014',
@@ -3480,6 +3519,7 @@ function saveLocal() {
 
 function migrateRecipes(list) {
   return list.map(function(r) {
+    if (!r.diets) r.diets = [];
     if (r.source === undefined) r.source = '';
     if (r.nutrition === undefined) r.nutrition = null;
     if (r.originalPhoto === undefined) r.originalPhoto = '';
