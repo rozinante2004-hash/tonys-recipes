@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.8 -->
+<!-- Tony's Recipes Collection v9.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1195,7 +1195,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.8</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.9</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1222,6 +1222,9 @@ body.banner-shown .header {
       <div class="drop-menu" id="exportDrop">
         <button class="drop-item" onclick="closeDrop('exportDrop');exportAllExcel()">📊 All to Excel</button>
         <button class="drop-item" onclick="closeDrop('exportDrop');exportAllWord()">📄 All to Word</button>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <button class="drop-item" onclick="closeDrop('exportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
+        <button class="drop-item" onclick="closeDrop('exportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
       </div>
     </div>
 
@@ -1238,6 +1241,7 @@ body.banner-shown .header {
 </div>
 
 <!-- Hidden file inputs -->
+<input type="file" id="backupRestoreInput" accept=".json" style="display:none" onchange="backupRestoreFile(event)">
 <input type="file" id="xlsxIn" accept=".xlsx,.xls" style="display:none" onchange="importExcel(event)">
 <input type="file" id="docxIn" accept=".docx" style="display:none" onchange="importWord(event)">
 <input type="file" id="heroPhotoIn" accept="image/*" style="display:none" onchange="heroPhotoChanged(event)">
@@ -1590,7 +1594,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4732,6 +4736,172 @@ function loadIngsTable(ingredients) {
 window.addIngRow          = addIngRow;
 window.syncIngsTextarea   = syncIngsTextarea;
 window.loadIngsTable      = loadIngsTable;
+
+
+// ─── BACKUP & RESTORE ────────────────────────────────────────────────────────
+function backupSave() {
+  try {
+    // Deduplicate photos: build a photo map so each unique photo is stored once
+    var photoMap = {}; // base64 → photoKey
+    var photoIndex = 0;
+
+    var exportRecipes = recipes.map(function(r) {
+      var rec = JSON.parse(JSON.stringify(r)); // deep clone
+
+      // Deduplicate photo
+      if (rec.photo && rec.photo.startsWith('data:')) {
+        if (photoMap[rec.photo] !== undefined) {
+          // Already stored — reference it
+          rec.photo = '__photo__' + photoMap[rec.photo];
+        } else {
+          var key = photoIndex++;
+          photoMap[rec.photo] = key;
+          rec.photo = '__photo__' + key;
+        }
+      }
+
+      // Deduplicate originalPhoto
+      if (rec.originalPhoto && rec.originalPhoto.startsWith('data:')) {
+        if (photoMap[rec.originalPhoto] !== undefined) {
+          rec.originalPhoto = '__photo__' + photoMap[rec.originalPhoto];
+        } else {
+          var key2 = photoIndex++;
+          photoMap[rec.originalPhoto] = key2;
+          rec.originalPhoto = '__photo__' + key2;
+        }
+      }
+
+      return rec;
+    });
+
+    // Build reverse map: key → base64
+    var photos = {};
+    Object.keys(photoMap).forEach(function(b64) {
+      photos[String(photoMap[b64])] = b64;
+    });
+
+    var backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      appVersion: document.getElementById('appVersion') ? document.getElementById('appVersion').textContent : 'unknown',
+      nextId: nextId,
+      recipes: exportRecipes,
+      photos: photos,
+      settings: {
+        viewMode: viewMode,
+        activeCat: activeCat
+      }
+    };
+
+    var json = JSON.stringify(backup, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = 'tonys-recipes-backup-' + date + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    var photoCount = Object.keys(photos).length;
+    var sizeMB = (json.length / 1024 / 1024).toFixed(1);
+    toast('✅ Backup saved! ' + recipes.length + ' recipes, ' + photoCount + ' photos (' + sizeMB + ' MB)');
+  } catch(err) {
+    toast('❌ Backup failed: ' + err.message);
+    console.error('Backup error:', err);
+  }
+}
+
+function backupRestore() {
+  if (!confirm(
+    'Restore from backup?\n\n' +
+    'WARNING: This will REPLACE all your current recipes with the backup.\n\n' +
+    'Your current recipes will be overwritten. Make sure you have a recent backup before continuing.\n\n' +
+    'Continue?'
+  )) return;
+  document.getElementById('backupRestoreInput').click();
+}
+
+async function backupRestoreFile(event) {
+  var file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  try {
+    toast('Reading backup file...');
+    var text = await file.text();
+    var backup = JSON.parse(text);
+
+    if (!backup.version || !Array.isArray(backup.recipes)) {
+      throw new Error('Invalid backup file format');
+    }
+
+    // Restore photos: replace __photo__N references with actual base64
+    var photos = backup.photos || {};
+    var restored = backup.recipes.map(function(r) {
+      var rec = JSON.parse(JSON.stringify(r));
+
+      if (rec.photo && rec.photo.startsWith('__photo__')) {
+        var key = rec.photo.replace('__photo__', '');
+        rec.photo = photos[key] || '';
+      }
+      if (rec.originalPhoto && rec.originalPhoto.startsWith('__photo__')) {
+        var key2 = rec.originalPhoto.replace('__photo__', '');
+        rec.originalPhoto = photos[key2] || '';
+      }
+
+      return rec;
+    });
+
+    // Apply
+    recipes = migrateRecipes(restored);
+    nextId = backup.nextId || (Math.max.apply(null, recipes.map(function(r){ return r.id || 0; })) + 1);
+    if (backup.settings) {
+      if (backup.settings.viewMode) viewMode = backup.settings.viewMode;
+    }
+
+    saveLocal();
+    renderFilters();
+    renderGrid();
+
+    // Sync to cloud if signed in
+    if (window._driveMode && window._fbUser) {
+      toast('Syncing restored recipes to cloud...');
+      await saveToFirestore();
+    }
+
+    toast('✅ Restored ' + recipes.length + ' recipes from backup (' + backup.exportedAt.slice(0,10) + ')');
+  } catch(err) {
+    toast('❌ Restore failed: ' + err.message);
+    console.error('Restore error:', err);
+  }
+}
+
+// Show/hide backup options based on device (desktop only)
+(function() {
+  function updateBackupVisibility() {
+    var isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    var saveBtn    = document.getElementById('backupSaveBtn');
+    var restoreBtn = document.getElementById('backupRestoreBtn');
+    if (isMobileDevice) {
+      if (saveBtn)    saveBtn.style.display    = 'none';
+      if (restoreBtn) restoreBtn.style.display = 'none';
+    }
+  }
+  // Run after DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateBackupVisibility);
+  } else {
+    updateBackupVisibility();
+  }
+})();
+
+window.backupSave        = backupSave;
+window.backupRestore     = backupRestore;
+window.backupRestoreFile = backupRestoreFile;
+
 
 // ─── BRING! TOKEN REFRESH ────────────────────────────────────────────────────
 var _bringRetryItems = null;  // items to retry after token refresh
