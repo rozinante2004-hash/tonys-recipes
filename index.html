@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v11.5 -->
+<!-- Tony's Recipes Collection v11.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -168,7 +168,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; }
 .logo { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--cream); white-space: nowrap; }
 .logo span { color: var(--gold); font-style: italic; }
-.header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
 .btn { border: none; padding: 7px 13px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .btn-primary { background: var(--terracotta); color: white; }
 .btn-primary:hover { background: #a83a0c; }
@@ -179,7 +179,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* Dropdown menus */
 .drop-group { position: relative; }
-.drop-menu { display: none; position: absolute; top: calc(100% + 5px); right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 400; overflow: hidden; }
+.drop-menu { display: none; position: absolute; top: calc(100% + 5px); right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 400; overflow: hidden; }
 .drop-menu.open { display: block; }
 #helpOverlay.open,
 #photoSearchOverlay.open,
@@ -236,9 +236,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .fav-btn:hover { transform: scale(1.2); }
 
 /* MODALS */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 1.25rem; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; }
 .modal-overlay.open { display: flex; }
-.modal { background: var(--cream); border-radius: 16px; width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.22s ease; }
+.modal { background: var(--cream); border-radius: 16px; width: calc(100vw - 16px); max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.22s ease; }
 .modal::-webkit-scrollbar { width: 6px; }
 .modal::-webkit-scrollbar-track { background: transparent; }
 .modal::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
@@ -1246,7 +1246,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.5</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1672,7 +1672,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3207,6 +3207,11 @@ function toggleDrop(id){
   document.querySelectorAll('.drop-menu').forEach(m=>m.classList.remove('open'));
   if(!wasOpen){
     menu.classList.add('open');
+    // Reposition if overflowing viewport edges
+    menu.style.left=''; menu.style.right='0';
+    const rect=menu.getBoundingClientRect();
+    if(rect.left<8){ menu.style.right='auto'; menu.style.left='0'; }
+    if(rect.right>window.innerWidth-8){ menu.style.right='0'; menu.style.left='auto'; }
     setTimeout(()=>document.addEventListener('click',()=>menu.classList.remove('open'),{once:true}),0);
   }
 }
