@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v10.4 -->
+<!-- Tony's Recipes Collection v10.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -199,11 +199,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* FILTERS */
 .filter-bar { padding: 1rem 1.5rem 0.5rem; display: flex; gap: 8px; flex-wrap: wrap; }
-.filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+.filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); }
+.filter-frame { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); align-items: center; }
+.filter-frame-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; white-space: nowrap; }
+.filter-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
 .filter-btn:hover { border-color: var(--warm-brown); color: var(--warm-brown); }
 .filter-btn.active { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 500; }
-.filter-btn.fav-chip { background: #FFF0E8; border-color: #f0c8b0; color: var(--terracotta); }
-.filter-btn.fav-chip.active { background: var(--terracotta); border-color: var(--terracotta); color: white; }
+.filter-btn.all-btn { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 500; }
+.filter-btn.all-btn.inactive { background: transparent; border-color: var(--border); color: var(--muted); font-weight: 400; }
+.filter-btn.fav-btn { background: #FFF0E8; border-color: #f0c8b0; color: var(--terracotta); }
+.filter-btn.fav-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; font-weight: 500; }
+.filter-btn.diet-btn.active { background: #3A7D44; border-color: #3A7D44; color: white; font-weight: 500; }
 
 /* GRID */
 .grid-section { padding: 1rem 1.5rem 3rem; }
@@ -1215,7 +1221,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1625,7 +1631,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1867,7 +1873,8 @@ body.banner-shown .header {
 // DATA
 // ═══════════════════════════════════
 const EMOJIS = ['🍝','🍕','🥗','🍛','🥘','🍲','🥩','🍗','🐟','🥚','🍜','🫕','🥞','🍰','🎂','🫙','🥦','🥑','🫔','🌮','🍣','🍤','🥨','🧆','🫛'];
-const CATS   = ['All','Breakfast','Lunch','Dinner','Snack','Dessert','Vegetarian','Pasta','Soup'];
+const CATS   = ['Breakfast','Lunch','Dinner','Snack','Dessert','Soup'];
+const DIETS  = ['Keto','Carnivore','Vegetarian','Vegan','Omnivore'];
 const BGS    = ['#FFF0E8','#EAF5E9','#E8F0FF','#FFF8E8','#F5E8FF','#E8FFF5','#FFE8F0','#F0F8FF'];
 
 let recipes = [
@@ -1901,6 +1908,9 @@ var _fbDb         = null;
 var _fbProvider   = null;
 var _pendingRemoteData = null;
 var _bringRecipeId = null;
+var activeCategories = new Set(); // Frame 2: meal categories
+var activeDiets      = new Set(); // Frame 3: diet types
+var showFavOnly      = false;
 var _bringSelected = new Set();
 var _bringPopup    = null;
 var _bringTokenCheckInterval = null;
@@ -1908,15 +1918,66 @@ var _bringTokenCheckInterval = null;
 // ═══════════════════════════════════
 // GRID
 // ═══════════════════════════════════
-function renderFilters(){
-  var favActive = activeCat==='Favourites';
-  var favBtn = '<button class="filter-btn fav-chip' + (favActive?' active':'') + '" onclick="setCat(\u0027Favourites\u0027)">\u2764 Favourites</button>';
-  var catBtns = CATS.map(function(c){
-    return '<button class="filter-btn' + (c===activeCat?' active':'') + '" onclick="setCat(\u0027'+c+'\u0027)">'+c+'</button>';
-  }).join('');
-  document.getElementById('filterBar').innerHTML = favBtn + catBtns;
+function renderFilters() {
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly;
+  var allInactive  = hasSelection ? ' inactive' : '';
+
+  // Frame 1: All + Favourites
+  var frame1 = '<div class="filter-frame">'
+    + '<button class="filter-btn all-btn' + allInactive + '" onclick="resetFilters()">All</button>'
+    + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
+    + '</div>';
+
+  // Frame 2: Meal categories
+  var frame2 = '<div class="filter-frame">'
+    + CATS.map(function(c) {
+        return '<button class="filter-btn' + (activeCategories.has(c) ? ' active' : '') + '" onclick="toggleCatFilter(\'' + c + '\')">' + c + '</button>';
+      }).join('')
+    + '</div>';
+
+  // Frame 3: Diets
+  var frame3 = '<div class="filter-frame">'
+    + DIETS.map(function(d) {
+        return '<button class="filter-btn diet-btn' + (activeDiets.has(d) ? ' active' : '') + '" onclick="toggleDietFilter(\'' + d + '\')">' + d + '</button>';
+      }).join('')
+    + '</div>';
+
+  document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3;
 }
-function setCat(c){activeCat=c;renderFilters();renderGrid();}
+
+function resetFilters() {
+  activeCategories.clear();
+  activeDiets.clear();
+  showFavOnly = false;
+  renderFilters();
+  renderGrid();
+}
+
+function toggleFavFilter() {
+  showFavOnly = !showFavOnly;
+  renderFilters();
+  renderGrid();
+}
+
+function toggleCatFilter(cat) {
+  if (activeCategories.has(cat)) activeCategories.delete(cat);
+  else activeCategories.add(cat);
+  renderFilters();
+  renderGrid();
+}
+
+function toggleDietFilter(diet) {
+  if (activeDiets.has(diet)) activeDiets.delete(diet);
+  else activeDiets.add(diet);
+  renderFilters();
+  renderGrid();
+}
+
+window.resetFilters      = resetFilters;
+window.toggleFavFilter   = toggleFavFilter;
+window.toggleCatFilter   = toggleCatFilter;
+window.toggleDietFilter  = toggleDietFilter;
+function setCat(c){ if(c==='All') resetFilters(); else if(c==='Favourites') { showFavOnly=true; renderFilters(); renderGrid(); } }
 
 let viewMode = 'list';
 
@@ -1930,22 +1991,40 @@ function setView(mode) {
 function renderGrid() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const list = recipes.filter(r => {
-    if (activeCat === 'Favourites' && !r.fav) return false;
-    if (activeCat !== 'All' && activeCat !== 'Favourites' && r.category !== activeCat) return false;
+    // Frame 1: Favourites filter
+    if (showFavOnly && !r.fav) return false;
+    // Frame 2: Category filter (any selected category matches)
+    if (activeCategories.size > 0 && !activeCategories.has(r.category)) return false;
+    // Frame 3: Diet filter — match against recipe name, category, or tags
+    if (activeDiets.size > 0) {
+      var rText = (r.name + ' ' + r.category + ' ' + (r.tags||[]).join(' ')).toLowerCase();
+      var dietMatch = false;
+      activeDiets.forEach(function(d) {
+        if (rText.includes(d.toLowerCase())) dietMatch = true;
+        // Omnivore matches everything
+        if (d === 'Omnivore') dietMatch = true;
+      });
+      if (!dietMatch) return false;
+    }
+    // Search query
     if (!q) return true;
     return r.name.toLowerCase().includes(q)
       || r.category.toLowerCase().includes(q)
       || r.ingredients.some(i => i.n.toLowerCase().includes(q))
       || r.steps.some(s => s.toLowerCase().includes(q));
   });
-  document.getElementById('sectionLabel').textContent = activeCat === 'All' ? 'All Recipes' : activeCat;
+  var labelParts = [];
+  if (showFavOnly) labelParts.push('Favourites');
+  if (activeCategories.size) labelParts.push(Array.from(activeCategories).join(', '));
+  if (activeDiets.size) labelParts.push(Array.from(activeDiets).join(', '));
+  document.getElementById('sectionLabel').textContent = labelParts.length ? labelParts.join(' · ') : 'All Recipes';
   const g = document.getElementById('recipeGrid');
 
   if (!list.length) {
     g.className = '';
-    var emptyIcon = activeCat === 'Favourites' ? '\u2764\ufe0f' : q ? '\ud83d\udd0d' : '\ud83c\udf7d\ufe0f';
-    var emptyTitle = activeCat === 'Favourites' ? 'No favourites yet' : q ? 'No recipes found' : 'No recipes yet';
-    var emptySub = activeCat === 'Favourites' ? 'Tap the heart on any recipe to save it here.' : q ? 'Try a different search term.' : 'Add your first recipe or import one from a website.';
+    var emptyIcon = showFavOnly ? '\u2764\ufe0f' : q ? '\ud83d\udd0d' : '\ud83c\udf7d\ufe0f';
+    var emptyTitle = showFavOnly ? 'No favourites yet' : q ? 'No recipes found' : 'No recipes yet';
+    var emptySub = showFavOnly ? 'Tap the heart on any recipe to save it here.' : q ? 'Try a different search term.' : 'Add your first recipe or import one from a website.';
     var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
     g.innerHTML = '<div class="empty-state">'
       + '<div style="width:72px;height:72px;border-radius:50%;background:#FFF0E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">' + emptyIcon + '</div>'
@@ -2023,7 +2102,7 @@ function drawView(){
     </div>
     <div class="modal-content">
       <div class="modal-category">${r.category}</div>
-      <div class="modal-title">${r.name}</div>
+      <div class="modal-title" dir="auto">${r.name}</div>
       <div class="modal-meta">
         <span>⏱ ${r.prep}</span><span>🍽 ${r.servings} servings</span>
         <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
@@ -2059,7 +2138,7 @@ function drawView(){
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
       <div class="modal-section-title">Method</div>
-      <ol class="steps-list">${r.steps.map(s=>`<li>${s}</li>`).join('')}</ol>
+      <ol class="steps-list">${r.steps.map(s=>`<li dir="auto">${s}</li>`).join('')}</ol>
       <div class="recipe-actions">
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
         <button class="action-btn" onclick="openTranslate(${r.id})">🌐 Translate</button>
@@ -2726,7 +2805,7 @@ async function saveRecipe(){
     recipes.unshift({id:nextId++,bg:rndBg(),...data});
     toast('\u2705 Recipe saved!');
   }
-  closeM('editOverlay');activeCat='All';renderFilters();renderGrid();saveData();
+  closeM('editOverlay');resetFilters();renderFilters();renderGrid();saveData();
   // Refresh view modal if user edited from within it
   if (editingId && viewId === editingId) { drawView(); }
 }
