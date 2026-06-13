@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v9.6 -->
+<!-- Tony's Recipes Collection v9.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,9 +31,8 @@
         attempts++;
         if (attempts >= 30) {
           // Still not loaded after 15 seconds — show error
-          console.error('Firebase SDK failed to load after 15 seconds.');
-          var fbErr = document.getElementById('firebaseError');
-          if (fbErr) fbErr.style.display = 'block';
+          console.warn('Firebase SDK not loaded — likely offline. Sign-in will load it dynamically.');
+          // Don't show the error permanently — user can still tap Sign In to retry
           return;
         }
         setTimeout(tryInit, 500);
@@ -1196,7 +1195,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.6</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v9.7</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1591,7 +1590,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v9.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes to your own Google Drive. Your data stays in your account — nobody else can access it.</p>
@@ -1605,7 +1604,7 @@ body.banner-shown .header {
       Sign in with Google
     </button>
     <div id="loginError" style="color:#B03030;font-size:12px;margin-top:8px;display:none;"></div>
-    <div id="firebaseError" style="color:#B03030;font-size:11px;margin-top:4px;display:none;">⚠️ Firebase failed to load. Please check your connection and refresh.</div>
+    <div id="firebaseError" style="color:#B03030;font-size:11px;margin-top:4px;display:none;">📶 Offline — tap "Sign in with Google" when connected to sync your changes.</div>
     <div id="autoLoginNotice" style="color:#5C3D2E;font-size:12px;margin-top:8px;display:none;background:#FFF0E8;padding:8px 12px;border-radius:6px;">
       ⏳ Signing in automatically in 3 seconds…
       <button onclick="cancelAutoLogin()" style="margin-left:8px;background:none;border:none;color:var(--terracotta);cursor:pointer;font-size:12px;font-weight:600;text-decoration:underline;">Cancel</button>
@@ -3585,10 +3584,14 @@ async function startGoogleSignIn() {
   var btn = document.getElementById('googleSignInBtn');
   var errDiv = document.getElementById('loginError');
   var remember = document.getElementById('rememberMe');
+  // Always hide static error divs before attempting sign-in
+  var fbErrDiv = document.getElementById('firebaseError');
+  if (fbErrDiv) fbErrDiv.style.display = 'none';
+  if (errDiv) errDiv.style.display = 'none';
+
   if (typeof firebase === 'undefined' || !_fbAuth) {
     // Firebase not loaded (opened offline) — try loading it now
     if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
-    if (errDiv) { errDiv.style.display = 'none'; }
     try {
       await loadFirebaseDynamically();
       if (typeof firebase === 'undefined' || !_fbAuth) {
