@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v11.3 -->
+<!-- Tony's Recipes Collection v11.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1243,7 +1243,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1417,6 +1417,16 @@ body.banner-shown .header {
       <div class="form-group">
         <label class="form-label">Source</label>
         <input class="form-input" id="f-source" dir="auto" placeholder="e.g. https://www.example.com/recipe or 'AI generated'">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes <span style="font-size:11px;color:var(--muted);font-weight:400;">(personal notes, tips, variations…)</span></label>
+        <textarea class="form-textarea" id="f-notes" dir="auto" placeholder="e.g. Kids loved this! Next time add more garlic. Works great as leftovers." style="min-height:80px;"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+        <label style="font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="f-isclip" style="width:16px;height:16px;cursor:pointer;accent-color:var(--terracotta);">
+          🎥 This is a video clip (no written recipe)
+        </label>
       </div>
       <button class="btn-submit" id="editSubmitBtn" onclick="saveRecipe()">Save Recipe</button>
     </div>
@@ -1659,7 +1669,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1939,6 +1949,7 @@ var _bringRecipeId = null;
 var activeCategories = new Set(); // Frame 2: meal categories
 var activeDiets      = new Set(); // Frame 3: diet types
 var showFavOnly      = false;
+var showClipsOnly    = false;
 var _bringSelected = new Set();
 var _bringPopup    = null;
 var _bringTokenCheckInterval = null;
@@ -1950,10 +1961,11 @@ function renderFilters() {
   var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly;
   var allInactive  = hasSelection ? ' inactive' : '';
 
-  // Frame 1: All + Favourites
+  // Frame 1: All + Favourites + Clips
   var frame1 = '<div class="filter-frame">'
     + '<button class="filter-btn all-btn' + allInactive + '" onclick="resetFilters()">All</button>'
     + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
+    + '<button class="filter-btn' + (showClipsOnly ? ' active' : '') + '" style="background:' + (showClipsOnly ? '#2E7D32' : 'transparent') + ';border-color:' + (showClipsOnly ? '#2E7D32' : 'var(--border)') + ';color:' + (showClipsOnly ? 'white' : 'var(--muted)') + ';" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + '</div>';
 
   // Frame 2: Meal categories
@@ -1978,7 +1990,8 @@ function renderFilters() {
 function resetFilters() {
   activeCategories.clear();
   activeDiets.clear();
-  showFavOnly = false;
+  showFavOnly   = false;
+  showClipsOnly = false;
   renderFilters();
   renderGrid();
 }
@@ -1988,6 +2001,13 @@ function toggleFavFilter() {
   renderFilters();
   renderGrid();
 }
+
+function toggleClipsFilter() {
+  showClipsOnly = !showClipsOnly;
+  renderFilters();
+  renderGrid();
+}
+window.toggleClipsFilter = toggleClipsFilter;
 
 function toggleCatFilter(cat) {
   if (activeCategories.has(cat)) activeCategories.delete(cat);
@@ -2031,8 +2051,9 @@ function setView(mode) {
 function renderGrid() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const list = recipes.filter(r => {
-    // Frame 1: Favourites filter
+    // Frame 1: Favourites + Clips filter
     if (showFavOnly && !r.fav) return false;
+    if (showClipsOnly && !r.isClip && !r.isVideoBookmark) return false;
     // Frame 2: Category filter (any selected category matches)
     if (activeCategories.size > 0 && !activeCategories.has(r.category)) return false;
     // Frame 3: Diet filter
@@ -2054,6 +2075,7 @@ function renderGrid() {
   });
   var labelParts = [];
   if (showFavOnly) labelParts.push('Favourites');
+  if (showClipsOnly) labelParts.push('Clips');
   if (activeCategories.size) labelParts.push(Array.from(activeCategories).join(', '));
   if (activeDiets.size) labelParts.push(Array.from(activeDiets).join(', '));
   document.getElementById('sectionLabel').textContent = labelParts.length ? labelParts.join(' · ') : 'All Recipes';
@@ -2177,6 +2199,7 @@ function drawView(){
         </div>
       </div>
       ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + d + '</span>'; }).join('') + '</div>' : ''}
+      ${r.notes ? `<div style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;dir:auto;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
       <div class="modal-section-title">Method</div>
@@ -2752,6 +2775,10 @@ function openAddModal(id){
   renderDietButtons(r ? (r.diets || []) : []);
   document.getElementById('f-steps').value = r ? r.steps.join('\n') : '';
   if(document.getElementById('f-source'))document.getElementById('f-source').value=r?(r.source||''):'';
+  if(document.getElementById('f-notes'))document.getElementById('f-notes').value=r?(r.notes||''):'';
+  // Auto-set isClip if recipe has no ingredients and no steps
+  var autoClip = r ? (!r.ingredients||!r.ingredients.length) && (!r.steps||!r.steps.length||r.steps[0]==='Enjoy!') : false;
+  if(document.getElementById('f-isclip'))document.getElementById('f-isclip').checked=r?(r.isClip||r.isVideoBookmark||autoClip):false;
   document.getElementById('editOverlay').classList.add('open');
 }
 
@@ -2813,6 +2840,8 @@ async function saveRecipe(){
     name, emoji:selEmoji, photo:pendingPhoto,
     category:document.getElementById('f-category').value,
     diets: getSelectedDiets(),
+    notes: (document.getElementById('f-notes')||{value:''}).value.trim(),
+    isClip: !!(document.getElementById('f-isclip')||{}).checked,
     difficulty:document.getElementById('f-diff').value,
     prep:document.getElementById('f-prep').value||'\u2014',
     servings:document.getElementById('f-srv').value||'\u2014',
@@ -3578,6 +3607,9 @@ function saveLocal() {
 function migrateRecipes(list) {
   return list.map(function(r) {
     if (!r.diets) r.diets = [];
+    if (!r.notes) r.notes = '';
+    // Auto-flag as clip if isVideoBookmark or no recipe content
+    if (r.isVideoBookmark && !r.isClip) r.isClip = true;
     if (r.source === undefined) r.source = '';
     if (r.nutrition === undefined) r.nutrition = null;
     if (r.originalPhoto === undefined) r.originalPhoto = '';
