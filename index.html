@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v11.7 -->
+<!-- Tony's Recipes Collection v11.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -178,8 +178,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .btn-gold:hover { background: #c49a38; }
 
 /* Dropdown menus */
-.drop-group { position: relative; }
-.drop-menu { display: none; position: absolute; top: calc(100% + 5px); right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 400; overflow: hidden; }
+.drop-group { position: static; }
+.drop-menu { display: none; position: fixed; top: 0; left: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow: hidden; }
 .drop-menu.open { display: block; }
 #helpOverlay.open,
 #photoSearchOverlay.open,
@@ -1318,7 +1318,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.7</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1779,7 +1779,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3313,17 +3313,32 @@ function showServiceError(message) {
 function toggleDrop(id){
   const menu=document.getElementById(id);
   const wasOpen=menu.classList.contains('open');
-  document.querySelectorAll('.drop-menu').forEach(m=>{ m.classList.remove('open'); m.style.left=''; m.style.right='0'; });
+  document.querySelectorAll('.drop-menu').forEach(m=>m.classList.remove('open'));
   if(!wasOpen){
+    // Show offscreen first to measure width
+    menu.style.visibility='hidden';
+    menu.style.top='0'; menu.style.left='0';
     menu.classList.add('open');
-    // Reposition after paint so getBoundingClientRect is accurate
+    // Find the button that triggered this (parent of menu)
+    const btn=menu.previousElementSibling||menu.parentElement.querySelector('button');
+    const btnRect=btn?btn.getBoundingClientRect():{bottom:60,left:0,right:120};
     requestAnimationFrame(function(){
-      menu.style.left=''; menu.style.right='0';
-      const rect=menu.getBoundingClientRect();
-      if(rect.left<8){ menu.style.right='auto'; menu.style.left='0'; }
-      else if(rect.right>window.innerWidth-8){ menu.style.right='0'; menu.style.left='auto'; }
+      const mw=menu.offsetWidth;
+      const mh=menu.offsetHeight;
+      // Position below the button
+      var top=btnRect.bottom+4;
+      var left=btnRect.right-mw; // align right edge with button right
+      // Clamp to viewport
+      if(left<8) left=8;
+      if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
+      if(top+mh>window.innerHeight-8) top=btnRect.top-mh-4; // flip above if no space below
+      menu.style.top=top+'px';
+      menu.style.left=left+'px';
+      menu.style.visibility='visible';
     });
-    setTimeout(()=>document.addEventListener('click',()=>{ menu.classList.remove('open'); menu.style.left=''; menu.style.right='0'; },{once:true}),0);
+    setTimeout(()=>document.addEventListener('click',function onClickOutside(e){
+      if(!menu.contains(e.target)){ menu.classList.remove('open'); document.removeEventListener('click',onClickOutside); }
+    }),0);
   }
 }
 function closeDrop(id){document.getElementById(id).classList.remove('open');}
