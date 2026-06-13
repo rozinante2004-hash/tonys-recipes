@@ -129,6 +129,26 @@
 
     tryInit();
   });
+
+// ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
+// Always load local data and render immediately on page load
+// Firebase auth state will update the display asynchronously
+loadLocal();
+try {
+  if (localStorage.getItem('tonys_offline_queue') === '1') {
+    _offlineQueue = true;
+  }
+} catch(e) {}
+renderFilters();
+renderGrid();
+handleShareTarget();
+// Hide login screen if "remember me" was checked
+try {
+  if (localStorage.getItem('tonys_remember_me') === '1') {
+    var ls = document.getElementById('loginScreen');
+    if (ls) ls.style.display = 'none';
+  }
+} catch(e) {}
 </script>
 
 
