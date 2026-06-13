@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v11.4 -->
+<!-- Tony's Recipes Collection v11.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -203,14 +203,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; z-index: 150; }
 .filter-frame { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); align-items: center; }
 .filter-frame-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; white-space: nowrap; }
-.filter-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
-.filter-btn:hover { border-color: var(--warm-brown); color: var(--warm-brown); }
-.filter-btn.active { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 500; }
-.filter-btn.all-btn { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 500; }
-.filter-btn.all-btn.inactive { background: transparent; border-color: var(--border); color: var(--muted); font-weight: 400; }
-.filter-btn.fav-btn { background: #FFF0E8; border-color: #f0c8b0; color: var(--terracotta); }
-.filter-btn.fav-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; font-weight: 500; }
-.filter-btn.diet-btn.active { background: #3A7D44; border-color: #3A7D44; color: white; font-weight: 500; }
+.filter-btn { padding: 5px 12px; border-radius: 20px; border: 1.5px solid #D4C4B0; background: #F5EFE8; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: #6B5744; transition: all 0.15s; white-space: nowrap; font-weight: 500; }
+.filter-btn:hover { border-color: var(--warm-brown); color: var(--warm-brown); background: #EDE3D8; }
+.filter-btn.active { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 600; }
+.filter-btn.all-btn { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 600; }
+.filter-btn.all-btn.inactive { background: #F5EFE8; border-color: #D4C4B0; color: #6B5744; font-weight: 500; }
+.filter-btn.fav-btn { background: #FFF0E8; border-color: #E8B090; color: #C1440E; }
+.filter-btn.fav-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; font-weight: 600; }
+.filter-btn.diet-btn { background: #EAF3EB; border-color: #B0D4B8; color: #2E6B35; }
+.filter-btn.diet-btn.active { background: #2E7D32; border-color: #2E7D32; color: white; font-weight: 600; }
+.filter-btn.clip-btn { background: #EAF3EB; border-color: #B0D4B8; color: #2E6B35; }
+.filter-btn.clip-btn.active { background: #2E7D32; border-color: #2E7D32; color: white; font-weight: 600; }
 
 /* GRID */
 .grid-section { padding: 1rem 1.5rem 3rem; }
@@ -1243,7 +1246,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1669,7 +1672,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1963,22 +1966,26 @@ function renderFilters() {
 
   // Frame 1: All + Favourites + Clips
   var frame1 = '<div class="filter-frame">'
-    + '<button class="filter-btn all-btn' + allInactive + '" onclick="resetFilters()">All</button>'
+    + '<button class="filter-btn all-btn' + allInactive + '" onclick="resetFilters()">✦ All</button>'
     + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
-    + '<button class="filter-btn' + (showClipsOnly ? ' active' : '') + '" style="background:' + (showClipsOnly ? '#2E7D32' : 'transparent') + ';border-color:' + (showClipsOnly ? '#2E7D32' : 'var(--border)') + ';color:' + (showClipsOnly ? 'white' : 'var(--muted)') + ';" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
+    + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + '</div>';
 
-  // Frame 2: Meal categories
+  // Frame 2: Meal categories (with icons)
+  var catIcons = {Breakfast:'🌅',Lunch:'☀️',Dinner:'🌙',Snack:'🍿',Dessert:'🍰',Soup:'🍜'};
   var frame2 = '<div class="filter-frame">'
     + CATS.map(function(c) {
-        return '<button class="filter-btn' + (activeCategories.has(c) ? ' active' : '') + '" onclick="toggleCatFilter(\'' + c + '\')">' + c + '</button>';
+        var icon = catIcons[c] ? catIcons[c] + ' ' : '';
+        return '<button class="filter-btn' + (activeCategories.has(c) ? ' active' : '') + '" onclick="toggleCatFilter(\'' + c + '\')">' + icon + c + '</button>';
       }).join('')
     + '</div>';
 
-  // Frame 3: Diets
+  // Frame 3: Diets (with icons)
+  var dietIcons = {Keto:'⚡',Carnivore:'🥩',Vegetarian:'🥦',Vegan:'🌱',Omnivore:'🍽️'};
   var frame3 = '<div class="filter-frame">'
     + DIETS.map(function(d) {
-        return '<button class="filter-btn diet-btn' + (activeDiets.has(d) ? ' active' : '') + '" onclick="toggleDietFilter(\'' + d + '\')">' + d + '</button>';
+        var icon = dietIcons[d] ? dietIcons[d] + ' ' : '';
+        return '<button class="filter-btn diet-btn' + (activeDiets.has(d) ? ' active' : '') + '" onclick="toggleDietFilter(\'' + d + '\')">' + icon + d + '</button>';
       }).join('')
     + '</div>';
 
