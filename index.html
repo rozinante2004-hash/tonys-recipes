@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v10.0 -->
+<!-- Tony's Recipes Collection v10.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -131,24 +131,20 @@
   });
 
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
-// Always load local data and render immediately on page load
-// Firebase auth state will update the display asynchronously
-loadLocal();
-try {
-  if (localStorage.getItem('tonys_offline_queue') === '1') {
-    _offlineQueue = true;
-  }
-} catch(e) {}
-renderFilters();
-renderGrid();
-handleShareTarget();
-// Hide login screen if "remember me" was checked
-try {
-  if (localStorage.getItem('tonys_remember_me') === '1') {
-    var ls = document.getElementById('loginScreen');
-    if (ls) ls.style.display = 'none';
-  }
-} catch(e) {}
+// Runs after all variables/functions are declared
+// Load local data and render immediately; Firebase updates asynchronously
+(function initApp() {
+  loadLocal();
+  try {
+    if (localStorage.getItem('tonys_offline_queue') === '1') {
+      _offlineQueue = true;
+    }
+  } catch(e) {}
+  renderFilters();
+  renderGrid();
+  handleShareTarget();
+})();
+
 </script>
 
 
@@ -1218,7 +1214,7 @@ body.banner-shown .header {
     </svg>
     <div class="logo">Tony's <span>Recipes</span> Collection</div>
   </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v10.0</div>
+  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v10.1</div>
   <div id="driveStatus" title="Drive sync status">
     <span class="ds-dot"></span><span id="dsText">Offline mode</span>
     <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
@@ -1622,7 +1618,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1933,7 +1929,7 @@ function renderGrid() {
     var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
     g.innerHTML = '<div class="empty-state">'
       + '<div style="width:72px;height:72px;border-radius:50%;background:#FFF0E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">' + emptyIcon + '</div>'
-      + '<div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--warm-brown);margin-bottom:8px;">' + emptyTitle + '</div>'
+      + '<div style="font-family:Playfair Display,serif;font-size:18px;font-weight:700;color:var(--warm-brown);margin-bottom:8px;">' + emptyTitle + '</div>'
       + '<p style="font-size:13px;color:var(--muted);line-height:1.6;max-width:280px;margin:0 auto 12px;">' + emptySub + '</p>'
       + emptyBtn + '</div>';
     return;
@@ -3870,4 +3866,21 @@ function printRecipe(id) {
     + (r.source ? '<div class="source">Source: ' + escH(r.source) + '</div>' : '')
     + '<h2>Ingredients</h2><table>' + ings + '</table>'
     + '<h2>Method</h2>' + steps
-    + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script></body></html>
+    + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script></body></html>');
+  pw.document.close();
+}
+
+// ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
+(function initApp() {
+  loadLocal();
+  try {
+    if (localStorage.getItem('tonys_offline_queue') === '1') { _offlineQueue = true; }
+  } catch(e) {}
+  renderFilters();
+  renderGrid();
+  handleShareTarget();
+})();
+
+</script>
+</body>
+</html>
