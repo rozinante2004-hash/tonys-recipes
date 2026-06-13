@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v11.8 -->
+<!-- Tony's Recipes Collection v11.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -161,8 +161,8 @@
   --gold: #D4A843; --ink: #1C1A18; --muted: #8A8279;
   --card-bg: #FFFFFF; --border: #E8E0D5;
 }
-html { overflow-x: hidden; }
-body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; overflow-x: hidden; }
+html { overflow-y: scroll; overflow-x: hidden; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; overflow-x: hidden; scrollbar-gutter: stable; }
 
 /* HEADER */
 .header { background: var(--warm-brown); position: sticky; top: 0; z-index: 200; }
@@ -1319,7 +1319,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.8</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1780,7 +1780,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3316,26 +3316,23 @@ function toggleDrop(id){
   const wasOpen=menu.classList.contains('open');
   document.querySelectorAll('.drop-menu').forEach(m=>m.classList.remove('open'));
   if(!wasOpen){
-    // Show offscreen first to measure width
-    menu.style.visibility='hidden';
-    menu.style.top='0'; menu.style.left='0';
-    menu.classList.add('open');
-    // Find the button that triggered this (parent of menu)
+    // Find the button before opening (accurate rect)
     const btn=menu.previousElementSibling||menu.parentElement.querySelector('button');
     const btnRect=btn?btn.getBoundingClientRect():{bottom:60,left:0,right:120};
+    // Pre-position off-screen using transform to avoid layout impact
+    menu.style.transform='translateY(-9999px)';
+    menu.classList.add('open');
     requestAnimationFrame(function(){
       const mw=menu.offsetWidth;
       const mh=menu.offsetHeight;
-      // Position below the button
       var top=btnRect.bottom+4;
-      var left=btnRect.right-mw; // align right edge with button right
-      // Clamp to viewport
+      var left=btnRect.right-mw;
       if(left<8) left=8;
       if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
-      if(top+mh>window.innerHeight-8) top=btnRect.top-mh-4; // flip above if no space below
+      if(top+mh>window.innerHeight-8) top=btnRect.top-mh-4;
       menu.style.top=top+'px';
       menu.style.left=left+'px';
-      menu.style.visibility='visible';
+      menu.style.transform='';
     });
     setTimeout(()=>document.addEventListener('click',function onClickOutside(e){
       if(!menu.contains(e.target)){ menu.classList.remove('open'); document.removeEventListener('click',onClickOutside); }
