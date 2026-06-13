@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v10.3 -->
+<!-- Tony's Recipes Collection v10.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,7 +162,8 @@
 body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
 
 /* HEADER */
-.header { background: var(--warm-brown); padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 64px; position: sticky; top: 0; z-index: 100; gap: 10px; flex-wrap: wrap; }
+.header { background: var(--warm-brown); position: sticky; top: 0; z-index: 100; }
+.header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; }
 .logo { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--cream); white-space: nowrap; }
 .logo span { color: var(--gold); font-style: italic; }
 .header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -1201,67 +1202,83 @@ body.banner-shown .header {
 
 <!-- HEADER -->
 <div class="header">
-  <div style="display:flex;align-items:center;gap:8px;">
-    <svg width="32" height="32" viewBox="0 0 80 80">
-      <circle cx="40" cy="40" r="38" fill="#5C3D2E"/>
-      <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" stroke-width="1.5"/>
-      <line x1="28" y1="18" x2="28" y2="58" stroke="#FAF7F2" stroke-width="2.5" stroke-linecap="round"/>
-      <line x1="23" y1="18" x2="23" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
-      <line x1="28" y1="18" x2="28" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
-      <line x1="33" y1="18" x2="33" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
-      <path d="M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z" fill="#C1440E"/>
-      <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
-    </svg>
-    <div class="logo">Tony's <span>Recipes</span> Collection</div>
-  </div>
-  <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;margin-left:6px;align-self:center;">v10.3</div>
-  <div id="driveStatus" title="Drive sync status">
-    <span class="ds-dot"></span><span id="dsText">Offline mode</span>
-    <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
-    <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app" style="margin-left:8px;">?</button>
-    <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
-  </div>
-  <div class="header-actions">
-    <div class="drop-group">
-      <button class="btn btn-secondary" onclick="toggleDrop('moreDrop')">··· More</button>
-      <div class="drop-menu" id="moreDrop">
-        <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
-        <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
-        <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
-        <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
-      </div>
+  <div class="header-row">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <svg width="32" height="32" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="38" fill="#5C3D2E"/>
+        <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" stroke-width="1.5"/>
+        <line x1="28" y1="18" x2="28" y2="58" stroke="#FAF7F2" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="23" y1="18" x2="23" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+        <line x1="28" y1="18" x2="28" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+        <line x1="33" y1="18" x2="33" y2="30" stroke="#FAF7F2" stroke-width="2" stroke-linecap="round"/>
+        <path d="M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z" fill="#C1440E"/>
+        <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
+      </svg>
+      <div class="logo">Tony's <span>Recipes</span> Collection</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.4</div>
     </div>
-    <div class="drop-group">
-      <button class="btn btn-secondary" onclick="toggleDrop('importDrop')">📥 Import ▾</button>
-      <div class="drop-menu" id="importDrop">
-        <button class="drop-item" onclick="closeDrop('importDrop');openUrlImportModal()">🔗 From URL</button>
-        <button class="drop-item" onclick="closeDrop('importDrop');openFreehandModal()">✍️ Free-hand text</button>
-        <button class="drop-item" onclick="closeDrop('importDrop');openCameraImport()">📷 Scan (camera)</button>
-        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-        <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('xlsxIn').click()">📊 From Excel</button>
-        <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('docxIn').click()">📄 From Word</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div id="driveStatus" title="Sync status">
+        <span class="ds-dot"></span><span id="dsText">Offline mode</span>
+        <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
+        <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
       </div>
-    </div>
-    <div class="drop-group">
-      <button class="btn btn-secondary" onclick="toggleDrop('exportDrop')">📤 Export ▾</button>
-      <div class="drop-menu" id="exportDrop">
-        <button class="drop-item" onclick="closeDrop('exportDrop');exportAllExcel()">📊 All to Excel</button>
-        <button class="drop-item" onclick="closeDrop('exportDrop');exportAllWord()">📄 All to Word</button>
-        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-        <button class="drop-item" onclick="closeDrop('exportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
-        <button class="drop-item" onclick="closeDrop('exportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
-      </div>
-    </div>
-    <div class="drop-group">
-      <button class="btn btn-primary" onclick="toggleDrop('addDrop')">+ Add Recipe ▾</button>
-      <div class="drop-menu" id="addDrop">
-        <button class="drop-item" onclick="closeDrop('addDrop');openAddModal(null)">✏️ Fill in manually</button>
-        <button class="drop-item" onclick="closeDrop('addDrop');openFreehandModal()">✍️ Paste free-hand text</button>
-        <button class="drop-item" onclick="closeDrop('addDrop');openUrlImportModal()">🔗 Import from URL</button>
-        <button class="drop-item" onclick="closeDrop('addDrop');openCameraImport()">📷 Scan recipe (camera/photo)</button>
-      </div>
+      <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app">?</button>
     </div>
   </div>
+  <div class="header-row" style="padding-top:0;padding-bottom:10px;gap:8px;">
+    <div style="flex:1;position:relative;">
+      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.45);font-size:13px;pointer-events:none;">🔍</span>
+      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" oninput="renderGrid()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
+    </div>
+    <div class="header-actions">
+      <div class="drop-group">
+        <button class="btn btn-secondary" onclick="toggleDrop('moreDrop')">··· More</button>
+        <div class="drop-menu" id="moreDrop">
+          <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
+        </div>
+      </div>
+      <div class="drop-group">
+        <button class="btn btn-secondary" onclick="toggleDrop('importDrop')">📥 Import ▾</button>
+        <div class="drop-menu" id="importDrop">
+          <button class="drop-item" onclick="closeDrop('importDrop');openUrlImportModal()">🔗 From URL</button>
+          <button class="drop-item" onclick="closeDrop('importDrop');openFreehandModal()">✍️ Free-hand text</button>
+          <button class="drop-item" onclick="closeDrop('importDrop');openCameraImport()">📷 Scan (camera)</button>
+          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('xlsxIn').click()">📊 From Excel</button>
+          <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('docxIn').click()">📄 From Word</button>
+        </div>
+      </div>
+      <div class="drop-group">
+        <button class="btn btn-secondary" onclick="toggleDrop('exportDrop')">📤 Export ▾</button>
+        <div class="drop-menu" id="exportDrop">
+          <button class="drop-item" onclick="closeDrop('exportDrop');exportAllExcel()">📊 All to Excel</button>
+          <button class="drop-item" onclick="closeDrop('exportDrop');exportAllWord()">📄 All to Word</button>
+          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button class="drop-item" onclick="closeDrop('exportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
+          <button class="drop-item" onclick="closeDrop('exportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
+        </div>
+      </div>
+      <div class="drop-group">
+        <button class="btn btn-primary" onclick="toggleDrop('addDrop')">+ Add Recipe ▾</button>
+        <div class="drop-menu" id="addDrop">
+          <button class="drop-item" onclick="closeDrop('addDrop');openAddModal(null)">✏️ Fill in manually</button>
+          <button class="drop-item" onclick="closeDrop('addDrop');openFreehandModal()">✍️ Paste free-hand text</button>
+          <button class="drop-item" onclick="closeDrop('addDrop');openUrlImportModal()">🔗 Import from URL</button>
+          <button class="drop-item" onclick="closeDrop('addDrop');openCameraImport()">📷 Scan recipe (camera/photo)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
+    <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
+    <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.55);flex:1;">Sign in to sync across devices</span>
+    <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.25);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans',sans-serif;">Reset</button>
+  </div>
+</div>
 
 <!-- Hidden file inputs -->
 <input type="file" id="backupRestoreInput" accept=".json" style="display:none" onchange="backupRestoreFile(event)">
@@ -1269,20 +1286,10 @@ body.banner-shown .header {
 <input type="file" id="docxIn" accept=".docx" style="display:none" onchange="importWord(event)">
 <input type="file" id="heroPhotoIn" accept="image/*" style="display:none" onchange="heroPhotoChanged(event)">
 
-<!-- SEARCH -->
-<div class="search-section">
-  <div class="search-wrap">
-    <span class="search-icon">🔍</span>
-    <input class="search-input" type="text" placeholder="Search recipes, ingredients, steps…" id="searchInput" oninput="renderGrid()">
-  </div>
-</div>
+<!-- search moved into header -->
 
 <!-- FILTERS -->
-<div style="background:var(--warm-brown);padding:3px 1.5rem 7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-  <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
-  <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.6);flex:1;">Sign in to sync across devices</span>
-  <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans',sans-serif;" title="Remove all recipes and reset to defaults">Reset</button>
-</div>
+<!-- status bar moved into header -->
 <div class="filter-bar" id="filterBar"></div>
 
 <!-- GRID -->
@@ -1618,7 +1625,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
