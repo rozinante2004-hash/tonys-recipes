@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v12.4 -->
+<!-- Tony's Recipes Collection v12.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -165,11 +165,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 *, *::before, *::after { box-sizing: border-box; }
 
 /* HEADER */
-.header { background: var(--warm-brown); position: sticky; top: 0; z-index: 200; overflow: visible; }
-.header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; overflow: visible; }
+.header { background: var(--warm-brown); position: sticky; top: 0; z-index: 200; }
+.header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; }
 .logo { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--cream); white-space: nowrap; }
 .logo span { color: var(--gold); font-style: italic; }
-.header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
+.header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .btn { border: none; padding: 7px 13px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .btn-primary { background: var(--terracotta); color: white; }
 .btn-primary:hover { background: #a83a0c; }
@@ -179,9 +179,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .btn-gold:hover { background: #c49a38; }
 
 /* Dropdown menus */
-.drop-group { position: relative; }
-.drop-menu { display: none; position: absolute; top: calc(100% + 5px); right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow: hidden; }
-.drop-menu.open { display: block; }
+.drop-group { position: static; }
+.drop-menu { opacity: 0; pointer-events: none; position: fixed; top: -999px; left: -999px; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow: hidden; transition: opacity 0.12s ease; }
+.drop-menu.open { opacity: 1; pointer-events: auto; }
 #helpOverlay.open,
 #photoSearchOverlay.open,
 #bringTokenExpiredOverlay.open,
@@ -1319,7 +1319,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1780,7 +1780,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3314,12 +3314,36 @@ function showServiceError(message) {
 function toggleDrop(id){
   const menu=document.getElementById(id);
   const wasOpen=menu.classList.contains('open');
+  // Close all
   document.querySelectorAll('.drop-menu').forEach(m=>m.classList.remove('open'));
   if(!wasOpen){
-    menu.classList.add('open');
-    setTimeout(()=>document.addEventListener('click',function onOut(e){
-      if(!menu.contains(e.target)){menu.classList.remove('open');document.removeEventListener('click',onOut);}
-    }),0);
+    // Find button rect BEFORE showing menu
+    const btn=menu.previousElementSibling||menu.parentElement.querySelector('button');
+    const r=btn?btn.getBoundingClientRect():{bottom:56,left:0,right:100};
+    // Position offscreen (already default from CSS), then measure, then move+show
+    // Menu is already at top:-999px so measuring won't affect layout
+    menu.style.top='-999px'; menu.style.left='-999px';
+    menu.classList.add('open'); // opacity:0 at this point
+    // Use rAF to let browser calculate size without showing
+    requestAnimationFrame(function(){
+      const mw=menu.offsetWidth, mh=menu.offsetHeight;
+      var top=r.bottom+4, left=r.right-mw;
+      if(left<8) left=8;
+      if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
+      if(top+mh>window.innerHeight-8) top=r.top-mh-4;
+      menu.style.top=top+'px';
+      menu.style.left=left+'px';
+      // Now it's in position, opacity transition kicks in
+    });
+    setTimeout(function(){
+      document.addEventListener('click',function onOut(e){
+        if(!menu.contains(e.target)){
+          menu.classList.remove('open');
+          menu.style.top='-999px'; menu.style.left='-999px';
+          document.removeEventListener('click',onOut);
+        }
+      });
+    },0);
   }
 }
 function closeDrop(id){document.getElementById(id).classList.remove('open');}
