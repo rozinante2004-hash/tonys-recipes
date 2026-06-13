@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v10.8 -->
+<!-- Tony's Recipes Collection v11.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,6 +143,8 @@
   renderFilters();
   renderGrid();
   handleShareTarget();
+  updateFilterBarTop();
+  window.addEventListener('resize', updateFilterBarTop);
 })();
 
 </script>
@@ -198,7 +200,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .search-input:focus { background: rgba(255,255,255,0.18); }
 
 /* FILTERS */
-.filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); }
+.filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; z-index: 150; }
 .filter-frame { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); align-items: center; }
 .filter-frame-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; white-space: nowrap; }
 .filter-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
@@ -1241,7 +1243,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.8</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1657,7 +1659,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v10.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v11.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -1969,6 +1971,8 @@ function renderFilters() {
     + '</div>';
 
   document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3;
+  // Update sticky top position after render
+  if (typeof updateFilterBarTop === 'function') updateFilterBarTop();
 }
 
 function resetFilters() {
@@ -2098,6 +2102,7 @@ function renderGrid() {
         <div class="card-image" style="background:${r.bg}">
           ${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${r.emoji}</span>`}
           <div class="card-category-badge">${r.category}</div>
+          ${r.isVideoBookmark ? `<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border-radius:6px;padding:3px 7px;font-size:16px;backdrop-filter:blur(4px);">🎬</div>` : ''}
         </div>
         <div class="card-body">
           <div class="card-title">${r.name}</div>
@@ -3351,11 +3356,22 @@ function isYouTubeUrl(url) {
   return /youtube\.com\/(shorts|watch)|youtu\.be\//.test(url);
 }
 
+function isInstagramUrl(url) {
+  return /instagram\.com\/(reel|p|tv)\//.test(url);
+}
+
+function extractInstagramId(url) {
+  var m = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
 async function runUrlImport() {
   const url = document.getElementById('urlImportInput').value.trim();
   if (!url) { toast('Please enter a URL'); return; }
   if (!url.startsWith('http')) { toast('Please enter a valid URL starting with http'); return; }
   const res = document.getElementById('urlImportResult');
+
+  var _importSourceUrl = url;
 
   if (isYouTubeUrl(url)) {
     res.innerHTML = '<div style="text-align:center;padding:20px;">'
@@ -3363,6 +3379,51 @@ async function runUrlImport() {
       + '<div style="font-weight:600;color:var(--warm-brown);margin-bottom:6px;">YouTube video detected</div>'
       + '<div style="font-size:13px;color:var(--muted);">Fetching video description to find the recipe...</div>'
       + '</div>';
+  }
+
+  if (isInstagramUrl(url)) {
+    var igId = extractInstagramId(url);
+    res.innerHTML = '<div style="text-align:center;padding:20px;">'
+      + '<div style="font-size:36px;margin-bottom:10px;">📸</div>'
+      + '<div style="font-weight:600;color:var(--warm-brown);margin-bottom:6px;">Instagram post detected</div>'
+      + '<div style="font-size:13px;color:var(--muted);">Fetching caption to find the recipe...</div>'
+      + '</div>';
+    // Try Instagram oEmbed via Worker
+    try {
+      var igResp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'instagram-fetch', shortcode: igId })
+      });
+      var igData = await igResp.json();
+      if (igData.text && igData.text.length > 10) {
+        // Use the caption text as page content — skip normal fetch
+        res.innerHTML = spinner('Extracting recipe from caption...');
+        const igPrompt = 'Extract the recipe from this Instagram post caption. '
+          + 'Keep the original language — do NOT translate. '
+          + 'Return ONLY valid JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"",'
+          + '"ingredients":[{"a":"amount","n":"ingredient"}],"steps":["step 1"]}. '
+          + 'Return {"error":"no recipe found"} if no recipe is in the caption. '
+          + 'Caption:\n\n' + igData.text;
+        try {
+          const igRaw = await aiCall(igPrompt, 2000);
+          const igParsed = extractJSON(igRaw);
+          if (igParsed.error) throw new Error(igParsed.error);
+          igParsed.source = url;
+          applyParsedRecipe(igParsed, 'urlImportResult', 'urlImportOverlay');
+        } catch(igErr) {
+          // Caption exists but no recipe — offer video bookmark
+          showSaveAsVideoBookmark(url, igData.title || 'Instagram post', '📸');
+        }
+        return;
+      } else {
+        // Instagram blocked or no caption — offer bookmark
+        showSaveAsVideoBookmark(url, 'Instagram post', '📸');
+        return;
+      }
+    } catch(igErr) {
+      showSaveAsVideoBookmark(url, 'Instagram post', '📸');
+      return;
+    }
   }
 
   // ── Step 1: Fetch the page via Worker (server-side, no CORS issues) ────────
@@ -3440,11 +3501,8 @@ async function runUrlImport() {
     parsed.source = url;
     applyParsedRecipe(parsed, 'urlImportResult', 'urlImportOverlay');
   } catch(err) {
-    res.innerHTML = `<div class="explore-result" style="color:#B03030;">
-      <strong>&#10060; Could not extract recipe.</strong><br><br>
-      Try: open the page, copy all text, and use <strong>Import &rarr; &#9997;&#65039; Paste free-hand text</strong>.<br><br>
-      <em>${escH(err.message)}</em>
-    </div>`;
+    // No recipe found — offer to save as video/link bookmark
+    showSaveAsVideoBookmark(url, '', '🎬');
   }
 }
 
@@ -4478,6 +4536,73 @@ window.renderDietButtons = renderDietButtons;
 window.toggleDietTag     = toggleDietTag;
 window.getSelectedDiets  = getSelectedDiets;
 window.aiTagAllDiets     = aiTagAllDiets;
+
+
+// ─── SAVE AS VIDEO / LINK BOOKMARK ───────────────────────────────────────────
+function showSaveAsVideoBookmark(url, suggestedName, emoji) {
+  var res = document.getElementById('urlImportResult');
+  var hostname = '';
+  try { hostname = new URL(url).hostname.replace('www.',''); } catch(e) {}
+  var name = suggestedName || hostname || 'Video clip';
+
+  res.innerHTML = '<div style="background:var(--card-bg);border-radius:12px;padding:16px;border:1.5px solid var(--border);">'
+    + '<div style="font-size:32px;text-align:center;margin-bottom:10px;">' + (emoji||'🎬') + '</div>'
+    + '<div style="font-weight:600;color:var(--warm-brown);text-align:center;margin-bottom:6px;">No recipe found in this link</div>'
+    + '<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px;">Would you like to save this as a video bookmark? You can open it later and add recipe details manually.</div>'
+    + '<div style="margin-bottom:10px;">'
+    + '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">NAME</label>'
+    + '<input id="bookmarkNameInput" class="form-input" value="' + escH(name) + '" style="width:100%;box-sizing:border-box;">'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escH(url) + '" data-emoji="' + (emoji||'🎬') + '" style="flex:1;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
+    + (emoji||'🎬') + ' Save as bookmark</button>'
+    + '<button onclick="clearUrlImportResult()" style="padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function saveAsVideoBookmark(btn) {
+  var url = btn ? btn.getAttribute('data-url') : '';
+  var emoji = btn ? btn.getAttribute('data-emoji') : '🎬';
+  var name = (document.getElementById('bookmarkNameInput') || {value:''}).value.trim();
+  if (!name) name = 'Video clip';
+  var r = {
+    id: nextId++,
+    name: name,
+    emoji: emoji || '🎬',
+    photo: '',
+    source: url,
+    category: 'Dinner',
+    difficulty: 'Easy',
+    prep: '',
+    servings: '',
+    bg: rndBg(),
+    fav: false,
+    ingredients: [],
+    steps: [],
+    diets: [],
+    isVideoBookmark: true,
+    updatedAt: Date.now()
+  };
+  recipes.unshift(r);
+  saveData();
+  renderGrid();
+  closeM('urlImportOverlay');
+  toast('🎬 Saved as video bookmark! Open it to add recipe details.');
+}
+
+function clearUrlImportResult(){ var el=document.getElementById('urlImportResult'); if(el) el.innerHTML=''; }
+window.clearUrlImportResult = clearUrlImportResult;
+window.showSaveAsVideoBookmark = showSaveAsVideoBookmark;
+window.saveAsVideoBookmark = saveAsVideoBookmark;
+
+function updateFilterBarTop() {
+  var header = document.querySelector('.header');
+  var filterBar = document.getElementById('filterBar');
+  if (header && filterBar) {
+    filterBar.style.top = header.offsetHeight + 'px';
+  }
+}
 
 (function initApp() {
   var hasLocal = loadLocal();
