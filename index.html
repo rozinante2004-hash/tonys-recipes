@@ -4010,6 +4010,413 @@ function printRecipe(id) {
 }
 
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
+
+// ─── INGREDIENT TABLE ────────────────────────────────────────────────────────
+function addIngRow(amount, name) {
+  var tbody = document.getElementById('ingsRows');
+  if (!tbody) return;
+  var row = document.createElement('div');
+  row.className = 'ing-row';
+
+  var handle = document.createElement('div');
+  handle.className = 'ing-handle';
+  handle.innerHTML = '⠿';
+  handle.title = 'Drag to reorder';
+
+  var amtInput = document.createElement('input');
+  amtInput.type = 'text'; amtInput.placeholder = 'Amount';
+  amtInput.value = amount || ''; amtInput.setAttribute('dir','auto');
+  amtInput.oninput = syncIngsTextarea;
+
+  var nameInput = document.createElement('input');
+  nameInput.type = 'text'; nameInput.placeholder = 'Ingredient name';
+  nameInput.value = name || ''; nameInput.setAttribute('dir','auto');
+  nameInput.oninput = syncIngsTextarea;
+
+  amtInput.onkeydown = function(e) {
+    if (e.key==='Tab' && !e.shiftKey) { e.preventDefault(); nameInput.focus(); }
+  };
+  nameInput.onkeydown = function(e) {
+    if (e.key==='Tab' && !e.shiftKey) {
+      e.preventDefault();
+      var rows = tbody.querySelectorAll('.ing-row');
+      var idx = Array.from(rows).indexOf(row);
+      if (idx === rows.length-1) addIngRow(); else rows[idx+1].querySelector('input').focus();
+    }
+    if (e.key==='Enter') { e.preventDefault(); addIngRow(); }
+  };
+
+  var delBtn = document.createElement('button');
+  delBtn.type='button'; delBtn.className='ing-del'; delBtn.textContent='✕';
+  delBtn.onclick = function() { row.remove(); syncIngsTextarea(); if (!tbody.children.length) addIngRow(); };
+
+  // Drag to reorder
+  var dragState = null;
+  function startDrag(clientY) { dragState={startY:clientY,row:row}; row.classList.add('dragging'); document.body.style.userSelect='none'; }
+  function moveDrag(clientY) {
+    if (!dragState) return;
+    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
+    var target = null;
+    rows.forEach(function(r) { if (r===row) return; var rect=r.getBoundingClientRect(); r.classList.remove('drag-over'); if (clientY<rect.top+rect.height/2 && !target) target=r; });
+    if (target) target.classList.add('drag-over');
+    dragState.target = target;
+  }
+  function endDrag() {
+    if (!dragState) return;
+    row.classList.remove('dragging'); document.body.style.userSelect='';
+    Array.from(tbody.querySelectorAll('.ing-row')).forEach(function(r){ r.classList.remove('drag-over'); });
+    if (dragState.target) tbody.insertBefore(row, dragState.target); else tbody.appendChild(row);
+    dragState=null; syncIngsTextarea();
+  }
+  handle.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(e.clientY); document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU); });
+  function onMM(e){ moveDrag(e.clientY); } function onMU(e){ endDrag(); document.removeEventListener('mousemove',onMM); document.removeEventListener('mouseup',onMU); }
+  handle.addEventListener('touchstart', function(e){ e.preventDefault(); startDrag(e.touches[0].clientY); },{passive:false});
+  handle.addEventListener('touchmove', function(e){ e.preventDefault(); moveDrag(e.touches[0].clientY); },{passive:false});
+  handle.addEventListener('touchend', function(e){ e.preventDefault(); endDrag(); },{passive:false});
+
+  row.appendChild(handle); row.appendChild(amtInput); row.appendChild(nameInput); row.appendChild(delBtn);
+  tbody.appendChild(row);
+  syncIngsTextarea();
+  if (amount) nameInput.focus();
+  return row;
+}
+
+function syncIngsTextarea() {
+  var rows = document.querySelectorAll('#ingsRows .ing-row');
+  var lines = [];
+  rows.forEach(function(row) {
+    var inputs = row.querySelectorAll('input');
+    var amt = inputs[0] ? inputs[0].value.trim() : '';
+    var name = inputs[1] ? inputs[1].value.trim() : '';
+    if (amt || name) lines.push(amt ? amt + ' \u2014 ' + name : name);
+  });
+  var ta = document.getElementById('f-ings');
+  if (ta) ta.value = lines.join('\n');
+}
+
+function loadIngsTable(ingredients) {
+  var tbody = document.getElementById('ingsRows');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!ingredients || !ingredients.length) { addIngRow(); return; }
+  ingredients.forEach(function(ing) { addIngRow(ing.a||'', ing.n||''); });
+}
+
+// ─── PHOTO SEARCH ─────────────────────────────────────────────────────────────
+var _photoSearchSelected = null;
+var _photoSearchResults  = [];
+
+function openPhotoSearch(recipeName) {
+  _photoSearchSelected = null; _photoSearchResults = [];
+  document.getElementById('photoSearchGrid').innerHTML = '';
+  document.getElementById('photoSearchUseBtn').style.display = 'none';
+  document.getElementById('photoSearchStatus').textContent = '';
+  document.getElementById('photoSearchInput').value = recipeName || '';
+  document.getElementById('photoSearchOverlay').classList.add('open');
+  if (recipeName) setTimeout(searchPhotos, 300);
+}
+
+async function searchPhotos() {
+  var query = document.getElementById('photoSearchInput').value.trim();
+  if (!query) { toast('Enter a search term'); return; }
+  var grid = document.getElementById('photoSearchGrid');
+  var status = document.getElementById('photoSearchStatus');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching...</div>';
+  status.textContent = ''; document.getElementById('photoSearchUseBtn').style.display='none'; _photoSearchSelected=null;
+  try {
+    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'photo-search',query:query}) });
+    if (!resp.ok) throw new Error('Search failed: '+resp.status);
+    var data = await resp.json();
+    if (data.error) { grid.innerHTML='<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">'+data.error+'</div>'; return; }
+    if (!data.images||!data.images.length) { grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos found.</div>'; return; }
+    _photoSearchResults = data.images; renderPhotoSearchGrid(data.images);
+    status.textContent = data.images.length + ' photos found — tap to select';
+  } catch(err) { grid.innerHTML='<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: '+err.message+'</div>'; }
+}
+
+function renderPhotoSearchGrid(images) {
+  var grid = document.getElementById('photoSearchGrid'); grid.innerHTML='';
+  images.forEach(function(img,i) {
+    var div=document.createElement('div'); div.className='photo-search-item';
+    div.onclick=function(){ selectSearchPhoto(i,div); };
+    var image=document.createElement('img'); image.alt='Photo '+(i+1);
+    image.style.cssText='width:100%;height:100%;object-fit:cover;background:#f0ebe4;';
+    image.onerror=function(){ if(image.src!==img.url) image.src=img.url; else div.style.display='none'; };
+    div.style.cssText='aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s;position:relative;background:#f0ebe4;display:flex;align-items:center;justify-content:center;';
+    div.innerHTML='<div style="color:var(--muted);font-size:10px;">Loading...</div>';
+    image.onload=function(){ div.innerHTML=''; div.appendChild(image); if(img.credit){var c=document.createElement('div');c.style.cssText='position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';c.textContent='© '+img.credit;div.appendChild(c);} };
+    image.src=img.thumb||img.url; grid.appendChild(div);
+  });
+}
+
+function selectSearchPhoto(idx, el) {
+  document.querySelectorAll('.photo-search-item').forEach(function(d){ d.classList.remove('selected'); });
+  el.classList.add('selected'); _photoSearchSelected=idx;
+  document.getElementById('photoSearchUseBtn').style.display='block';
+}
+
+async function useSelectedSearchPhoto() {
+  if (_photoSearchSelected===null) { toast('Select a photo first'); return; }
+  var img = _photoSearchResults[_photoSearchSelected]; if (!img) return;
+  closeM('photoSearchOverlay'); toast('Downloading photo...');
+  try {
+    var resp=await fetch(img.url); if(!resp.ok) throw new Error('Could not download: '+resp.status);
+    var blob=await resp.blob(); var file=new File([blob],'web-photo.jpg',{type:blob.type||'image/jpeg'});
+    photoUploadInProgress=true;
+    var photoUrl=await uploadPhotoToStorage(file,heroPhotoTargetId);
+    photoUploadInProgress=false;
+    if (!photoUrl) throw new Error('Compression failed');
+    var r=recipes.find(function(x){ return x.id===heroPhotoTargetId; });
+    if (!r) throw new Error('Recipe not found');
+    r.photo=photoUrl; r.updatedAt=Date.now(); pendingPhoto=photoUrl;
+    saveData();
+    var heroImg=document.getElementById('viewHeroImg'); if(heroImg) heroImg.src=photoUrl;
+    renderGrid(); toast('\u2705 Photo updated!');
+  } catch(err) { photoUploadInProgress=false; toast('Photo failed: '+err.message); }
+}
+
+// ─── HELP ASSISTANT ───────────────────────────────────────────────────────────
+var HELP_SYSTEM_PROMPT = [
+  "You are a helpful assistant for Tony's Recipes Collection app.",
+  "Answer questions about how to use the app clearly and concisely.",
+  "The app has: browse/search/filter recipes, add/edit/delete, import from URL/YouTube/text/camera, AI translate/explore/suggest, send to Bring!, export Excel/Word, cloud sync via Firebase.",
+  "Keep answers brief and practical."
+].join("\n");
+
+var _lastHelpQuestion = '';
+
+function openHelp() {
+  document.getElementById('helpAnswer').style.display='none';
+  document.getElementById('helpLoading').style.display='none';
+  document.getElementById('helpInput').value='';
+  document.getElementById('helpOverlay').classList.add('open');
+  setTimeout(function(){ document.getElementById('helpInput').focus(); },200);
+}
+
+function askHelpQ(q) { document.getElementById('helpInput').value=q; askHelp(); }
+
+async function askHelp() {
+  var q=document.getElementById('helpInput').value.trim(); if(!q) return;
+  _lastHelpQuestion=q;
+  var answerEl=document.getElementById('helpAnswer'); var loadingEl=document.getElementById('helpLoading');
+  answerEl.style.display='none'; loadingEl.style.display='block';
+  try {
+    var answer=await aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nUser: '+q+'\n\nBe concise.',400);
+    answer=answer.trim(); answerEl.innerHTML='';
+    var lines=answer.split('\n');
+    lines.forEach(function(line) {
+      if(!line.trim()) return;
+      var row=document.createElement('div'); row.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;';
+      var lineText=document.createElement('div'); lineText.style.cssText='flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;'; lineText.textContent=line;
+      row.appendChild(lineText);
+      if(line.trim().length>15 && !line.trim().endsWith(':')) {
+        var btn=document.createElement('button'); btn.style.cssText='flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;'; btn.textContent='🔍 Details';
+        (function(topic){ btn.onclick=function(){ showHelpDetail(topic,q); }; })(line.trim());
+        row.appendChild(btn);
+      }
+      answerEl.appendChild(row);
+    });
+    var followRow=document.createElement('div'); followRow.style.cssText='margin-top:12px;padding-top:10px;border-top:1px solid var(--border);';
+    followRow.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Ask a follow-up:</div>';
+    var followInp=document.createElement('input'); followInp.className='help-input'; followInp.placeholder='Ask more...';
+    followInp.style.cssText='width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--card-bg);color:var(--ink);box-sizing:border-box;';
+    followInp.onkeydown=function(e){ if(e.key==='Enter'&&followInp.value.trim()){ document.getElementById('helpInput').value=followInp.value.trim(); askHelp(); } };
+    followRow.appendChild(followInp); answerEl.appendChild(followRow);
+    answerEl.style.display='block'; loadingEl.style.display='none';
+  } catch(err) {
+    loadingEl.style.display='none';
+    if(err.message&&(err.message.startsWith('BILLING:')||err.message.startsWith('API_KEY:'))) showServiceError(err.message);
+    else { document.getElementById('helpAnswer').textContent='Error: '+err.message; document.getElementById('helpAnswer').style.display='block'; }
+  }
+}
+
+function showHelpDetail(topic, context) {
+  var existing=document.getElementById('helpDetailOverlay'); if(existing) existing.remove();
+  var overlay=document.createElement('div'); overlay.id='helpDetailOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(28,26,24,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var card=document.createElement('div'); card.style.cssText='background:var(--card-bg);border-radius:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);';
+  var header=document.createElement('div'); header.style.cssText='display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;';
+  var title=document.createElement('div'); title.style.cssText='flex:1;font-family:Playfair Display,serif;font-size:15px;color:var(--warm-brown);line-height:1.4;'; title.textContent=topic;
+  var closeBtn=document.createElement('button'); closeBtn.style.cssText='flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;color:var(--muted);'; closeBtn.textContent='✕'; closeBtn.onclick=function(){ overlay.remove(); };
+  header.appendChild(title); header.appendChild(closeBtn);
+  var body=document.createElement('div'); body.style.cssText='font-size:13px;color:var(--muted);text-align:center;padding:16px 0;'; body.textContent='🤔 Loading...';
+  card.appendChild(header); card.appendChild(body); overlay.appendChild(card);
+  overlay.onclick=function(e){ if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nThe user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',500)
+    .then(function(d){ body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;'; body.textContent=d.trim(); })
+    .catch(function(e){ body.textContent='Error: '+e.message; });
+}
+
+// ─── BRING! TOKEN & REFRESH ───────────────────────────────────────────────────
+var BRING_TOKEN_STORAGE_KEY='bring_token_expiry';
+var BRING_WORKER_URL='https://lively-bread-273a.rozinante2004.workers.dev';
+var BRING_TOKEN_SECRET='tonys-recipes-2024';
+var _bringPopup=null; var _bringTokenCheckInterval=null;
+
+function getBringTokenExpiry(){ try{ var s=localStorage.getItem(BRING_TOKEN_STORAGE_KEY); return s?parseInt(s):null; }catch(e){return null;} }
+function setBringTokenExpiry(ts){ try{ localStorage.setItem(BRING_TOKEN_STORAGE_KEY,String(ts)); }catch(e){} }
+function getBringTokenDaysLeft(){ var exp=getBringTokenExpiry(); if(!exp) return null; return Math.floor((exp*1000-Date.now())/(1000*60*60*24)); }
+
+async function updateBringToken(token) {
+  try {
+    var parts=token.split('.'); if(parts.length!==3) throw new Error('Invalid token');
+    var payload=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    setBringTokenExpiry(payload.exp);
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'bring-settoken',token:token,secret:BRING_TOKEN_SECRET})});
+    var data=await resp.json();
+    if(data.success){ toast('Bring! token updated! Valid for 7 days.'); renderBringTokenStatus(); return true; }
+  } catch(e){ console.warn('Bring token update failed:',e); }
+  return false;
+}
+
+window.addEventListener('message',function(event){
+  var allowed=['https://rozinante2004-hash.github.io','https://web.getbring.com'];
+  if(!allowed.includes(event.origin)) return; if(!event.data||!event.data.bringToken) return;
+  clearTimeout(window._bringRelayTimeout); clearInterval(_bringTokenCheckInterval);
+  if(_bringPopup&&!_bringPopup.closed) _bringPopup.close();
+  updateBringToken(event.data.bringToken).then(function(ok){ if(ok) toast('\u2705 Bring! connection refreshed!'); });
+});
+
+function openBringAutoRefresh() {
+  toast('Opening Bring! relay...');
+  _bringPopup=window.open('https://rozinante2004-hash.github.io/tonys-recipes/bring-relay.html','bring_relay','width=500,height=500,left=200,top=100');
+  if(!_bringPopup){ toast('Popup blocked. Use the bookmarklet instead.'); showBringBookmarklet(); return; }
+  var timeout=setTimeout(function(){ if(_bringPopup&&!_bringPopup.closed) _bringPopup.close(); toast('Auto-capture timed out. Use the bookmarklet.'); showBringBookmarklet(); },120000);
+  window._bringRelayTimeout=timeout;
+}
+
+function showBringBookmarklet() {
+  var code='javascript:(function(){var t=localStorage.getItem("accessToken");if(!t){alert("Not logged into Bring!");return;}fetch("'+BRING_WORKER_URL+'",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"bring-settoken",token:t,secret:"'+BRING_TOKEN_SECRET+'"})}).then(function(r){return r.json();}).then(function(d){alert(d.success?"Bring! token updated!":"Failed: "+d.message);}).catch(function(e){alert("Error: "+e.message);});})();';
+  document.getElementById('bringBookmarkletCode').textContent=code;
+  document.getElementById('bringBookmarkletOverlay').classList.add('open');
+}
+
+function renderBringTokenStatus() {
+  var el=document.getElementById('bringTokenStatus'); if(!el) return;
+  var days=getBringTokenDaysLeft(); var dot,label;
+  if(days===null){dot='error';label='Bring! token not set';}
+  else if(days<0){dot='error';label='Bring! token expired';}
+  else if(days<=2){dot='warn';label='Bring! token expires in '+days+' day'+(days===1?'':'s');}
+  else{dot='';label='Bring! connected ('+days+' days left)';}
+  var buttons='';
+  if(!isMobile()&&(days===null||days<=2)){
+    buttons='<button class="bring-token-btn" onclick="event.stopPropagation();openBringAutoRefresh()">'+(days<0?'Refresh':'Refresh Now')+'</button>'
+      +'<button class="bring-token-btn" style="background:#8A8279;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Bookmarklet</button>';
+  } else if(days!==null&&days<=2) {
+    buttons='<span style="font-size:11px;color:var(--muted);margin-left:4px;">Refresh on PC when needed</span>';
+  }
+  el.innerHTML='<div class="bring-token-dot'+(dot?' '+dot:'')+'"></div>'+'<span class="bring-token-label">'+label+'</span>'+buttons;
+}
+
+function isMobile(){ return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); }
+
+// ─── BRING! TOKEN EXPIRED MODAL ───────────────────────────────────────────────
+var _bringRetryItems=null; var _bringTokenPollInterval=null; var _bringTokenPollAttempts=0;
+
+function openBringForTokenRefresh() {
+  window.open('https://web.getbring.com','_blank');
+  document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:var(--terracotta);">⏳ Waiting... click your 🛒 bookmark on that page</span>';
+  _bringTokenPollAttempts=0; clearInterval(_bringTokenPollInterval);
+  _bringTokenPollInterval=setInterval(async function(){
+    _bringTokenPollAttempts++;
+    if(_bringTokenPollAttempts>40){ clearInterval(_bringTokenPollInterval); document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:#c62828;">Timed out. Try again.</span>'; return; }
+    try {
+      var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'bring-lists'})});
+      var data=await resp.json();
+      if(data.ok||(data.lists&&data.lists.length>0)){
+        clearInterval(_bringTokenPollInterval);
+        document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:#2e7d32;">✅ Token refreshed!</span>';
+        setBringTokenExpiry(Math.floor(Date.now()/1000)+7*24*60*60); renderBringTokenStatus();
+        setTimeout(function(){ closeM('bringTokenExpiredOverlay'); if(_bringRetryItems&&_bringRetryItems.length>0){ toast('Sending ingredients to Bring!...'); sendItemsToBring(_bringRetryItems); } },1200);
+      }
+    } catch(e){}
+  },3000);
+}
+
+function showBringTokenExpired(items) {
+  _bringRetryItems=items; clearInterval(_bringTokenPollInterval);
+  document.getElementById('bringTokenExpiredStatus').innerHTML='';
+  document.getElementById('bringTokenExpiredOverlay').classList.add('open');
+}
+
+async function sendItemsToBring(items) {
+  try {
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'bring-add',items:items})});
+    var data=await resp.json();
+    if(data.tokenExpired){ showBringTokenExpired(items); return; }
+    if(data.success){
+      toast('\u2705 '+items.length+' ingredient'+(items.length>1?'s':'')+' added to Bring!');
+      setTimeout(function(){ window.location.href='bring://'; setTimeout(function(){ window.open('https://web.getbring.com','_blank'); },1500); },600);
+    } else { toast('\u26a0\ufe0f Some items failed to send'); setTimeout(function(){ window.location.href='bring://'; setTimeout(function(){ window.open('https://web.getbring.com','_blank'); },1500); },800); }
+  } catch(err){ toast('Connection error. Please try again.'); }
+}
+
+// ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
+function backupSave() {
+  try {
+    var photoMap={}; var photoIndex=0;
+    var exportRecipes=recipes.map(function(r){
+      var rec=JSON.parse(JSON.stringify(r));
+      if(rec.photo&&rec.photo.startsWith('data:')){ if(photoMap[rec.photo]!==undefined){rec.photo='__photo__'+photoMap[rec.photo];}else{var k=photoIndex++;photoMap[rec.photo]=k;rec.photo='__photo__'+k;} }
+      if(rec.originalPhoto&&rec.originalPhoto.startsWith('data:')){ if(photoMap[rec.originalPhoto]!==undefined){rec.originalPhoto='__photo__'+photoMap[rec.originalPhoto];}else{var k2=photoIndex++;photoMap[rec.originalPhoto]=k2;rec.originalPhoto='__photo__'+k2;} }
+      return rec;
+    });
+    var photos={}; Object.keys(photoMap).forEach(function(b64){ photos[String(photoMap[b64])]=b64; });
+    var backup={version:1,exportedAt:new Date().toISOString(),nextId:nextId,recipes:exportRecipes,photos:photos,settings:{viewMode:viewMode}};
+    var json=JSON.stringify(backup,null,2);
+    var blob=new Blob([json],{type:'application/json'});
+    var url=URL.createObjectURL(blob); var a=document.createElement('a');
+    var date=new Date().toISOString().slice(0,10);
+    a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('\u2705 Backup saved! '+recipes.length+' recipes, '+(Object.keys(photos).length)+' photos');
+  } catch(err){ toast('\u274c Backup failed: '+err.message); }
+}
+
+function backupRestore() {
+  if(!confirm('Restore from backup?\n\nWARNING: This will REPLACE all your current recipes. Continue?')) return;
+  document.getElementById('backupRestoreInput').click();
+}
+
+async function backupRestoreFile(event) {
+  var file=event.target.files[0]; event.target.value=''; if(!file) return;
+  try {
+    toast('Reading backup file...');
+    var text=await file.text(); var backup=JSON.parse(text);
+    if(!backup.version||!Array.isArray(backup.recipes)) throw new Error('Invalid backup file');
+    var photos=backup.photos||{};
+    var restored=backup.recipes.map(function(r){
+      var rec=JSON.parse(JSON.stringify(r));
+      if(rec.photo&&rec.photo.startsWith('__photo__')){ var k=rec.photo.replace('__photo__',''); rec.photo=photos[k]||''; }
+      if(rec.originalPhoto&&rec.originalPhoto.startsWith('__photo__')){ var k2=rec.originalPhoto.replace('__photo__',''); rec.originalPhoto=photos[k2]||''; }
+      return rec;
+    });
+    recipes=migrateRecipes(restored);
+    nextId=backup.nextId||(Math.max.apply(null,recipes.map(function(r){ return r.id||0; }))+1);
+    if(backup.settings&&backup.settings.viewMode) viewMode=backup.settings.viewMode;
+    saveLocal(); renderFilters(); renderGrid();
+    if(window._driveMode&&window._fbUser){ toast('Syncing to cloud...'); await saveToFirestore(); }
+    toast('\u2705 Restored '+recipes.length+' recipes from backup ('+backup.exportedAt.slice(0,10)+')');
+  } catch(err){ toast('\u274c Restore failed: '+err.message); }
+}
+
+// Show backup buttons only on desktop
+(function(){
+  function upd(){ var mob=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent); ['backupSaveBtn','backupRestoreBtn'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=mob?'none':''; }); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',upd); else upd();
+})();
+
+window.addIngRow=addIngRow; window.syncIngsTextarea=syncIngsTextarea; window.loadIngsTable=loadIngsTable;
+window.openPhotoSearch=openPhotoSearch; window.searchPhotos=searchPhotos; window.selectSearchPhoto=selectSearchPhoto;
+window.renderPhotoSearchGrid=renderPhotoSearchGrid; window.useSelectedSearchPhoto=useSelectedSearchPhoto;
+window.openHelp=openHelp; window.askHelp=askHelp; window.askHelpQ=askHelpQ; window.showHelpDetail=showHelpDetail;
+window.openBringAutoRefresh=openBringAutoRefresh; window.showBringBookmarklet=showBringBookmarklet;
+window.renderBringTokenStatus=renderBringTokenStatus; window.openBringForTokenRefresh=openBringForTokenRefresh;
+window.showBringTokenExpired=showBringTokenExpired; window.sendItemsToBring=sendItemsToBring;
+window.backupSave=backupSave; window.backupRestore=backupRestore; window.backupRestoreFile=backupRestoreFile;
+window.isMobile=isMobile;
+
 // ─── DIET TAG FUNCTIONS ──────────────────────────────────────────────────────
 function renderDietButtons(selectedDiets) {
   var container = document.getElementById('f-diets');
