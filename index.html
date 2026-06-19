@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v12.8 -->
+<!-- Tony's Recipes Collection v12.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -310,6 +310,68 @@ function copyBookmarklet() {
 }
 
 window.copyBookmarklet = copyBookmarklet;
+
+
+// ─── TRANSLATE FUNCTIONS ──────────────────────────────────────────────────────
+function setLang(dir) {
+  translateDir = dir;
+  document.getElementById('langEN').classList.toggle('active', dir==='en');
+  document.getElementById('langHE').classList.toggle('active', dir==='he');
+}
+
+async function runTranslate() {
+  var r = recipes.find(function(x){ return x.id===translateId; });
+  if (!r) return;
+  var btn = document.getElementById('translateRunBtn');
+  var res = document.getElementById('translateResult');
+  if (btn) { btn.disabled=true; btn.textContent='🌐 Translating...'; }
+  if (res) res.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);">Translating...</div>';
+  var fromLang = translateDir==='en' ? 'English' : 'Hebrew';
+  var toLang   = translateDir==='en' ? 'Hebrew'  : 'English';
+  var prompt = 'Translate this recipe from ' + fromLang + ' to ' + toLang + '. '
+    + 'Keep the JSON structure exactly. Return ONLY valid JSON: '
+    + JSON.stringify({name:r.name, ingredients:r.ingredients, steps:r.steps, notes:r.notes||''});
+  try {
+    var raw = await aiCall(prompt, 2500);
+    var parsed = extractJSON(raw);
+    if (!parsed.name) throw new Error('Translation returned no data');
+    // Show preview
+    if (res) {
+      res.innerHTML = '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">'
+        + '<div style="font-weight:600;font-size:15px;margin-bottom:8px;direction:auto;" dir="auto">' + escH(parsed.name) + '</div>'
+        + '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">' + parsed.ingredients.length + ' ingredients, ' + parsed.steps.length + ' steps</div>'
+        + '<div style="display:flex;gap:8px;">'
+        + '<button onclick="applyTranslation(' + r.id + ',this)" data-parsed='' + JSON.stringify(parsed).replace(/'/g,"&#39;") + '' style="flex:1;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,sans-serif;font-weight:600;cursor:pointer;">✅ Apply Translation</button>'
+        + '<button onclick="closeM('translateOverlay')" style="padding:10px 14px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,sans-serif;cursor:pointer;">Cancel</button>'
+        + '</div></div>';
+    }
+  } catch(e) {
+    if (res) res.innerHTML='<div style="color:var(--terracotta);padding:12px;">❌ ' + escH(e.message) + '</div>';
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='🌐 Translate Now'; }
+  }
+}
+
+function applyTranslation(id, btn) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  try {
+    var parsed = JSON.parse(btn.getAttribute('data-parsed').replace(/&#39;/g,"'"));
+    if (parsed.name) r.name = parsed.name;
+    if (parsed.ingredients) r.ingredients = parsed.ingredients;
+    if (parsed.steps) r.steps = parsed.steps;
+    if (parsed.notes !== undefined) r.notes = parsed.notes;
+    r.updatedAt = Date.now();
+    saveData();
+    closeM('translateOverlay');
+    drawView(id);
+    toast('✅ Translation applied!');
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+window.setLang          = setLang;
+window.runTranslate     = runTranslate;
+window.applyTranslation = applyTranslation;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -1503,7 +1565,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.8</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1964,7 +2026,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4933,7 +4995,7 @@ function openBringModal(recipeId) {
     }
   }
   renderBringTokenStatus();
-  document.getElementById('bringOverlay').style.display = 'flex';
+  document.getElementById('bringOverlay').classList.add('open');
 }
 
 function bringToggleAll() {
@@ -4957,28 +5019,6 @@ function bringConfirmSend() {
 }
 
 // ─── TRANSLATE ───────────────────────────────────────────────────────────────
-function openTranslate(recipeId) {
-  var r = recipes.find(function(x){ return x.id===recipeId; });
-  if (!r) return;
-  // Detect language direction — if Hebrew, translate to English, else to Hebrew
-  var heChars = (r.name + (r.steps||[]).join(' ')).match(/[\u0590-\u05FF]/g);
-  var targetLang = heChars && heChars.length > 5 ? 'English' : 'Hebrew';
-  if (!confirm('Translate "' + r.name + '" to ' + targetLang + '?')) return;
-  toast('🌐 Translating...');
-  var prompt = 'Translate this recipe to ' + targetLang + '. Return ONLY valid JSON with the same structure:\n'
-    + JSON.stringify({name:r.name, ingredients:r.ingredients, steps:r.steps});
-  aiCall(prompt, 2000).then(function(raw) {
-    try {
-      var parsed = extractJSON(raw);
-      if (parsed.name) r.name = parsed.name;
-      if (parsed.ingredients) r.ingredients = parsed.ingredients;
-      if (parsed.steps) r.steps = parsed.steps;
-      saveData();
-      drawView(r.id);
-      toast('✅ Translated to ' + targetLang);
-    } catch(e) { toast('❌ Translation failed: ' + e.message); }
-  }).catch(function(e) { toast('❌ ' + e.message); });
-}
 
 window.openBringModal  = openBringModal;
 window.sendToBring     = openBringModal; // alias for backward compat
