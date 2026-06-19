@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v12.6 -->
+<!-- Tony's Recipes Collection v12.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,6 +133,184 @@
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
 // Runs after all variables/functions are declared
 // Load local data and render immediately; Firebase updates asynchronously
+
+// ─── SELECT MODE ─────────────────────────────────────────────────────────────
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+  renderGrid();
+  var bar = document.getElementById('selectBar');
+  if (bar) bar.style.display = selectMode ? 'flex' : 'none';
+}
+
+function cancelSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+  renderGrid();
+  var bar = document.getElementById('selectBar');
+  if (bar) bar.style.display = 'none';
+}
+
+function toggleRecipeSelect(e, id) {
+  e.stopPropagation();
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  renderGrid();
+  var bar = document.getElementById('selectBar');
+  if (bar) {
+    var count = selectedIds.size;
+    var countEl = document.getElementById('selectedCount');
+    if (countEl) countEl.textContent = count + ' selected';
+  }
+}
+
+function deleteSelected() {
+  if (!selectedIds.size) { toast('No recipes selected'); return; }
+  if (!confirm('Delete ' + selectedIds.size + ' recipe(s)? This cannot be undone.')) return;
+  recipes = recipes.filter(function(r) { return !selectedIds.has(r.id); });
+  selectedIds.clear();
+  cancelSelectMode();
+  saveData();
+  toast('🗑️ Deleted');
+}
+
+function exportSelExcel() {
+  if (!selectedIds.size) { toast('No recipes selected'); return; }
+  var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
+  exportRecipesToExcel(sel);
+}
+
+function exportSelWord() {
+  if (!selectedIds.size) { toast('No recipes selected'); return; }
+  var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
+  exportRecipesToWord(sel);
+}
+
+function shareSelected() {
+  if (!selectedIds.size) { toast('No recipes selected'); return; }
+  var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
+  var text = sel.map(function(r) { return r.name; }).join('\n');
+  if (navigator.share) {
+    navigator.share({ title: "Tony's Recipes", text: text });
+  } else {
+    navigator.clipboard.writeText(text).then(function() { toast('✅ Recipe names copied'); });
+  }
+}
+
+function printSelected() {
+  if (!selectedIds.size) { toast('No recipes selected'); return; }
+  selectedIds.forEach(function(id) { printRecipe(id); });
+}
+
+window.toggleSelectMode  = toggleSelectMode;
+window.cancelSelectMode  = cancelSelectMode;
+window.toggleRecipeSelect = toggleRecipeSelect;
+window.deleteSelected    = deleteSelected;
+window.exportSelExcel    = exportSelExcel;
+window.exportSelWord     = exportSelWord;
+window.shareSelected     = shareSelected;
+window.printSelected     = printSelected;
+
+// ─── SOURCE EDITING ───────────────────────────────────────────────────────────
+function editSource(id) {
+  var r = recipes.find(function(x) { return x.id===id; });
+  if (!r) return;
+  var disp = document.getElementById('srcDisplay-'+id);
+  var edit = document.getElementById('srcEdit-'+id);
+  if (disp) disp.style.display = 'none';
+  if (edit) edit.style.display = 'flex';
+}
+
+function saveSource(id) {
+  var r = recipes.find(function(x) { return x.id===id; });
+  if (!r) return;
+  var inp = document.getElementById('srcInput-'+id);
+  if (inp) { r.source = inp.value.trim(); r.updatedAt = Date.now(); }
+  cancelSource(id);
+  saveData();
+  drawView(id);
+  toast('✅ Source saved');
+}
+
+function cancelSource(id) {
+  var disp = document.getElementById('srcDisplay-'+id);
+  var edit = document.getElementById('srcEdit-'+id);
+  if (disp) disp.style.display = '';
+  if (edit) edit.style.display = 'none';
+}
+
+window.editSource   = editSource;
+window.saveSource   = saveSource;
+window.cancelSource = cancelSource;
+
+// ─── NUTRITION ────────────────────────────────────────────────────────────────
+async function calcNutrition(id) {
+  var r = recipes.find(function(x) { return x.id===id; });
+  if (!r) return;
+  toast('⏳ Calculating nutrition...');
+  var ings = r.ingredients.map(function(i) { return (i.a?i.a+' ':'')+i.n; }).join(', ');
+  var prompt = 'Estimate nutrition per serving for a recipe with these ingredients: ' + ings
+    + '. Servings: ' + (r.servings||'4') + '. '
+    + 'Return ONLY JSON: {"calories":0,"protein":0,"carbs":0,"fat":0} (numbers only, per serving).';
+  try {
+    var raw = await aiCall(prompt, 200);
+    var data = extractJSON(raw);
+    if (data.calories !== undefined) {
+      r.nutrition = { calories: data.calories, protein: data.protein, carbs: data.carbs, fat: data.fat };
+      r.updatedAt = Date.now();
+      saveData();
+      drawView(id);
+      toast('✅ Nutrition calculated');
+    }
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+window.calcNutrition = calcNutrition;
+
+// ─── PHOTO TOGGLE ─────────────────────────────────────────────────────────────
+function toggleOriginalPhoto(id) {
+  var r = recipes.find(function(x) { return x.id===id; });
+  if (!r || !r.originalPhoto) return;
+  var heroImg = document.getElementById('viewHeroImg');
+  if (!heroImg) return;
+  var showingOriginal = heroImg.getAttribute('data-showing') === 'original';
+  if (showingOriginal) {
+    heroImg.src = r.photo;
+    heroImg.removeAttribute('data-showing');
+  } else {
+    heroImg.src = r.originalPhoto;
+    heroImg.setAttribute('data-showing', 'original');
+  }
+}
+
+function removeOriginalPhoto(id) {
+  var r = recipes.find(function(x) { return x.id===id; });
+  if (!r) return;
+  if (!confirm('Remove the original photo backup?')) return;
+  delete r.originalPhoto;
+  r.updatedAt = Date.now();
+  saveData();
+  drawView(id);
+  toast('✅ Original photo removed');
+}
+
+window.toggleOriginalPhoto = toggleOriginalPhoto;
+window.removeOriginalPhoto = removeOriginalPhoto;
+
+// ─── BOOKMARKLET ──────────────────────────────────────────────────────────────
+function copyBookmarklet() {
+  var el = document.getElementById('bringBookmarkletCode');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function() {
+    toast('✅ Bookmarklet code copied! Paste it as a bookmark URL.');
+  }).catch(function() {
+    el.select(); document.execCommand('copy');
+    toast('✅ Copied!');
+  });
+}
+
+window.copyBookmarklet = copyBookmarklet;
+
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
   console.error('[Global error]', e.message, e.filename, e.lineno);
@@ -1325,7 +1503,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1786,7 +1964,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -2334,7 +2512,7 @@ function drawView(){
         <button class="action-btn" onclick="expOneWord(${r.id})">📄 Word</button>
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
-        <button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" onclick="sendToBring(${r.id})">🛒 Send to Bring!</button>
+        <button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
         ${r.originalPhoto ? `<button class="action-btn" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
@@ -4803,6 +4981,7 @@ function openTranslate(recipeId) {
 }
 
 window.openBringModal  = openBringModal;
+window.sendToBring     = openBringModal; // alias for backward compat
 window.bringToggleAll  = bringToggleAll;
 window.bringConfirmSend = bringConfirmSend;
 window.openTranslate   = openTranslate;
