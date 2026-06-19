@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v14.0 -->
+<!-- Tony's Recipes Collection v14.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -374,7 +374,7 @@ const SELF_TESTS = [
     test: async()=>{ const s=document.getElementById('searchInput'); if(!s) throw new Error('searchInput missing'); } },
   { id:'ui_modals',      group:'UI',      name:'All overlays present',
     test: async()=>{
-      const required=['viewOverlay','addOverlay','translateOverlay','calcOverlay','bringOverlay','urlImportOverlay','selfTestOverlay'];
+      const required=['viewOverlay','editOverlay','translateOverlay','calcOverlay','bringOverlay','urlImportOverlay','selfTestOverlay'];
       const missing=required.filter(id=>!document.getElementById(id));
       if(missing.length) throw new Error('Missing overlays: '+missing.join(', '));
     }
@@ -411,9 +411,9 @@ const SELF_TESTS = [
       if(typeof openAddModal!=='function') throw new Error('openAddModal not defined');
       openAddModal(null);
       await wait(300);
-      const o=document.getElementById('addOverlay');
+      const o=document.getElementById('editOverlay');
       if(!o || !o.classList.contains('open')) throw new Error('Add modal did not open');
-      closeM('addOverlay');
+      closeM('editOverlay');
     }
   },
   { id:'crud_save',      group:'CRUD',    name:'Save & delete test recipe',
@@ -644,21 +644,29 @@ function openSelfTest() {
 
 function selfTestSelectAll(val) {
   document.querySelectorAll('.st-checkbox').forEach(cb=>cb.checked=val);
+  // Sync all group header checkboxes
+  const groups = new Set();
+  document.querySelectorAll('.st-checkbox[data-group]').forEach(cb=>groups.add(cb.getAttribute('data-group')));
+  groups.forEach(g=>{ const h=document.getElementById(g); if(h){ h.checked=val; h.indeterminate=false; } });
 }
 
 function renderSelfTestList() {
   const container = document.getElementById('selfTestList');
-  // Group tests
   const groups = {};
   SELF_TESTS.forEach(t => { if(!groups[t.group]) groups[t.group]=[]; groups[t.group].push(t); });
 
   container.innerHTML = Object.keys(groups).map(group => {
     const tests = groups[group];
+    const groupKey = 'stgroup_' + group.replace(/\s+/g,'_');
     return `<div style="margin-bottom:4px;">
-      <div style="padding:6px 16px;background:var(--bg);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;border-bottom:1px solid var(--border);">${group}</div>
+      <div style="padding:6px 16px;background:var(--bg);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="selfTestToggleGroup('${groupKey}')">
+        <input type="checkbox" id="${groupKey}" checked onclick="event.stopPropagation();selfTestGroupCheck('${groupKey}')" style="width:15px;height:15px;cursor:pointer;accent-color:var(--warm-brown);flex-shrink:0;">
+        <span style="flex:1;">${group}</span>
+        <span style="font-size:10px;color:var(--muted);font-weight:400;font-style:italic;">${tests.length} test${tests.length!==1?'s':''}</span>
+      </div>
       ${tests.map(t => `
-        <div class="st-row" id="strow_${t.id}" style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--border);">
-          <input type="checkbox" class="st-checkbox" data-id="${t.id}" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--terracotta);flex-shrink:0;">
+        <div class="st-row" id="strow_${t.id}" data-group="${groupKey}" style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--border);">
+          <input type="checkbox" class="st-checkbox" data-id="${t.id}" data-group="${groupKey}" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--terracotta);flex-shrink:0;" onchange="selfTestUpdateGroupHeader('${groupKey}')">
           <span style="flex:1;font-size:13px;color:var(--ink);">${t.name}</span>
           <span class="st-status" id="ststat_${t.id}" style="font-size:18px;min-width:24px;text-align:center;"></span>
           <button class="st-detail-btn" id="stdetail_${t.id}" onclick="showSelfTestDetail('${t.id}')" style="display:none;padding:3px 10px;font-size:11px;border:1px solid var(--terracotta);background:transparent;color:var(--terracotta);border-radius:5px;cursor:pointer;font-family:DM Sans,sans-serif;">Details</button>
@@ -666,6 +674,34 @@ function renderSelfTestList() {
     </div>`;
   }).join('');
 }
+
+function selfTestToggleGroup(groupKey) {
+  const header = document.getElementById(groupKey);
+  if(!header) return;
+  const newState = !header.checked;
+  header.checked = newState;
+  document.querySelectorAll('.st-checkbox[data-group="'+groupKey+'"]').forEach(cb => cb.checked = newState);
+}
+
+function selfTestGroupCheck(groupKey) {
+  const header = document.getElementById(groupKey);
+  if(!header) return;
+  const newState = header.checked;
+  document.querySelectorAll('.st-checkbox[data-group="'+groupKey+'"]').forEach(cb => cb.checked = newState);
+}
+
+function selfTestUpdateGroupHeader(groupKey) {
+  const header = document.getElementById(groupKey);
+  if(!header) return;
+  const all  = document.querySelectorAll('.st-checkbox[data-group="'+groupKey+'"]');
+  const checked = document.querySelectorAll('.st-checkbox[data-group="'+groupKey+'"]:checked');
+  header.checked = checked.length === all.length;
+  header.indeterminate = checked.length > 0 && checked.length < all.length;
+}
+
+window.selfTestToggleGroup      = selfTestToggleGroup;
+window.selfTestGroupCheck       = selfTestGroupCheck;
+window.selfTestUpdateGroupHeader = selfTestUpdateGroupHeader;
 
 // ── RUN TESTS ────────────────────────────────────────────────────────────────
 async function runSelfTests() {
@@ -2002,7 +2038,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2465,7 +2501,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
