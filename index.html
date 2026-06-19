@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v14.8 -->
+<!-- Tony's Recipes Collection v14.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2065,7 +2065,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.8</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2096,24 +2096,21 @@ body.banner-shown .header {
         </div>
       </div>
       <div class="drop-group">
-        <button class="btn btn-secondary" onclick="toggleDrop('importDrop')">📥 Import ▾</button>
-        <div class="drop-menu" id="importDrop">
-          <button class="drop-item" onclick="closeDrop('importDrop');openUrlImportModal()">🔗 From URL</button>
-          <button class="drop-item" onclick="closeDrop('importDrop');openFreehandModal()">✍️ Free-hand text</button>
-          <button class="drop-item" onclick="closeDrop('importDrop');openCameraImport()">📷 Scan (camera)</button>
+        <button class="btn btn-secondary" onclick="toggleDrop('importExportDrop')">📥📤 ▾</button>
+        <div class="drop-menu" id="importExportDrop">
+          <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Import</div>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');openUrlImportModal()">🔗 From URL</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');openFreehandModal()">✍️ Free-hand text</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');openCameraImport()">📷 Scan (camera)</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('xlsxIn').click()">📊 From Excel</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('docxIn').click()">📄 From Word</button>
+          <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
+          <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllExcel()">📊 All to Excel</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllWord()">📄 All to Word</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('xlsxIn').click()">📊 From Excel</button>
-          <button class="drop-item" onclick="closeDrop('importDrop');document.getElementById('docxIn').click()">📄 From Word</button>
-        </div>
-      </div>
-      <div class="drop-group">
-        <button class="btn btn-secondary" onclick="toggleDrop('exportDrop')">📤 Export ▾</button>
-        <div class="drop-menu" id="exportDrop">
-          <button class="drop-item" onclick="closeDrop('exportDrop');exportAllExcel()">📊 All to Excel</button>
-          <button class="drop-item" onclick="closeDrop('exportDrop');exportAllWord()">📄 All to Word</button>
-          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button class="drop-item" onclick="closeDrop('exportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
-          <button class="drop-item" onclick="closeDrop('exportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
         </div>
       </div>
       <div class="drop-group">
@@ -2528,7 +2525,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v14.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
