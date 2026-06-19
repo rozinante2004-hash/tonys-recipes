@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v12.5 -->
+<!-- Tony's Recipes Collection v12.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,6 +133,12 @@
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
 // Runs after all variables/functions are declared
 // Load local data and render immediately; Firebase updates asynchronously
+// Global error handler — catch silent JS errors and show them
+window.addEventListener('error', function(e) {
+  console.error('[Global error]', e.message, e.filename, e.lineno);
+  if (typeof toast === 'function') toast('⚠️ Error: ' + e.message);
+});
+
 (function initApp() {
   loadLocal();
   try {
@@ -1319,7 +1325,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.5</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1780,7 +1786,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v12.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4649,6 +4655,157 @@ window.renderBringTokenStatus=renderBringTokenStatus; window.openBringForTokenRe
 window.showBringTokenExpired=showBringTokenExpired; window.sendItemsToBring=sendItemsToBring;
 window.backupSave=backupSave; window.backupRestore=backupRestore; window.backupRestoreFile=backupRestoreFile;
 window.isMobile=isMobile;
+
+
+// ─── MEASUREMENT CONVERTER ───────────────────────────────────────────────────
+var CALC_CATS = {
+  'Weight':  { units: ['g','kg','oz','lb'], base: 'g', factors: {g:1, kg:1000, oz:28.3495, lb:453.592} },
+  'Volume':  { units: ['ml','l','tsp','tbsp','cup','fl oz'], base: 'ml', factors: {ml:1, l:1000, tsp:4.92892, tbsp:14.7868, cup:236.588, 'fl oz':29.5735} },
+  'Temp':    { units: ['°C','°F'], base: '°C', factors: null },
+  'Length':  { units: ['mm','cm','m','in','ft'], base: 'mm', factors: {mm:1, cm:10, m:1000, in:25.4, ft:304.8} },
+};
+var _calcCat = 'Weight';
+
+function openCalcModal() {
+  // Build category buttons
+  var catRow = document.getElementById('calcCatRow');
+  if (catRow) {
+    catRow.innerHTML = Object.keys(CALC_CATS).map(function(c) {
+      return '<button class="calc-cat-btn' + (c===_calcCat?' active':'') + '" onclick="setCalcCat(\''+c+'\')">' + c + '</button>';
+    }).join('');
+  }
+  populateCalcUnits();
+  document.getElementById('calcFrom').value = '';
+  document.getElementById('calcTo').value = '';
+  document.getElementById('calcOverlay').style.display = 'flex';
+}
+
+function setCalcCat(cat) {
+  _calcCat = cat;
+  var catRow = document.getElementById('calcCatRow');
+  if (catRow) {
+    catRow.querySelectorAll('.calc-cat-btn').forEach(function(b) {
+      b.classList.toggle('active', b.textContent===cat);
+    });
+  }
+  populateCalcUnits();
+  document.getElementById('calcFrom').value = '';
+  document.getElementById('calcTo').value = '';
+}
+
+function populateCalcUnits() {
+  var cat = CALC_CATS[_calcCat];
+  var fromSel = document.getElementById('calcUnitFrom');
+  var toSel   = document.getElementById('calcUnitTo');
+  if (!fromSel || !toSel) return;
+  fromSel.innerHTML = cat.units.map(function(u){ return '<option>'+u+'</option>'; }).join('');
+  toSel.innerHTML   = cat.units.map(function(u,i){ return '<option'+(i===1?' selected':'')+'>'+u+'</option>'; }).join('');
+}
+
+function doCalc() {
+  var val = parseFloat(document.getElementById('calcFrom').value);
+  if (isNaN(val)) { document.getElementById('calcTo').value=''; return; }
+  var from = document.getElementById('calcUnitFrom').value;
+  var to   = document.getElementById('calcUnitTo').value;
+  document.getElementById('calcTo').value = convertUnits(val, from, to, _calcCat);
+}
+
+function doCalcReverse() {
+  var val = parseFloat(document.getElementById('calcTo').value);
+  if (isNaN(val)) { document.getElementById('calcFrom').value=''; return; }
+  var from = document.getElementById('calcUnitFrom').value;
+  var to   = document.getElementById('calcUnitTo').value;
+  document.getElementById('calcFrom').value = convertUnits(val, to, from, _calcCat);
+}
+
+function convertUnits(val, from, to, catName) {
+  if (from === to) return +val.toFixed(4);
+  if (catName === 'Temp') {
+    if (from==='°C'&&to==='°F') return +(val*9/5+32).toFixed(2);
+    if (from==='°F'&&to==='°C') return +((val-32)*5/9).toFixed(2);
+    return val;
+  }
+  var cat = CALC_CATS[catName];
+  var inBase = val * cat.factors[from];
+  return +(inBase / cat.factors[to]).toFixed(4);
+}
+
+window.openCalcModal = openCalcModal;
+window.setCalcCat    = setCalcCat;
+window.doCalc        = doCalc;
+window.doCalcReverse = doCalcReverse;
+
+// ─── BRING! MODAL ─────────────────────────────────────────────────────────────
+var _bringRecipeId = null;
+
+function openBringModal(recipeId) {
+  _bringRecipeId = recipeId;
+  var r = recipes.find(function(x){ return x.id===recipeId; });
+  if (!r) return;
+  // Render ingredients as checkboxes
+  var list = document.getElementById('bringIngList');
+  if (list) {
+    if (!r.ingredients || !r.ingredients.length) {
+      list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">No ingredients found in this recipe.</div>';
+    } else {
+      list.innerHTML = r.ingredients.map(function(ing, i) {
+        var label = (ing.a ? ing.a + ' ' : '') + ing.n;
+        return '<label class="bring-ing-item"><input type="checkbox" class="bring-ing-cb" value="'+i+'" checked><span dir="auto">'+escH(label)+'</span></label>';
+      }).join('');
+    }
+  }
+  renderBringTokenStatus();
+  document.getElementById('bringOverlay').style.display = 'flex';
+}
+
+function bringToggleAll() {
+  var cbs = document.querySelectorAll('.bring-ing-cb');
+  var anyUnchecked = Array.from(cbs).some(function(cb){ return !cb.checked; });
+  cbs.forEach(function(cb){ cb.checked = anyUnchecked; });
+}
+
+function bringConfirmSend() {
+  var r = recipes.find(function(x){ return x.id===_bringRecipeId; });
+  if (!r) return;
+  var checked = document.querySelectorAll('.bring-ing-cb:checked');
+  if (!checked.length) { toast('Select at least one ingredient'); return; }
+  var items = [];
+  checked.forEach(function(cb) {
+    var ing = r.ingredients[parseInt(cb.value)];
+    if (ing) items.push({ name: ing.n, spec: ing.a || '' });
+  });
+  closeM('bringOverlay');
+  sendItemsToBring(items);
+}
+
+// ─── TRANSLATE ───────────────────────────────────────────────────────────────
+function openTranslate(recipeId) {
+  var r = recipes.find(function(x){ return x.id===recipeId; });
+  if (!r) return;
+  // Detect language direction — if Hebrew, translate to English, else to Hebrew
+  var heChars = (r.name + (r.steps||[]).join(' ')).match(/[\u0590-\u05FF]/g);
+  var targetLang = heChars && heChars.length > 5 ? 'English' : 'Hebrew';
+  if (!confirm('Translate "' + r.name + '" to ' + targetLang + '?')) return;
+  toast('🌐 Translating...');
+  var prompt = 'Translate this recipe to ' + targetLang + '. Return ONLY valid JSON with the same structure:\n'
+    + JSON.stringify({name:r.name, ingredients:r.ingredients, steps:r.steps});
+  aiCall(prompt, 2000).then(function(raw) {
+    try {
+      var parsed = extractJSON(raw);
+      if (parsed.name) r.name = parsed.name;
+      if (parsed.ingredients) r.ingredients = parsed.ingredients;
+      if (parsed.steps) r.steps = parsed.steps;
+      saveData();
+      drawView(r.id);
+      toast('✅ Translated to ' + targetLang);
+    } catch(e) { toast('❌ Translation failed: ' + e.message); }
+  }).catch(function(e) { toast('❌ ' + e.message); });
+}
+
+window.openBringModal  = openBringModal;
+window.bringToggleAll  = bringToggleAll;
+window.bringConfirmSend = bringConfirmSend;
+window.openTranslate   = openTranslate;
 
 // ─── DIET TAG FUNCTIONS ──────────────────────────────────────────────────────
 function renderDietButtons(selectedDiets) {
