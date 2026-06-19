@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v13.3 -->
+<!-- Tony's Recipes Collection v13.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -318,8 +318,7 @@ window.copyBookmarklet = copyBookmarklet;
 
 // ─── TRANSLATE FUNCTIONS ──────────────────────────────────────────────────────
 
-async 
-function applyTranslation(id, btn) {
+async function applyTranslation(id, btn) {
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r) return;
   try {
@@ -336,9 +335,7 @@ function applyTranslation(id, btn) {
   } catch(e) { toast('❌ ' + e.message); }
 }
 
-window.setLang          = setLang;
-window.runTranslate     = runTranslate;
-window.applyTranslation = applyTranslation;
+// setLang, runTranslate, applyTranslation defined in main script
 
 
 // ─── SHARE TARGET (iOS Shortcut) ─────────────────────────────────────────────
@@ -1532,7 +1529,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1993,7 +1990,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
