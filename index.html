@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v13.2 -->
+<!-- Tony's Recipes Collection v13.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -339,6 +339,28 @@ function applyTranslation(id, btn) {
 window.setLang          = setLang;
 window.runTranslate     = runTranslate;
 window.applyTranslation = applyTranslation;
+
+
+// ─── SHARE TARGET (iOS Shortcut) ─────────────────────────────────────────────
+function handleShareTarget() {
+  var params = new URLSearchParams(window.location.search);
+  var sharedUrl = params.get('share-target') || params.get('url') || params.get('text');
+  if (!sharedUrl) return;
+  // Remove the query param from URL without reloading
+  try {
+    var cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+  } catch(e) {}
+  // Decode Hebrew/unicode URLs
+  try { sharedUrl = decodeURIComponent(sharedUrl); } catch(e) {}
+  if (sharedUrl) {
+    setTimeout(function() {
+      document.getElementById('urlImportInput') && (document.getElementById('urlImportInput').value = sharedUrl);
+      openUrlImportModal();
+    }, 500);
+  }
+}
+window.handleShareTarget = handleShareTarget;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -1510,7 +1532,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.2</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -1971,7 +1993,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v13.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
