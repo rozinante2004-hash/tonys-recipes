@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v15.6 -->
+<!-- Tony's Recipes Collection v15.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2117,7 +2117,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v15.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v15.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2252,6 +2252,26 @@ body.banner-shown .header {
 <!-- VIEW MODAL -->
 <div class="modal-overlay" id="viewOverlay" onclick="bgClose(event,'viewOverlay')">
   <div class="modal" id="viewModal"></div>
+  <button id="viewCloseBtn" onclick="closeM('viewOverlay')" style="
+    position: fixed;
+    top: 100px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: var(--warm-brown);
+    z-index: 9000;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  ">✕</button>
 </div>
 
 <!-- ADD / EDIT MODAL -->
@@ -2577,7 +2597,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v15.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v15.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3071,8 +3091,9 @@ function drawView(){
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
     return `<li dir="auto"><span>${i.n}</span><span class="ing-amount">${sc}</span></li>`;
   }).join('');
+  var viewCloseBtn = document.getElementById('viewCloseBtn');
+  if (viewCloseBtn) viewCloseBtn.style.display = 'flex';
   document.getElementById('viewModal').innerHTML=`
-    <button class="modal-close" onclick="closeM('viewOverlay')">✕</button>
     <div class="modal-hero" style="background:${r.bg}">
       ${r.photo?`<img src="${r.photo}" alt="">`:''}
       <span class="emoji-over"${r.photo?' style="display:none"':''}>${r.emoji}</span>
@@ -4157,7 +4178,10 @@ function closeDrop(id){document.getElementById(id).classList.remove('open');}
 // ═══════════════════════════════════
 // MODAL / UTILS
 // ═══════════════════════════════════
-function closeM(id){document.getElementById(id).classList.remove('open');}
+function closeM(id){
+  document.getElementById(id).classList.remove('open');
+  if(id==='viewOverlay'){ var vcb=document.getElementById('viewCloseBtn'); if(vcb) vcb.style.display='none'; }
+}
 function bgClose(e,id){if(e.target===document.getElementById(id))closeM(id);}
 function openExploreModal(){
   ingTags=[];renderIngTags();
