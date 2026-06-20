@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v15.8 -->
+<!-- Tony's Recipes Collection v16.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -939,6 +939,96 @@ window.pwaInstall   = pwaInstall;
 window.pwaDismiss   = pwaDismiss;
 window.pwaIosDismiss = pwaIosDismiss;
 
+
+
+
+// ─── WAKE LOCK (prevent screen sleep while viewing recipe) ───────────────────
+var _wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return; // not supported
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', function() { _wakeLock = null; });
+    console.log('[WakeLock] Screen will stay on while recipe is open');
+  } catch(err) {
+    console.warn('[WakeLock]', err.message);
+  }
+}
+
+function releaseWakeLock() {
+  if (_wakeLock) { _wakeLock.release(); _wakeLock = null; }
+}
+
+// Re-acquire wake lock if page becomes visible again (iOS releases on background)
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    var viewOpen = document.getElementById('viewOverlay');
+    if (viewOpen && viewOpen.classList.contains('open')) requestWakeLock();
+  }
+});
+
+// ─── COOK COUNT ───────────────────────────────────────────────────────────────
+function markCooked(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  r.cookCount = (r.cookCount||0) + 1;
+  r.lastCooked = Date.now();
+  r.updatedAt  = Date.now();
+  saveData();
+  drawView(id); // refresh view to show updated count
+  toast('🍳 Cooked! (' + r.cookCount + ' time' + (r.cookCount!==1?'s':'') + ' total)');
+}
+window.markCooked = markCooked;
+
+// ─── AUTO-FETCH MISSING PHOTOS ───────────────────────────────────────────────
+async function autoFetchMissingPhotos() {
+  var noPhoto = recipes.filter(function(r){ return !r.photo && !r.isVideoBookmark; });
+  if (!noPhoto.length) { toast('✅ All recipes already have photos!'); return; }
+  if (!confirm('Auto-fetch photos for ' + noPhoto.length + ' recipe(s) without photos?\n\nThis will search Pixabay for each recipe name and use the best match.')) return;
+
+  var fetched = 0;
+  for (var i = 0; i < noPhoto.length; i++) {
+    var r = noPhoto[i];
+    toast('🔍 Fetching photo ' + (i+1) + '/' + noPhoto.length + ': ' + r.name.slice(0,20));
+    try {
+      // Build a clean English search query using AI if name is Hebrew
+      var query = r.name;
+      var isHeb = /[\u0590-\u05FF]/.test(r.name);
+      if (isHeb) {
+        var tResult = await aiCall('Translate this recipe name to English for image search, reply with ONLY the English name: ' + r.name, 30);
+        query = tResult.trim().replace(/['"]/g,'');
+      }
+      // Search Pixabay
+      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action:'photo-search', query: query + ' food recipe'}),
+        signal: AbortSignal.timeout(10000)
+      });
+      var data = await resp.json();
+      if (!data.images || !data.images.length) continue;
+
+      // Download and compress first result
+      var imgResp = await fetch(data.images[0].url);
+      var blob = await imgResp.blob();
+      var file = new File([blob], 'auto-photo.jpg', {type: blob.type||'image/jpeg'});
+      var photoUrl = await uploadPhotoToStorage(file, r.id);
+      if (photoUrl) {
+        r.photo = photoUrl;
+        r.updatedAt = Date.now();
+        fetched++;
+      }
+    } catch(err) {
+      console.warn('Auto-photo failed for', r.name, err);
+    }
+    await new Promise(function(res){ setTimeout(res, 500); });
+  }
+  saveData();
+  renderGrid();
+  toast('✅ Fetched ' + fetched + '/' + noPhoto.length + ' photos!');
+}
+window.autoFetchMissingPhotos = autoFetchMissingPhotos;
+
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
   console.error('[Global error]', e.message, e.filename, e.lineno);
@@ -1048,7 +1138,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* MODALS */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; }
 .modal-overlay.open { display: flex; }
-.modal { background: var(--cream); border-radius: 16px; width: calc(100vw - 16px); max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.22s ease; }
+.modal { background: var(--cream); border-radius: 16px; width: calc(100vw - 16px); max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .modal::-webkit-scrollbar { width: 6px; }
 .modal::-webkit-scrollbar-track { background: transparent; }
 .modal::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
@@ -2096,6 +2186,31 @@ body.banner-shown .header {
   font-size: 14px; font-weight: 600; cursor: pointer;
 }
 
+
+/* ── SKELETON LOADING ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0ebe4 25%, #e8e0d5 50%, #f0ebe4 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+.skeleton-card {
+  background: white; border-radius: 10px;
+  border: 1px solid var(--border); overflow: hidden;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px 10px 10px; margin-bottom: 8px;
+}
+.skeleton-thumb { width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0; }
+.skeleton-body  { flex: 1; }
+.skeleton-line  { height: 12px; margin-bottom: 7px; border-radius: 4px; }
+.skeleton-line.wide  { width: 70%; }
+.skeleton-line.mid   { width: 45%; }
+.skeleton-line.short { width: 30%; }
+
 </style>
 
 </head>
@@ -2117,7 +2232,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v15.8</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2143,6 +2258,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
+        <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');openSelfTest()">🧪 Self Test</button>
         </div>
@@ -2244,6 +2360,17 @@ body.banner-shown .header {
       <button class="view-toggle-btn active-view" id="viewBtnList" onclick="setView('list')" title="List view">
         ≡ List
       </button>
+      <div class="drop-group" style="margin-left:4px;">
+        <button class="view-toggle-btn" id="sortBtn" onclick="toggleDrop('sortDrop')" title="Sort recipes">⇅ Sort</button>
+        <div class="drop-menu" id="sortDrop" style="min-width:160px;">
+          <button class="drop-item sort-opt" data-sort="default"  onclick="setSort('default');closeDrop('sortDrop')">📋 Default (added)</button>
+          <button class="drop-item sort-opt" data-sort="recent"   onclick="setSort('recent');closeDrop('sortDrop')">🕐 Recently viewed</button>
+          <button class="drop-item sort-opt" data-sort="alpha"    onclick="setSort('alpha');closeDrop('sortDrop')">🔤 Alphabetical</button>
+          <button class="drop-item sort-opt" data-sort="prep"     onclick="setSort('prep');closeDrop('sortDrop')">⏱ Prep time</button>
+          <button class="drop-item sort-opt" data-sort="difficulty" onclick="setSort('difficulty');closeDrop('sortDrop')">📊 Difficulty</button>
+          <button class="drop-item sort-opt" data-sort="popular"  onclick="setSort('popular');closeDrop('sortDrop')">🔥 Most cooked</button>
+        </div>
+      </div>
     </div>
   </div>
   <div id="recipeGrid"></div>
@@ -2577,7 +2704,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v15.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -2859,6 +2986,7 @@ var activeCategories = new Set(); // Frame 2: meal categories
 var activeDiets      = new Set(); // Frame 3: diet types
 var showFavOnly      = false;
 var showClipsOnly    = false;
+var showRecentOnly   = false;
 var _bringSelected = new Set();
 var _bringPopup    = null;
 var _bringTokenCheckInterval = null;
@@ -2871,9 +2999,12 @@ function renderFilters() {
   var allInactive  = hasSelection ? ' inactive' : '';
 
   // Frame 1: All + Favourites + Clips
+  var recentIds = [];
+  try { recentIds = JSON.parse(localStorage.getItem('recent_views')||'[]'); } catch(e){}
   var frame1 = '<div class="filter-frame">'
     + '<button class="filter-btn all-btn' + allInactive + '" onclick="resetFilters()">✦ All</button>'
     + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
+    + (recentIds.length ? '<button class="filter-btn' + (showRecentOnly ? ' active' : '') + '" style="background:' + (showRecentOnly ? '#4F7AFF' : '#EEF2FF') + ';border-color:' + (showRecentOnly ? '#4F7AFF' : '#C0CAFF') + ';color:' + (showRecentOnly ? 'white' : '#3451CC') + ';" onclick="toggleRecentFilter()">🕐 Recent</button>' : '')
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + '</div>';
 
@@ -2903,8 +3034,9 @@ function renderFilters() {
 function resetFilters() {
   activeCategories.clear();
   activeDiets.clear();
-  showFavOnly   = false;
-  showClipsOnly = false;
+  showFavOnly    = false;
+  showClipsOnly  = false;
+  showRecentOnly = false;
   document.querySelectorAll('.mobile-dropdown-panel input[type=checkbox]').forEach(function(cb){ cb.checked=false; });
   if(typeof updateMobileButtons==='function') updateMobileButtons();
   renderFilters();
@@ -2923,6 +3055,13 @@ function toggleClipsFilter() {
   renderGrid();
 }
 window.toggleClipsFilter = toggleClipsFilter;
+
+function toggleRecentFilter() {
+  showRecentOnly = !showRecentOnly;
+  renderFilters();
+  renderGrid();
+}
+window.toggleRecentFilter = toggleRecentFilter;
 
 function toggleCatFilter(cat) {
   if (activeCategories.has(cat)) activeCategories.delete(cat);
@@ -2963,12 +3102,52 @@ function setView(mode) {
   renderGrid();
 }
 
+function setSort(mode) {
+  sortMode = mode;
+  // Highlight active sort
+  document.querySelectorAll('.sort-opt').forEach(function(b) {
+    b.style.fontWeight = b.getAttribute('data-sort')===mode ? '700' : '';
+    b.style.color = b.getAttribute('data-sort')===mode ? 'var(--terracotta)' : '';
+  });
+  var btn = document.getElementById('sortBtn');
+  var labels = {default:'⇅ Sort',recent:'🕐 Recent',alpha:'🔤 A–Z',prep:'⏱ Prep',difficulty:'📊 Level',popular:'🔥 Popular'};
+  if(btn) btn.textContent = mode==='default' ? '⇅ Sort' : labels[mode];
+  renderGrid();
+}
+window.setSort = setSort;
+
 function renderGrid() {
   const q = document.getElementById('searchInput').value.toLowerCase();
-  const list = recipes.filter(r => {
-    // Frame 1: Favourites + Clips filter
+  // Apply sort
+  var sortedRecipes = recipes.slice();
+  if (sortMode === 'alpha') {
+    sortedRecipes.sort(function(a,b){ return a.name.localeCompare(b.name); });
+  } else if (sortMode === 'prep') {
+    sortedRecipes.sort(function(a,b){
+      var pa = parseInt(a.prep)||999, pb = parseInt(b.prep)||999;
+      return pa - pb;
+    });
+  } else if (sortMode === 'difficulty') {
+    var dmap = {Easy:1,Medium:2,Hard:3};
+    sortedRecipes.sort(function(a,b){ return (dmap[a.difficulty]||2)-(dmap[b.difficulty]||2); });
+  } else if (sortMode === 'popular') {
+    sortedRecipes.sort(function(a,b){ return (b.cookCount||0)-(a.cookCount||0); });
+  } else if (sortMode === 'recent') {
+    var recentOrder = []; try{ recentOrder=JSON.parse(localStorage.getItem('recent_views')||'[]'); }catch(e){}
+    sortedRecipes.sort(function(a,b){
+      var ai=recentOrder.indexOf(a.id), bi=recentOrder.indexOf(b.id);
+      if(ai===-1) ai=9999; if(bi===-1) bi=9999;
+      return ai-bi;
+    });
+  }
+  const list = sortedRecipes.filter(r => {
+    // Frame 1: Favourites + Clips + Recent filter
     if (showFavOnly && !r.fav) return false;
     if (showClipsOnly && !r.isClip && !r.isVideoBookmark) return false;
+    if (showRecentOnly) {
+      var recentIds = []; try { recentIds = JSON.parse(localStorage.getItem('recent_views')||'[]'); } catch(e){}
+      if (!recentIds.includes(r.id)) return false;
+    }
     // Frame 2: Category filter (any selected category matches)
     if (activeCategories.size > 0 && !activeCategories.has(r.category)) return false;
     // Frame 3: Diet filter
@@ -3016,11 +3195,11 @@ function renderGrid() {
       <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${r.bg};position:relative;overflow:hidden;">
-          ${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${r.emoji}</span>`}
+          ${r.photo ? `<img src="${r.photo}" alt="">` : `<span style="font-size:26px;">${r.emoji}</span>`}
           ${r.isVideoBookmark ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:28px;height:28px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div></div>` : ''}
         </div>
         <div class="recipe-list-info">
-          <div class="recipe-list-name" style="text-align:right;">${r.name}</div>
+          <div class="recipe-list-name" style="text-align:right;">${r.name}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${r.category}</span>
             <span>⏱ ${r.prep}</span>
@@ -3038,7 +3217,7 @@ function renderGrid() {
       <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${r.bg}">
-          ${r.photo ? `<img src="${r.photo}" alt="">` : `<span>${r.emoji}</span>`}
+          ${r.photo ? `<img src="${r.photo}" alt="">` : `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:52px;line-height:1;">${r.emoji}</span><span style="font-size:10px;color:rgba(0,0,0,0.25);letter-spacing:0.5px;text-transform:uppercase;">${r.category}</span></div>`}
           <div class="card-category-badge">${r.category}</div>
           ${r.isVideoBookmark ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
         </div>
@@ -3071,6 +3250,7 @@ function drawView(){
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
     return `<li dir="auto"><span>${i.n}</span><span class="ing-amount">${sc}</span></li>`;
   }).join('');
+  requestWakeLock();
   document.getElementById('viewModal').innerHTML=`
     <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
       <button onclick="closeM('viewOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);touch-action:manipulation;flex-shrink:0;">✕</button>
@@ -3116,6 +3296,7 @@ function drawView(){
         </div>
       </div>
       ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + d + '</span>'; }).join('') + '</div>' : ''}
+      ${r.cookCount ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="background:#FFF0E8;border-radius:12px;padding:2px 10px;color:var(--terracotta);font-weight:600;">🍳 Cooked ${r.cookCount} time${r.cookCount!==1?'s':''}</span>${r.lastCooked?`<span>· last ${new Date(r.lastCooked).toLocaleDateString()}</span>`:''}</div>` : ''}
       ${r.notes ? `<div style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;dir:auto;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
@@ -3131,6 +3312,7 @@ function drawView(){
       }).join('')}</ol>
       <div class="recipe-actions">
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
+        <button class="action-btn" onclick="markCooked(${r.id})" title="Mark as cooked today">🍳 Cooked!</button>
         <button class="action-btn" onclick="openTranslate(${r.id})">🌐 Translate</button>
         <button class="action-btn" onclick="expOneExcel(${r.id})">📊 Excel</button>
         <button class="action-btn" onclick="expOneWord(${r.id})">📄 Word</button>
@@ -4159,7 +4341,10 @@ function closeDrop(id){document.getElementById(id).classList.remove('open');}
 // ═══════════════════════════════════
 // MODAL / UTILS
 // ═══════════════════════════════════
-function closeM(id){document.getElementById(id).classList.remove('open');}
+function closeM(id){
+  document.getElementById(id).classList.remove('open');
+  if(id==='viewOverlay') releaseWakeLock();
+}
 function bgClose(e,id){if(e.target===document.getElementById(id))closeM(id);}
 function openExploreModal(){
   ingTags=[];renderIngTags();
@@ -4558,6 +4743,7 @@ function saveLocal() {
 function migrateRecipes(list) {
   return list.map(function(r) {
     if (!r.diets) r.diets = [];
+    if (!r.cookCount) r.cookCount = 0;
     if (!r.notes) r.notes = '';
     // Auto-flag as clip if isVideoBookmark or no recipe content
     if (r.isVideoBookmark && !r.isClip) r.isClip = true;
@@ -5929,8 +6115,20 @@ function updateFilterBarTop() {
     var ls = document.getElementById('loginScreen');
     if (ls) ls.style.display = 'none';
   }
+  // Show skeleton cards while data loads
+  var g = document.getElementById('recipeGrid');
+  if (g) {
+    var skels = '';
+    for (var si=0; si<5; si++) {
+      skels += '<div class="skeleton-card"><div class="skeleton skeleton-thumb"></div>'
+             + '<div class="skeleton-body"><div class="skeleton skeleton-line wide"></div>'
+             + '<div class="skeleton skeleton-line mid"></div>'
+             + '<div class="skeleton skeleton-line short"></div></div></div>';
+    }
+    g.innerHTML = skels;
+  }
   renderFilters();
-  renderGrid();
+  setTimeout(function(){ renderGrid(); }, 150); // slight delay so skeletons flash
   handleShareTarget();
 })();
 
