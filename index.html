@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v16.3 -->
+<!-- Tony's Recipes Collection v16.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -636,6 +636,113 @@ const SELF_TESTS = [
       if(bg==='rgba(0, 0, 0, 0)'||bg==='transparent') throw new Error('Header background is transparent — CSS may not have loaded');
     }
   },
+
+  // ── NEW FEATURES (v16) ──────────────────────────────────────────────────────
+  { id:'feat_sort',      group:'Features', name:'Sort options work',
+    test: async()=>{
+      if(typeof setSort!=='function') throw new Error('setSort not defined');
+      if(typeof sortMode==='undefined') throw new Error('sortMode variable not declared');
+      const before = sortMode;
+      setSort('alpha'); if(sortMode!=='alpha') throw new Error('sortMode not updated');
+      setSort(before); // revert
+    }
+  },
+  { id:'feat_recent',    group:'Features', name:'Recently viewed tracking',
+    test: async()=>{
+      if(typeof toggleRecentFilter!=='function') throw new Error('toggleRecentFilter not defined');
+      if(!recipes.length) throw new Error('No recipes to test with');
+      const before = localStorage.getItem('recent_views');
+      openView(recipes[0].id);
+      await wait(200);
+      closeM('viewOverlay');
+      const after = JSON.parse(localStorage.getItem('recent_views')||'[]');
+      if(!after.includes(recipes[0].id)) throw new Error('Recipe not added to recent_views');
+      if(before!==null) localStorage.setItem('recent_views', before);
+    }
+  },
+  { id:'feat_cook',      group:'Features', name:'Cook count (mark as cooked)',
+    test: async()=>{
+      if(typeof markCooked!=='function') throw new Error('markCooked not defined');
+      if(!recipes.length) throw new Error('No recipes');
+      const r=recipes[0]; const before=r.cookCount||0;
+      markCooked(r.id);
+      await wait(200);
+      closeM('viewOverlay');
+      if((r.cookCount||0)!==before+1) throw new Error('cookCount not incremented');
+      r.cookCount=before; r.updatedAt=Date.now(); saveLocal(); // revert
+    }
+  },
+  { id:'feat_scale',     group:'Features', name:'Scaling memory persists',
+    test: async()=>{
+      if(!recipes.length) throw new Error('No recipes');
+      const id=recipes[0].id;
+      localStorage.setItem('scale_'+id,'3');
+      openView(id);
+      await wait(200);
+      if(viewMult!==3) throw new Error('Scale not restored — got '+viewMult+' expected 3');
+      closeM('viewOverlay');
+      localStorage.removeItem('scale_'+id); // revert
+    }
+  },
+  { id:'feat_wakelock',  group:'Features', name:'Wake lock API available',
+    test: async()=>{
+      if(!('wakeLock' in navigator)) throw new Error('Wake Lock API not supported in this browser');
+      if(typeof requestWakeLock!=='function') throw new Error('requestWakeLock not defined');
+      // Just verify API is available — actual lock requires user interaction on some browsers
+    }
+  },
+  { id:'feat_autophotos',group:'Features', name:'Auto-fetch photos function exists',
+    test: async()=>{
+      if(typeof autoFetchMissingPhotos!=='function') throw new Error('autoFetchMissingPhotos not defined');
+    }
+  },
+
+  // ── IMPORT / EXPORT ─────────────────────────────────────────────────────────
+  { id:'import_url_modal', group:'Import/Export', name:'URL import modal opens',
+    test: async()=>{
+      if(typeof openUrlImportModal!=='function') throw new Error('openUrlImportModal not defined');
+      openUrlImportModal();
+      await wait(300);
+      const o=document.getElementById('urlImportOverlay');
+      if(!o||!o.classList.contains('open')) throw new Error('URL import modal did not open');
+      closeM('urlImportOverlay');
+    }
+  },
+  { id:'import_freehand', group:'Import/Export', name:'Free-hand import modal opens',
+    test: async()=>{
+      if(typeof openFreehandModal!=='function') throw new Error('openFreehandModal not defined');
+      openFreehandModal();
+      await wait(300);
+      const o=document.getElementById('freehandOverlay');
+      if(!o||!o.classList.contains('open')) throw new Error('Freehand modal did not open');
+      closeM('freehandOverlay');
+    }
+  },
+  { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
+    test: async()=>{
+      if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');
+    }
+  },
+  { id:'export_excel',    group:'Import/Export', name:'Export Excel function exists',
+    test: async()=>{
+      if(typeof exportAllExcel!=='function') throw new Error('exportAllExcel not defined');
+    }
+  },
+  { id:'export_word',     group:'Import/Export', name:'Export Word function exists',
+    test: async()=>{
+      if(typeof exportAllWord!=='function') throw new Error('exportAllWord not defined');
+    }
+  },
+  { id:'import_save_recipe', group:'Import/Export', name:'saveRecipe function exists',
+    test: async()=>{
+      if(typeof saveRecipe!=='function') throw new Error('saveRecipe not defined');
+    }
+  },
+  { id:'feat_autotag',    group:'Features', name:'AI auto-tag diet types exists',
+    test: async()=>{
+      if(typeof aiTagAllDiets!=='function') throw new Error('aiTagAllDiets not defined');
+    }
+  },
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -792,6 +899,19 @@ var SELF_TEST_FIXES = {
   backup_fn:      { fix:'Backup functions missing. They should be defined in the main script. Check for truncation or syntax errors.', autofix: null },
   css_vars:       { fix:'CSS variables not set. The :root { } block is missing from the stylesheet. Re-add the CSS variable definitions.', autofix: ()=>{ const s=document.createElement('style'); s.textContent=':root{--cream:#FAF7F2;--warm-brown:#5C3D2E;--terracotta:#C1440E;--gold:#D4A843;--ink:#1C1A18;--muted:#8A8279;--border:#E8E0D5;--card-bg:#FFFFFF;--bg:#FAF7F2;--green:#2E7D32;}'; document.head.appendChild(s); } },
   css_header:     { fix:'Header background is transparent — :root CSS variables may not be loaded. Run the css_vars fix first.', autofix: null },
+  feat_sort:      { fix:'sortMode variable is not declared. Add: var sortMode = "default"; alongside the other filter state variables (showFavOnly, showClipsOnly etc).', autofix: ()=>{ if(typeof sortMode==='undefined') window.sortMode='default'; } },
+  feat_recent:    { fix:'toggleRecentFilter not defined or recent_views localStorage not being written. Check openView() writes to recent_views key.', autofix: null },
+  feat_cook:      { fix:'markCooked not defined. Check the function is in the main script block.', autofix: null },
+  feat_scale:     { fix:'Scaling memory not working. Check openView() reads localStorage key scale_{id} and sets viewMult.', autofix: null },
+  feat_wakelock:  { fix:'Wake Lock API not supported. This browser does not support the Screen Wake Lock API. Works in Chrome/Edge on Android. Not supported in Safari.', autofix: null },
+  feat_autophotos:{ fix:'autoFetchMissingPhotos not defined. Check the function is in the main script block.', autofix: null },
+  import_url_modal:{ fix:'openUrlImportModal not defined or urlImportOverlay missing. Check function and modal HTML exist in the main script.', autofix: null },
+  import_freehand: { fix:'openFreehandModal not defined or freehandOverlay missing. Check function and modal HTML exist.', autofix: null },
+  import_camera:   { fix:'openCameraImport not defined. Check the function is in the main script block.', autofix: null },
+  export_excel:    { fix:'exportAllExcel not defined. Check the function is in the main script block.', autofix: null },
+  export_word:     { fix:'exportAllWord not defined. Check the function is in the main script block.', autofix: null },
+  import_save_recipe:{ fix:'saveRecipe not defined. Check the function is in the main script block.', autofix: null },
+  feat_autotag:    { fix:'aiTagAllDiets not defined. Check the function is in the main script block.', autofix: null },
 };
 
 function showSelfTestDetail(testId) {
@@ -2232,7 +2352,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2704,7 +2824,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5497,12 +5617,23 @@ var HELP_SYSTEM_PROMPT = [
   "- Failed tests show error details, impact, suggested fix, and runtime auto-fix where possible",
   "- All data changes made during tests are reverted",
   "",
+  "=== NEW FEATURES ===",
+  "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
+  "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
+  "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
+  "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching Pixabay photo for every recipe that has none",
+  "- 📏 Scaling memory: the app remembers the last serving size multiplier you used for each recipe",
+  "- 🌙 Screen stay-on (Wake Lock): when you open a recipe, the screen stays on automatically so your hands can stay clean while cooking. It goes back to normal sleep when you close the recipe. Works in Chrome and Edge on Android; not supported in Safari.",
+  "- ⏳ Skeleton loading: when the app first loads, animated placeholder cards appear briefly while your recipes render — no more blank white flash",
+  "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",
   "- Hebrew text is automatically right-aligned throughout the app",
   "- Recipe names are always right-aligned regardless of language",
+  "- Method steps in Hebrew recipes are right-aligned with step numbers on the right",
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
-  "- The Self Test button is useful for diagnosing if something stops working"
+  "- The Self Test button (··· More → 🧪 Self Test) is useful for diagnosing if something stops working",
+  "- The sort and filter settings reset when you tap 'All'"
 ].join("\n");
 
 var _lastHelpQuestion = '';
