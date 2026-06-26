@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v17.3 -->
+<!-- Tony's Recipes Collection v17.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2396,7 +2396,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2427,6 +2427,32 @@ body.banner-shown .header {
         <button class="drop-item" onclick="closeDrop('moreDrop');openSelfTest()">🧪 Self Test</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');openPayments()">💳 Payments</button>
+        <div class="drop-group" style="position:relative;width:100%;">
+          <button class="drop-item" style="width:100%;justify-content:space-between;" onclick="toggleDrop('deployDrop')">🚀 Deployments <span style="font-size:10px;color:var(--muted);">▶</span></button>
+          <div class="drop-menu" id="deployDrop" style="min-width:260px;">
+            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">GitHub</div>
+            <a class="drop-item" href="https://github.com/rozinante2004-hash/tonys-recipes/upload/main" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">📄 Deploy index.html</a>
+            <a class="drop-item" href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🐙 Repository</a>
+            <a class="drop-item" href="https://rozinante2004-hash.github.io/tonys-recipes/" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🌐 Live App</a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Cloudflare</div>
+            <a class="drop-item" href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">☁️ Edit Worker code</a>
+            <a class="drop-item" href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">⚙️ Worker settings & secrets</a>
+            <a class="drop-item" href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">📊 Workers dashboard</a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Firebase</div>
+            <a class="drop-item" href="https://console.firebase.google.com/project/recipes-f379d/firestore" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🔥 Firestore database</a>
+            <a class="drop-item" href="https://console.firebase.google.com/project/recipes-f379d/overview" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">📋 Firebase console</a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Anthropic</div>
+            <a class="drop-item" href="https://console.anthropic.com/settings/billing" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">💳 Billing & credits</a>
+            <a class="drop-item" href="https://console.anthropic.com/settings/keys" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🔑 API keys</a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Google Cloud</div>
+            <a class="drop-item" href="https://console.cloud.google.com/apis/credentials" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🔑 API credentials</a>
+            <a class="drop-item" href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">▶️ YouTube API quota</a>
+          </div>
+        </div>
         </div>
       </div>
       <div class="drop-group">
@@ -2872,7 +2898,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
