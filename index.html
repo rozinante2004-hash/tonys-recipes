@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v16.7 -->
+<!-- Tony's Recipes Collection v16.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2357,7 +2357,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.7</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2829,7 +2829,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v16.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4110,12 +4110,16 @@ async function saveRecipe(){
     if(idx>=0){
       // Preserve fields not in the edit form
       var existing = recipes[idx];
+      // Clear nutrition if ingredients or steps changed (values would be stale)
+      var ingsChanged = JSON.stringify(existing.ingredients) !== JSON.stringify(data.ingredients);
+      var stepsChanged = JSON.stringify(existing.steps) !== JSON.stringify(data.steps);
+      var nutritionToKeep = (ingsChanged || stepsChanged) ? null : existing.nutrition;
       recipes[idx] = {
         ...existing,
         ...data,
         fav: existing.fav,           // preserve favourite status
         bg: existing.bg,             // preserve background colour
-        nutrition: existing.nutrition || null,  // preserve nutrition
+        nutrition: nutritionToKeep,  // cleared if ingredients/steps changedrition
         originalPhoto: existing.originalPhoto || '',  // preserve original photo
       };
     }
