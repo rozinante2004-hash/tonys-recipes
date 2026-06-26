@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v17.4 -->
+<!-- Tony's Recipes Collection v17.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1154,6 +1154,13 @@ async function autoFetchMissingPhotos() {
 }
 window.autoFetchMissingPhotos = autoFetchMissingPhotos;
 
+
+
+// ─── DEPLOYMENTS MODAL ────────────────────────────────────────────────────────
+function openDeployments() {
+  document.getElementById('deploymentsOverlay').classList.add('open');
+}
+window.openDeployments = openDeployments;
 
 // ─── PAYMENTS MODAL ───────────────────────────────────────────────────────────
 function openPayments() {
@@ -2375,6 +2382,19 @@ body.banner-shown .header {
 }
 .payment-link:hover { background: var(--warm-brown); color: white; border-color: var(--warm-brown); }
 
+
+/* ── DEPLOYMENT LINKS ── */
+.deploy-link {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; border-radius: 8px; text-decoration: none;
+  background: var(--card-bg); border: 1px solid var(--border);
+  color: var(--ink); font-size: 13px; font-weight: 500;
+  transition: all 0.15s; gap: 8px;
+}
+.deploy-link:hover { background: #FFF0E8; border-color: var(--terracotta); color: var(--terracotta); }
+.deploy-hint { font-size: 11px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.deploy-link:hover .deploy-hint { color: var(--terracotta); opacity: 0.7; }
+
 </style>
 
 </head>
@@ -2396,7 +2416,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2427,32 +2447,7 @@ body.banner-shown .header {
         <button class="drop-item" onclick="closeDrop('moreDrop');openSelfTest()">🧪 Self Test</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');openPayments()">💳 Payments</button>
-        <div class="drop-group" style="position:relative;width:100%;">
-          <button class="drop-item" style="width:100%;justify-content:space-between;" onclick="toggleDrop('deployDrop')">🚀 Deployments <span style="font-size:10px;color:var(--muted);">▶</span></button>
-          <div class="drop-menu" id="deployDrop" style="min-width:260px;">
-            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">GitHub</div>
-            <a class="drop-item" href="https://github.com/rozinante2004-hash/tonys-recipes/upload/main" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">📄 Deploy index.html</a>
-            <a class="drop-item" href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🐙 Repository</a>
-            <a class="drop-item" href="https://rozinante2004-hash.github.io/tonys-recipes/" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🌐 Live App</a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Cloudflare</div>
-            <a class="drop-item" href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">☁️ Edit Worker code</a>
-            <a class="drop-item" href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">⚙️ Worker settings & secrets</a>
-            <a class="drop-item" href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">📊 Workers dashboard</a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Firebase</div>
-            <a class="drop-item" href="https://console.firebase.google.com/project/recipes-f379d/firestore" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🔥 Firestore database</a>
-            <a class="drop-item" href="https://console.firebase.google.com/project/recipes-f379d/overview" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">📋 Firebase console</a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Anthropic</div>
-            <a class="drop-item" href="https://console.anthropic.com/settings/billing" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">💳 Billing & credits</a>
-            <a class="drop-item" href="https://console.anthropic.com/settings/keys" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🔑 API keys</a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Google Cloud</div>
-            <a class="drop-item" href="https://console.cloud.google.com/apis/credentials" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">🔑 API credentials</a>
-            <a class="drop-item" href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" onclick="closeDrop('moreDrop');closeDrop('deployDrop')">▶️ YouTube API quota</a>
-          </div>
-        </div>
+        <button class="drop-item" onclick="closeDrop('moreDrop');openDeployments()">🚀 Deployments</button>
         </div>
       </div>
       <div class="drop-group">
@@ -2898,7 +2893,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6559,6 +6554,68 @@ function updateFilterBarTop() {
           <div style="font-size:11px;color:var(--muted);">Plus API credits as needed — everything else is free</div>
         </div>
         <div style="font-size:22px;font-weight:700;color:var(--terracotta);">$20 <span style="font-size:13px;font-weight:400;color:var(--muted);">/ month</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- DEPLOYMENTS MODAL -->
+<div class="modal-overlay" id="deploymentsOverlay" onclick="bgClose(event,'deploymentsOverlay')">
+  <div class="modal" style="max-width:520px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('deploymentsOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">🚀 Deployments</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Quick links to all deployment & management consoles</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 16px;">
+
+      <!-- GitHub -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:12px 0 6px;">🐙 GitHub</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://github.com/rozinante2004-hash/tonys-recipes/upload/main" target="_blank" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
+        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
+        <a href="https://rozinante2004-hash.github.io/tonys-recipes/" target="_blank" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Cloudflare -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">☁️ Cloudflare Workers</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint">lively-bread-273a</span></a>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Firebase -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">🔥 Firebase</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://console.firebase.google.com/project/recipes-f379d/firestore" target="_blank" class="deploy-link">🗄️ Firestore database <span class="deploy-hint">recipes-f379d</span></a>
+        <a href="https://console.firebase.google.com/project/recipes-f379d/overview" target="_blank" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Anthropic -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">🤖 Anthropic</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" class="deploy-link">💳 Billing & API credits <span class="deploy-hint">Top up credits</span></a>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" class="deploy-link">🔑 API keys <span class="deploy-hint">Regenerate if compromised</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Google Cloud -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">☁️ Google Cloud</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="deploy-link">🔑 API credentials <span class="deploy-hint">YouTube & other keys</span></a>
+        <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" class="deploy-link">▶️ YouTube API quota <span class="deploy-hint">10,000 units/day free</span></a>
       </div>
 
     </div>
