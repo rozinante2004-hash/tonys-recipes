@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v17.2 -->
+<!-- Tony's Recipes Collection v17.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -577,8 +577,9 @@ const SELF_TESTS = [
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'instagram-fetch',shortcode:'C5IHqgqoFMo'}),
         signal:AbortSignal.timeout(10000)});
-      // Instagram may return 404 if post deleted - just verify worker responded (not 500)
-      if(resp.status===500) throw new Error('Worker internal error on instagram-fetch');
+      // Instagram's oEmbed API now requires auth — Worker returns 404 (not 500) when unavailable.
+      // Accept 200 or 404; only fail on 500 (true Worker crash).
+      if(resp.status===500) throw new Error('Worker crashed on instagram-fetch (500)');
       // Any other status (200, 404) means worker is handling the action correctly
     }
   },
@@ -896,7 +897,7 @@ var SELF_TEST_FIXES = {
   net_ai:         { fix:'AI call failed. Check the Cloudflare Worker has ANTHROPIC_API_KEY set as a secret, and the Worker is not rate-limited.', autofix: null },
   net_url_import: { fix:'URL fetch via Worker failed. Check Worker fetch-url action is implemented and allrecipes.com is accessible.', autofix: null },
   net_photo:      { fix:'Photo search failed. Check Worker photo-search action is implemented and PIXABAY_API_KEY is set.', autofix: null },
-  net_instagram:  { fix:'Instagram fetch failed. Check Worker instagram-fetch action and that the oEmbed API is accessible.', autofix: null },
+  net_instagram:  { fix:'Instagram Worker action crashed with 500. The oEmbed endpoints returning 404 is expected (Instagram requires auth since 2024) — that is a PASS. A 500 means the Worker itself threw an exception. Check the Worker logs at dash.cloudflare.com.', autofix: null },
   stor_local:     { fix:'localStorage is not available. Check browser settings — private mode may restrict storage.', autofix: null },
   stor_save:      { fix:'saveLocal() failed to write to localStorage. Check STORAGE_KEY constant and localStorage quota.', autofix: null },
   stor_firebase:  { fix:'Firebase connection failed. Sign in first, then re-run the test. Check Firebase project is active.', autofix: null },
@@ -2395,7 +2396,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.2</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2871,7 +2872,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
