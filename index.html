@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v17.0 -->
+<!-- Tony's Recipes Collection v17.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1152,6 +1152,13 @@ async function autoFetchMissingPhotos() {
   toast('✅ Fetched ' + fetched + '/' + noPhoto.length + ' photos!');
 }
 window.autoFetchMissingPhotos = autoFetchMissingPhotos;
+
+
+// ─── PAYMENTS MODAL ───────────────────────────────────────────────────────────
+function openPayments() {
+  document.getElementById('paymentsOverlay').classList.add('open');
+}
+window.openPayments = openPayments;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -2336,6 +2343,37 @@ body.banner-shown .header {
 .skeleton-line.mid   { width: 45%; }
 .skeleton-line.short { width: 30%; }
 
+
+/* ── PAYMENT CARDS ── */
+.payment-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px; margin-bottom: 8px;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 10px; transition: box-shadow 0.15s;
+}
+.payment-card:hover { box-shadow: 0 2px 8px rgba(92,61,46,0.1); }
+.payment-icon {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.payment-body { flex: 1; min-width: 0; }
+.payment-name { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.payment-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 5px; }
+.payment-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.payment-cost { font-size: 13px; font-weight: 700; color: var(--terracotta); }
+.payment-cost.free { color: var(--green); }
+.payment-divider { color: var(--border); }
+.payment-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.3px; }
+.payment-badge.paid { background: #FFE8E8; color: var(--terracotta); }
+.payment-badge.free { background: #EAF5E9; color: var(--green); }
+.payment-link {
+  flex-shrink: 0; padding: 6px 12px; border-radius: 7px; font-size: 12px;
+  font-weight: 600; font-family: 'DM Sans', sans-serif; text-decoration: none;
+  background: var(--bg); border: 1px solid var(--border); color: var(--warm-brown);
+  white-space: nowrap; transition: all 0.15s;
+}
+.payment-link:hover { background: var(--warm-brown); color: white; border-color: var(--warm-brown); }
+
 </style>
 
 </head>
@@ -2357,7 +2395,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2386,6 +2424,8 @@ body.banner-shown .header {
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');openSelfTest()">🧪 Self Test</button>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <button class="drop-item" onclick="closeDrop('moreDrop');openPayments()">💳 Payments</button>
         </div>
       </div>
       <div class="drop-group">
@@ -2831,7 +2871,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6346,6 +6386,156 @@ function updateFilterBarTop() {
     <div style="font-size:12px;color:var(--muted);line-height:1.5;">Tap <strong>Share</strong> <span style="font-size:14px;">⎙</span> then <strong>"Add to Home Screen"</strong> to install as an app.</div>
   </div>
   <button onclick="pwaIosDismiss()" style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);cursor:pointer;font-size:14px;color:var(--muted);">✕</button>
+</div>
+
+
+<!-- PAYMENTS MODAL -->
+<div class="modal-overlay" id="paymentsOverlay" onclick="bgClose(event,'paymentsOverlay')">
+  <div class="modal" style="max-width:580px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('paymentsOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">💳 Payments & Services</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Services powering Tony's Recipes Collection</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 16px;">
+
+      <!-- PAID SERVICES -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:12px 0 8px;">Paid Services</div>
+
+      <!-- Anthropic Pro Plan -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#E8F0FF;">🤖</div>
+        <div class="payment-body">
+          <div class="payment-name">Anthropic <span class="payment-badge paid">Pro Plan</span></div>
+          <div class="payment-desc">Claude AI — powers all AI features: recipe import, translation, suggestions, nutrition, help assistant, auto-tagging</div>
+          <div class="payment-meta">
+            <span class="payment-cost">$20 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">Recurring subscription</span>
+          </div>
+        </div>
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" class="payment-link">Manage ↗</a>
+      </div>
+
+      <!-- Anthropic API Credits -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#EEF2FF;">💳</div>
+        <div class="payment-body">
+          <div class="payment-name">Anthropic <span class="payment-badge" style="background:#E8F0FF;color:#3451CC;">API Credits</span></div>
+          <div class="payment-desc">Pay-as-you-go credits for direct API usage. When credits run out, all AI features stop working — translation, import, suggest, explore, and nutrition all depend on this. Top up with as little as $5.</div>
+          <div class="payment-meta">
+            <span class="payment-cost" style="color:var(--ink);">As needed</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">~$5 lasts months of personal use</span>
+          </div>
+        </div>
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" class="payment-link">Top up ↗</a>
+      </div>
+
+      <!-- FREE SERVICES -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:16px 0 8px;">Free Services</div>
+
+      <!-- Cloudflare -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#FFF3E0;">☁️</div>
+        <div class="payment-body">
+          <div class="payment-name">Cloudflare Workers <span class="payment-badge free">Free Plan</span></div>
+          <div class="payment-desc">Proxies all API calls (AI, photos, YouTube, Instagram, Bring!). 100,000 requests/day free quota.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">Quota resets daily</span>
+          </div>
+        </div>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" class="payment-link">Dashboard ↗</a>
+      </div>
+
+      <!-- Firebase -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#FFF8E8;">🔥</div>
+        <div class="payment-body">
+          <div class="payment-name">Firebase (Google) <span class="payment-badge free">Spark Free Plan</span></div>
+          <div class="payment-desc">User authentication (Google Sign-In) and Firestore database for cloud sync across all your devices.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">1 GB storage, 50K reads/day free</span>
+          </div>
+        </div>
+        <a href="https://console.firebase.google.com/project/recipes-f379d" target="_blank" class="payment-link">Console ↗</a>
+      </div>
+
+      <!-- GitHub -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#F5E8FF;">🐙</div>
+        <div class="payment-body">
+          <div class="payment-name">GitHub Pages <span class="payment-badge free">Free</span></div>
+          <div class="payment-desc">Hosts the app at rozinante2004-hash.github.io/tonys-recipes — unlimited bandwidth for public repos.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+          </div>
+        </div>
+        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" class="payment-link">Repo ↗</a>
+      </div>
+
+      <!-- Pixabay -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#EAF5E9;">📷</div>
+        <div class="payment-body">
+          <div class="payment-name">Pixabay API <span class="payment-badge free">Free Plan</span></div>
+          <div class="payment-desc">Recipe photo search — finds food photos for recipes that don't have one. 100 requests/minute free.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">No attribution required</span>
+          </div>
+        </div>
+        <a href="https://pixabay.com/api/docs/" target="_blank" class="payment-link">Docs ↗</a>
+      </div>
+
+      <!-- YouTube -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#FFE8E8;">▶️</div>
+        <div class="payment-body">
+          <div class="payment-name">YouTube Data API <span class="payment-badge free">Free Quota</span></div>
+          <div class="payment-desc">Fetches video descriptions for recipe extraction from YouTube URLs. 10,000 units/day free.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">Via Google Cloud Console</span>
+          </div>
+        </div>
+        <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com" target="_blank" class="payment-link">Console ↗</a>
+      </div>
+
+      <!-- Bring! -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#FFF0E8;">🛒</div>
+        <div class="payment-body">
+          <div class="payment-name">Bring! <span class="payment-badge free">Free</span></div>
+          <div class="payment-desc">Shopping list integration — sends recipe ingredients directly to your Bring! app.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">Token refresh needed ~every 7 days</span>
+          </div>
+        </div>
+        <a href="https://web.getbring.com" target="_blank" class="payment-link">Open ↗</a>
+      </div>
+
+      <!-- Monthly total -->
+      <div style="margin-top:16px;padding:12px 16px;background:var(--bg);border-radius:10px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">Total monthly cost</div>
+          <div style="font-size:11px;color:var(--muted);">Plus API credits as needed — everything else is free</div>
+        </div>
+        <div style="font-size:22px;font-weight:700;color:var(--terracotta);">$20 <span style="font-size:13px;font-weight:400;color:var(--muted);">/ month</span></div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 </body>
