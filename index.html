@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v19.1 -->
+<!-- Tony's Recipes Collection v19.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v19.1';
+var APP_VERSION = 'v19.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1378,6 +1378,57 @@ function checkAppVersion() {
     });
 }
 window.checkAppVersion = checkAppVersion;
+
+
+// ─── FILE DROP ZONE ───────────────────────────────────────────────────────────
+function openDropZone() {
+  document.getElementById('dropZoneStatus').textContent = '';
+  document.getElementById('dropZoneOverlay').classList.add('open');
+}
+window.openDropZone = openDropZone;
+
+async function handleFileDrop(event) {
+  event.preventDefault();
+  var zone = document.getElementById('dropZone');
+  var status = document.getElementById('dropZoneStatus');
+  zone.classList.remove('drop-active');
+
+  var file = null;
+
+  // Try DataTransfer.files first (most compatible)
+  if(event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    file = event.dataTransfer.files[0];
+  }
+  // Fall back to DataTransfer.items
+  else if(event.dataTransfer.items && event.dataTransfer.items.length > 0) {
+    var item = event.dataTransfer.items[0];
+    if(item.kind === 'file') file = item.getAsFile();
+  }
+
+  if(!file) {
+    status.textContent = '⚠️ No file detected — try again';
+    return;
+  }
+
+  status.textContent = '📂 Reading: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)…';
+  console.log('[drop] file:', file.name, 'size:', file.size, 'type:', file.type);
+
+  if(file.size === 0) {
+    status.innerHTML = '❌ File reports 0 bytes. Try:<br>1. Copy file to home folder first<br>2. Use Free-hand text import instead';
+    return;
+  }
+
+  // Close modal and process using same importFromFile logic
+  closeM('dropZoneOverlay');
+
+  // Build a synthetic event-like object with the file
+  var syntheticEvent = {
+    target: { files: [file], value: '' },
+    dataTransfer: event.dataTransfer
+  };
+  await importFromFile(syntheticEvent);
+}
+window.handleFileDrop = handleFileDrop;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -2632,6 +2683,14 @@ body.banner-shown .header {
 .access-role-opt { display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card-bg);font-family:'DM Sans',sans-serif; }
 .access-role-opt:has(input:checked) { border-color:var(--terracotta);background:#FFF5F2;color:var(--terracotta); }
 
+
+/* ── DROP ZONE ── */
+#dropZone.drop-active {
+  border-color: var(--terracotta);
+  background: #FFF5F2;
+  transform: scale(1.02);
+}
+
 </style>
 
 </head>
@@ -2653,7 +2712,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.1</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2701,6 +2760,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('importExportDrop');openFreehandModal()">✍️ Free-hand text</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');openCameraImport()">📷 Scan (camera)</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span style="font-size:10px;color:var(--muted);">.docx .xlsx .pdf .html</span></button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span style="font-size:10px;color:var(--muted);">drag & drop</span></button>
           <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
           <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllExcel()">📊 All to Excel</button>
@@ -3148,7 +3208,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4227,6 +4287,13 @@ async function importFromFile(event){
 
   toast('📂 Reading ' + file.name + ' (' + (ext||'?') + ')…');
 
+  // Chrome on Linux sometimes reports .doc files as size:0 (browser bug)
+  // Warn the user but proceed anyway — FileReader may still work
+  if(file.size === 0) {
+    console.warn('[import] file.size=0 — possible Chrome/Linux bug or corrupt file');
+    toast('⚠️ File appears empty to browser — attempting to read anyway…');
+  }
+
   // ── Read entire file into memory FIRST using FileReader ──────────────────
   // This is synchronous-friendly and avoids Android permission issues with
   // file.arrayBuffer() which can fail if the event loop yields before reading.
@@ -4252,7 +4319,10 @@ async function importFromFile(event){
     console.log('[import] buffer ready, ext:', ext, 'mime:', mime);
   } catch(readErr) {
     console.error('[import] read failed:', readErr);
-    showImportError('Could not read file into memory.\n\nError: ' + readErr.message + '\n\nFile: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)\n\nTry: right-click the file → Properties → check it is not blocked by Windows security.');
+    var sizeMsg = file.size === 0
+      ? 'The browser reports this file as 0 bytes — this is a known Chrome bug on Linux with old .doc files.\n\nWorkarounds:\n1. Rename the file to .docx and try again\n2. Open in LibreOffice → Save As .docx → import the .docx\n3. Copy the text and use Free-hand text import'
+      : 'Error: ' + readErr.message + '\n\nFile: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)';
+    showImportError('Could not read file.\n\n' + sizeMsg);
     try { event.target.value = ''; } catch(e) {}
     return;
   }
@@ -7265,6 +7335,35 @@ function updateFilterBarTop() {
       style="padding:10px 16px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;">
       Later
     </button>
+  </div>
+</div>
+
+
+<!-- DROP ZONE MODAL -->
+<div class="modal-overlay" id="dropZoneOverlay" onclick="bgClose(event,'dropZoneOverlay')">
+  <div class="modal" style="max-width:460px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('dropZoneOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">📂 Drop File to Import</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Drag a recipe file from your file manager and drop it below</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 24px;">
+      <div id="dropZone"
+        ondragover="event.preventDefault();this.classList.add('drop-active')"
+        ondragleave="this.classList.remove('drop-active')"
+        ondrop="handleFileDrop(event)"
+        style="border:3px dashed var(--border);border-radius:14px;padding:48px 24px;text-align:center;cursor:pointer;transition:all 0.2s;margin-top:8px;">
+        <div style="font-size:48px;margin-bottom:12px;">📄</div>
+        <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px;">Drop your file here</div>
+        <div style="font-size:12px;color:var(--muted);">Supports .doc, .docx, .xlsx, .pdf, .html, .txt</div>
+      </div>
+      <div id="dropZoneStatus" style="margin-top:12px;font-size:13px;color:var(--muted);text-align:center;min-height:20px;"></div>
+      <div style="margin-top:16px;padding:12px;background:#EEF6FF;border-radius:8px;font-size:12px;color:#2255AA;line-height:1.6;">
+        <strong>Tip for Linux users:</strong> If the regular file picker shows permission errors, drag the file directly from your file manager (Nautilus, Dolphin, etc.) into the box above.
+      </div>
+    </div>
   </div>
 </div>
 
