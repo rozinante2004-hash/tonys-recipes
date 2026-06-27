@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.9 -->
+<!-- Tony's Recipes Collection v19.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v18.9';
+var APP_VERSION = 'v19.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2653,7 +2653,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.9</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3148,7 +3148,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4210,13 +4210,12 @@ function exportAllWord(){
 async function importFromFile(event){
   var file = event.target.files[0];
   if(!file) return;
-  // IMPORTANT: read file BEFORE clearing input — clearing invalidates the file handle
-  // event.target.value is cleared at the end instead
+
   var name = file.name.toLowerCase();
   var ext  = name.includes('.') ? name.split('.').pop().trim() : '';
   var mime = (file.type || '').toLowerCase();
 
-  // Also detect by MIME type in case extension is missing (common on Android)
+  // Detect by MIME type in case extension is missing (common on Android)
   if(!ext || ext === name) {
     if(mime.includes('wordprocessingml') || mime.includes('msword')) ext = 'docx';
     else if(mime.includes('spreadsheetml') || mime.includes('excel')) ext = 'xlsx';
@@ -4224,17 +4223,46 @@ async function importFromFile(event){
     else if(mime.includes('html')) ext = 'html';
     else if(mime.includes('text')) ext = 'txt';
   }
-  // Normalise: treat .doc MIME as doc
   if(mime === 'application/msword' && ext !== 'docx') ext = 'doc';
 
   toast('📂 Reading ' + file.name + ' (' + (ext||'?') + ')…');
+
+  // ── Read entire file into memory FIRST using FileReader ──────────────────
+  // This is synchronous-friendly and avoids Android permission issues with
+  // file.arrayBuffer() which can fail if the event loop yields before reading.
+  var fileBuffer;
+  var fileText;
+  try {
+    toast('📂 Step 1: Reading file into memory…');
+    console.log('[import] file:', file.name, 'size:', file.size, 'type:', file.type);
+    fileBuffer = await new Promise(function(resolve, reject) {
+      var fr = new FileReader();
+      fr.onload  = function(e){
+        console.log('[import] FileReader success, bytes:', e.target.result.byteLength);
+        resolve(e.target.result);
+      };
+      fr.onerror = function(e){
+        console.error('[import] FileReader error:', fr.error);
+        reject(new Error('FileReader error: ' + (fr.error ? (fr.error.message || fr.error.name) : 'unknown')));
+      };
+      fr.onprogress = function(e){ console.log('[import] progress:', e.loaded, '/', e.total); };
+      fr.readAsArrayBuffer(file);
+    });
+    toast('📂 Step 2: File read OK (' + Math.round(fileBuffer.byteLength/1024) + ' KB), processing…');
+    console.log('[import] buffer ready, ext:', ext, 'mime:', mime);
+  } catch(readErr) {
+    console.error('[import] read failed:', readErr);
+    showImportError('Could not read file into memory.\n\nError: ' + readErr.message + '\n\nFile: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)\n\nTry: right-click the file → Properties → check it is not blocked by Windows security.');
+    try { event.target.value = ''; } catch(e) {}
+    return;
+  }
 
   try {
     var text = '';
 
     if(ext === 'xlsx' || ext === 'xls') {
       // ── Excel ──────────────────────────────────────────────────────────────
-      var buf = await file.arrayBuffer();
+      var buf = fileBuffer;
       if(typeof XLSX === 'undefined') { toast('❌ Excel library not loaded'); return; }
       var wb = XLSX.read(buf, {type:'array'});
       var rows = [];
@@ -4249,13 +4277,17 @@ async function importFromFile(event){
     } else if(ext === 'docx' || ext === 'doc' ||
                mime.includes('wordprocessingml') || mime.includes('msword')) {
       // ── Word .doc / .docx — try mammoth first, fall back to raw XML ────────
-      var buf2 = await file.arrayBuffer();
+      var buf2 = fileBuffer;
+      console.log('[import] mammoth available:', typeof mammoth !== 'undefined');
+      toast('📂 Step 3: Extracting text from Word file…');
       if(typeof mammoth !== 'undefined') {
         try {
+          console.log('[import] calling mammoth.extractRawText, buf size:', buf2.byteLength);
           var mResult = await mammoth.extractRawText({arrayBuffer: buf2});
           text = mResult.value || '';
-          if(text.trim()) { toast('📄 Extracted text via mammoth…'); }
-        } catch(e) { text = ''; console.warn('[mammoth]', e); }
+          console.log('[import] mammoth result length:', text.length, 'messages:', mResult.messages);
+          if(text.trim()) { toast('📄 Step 4: Text extracted (' + text.length + ' chars), sending to AI…'); }
+        } catch(e) { console.warn('[mammoth] error:', e); text = ''; }
       } else {
         toast('⚠️ Word reader still loading — please try again in a moment.');
         return;
@@ -4276,12 +4308,8 @@ async function importFromFile(event){
 
     } else if(ext === 'pdf') {
       // ── PDF — extract visible text via AI OCR ──────────────────────────────
-      var b64 = await new Promise(function(res, rej){
-        var rd = new FileReader();
-        rd.onload = function(){ res(rd.result.split(',')[1]); };
-        rd.onerror = rej;
-        rd.readAsDataURL(file);
-      });
+      // Convert already-read buffer to base64
+      var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(fileBuffer)));
       toast('🤖 Extracting text from PDF…');
       var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -4299,13 +4327,13 @@ async function importFromFile(event){
 
     } else if(ext === 'html' || ext === 'htm') {
       // ── HTML — strip tags ───────────────────────────────────────────────────
-      var raw2 = await file.text();
+      var raw2 = new TextDecoder('utf-8', {fatal:false}).decode(new Uint8Array(fileBuffer));
       var tmp = document.createElement('div');
       tmp.innerHTML = raw2;
       text = tmp.innerText || tmp.textContent || '';
 
     } else if(ext === 'txt') {
-      text = await file.text();
+      text = new TextDecoder('utf-8', {fatal:false}).decode(new Uint8Array(fileBuffer));
 
     } else {
       toast('⚠️ Unsupported file type: .' + ext + '. Please use .docx, .xlsx, .pdf, .html, or .txt');
