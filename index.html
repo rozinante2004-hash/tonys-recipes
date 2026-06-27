@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v19.4 -->
+<!-- Tony's Recipes Collection v19.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v19.4';
+var APP_VERSION = 'v19.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1629,7 +1629,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .ing-amount { color: var(--terracotta); font-weight: 500; }
 .steps-list { list-style: none; }
 .steps-list li { display: flex; gap: 9px; margin-bottom: 9px; font-size: 13px; line-height: 1.6; align-items: flex-start; }
-.steps-list li.step-rtl { flex-direction: row-reverse; text-align: right; }
+.steps-list li.step-rtl { text-align: right; }
 .step-num { min-width: 22px; height: 22px; background: var(--terracotta); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; flex-shrink: 0; margin-top: 2px; }
 .step-text { flex: 1; }
 
@@ -2753,7 +2753,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3250,7 +3250,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3861,7 +3861,7 @@ function drawView(){
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
       <div class="modal-section-title">Method</div>
-      <ol class="steps-list">${r.steps.map((s,i)=>{
+      <ol class="steps-list" dir="auto">${r.steps.map((s,i)=>{
         const isHebrew = /[\u0590-\u05FF]/.test(s);
         const num = `<span class="step-num">${i+1}</span>`;
         const txt = `<span class="step-text">${s}</span>`;
