@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v19.3 -->
+<!-- Tony's Recipes Collection v19.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v19.3';
+var APP_VERSION = 'v19.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1379,6 +1379,47 @@ function checkAppVersion() {
 }
 window.checkAppVersion = checkAppVersion;
 
+
+
+// ─── NATIVE FILE PICKER (File System Access API) ─────────────────────────────
+// Uses showOpenFilePicker which bypasses Chrome's file input sandbox on Linux
+async function importViaFilePicker() {
+  if(!window.showOpenFilePicker) {
+    toast('⚠️ Native file picker not supported in this browser. Try Firefox instead.');
+    return;
+  }
+  try {
+    var handles = await window.showOpenFilePicker({
+      types: [
+        { description: 'Recipe files', accept: {
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+          'application/msword': ['.doc'],
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+          'application/pdf': ['.pdf'],
+          'text/html': ['.html', '.htm'],
+          'text/plain': ['.txt'],
+        }}
+      ],
+      multiple: false
+    });
+    if(!handles || !handles.length) return;
+    var fileHandle = handles[0];
+    toast('📂 Getting file via native picker…');
+    var file = await fileHandle.getFile();
+    console.log('[picker] file:', file.name, 'size:', file.size, 'type:', file.type);
+    if(file.size === 0) {
+      showImportError('File still reports 0 bytes via native picker.\n\nPlease try:\n1. Open the file in LibreOffice\n2. File → Save As → Word 2007-365 (.docx)\n3. Import the new .docx file\n\nOr copy the recipe text and use ✍️ Free-hand text import.');
+      return;
+    }
+    // Reuse importFromFile with synthetic event
+    await importFromFile({ target: { files: [file], value: '' } });
+  } catch(err) {
+    if(err.name === 'AbortError') return; // user cancelled
+    toast('❌ File picker error: ' + err.message);
+    console.error('[picker]', err);
+  }
+}
+window.importViaFilePicker = importViaFilePicker;
 
 // ─── FILE DROP ZONE ───────────────────────────────────────────────────────────
 function openDropZone() {
@@ -2712,7 +2753,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2761,6 +2802,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('importExportDrop');openCameraImport()">📷 Scan (camera)</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span style="font-size:10px;color:var(--muted);">.docx .xlsx .pdf .html</span></button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span style="font-size:10px;color:var(--muted);">drag & drop</span></button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');importViaFilePicker()">🗂️ Native File Picker <span style="font-size:10px;color:var(--muted);">Linux fix</span></button>
           <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
           <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllExcel()">📊 All to Excel</button>
@@ -3208,7 +3250,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
