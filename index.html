@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v17.7 -->
+<!-- Tony's Recipes Collection v17.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -748,6 +748,27 @@ const SELF_TESTS = [
       if(typeof aiTagAllDiets!=='function') throw new Error('aiTagAllDiets not defined');
     }
   },
+  { id:'import_file',     group:'Import/Export', name:'From File import function exists',
+    test: async()=>{
+      if(typeof importFromFile!=='function') throw new Error('importFromFile not defined');
+      const el = document.getElementById('fileIn');
+      if(!el) throw new Error('#fileIn input element missing');
+      const accept = el.getAttribute('accept')||'';
+      if(!accept.includes('.docx')) throw new Error('fileIn does not accept .docx');
+      if(!accept.includes('.xlsx')) throw new Error('fileIn does not accept .xlsx');
+      if(!accept.includes('.pdf'))  throw new Error('fileIn does not accept .pdf');
+    }
+  },
+  { id:'share_modal',     group:'Features', name:'Share recipe modal exists',
+    test: async()=>{
+      if(typeof toggleShare!=='function') throw new Error('toggleShare not defined');
+      const o = document.getElementById('shareRecipeOverlay');
+      if(!o) throw new Error('#shareRecipeOverlay not found');
+      if(!document.getElementById('shareWaBtn'))   throw new Error('#shareWaBtn missing');
+      if(!document.getElementById('shareMailBtn'))  throw new Error('#shareMailBtn missing');
+      if(!document.getElementById('shareCopyBtn'))  throw new Error('#shareCopyBtn missing');
+    }
+  },
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -917,6 +938,8 @@ var SELF_TEST_FIXES = {
   export_word:     { fix:'exportAllWord not defined. Check the function is in the main script block.', autofix: null },
   import_save_recipe:{ fix:'saveRecipe not defined. Check the function is in the main script block.', autofix: null },
   feat_autotag:    { fix:'aiTagAllDiets not defined. Check the function is in the main script block.', autofix: null },
+  import_file:     { fix:'importFromFile not defined or #fileIn input missing. Check the merged file import was applied correctly.', autofix: null },
+  share_modal:     { fix:'shareRecipeOverlay or share buttons missing. Check the share recipe modal HTML is present.', autofix: null },
 };
 
 function showSelfTestDetail(testId) {
@@ -2416,7 +2439,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.7</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2461,8 +2484,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('importExportDrop');openUrlImportModal()">🔗 From URL</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');openFreehandModal()">✍️ Free-hand text</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');openCameraImport()">📷 Scan (camera)</button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('xlsxIn').click()">📊 From Excel</button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('docxIn').click()">📄 From Word</button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span style="font-size:10px;color:var(--muted);">.docx .xlsx .pdf .html</span></button>
           <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
           <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllExcel()">📊 All to Excel</button>
@@ -2492,8 +2514,7 @@ body.banner-shown .header {
 
 <!-- Hidden file inputs -->
 <input type="file" id="backupRestoreInput" accept=".json" style="display:none" onchange="backupRestoreFile(event)">
-<input type="file" id="xlsxIn" accept=".xlsx,.xls" style="display:none" onchange="importExcel(event)">
-<input type="file" id="docxIn" accept=".docx" style="display:none" onchange="importWord(event)">
+<input type="file" id="fileIn" accept=".xlsx,.xls,.docx,.doc,.pdf,.html,.htm,.txt" style="display:none" onchange="importFromFile(event)">
 <input type="file" id="heroPhotoIn" accept="image/*" style="display:none" onchange="heroPhotoChanged(event)">
 
 <!-- search moved into header -->
@@ -2897,7 +2918,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3530,21 +3551,31 @@ function drawView(){
         ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
       ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><img src="${r.originalPhoto}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
-      <div class="share-panel" id="sp${r.id}">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:5px;">Share this recipe:</div>
-        <div class="share-links">
-          <span class="share-link share-mail" onclick="doEmail(${r.id})">✉️ Email</span>
-          <span class="share-link share-whatsapp" onclick="doWhatsApp(${r.id})">💬 WhatsApp</span>
-          <span class="share-link share-copy" onclick="doCopy(${r.id})">📋 Copy</span>
-        </div>
-      </div>
+      
     </div>`;
   document.getElementById('viewOverlay').classList.add('open');
 }
 
 function setMult(m){viewMult=m;drawView();}
 function setUnit(u){viewUnit=u;drawView();}
-function toggleShare(id){const p=document.getElementById('sp'+id);if(p)p.classList.toggle('open');}
+function toggleShare(id){
+  var r=recipes.find(function(x){return x.id===id;});
+  if(!r) return;
+  document.getElementById('shareModalTitle').textContent = r.name;
+  document.getElementById('shareMailBtn').onclick   = function(){ doEmail(id); };
+  document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
+  document.getElementById('shareCopyBtn').onclick   = function(){ doCopy(id); };
+  if(navigator.share){
+    document.getElementById('shareNativeBtn').style.display='flex';
+    document.getElementById('shareNativeBtn').onclick = function(){
+      navigator.share({title: r.name, text: rText(r)}).catch(function(){});
+    };
+  } else {
+    document.getElementById('shareNativeBtn').style.display='none';
+  }
+  document.getElementById('shareRecipeOverlay').classList.add('open');
+}
+window.toggleShare = toggleShare;
 
 // Photo change from inside view modal
 function changeHeroPhoto(id){
@@ -3701,8 +3732,11 @@ function scaleAmt(amt,mult){
 function rText(r){
   let t=`🍴 ${r.name}\n`;
   t+=`Category: ${r.category} | Difficulty: ${r.difficulty} | Prep: ${r.prep} | Servings: ${r.servings}\n\n`;
+  if(r.diets&&r.diets.length) t+=`Diet: ${r.diets.join(', ')}\n\n`;
   t+=`INGREDIENTS:\n${r.ingredients.map(i=>`• ${i.a} ${i.n}`).join('\n')}\n\n`;
   t+=`METHOD:\n${r.steps.map((s,i)=>`${i+1}. ${s}`).join('\n')}`;
+  if(r.notes&&r.notes.trim()) t+=`\n\nNOTES:\n${r.notes.trim()}`;
+  if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
 }
 function doEmail(id){const r=recipes.find(x=>x.id===id);window.open(`mailto:?subject=${encodeURIComponent(r.name)}&body=${encodeURIComponent(rText(r))}`);}
@@ -3754,39 +3788,6 @@ function exportAllExcel(){
   });
   downloadExcelWb(wb,'Tonys_Recipes_Collection.xlsx');
   toast(`📊 Exported ${recipes.length} recipes to Excel!`);
-}
-function importExcel(event){
-  const file=event.target.files[0];if(!file)return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      let n=0;
-      wb.SheetNames.forEach(sn=>{
-        if(sn==='All Recipes')return;
-        const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
-        const name=(rows[0]||[])[1]||sn;
-        const cat=(rows[1]||[])[1]||'Dinner';
-        const diff=(rows[2]||[])[1]||'Medium';
-        const prep=(rows[3]||[])[1]||'';
-        const srv=(rows[4]||[])[1]||'';
-        let ings=[],steps=[];
-        let i=8;
-        while(i<rows.length&&rows[i][0]!==''&&rows[i][0]!=='METHOD'){
-          if(rows[i][0]&&rows[i][1])ings.push({a:String(rows[i][0]),n:String(rows[i][1])});i++;
-        }
-        const mi=rows.findIndex(r=>r[0]==='METHOD');
-        if(mi>=0)for(let j=mi+1;j<rows.length;j++)if(rows[j][1])steps.push(String(rows[j][1]));
-        if(!name||recipes.find(r=>r.name.toLowerCase()===name.toLowerCase()))return;
-        recipes.unshift({id:nextId++,name,emoji:rndEmoji(),photo:'',category:cat,difficulty:diff,prep,servings:srv,bg:rndBg(),fav:false,
-          ingredients:ings.length?ings:[{a:'',n:'See notes'}],steps:steps.length?steps:['See notes']});
-        n++;
-      });
-      renderGrid();saveData();toast(n?`✅ Imported ${n} recipe(s)!`:'No new recipes found');
-    }catch{toast('❌ Could not read Excel file');}
-    event.target.value='';
-  };
-  rd.readAsArrayBuffer(file);
 }
 
 // ═══════════════════════════════════
@@ -3976,27 +3977,137 @@ function exportAllWord(){
 // ═══════════════════════════════════
 // WORD IMPORT
 // ═══════════════════════════════════
-function importWord(event){
-  const file=event.target.files[0];if(!file)return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    try{
-      // Extract raw XML text from docx ZIP
-      const bytes=new Uint8Array(e.target.result);
-      const raw=new TextDecoder('utf-8',{fatal:false}).decode(bytes);
-      // Pull text content between <w:t> tags
-      const texts=[...raw.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m=>m[1]);
-      if(!texts.length){toast('⚠️ Could not extract text from this Word file.');event.target.value='';return;}
-      const fullText=texts.join('\n');
-      const imported=parseWordText(fullText);
-      renderGrid();
-      saveData();
-      toast(imported?`✅ Imported ${imported} recipe(s) from Word!`:'No recognisable recipes found. Tip: import files exported from this app.');
-    }catch(err){toast('❌ Could not read Word file: '+err.message);}
-    event.target.value='';
-  };
-  rd.readAsArrayBuffer(file);
+async function importFromFile(event){
+  var file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  var name = file.name.toLowerCase();
+  var ext  = name.split('.').pop();
+  toast('📂 Reading ' + file.name + '…');
+
+  try {
+    var text = '';
+
+    if(ext === 'xlsx' || ext === 'xls') {
+      // ── Excel ──────────────────────────────────────────────────────────────
+      var buf = await file.arrayBuffer();
+      if(typeof XLSX === 'undefined') { toast('❌ Excel library not loaded'); return; }
+      var wb = XLSX.read(buf, {type:'array'});
+      var rows = [];
+      wb.SheetNames.forEach(function(sn){
+        var ws = wb.Sheets[sn];
+        var data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        data.forEach(function(r){ rows.push(r.join(' | ')); });
+        rows.push('---');
+      });
+      text = rows.join('\n');
+
+    } else if(ext === 'docx') {
+      // ── Word .docx (ZIP XML) ────────────────────────────────────────────────
+      var buf2 = await file.arrayBuffer();
+      var bytes = new Uint8Array(buf2);
+      var raw = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+      var texts = [...raw.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(function(m){return m[1];});
+      if(!texts.length) throw new Error('Could not extract text from this .docx file. Make sure it is a valid Word document (not .doc format).');
+      text = texts.join('\n');
+
+    } else if(ext === 'doc') {
+      // ── Legacy .doc — not supported (binary format) ─────────────────────────
+      toast('⚠️ Old .doc format is not supported. Please open the file in Word and save as .docx, then try again.');
+      return;
+
+    } else if(ext === 'pdf') {
+      // ── PDF — extract visible text via AI OCR ──────────────────────────────
+      var b64 = await new Promise(function(res, rej){
+        var rd = new FileReader();
+        rd.onload = function(){ res(rd.result.split(',')[1]); };
+        rd.onerror = rej;
+        rd.readAsDataURL(file);
+      });
+      toast('🤖 Extracting text from PDF…');
+      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model:'claude-sonnet-4-6', max_tokens:2000,
+          messages:[{role:'user', content:[
+            {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
+            {type:'text', text:'Extract all recipe text from this document. Return the full text exactly as it appears, preserving all ingredient lists and method steps. Keep the original language — do NOT translate.'}
+          ]}]
+        })
+      });
+      var d = await resp.json();
+      text = (d.content||[]).map(function(c){return c.text||'';}).join('\n');
+      if(!text.trim()) throw new Error('Could not extract text from PDF.');
+
+    } else if(ext === 'html' || ext === 'htm') {
+      // ── HTML — strip tags ───────────────────────────────────────────────────
+      var raw2 = await file.text();
+      var tmp = document.createElement('div');
+      tmp.innerHTML = raw2;
+      text = tmp.innerText || tmp.textContent || '';
+
+    } else if(ext === 'txt') {
+      text = await file.text();
+
+    } else {
+      toast('⚠️ Unsupported file type: .' + ext + '. Please use .docx, .xlsx, .pdf, .html, or .txt');
+      return;
+    }
+
+    if(!text || !text.trim()){ toast('⚠️ No text could be extracted from this file.'); return; }
+
+    // Send to AI for recipe extraction
+    toast('🤖 Extracting recipe with AI…');
+    var aiText = await aiCall(
+      'Extract all recipes from the following text. For each recipe return a JSON object with fields: name, category (one of: Breakfast/Lunch/Dinner/Snack/Dessert/Soup), difficulty (Easy/Medium/Hard), prep (e.g. "30 min"), servings (e.g. "4"), ingredients (array of {a: amount, n: name}), steps (array of strings), notes (string). Return a JSON array. Keep the original language — do NOT translate.\n\nTEXT:\n' + text.slice(0, 8000),
+      2000
+    );
+
+    var parsed;
+    try {
+      var clean = aiText.replace(/```json|```/g,'').trim();
+      parsed = JSON.parse(clean);
+      if(!Array.isArray(parsed)) parsed = [parsed];
+    } catch(e) {
+      throw new Error('AI could not parse a recipe from this file. Try the Free-hand text import instead.');
+    }
+
+    var count = 0;
+    parsed.forEach(function(rec){
+      if(!rec.name) return;
+      recipes.unshift({
+        id: nextId++, bg: rndBg(), fav: false,
+        name:        rec.name        || '',
+        emoji:       rec.emoji       || '🍽️',
+        category:    rec.category    || 'Dinner',
+        difficulty:  rec.difficulty  || 'Medium',
+        prep:        rec.prep        || '—',
+        servings:    rec.servings    || '4',
+        ingredients: rec.ingredients || [],
+        steps:       rec.steps       || [],
+        notes:       rec.notes       || '',
+        diets:       rec.diets       || [],
+        source:      file.name,
+        photo:       '', originalPhoto: '',
+        isClip:      false, isVideoBookmark: false,
+        updatedAt:   Date.now()
+      });
+      count++;
+    });
+
+    if(count > 0){
+      saveData(); renderGrid(); resetFilters(); renderFilters();
+      toast('✅ Imported ' + count + ' recipe(s) from ' + file.name + '!');
+    } else {
+      toast('⚠️ No recipes found in this file. Try Free-hand text import.');
+    }
+
+  } catch(err) {
+    toast('❌ Import failed: ' + err.message);
+    console.error('[importFromFile]', err);
+  }
 }
+window.importFromFile = importFromFile;
 
 function parseWordText(text){
   // Split on recipe headings: lines that contain an emoji followed by a name (our export format)
@@ -6637,6 +6748,34 @@ function updateFilterBarTop() {
         <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" class="deploy-link">▶️ YouTube API quota <span class="deploy-hint">10,000 units/day free</span></a>
       </div>
 
+    </div>
+  </div>
+</div>
+
+
+<!-- SHARE RECIPE MODAL -->
+<div class="modal-overlay" id="shareRecipeOverlay" onclick="bgClose(event,'shareRecipeOverlay')">
+  <div class="modal" style="max-width:380px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('shareRecipeOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">📤 Share Recipe</div>
+      <div id="shareModalTitle" style="font-size:13px;color:var(--muted);margin-top:3px;"></div>
+    </div>
+    <div class="modal-body" style="padding:8px 16px 20px;display:flex;flex-direction:column;gap:10px;">
+      <button id="shareNativeBtn" style="display:none;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+        <span style="font-size:20px;">📲</span> Share via…
+      </button>
+      <button id="shareWaBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#25D366;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+        <span style="font-size:20px;">💬</span> Share on WhatsApp
+      </button>
+      <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#4A90D9;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+        <span style="font-size:20px;">✉️</span> Send by Email
+      </button>
+      <button id="shareCopyBtn" onclick="closeM('shareRecipeOverlay')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+        <span style="font-size:20px;">📋</span> Copy to Clipboard
+      </button>
     </div>
   </div>
 </div>
