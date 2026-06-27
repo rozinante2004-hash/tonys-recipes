@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v17.9 -->
+<!-- Tony's Recipes Collection v18.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,7 +110,7 @@
             } catch(e) { console.warn('Firestore error:', e); }
             _autoLoginTimer = null;
             if (typeof setDriveStatus === 'function')
-              setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
+              setDriveStatus('synced', '☁️ Shared · ' + (user.displayName || user.email));
           }, delay);
         } else {
           // User signed out or auth cleared — unsubscribe Firestore listener immediately
@@ -610,7 +610,7 @@ const SELF_TESTS = [
       if(!window._fbUser) throw new Error('Not signed in to Firebase — sign in first');
       if(!window._fbDb)   throw new Error('Firestore not initialised');
       // Try a lightweight read
-      const snap=await window._fbDb.collection('users').doc(window._fbUser.uid).get();
+      const snap=await window._fbDb.collection('shared').doc('recipes').get();
       if(!snap) throw new Error('Firestore read returned nothing');
     }
   },
@@ -2605,7 +2605,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.9</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3100,7 +3100,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v17.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5301,7 +5301,7 @@ async function saveToFirestore() {
   setDriveStatus('syncing', '☁️ Saving...');
   try {
     window._justSaved = true;
-    await _fbDb.collection('users').doc(user.uid).set({
+    await _fbDb.collection('shared').doc('recipes').set({
       recipes: JSON.stringify(recipes), nextId: nextId,
       updatedAt: new Date().toISOString()
     });
@@ -5336,7 +5336,7 @@ async function loadFromFirestore() {
   if (!user) return false;
   try {
     // Step 1: One-time load to get current data
-    var snap = await _fbDb.collection('users').doc(user.uid).get();
+    var snap = await _fbDb.collection('shared').doc('recipes').get();
     var hasData = false;
     if (snap.exists) {
       var data = snap.data();
@@ -5379,7 +5379,7 @@ async function loadFromFirestore() {
     // Use a flag to skip the first snapshot (which echoes the current state)
     if (_firestoreUnsubscribe) _firestoreUnsubscribe();
     var isFirstSnapshot = true;
-    _firestoreUnsubscribe = _fbDb.collection('users').doc(user.uid)
+    _firestoreUnsubscribe = _fbDb.collection('shared').doc('recipes')
       .onSnapshot({includeMetadataChanges: false}, function(docSnap) {
         // Skip the first snapshot — it always fires immediately with current data
         if (isFirstSnapshot) { isFirstSnapshot = false; return; }
@@ -5620,8 +5620,9 @@ async function clearAllData() {
   localStorage.removeItem(NEXTID_KEY);
   if (window._driveMode && window._fbUser && _fbDb) {
     try {
-      await _fbDb.collection('users').doc(window._fbUser.uid).delete();
-    } catch(e) { console.warn('Firestore delete failed:', e); }
+      // Shared collection — sign-out does NOT delete data
+      // (recipes belong to the family, not the individual user)
+    } catch(e) { console.warn('Sign-out cleanup error:', e); }
   }
   location.reload();
 }
@@ -7010,7 +7011,9 @@ function updateFilterBarTop() {
       <!-- How it works note -->
       <div style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
         <div style="font-size:12px;color:#2255AA;line-height:1.6;">
-          <strong>How it works:</strong> Family members sign in with their own Google account at the same URL. They'll see your recipes in real-time and any changes sync instantly — just like your PC↔iPhone sync. Access is controlled here and enforced via Firestore security rules.
+          <strong>How it works:</strong> Family members sign in with their own Google account at the same URL: <strong>rozinante2004-hash.github.io/tonys-recipes/</strong><br><br>
+        All accounts read and write to the <strong>same shared recipe collection</strong> — changes sync in real-time across everyone's devices, just like your PC↔iPhone sync today.<br><br>
+        After adding members below, tap <em>"Show Firestore security rules"</em>, copy the rules, and paste them into Firebase Console to activate access.
         </div>
       </div>
 
