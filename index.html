@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v19.6 -->
+<!-- Tony's Recipes Collection v20.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v19.6';
+var APP_VERSION = 'v20.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1470,6 +1470,171 @@ async function handleFileDrop(event) {
   await importFromFile(syntheticEvent);
 }
 window.handleFileDrop = handleFileDrop;
+
+
+// ─── EMAIL MODAL ──────────────────────────────────────────────────────────────
+function rHtml(r) {
+  // Build beautiful HTML email body
+  var photo = r.photo ? '<img src="' + r.photo + '" alt="' + r.name + '" style="width:100%;max-height:320px;object-fit:cover;border-radius:0;">' : '';
+  var emojiBlock = !r.photo ? '<div style="font-size:80px;text-align:center;padding:32px 0;background:' + (r.bg||'#FFF0E8') + ';">' + (r.emoji||'🍽️') + '</div>' : '';
+
+  var dietTags = (r.diets && r.diets.length)
+    ? r.diets.map(function(d){ return '<span style="display:inline-block;padding:3px 10px;background:#E8F5E9;color:#2E7D32;border-radius:12px;font-size:12px;font-weight:600;margin:2px;">' + d + '</span>'; }).join(' ')
+    : '';
+
+  var ingredients = r.ingredients.map(function(i){
+    return '<tr><td style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;">' + (i.a||'') + '</td>' +
+           '<td style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;">' + (i.n||'') + '</td></tr>';
+  }).join('');
+
+  var steps = r.steps.map(function(s, i){
+    var isHeb = /[א-ת]/.test(s);
+    var dir = isHeb ? 'rtl' : 'ltr';
+    return '<tr><td style="padding:0 12px 0 0;vertical-align:top;' + (isHeb?'padding:0 0 0 12px;':'') + '">' +
+      '<div style="width:28px;height:28px;border-radius:50%;background:#C1440E;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;text-align:center;line-height:28px;">' + (i+1) + '</div>' +
+      '</td><td dir="' + dir + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';">' + s + '</td></tr>';
+  }).join('');
+
+  var notesBlock = r.notes ? '<div style="margin:24px 0 0;padding:16px;background:#FFFBEB;border-left:4px solid #D4A843;border-radius:0 8px 8px 0;">' +
+    '<div style="font-size:12px;font-weight:700;color:#8B6914;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Notes</div>' +
+    '<div style="font-size:14px;color:#1C1A18;line-height:1.6;">' + r.notes + '</div></div>' : '';
+
+  var sourceBlock = r.source ? '<div style="margin-top:8px;font-size:12px;color:#8A8279;">Source: <a href="' + r.source + '" style="color:#C1440E;">' + r.source + '</a></div>' : '';
+
+  var metaItems = [
+    r.category ? '🍽 ' + r.category : '',
+    r.difficulty ? '📊 ' + r.difficulty : '',
+    r.prep ? '⏱ ' + r.prep : '',
+    r.servings ? '👥 ' + r.servings + ' servings' : '',
+  ].filter(Boolean);
+
+  var html = [
+    '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#F5F0EA;font-family:Georgia,serif;">',
+    '<div style="max-width:580px;margin:0 auto;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">',
+
+    // Hero photo or emoji
+    photo || emojiBlock,
+
+    // Header band
+    '<div style="background:#5C3D2E;padding:24px 32px;">',
+    '<div style="font-size:28px;font-weight:700;color:#FFFFFF;font-family:Georgia,serif;line-height:1.3;">' + r.name + '</div>',
+    dietTags ? '<div style="margin-top:10px;">' + dietTags + '</div>' : '',
+    '</div>',
+
+    // Meta row
+    '<div style="background:#FAF7F2;padding:14px 32px;border-bottom:1px solid #E8E0D5;display:flex;flex-wrap:wrap;gap:16px;">',
+    metaItems.map(function(m){ return '<span style="font-size:13px;color:#5C3D2E;font-weight:600;">' + m + '</span>'; }).join('<span style="color:#E8E0D5;">|</span>'),
+    '</div>',
+
+    // Body
+    '<div style="padding:28px 32px;">',
+
+    // Ingredients
+    '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#C1440E;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #C1440E;">Ingredients</div>',
+    '<table style="border-collapse:collapse;width:100%;">' + ingredients + '</table>',
+
+    // Method
+    '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#C1440E;margin:28px 0 14px;padding-bottom:8px;border-bottom:2px solid #C1440E;">Method</div>',
+    '<table style="border-collapse:collapse;width:100%;">' + steps + '</table>',
+
+    notesBlock,
+    '</div>',
+
+    // Footer
+    '<div style="background:#5C3D2E;padding:16px 32px;text-align:center;">',
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);">Shared from <span style="color:#D4A843;font-weight:600;">Tony\u2019s Recipes Collection</span></div>',
+    sourceBlock ? '<div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,0.4);">' + (r.source ? 'Source: ' + r.source : '') + '</div>' : '',
+    '</div>',
+
+    '</div></body></html>'
+  ].join('\n');
+
+  return html;
+}
+
+function showEmailModal(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if(!r) return;
+  var htmlBody = rHtml(r);
+  var plainText = rText(r);
+
+  var existing = document.getElementById('emailModalOverlay');
+  if(existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'emailModalOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+  var card = document.createElement('div');
+  card.style.cssText = 'background:white;border-radius:14px;padding:20px;max-width:560px;width:100%;font-family:DM Sans,sans-serif;max-height:90vh;display:flex;flex-direction:column;gap:12px;';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:16px;font-weight:700;color:#1C1A18;';
+  title.textContent = '✉️ Email: ' + r.name;
+
+  var subjectRow = document.createElement('div');
+  subjectRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  var subjectLabel = document.createElement('span');
+  subjectLabel.style.cssText = 'font-size:12px;font-weight:600;color:#5C3D2E;white-space:nowrap;';
+  subjectLabel.textContent = 'Subject:';
+  var subjectInput = document.createElement('input');
+  subjectInput.type = 'text';
+  subjectInput.value = '🍴 ' + r.name + ' — Recipe';
+  subjectInput.style.cssText = 'flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;outline:none;';
+  subjectRow.appendChild(subjectLabel);
+  subjectRow.appendChild(subjectInput);
+
+  // Preview iframe
+  var previewWrap = document.createElement('div');
+  previewWrap.style.cssText = 'flex:1;border:1px solid #E8E0D5;border-radius:8px;overflow:hidden;min-height:280px;';
+  var iframe = document.createElement('iframe');
+  iframe.style.cssText = 'width:100%;height:320px;border:none;';
+  iframe.srcdoc = htmlBody;
+  previewWrap.appendChild(iframe);
+
+  var hint = document.createElement('div');
+  hint.style.cssText = 'font-size:11px;color:#8A8279;text-align:center;';
+  hint.textContent = 'Preview of your email — click Open Gmail to send';
+
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;';
+
+  var gmailBtn = document.createElement('button');
+  gmailBtn.style.cssText = 'flex:2;padding:11px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  gmailBtn.textContent = '📧 Open Gmail';
+  gmailBtn.onclick = function(){
+    var subject = encodeURIComponent(subjectInput.value);
+    var body    = encodeURIComponent(plainText);
+    var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&su=' + subject + '&body=' + body;
+    window.open(gmailUrl, '_blank');
+  };
+
+  var copyBtn = document.createElement('button');
+  copyBtn.style.cssText = 'flex:1;padding:11px;background:#5C3D2E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  copyBtn.textContent = '📋 Copy Text';
+  copyBtn.onclick = function(){
+    navigator.clipboard.writeText(plainText).then(function(){ copyBtn.textContent = '✅ Copied!'; setTimeout(function(){ copyBtn.textContent = '📋 Copy Text'; }, 2000); });
+  };
+
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'padding:11px 14px;background:#F0EBE4;color:#5C3D2E;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = function(){ overlay.remove(); };
+
+  btnRow.appendChild(gmailBtn);
+  btnRow.appendChild(copyBtn);
+  btnRow.appendChild(closeBtn);
+
+  card.appendChild(title);
+  card.appendChild(subjectRow);
+  card.appendChild(previewWrap);
+  card.appendChild(hint);
+  card.appendChild(btnRow);
+  overlay.appendChild(card);
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+window.showEmailModal = showEmailModal;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -2753,7 +2918,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v19.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -2802,7 +2967,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('importExportDrop');openCameraImport()">📷 Scan (camera)</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span style="font-size:10px;color:var(--muted);">.docx .xlsx .pdf .html</span></button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span style="font-size:10px;color:var(--muted);">drag & drop</span></button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');importViaFilePicker()">🗂️ Native File Picker <span style="font-size:10px;color:var(--muted);">Linux fix</span></button>
+
           <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
           <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllExcel()">📊 All to Excel</button>
@@ -3250,7 +3415,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v19.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3894,7 +4059,10 @@ function toggleShare(id){
   var r=recipes.find(function(x){return x.id===id;});
   if(!r) return;
   document.getElementById('shareModalTitle').textContent = r.name;
-  document.getElementById('shareMailBtn').onclick   = function(){ doEmail(id); };
+  document.getElementById('shareMailBtn').onclick   = function(){
+    closeM('shareRecipeOverlay');
+    showEmailModal(id);
+  };
   document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
   document.getElementById('shareCopyBtn').onclick   = function(){ doCopy(id); };
   if(navigator.share){
@@ -4071,7 +4239,12 @@ function rText(r){
   if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
 }
-function doEmail(id){const r=recipes.find(x=>x.id===id);window.open(`mailto:?subject=${encodeURIComponent(r.name)}&body=${encodeURIComponent(rText(r))}`);}
+function doEmail(id){
+  var r=recipes.find(x=>x.id===id);
+  if(!r) return;
+  // Always show the email modal — it has Gmail compose + copy options
+  showEmailModal(id);
+}
 function doWhatsApp(id){const r=recipes.find(x=>x.id===id);window.open(`https://wa.me/?text=${encodeURIComponent(rText(r))}`);}
 function doCopy(id){navigator.clipboard.writeText(rText(recipes.find(x=>x.id===id))).then(()=>toast('📋 Copied!'));}
 
@@ -7282,6 +7455,7 @@ function updateFilterBarTop() {
       </button>
       <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#4A90D9;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
         <span style="font-size:20px;">✉️</span> Send by Email
+        <span style="font-size:11px;opacity:0.8;">(copy & paste)</span>
       </button>
       <button id="shareCopyBtn" onclick="closeM('shareRecipeOverlay')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
         <span style="font-size:20px;">📋</span> Copy to Clipboard
