@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.0 -->
+<!-- Tony's Recipes Collection v18.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2605,7 +2605,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3100,7 +3100,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5315,7 +5315,7 @@ async function saveToFirestore() {
     // Queue for retry when back online
     _offlineQueue = true;
     if (fbErr.includes('quota') || fbErr.includes('RESOURCE_EXHAUSTED')) {
-      showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/project/recipes-f379d/firestore\n\nUpgrade at: https://console.firebase.google.com/project/recipes-f379d/overview');
+      showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data\n\nUpgrade at: https://console.firebase.google.com/u/0/project/recipes-f379d/overview');
     } else {
       toast('❌ Cloud sync failed — will retry automatically when connection is restored');
       // Schedule automatic retry in 30 seconds
@@ -6903,8 +6903,8 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Cloud database & authentication — stores your recipes in the cloud so they sync across all devices, and handles Google sign-in</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.firebase.google.com/project/recipes-f379d/firestore" target="_blank" class="deploy-link">🗄️ Firestore database <span class="deploy-hint">recipes-f379d</span></a>
-        <a href="https://console.firebase.google.com/project/recipes-f379d/overview" target="_blank" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
+        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data" target="_blank" class="deploy-link">🗄️ Firestore database <span class="deploy-hint">recipes-f379d</span></a>
+        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/overview" target="_blank" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -7021,7 +7021,7 @@ function updateFilterBarTop() {
       <div style="margin-top:10px;">
         <button onclick="toggleAccessRules()" style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;padding:4px 0;font-family:'DM Sans',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:8px;">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Copy these rules to <a href="https://console.firebase.google.com/project/recipes-f379d/firestore/rules" target="_blank" style="color:var(--terracotta);">Firebase Console → Firestore → Rules</a></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" style="color:var(--terracotta);">Firebase Console → Firestore → Rules</a></div>
           <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
           <button onclick="copyAccessRules()" style="margin-top:6px;padding:6px 14px;background:var(--warm-brown);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy Rules</button>
         </div>
