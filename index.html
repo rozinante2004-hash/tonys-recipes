@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.2 -->
+<!-- Tony's Recipes Collection v20.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1334,7 +1334,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.2';
+var APP_VERSION = 'v20.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1616,12 +1616,13 @@ function showEmailModal(id) {
   var gmailBtn = document.createElement('button');
   gmailBtn.style.cssText = 'flex:2;padding:11px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
   gmailBtn.textContent = '📧 Send Email';
+  gmailBtn.title = 'Will ask for Gmail permission on first use';
   gmailBtn.onclick = async function(){
     var to      = toInput.value.trim();
     var subject = subjectInput.value.trim();
     if(!to) { toast('⚠️ Please enter a recipient email address'); toInput.focus(); return; }
     if(!subject) subject = r.name;
-    gmailBtn.textContent = '⏳ Sending…';
+    gmailBtn.textContent = '🔐 Authorising…';
     gmailBtn.disabled = true;
     try {
       await sendViaGmailApi(to, subject, htmlBody, plainText);
@@ -1692,20 +1693,24 @@ window.showGmailPasteHint = showGmailPasteHint;
 
 // ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
 async function sendViaGmailApi(to, subject, htmlBody, plainText) {
-  // Get fresh access token — re-authenticate silently if needed
-  var token = window._googleAccessToken;
-  if(!token) {
-    try {
-      var result = await _fbAuth.currentUser.getIdToken(true);
-      // Re-sign-in silently to get Google OAuth token
-      var cred = await _fbAuth.signInWithPopup(_fbProvider);
-      token = cred.credential ? cred.credential.accessToken : null;
-      if(token) window._googleAccessToken = token;
-    } catch(e) {
-      throw new Error('Could not get Gmail access. Please sign out and sign in again.');
+  // Always get a fresh Google OAuth token via popup — most reliable approach
+  var token = null;
+  try {
+    // Create a provider specifically for this call with gmail scope
+    var gmailProvider = new firebase.auth.GoogleAuthProvider();
+    gmailProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+    // setCustomParameters to avoid full account picker if already signed in
+    gmailProvider.setCustomParameters({ login_hint: window._fbUser ? window._fbUser.email : '' });
+    var result = await _fbAuth.signInWithPopup(gmailProvider);
+    token = result.credential ? result.credential.accessToken : null;
+    if(token) window._googleAccessToken = token;
+  } catch(e) {
+    if(e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+      throw new Error('Gmail permission popup was closed. Please try again and click Allow.');
     }
+    throw new Error('Could not get Gmail access: ' + e.message);
   }
-  if(!token) throw new Error('No Gmail access token. Please sign out and sign in again to grant Gmail permission.');
+  if(!token) throw new Error('Gmail access token not received. Please try again.');
 
   // Build RFC 2822 MIME email
   var boundary = 'tony_recipes_' + Date.now();
@@ -3040,7 +3045,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.2</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3537,7 +3542,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
