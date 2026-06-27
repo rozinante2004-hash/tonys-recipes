@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.6 -->
+<!-- Tony's Recipes Collection v18.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v18.6';
+var APP_VERSION = 'v18.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2653,7 +2653,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3148,7 +3148,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4212,8 +4212,21 @@ async function importFromFile(event){
   event.target.value = '';
   if(!file) return;
   var name = file.name.toLowerCase();
-  var ext  = name.split('.').pop();
-  toast('📂 Reading ' + file.name + '…');
+  var ext  = name.includes('.') ? name.split('.').pop().trim() : '';
+  var mime = (file.type || '').toLowerCase();
+
+  // Also detect by MIME type in case extension is missing (common on Android)
+  if(!ext || ext === name) {
+    if(mime.includes('wordprocessingml') || mime.includes('msword')) ext = 'docx';
+    else if(mime.includes('spreadsheetml') || mime.includes('excel')) ext = 'xlsx';
+    else if(mime.includes('pdf')) ext = 'pdf';
+    else if(mime.includes('html')) ext = 'html';
+    else if(mime.includes('text')) ext = 'txt';
+  }
+  // Normalise: treat .doc MIME as doc
+  if(mime === 'application/msword' && ext !== 'docx') ext = 'doc';
+
+  toast('📂 Reading ' + file.name + ' (' + (ext||'?') + ')…');
 
   try {
     var text = '';
@@ -4232,61 +4245,33 @@ async function importFromFile(event){
       });
       text = rows.join('\n');
 
-    } else if(ext === 'docx') {
-      // ── Word .docx — try mammoth first, fall back to raw XML ───────────────
+    } else if(ext === 'docx' || ext === 'doc' ||
+               mime.includes('wordprocessingml') || mime.includes('msword')) {
+      // ── Word .doc / .docx — try mammoth first, fall back to raw XML ────────
       var buf2 = await file.arrayBuffer();
       if(typeof mammoth !== 'undefined') {
         try {
           var mResult = await mammoth.extractRawText({arrayBuffer: buf2});
           text = mResult.value || '';
-        } catch(e) { text = ''; }
-      }
-      if(!text.trim()) {
-        // Fall back to raw XML extraction
-        var bytes = new Uint8Array(buf2);
-        var raw = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
-        var texts = [...raw.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(function(m){return m[1];});
-        if(!texts.length) throw new Error('Could not extract text from this .docx file.');
-        text = texts.join('\n');
-      }
-
-    } else if(ext === 'doc') {
-      // ── Legacy .doc — use mammoth.js to extract text ─────────────────────────
-      if(typeof mammoth === 'undefined') {
-        toast('⚠️ Word reader not loaded yet. Please wait a moment and try again.');
+          if(text.trim()) { toast('📄 Extracted text via mammoth…'); }
+        } catch(e) { text = ''; console.warn('[mammoth]', e); }
+      } else {
+        toast('⚠️ Word reader still loading — please try again in a moment.');
         return;
       }
-      var buf3 = await file.arrayBuffer();
-      try {
-        var result = await mammoth.extractRawText({arrayBuffer: buf3});
-        text = result.value || '';
-        if(!text.trim()) throw new Error('No text extracted');
-      } catch(mammothErr) {
-        // mammoth may struggle with very old .doc binary format — fall back to AI
-        toast('⚠️ Could not read .doc directly — sending to AI for extraction…');
-        var b64doc = await new Promise(function(res, rej){
-          var rd = new FileReader();
-          rd.onload = function(){ res(rd.result.split(',')[1]); };
-          rd.onerror = rej;
-          rd.readAsDataURL(file);
-        });
-        var docResp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            model:'claude-sonnet-4-6', max_tokens:2000,
-            messages:[{role:'user', content:[
-              {type:'document', source:{type:'base64', media_type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document', data:b64doc}},
-              {type:'text', text:'Extract the full recipe text from this document. Keep the original language — do NOT translate.'}
-            ]}]
-          })
-        });
-        var docData = await docResp.json();
-        text = (docData.content||[]).map(function(c){return c.text||'';}).join('\n');
-        if(!text.trim()) {
-          toast('❌ Could not read this .doc file. Please open it in Word and save as .docx, then try again.');
-          return;
+      if(!text.trim()) {
+        // Fall back to raw XML extraction (works for .docx, not old .doc)
+        var bytes = new Uint8Array(buf2);
+        var raw = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+        var wTexts = [...raw.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(function(m){return m[1];});
+        if(wTexts.length) {
+          text = wTexts.join('\n');
+        } else {
+          throw new Error('Could not extract text. If this is an old .doc file, please open it in Word and save as .docx first.');
         }
       }
+
+
 
     } else if(ext === 'pdf') {
       // ── PDF — extract visible text via AI OCR ──────────────────────────────
