@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.3 -->
+<!-- Tony's Recipes Collection v20.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1334,7 +1334,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.3';
+var APP_VERSION = 'v20.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1622,7 +1622,7 @@ function showEmailModal(id) {
     var subject = subjectInput.value.trim();
     if(!to) { toast('⚠️ Please enter a recipient email address'); toInput.focus(); return; }
     if(!subject) subject = r.name;
-    gmailBtn.textContent = '🔐 Authorising…';
+    gmailBtn.textContent = '🔐 Requesting Gmail access…';
     gmailBtn.disabled = true;
     try {
       await sendViaGmailApi(to, subject, htmlBody, plainText);
@@ -1691,25 +1691,71 @@ function showGmailPasteHint() {
 window.showGmailPasteHint = showGmailPasteHint;
 
 
-// ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
-async function sendViaGmailApi(to, subject, htmlBody, plainText) {
-  // Always get a fresh Google OAuth token via popup — most reliable approach
-  var token = null;
-  try {
-    // Create a provider specifically for this call with gmail scope
-    var gmailProvider = new firebase.auth.GoogleAuthProvider();
-    gmailProvider.addScope('https://www.googleapis.com/auth/gmail.send');
-    // setCustomParameters to avoid full account picker if already signed in
-    gmailProvider.setCustomParameters({ login_hint: window._fbUser ? window._fbUser.email : '' });
-    var result = await _fbAuth.signInWithPopup(gmailProvider);
-    token = result.credential ? result.credential.accessToken : null;
-    if(token) window._googleAccessToken = token;
-  } catch(e) {
-    if(e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-      throw new Error('Gmail permission popup was closed. Please try again and click Allow.');
-    }
-    throw new Error('Could not get Gmail access: ' + e.message);
+
+// ─── GMAIL OAUTH SETUP ────────────────────────────────────────────────────────
+var GMAIL_CLIENT_KEY = 'tonys_gmail_client_id';
+(function(){
+  var stored = localStorage.getItem(GMAIL_CLIENT_KEY);
+  if(stored) window._gmailOAuthClientId = stored;
+})();
+
+function openGmailSetup() {
+  var current = window._gmailOAuthClientId || '';
+  var val = prompt(
+    'Enter your Google OAuth Client ID for Gmail sending.\n\n' +
+    'Find it at:\nconsole.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client IDs\n\n' +
+    'It looks like: 123456789-abc.apps.googleusercontent.com\n\n' +
+    'Make sure gmail.googleapis.com is enabled and your domain is in Authorised origins.',
+    current
+  );
+  if(val === null) return; // cancelled
+  val = val.trim();
+  if(val) {
+    window._gmailOAuthClientId = val;
+    localStorage.setItem(GMAIL_CLIENT_KEY, val);
+    toast('✅ Gmail Client ID saved!');
+  } else {
+    window._gmailOAuthClientId = null;
+    localStorage.removeItem(GMAIL_CLIENT_KEY);
+    toast('Gmail Client ID cleared');
   }
+}
+window.openGmailSetup = openGmailSetup;
+
+// ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
+async function getGmailToken() {
+  return new Promise(function(resolve, reject) {
+    if(!window.google || !window.google.accounts) {
+      reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
+      return;
+    }
+    var OAUTH_CLIENT_ID = '397837948839-qp0sn3f6r0r2dv0k4k0j7v3k5m9n5t6a.apps.googleusercontent.com';
+    // Use the Firebase project OAuth client ID
+    // Get it from: console.cloud.google.com → APIs & Credentials → OAuth 2.0 Client IDs
+    if(!window._gmailOAuthClientId) {
+      reject(new Error('Gmail OAuth Client ID not configured.\n\nPlease go to:\nGoogle Cloud Console → APIs & Credentials → OAuth 2.0 Client IDs\nCopy your Web Client ID and set it in ⚙️ Settings → Gmail Setup'));
+      return;
+    }
+    var client = google.accounts.oauth2.initTokenClient({
+      client_id: window._gmailOAuthClientId,
+      scope: 'https://www.googleapis.com/auth/gmail.send',
+      hint: window._fbUser ? window._fbUser.email : '',
+      callback: function(response) {
+        if(response.error) {
+          reject(new Error('Gmail auth error: ' + response.error));
+        } else {
+          window._googleAccessToken = response.access_token;
+          resolve(response.access_token);
+        }
+      }
+    });
+    client.requestAccessToken({prompt: window._googleAccessToken ? '' : 'consent'});
+  });
+}
+window.getGmailToken = getGmailToken;
+
+async function sendViaGmailApi(to, subject, htmlBody, plainText) {
+  var token = await getGmailToken();
   if(!token) throw new Error('Gmail access token not received. Please try again.');
 
   // Build RFC 2822 MIME email
@@ -3045,7 +3091,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3058,6 +3104,7 @@ body.banner-shown .header {
         <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')">⚙️</button>
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -3542,7 +3589,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
