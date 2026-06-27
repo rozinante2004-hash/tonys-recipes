@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.4 -->
+<!-- Tony's Recipes Collection v18.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,28 +1333,36 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
+var APP_VERSION = 'v18.5';
+
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
-function checkAppVersion() {
+// Step 1: called early (block 2) — reads & saves version, stores result for later
+var _versionUpdated = false;
+var _versionFrom    = null;
+(function() {
   var VERSION_KEY = 'tonys_last_version';
   try {
     var lastSeen = localStorage.getItem(VERSION_KEY);
     if (lastSeen && lastSeen !== APP_VERSION) {
-      // User has an older version recorded — show update banner
-      var banner = document.getElementById('swUpdateBanner');
-      var msg    = document.getElementById('swUpdateMsg');
-      if (msg) msg.innerHTML = 'Updated from <strong style="color:white;">' + lastSeen + '</strong> → <strong style="color:white;">' + APP_VERSION + '</strong>. Pull down to refresh or tap Update now.';
-      if (banner) {
-        banner.style.display = 'flex';
-        // Auto-hide after 30 seconds if ignored
-        setTimeout(function(){ if(banner.style.display!=='none') banner.style.display='none'; }, 30000);
-      }
+      _versionUpdated = true;
+      _versionFrom    = lastSeen;
     }
-    // Always record current version
     localStorage.setItem(VERSION_KEY, APP_VERSION);
-    // Keep header badge in sync
-    var badge = document.getElementById('appVersionBadge');
-    if (badge) badge.textContent = APP_VERSION;
   } catch(e) {}
+})();
+
+// Step 2: called from initApp (block 3) — DOM is ready, safe to show banner
+function checkAppVersion() {
+  // Keep header badge in sync
+  var badge = document.getElementById('appVersionBadge');
+  if (badge) badge.textContent = APP_VERSION;
+
+  if (!_versionUpdated) return; // no update — nothing to show
+
+  var banner = document.getElementById('swUpdateBanner');
+  var msg    = document.getElementById('swUpdateMsg');
+  if (msg) msg.innerHTML = 'Updated from <strong style="color:white;">' + _versionFrom + '</strong> to <strong style="color:white;">' + APP_VERSION + '</strong> — tap to reload and get the latest version.';
+  if (banner) banner.style.display = 'flex'; // permanent until dismissed
 }
 window.checkAppVersion = checkAppVersion;
 
@@ -2632,7 +2640,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3127,7 +3135,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5303,7 +5311,6 @@ function confirmImportParsed(parsed, overlayId) {
   toast('Recipe imported!');
 }
 
-const APP_VERSION  = 'v18.4';
 const STORAGE_KEY  = 'tonys_recipes_v1';
 const NEXTID_KEY  = 'tonys_nextId_v1';
 
