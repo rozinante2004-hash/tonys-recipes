@@ -45,6 +45,12 @@ self.addEventListener('fetch', function(event) {
   // Only handle same-origin requests for our app files
   if (!event.request.url.includes('/tonys-recipes/')) return;
 
+  // Never cache version.json — always fetch fresh
+  if (event.request.url.includes('version.json')) {
+    event.respondWith(fetch(event.request, {cache: 'no-store'}));
+    return;
+  }
+
   // For HTML (the main app): always try network first
   if (event.request.destination === 'document' ||
       event.request.url.endsWith('/tonys-recipes/') ||

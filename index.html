@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.5 -->
+<!-- Tony's Recipes Collection v18.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,36 +1333,49 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v18.5';
+var APP_VERSION = 'v18.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
-// Step 1: called early (block 2) — reads & saves version, stores result for later
-var _versionUpdated = false;
-var _versionFrom    = null;
-(function() {
-  var VERSION_KEY = 'tonys_last_version';
-  try {
-    var lastSeen = localStorage.getItem(VERSION_KEY);
-    if (lastSeen && lastSeen !== APP_VERSION) {
-      _versionUpdated = true;
-      _versionFrom    = lastSeen;
-    }
-    localStorage.setItem(VERSION_KEY, APP_VERSION);
-  } catch(e) {}
-})();
-
-// Step 2: called from initApp (block 3) — DOM is ready, safe to show banner
+// Fetches /version.json (never cached) to detect if a newer version is deployed.
+// This works even when the SW serves a cached index.html.
 function checkAppVersion() {
-  // Keep header badge in sync
+  // Keep header badge in sync with this build's version
   var badge = document.getElementById('appVersionBadge');
   if (badge) badge.textContent = APP_VERSION;
 
-  if (!_versionUpdated) return; // no update — nothing to show
+  var VERSION_KEY = 'tonys_last_version';
+  var lastSeen = '';
+  try { lastSeen = localStorage.getItem(VERSION_KEY) || ''; } catch(e) {}
 
-  var banner = document.getElementById('swUpdateBanner');
-  var msg    = document.getElementById('swUpdateMsg');
-  if (msg) msg.innerHTML = 'Updated from <strong style="color:white;">' + _versionFrom + '</strong> to <strong style="color:white;">' + APP_VERSION + '</strong> — tap to reload and get the latest version.';
-  if (banner) banner.style.display = 'flex'; // permanent until dismissed
+  // Fetch the canonical version from server — bypasses SW cache
+  fetch('/tonys-recipes/version.json?t=' + Date.now(), {cache: 'no-store'})
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var serverVersion = data.version || APP_VERSION;
+
+      // Update header badge to show actual server version
+      if (badge) badge.textContent = serverVersion;
+
+      // Show banner if server version differs from what we last saw
+      if (lastSeen && lastSeen !== serverVersion) {
+        var banner = document.getElementById('swUpdateBanner');
+        var msg    = document.getElementById('swUpdateMsg');
+        if (msg) msg.innerHTML = '📲 App updated from <strong style="color:white;">' + lastSeen + '</strong> to <strong style="color:white;">' + serverVersion + '</strong> — tap <strong style="color:white;">Update Now</strong> to get the latest version.';
+        if (banner) banner.style.display = 'flex';
+      }
+      // Save server version as last seen
+      try { localStorage.setItem(VERSION_KEY, serverVersion); } catch(e) {}
+    })
+    .catch(function() {
+      // Offline or version.json missing — fall back to comparing APP_VERSION
+      if (lastSeen && lastSeen !== APP_VERSION) {
+        var banner = document.getElementById('swUpdateBanner');
+        var msg    = document.getElementById('swUpdateMsg');
+        if (msg) msg.innerHTML = '📲 App updated to <strong style="color:white;">' + APP_VERSION + '</strong> — tap <strong style="color:white;">Update Now</strong> to reload.';
+        if (banner) banner.style.display = 'flex';
+      }
+      try { localStorage.setItem(VERSION_KEY, APP_VERSION); } catch(e) {}
+    });
 }
 window.checkAppVersion = checkAppVersion;
 
@@ -2640,7 +2653,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.5</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3135,7 +3148,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
