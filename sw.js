@@ -1,8 +1,8 @@
-// Tony's Recipes — Service Worker v2
+// Tony's Recipes — Service Worker v3
 // Strategy: Network first, fall back to cache
 // This ensures updates appear immediately on all devices
 
-const CACHE_NAME = 'tonys-recipes-v5';
+const CACHE_NAME = 'tonys-recipes-v6';
 const URLS_TO_CACHE = [
   '/tonys-recipes/',
   '/tonys-recipes/index.html',
@@ -79,4 +79,11 @@ self.addEventListener('fetch', function(event) {
       });
     })
   );
+});
+
+// Handle SKIP_WAITING message from app to activate new SW immediately
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
