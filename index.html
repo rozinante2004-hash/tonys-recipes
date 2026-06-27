@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.0 -->
+<!-- Tony's Recipes Collection v20.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,6 +56,7 @@
       _fbAuth     = firebase.auth();
       _fbDb       = firebase.firestore();
       _fbProvider = new firebase.auth.GoogleAuthProvider();
+      _fbProvider.addScope('https://www.googleapis.com/auth/gmail.send');
       window._fbAuth     = _fbAuth;
       window._fbDb       = _fbDb;
       window._fbProvider = _fbProvider;
@@ -1333,7 +1334,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.0';
+var APP_VERSION = 'v20.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1572,10 +1573,23 @@ function showEmailModal(id) {
   title.style.cssText = 'font-size:16px;font-weight:700;color:#1C1A18;';
   title.textContent = '✉️ Email: ' + r.name;
 
+  // To field
+  var toRow = document.createElement('div');
+  toRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  var toLabel = document.createElement('span');
+  toLabel.style.cssText = 'font-size:12px;font-weight:600;color:#5C3D2E;white-space:nowrap;width:52px;';
+  toLabel.textContent = 'To:';
+  var toInput = document.createElement('input');
+  toInput.type = 'email';
+  toInput.placeholder = 'recipient@email.com';
+  toInput.style.cssText = 'flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;outline:none;';
+  toRow.appendChild(toLabel);
+  toRow.appendChild(toInput);
+
   var subjectRow = document.createElement('div');
   subjectRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
   var subjectLabel = document.createElement('span');
-  subjectLabel.style.cssText = 'font-size:12px;font-weight:600;color:#5C3D2E;white-space:nowrap;';
+  subjectLabel.style.cssText = 'font-size:12px;font-weight:600;color:#5C3D2E;white-space:nowrap;width:52px;';
   subjectLabel.textContent = 'Subject:';
   var subjectInput = document.createElement('input');
   subjectInput.type = 'text';
@@ -1601,12 +1615,31 @@ function showEmailModal(id) {
 
   var gmailBtn = document.createElement('button');
   gmailBtn.style.cssText = 'flex:2;padding:11px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
-  gmailBtn.textContent = '📧 Open Gmail';
-  gmailBtn.onclick = function(){
-    var subject = encodeURIComponent(subjectInput.value);
-    var body    = encodeURIComponent(plainText);
-    var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&su=' + subject + '&body=' + body;
-    window.open(gmailUrl, '_blank');
+  gmailBtn.textContent = '📧 Send Email';
+  gmailBtn.onclick = async function(){
+    var to      = toInput.value.trim();
+    var subject = subjectInput.value.trim();
+    if(!to) { toast('⚠️ Please enter a recipient email address'); toInput.focus(); return; }
+    if(!subject) subject = r.name;
+    gmailBtn.textContent = '⏳ Sending…';
+    gmailBtn.disabled = true;
+    try {
+      await sendViaGmailApi(to, subject, htmlBody, plainText);
+      gmailBtn.textContent = '✅ Sent!';
+      gmailBtn.style.background = '#2E7D32';
+      toast('✅ Recipe emailed to ' + to + '!');
+      setTimeout(function(){ overlay.remove(); }, 2000);
+    } catch(err) {
+      gmailBtn.textContent = '📧 Send Email';
+      gmailBtn.disabled = false;
+      gmailBtn.style.background = '#C1440E';
+      // If auth error, offer fallback
+      if(err.message.includes('sign') || err.message.includes('access')) {
+        showImportError(err.message + '\n\nAlternative: Use the Copy Text button and paste into Gmail manually.');
+      } else {
+        toast('❌ ' + err.message);
+      }
+    }
   };
 
   var copyBtn = document.createElement('button');
@@ -1626,6 +1659,7 @@ function showEmailModal(id) {
   btnRow.appendChild(closeBtn);
 
   card.appendChild(title);
+  card.appendChild(toRow);
   card.appendChild(subjectRow);
   card.appendChild(previewWrap);
   card.appendChild(hint);
@@ -1635,6 +1669,94 @@ function showEmailModal(id) {
   document.body.appendChild(overlay);
 }
 window.showEmailModal = showEmailModal;
+
+
+function showGmailPasteHint() {
+  var existing = document.getElementById('gmailPasteHint');
+  if(existing) existing.remove();
+  var div = document.createElement('div');
+  div.id = 'gmailPasteHint';
+  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;background:#1C1A18;color:white;border-radius:12px;padding:16px 20px;max-width:340px;width:calc(100vw - 32px);box-shadow:0 8px 32px rgba(0,0,0,0.4);font-family:DM Sans,sans-serif;';
+  div.innerHTML =
+    '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">📋 HTML email copied!</div>' +
+    '<div style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.6;">In Gmail compose:<br>' +
+    '<strong style="color:#D4A843;">Ctrl+Shift+V</strong> to paste with full formatting<br>' +
+    '<span style="font-size:11px;opacity:0.6;">(Ctrl+V pastes plain text only)</span></div>' +
+    '<button onclick="var el=document.getElementById(\'gmailPasteHint\');if(el)el.remove();" ' +
+    'style="margin-top:10px;width:100%;padding:8px;background:#C1440E;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Got it</button>';
+  document.body.appendChild(div);
+  setTimeout(function(){ if(div.parentNode) div.remove(); }, 12000);
+}
+window.showGmailPasteHint = showGmailPasteHint;
+
+
+// ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
+async function sendViaGmailApi(to, subject, htmlBody, plainText) {
+  // Get fresh access token — re-authenticate silently if needed
+  var token = window._googleAccessToken;
+  if(!token) {
+    try {
+      var result = await _fbAuth.currentUser.getIdToken(true);
+      // Re-sign-in silently to get Google OAuth token
+      var cred = await _fbAuth.signInWithPopup(_fbProvider);
+      token = cred.credential ? cred.credential.accessToken : null;
+      if(token) window._googleAccessToken = token;
+    } catch(e) {
+      throw new Error('Could not get Gmail access. Please sign out and sign in again.');
+    }
+  }
+  if(!token) throw new Error('No Gmail access token. Please sign out and sign in again to grant Gmail permission.');
+
+  // Build RFC 2822 MIME email
+  var boundary = 'tony_recipes_' + Date.now();
+  var toLine   = to ? 'To: ' + to + '\r\n' : '';
+  var from     = window._fbUser ? window._fbUser.email : '';
+  var mime = [
+    'MIME-Version: 1.0',
+    'From: ' + from,
+    toLine.trim(),
+    'Subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(subject))) + '?=',
+    'Content-Type: multipart/alternative; boundary="' + boundary + '"',
+    '',
+    '--' + boundary,
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    plainText,
+    '',
+    '--' + boundary,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    htmlBody,
+    '',
+    '--' + boundary + '--'
+  ].join('\r\n');
+
+  // Base64url encode
+  var encoded = btoa(unescape(encodeURIComponent(mime)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+  var resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw: encoded })
+  });
+
+  if(!resp.ok) {
+    var err = await resp.json().catch(function(){ return {}; });
+    if(resp.status === 401) {
+      window._googleAccessToken = null; // Clear stale token
+      throw new Error('Gmail access expired. Please sign out and sign in again to grant Gmail permission.');
+    }
+    throw new Error('Gmail API error ' + resp.status + ': ' + (err.error ? err.error.message : 'Unknown error'));
+  }
+  return await resp.json();
+}
+window.sendViaGmailApi = sendViaGmailApi;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -2918,7 +3040,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3415,7 +3537,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5975,7 +6097,11 @@ async function startGoogleSignIn() {
   window._justSignedIn = true;
   if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
   try {
-    await _fbAuth.signInWithPopup(_fbProvider);
+    var popupResult = await _fbAuth.signInWithPopup(_fbProvider);
+    // Store Google OAuth access token for Gmail API calls
+    if(popupResult.credential) {
+      window._googleAccessToken = popupResult.credential.accessToken;
+    }
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
   } catch(err) {
     window._justSignedIn = false;
