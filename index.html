@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.3 -->
+<!-- Tony's Recipes Collection v18.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1332,6 +1332,32 @@ function copyAccessRules() {
 }
 window.copyAccessRules = copyAccessRules;
 
+
+// ─── VERSION CHECK ────────────────────────────────────────────────────────────
+function checkAppVersion() {
+  var VERSION_KEY = 'tonys_last_version';
+  try {
+    var lastSeen = localStorage.getItem(VERSION_KEY);
+    if (lastSeen && lastSeen !== APP_VERSION) {
+      // User has an older version recorded — show update banner
+      var banner = document.getElementById('swUpdateBanner');
+      var msg    = document.getElementById('swUpdateMsg');
+      if (msg) msg.innerHTML = 'Updated from <strong style="color:white;">' + lastSeen + '</strong> → <strong style="color:white;">' + APP_VERSION + '</strong>. Pull down to refresh or tap Update now.';
+      if (banner) {
+        banner.style.display = 'flex';
+        // Auto-hide after 30 seconds if ignored
+        setTimeout(function(){ if(banner.style.display!=='none') banner.style.display='none'; }, 30000);
+      }
+    }
+    // Always record current version
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    // Keep header badge in sync
+    var badge = document.getElementById('appVersionBadge');
+    if (badge) badge.textContent = APP_VERSION;
+  } catch(e) {}
+}
+window.checkAppVersion = checkAppVersion;
+
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
   console.error('[Global error]', e.message, e.filename, e.lineno);
@@ -2606,7 +2632,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3101,7 +3127,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5277,7 +5303,8 @@ function confirmImportParsed(parsed, overlayId) {
   toast('Recipe imported!');
 }
 
-const STORAGE_KEY = 'tonys_recipes_v1';
+const APP_VERSION  = 'v18.4';
+const STORAGE_KEY  = 'tonys_recipes_v1';
 const NEXTID_KEY  = 'tonys_nextId_v1';
 
 function saveLocal() {
@@ -6719,6 +6746,8 @@ function updateFilterBarTop() {
   renderFilters();
   renderGrid();
   handleShareTarget();
+  // Check if app was updated since last visit
+  checkAppVersion();
   // Show skeleton briefly only if no local recipes yet
   var g = document.getElementById('recipeGrid');
   if (g && (!recipes || recipes.length === 0)) {
@@ -7125,8 +7154,8 @@ function updateFilterBarTop() {
     <span style="font-size:24px;flex-shrink:0;">🆕</span>
     <div style="flex:1;">
       <div style="font-weight:700;color:white;font-size:14px;margin-bottom:2px;">New version available!</div>
-      <div style="color:rgba(255,255,255,0.8);font-size:12px;line-height:1.5;">
-        Pull down to refresh, or close and reopen the app to get the latest version.
+      <div id="swUpdateMsg" style="color:rgba(255,255,255,0.8);font-size:12px;line-height:1.5;">
+        Pull down to refresh, or tap <strong style="color:white;">Update now</strong> below.
       </div>
     </div>
     <button onclick="document.getElementById('swUpdateBanner').style.display='none'"
