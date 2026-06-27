@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v18.7 -->
+<!-- Tony's Recipes Collection v18.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1333,7 +1333,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v18.7';
+var APP_VERSION = 'v18.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2653,7 +2653,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.7</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v18.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3148,7 +3148,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v18.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4360,11 +4360,60 @@ async function importFromFile(event){
     }
 
   } catch(err) {
-    toast('❌ Import failed: ' + err.message);
     console.error('[importFromFile]', err);
+    showImportError(err.message);
   }
 }
 window.importFromFile = importFromFile;
+
+function showImportError(msg) {
+  var existing = document.getElementById('importErrorModal');
+  if(existing) existing.remove();
+
+  // Overlay
+  var overlay = document.createElement('div');
+  overlay.id = 'importErrorModal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+
+  // Card
+  var card = document.createElement('div');
+  card.style.cssText = 'background:white;border-radius:14px;padding:24px;max-width:420px;width:100%;font-family:DM Sans,sans-serif;';
+
+  // Icon
+  var icon = document.createElement('div');
+  icon.style.cssText = 'font-size:28px;margin-bottom:10px;';
+  icon.textContent = '❌';
+
+  // Title
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:16px;font-weight:700;color:#1C1A18;margin-bottom:8px;';
+  title.textContent = 'Import Failed';
+
+  // Message
+  var msgEl = document.createElement('div');
+  msgEl.style.cssText = 'font-size:13px;color:#5C3D2E;background:#FFF0E8;border-radius:8px;padding:12px;margin-bottom:12px;line-height:1.6;word-break:break-word;';
+  msgEl.textContent = msg;
+
+  // Tip
+  var tip = document.createElement('div');
+  tip.style.cssText = 'font-size:12px;color:#8A8279;margin-bottom:16px;';
+  tip.textContent = 'Tip: Try the Free-hand text import — copy the recipe text and paste it there.';
+
+  // Button
+  var btn = document.createElement('button');
+  btn.style.cssText = 'width:100%;padding:12px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;';
+  btn.textContent = 'OK';
+  btn.onclick = function(){ overlay.remove(); };
+
+  card.appendChild(icon);
+  card.appendChild(title);
+  card.appendChild(msgEl);
+  card.appendChild(tip);
+  card.appendChild(btn);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+window.showImportError = showImportError;
 
 function parseWordText(text){
   // Split on recipe headings: lines that contain an emoji followed by a name (our export format)
@@ -4934,10 +4983,19 @@ function openExploreModal(){
   document.getElementById('dietPills').innerHTML='';
   document.getElementById('exploreOverlay').classList.add('open');
 }
-function toast(msg){
+function toast(msg, duration){
+  duration = duration || (msg.includes('❌') || msg.includes('⚠️') ? 8000 : 2800);
   const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  clearTimeout(t._tid);t._tid=setTimeout(()=>t.classList.remove('show'),2800);
+  // Allow tapping toast to dismiss early
+  t.onclick = function(){ clearTimeout(t._tid); t.classList.remove('show'); };
+  // For errors, make toast larger and tappable
+  t.style.cursor = duration > 3000 ? 'pointer' : '';
+  t.style.maxWidth = duration > 3000 ? '90vw' : '';
+  t.style.whiteSpace = duration > 3000 ? 'normal' : 'nowrap';
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(()=>t.classList.remove('show'), duration);
 }
 function escH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
 function rndEmoji(){return EMOJIS[Math.floor(Math.random()*EMOJIS.length)];}
