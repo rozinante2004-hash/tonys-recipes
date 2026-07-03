@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v22.2 -->
+<!-- Tony's Recipes Collection v22.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v22.2';
+var APP_VERSION = 'v22.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.2</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4806,43 +4806,81 @@ function buildZip(files){
 }
 
 function downloadBlob(blob, filename) {
-  // Strategy: store in Worker KV, get URL with filename in path.
-  // Chrome uses the URL path's last segment as the download filename.
-  // e.g. https://worker.dev/שניצל%20בקר.docx?dl=key → saves as "שניצל בקר.docx"
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var b64 = e.target.result.split(',')[1];
-    fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        action: 'download-store',
-        data: b64,
-        filename: filename,
-        mime: blob.type || 'application/octet-stream'
-      })
-    })
-    .then(function(resp) { return resp.json(); })
-    .then(function(data) {
-      if(!data.url) throw new Error('No URL returned');
-      // Open in new tab — Chrome downloads the file and uses URL path as filename
-      window.open(data.url, '_blank');
-    })
-    .catch(function(err) {
-      console.warn('[download] Worker store failed:', err);
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
-      toast('⚠️ Rename file to: ' + filename, 8000);
+  // Download the file using a blob URL
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+
+  // Chrome on Linux ignores non-ASCII in download filenames (known browser bug).
+  // If filename has non-ASCII chars, show a persistent notification with the correct name.
+  var hasNonAscii = /[^\x00-\x7F]/.test(filename);
+  if(hasNonAscii) {
+    showRenameHint(filename);
+  }
+}
+
+function showRenameHint(filename) {
+  var existing = document.getElementById('renameHint');
+  if(existing) existing.remove();
+
+  var div = document.createElement('div');
+  div.id = 'renameHint';
+  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+    'z-index:9999;background:var(--warm-brown);color:white;border-radius:12px;' +
+    'padding:14px 18px;max-width:380px;width:calc(100vw - 32px);' +
+    'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:DM Sans,sans-serif;';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:6px;';
+  title.textContent = '📄 File saved — rename it to:';
+
+  var name = document.createElement('div');
+  name.style.cssText = 'font-size:15px;font-weight:700;color:var(--gold);' +
+    'background:rgba(0,0,0,0.2);border-radius:6px;padding:8px 10px;margin-bottom:10px;' +
+    'word-break:break-all;direction:rtl;text-align:right;';
+  name.textContent = filename;
+
+  var hint = document.createElement('div');
+  hint.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.7);margin-bottom:10px;';
+  hint.textContent = 'Chrome on Linux saves non-English filenames as "download". ' +
+    'Right-click the downloaded file → Rename → paste the name above.';
+
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;';
+
+  var copyBtn = document.createElement('button');
+  copyBtn.style.cssText = 'flex:1;padding:8px;background:var(--terracotta);color:white;' +
+    'border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;' +
+    'font-family:DM Sans,sans-serif;';
+  copyBtn.textContent = '📋 Copy name';
+  copyBtn.onclick = function() {
+    navigator.clipboard.writeText(filename).then(function() {
+      copyBtn.textContent = '✅ Copied!';
+      setTimeout(function(){ copyBtn.textContent = '📋 Copy name'; }, 2000);
     });
   };
-  reader.readAsDataURL(blob);
+
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:white;' +
+    'border:1px solid rgba(255,255,255,0.3);border-radius:7px;font-size:12px;cursor:pointer;' +
+    'font-family:DM Sans,sans-serif;';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = function(){ div.remove(); };
+
+  btnRow.appendChild(copyBtn);
+  btnRow.appendChild(closeBtn);
+  div.appendChild(title);
+  div.appendChild(name);
+  div.appendChild(hint);
+  div.appendChild(btnRow);
+  document.body.appendChild(div);
 }
+window.showRenameHint = showRenameHint;
 
 function expOneWord(id){
   const r=recipes.find(x=>x.id===id);if(!r)return;
