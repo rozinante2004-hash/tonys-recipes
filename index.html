@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.5 -->
+<!-- Tony's Recipes Collection v20.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase Compat SDK — single combined file for faster loading -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="console.error('Failed to load Firebase app SDK')"></script>
@@ -1334,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.5';
+var APP_VERSION = 'v20.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1489,11 +1490,13 @@ function rHtml(r) {
   }).join('');
 
   var steps = r.steps.map(function(s, i){
-    var isHeb = /[א-ת]/.test(s);
-    var dir = isHeb ? 'rtl' : 'ltr';
-    return '<tr><td style="padding:0 12px 0 0;vertical-align:top;' + (isHeb?'padding:0 0 0 12px;':'') + '">' +
-      '<div style="width:28px;height:28px;border-radius:50%;background:#C1440E;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;text-align:center;line-height:28px;">' + (i+1) + '</div>' +
-      '</td><td dir="' + dir + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';">' + s + '</td></tr>';
+    var isHeb = /[\u05d0-\u05ea]/.test(s);
+    var numCell = '<td style="padding:0 ' + (isHeb?'0':'12px') + ' 0 ' + (isHeb?'12px':'0') + ';vertical-align:top;">' +
+      '<div style="width:28px;height:28px;border-radius:50%;background:#C1440E;color:white;font-size:12px;font-weight:700;text-align:center;line-height:28px;min-width:28px;">' + (i+1) + '</div>' +
+      '</td>';
+    var txtCell = '<td dir="' + (isHeb?'rtl':'ltr') + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';width:100%;">' + s + '</td>';
+    // For Hebrew: text cell first (left col), number cell second (right col) — table reads LTR so right col = right side
+    return '<tr>' + (isHeb ? txtCell + numCell : numCell + txtCell) + '</tr>';
   }).join('');
 
   var notesBlock = r.notes ? '<div style="margin:24px 0 0;padding:16px;background:#FFFBEB;border-left:4px solid #D4A843;border-radius:0 8px 8px 0;">' +
@@ -3091,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.5</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3589,7 +3592,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -3636,6 +3639,8 @@ body.banner-shown .header {
         <button class="share-app-btn share-whatsapp-app" onclick="shareAppWhatsApp()">💬 WhatsApp</button>
         <button class="share-app-btn share-copy-link" onclick="copyAppLink()">📋 Copy link</button>
       </div>
+      <div class="share-qr-wrap" id="shareAppQr" style="margin-top:14px;"></div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">Scan QR code to open on another device</div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;">
         <strong>📱 To install on iPhone:</strong> Open link in Safari → tap Share → "Add to Home Screen"<br>
         <strong>🤖 To install on Android:</strong> Open link in Chrome → tap menu → "Add to Home Screen"<br>
@@ -4242,7 +4247,23 @@ function toggleShare(id){
   if(navigator.share){
     document.getElementById('shareNativeBtn').style.display='flex';
     document.getElementById('shareNativeBtn').onclick = function(){
-      navigator.share({title: r.name, text: rText(r)}).catch(function(){});
+      var btn = document.getElementById('shareNativeBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Opening share…';
+      // Use a timeout to re-enable if share dialog is dismissed without resolving
+      var timeout = setTimeout(function(){
+        btn.disabled = false;
+        btn.innerHTML = '<span style="font-size:20px;">📲</span> Share via…';
+      }, 5000);
+      navigator.share({title: r.name, text: rText(r)})
+        .then(function(){ clearTimeout(timeout); closeM('shareRecipeOverlay'); })
+        .catch(function(err){
+          clearTimeout(timeout);
+          btn.disabled = false;
+          btn.innerHTML = '<span style="font-size:20px;">📲</span> Share via…';
+          // AbortError = user cancelled, don't show error
+          if(err && err.name !== 'AbortError') console.warn('[share]', err);
+        });
     };
   } else {
     document.getElementById('shareNativeBtn').style.display='none';
@@ -6337,6 +6358,20 @@ window.swUpdateNow = swUpdateNow;
 function openShareAppModal() {
   const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
   document.getElementById('shareAppUrl').textContent = url;
+  // Generate QR code
+  var qrEl = document.getElementById('shareAppQr');
+  if(qrEl) {
+    qrEl.innerHTML = '';
+    if(typeof QRCode !== 'undefined') {
+      new QRCode(qrEl, {
+        text: url,
+        width: 160, height: 160,
+        colorDark: '#5C3D2E',
+        colorLight: '#FAF7F2',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }
   document.getElementById('shareAppOverlay').classList.add('open');
 }
 function shareAppWhatsApp() {
