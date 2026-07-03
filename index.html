@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v21.4 -->
+<!-- Tony's Recipes Collection v21.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v21.4';
+var APP_VERSION = 'v21.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4549,26 +4549,35 @@ function sheetRows(r){
   return rows;
 }
 function downloadExcelWb(wb, filename){
+  // Write to array buffer, wrap in File object for proper Unicode filename support
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   try {
-    // Use Blob URL — handles Unicode filenames (Hebrew etc.) correctly
-    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-    const blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    var file = new File([wbout], filename, {type: mime});
+    var url = URL.createObjectURL(file);
+    var a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.style.cssText = 'display:none;position:fixed;top:-9999px';
     document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 300);
+    setTimeout(function() {
+      a.click();
+      setTimeout(function() {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 500);
+    }, 10);
   } catch(e) {
-    // Fallback to base64 if Blob URL fails (sandboxed iframe)
-    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
-    const a = document.createElement('a');
-    a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // Fallback: plain blob
+    var blob = new Blob([wbout], {type: mime});
+    var url2 = URL.createObjectURL(blob);
+    var a2 = document.createElement('a');
+    a2.href = url2;
+    a2.download = filename;
+    a2.style.display = 'none';
+    document.body.appendChild(a2);
+    a2.click();
+    setTimeout(function(){ URL.revokeObjectURL(url2); document.body.removeChild(a2); }, 500);
   }
 }
 // ─── EXCEL STYLING ────────────────────────────────────────────────────────────
@@ -4821,22 +4830,34 @@ function buildZip(files){
 }
 
 function downloadBlob(blob, filename) {
-  // Strategy: use Blob URL which correctly passes filename to browser
-  // This works on GitHub Pages and handles Unicode/Hebrew filenames
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.cssText = 'display:none;position:fixed;top:-9999px';
-  document.body.appendChild(a);
-  // Small delay ensures the DOM is ready before click
-  setTimeout(function() {
-    a.click();
+  // Wrap in a File object — the File carries the name natively,
+  // which Chrome uses even for non-ASCII (Hebrew, Russian etc.) filenames
+  try {
+    var file = new File([blob], filename, {type: blob.type});
+    var url = URL.createObjectURL(file);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.cssText = 'display:none;position:fixed;top:-9999px';
+    document.body.appendChild(a);
     setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 500);
-  }, 10);
+      a.click();
+      setTimeout(function() {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 500);
+    }, 10);
+  } catch(e) {
+    // Fallback: plain blob URL
+    var url2 = URL.createObjectURL(blob);
+    var a2 = document.createElement('a');
+    a2.href = url2;
+    a2.download = filename;
+    a2.style.display = 'none';
+    document.body.appendChild(a2);
+    a2.click();
+    setTimeout(function(){ URL.revokeObjectURL(url2); document.body.removeChild(a2); }, 500);
+  }
 }
 
 function expOneWord(id){
