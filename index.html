@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v22.1 -->
+<!-- Tony's Recipes Collection v22.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v22.1';
+var APP_VERSION = 'v22.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.1</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4806,11 +4806,9 @@ function buildZip(files){
 }
 
 function downloadBlob(blob, filename) {
-  // Store file in Worker KV, get one-time GET URL.
-  // Use a hidden <a> with target="_blank" so the download comes from
-  // the Worker's response headers directly — Chrome honours Content-Disposition
-  // when the download is initiated from the same tab via an anchor click
-  // (not window.location.href which strips cross-origin filenames).
+  // Strategy: store in Worker KV, get URL with filename in path.
+  // Chrome uses the URL path's last segment as the download filename.
+  // e.g. https://worker.dev/שניצל%20בקר.docx?dl=key → saves as "שניצל בקר.docx"
   var reader = new FileReader();
   reader.onload = function(e) {
     var b64 = e.target.result.split(',')[1];
@@ -4827,19 +4825,11 @@ function downloadBlob(blob, filename) {
     .then(function(resp) { return resp.json(); })
     .then(function(data) {
       if(!data.url) throw new Error('No URL returned');
-      // Use hidden iframe — triggers download without navigating away
-      // and Chrome honours Content-Disposition filename from iframe responses
-      var iframe = document.createElement('iframe');
-      iframe.style.cssText = 'display:none;width:0;height:0;position:fixed;top:-9999px';
-      iframe.src = data.url;
-      document.body.appendChild(iframe);
-      setTimeout(function(){ 
-        if(iframe.parentNode) document.body.removeChild(iframe); 
-      }, 10000);
+      // Open in new tab — Chrome downloads the file and uses URL path as filename
+      window.open(data.url, '_blank');
     })
     .catch(function(err) {
       console.warn('[download] Worker store failed:', err);
-      // Fallback — blob URL
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
