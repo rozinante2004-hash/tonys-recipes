@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.4 -->
+<!-- Tony's Recipes Collection v20.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1334,7 +1334,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.4';
+var APP_VERSION = 'v20.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3091,7 +3091,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.4</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3589,7 +3589,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4285,6 +4285,28 @@ function showPhotoSourcePicker(id, recipeName) {
     inp.value = ''; inp.click();
   };
 
+  var cameraBtn = document.createElement('button');
+  cameraBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  cameraBtn.textContent = '📸 Take a photo';
+  cameraBtn.onclick = function() {
+    picker.remove();
+    var camInp = document.getElementById('heroCameraIn');
+    if(!camInp) {
+      camInp = document.createElement('input');
+      camInp.type = 'file';
+      camInp.id = 'heroCameraIn';
+      camInp.accept = 'image/*';
+      camInp.setAttribute('capture', 'environment'); // rear camera by default
+      camInp.style.display = 'none';
+      camInp.onchange = function(e) {
+        heroPhotoChanged(e);
+        camInp.value = '';
+      };
+      document.body.appendChild(camInp);
+    }
+    camInp.click();
+  };
+
   var searchBtn = document.createElement('button');
   searchBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
   searchBtn.textContent = '🔍 Search web for photo';
@@ -4300,6 +4322,7 @@ function showPhotoSourcePicker(id, recipeName) {
 
   inner.appendChild(title);
   inner.appendChild(uploadBtn);
+  inner.appendChild(cameraBtn);
   inner.appendChild(searchBtn);
   inner.appendChild(cancelBtn);
   picker.appendChild(inner);
