@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v21.9 -->
+<!-- Tony's Recipes Collection v22.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v21.9';
+var APP_VERSION = 'v22.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.9</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4594,7 +4594,8 @@ function expOneExcel(id){
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:20},{wch:70}];
   styleExcelSheet(ws, rows, r);
-  XLSX.utils.book_append_sheet(wb,ws,r.name.slice(0,31));
+  var sn1 = r.name.replace(/[:\\/?*\[\]]/g,'').trim().slice(0,31)||'Recipe';
+  XLSX.utils.book_append_sheet(wb,ws,sn1);
   const fname = safeFilename(r.name) + '.xlsx';
   downloadExcelWb(wb, fname);
   toast('📊 Preparing: ' + fname + '…', 5000);
@@ -4608,7 +4609,8 @@ function exportAllExcel(){
   recipes.forEach(r=>{
     const ws=XLSX.utils.aoa_to_sheet(sheetRows(r));
     ws['!cols']=[{wch:18},{wch:60}];
-    XLSX.utils.book_append_sheet(wb,ws,r.name.slice(0,31));
+    var sn2 = r.name.replace(/[:\\/?*\[\]]/g,'').trim().slice(0,31)||'Recipe';
+    XLSX.utils.book_append_sheet(wb,ws,sn2);
   });
   downloadExcelWb(wb,'Tonys_Recipes_Collection.xlsx');
   toast(`📊 Exported ${recipes.length} recipes to Excel!`);
