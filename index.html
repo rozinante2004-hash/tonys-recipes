@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.9 -->
+<!-- Tony's Recipes Collection v21.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.9';
+var APP_VERSION = 'v21.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.9</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4584,6 +4584,11 @@ function makeDocxBlob(recipeList){
     // Recipe heading
     bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>${esc(r.emoji+' '+r.name)}</w:t></w:r></w:p>`;
 
+    // Photo (embedded image if available)
+    if(r.photo && r.photo.startsWith('data:image')) {
+      bodyXml += '<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="4572000" cy="2286000"/><wp:docPr id="' + (idx+1) + '" name="Photo_' + idx + '"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="' + (idx+1) + '" name="Photo_' + idx + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg' + idx + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="4572000" cy="2286000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
+    }
+
     // Meta
     bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>${esc(`Category: ${r.category}   |   Difficulty: ${r.difficulty}   |   Prep: ${r.prep}   |   Servings: ${r.servings}`)}</w:t></w:r></w:p>`;
     bodyXml+=`<w:p></w:p>`;
@@ -4600,6 +4605,22 @@ function makeDocxBlob(recipeList){
     r.steps.forEach((s,si)=>{
       bodyXml+=`<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${si+1}. </w:t></w:r><w:r><w:t>${esc(s)}</w:t></w:r></w:p>`;
     });
+
+    // Notes section
+    if(r.notes && r.notes.trim()) {
+      bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Notes</w:t></w:r></w:p>`;
+      bodyXml+=`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="12" w:space="6" w:color="D4A843"/></w:pBdr></w:pPr><w:r><w:rPr><w:i/><w:color w:val="5C3D2E"/></w:rPr><w:t xml:space="preserve">${esc(r.notes.trim())}</w:t></w:r></w:p>`;
+    }
+
+    // Diet tags
+    if(r.diets && r.diets.length) {
+      bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="3A7D44"/></w:rPr><w:t>Diet: ${esc(r.diets.join(', '))}</w:t></w:r></w:p>`;
+    }
+
+    // Source
+    if(r.source) {
+      bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>Source: ${esc(r.source)}</w:t></w:r></w:p>`;
+    }
   });
 
   const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -4609,10 +4630,7 @@ function makeDocxBlob(recipeList){
   xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
 <w:body>${bodyXml}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
 
-  const relsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`;
+
 
   const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -4643,13 +4661,34 @@ function makeDocxBlob(recipeList){
 </Relationships>`;
 
   // Build ZIP manually using a simple ZIP writer
-  return buildZip({
+  // Build relationships and embed photos
+  var zipFiles = {
     '[Content_Types].xml': contentTypesXml,
     '_rels/.rels': rootRelsXml,
     'word/document.xml': docXml,
     'word/styles.xml': stylesXml,
-    'word/_rels/document.xml.rels': relsXml,
+  };
+
+  // Add image relationships for recipes with photos
+  var relsEntries = ['<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'];
+  recipeList.forEach(function(r, ri) {
+    if(r.photo && r.photo.startsWith('data:image')) {
+      relsEntries.push('<Relationship Id="rIdImg' + ri + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/img' + ri + '.jpg"/>');
+      // Extract base64 data and add to ZIP
+      var b64 = r.photo.split(',')[1] || '';
+      zipFiles['word/media/img' + ri + '.jpg'] = b64;
+    }
   });
+  var relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + relsEntries.join('') + '</Relationships>';
+  zipFiles['word/_rels/document.xml.rels'] = relsXml;
+
+  // Add image content type if needed
+  if(recipeList.some(function(r){ return r.photo && r.photo.startsWith('data:image'); })) {
+    contentTypesXml = contentTypesXml.replace('</Types>', '<Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
+    zipFiles['[Content_Types].xml'] = contentTypesXml;
+  }
+
+  return buildZip(zipFiles);
 }
 
 // Minimal synchronous ZIP builder (store method, no compression)
@@ -4744,8 +4783,9 @@ function expOneWord(id){
 }
 function exportAllWord(){
   if(!recipes.length){toast('No recipes to export');return;}
-  downloadBlob(makeDocxBlob(recipes),'Tonys_Recipes_Collection.docx');
-  toast(`📄 Exported ${recipes.length} recipes to Word!`);
+  var date = new Date().toISOString().slice(0,10);
+  downloadBlob(makeDocxBlob(recipes),'Tonys_Recipes_' + date + '.docx');
+  toast('📄 Exported ' + recipes.length + ' recipes to Word!');
 }
 
 // ═══════════════════════════════════
