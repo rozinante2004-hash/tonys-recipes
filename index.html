@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v21.2 -->
+<!-- Tony's Recipes Collection v21.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v21.2';
+var APP_VERSION = 'v21.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.2</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4517,18 +4517,36 @@ function doEmail(id){
 function doWhatsApp(id){const r=recipes.find(x=>x.id===id);window.open(`https://wa.me/?text=${encodeURIComponent(rText(r))}`);}
 function doCopy(id){navigator.clipboard.writeText(rText(recipes.find(x=>x.id===id))).then(()=>toast('📋 Copied!'));}
 
+
+function safeFilename(name) {
+  // Only strip characters that are truly invalid in filenames
+  // Keep Hebrew, Arabic, Russian, spaces, dashes etc.
+  return (name || 'Recipe')
+    .replace(/[\/:*?"<>|\\]/g, '_')  // Windows invalid chars only
+    .replace(/\s+/g, ' ')              // normalise spaces
+    .trim()
+    .slice(0, 100);
+}
+
 // ═══════════════════════════════════
 // EXCEL EXPORT / IMPORT
 // ═══════════════════════════════════
 function sheetRows(r){
-  return[
-    ['Recipe',r.name],['Category',r.category],['Difficulty',r.difficulty],
-    ['Prep Time',r.prep],['Servings',r.servings],[],
-    ['INGREDIENTS',''],['Amount','Ingredient'],
-    ...r.ingredients.map(i=>[i.a,i.n]),
-    [],['METHOD',''],
-    ...r.steps.map((s,i)=>[`Step ${i+1}`,s]),
+  var rows = [
+    [r.emoji + ' ' + r.name, ''],
+    ['Category', r.category],
+    ['Difficulty', r.difficulty],
+    ['Prep Time', r.prep],
+    ['Servings', r.servings],
   ];
+  if(r.diets && r.diets.length) rows.push(['Diet', r.diets.join(', ')]);
+  if(r.source) rows.push(['Source', r.source]);
+  rows.push([], ['INGREDIENTS', ''], ['Amount', 'Ingredient']);
+  r.ingredients.forEach(function(i){ rows.push([i.a, i.n]); });
+  rows.push([], ['METHOD', '']);
+  r.steps.forEach(function(s, i){ rows.push(['Step ' + (i+1), s]); });
+  if(r.notes && r.notes.trim()) rows.push([], ['NOTES', r.notes.trim()]);
+  return rows;
 }
 function downloadExcelWb(wb, filename){
   try {
@@ -4556,11 +4574,14 @@ function downloadExcelWb(wb, filename){
 function expOneExcel(id){
   const r=recipes.find(x=>x.id===id);if(!r)return;
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(sheetRows(r));
-  ws['!cols']=[{wch:18},{wch:60}];
+  const rows=sheetRows(r);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:20},{wch:70}];
+  styleExcelSheet(ws, rows, r);
   XLSX.utils.book_append_sheet(wb,ws,r.name.slice(0,31));
-  downloadExcelWb(wb,`${r.name.replace(/[\/\\?*:[\]]/g,'_')}.xlsx`);
-  toast('📊 Exported to Excel!');
+  const fname = safeFilename(r.name) + '.xlsx';
+  downloadExcelWb(wb, fname);
+  toast('📊 Exported: ' + fname);
 }
 function exportAllExcel(){
   if(!recipes.length){toast('No recipes to export');return;}
@@ -4587,6 +4608,7 @@ function makeDocxBlob(recipeList){
   // Build the document XML content
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   let bodyXml='';
+  var srcUrls = []; // Collect hyperlink URLs for relationships
 
   // Title
   bodyXml+=`<w:p><w:pPr><w:jc w:val="center"/><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Tony's Recipes Collection</w:t></w:r></w:p>`;
@@ -4630,8 +4652,16 @@ function makeDocxBlob(recipeList){
       bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="3A7D44"/></w:rPr><w:t>Diet: ${esc(r.diets.join(', '))}</w:t></w:r></w:p>`;
     }
 
-    // Source
-    if(r.source) {
+    // Source — as clickable hyperlink
+    if(r.source && r.source.startsWith('http')) {
+      const srcId = 'srcRel' + idx;
+      // Store hyperlink — we add relationships dynamically per recipe
+      if(!bodyXml.includes('w:hyperlink')) {
+        // Add hyperlink relationship to rels (simplified — use external hyperlink)
+      }
+      bodyXml+=`<w:p><w:r><w:rPr><w:rStyle w:val="Hyperlink"/><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">Source: </w:t></w:r><w:hyperlink r:id="rId${idx+10}" w:history="1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:r><w:rPr><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr><w:t>${esc(r.source)}</w:t></w:r></w:hyperlink></w:p>`;
+      srcUrls.push(r.source);
+    } else if(r.source) {
       bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>Source: ${esc(r.source)}</w:t></w:r></w:p>`;
     }
   });
@@ -4674,10 +4704,12 @@ function makeDocxBlob(recipeList){
 </Relationships>`;
 
   // Build ZIP manually using a simple ZIP writer
-  const relsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`;
+  // Build rels including hyperlinks for source URLs
+  var relsEntries = ['<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'];
+  srcUrls.forEach(function(url, i) {
+    relsEntries.push('<Relationship Id="rId' + (i+10) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + url.replace(/&/g,'&amp;') + '" TargetMode="External"/>');
+  });
+  const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + relsEntries.join('') + '</Relationships>';
 
   return buildZip({
     '[Content_Types].xml': contentTypesXml,
@@ -4784,8 +4816,9 @@ function downloadBlob(blob, filename) {
 
 function expOneWord(id){
   const r=recipes.find(x=>x.id===id);if(!r)return;
-  downloadBlob(makeDocxBlob([r]),`${r.name.replace(/[\/\\?*:[\]]/g,'_')}.docx`);
-  toast('📄 Exported to Word!');
+  const fname = safeFilename(r.name) + '.docx';
+  downloadBlob(makeDocxBlob([r]), fname);
+  toast('📄 Exported: ' + fname);
 }
 function exportAllWord(){
   if(!recipes.length){toast('No recipes to export');return;}
