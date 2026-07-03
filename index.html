@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v22.3 -->
+<!-- Tony's Recipes Collection v22.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v22.3';
+var APP_VERSION = 'v22.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1811,6 +1811,205 @@ async function sendViaGmailApi(to, subject, htmlBody, plainText) {
   return await resp.json();
 }
 window.sendViaGmailApi = sendViaGmailApi;
+
+
+// ─── LOCAL SAVE HELPER ────────────────────────────────────────────────────────
+var _helperCheckInterval = null;
+
+function checkHelperStatus(callback) {
+  fetch('http://127.0.0.1:27182', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ping:true, filename:'ping', data:''}),
+    signal: AbortSignal.timeout(1000)
+  })
+  .then(function(){
+    _localSaveAvailable = true;
+    var ind = document.getElementById('helperIndicator');
+    if(ind) ind.style.background = '#4CAF50';
+    if(callback) callback(true);
+  })
+  .catch(function(){
+    _localSaveAvailable = false;
+    var ind = document.getElementById('helperIndicator');
+    if(ind) ind.style.background = '#e74c3c';
+    if(callback) callback(false);
+  });
+}
+
+function showSaveHelperInfo() {
+  var existing = document.getElementById('saveHelperOverlay');
+  if(existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'saveHelperOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);' +
+    'display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+  var card = document.createElement('div');
+  card.style.cssText = 'background:white;border-radius:14px;padding:0;max-width:500px;width:100%;' +
+    'font-family:DM Sans,sans-serif;overflow:hidden;max-height:90vh;overflow-y:auto;';
+
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'background:var(--warm-brown);padding:18px 20px;display:flex;align-items:center;gap:10px;';
+  header.innerHTML = '<div style="flex:1"><div style="font-size:16px;font-weight:700;color:white;">💾 Save Helper</div>' +
+    '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px;">Fixes Hebrew/Russian filenames on Linux</div></div>' +
+    '<button id="saveHelperCloseBtn" style="background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;' +
+    'border-radius:50%;cursor:pointer;font-size:14px;">✕</button>';
+
+  // Status bar
+  var statusBar = document.createElement('div');
+  statusBar.id = 'helperStatusBar';
+  statusBar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 20px;' +
+    'background:#F5F0EA;border-bottom:1px solid #E8E0D5;';
+
+  var statusDot = document.createElement('div');
+  statusDot.id = 'helperStatusDot';
+  statusDot.style.cssText = 'width:12px;height:12px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background 0.3s;';
+
+  var statusText = document.createElement('div');
+  statusText.id = 'helperStatusText';
+  statusText.style.cssText = 'font-size:13px;font-weight:600;color:#5C3D2E;flex:1;';
+  statusText.textContent = 'Checking…';
+
+  statusBar.appendChild(statusDot);
+  statusBar.appendChild(statusText);
+
+  // Body
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:16px 20px;';
+
+  // On/Off buttons
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-bottom:16px;';
+
+  var startBtn = document.createElement('button');
+  startBtn.id = 'helperStartBtn';
+  startBtn.style.cssText = 'flex:1;padding:10px;background:#2E7D32;color:white;border:none;' +
+    'border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  startBtn.textContent = '▶ Start Helper';
+  startBtn.onclick = function() {
+    // Can't exec directly — show terminal command to copy
+    var cmd = 'python3 ~/Downloads/local-save-helper.py &';
+    navigator.clipboard.writeText(cmd).then(function() {
+      startBtn.textContent = '📋 Command copied! Paste in terminal';
+      setTimeout(function(){ startBtn.textContent = '▶ Start Helper'; }, 3000);
+    });
+    toast('📋 Paste this in a terminal: ' + cmd, 6000);
+  };
+
+  var stopBtn = document.createElement('button');
+  stopBtn.id = 'helperStopBtn';
+  stopBtn.style.cssText = 'flex:1;padding:10px;background:#c0392b;color:white;border:none;' +
+    'border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  stopBtn.textContent = '⏹ Stop Helper';
+  stopBtn.onclick = function() {
+    // Send stop signal to helper
+    fetch('http://127.0.0.1:27182', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'stop'})
+    }).catch(function(){});
+    setTimeout(function(){ updateHelperStatus(); }, 800);
+    toast('⏹ Stop signal sent', 2000);
+  };
+
+  var refreshBtn = document.createElement('button');
+  refreshBtn.style.cssText = 'padding:10px 14px;background:#F5F0EA;color:#5C3D2E;border:1px solid #E8E0D5;' +
+    'border-radius:8px;font-size:13px;cursor:pointer;font-family:DM Sans,sans-serif;';
+  refreshBtn.textContent = '🔄';
+  refreshBtn.title = 'Check status';
+  refreshBtn.onclick = function() { updateHelperStatus(); };
+
+  btnRow.appendChild(startBtn);
+  btnRow.appendChild(stopBtn);
+  btnRow.appendChild(refreshBtn);
+
+  // Auto-start section
+  var autoSection = document.createElement('div');
+  autoSection.style.cssText = 'border:1px solid #E8E0D5;border-radius:10px;padding:14px;margin-bottom:14px;';
+  autoSection.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:#5C3D2E;margin-bottom:8px;">🚀 Auto-start on login (recommended)</div>' +
+    '<div style="font-size:11px;color:#8A8279;margin-bottom:8px;">Run this once in a terminal — helper will start automatically every time you log in:</div>' +
+    '<pre id="autoStartCmd" style="background:#1e1e1e;color:#d4d4d4;border-radius:7px;padding:10px;font-family:monospace;font-size:11px;line-height:1.6;word-break:break-all;white-space:pre-wrap;margin:0;">' +
+    'See below for command</pre>' +
+    '<button onclick="copyAutoStart()" style="margin-top:8px;width:100%;padding:7px;background:#5C3D2E;' +
+    'color:white;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;" ' +
+    'id="copyAutoBtn">📋 Copy setup command</button>';
+
+  // Manual start
+  var manualSection = document.createElement('div');
+  manualSection.style.cssText = 'border:1px solid #E8E0D5;border-radius:10px;padding:14px;';
+  manualSection.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:#5C3D2E;margin-bottom:6px;">▶ Manual start</div>' +
+    '<div style="background:#1e1e1e;color:#d4d4d4;border-radius:7px;padding:8px 10px;' +
+    'font-family:monospace;font-size:12px;">python3 ~/local-save-helper.py &amp;</div>' +
+    '<div style="font-size:11px;color:#8A8279;margin-top:6px;">The &amp; runs it in background — no terminal window stays open.</div>';
+
+  body.appendChild(btnRow);
+  body.appendChild(autoSection);
+  body.appendChild(manualSection);
+
+  card.appendChild(header);
+  card.querySelector('#saveHelperCloseBtn').onclick = function(){ overlay.remove(); };
+  card.appendChild(statusBar);
+  card.appendChild(body);
+  overlay.appendChild(card);
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+
+  // Show the autostart command in the pre element
+  var pre = document.getElementById('autoStartCmd');
+  if(pre) pre.textContent = getAutoStartCmd();
+  // Check status immediately and every 3 seconds while modal is open
+  updateHelperStatus();
+  var interval = setInterval(function() {
+    if(!document.getElementById('saveHelperOverlay')) { clearInterval(interval); return; }
+    updateHelperStatus();
+  }, 3000);
+}
+
+function updateHelperStatus() {
+  var dot  = document.getElementById('helperStatusDot');
+  var text = document.getElementById('helperStatusText');
+  if(!dot || !text) return;
+  dot.style.background = '#f0a500'; // checking - amber
+  text.textContent = 'Checking…';
+  checkHelperStatus(function(running) {
+    if(!dot || !text) return;
+    if(running) {
+      dot.style.background = '#2E7D32';
+      text.textContent = '🟢 Running — files save directly to ~/Downloads';
+    } else {
+      dot.style.background = '#c0392b';
+      text.textContent = '🔴 Not running — exports will use browser download';
+    }
+  });
+}
+
+function getAutoStartCmd() {
+  return 'mkdir -p ~/.config/autostart && ' +
+    'cp ~/Downloads/local-save-helper.py ~/local-save-helper.py && ' +
+    'cat > ~/.config/autostart/tonys-recipes-helper.desktop << ENDOFFILE\n' +
+    '[Desktop Entry]\nType=Application\nName=Tonys Recipes Save Helper\n' +
+    'Exec=python3 /home/$USER/local-save-helper.py\nHidden=false\nNoDisplay=true\n' +
+    'X-GNOME-Autostart-enabled=true\nENDOFFILE';
+}
+function copyAutoStart() {
+  var cmd = getAutoStartCmd();
+  var pre = document.getElementById('autoStartCmd');
+  if(pre) pre.textContent = cmd;
+  navigator.clipboard.writeText(cmd).then(function() {
+    var btn = document.getElementById('copyAutoBtn');
+    if(btn) { btn.textContent = '✅ Copied! Paste in terminal'; }
+    setTimeout(function(){
+      var b = document.getElementById('copyAutoBtn');
+      if(b) b.textContent = '📋 Copy setup command';
+    }, 3000);
+  });
+}
+window.showSaveHelperInfo = showSaveHelperInfo;
+window.copyAutoStart = copyAutoStart;
+window.updateHelperStatus = updateHelperStatus;
 
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
@@ -3094,7 +3293,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.3</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3104,10 +3303,11 @@ body.banner-shown .header {
       </div>
       <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app">?</button>
       <div class="drop-group">
-        <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')">⚙️</button>
+        <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️<span id="helperIndicator" style="position:absolute;top:0;right:0;width:7px;height:7px;border-radius:50%;background:#ccc;border:1px solid rgba(255,255,255,0.5);"></span></button>
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -3642,7 +3842,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4805,8 +5005,44 @@ function buildZip(files){
   return new Blob([zipBytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
 }
 
+var LOCAL_SAVE_PORT = 27182;
+var _localSaveAvailable = null; // null=untested, true=available, false=unavailable
+
 function downloadBlob(blob, filename) {
-  // Download the file using a blob URL
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result.split(',')[1];
+    var hasNonAscii = /[^\x00-\x7F]/.test(filename);
+
+    // Try local save helper first (if available or untested)
+    if(_localSaveAvailable !== false) {
+      fetch('http://127.0.0.1:' + LOCAL_SAVE_PORT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ filename: filename, data: b64 })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if(data.ok) {
+          _localSaveAvailable = true;
+          toast('✅ Saved to Downloads: ' + data.filename, 4000);
+        } else {
+          throw new Error(data.error);
+        }
+      })
+      .catch(function() {
+        _localSaveAvailable = false;
+        // Fall back to browser download
+        _browserDownload(blob, filename, b64, hasNonAscii);
+      });
+    } else {
+      _browserDownload(blob, filename, b64, hasNonAscii);
+    }
+  };
+  reader.readAsDataURL(blob);
+}
+
+function _browserDownload(blob, filename, b64, hasNonAscii) {
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
@@ -4815,13 +5051,8 @@ function downloadBlob(blob, filename) {
   document.body.appendChild(a);
   a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
-
-  // Chrome on Linux ignores non-ASCII in download filenames (known browser bug).
-  // If filename has non-ASCII chars, show a persistent notification with the correct name.
-  var hasNonAscii = /[^\x00-\x7F]/.test(filename);
-  if(hasNonAscii) {
-    showRenameHint(filename);
-  }
+  // Show rename hint only for non-ASCII names on first failure
+  if(hasNonAscii) showRenameHint(filename);
 }
 
 function showRenameHint(filename) {
@@ -7576,8 +7807,9 @@ function updateFilterBarTop() {
   renderFilters();
   renderGrid();
   handleShareTarget();
-  // Check if app was updated since last visit
   checkAppVersion();
+  // Check if local save helper is running
+  setTimeout(function(){ checkHelperStatus(null); }, 2000);
   // Show skeleton briefly only if no local recipes yet
   var g = document.getElementById('recipeGrid');
   if (g && (!recipes || recipes.length === 0)) {
