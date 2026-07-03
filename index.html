@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v20.6 -->
+<!-- Tony's Recipes Collection v20.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v20.6';
+var APP_VERSION = 'v20.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.6</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v20.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3592,7 +3592,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v20.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4244,13 +4244,15 @@ function toggleShare(id){
   };
   document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
   document.getElementById('shareCopyBtn').onclick   = function(){ doCopy(id); };
-  if(navigator.share){
+  // navigator.share only works reliably on mobile — hide on desktop
+  var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var shareSupported = navigator.share && isMobile;
+  if(shareSupported){
     document.getElementById('shareNativeBtn').style.display='flex';
     document.getElementById('shareNativeBtn').onclick = function(){
       var btn = document.getElementById('shareNativeBtn');
       btn.disabled = true;
       btn.textContent = '⏳ Opening share…';
-      // Use a timeout to re-enable if share dialog is dismissed without resolving
       var timeout = setTimeout(function(){
         btn.disabled = false;
         btn.innerHTML = '<span style="font-size:20px;">📲</span> Share via…';
@@ -4261,7 +4263,6 @@ function toggleShare(id){
           clearTimeout(timeout);
           btn.disabled = false;
           btn.innerHTML = '<span style="font-size:20px;">📲</span> Share via…';
-          // AbortError = user cancelled, don't show error
           if(err && err.name !== 'AbortError') console.warn('[share]', err);
         });
     };
