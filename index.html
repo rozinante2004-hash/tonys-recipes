@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v21.7 -->
+<!-- Tony's Recipes Collection v21.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v21.7';
+var APP_VERSION = 'v21.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3094,7 +3094,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.7</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v21.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3642,7 +3642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v21.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4804,9 +4804,9 @@ function buildZip(files){
 }
 
 function downloadBlob(blob, filename) {
-  // Route through Cloudflare Worker which sets proper Content-Disposition header
-  // with RFC 5987 UTF-8 encoding — the only reliable way to get Unicode filenames
-  // on Chrome/Linux
+  // Store file in Worker KV, get back a one-time GET URL.
+  // Chrome downloads the file directly from that URL and honours
+  // the Content-Disposition: attachment; filename*=UTF-8''... header.
   var reader = new FileReader();
   reader.onload = function(e) {
     var b64 = e.target.result.split(',')[1];
@@ -4814,28 +4814,21 @@ function downloadBlob(blob, filename) {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        action: 'download',
+        action: 'download-store',
         data: b64,
         filename: filename,
-        mime: blob.type
+        mime: blob.type || 'application/octet-stream'
       })
     })
-    .then(function(resp) {
-      if(!resp.ok) throw new Error('Worker error ' + resp.status);
-      return resp.blob();
+    .then(function(resp) { return resp.json(); })
+    .then(function(data) {
+      if(!data.url) throw new Error('No URL returned');
+      // Navigate to the GET URL — browser receives Content-Disposition header
+      window.location.href = data.url;
     })
-    .then(function(respBlob) {
-      var url = URL.createObjectURL(respBlob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
-    })
-    .catch(function() {
-      // Fallback: direct blob URL (may show "download" on Linux)
+    .catch(function(err) {
+      console.warn('[download] Worker store failed:', err);
+      // Fallback — blob URL (filename may show as "download" on Linux)
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
@@ -4844,6 +4837,7 @@ function downloadBlob(blob, filename) {
       document.body.appendChild(a);
       a.click();
       setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+      toast('⚠️ Rename file to: ' + filename, 8000);
     });
   };
   reader.readAsDataURL(blob);
