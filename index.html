@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v22.5 -->
+<!-- Tony's Recipes Collection v22.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v22.5';
+var APP_VERSION = 'v22.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1936,6 +1936,23 @@ function showSaveHelperInfo() {
     'color:white;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;" ' +
     'id="copyAutoBtn">📋 Copy setup command</button>';
 
+  // Save directory setting
+  var dirSection = document.createElement('div');
+  dirSection.style.cssText = 'border:1px solid #E8E0D5;border-radius:10px;padding:14px;margin-bottom:12px;';
+  var currentDir = localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App';
+  dirSection.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:#5C3D2E;margin-bottom:6px;">📁 Save location</div>' +
+    '<div style="font-size:11px;color:#8A8279;margin-bottom:8px;">Where exported files are saved. Leave blank for ~/Downloads.</div>' +
+    '<div style="display:flex;gap:6px;">' +
+    '<input id="saveDirInput" type="text" placeholder="e.g. /home/rozinante/Recipes" value="' + currentDir + '" ' +
+    'style="flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:7px;font-size:13px;' +
+    'font-family:DM Sans,sans-serif;outline:none;" />' +
+    '<button onclick="saveDirSetting()" style="padding:7px 14px;background:var(--terracotta);color:white;' +
+    'border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;' +
+    'font-family:DM Sans,sans-serif;white-space:nowrap;">Save</button>' +
+    '</div>' +
+    '<div id="saveDirStatus" style="font-size:11px;margin-top:5px;color:var(--muted);"></div>';
+
   // Manual start
   var manualSection = document.createElement('div');
   manualSection.style.cssText = 'border:1px solid #E8E0D5;border-radius:10px;padding:14px;';
@@ -1946,6 +1963,7 @@ function showSaveHelperInfo() {
     '<div style="font-size:11px;color:#8A8279;margin-top:6px;">The &amp; runs it in background — no terminal window stays open.</div>';
 
   body.appendChild(btnRow);
+  body.appendChild(dirSection);
   body.appendChild(autoSection);
   body.appendChild(manualSection);
 
@@ -1985,6 +2003,22 @@ function updateHelperStatus() {
     }
   });
 }
+
+function saveDirSetting() {
+  var input = document.getElementById('saveDirInput');
+  var status = document.getElementById('saveDirStatus');
+  var dir = (input ? input.value.trim() : '') || '';
+  if(dir) {
+    localStorage.setItem('save_helper_dir', dir);
+    if(status) status.textContent = '✅ Saved — exports will go to: ' + dir;
+    toast('📁 Save location updated: ' + dir, 4000);
+  } else {
+    localStorage.removeItem('save_helper_dir');
+    if(status) status.textContent = '✅ Cleared — exports will go to ~/Downloads';
+    toast('📁 Save location reset to ~/Downloads', 3000);
+  }
+}
+window.saveDirSetting = saveDirSetting;
 
 function getAutoStartCmd() {
   return 'mkdir -p ~/.config/autostart && ' +
@@ -3293,7 +3327,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.5</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3842,7 +3876,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5019,7 +5053,11 @@ function downloadBlob(blob, filename) {
       fetch('http://127.0.0.1:' + LOCAL_SAVE_PORT, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ filename: filename, data: b64 })
+        body: JSON.stringify({
+        filename: filename,
+        data: b64,
+        directory: localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App'
+      })
       })
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
@@ -8105,6 +8143,22 @@ function updateFilterBarTop() {
       <div style="display:flex;flex-direction:column;gap:4px;">
         <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="deploy-link">🔑 API credentials <span class="deploy-hint">YouTube & other keys</span></a>
         <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" class="deploy-link">▶️ YouTube API quota <span class="deploy-hint">10,000 units/day free</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Linux Save Helper -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🐧 Linux Save Helper</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Fixes Hebrew/Russian filenames on Linux by saving exports directly to disk, bypassing Chrome browser limitations</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://rozinante2004-hash.github.io/tonys-recipes/local-save-helper.py" download class="deploy-link" onclick="this.style.background='#EAF5E9'">🐍 Download local-save-helper.py <span class="deploy-hint">Python helper script</span></a>
+        <a href="https://rozinante2004-hash.github.io/tonys-recipes/setup-save-helper.sh" download class="deploy-link" onclick="this.style.background='#EAF5E9'">⚙️ Download setup-save-helper.sh <span class="deploy-hint">One-click installer</span></a>
+        <div class="deploy-link" style="cursor:default;background:#F5F0EA;">
+          <span style="font-size:12px;color:var(--ink);">📋 Run in terminal after downloading:</span>
+          <span class="deploy-hint" style="font-family:monospace;">bash ~/Downloads/setup-save-helper.sh</span>
+        </div>
       </div>
 
     </div>
