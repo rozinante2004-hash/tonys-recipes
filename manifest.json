@@ -8,8 +8,16 @@
   "theme_color": "#5C3D2E",
   "background_color": "#FAF7F2",
   "icons": [
-    { "src": "/tonys-recipes/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/tonys-recipes/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/tonys-recipes/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/tonys-recipes/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ],
   "share_target": {
     "action": "/tonys-recipes/",
