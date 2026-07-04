@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v22.8 -->
+<!-- Tony's Recipes Collection v22.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1335,7 +1335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v22.8';
+var APP_VERSION = 'v22.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1939,7 +1939,7 @@ function showSaveHelperInfo() {
   // Save directory setting
   var dirSection = document.createElement('div');
   dirSection.style.cssText = 'border:1px solid #E8E0D5;border-radius:10px;padding:14px;margin-bottom:12px;';
-  var currentDir = localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App';
+  var currentDir = localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App/Backups';
   dirSection.innerHTML =
     '<div style="font-size:12px;font-weight:700;color:#5C3D2E;margin-bottom:6px;">📁 Save location</div>' +
     '<div style="font-size:11px;color:#8A8279;margin-bottom:8px;">Where exported files are saved. Leave blank for ~/Downloads.</div>' +
@@ -2010,12 +2010,13 @@ function saveDirSetting() {
   var dir = (input ? input.value.trim() : '') || '';
   if(dir) {
     localStorage.setItem('save_helper_dir', dir);
+    console.log('[SaveHelper] Directory set to:', dir);
     if(status) status.textContent = '✅ Saved — exports will go to: ' + dir;
-    toast('📁 Save location updated: ' + dir, 4000);
+    toast('📁 Save location updated: ' + dir, 5000);
   } else {
     localStorage.removeItem('save_helper_dir');
-    if(status) status.textContent = '✅ Cleared — exports will go to ~/Downloads';
-    toast('📁 Save location reset to ~/Downloads', 3000);
+    if(status) status.textContent = '✅ Cleared — using helper default directory';
+    toast('📁 Save location reset to helper default', 3000);
   }
 }
 window.saveDirSetting = saveDirSetting;
@@ -3327,7 +3328,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.8</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v22.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3876,7 +3877,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v22.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5056,14 +5057,15 @@ function downloadBlob(blob, filename) {
         body: JSON.stringify({
         filename: filename,
         data: b64,
-        directory: localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App'
+        directory: localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App/Backups'
       })
       })
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
         if(data.ok) {
           _localSaveAvailable = true;
-          toast('✅ Saved to Downloads: ' + data.filename, 4000);
+          var savedDir = data.directory || 'Downloads';
+          toast('✅ Saved: ' + data.filename + ' → ' + savedDir, 5000);
         } else {
           throw new Error(data.error);
         }

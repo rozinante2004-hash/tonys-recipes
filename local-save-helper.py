@@ -4,7 +4,7 @@ import http.server, json, base64, os, sys, threading
 from pathlib import Path
 
 PORT = 27182
-DEFAULT_SAVE_DIR = Path.home() / 'Documents' / 'Projects' / 'Recipes App'
+DEFAULT_SAVE_DIR = Path.home() / 'Documents' / 'Projects' / 'Recipes App' / 'Backups'
 ALLOWED_ORIGIN = 'https://rozinante2004-hash.github.io'
 _server = None
 
