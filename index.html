@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v24.0 -->
+<!-- Tony's Recipes Collection v25.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1354,7 +1354,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v24.0';
+var APP_VERSION = 'v25.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3364,7 +3364,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v24.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v25.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3914,7 +3914,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v24.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6524,6 +6524,150 @@ function saveData() {
   }
 }
 
+// ─── CLOUD PHOTO STORAGE ──────────────────────────────────────────────────────
+// Firestore caps a single document at ~1 MiB. Photos are base64 and quickly overflow
+// the one recipes doc, so each recipe's display photo lives in its own doc
+// `shared/photo_<id>` (covered by the existing `match /shared/{document=**}` rule),
+// and the recipes doc is kept photo-free. `originalPhoto` (a full-res scan backup that
+// can be several MB) is never synced — it stays local-only.
+var FIRESTORE_DOC_LIMIT = 1048487;   // Firestore's real per-document byte cap
+var _cloudPhotoStamps   = {};        // id -> last-synced photo string (skip unchanged rewrites)
+var _cloudPhotoIds      = {};        // id -> true when a cloud photo doc exists for that recipe
+
+function byteLen(str) {
+  try { return new Blob([str]).size; } catch(e) { return (str || '').length; }
+}
+
+function isSizeError(err) {
+  var m = ((err && err.message) || '').toLowerCase();
+  var c = (err && err.code) || '';
+  return c === 'invalid-argument' || m.indexOf('longer than') > -1 ||
+         m.indexOf('maximum') > -1 || m.indexOf('exceeds') > -1 || m.indexOf('1048') > -1;
+}
+
+// A recipe copy with photo data removed, for the slim recipes doc. `hp:1` flags that a
+// separate cloud photo doc should be fetched on load.
+function stripPhotosForCloud(list) {
+  return list.map(function(r) {
+    var c = {};
+    for (var k in r) {
+      if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== 'hp') c[k] = r[k];
+    }
+    c.photo = '';
+    if (r.photo) c.hp = 1;
+    return c;
+  });
+}
+
+// Write each changed photo to its own doc; remove docs for cleared/deleted photos.
+// Returns an array of human-readable descriptions of photos too large to sync.
+async function syncCloudPhotos() {
+  var errors = [];
+  var currentIds = {};
+  for (var i = 0; i < recipes.length; i++) {
+    var r = recipes[i];
+    currentIds[r.id] = true;
+    if (r.photo) {
+      if (_cloudPhotoStamps[r.id] === r.photo) continue; // unchanged — already synced
+      var pbytes = byteLen(r.photo);
+      if (pbytes > FIRESTORE_DOC_LIMIT) {
+        errors.push((r.name || ('#' + r.id)) + ' — ' + Math.round(pbytes / 1024) + ' KB');
+        continue;
+      }
+      try {
+        await _fbDb.collection('shared').doc('photo_' + r.id)
+          .set({ photo: r.photo, updatedAt: r.updatedAt || Date.now() });
+        _cloudPhotoStamps[r.id] = r.photo;
+        _cloudPhotoIds[r.id] = true;
+      } catch(e) {
+        if (isSizeError(e)) errors.push((r.name || ('#' + r.id)) + ' — too large');
+        else throw e; // genuine failure (network/permission) — let the caller handle it
+      }
+    } else if (_cloudPhotoIds[r.id]) {
+      // photo was removed — delete its cloud doc
+      try { await _fbDb.collection('shared').doc('photo_' + r.id).delete(); } catch(e) {}
+      delete _cloudPhotoIds[r.id];
+      delete _cloudPhotoStamps[r.id];
+    }
+  }
+  // Drop photo docs for recipes that no longer exist
+  Object.keys(_cloudPhotoIds).forEach(function(id) {
+    if (!currentIds[id]) {
+      _fbDb.collection('shared').doc('photo_' + id).delete().catch(function() {});
+      delete _cloudPhotoIds[id];
+      delete _cloudPhotoStamps[id];
+    }
+  });
+  return errors;
+}
+
+// Re-attach cloud photos to a freshly-loaded recipe list. Legacy inline photos (from the
+// old single-doc format) are kept as-is and left un-stamped so the next save migrates them.
+async function attachCloudPhotos(list) {
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    if (r.photo) { delete r.hp; continue; } // legacy inline photo — keep, migrate on next save
+    if (r.hp) {
+      try {
+        var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
+        if (snap.exists) {
+          var d = snap.data() || {};
+          r.photo = d.photo || '';
+          _cloudPhotoStamps[r.id] = r.photo;
+          _cloudPhotoIds[r.id] = true;
+        }
+      } catch(e) { /* leave photoless if the photo doc can't be read */ }
+    }
+    delete r.hp;
+  }
+  return list;
+}
+
+function handleFirestoreSaveError(err) {
+  setDriveStatus('error', 'Sync failed');
+  console.error('[Firestore] Save FAILED:', err && err.code, err && err.message, err);
+  var code = (err && err.code) || '';
+  var msg  = (err && err.message) || '';
+  _offlineQueue = true;
+  try { localStorage.setItem('tonys_offline_queue', '1'); } catch(e) {}
+
+  if (isSizeError(err)) {
+    showServiceError('DOC_TOO_BIG: A cloud item exceeded Firestore\'s ~1 MB limit.\n\n'
+      + 'Photos are now stored separately, so this most likely means a single recipe\'s text '
+      + '(notes/steps) is unusually large. Details: ' + (msg || code)
+      + '\n\nRetrying will NOT fix this — trim the recipe and save again.');
+    return;
+  }
+  if (code === 'permission-denied' || msg.toLowerCase().indexOf('permission') > -1) {
+    showServiceError('PERMISSION: The cloud write was denied by your Firestore security rules.\n\n'
+      + 'Make sure your account is allowed to write to the shared collection:\n'
+      + 'https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules');
+    return;
+  }
+  if (msg.indexOf('quota') > -1 || code === 'resource-exhausted' || msg.indexOf('RESOURCE_EXHAUSTED') > -1) {
+    showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data\n\nUpgrade at: https://console.firebase.google.com/u/0/project/recipes-f379d/overview');
+    return;
+  }
+  if (code === 'unavailable' || !navigator.onLine) {
+    toast('📴 Offline — changes saved locally, will sync when reconnected');
+    setTimeout(function() {
+      if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) {
+        toast('🔄 Retrying cloud sync...');
+        saveToFirestore().then(function() {
+          _offlineQueue = false;
+          try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
+        });
+      }
+    }, 30000);
+    return;
+  }
+  // Unknown error — be honest about what actually happened, then retry once
+  toast('❌ Cloud sync failed: ' + (code || msg.slice(0, 60)) + ' — will retry shortly');
+  setTimeout(function() {
+    if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) saveToFirestore();
+  }, 30000);
+}
+
 async function saveToFirestore() {
   var user = window._fbUser;
   if (!user || !window._driveMode) {
@@ -6536,31 +6680,41 @@ async function saveToFirestore() {
   setDriveStatus('syncing', '☁️ Saving...');
   try {
     window._justSaved = true;
+
+    // 1) Slim recipes doc (no photo data) — stays comfortably under the 1 MiB limit
+    var recipesJson = JSON.stringify(stripPhotosForCloud(recipes));
+    var docBytes = byteLen(recipesJson);
+    if (docBytes > FIRESTORE_DOC_LIMIT) {
+      window._justSaved = false;
+      setDriveStatus('error', 'Sync failed');
+      showServiceError('DOC_TOO_BIG: Your recipe text alone is too large for one cloud document ('
+        + Math.round(docBytes / 1024) + ' KB, limit ~1024 KB), even with photos removed.\n\n'
+        + 'This usually means one recipe has an enormous notes or steps field. Trim it and try again.');
+      return;
+    }
     await _fbDb.collection('shared').doc('recipes').set({
-      recipes: JSON.stringify(recipes), nextId: nextId,
-      updatedAt: new Date().toISOString()
+      recipes: recipesJson, nextId: nextId, updatedAt: new Date().toISOString()
     });
+
+    // 2) Each changed photo into its own doc
+    var photoErrors = await syncCloudPhotos();
+
     setTimeout(function() { window._justSaved = false; }, 5000);
+    _offlineQueue = false;
+    try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
+
+    if (photoErrors.length) {
+      setDriveStatus('error', 'Some photos not synced');
+      showServiceError('PHOTO_TOO_BIG: ' + photoErrors.length + ' photo(s) exceed Firestore\'s ~1 MB '
+        + 'per-item limit and could not be synced:\n\n'
+        + photoErrors.map(function(e) { return '• ' + e; }).join('\n')
+        + '\n\nYour recipes synced fine — only these photos were skipped. Re-add a smaller photo for them.');
+    } else {
       setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
+    }
   } catch(err) {
     window._justSaved = false;
-    setDriveStatus('error', 'Sync failed');
-    console.error('[Firestore] Save FAILED:', err.code, err.message, err);
-    var fbErr = err.message || '';
-    // Queue for retry when back online
-    _offlineQueue = true;
-    if (fbErr.includes('quota') || fbErr.includes('RESOURCE_EXHAUSTED')) {
-      showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data\n\nUpgrade at: https://console.firebase.google.com/u/0/project/recipes-f379d/overview');
-    } else {
-      toast('❌ Cloud sync failed — will retry automatically when connection is restored');
-      // Schedule automatic retry in 30 seconds
-      setTimeout(function() {
-        if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) {
-          toast('🔄 Retrying cloud sync...');
-          saveToFirestore().then(function() { _offlineQueue = false; });
-        }
-      }, 30000);
-    }
+    handleFirestoreSaveError(err);
   }
 }
 
@@ -6569,6 +6723,9 @@ var _firestoreUnsubscribe = null;
 async function loadFromFirestore() {
   var user = window._fbUser;
   if (!user) return false;
+  // originalPhoto is local-only (never synced) — remember it so a cloud load doesn't drop it
+  var _localOrig = {};
+  recipes.forEach(function(r) { if (r.originalPhoto) _localOrig[r.id] = r.originalPhoto; });
   try {
     // Step 1: One-time load to get current data
     var snap = await _fbDb.collection('shared').doc('recipes').get();
@@ -6597,6 +6754,9 @@ async function loadFromFirestore() {
         } else {
           recipes = fsRecipes; // normal load
         }
+        // Pull each recipe's photo from its own cloud doc, and restore local-only originals
+        await attachCloudPhotos(recipes);
+        recipes.forEach(function(r) { if (!r.originalPhoto && _localOrig[r.id]) r.originalPhoto = _localOrig[r.id]; });
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
         hasData = true;
@@ -6654,13 +6814,18 @@ async function loadFromFirestore() {
   }
 }
 
-function applyRemoteUpdate() {
+async function applyRemoteUpdate() {
   var data = window._pendingRemoteData;
   if (!data) { location.reload(); return; }
   try {
     var parsed = JSON.parse(data.recipes || '[]');
     if (Array.isArray(parsed) && parsed.length > 0) {
-      recipes = migrateRecipes(parsed);
+      var localOrig = {};
+      recipes.forEach(function(r) { if (r.originalPhoto) localOrig[r.id] = r.originalPhoto; });
+      var incoming = migrateRecipes(parsed);
+      await attachCloudPhotos(incoming);
+      incoming.forEach(function(r) { if (!r.originalPhoto && localOrig[r.id]) r.originalPhoto = localOrig[r.id]; });
+      recipes = incoming;
       if (data.nextId) nextId = Math.max(nextId, data.nextId);
       saveLocal();
       renderFilters();
