@@ -177,6 +177,8 @@ forwards whatever the client sends.)
 - `tonys_nextId_v1` → the next integer id (`NEXTID_KEY`)
 - `recent_views` → array of recently viewed recipe ids (max 8, most‑recent first)
 - `scale_<id>` → remembered serving multiplier per recipe
+- `tonys_view_mode` → `'grid'` | `'list'` — remembered grid/list toggle (phones default to `grid`)
+- `tonys_mobile_cols` → `1`–`5`, recipe cubes per row on phone‑width screens (Settings → Grid Layout; default `3`, drives the `--mobile-cols` CSS variable)
 - `tonys_offline_queue` → `'1'` when there are unsynced offline edits
 - `tonys_access_members` → family access list (also mirrored to Firestore `shared/access`)
 - `bring_token_expiry` → unix seconds when the Bring token expires
@@ -280,12 +282,18 @@ A thin save‑status bar with a **Reset** (clear all data) link sits under the h
 A separate **mobile filter bar** (`#mobileFilterBar`) collapses categories/diets into ▾ dropdown
 panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow screens.
 
-**Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`, default `list`). Cards show photo
-or emoji tile (with category), title (right‑aligned for Hebrew), prep/servings, difficulty pill,
-favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a video badge for bookmarks. There is a
-**sort** control (`setSort`): default / recent / alpha (A–Z) / prep time / difficulty / popular
-(by cookCount). Search matches name, category, ingredient names, and step text. Empty states are
-context‑aware (no favourites / no search results / no recipes yet + Add button).
+**Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
+`tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
+resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
+(`.card-category-badge`, bottom‑left over the image), title (right‑aligned for Hebrew),
+prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a video
+badge for bookmarks. On phone‑width screens the grid uses a configurable column count
+(`--mobile-cols`, 1–5, default 3) with square (`aspect-ratio:1/1`) cubes — see **Settings → Grid
+Layout** (`openGridSettings`, stored in `tonys_mobile_cols`). Desktop grid uses
+`repeat(auto-fill, minmax(220px, 1fr))`. There is a **sort** control (`setSort`): default /
+recent / alpha (A–Z) / prep time / difficulty / popular (by cookCount). Search matches name,
+category, ingredient names, and step text. Empty states are context‑aware (no favourites / no
+search results / no recipes yet + Add button).
 
 **Select mode** (`toggleSelectMode`): checkboxes on cards + a bottom action bar to bulk delete,
 export (Excel/Word), share, or print selected recipes.
