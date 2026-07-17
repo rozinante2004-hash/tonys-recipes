@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v23.0 -->
+<!-- Tony's Recipes Collection v24.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1354,7 +1354,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v23.0';
+var APP_VERSION = 'v24.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2161,6 +2161,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .recipe-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(92,61,46,0.12); }
 .card-image { width: 100%; height: 148px; display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; overflow: hidden; }
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.55); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-body { padding: 11px 13px 13px; }
 .card-category { font-size: 10px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 3px; }
 .card-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3;; text-align: right; }
@@ -2170,6 +2171,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .easy { background: #EAF5E9; color: #3A7D44; } .medium { background: #FFF3E0; color: #B05E00; } .hard { background: #FEECEC; color: #B03030; }
 .fav-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px; transition: transform 0.15s; }
 .fav-btn:hover { transform: scale(1.2); }
+
+/* MOBILE RECIPE GRID — configurable columns (Settings → Grid Layout) */
+@media (max-width: 700px) {
+  .grid-section { padding: 1rem 0.75rem 3rem; }
+  .recipe-grid { grid-template-columns: repeat(var(--mobile-cols, 3), minmax(0, 1fr)); gap: 10px; }
+  .recipe-grid .card-image { height: auto; aspect-ratio: 1 / 1; font-size: 34px; }
+  .recipe-grid .card-body { padding: 8px 9px 9px; }
+  .recipe-grid .card-title { font-size: 13px; }
+  .recipe-grid .card-meta { font-size: 10px; gap: 6px; }
+  .recipe-grid .card-footer { padding: 6px 9px; }
+}
+
+/* Grid Layout settings — column picker buttons */
+.gridcol-btn { flex: 1; padding: 12px 0; border-radius: 8px; border: 1.5px solid var(--border); background: #fff; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all 0.15s; }
+.gridcol-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
+.gridcol-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: #fff; }
 
 /* MODALS */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; }
@@ -3347,7 +3364,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v23.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v24.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3359,6 +3376,7 @@ body.banner-shown .header {
       <div class="drop-group">
         <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️<span id="helperIndicator" style="position:absolute;top:0;right:0;width:7px;height:7px;border-radius:50%;background:#ccc;border:1px solid rgba(255,255,255,0.5);"></span></button>
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
+          <button class="drop-item" onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
@@ -3896,7 +3914,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v23.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v24.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4291,10 +4309,55 @@ let viewMode = 'list';
 
 function setView(mode) {
   viewMode = mode;
+  try { localStorage.setItem('tonys_view_mode', mode); } catch(e){}
   document.getElementById('viewBtnGrid').classList.toggle('active-view', mode === 'grid');
   document.getElementById('viewBtnList').classList.toggle('active-view', mode === 'list');
   renderGrid();
 }
+
+// Restore the saved view; default phones to the cube grid so it resembles the PC layout
+function initViewMode() {
+  var saved = null;
+  try { saved = localStorage.getItem('tonys_view_mode'); } catch(e){}
+  var isPhone = window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
+  var mode = (saved === 'grid' || saved === 'list') ? saved : (isPhone ? 'grid' : 'list');
+  viewMode = mode;
+  var g = document.getElementById('viewBtnGrid');
+  var l = document.getElementById('viewBtnList');
+  if (g) g.classList.toggle('active-view', mode === 'grid');
+  if (l) l.classList.toggle('active-view', mode === 'list');
+}
+
+// ─── MOBILE GRID COLUMNS (Settings → Grid Layout, 1–5, default 3) ─────────────
+function getMobileCols() {
+  var n = parseInt(localStorage.getItem('tonys_mobile_cols'), 10);
+  if (isNaN(n) || n < 1 || n > 5) n = 3;
+  return n;
+}
+function applyMobileCols() {
+  document.documentElement.style.setProperty('--mobile-cols', getMobileCols());
+}
+function setMobileCols(n) {
+  n = Math.max(1, Math.min(5, parseInt(n, 10) || 3));
+  try { localStorage.setItem('tonys_mobile_cols', String(n)); } catch(e){}
+  applyMobileCols();
+  renderGridColsUI();
+  toast('📱 Phone grid set to ' + n + ' per row');
+}
+function renderGridColsUI() {
+  var cur = getMobileCols();
+  var wrap = document.getElementById('gridColsBtns');
+  if (!wrap) return;
+  wrap.innerHTML = [1,2,3,4,5].map(function(n){
+    return '<button class="gridcol-btn' + (n===cur?' active':'') + '" onclick="setMobileCols(' + n + ')">' + n + '</button>';
+  }).join('');
+}
+function openGridSettings() {
+  renderGridColsUI();
+  document.getElementById('gridSettingsOverlay').classList.add('open');
+}
+window.setMobileCols   = setMobileCols;
+window.openGridSettings = openGridSettings;
 
 function setSort(mode) {
   sortMode = mode;
@@ -4411,7 +4474,7 @@ function renderGrid() {
       <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${r.bg}">
-          ${r.photo ? `<img src="${r.photo}" alt="">` : `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:52px;line-height:1;">${r.emoji}</span><span style="font-size:10px;color:rgba(0,0,0,0.25);letter-spacing:0.5px;text-transform:uppercase;">${r.category}</span></div>`}
+          ${r.photo ? `<img src="${r.photo}" alt="">` : `<span style="font-size:52px;line-height:1;">${r.emoji}</span>`}
           <div class="card-category-badge">${r.category}</div>
           ${r.isVideoBookmark ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
         </div>
@@ -7863,6 +7926,8 @@ function updateFilterBarTop() {
     var ls = document.getElementById('loginScreen');
     if (ls) ls.style.display = 'none';
   }
+  applyMobileCols();
+  initViewMode();
   renderFilters();
   renderGrid();
   handleShareTarget();
@@ -8335,6 +8400,24 @@ function updateFilterBarTop() {
       <div id="dropZoneStatus" style="margin-top:12px;font-size:13px;color:var(--muted);text-align:center;min-height:20px;"></div>
       <div style="margin-top:16px;padding:12px;background:#EEF6FF;border-radius:8px;font-size:12px;color:#2255AA;line-height:1.6;">
         <strong>Tip for Linux users:</strong> If the regular file picker shows permission errors, drag the file directly from your file manager (Nautilus, Dolphin, etc.) into the box above.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GRID LAYOUT SETTINGS MODAL -->
+<div class="modal-overlay" id="gridSettingsOverlay" onclick="bgClose(event,'gridSettingsOverlay')">
+  <div class="modal" style="max-width:420px;">
+    <button class="modal-close" onclick="closeM('gridSettingsOverlay')">✕</button>
+    <div class="modal-header">
+      <div class="modal-header-title">📱 Grid Layout</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">How many recipe cubes per row on phones</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-label" style="margin-bottom:8px;">Cubes per row (1–5)</div>
+      <div id="gridColsBtns" style="display:flex;gap:8px;"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;">
+        Applies to the phone view when the grid (▦) layout is active. Your desktop layout is unaffected. Default is 3.
       </div>
     </div>
   </div>
