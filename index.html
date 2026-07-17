@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.0 -->
+<!-- Tony's Recipes Collection v25.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1354,7 +1354,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.0';
+var APP_VERSION = 'v25.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3364,7 +3364,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v25.0</div>
+      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v25.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3914,7 +3914,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6472,11 +6472,105 @@ function confirmImportParsed(parsed, overlayId) {
 const STORAGE_KEY  = 'tonys_recipes_v1';
 const NEXTID_KEY  = 'tonys_nextId_v1';
 
+// ─── LOCAL PHOTO STORAGE (IndexedDB) ──────────────────────────────────────────
+// localStorage is only ~5 MB and stores strings as UTF-16, so inline base64 photos
+// fill it fast and saves then fail silently. Photos live in IndexedDB (hundreds of
+// MB+) keyed by recipe id; localStorage keeps only the lightweight recipe text.
+// Photos stay inline in the in-memory `recipes` array, so rendering / backup / export
+// are unchanged. If IndexedDB is unavailable (e.g. private mode) we fall back to the
+// old inline-in-localStorage behaviour.
+var IDB_NAME = 'tonys_recipes_db', IDB_STORE = 'photos', _idbReadyPromise = null;
+var _idbAvailable = (typeof indexedDB !== 'undefined' && indexedDB !== null);
+var _idbPhotoStamps = {}; // id -> signature of last-written photos (skip unchanged writes)
+
+function idbStamp(r) {
+  return (r.photo||'').length + ':' + (r.originalPhoto||'').length + ':' + (r.updatedAt||0);
+}
+function idbOpen() {
+  if (_idbReadyPromise) return _idbReadyPromise;
+  _idbReadyPromise = new Promise(function(resolve, reject) {
+    try {
+      var req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+      };
+      req.onsuccess = function(e) { resolve(e.target.result); };
+      req.onerror   = function() { _idbAvailable = false; reject(req.error); };
+    } catch(e) { _idbAvailable = false; reject(e); }
+  });
+  return _idbReadyPromise;
+}
+function idbStore(mode) {
+  return idbOpen().then(function(db) { return db.transaction(IDB_STORE, mode).objectStore(IDB_STORE); });
+}
+function idbPut(rec) {
+  return idbStore('readwrite').then(function(s) { return new Promise(function(res, rej) {
+    var r = s.put(rec); r.onsuccess = function(){res();}; r.onerror = function(){rej(r.error);}; }); });
+}
+function idbDelete(id) {
+  return idbStore('readwrite').then(function(s) { return new Promise(function(res) {
+    var r = s.delete(id); r.onsuccess = function(){res();}; r.onerror = function(){res();}; }); });
+}
+function idbGetAll() {
+  return idbStore('readonly').then(function(s) { return new Promise(function(res) {
+    var r = s.getAll(); r.onsuccess = function(){res(r.result || []);}; r.onerror = function(){res([]);}; }); });
+}
+
+// Copy of the recipe list with photo data removed, for localStorage. `_ph`/`_po` flag
+// that a photo / originalPhoto exists in IndexedDB and should be hydrated on load.
+function stripPhotosLocal(list) {
+  return list.map(function(r) {
+    var c = {};
+    for (var k in r) {
+      if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== '_ph' && k !== '_po') c[k] = r[k];
+    }
+    c.photo = ''; c.originalPhoto = '';
+    if (r.photo) c._ph = 1;
+    if (r.originalPhoto) c._po = 1;
+    return c;
+  });
+}
+
+// Persist photos to IndexedDB: write changed ones, prune deleted ones. Fire-and-forget.
+function savePhotosToIDB() {
+  if (!_idbAvailable) return;
+  var currentIds = {};
+  recipes.forEach(function(r) {
+    currentIds[r.id] = true;
+    if (r._ph || r._po) return; // photo lives in IDB but isn't hydrated into memory yet — leave it
+    if (r.photo || r.originalPhoto) {
+      var stamp = idbStamp(r);
+      if (_idbPhotoStamps[r.id] !== stamp) {
+        idbPut({ id: r.id, photo: r.photo || '', originalPhoto: r.originalPhoto || '' })
+          .then(function() { _idbPhotoStamps[r.id] = stamp; })
+          .catch(function(e) { console.warn('IDB photo write failed:', e); });
+      }
+    } else if (_idbPhotoStamps[r.id]) {
+      idbDelete(r.id); delete _idbPhotoStamps[r.id];
+    }
+  });
+  Object.keys(_idbPhotoStamps).forEach(function(id) {
+    if (!currentIds[id]) { idbDelete(Number(id)); delete _idbPhotoStamps[id]; }
+  });
+}
+
+function handleLocalQuotaError() {
+  toast('⚠️ Local storage is full — freeing space by moving photos to the database…');
+  // With photos offloaded to IDB the text is tiny, so this is rare; surface it honestly.
+  console.warn('localStorage quota exceeded even for photo-free recipe text.');
+}
+
 function saveLocal() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+    var payload = _idbAvailable ? stripPhotosLocal(recipes) : recipes;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     localStorage.setItem(NEXTID_KEY, String(nextId));
-  } catch(e) { console.warn('localStorage save failed:', e); }
+  } catch(e) {
+    console.warn('localStorage save failed:', e);
+    if (e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''))) handleLocalQuotaError();
+  }
+  if (_idbAvailable) savePhotosToIDB();
 }
 
 function migrateRecipes(list) {
@@ -6494,6 +6588,31 @@ function migrateRecipes(list) {
   });
 }
 
+// Pull photos back out of IndexedDB into the in-memory recipes, then re-render.
+function hydratePhotosFromIDB() {
+  return idbGetAll().then(function(rows) {
+    var byId = {};
+    rows.forEach(function(row) { byId[row.id] = row; });
+    var changed = false;
+    recipes.forEach(function(r) {
+      if (r._ph || r._po) {
+        var row = byId[r.id];
+        if (row) {
+          if (r._ph && row.photo) { r.photo = row.photo; changed = true; }
+          if (r._po && row.originalPhoto) { r.originalPhoto = row.originalPhoto; changed = true; }
+        }
+        _idbPhotoStamps[r.id] = idbStamp(r);
+        delete r._ph; delete r._po;
+      }
+    });
+    if (changed) {
+      if (typeof renderGrid === 'function') renderGrid();
+      var o = document.getElementById('viewOverlay');
+      if (o && o.classList.contains('open') && typeof drawView === 'function') drawView();
+    }
+  }).catch(function(e) { console.warn('IDB hydrate failed:', e); });
+}
+
 function loadLocal() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -6503,6 +6622,16 @@ function loadLocal() {
         recipes = migrateRecipes(parsed);
         const sid = localStorage.getItem(NEXTID_KEY);
         if (sid) nextId = Math.max(nextId, parseInt(sid) || 10);
+        var needsHydrate = recipes.some(function(r) { return r._ph || r._po; });
+        if (_idbAvailable && needsHydrate) {
+          // New format: photos are in IndexedDB — load them in asynchronously
+          hydratePhotosFromIDB();
+        } else if (_idbAvailable) {
+          // Legacy format: photos are still inline in localStorage — offload them to
+          // IndexedDB so the next save writes photo-free text and frees localStorage.
+          recipes.forEach(function(r) { if (r.photo || r.originalPhoto) _idbPhotoStamps[r.id] = '__migrate__'; });
+          savePhotosToIDB();
+        }
         return true;
       }
     }
@@ -6551,10 +6680,11 @@ function stripPhotosForCloud(list) {
   return list.map(function(r) {
     var c = {};
     for (var k in r) {
-      if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== 'hp') c[k] = r[k];
+      if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== 'hp'
+          && k !== '_ph' && k !== '_po') c[k] = r[k];
     }
     c.photo = '';
-    if (r.photo) c.hp = 1;
+    if (r.photo || r._ph) c.hp = 1; // _ph: photo is in local IDB but not yet hydrated
     return c;
   });
 }
@@ -6583,8 +6713,8 @@ async function syncCloudPhotos() {
         if (isSizeError(e)) errors.push((r.name || ('#' + r.id)) + ' — too large');
         else throw e; // genuine failure (network/permission) — let the caller handle it
       }
-    } else if (_cloudPhotoIds[r.id]) {
-      // photo was removed — delete its cloud doc
+    } else if (_cloudPhotoIds[r.id] && !r._ph) {
+      // photo was genuinely removed (not merely un-hydrated from local IDB) — delete its doc
       try { await _fbDb.collection('shared').doc('photo_' + r.id).delete(); } catch(e) {}
       delete _cloudPhotoIds[r.id];
       delete _cloudPhotoStamps[r.id];

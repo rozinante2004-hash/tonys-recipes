@@ -173,7 +173,9 @@ forwards whatever the client sends.)
 ## 5. Data model
 
 **localStorage keys:**
-- `tonys_recipes_v1` → JSON array of recipe objects (`STORAGE_KEY`)
+- `tonys_recipes_v1` → JSON array of recipe objects (`STORAGE_KEY`) — **photo‑free** when
+  IndexedDB is available (see local photo storage below); each recipe carries `_ph`/`_po` flags
+  marking that a photo/originalPhoto lives in IndexedDB
 - `tonys_nextId_v1` → the next integer id (`NEXTID_KEY`)
 - `recent_views` → array of recently viewed recipe ids (max 8, most‑recent first)
 - `scale_<id>` → remembered serving multiplier per recipe
@@ -248,6 +250,19 @@ it is captured before a cloud load and re‑attached afterward so a load doesn't
 Save errors are classified honestly (`handleFirestoreSaveError`/`isSizeError`): size vs.
 `permission-denied` vs. quota vs. genuine `unavailable`/offline — only real network errors get the
 auto‑retry; oversized photos are named and skipped while the rest sync.
+
+**Local photo storage (IndexedDB — same reasoning as the cloud, for `localStorage`'s ~5 MB cap):**
+`localStorage` stores strings as UTF‑16, so inline base64 photos overflow it fast and saves then
+fail silently. Photos are therefore kept in **IndexedDB** (`db tonys_recipes_db`, store `photos`,
+keyed by recipe id, `{ id, photo, originalPhoto }`), while `localStorage` holds only photo‑free
+recipe text (`saveLocal` → `stripPhotosLocal`, setting `_ph`/`_po` flags). `savePhotosToIDB`
+writes only changed photos and prunes deleted ones; `loadLocal` renders text immediately and
+`hydratePhotosFromIDB` re‑attaches photos asynchronously, then re‑renders. Photos stay inline in
+the in‑memory `recipes` array (so rendering/backup/export are unchanged). Legacy inline‑in‑
+`localStorage` photos are detected on load and migrated to IndexedDB on the next save. If
+IndexedDB is unavailable (e.g. private mode) it falls back to the old inline‑in‑`localStorage`
+behaviour. The `_ph`/`_po` flags also guard the cloud path so a not‑yet‑hydrated recipe never
+wipes its cloud photo.
 
 ---
 
