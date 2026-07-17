@@ -228,9 +228,26 @@ logic only pushes local recipes to the cloud if the user has **more than 5** (i.
 `notes=''`, `source=''`, `nutrition=null`, `originalPhoto=''`, `updatedAt=0`; if
 `isVideoBookmark && !isClip` set `isClip=true`). Run on every load/restore/remote‑update.
 
-**Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }`.
-The whole collection is a single shared document so the whole family reads/writes the same list.
+**Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }` —
+but the JSON is **photo‑free** (see below). The whole family reads/writes this one shared list.
 Doc `shared/access` = `{ members, updatedAt }`. Legacy `users/{uid}/…` rules kept for safety.
+
+**Cloud photo storage (critical — Firestore's 1 MiB/doc limit):** photos are base64 and must
+NOT live inline in the `shared/recipes` doc or it overflows 1 MiB after a dozen or so photos and
+every write fails. Instead, `saveToFirestore` writes a **slim** recipes doc via
+`stripPhotosForCloud` (each recipe's `photo` blanked, an `hp:1` flag set when a photo exists, and
+`originalPhoto` omitted entirely), then `syncCloudPhotos` writes each recipe's display photo to
+its **own** doc `shared/photo_<id>` = `{ photo:<base64>, updatedAt }` (only when changed; deletes
+docs for removed/deleted photos). These per‑photo docs sit in the `shared` collection so the
+existing `match /shared/{document=**}` rule already permits them — no rules change needed.
+`loadFromFirestore`/`applyRemoteUpdate` re‑attach photos via `attachCloudPhotos` (fetch
+`shared/photo_<id>` for `hp` recipes; legacy inline photos are kept and migrated on next save).
+Photos remain inline in memory + localStorage, so rendering/backup/export are unchanged.
+**`originalPhoto` (the full‑res scan backup, potentially many MB) is never synced — local‑only**;
+it is captured before a cloud load and re‑attached afterward so a load doesn't drop it.
+Save errors are classified honestly (`handleFirestoreSaveError`/`isSizeError`): size vs.
+`permission-denied` vs. quota vs. genuine `unavailable`/offline — only real network errors get the
+auto‑retry; oversized photos are named and skipped while the rest sync.
 
 ---
 
