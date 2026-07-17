@@ -173,7 +173,9 @@ forwards whatever the client sends.)
 ## 5. Data model
 
 **localStorage keys:**
-- `tonys_recipes_v1` → JSON array of recipe objects (`STORAGE_KEY`)
+- `tonys_recipes_v1` → JSON array of recipe objects (`STORAGE_KEY`) — **photo‑free** when
+  IndexedDB is available (see local photo storage below); each recipe carries `_ph`/`_po` flags
+  marking that a photo/originalPhoto lives in IndexedDB
 - `tonys_nextId_v1` → the next integer id (`NEXTID_KEY`)
 - `recent_views` → array of recently viewed recipe ids (max 8, most‑recent first)
 - `scale_<id>` → remembered serving multiplier per recipe
@@ -228,9 +230,39 @@ logic only pushes local recipes to the cloud if the user has **more than 5** (i.
 `notes=''`, `source=''`, `nutrition=null`, `originalPhoto=''`, `updatedAt=0`; if
 `isVideoBookmark && !isClip` set `isClip=true`). Run on every load/restore/remote‑update.
 
-**Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }`.
-The whole collection is a single shared document so the whole family reads/writes the same list.
+**Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }` —
+but the JSON is **photo‑free** (see below). The whole family reads/writes this one shared list.
 Doc `shared/access` = `{ members, updatedAt }`. Legacy `users/{uid}/…` rules kept for safety.
+
+**Cloud photo storage (critical — Firestore's 1 MiB/doc limit):** photos are base64 and must
+NOT live inline in the `shared/recipes` doc or it overflows 1 MiB after a dozen or so photos and
+every write fails. Instead, `saveToFirestore` writes a **slim** recipes doc via
+`stripPhotosForCloud` (each recipe's `photo` blanked, an `hp:1` flag set when a photo exists, and
+`originalPhoto` omitted entirely), then `syncCloudPhotos` writes each recipe's display photo to
+its **own** doc `shared/photo_<id>` = `{ photo:<base64>, updatedAt }` (only when changed; deletes
+docs for removed/deleted photos). These per‑photo docs sit in the `shared` collection so the
+existing `match /shared/{document=**}` rule already permits them — no rules change needed.
+`loadFromFirestore`/`applyRemoteUpdate` re‑attach photos via `attachCloudPhotos` (fetch
+`shared/photo_<id>` for `hp` recipes; legacy inline photos are kept and migrated on next save).
+Photos remain inline in memory + localStorage, so rendering/backup/export are unchanged.
+**`originalPhoto` (the full‑res scan backup, potentially many MB) is never synced — local‑only**;
+it is captured before a cloud load and re‑attached afterward so a load doesn't drop it.
+Save errors are classified honestly (`handleFirestoreSaveError`/`isSizeError`): size vs.
+`permission-denied` vs. quota vs. genuine `unavailable`/offline — only real network errors get the
+auto‑retry; oversized photos are named and skipped while the rest sync.
+
+**Local photo storage (IndexedDB — same reasoning as the cloud, for `localStorage`'s ~5 MB cap):**
+`localStorage` stores strings as UTF‑16, so inline base64 photos overflow it fast and saves then
+fail silently. Photos are therefore kept in **IndexedDB** (`db tonys_recipes_db`, store `photos`,
+keyed by recipe id, `{ id, photo, originalPhoto }`), while `localStorage` holds only photo‑free
+recipe text (`saveLocal` → `stripPhotosLocal`, setting `_ph`/`_po` flags). `savePhotosToIDB`
+writes only changed photos and prunes deleted ones; `loadLocal` renders text immediately and
+`hydratePhotosFromIDB` re‑attaches photos asynchronously, then re‑renders. Photos stay inline in
+the in‑memory `recipes` array (so rendering/backup/export are unchanged). Legacy inline‑in‑
+`localStorage` photos are detected on load and migrated to IndexedDB on the next save. If
+IndexedDB is unavailable (e.g. private mode) it falls back to the old inline‑in‑`localStorage`
+behaviour. The `_ph`/`_po` flags also guard the cloud path so a not‑yet‑hydrated recipe never
+wipes its cloud photo.
 
 ---
 
