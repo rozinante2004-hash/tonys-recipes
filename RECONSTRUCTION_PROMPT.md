@@ -186,6 +186,7 @@ forwards whatever the client sends.)
 - `bring_token_expiry` → unix seconds when the Bring token expires
 - `pwa_install_dismissed`, `pwa_install_dismissed_ios` → PWA banner dismissal
 - `tonys_gmail_client_id` → user‑supplied Google OAuth client id for Gmail send
+- `tonys_debug_mode` → `'1'`/`'0'` — Debug mode (⚙️ Settings → Debug mode, off by default); all debug tracing goes through `dlog()`, silent unless enabled
 
 **Recipe object shape:**
 ```js
