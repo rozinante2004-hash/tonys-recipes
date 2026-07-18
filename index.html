@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.5 -->
+<!-- Tony's Recipes Collection v25.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -408,16 +408,24 @@ function handleShareTarget() {
 
   dlog('[ShareTarget] url:', sharedUrl, '| text:', sharedText, '| title:', sharedTitle);
 
-  var urlToUse = extractSharedUrl(sharedUrl, sharedText, sharedTitle, rawSearch);
+  // A real link in the url field (the Shortcut's extracted URL) is the strongest
+  // signal: fetch the page. Otherwise, if substantial recipe TEXT was shared, hand
+  // it to the free-hand importer for AI extraction. A stray link elsewhere is the
+  // last resort, and if nothing is usable we show the diagnostic.
+  var directUrl = /^https?:\/\//i.test(sharedUrl.trim())
+    ? sharedUrl.trim().replace(/[.,;!?)]+$/, '') : '';
+  var anyUrl    = directUrl || extractSharedUrl('', sharedText, sharedTitle, rawSearch);
+  var textBlob  = (sharedText.length >= sharedTitle.length ? sharedText : sharedTitle) || sharedText || sharedTitle;
+  var textNoUrl = (textBlob || '').replace(/https?:\/\/[^\s]+/g, '').trim();
+  var hasRecipeText = textNoUrl.length >= 40; // long enough to be a recipe, not a title/author
 
-  if (urlToUse && /^https?:\/\//i.test(urlToUse)) {
-    setTimeout(function() { openUrlImportModal(urlToUse); }, 600);
-    return;
-  }
-
-  // Something was shared but it contained no web link. Open the box empty (never
-  // paste a title/author) and show exactly what arrived so the cause is obvious.
   setTimeout(function() {
+    if (directUrl) { openUrlImportModal(directUrl); return; }
+    if (hasRecipeText && typeof openFreehandModal === 'function') { openFreehandModal(textBlob); return; }
+    if (anyUrl && /^https?:\/\//i.test(anyUrl)) { openUrlImportModal(anyUrl); return; }
+
+    // Nothing usable — open the URL box empty (never paste a title/author) and show
+    // exactly what arrived so the cause is obvious.
     openUrlImportModal('');
     var res = document.getElementById('urlImportResult');
     if (!res) return;
@@ -426,7 +434,7 @@ function handleShareTarget() {
     if (sharedText)  got.push('text: ' + sharedText);
     if (sharedUrl)   got.push('url: ' + sharedUrl);
     res.innerHTML = '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:12px;font-size:13px;color:#5C3D2E;line-height:1.6;">'
-      + '⚠️ <strong>No web link was found in what you shared.</strong> The app you shared from sent only text (a title or author), not the page address.<br><br>'
+      + '⚠️ <strong>No web link or recipe text was found in what you shared.</strong> The app you shared from sent only a short title or author, not the page address or recipe.<br><br>'
       + 'To fix: in that app tap <strong>Share → Copy Link</strong> and paste it above, or open the recipe in a browser and share from there.'
       + '<div style="margin-top:8px;font-size:11px;color:#8A8279;word-break:break-all;">Received — ' + escH(got.join('  |  ').slice(0,240)) + '</div>'
       + '</div>';
@@ -792,6 +800,16 @@ const SELF_TESTS = [
       const o=document.getElementById('freehandOverlay');
       if(!o||!o.classList.contains('open')) throw new Error('Freehand modal did not open');
       closeM('freehandOverlay');
+    }
+  },
+  { id:'import_freehand_prefill', group:'Import/Export', name:'Free-hand importer accepts shared text',
+    test: async()=>{
+      if(typeof openFreehandModal!=='function') throw new Error('openFreehandModal not defined');
+      openFreehandModal('Shared recipe text for extraction');
+      var v=document.getElementById('freehandText').value;
+      closeM('freehandOverlay');
+      document.getElementById('freehandText').value='';
+      if(v!=='Shared recipe text for extraction') throw new Error('openFreehandModal did not accept prefilled text — text shares would arrive empty');
     }
   },
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
@@ -1570,7 +1588,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.5';
+var APP_VERSION = 'v25.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3581,7 +3599,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4132,7 +4150,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6428,8 +6446,8 @@ function saveTranslation(parsed) {
 // ═══════════════════════════════════
 // FREE-HAND IMPORT
 // ═══════════════════════════════════
-function openFreehandModal() {
-  document.getElementById('freehandText').value = '';
+function openFreehandModal(prefillText) {
+  document.getElementById('freehandText').value = prefillText || '';
   document.getElementById('freehandResult').innerHTML = '';
   document.getElementById('freehandOverlay').classList.add('open');
 }
