@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.2 -->
+<!-- Tony's Recipes Collection v25.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -790,6 +790,129 @@ const SELF_TESTS = [
       if(!document.getElementById('shareCopyBtn'))  throw new Error('#shareCopyBtn missing');
     }
   },
+
+  // ── STORAGE (IndexedDB photo storage) ────────────────────────────────────────
+  { id:'stor_idb_avail', group:'Storage', name:'IndexedDB available',
+    test: async()=>{
+      if(typeof indexedDB==='undefined'||!indexedDB) throw new Error('IndexedDB not supported by this browser — photos fall back to localStorage');
+      if(typeof idbGetAll!=='function') throw new Error('idbGetAll not defined');
+    } },
+  { id:'stor_idb_roundtrip', group:'Storage', name:'IndexedDB photo read/write',
+    test: async()=>{
+      if(!_idbAvailable) throw new Error('IndexedDB unavailable — running in localStorage fallback mode');
+      var testId=999999;
+      await idbPut({id:testId, photo:'data:test/roundtrip', originalPhoto:''});
+      var rows=await idbGetAll();
+      var found=rows.some(function(r){ return r.id===testId; });
+      await idbDelete(testId);
+      if(!found) throw new Error('A photo written to IndexedDB could not be read back');
+    } },
+  { id:'stor_local_photofree', group:'Storage', name:'localStorage stays photo-free',
+    test: async()=>{
+      if(!_idbAvailable) return; // fallback mode intentionally keeps photos inline
+      if(typeof stripPhotosLocal!=='function') throw new Error('stripPhotosLocal not defined');
+      var slim=stripPhotosLocal([{id:1,name:'x',photo:'data:image/jpeg;base64,AAAA',originalPhoto:''}]);
+      if(slim[0].photo!=='') throw new Error('stripPhotosLocal left photo data in the localStorage payload');
+      if(slim[0]._ph!==1) throw new Error('stripPhotosLocal did not flag the photo (_ph) for hydration');
+    } },
+  { id:'stor_hydrate_fn', group:'Storage', name:'Photo hydrate/offload functions present',
+    test: async()=>{
+      if(typeof hydratePhotosFromIDB!=='function') throw new Error('hydratePhotosFromIDB not defined');
+      if(typeof savePhotosToIDB!=='function') throw new Error('savePhotosToIDB not defined');
+    } },
+
+  // ── CLOUD SYNC (Firestore photo split) ───────────────────────────────────────
+  { id:'cloud_strip', group:'Cloud Sync', name:'Photos stripped from recipes doc',
+    test: async()=>{
+      if(typeof stripPhotosForCloud!=='function') throw new Error('stripPhotosForCloud not defined');
+      var slim=stripPhotosForCloud([{id:1,name:'x',photo:'data:image/jpeg;base64,AAAA',originalPhoto:'data:big',updatedAt:1}]);
+      if(slim[0].photo!=='') throw new Error('photo not blanked in the cloud recipes doc');
+      if(slim[0].originalPhoto!==undefined) throw new Error('originalPhoto must never be sent to the cloud');
+      if(slim[0].hp!==1) throw new Error('hp (has-photo) flag not set for cloud hydration');
+    } },
+  { id:'cloud_bytelen', group:'Cloud Sync', name:'byteLen measures UTF-8 size',
+    test: async()=>{
+      if(typeof byteLen!=='function') throw new Error('byteLen not defined');
+      if(byteLen('abc')!==3) throw new Error('byteLen wrong for ASCII');
+      if(byteLen('é')!==2) throw new Error('byteLen wrong for a multi-byte character');
+    } },
+  { id:'cloud_sizeerr', group:'Cloud Sync', name:'Firestore 1 MiB error detected',
+    test: async()=>{
+      if(typeof isSizeError!=='function') throw new Error('isSizeError not defined');
+      if(!isSizeError({code:'invalid-argument'})) throw new Error('did not flag invalid-argument as a size error');
+      if(!isSizeError({message:'is longer than 1048487 bytes'})) throw new Error('did not flag the size message');
+      if(isSizeError({code:'unavailable'})) throw new Error('false positive: offline error treated as size error');
+    } },
+  { id:'cloud_fns', group:'Cloud Sync', name:'Cloud sync functions present',
+    test: async()=>{
+      ['syncCloudPhotos','attachCloudPhotos','handleFirestoreSaveError','saveToFirestore','loadFromFirestore'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+    } },
+
+  // ── FEATURES (recent additions) ──────────────────────────────────────────────
+  { id:'feat_gridcols', group:'Features', name:'Phone grid columns (1–5) & clamp',
+    test: async()=>{
+      if(typeof getMobileCols!=='function'||typeof setMobileCols!=='function') throw new Error('grid column functions not defined');
+      var prev=getMobileCols();
+      setMobileCols(9); if(getMobileCols()!==5) throw new Error('value not clamped to max 5');
+      setMobileCols(0); if(getMobileCols()!==1) throw new Error('value not clamped to min 1');
+      setMobileCols(4);
+      var cssVar=getComputedStyle(document.documentElement).getPropertyValue('--mobile-cols').trim();
+      setMobileCols(prev); // restore
+      if(cssVar!=='4') throw new Error('--mobile-cols CSS variable not applied (got "'+cssVar+'")');
+    } },
+  { id:'feat_viewmode', group:'Features', name:'Grid/List choice remembered',
+    test: async()=>{
+      if(typeof initViewMode!=='function') throw new Error('initViewMode not defined');
+      var prev=null; try{ prev=localStorage.getItem('tonys_view_mode'); }catch(e){}
+      setView('grid');
+      if(localStorage.getItem('tonys_view_mode')!=='grid') throw new Error('view mode was not persisted to localStorage');
+      if(prev==='grid'||prev==='list') setView(prev); else setView('list'); // restore
+    } },
+  { id:'feat_sharetarget', group:'Features', name:'Shared URL prefills import box',
+    test: async()=>{
+      if(typeof handleShareTarget!=='function') throw new Error('handleShareTarget not defined');
+      openUrlImportModal('https://example.com/recipe');
+      var v=document.getElementById('urlImportInput').value;
+      closeM('urlImportOverlay');
+      document.getElementById('urlImportInput').value='';
+      if(v!=='https://example.com/recipe') throw new Error('openUrlImportModal cleared the prefilled URL — shared links would be lost');
+    } },
+  { id:'feat_migrate', group:'Features', name:'Recipe migration backfills fields',
+    test: async()=>{
+      if(typeof migrateRecipes!=='function') throw new Error('migrateRecipes not defined');
+      var m=migrateRecipes([{id:1,name:'x'}])[0];
+      if(!Array.isArray(m.diets)) throw new Error('diets not backfilled');
+      if(m.cookCount!==0) throw new Error('cookCount not backfilled');
+      if(m.nutrition!==null) throw new Error('nutrition not backfilled');
+    } },
+  { id:'feat_convert', group:'Features', name:'Unit conversion is correct',
+    test: async()=>{
+      if(typeof convertUnits!=='function') throw new Error('convertUnits not defined');
+      if(convertUnits(1000,'g','kg','Weight')!==1) throw new Error('1000 g should convert to 1 kg');
+      if(convertUnits(100,'°C','°F','Temp')!==212) throw new Error('100°C should convert to 212°F');
+    } },
+  { id:'feat_escape', group:'Features', name:'HTML escaping prevents injection',
+    test: async()=>{
+      if(typeof escH!=='function') throw new Error('escH not defined');
+      var out=escH('<b>&x</b>');
+      if(out.indexOf('<b>')!==-1) throw new Error('escH did not escape angle brackets');
+      if(out.indexOf('&amp;')===-1) throw new Error('escH did not escape the ampersand');
+    } },
+
+  // ── UI (recent additions) ────────────────────────────────────────────────────
+  { id:'ui_version_badge', group:'UI', name:'Version badge renders',
+    test: async()=>{
+      var b=document.getElementById('appVersionBadge');
+      if(!b) throw new Error('#appVersionBadge element missing (dynamic version display broken)');
+      if(!b.textContent.trim()) throw new Error('version badge is empty');
+    } },
+  { id:'ui_gridsettings', group:'UI', name:'Grid Layout modal present',
+    test: async()=>{
+      if(!document.getElementById('gridSettingsOverlay')) throw new Error('#gridSettingsOverlay missing');
+      if(typeof openGridSettings!=='function') throw new Error('openGridSettings not defined');
+    } },
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -961,6 +1084,22 @@ var SELF_TEST_FIXES = {
   feat_autotag:    { fix:'aiTagAllDiets not defined. Check the function is in the main script block.', autofix: null },
   import_file:     { fix:'importFromFile not defined or #fileIn input missing. Check the merged file import was applied correctly.', autofix: null },
   share_modal:     { fix:'shareRecipeOverlay or share buttons missing. Check the share recipe modal HTML is present.', autofix: null },
+  stor_idb_avail:    { fix:'IndexedDB is unavailable (often private/incognito mode). Photos then fall back to localStorage, which is limited to ~5 MB — use a normal browser window for large photo collections.', autofix: null },
+  stor_idb_roundtrip:{ fix:'IndexedDB read/write failed. Storage may be full or blocked. Check DevTools → Application → IndexedDB → tonys_recipes_db, and free device storage.', autofix: null },
+  stor_local_photofree:{ fix:'stripPhotosLocal is not removing photo data before writing to localStorage — photos would overflow the ~5 MB quota. Verify the local IndexedDB photo-storage code is intact.', autofix: null },
+  stor_hydrate_fn:   { fix:'hydratePhotosFromIDB / savePhotosToIDB missing. The IndexedDB photo layer is incomplete — photos will not persist or reload correctly.', autofix: null },
+  cloud_strip:       { fix:'stripPhotosForCloud must blank photo, drop originalPhoto, and set hp:1. If broken, the shared/recipes doc will bloat past Firestore’s 1 MiB limit and all cloud saves will fail.', autofix: null },
+  cloud_bytelen:     { fix:'byteLen (Blob-based UTF-8 size) is wrong. Document/photo size checks depend on it — the 1 MiB guardrails may misfire.', autofix: null },
+  cloud_sizeerr:     { fix:'isSizeError misclassifies Firestore errors. Size errors must NOT be auto-retried (they never succeed) and offline errors must be. Check the error-classification code.', autofix: null },
+  cloud_fns:         { fix:'A cloud-sync function is missing. Check for a syntax error or truncation in the CLOUD PHOTO STORAGE / Firestore section.', autofix: null },
+  feat_gridcols:     { fix:'Phone grid column setting broken. getMobileCols must clamp to 1–5 and setMobileCols must update the --mobile-cols CSS variable. Check Settings → Grid Layout code.', autofix: null },
+  feat_viewmode:     { fix:'setView must persist the choice to localStorage key tonys_view_mode, and initViewMode must restore it. Check the view-toggle code.', autofix: null },
+  feat_sharetarget:  { fix:'openUrlImportModal must accept a prefill URL and NOT clear it. If it resets the input, shared links (iOS share/Shortcut) arrive empty. Check openUrlImportModal(prefillUrl).', autofix: null },
+  feat_migrate:      { fix:'migrateRecipes must backfill diets/cookCount/notes/nutrition/originalPhoto/updatedAt on load so older or partial recipes render safely.', autofix: null },
+  feat_convert:      { fix:'convertUnits math is wrong. Check CALC_CATS factors (Weight/Volume/Length) and the special-cased Temperature formulas.', autofix: null },
+  feat_escape:       { fix:'escH is not escaping &, <, >. Recipe text is injected into innerHTML in many places — broken escaping risks layout breakage or injection.', autofix: null },
+  ui_version_badge:  { fix:'#appVersionBadge missing or empty. checkAppVersion() targets this id; a malformed/duplicate id attribute breaks the dynamic version display.', autofix: null },
+  ui_gridsettings:   { fix:'#gridSettingsOverlay or openGridSettings missing. Check the Grid Layout modal HTML and the Settings menu wiring.', autofix: null },
 };
 
 function showSelfTestDetail(testId) {
@@ -1353,7 +1492,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.2';
+var APP_VERSION = 'v25.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1832,7 +1971,6 @@ window.sendViaGmailApi = sendViaGmailApi;
 
 
 // ─── LOCAL SAVE HELPER ────────────────────────────────────────────────────────
-var _helperCheckInterval = null;
 
 function checkHelperStatus(callback) {
   fetch('http://127.0.0.1:27182', {method:'POST',
@@ -1960,7 +2098,7 @@ function showSaveHelperInfo() {
   var currentDir = localStorage.getItem('save_helper_dir') || '/home/rozinante/Documents/Projects/Recipes App/Backups';
   dirSection.innerHTML =
     '<div style="font-size:12px;font-weight:700;color:#5C3D2E;margin-bottom:6px;">📁 Save location</div>' +
-    '<div style="font-size:11px;color:#8A8279;margin-bottom:8px;">Where exported files are saved. Leave blank for ~/Downloads.</div>' +
+    '<div style="font-size:11px;color:#8A8279;margin-bottom:8px;">Where exported files are saved. Leave blank to use the helper\'s default folder (Documents/Projects/Recipes App/Backups).</div>' +
     '<div style="display:flex;gap:6px;">' +
     '<input id="saveDirInput" type="text" placeholder="e.g. /home/rozinante/Recipes" value="' + currentDir + '" ' +
     'style="flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:7px;font-size:13px;' +
@@ -2014,7 +2152,7 @@ function updateHelperStatus() {
     if(!dot || !text) return;
     if(running) {
       dot.style.background = '#2E7D32';
-      text.textContent = '🟢 Running — files save directly to ~/Downloads';
+      text.textContent = '🟢 Running — exports save directly to your chosen folder';
     } else {
       dot.style.background = '#c0392b';
       text.textContent = '🔴 Not running — exports will use browser download';
@@ -3363,7 +3501,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersion" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;"" id="appVersionBadge">v25.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3913,7 +4051,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4337,7 +4475,9 @@ function applyMobileCols() {
   document.documentElement.style.setProperty('--mobile-cols', getMobileCols());
 }
 function setMobileCols(n) {
-  n = Math.max(1, Math.min(5, parseInt(n, 10) || 3));
+  n = parseInt(n, 10);
+  if (isNaN(n)) n = 3;
+  n = Math.max(1, Math.min(5, n)); // clamp into 1–5
   try { localStorage.setItem('tonys_mobile_cols', String(n)); } catch(e){}
   applyMobileCols();
   renderGridColsUI();
@@ -4567,7 +4707,7 @@ function drawView(){
       </div>
       ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + d + '</span>'; }).join('') + '</div>' : ''}
       ${r.cookCount ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="background:#FFF0E8;border-radius:12px;padding:2px 10px;color:var(--terracotta);font-weight:600;">🍳 Cooked ${r.cookCount} time${r.cookCount!==1?'s':''}</span>${r.lastCooked?`<span>· last ${new Date(r.lastCooked).toLocaleDateString()}</span>`:''}</div>` : ''}
-      ${r.notes ? `<div style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;dir:auto;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
+      ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
       <div class="modal-section-title">Method</div>
