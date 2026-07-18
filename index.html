@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.6 -->
+<!-- Tony's Recipes Collection v25.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -997,6 +997,16 @@ const SELF_TESTS = [
       setDebugMode(false); if(_debugMode!==false) throw new Error('debug flag not turned off');
       if(prev==='1') setDebugMode(true); else setDebugMode(false); // restore
     } },
+  { id:'feat_photo_sources', group:'Features', name:'Photo search wires multiple sources',
+    test: async()=>{
+      if(typeof photoSearchMore!=='function') throw new Error('photoSearchMore not defined');
+      if(!Array.isArray(PHOTO_SOURCES)||PHOTO_SOURCES.length<3) throw new Error('expected 3 photo sources');
+      ['pixabay','pexels','unsplash'].forEach(function(s){
+        if(PHOTO_SOURCES.indexOf(s)<0) throw new Error('missing photo source: '+s);
+        if(!PHOTO_SOURCE_LABELS[s]) throw new Error('missing label for: '+s);
+      });
+      if(!document.getElementById('photoSearchMoreBtn')) throw new Error('#photoSearchMoreBtn (See more) missing from photo modal');
+    } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
     test: async()=>{
       if(typeof makeDocxBlob!=='function') throw new Error('makeDocxBlob not defined');
@@ -1195,6 +1205,7 @@ var SELF_TEST_FIXES = {
   ui_version_badge:  { fix:'#appVersionBadge missing or empty. checkAppVersion() targets this id; a malformed/duplicate id attribute breaks the dynamic version display.', autofix: null },
   ui_gridsettings:   { fix:'#gridSettingsOverlay or openGridSettings missing. Check the Grid Layout modal HTML and the Settings menu wiring.', autofix: null },
   feat_debug:        { fix:'Debug mode plumbing missing. dlog()/setDebugMode()/toggleDebugMode() must exist and persist tonys_debug_mode; the ⚙️ Settings menu item (#debugModeItem) toggles it.', autofix: null },
+  feat_photo_sources:{ fix:'Multi-source photo search is broken. PHOTO_SOURCES/PHOTO_SOURCE_LABELS must list pixabay/pexels/unsplash, photoSearchMore() must cycle them, and #photoSearchMoreBtn must exist. Worker photo-search must accept a source param.', autofix: null },
   export_docx_build: { fix:'Word export is broken. makeDocxBlob → buildZip must emit a store-method ZIP starting with the PK signature. Check the OOXML XML parts and the crc32/central-directory code in buildZip.', autofix: null },
 };
 
@@ -1588,7 +1599,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.6';
+var APP_VERSION = 'v25.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3599,7 +3610,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4150,7 +4161,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4321,6 +4332,9 @@ body.banner-shown .header {
     </div>
     <div id="photoSearchStatus" style="font-size:12px;color:var(--muted);margin-bottom:8px;min-height:18px;"></div>
     <div id="photoSearchGrid" class="photo-search-grid"></div>
+    <div id="photoSearchMoreWrap" style="display:none;margin-top:10px;text-align:center;">
+      <button id="photoSearchMoreBtn" onclick="photoSearchMore()" style="padding:9px 18px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--warm-brown);cursor:pointer;">🔄 See more →</button>
+    </div>
     <div id="photoSearchUseBtn" style="display:none;margin-top:12px;">
       <button onclick="useSelectedSearchPhoto()" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Use This Photo</button>
     </div>
@@ -7657,33 +7671,94 @@ function loadIngsTable(ingredients) {
 // ─── PHOTO SEARCH ─────────────────────────────────────────────────────────────
 var _photoSearchSelected = null;
 var _photoSearchResults  = [];
+// Photo search cycles through these free sources via the "See more" button.
+var PHOTO_SOURCES = ['pixabay', 'pexels', 'unsplash'];
+var PHOTO_SOURCE_LABELS = { pixabay: 'Pixabay', pexels: 'Pexels', unsplash: 'Unsplash' };
+var _photoSrcIdx = 0, _photoPage = 1, _photoQuery = '';
 
 function openPhotoSearch(recipeName) {
   _photoSearchSelected = null; _photoSearchResults = [];
+  _photoSrcIdx = 0; _photoPage = 1; _photoQuery = '';
   document.getElementById('photoSearchGrid').innerHTML = '';
   document.getElementById('photoSearchUseBtn').style.display = 'none';
+  var moreWrap = document.getElementById('photoSearchMoreWrap'); if (moreWrap) moreWrap.style.display = 'none';
   document.getElementById('photoSearchStatus').textContent = '';
   document.getElementById('photoSearchInput').value = recipeName || '';
   document.getElementById('photoSearchOverlay').classList.add('open');
   if (recipeName) setTimeout(searchPhotos, 300);
 }
 
-async function searchPhotos() {
+// New search — start from the first source, first page
+function searchPhotos() {
   var query = document.getElementById('photoSearchInput').value.trim();
   if (!query) { toast('Enter a search term'); return; }
-  var grid = document.getElementById('photoSearchGrid');
+  _photoQuery = query; _photoSrcIdx = 0; _photoPage = 1;
+  doPhotoSearch();
+}
+
+// "See more" — advance to the next source (wrapping to page 2, 3… of the first)
+function photoSearchMore() {
+  _photoSrcIdx++;
+  if (_photoSrcIdx >= PHOTO_SOURCES.length) { _photoSrcIdx = 0; _photoPage++; }
+  doPhotoSearch();
+}
+
+function updatePhotoMoreBtn() {
+  var wrap = document.getElementById('photoSearchMoreWrap');
+  var btn  = document.getElementById('photoSearchMoreBtn');
+  if (!wrap || !btn) return;
+  var nextIdx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
+  btn.textContent = '🔄 See more from ' + (PHOTO_SOURCE_LABELS[PHOTO_SOURCES[nextIdx]] || PHOTO_SOURCES[nextIdx]) + ' →';
+  wrap.style.display = 'block';
+}
+
+async function doPhotoSearch() {
+  if (!_photoQuery) return;
+  var grid   = document.getElementById('photoSearchGrid');
   var status = document.getElementById('photoSearchStatus');
-  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching...</div>';
-  status.textContent = ''; document.getElementById('photoSearchUseBtn').style.display='none'; _photoSearchSelected=null;
-  try {
-    var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'photo-search',query:query}) });
-    if (!resp.ok) throw new Error('Search failed: '+resp.status);
-    var data = await resp.json();
-    if (data.error) { grid.innerHTML='<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">'+data.error+'</div>'; return; }
-    if (!data.images||!data.images.length) { grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos found.</div>'; return; }
-    _photoSearchResults = data.images; renderPhotoSearchGrid(data.images);
-    status.textContent = data.images.length + ' photos found — tap to select';
-  } catch(err) { grid.innerHTML='<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: '+err.message+'</div>'; }
+  var moreWrap = document.getElementById('photoSearchMoreWrap');
+  document.getElementById('photoSearchUseBtn').style.display = 'none';
+  _photoSearchSelected = null;
+  if (moreWrap) moreWrap.style.display = 'none';
+
+  var tried = 0;
+  while (tried < PHOTO_SOURCES.length) {
+    var source = PHOTO_SOURCES[_photoSrcIdx];
+    var label  = PHOTO_SOURCE_LABELS[source] || source;
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching ' + label + '…</div>';
+    try {
+      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'photo-search', query: _photoQuery, source: source, page: _photoPage })
+      });
+      var data = await resp.json();
+      if (data.notConfigured) {
+        // No API key for this source — skip to the next one automatically
+        tried++;
+        _photoSrcIdx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
+        if (_photoSrcIdx === 0) _photoPage++;
+        continue;
+      }
+      if (data.error) {
+        grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;font-size:13px;">' + escH(data.error) + '</div>';
+        updatePhotoMoreBtn(); return;
+      }
+      if (!data.images || !data.images.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos from ' + label + '. Tap “See more” to try another source.</div>';
+        updatePhotoMoreBtn(); return;
+      }
+      _photoSearchResults = data.images;
+      renderPhotoSearchGrid(data.images);
+      status.textContent = data.images.length + ' from ' + label + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select';
+      updatePhotoMoreBtn(); return;
+    } catch(err) {
+      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: ' + escH(err.message) + '</div>';
+      updatePhotoMoreBtn(); return;
+    }
+  }
+  // Every source came back notConfigured
+  grid.innerHTML = '<div style="grid-column:1/-1;padding:14px;color:var(--muted);font-size:13px;line-height:1.6;">No photo sources are set up yet. Add a free API key (Pixabay, Pexels, or Unsplash) — see <strong>⚙️ → Deployments → Photo Sources</strong> for links and setup steps.</div>';
+  status.textContent = '';
 }
 
 function renderPhotoSearchGrid(images) {
@@ -8072,7 +8147,7 @@ async function backupRestoreFile(event) {
 })();
 
 window.addIngRow=addIngRow; window.syncIngsTextarea=syncIngsTextarea; window.loadIngsTable=loadIngsTable;
-window.openPhotoSearch=openPhotoSearch; window.searchPhotos=searchPhotos; window.selectSearchPhoto=selectSearchPhoto;
+window.openPhotoSearch=openPhotoSearch; window.searchPhotos=searchPhotos; window.selectSearchPhoto=selectSearchPhoto; window.photoSearchMore=photoSearchMore;
 window.renderPhotoSearchGrid=renderPhotoSearchGrid; window.useSelectedSearchPhoto=useSelectedSearchPhoto;
 window.openHelp=openHelp; window.askHelp=askHelp; window.askHelpQ=askHelpQ; window.showHelpDetail=showHelpDetail;
 window.openBringAutoRefresh=openBringAutoRefresh; window.showBringBookmarklet=showBringBookmarklet;
@@ -8725,6 +8800,19 @@ function updateFilterBarTop() {
         <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint">lively-bread-273a</span></a>
         <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
         <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Photo Sources -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🖼️ Photo Sources</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Free stock-photo APIs behind “🔍 Search web for photo”. The app cycles through them with the <strong>See more</strong> button. Add each key as a Worker secret (⚙️ Worker settings above) — a source with no key is simply skipped.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://pixabay.com/api/docs/" target="_blank" class="deploy-link">🟢 Pixabay — get API key <span class="deploy-hint">secret: PIXABAY_API_KEY · free</span></a>
+        <a href="https://www.pexels.com/api/" target="_blank" class="deploy-link">🔵 Pexels — get API key <span class="deploy-hint">secret: PEXELS_API_KEY · free</span></a>
+        <a href="https://unsplash.com/developers" target="_blank" class="deploy-link">⚫ Unsplash — get Access Key <span class="deploy-hint">secret: UNSPLASH_ACCESS_KEY · free</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>

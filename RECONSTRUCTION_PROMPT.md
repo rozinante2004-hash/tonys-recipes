@@ -99,7 +99,7 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 | **Anthropic Claude API** | All AI (import/extract, translate, suggest, explore, nutrition, help, diet auto‑tag) | Worker secret `ANTHROPIC_API_KEY` |
 | **Firebase** (Auth + Firestore) | Google sign‑in + shared cloud recipe doc | Public web config (safe to ship) |
 | **Cloudflare Worker** | Single POST endpoint proxying everything | The Worker itself |
-| **Pixabay** | Food photo search / auto‑fetch | Worker secret `PIXABAY_API_KEY` |
+| **Pixabay / Pexels / Unsplash** | Food photo search / auto‑fetch (app cycles sources via "See more") | Worker secrets `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` (any subset; unset sources are skipped) |
 | **YouTube Data API** | Fetch video description for recipe extraction | Worker secret `YOUTUBE_API_KEY` |
 | **Bring!** | Push ingredients to a shopping list | Token in Worker KV `BRING_KV` (key `accessToken`) or fallback constant |
 | **GitHub Pages** | Hosting | n/a |
@@ -151,8 +151,14 @@ the **Anthropic Messages API** (this is the AI path).
 3. **`bring-lists`** — GET `/bringlists/{BRING_USER_UUID}`; return `{status, ok, lists:[{name,uuid}]}`.
 4. **`bring-settoken`** `{token, secret}` — require `secret === 'tonys-recipes-2024'`, validate
    the JWT has 3 segments, store in `BRING_KV` under `accessToken`.
-5. **`photo-search`** `{query}` — Pixabay `?image_type=photo&per_page=9&safesearch=true&order=popular`;
-   return `{images:[{url,thumb,credit,creditUrl}], total}`.
+5. **`photo-search`** `{query, source?, page?}` — multi‑source (`source` = `pixabay` |
+   `pexels` | `unsplash`, default `pixabay`; 9 per page). Pixabay
+   `?image_type=photo&per_page=9&safesearch=true&order=popular`; Pexels `/v1/search`
+   (Authorization: key); Unsplash `/search/photos` (Authorization: `Client-ID key`,
+   `content_filter=high`). A source with no key returns `{notConfigured:true}`; per‑source
+   failures return HTTP 200 with an `{error}` field so one bad source never breaks the others.
+   The app cycles sources via a **"See more"** button (`PHOTO_SOURCES`/`photoSearchMore`).
+   Each source returns `{source, page, images:[{url,thumb,credit,creditUrl}], total}`.
 6. **(default, no action)** — forward the whole body to
    `https://api.anthropic.com/v1/messages` with headers `x-api-key: env.ANTHROPIC_API_KEY`,
    `anthropic-version: 2023-06-01`; return the JSON response with `Access-Control-Allow-Origin: *`.

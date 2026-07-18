@@ -198,38 +198,75 @@ export default {
     }
 
     // ── photo-search ──────────────────────────────────────────────────────────
+    // Multi-source: Pixabay (PIXABAY_API_KEY), Pexels (PEXELS_API_KEY),
+    // Unsplash (UNSPLASH_ACCESS_KEY). The app cycles sources via a "See more" button.
+    // A source with no key set returns { notConfigured:true } so the app can skip it.
+    // Per-source failures return HTTP 200 with an { error } field (not 500) so one
+    // bad source never breaks the others.
     if (body.action === 'photo-search') {
       const query = body.query;
       if (!query) return jsonResp({ error: 'No query' }, 400);
-      const pixabayKey = env.PIXABAY_API_KEY;
-      if (!pixabayKey) return jsonResp({
-        error: 'PIXABAY_API_KEY not set in Worker. Go to: https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings → Bindings → Add variable PIXABAY_API_KEY'
-      }, 500);
+      const source  = (body.source || 'pixabay').toLowerCase();
+      const page    = Math.max(1, parseInt(body.page, 10) || 1);
+      const perPage = 9;
       try {
-        const url = 'https://pixabay.com/api/?key=' + pixabayKey
-          + '&q=' + encodeURIComponent(query)
-          + '&image_type=photo&per_page=9&safesearch=true&order=popular';
-        const resp = await fetch(url);
-        const rawText = await resp.text();
-        // Parse JSON
-        let data;
-        try { data = JSON.parse(rawText); }
-        catch(e) { return jsonResp({ error: 'Pixabay returned invalid JSON. Status: ' + resp.status + '. Body: ' + rawText.slice(0,200) }, 500); }
-        if (!resp.ok || data.error) {
-          return jsonResp({ error: 'Pixabay API error ' + resp.status + ': ' + (data.error || rawText.slice(0,200)) }, 500);
+        // ── Pixabay ──
+        if (source === 'pixabay') {
+          const key = env.PIXABAY_API_KEY;
+          if (!key) return jsonResp({ source, images: [], notConfigured: true });
+          const url = 'https://pixabay.com/api/?key=' + key + '&q=' + encodeURIComponent(query)
+            + '&image_type=photo&per_page=' + perPage + '&page=' + page + '&safesearch=true&order=popular';
+          const resp = await fetch(url);
+          const raw = await resp.text();
+          let data; try { data = JSON.parse(raw); } catch(e) { return jsonResp({ source, error: 'Pixabay: invalid JSON (' + resp.status + ')' }); }
+          if (!resp.ok || data.error) return jsonResp({ source, error: 'Pixabay error ' + resp.status + ': ' + (data.error || raw.slice(0,120)) });
+          const images = (data.hits || []).map(h => ({
+            url: h.largeImageURL || h.webformatURL,
+            thumb: h.webformatURL || h.previewURL,
+            credit: h.user,
+            creditUrl: 'https://pixabay.com/users/' + h.user + '-' + h.user_id + '/'
+          }));
+          return jsonResp({ source, page, images, total: data.totalHits });
         }
-        if (!data.hits || !data.hits.length) {
-          return jsonResp({ images: [], total: 0 });
+        // ── Pexels ──
+        if (source === 'pexels') {
+          const key = env.PEXELS_API_KEY;
+          if (!key) return jsonResp({ source, images: [], notConfigured: true });
+          const url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(query)
+            + '&per_page=' + perPage + '&page=' + page;
+          const resp = await fetch(url, { headers: { 'Authorization': key } });
+          const raw = await resp.text();
+          let data; try { data = JSON.parse(raw); } catch(e) { return jsonResp({ source, error: 'Pexels: invalid JSON (' + resp.status + ')' }); }
+          if (!resp.ok) return jsonResp({ source, error: 'Pexels error ' + resp.status + ': ' + (data.error || raw.slice(0,120)) });
+          const images = (data.photos || []).map(p => ({
+            url: (p.src && (p.src.large || p.src.original)) || (p.src && p.src.medium),
+            thumb: (p.src && (p.src.medium || p.src.small)) || (p.src && p.src.tiny),
+            credit: p.photographer,
+            creditUrl: p.photographer_url
+          }));
+          return jsonResp({ source, page, images, total: data.total_results });
         }
-        const images = data.hits.map(hit => ({
-          url: hit.largeImageURL || hit.webformatURL,
-          thumb: hit.webformatURL || hit.previewURL,
-          credit: hit.user,
-          creditUrl: 'https://pixabay.com/users/' + hit.user + '-' + hit.user_id + '/'
-        }));
-        return jsonResp({ images, total: data.totalHits });
+        // ── Unsplash ──
+        if (source === 'unsplash') {
+          const key = env.UNSPLASH_ACCESS_KEY;
+          if (!key) return jsonResp({ source, images: [], notConfigured: true });
+          const url = 'https://api.unsplash.com/search/photos?query=' + encodeURIComponent(query)
+            + '&per_page=' + perPage + '&page=' + page + '&content_filter=high';
+          const resp = await fetch(url, { headers: { 'Authorization': 'Client-ID ' + key, 'Accept-Version': 'v1' } });
+          const raw = await resp.text();
+          let data; try { data = JSON.parse(raw); } catch(e) { return jsonResp({ source, error: 'Unsplash: invalid JSON (' + resp.status + ')' }); }
+          if (!resp.ok) return jsonResp({ source, error: 'Unsplash error ' + resp.status + ': ' + ((data.errors && data.errors.join(', ')) || raw.slice(0,120)) });
+          const images = (data.results || []).map(p => ({
+            url: (p.urls && (p.urls.regular || p.urls.full)) || (p.urls && p.urls.small),
+            thumb: (p.urls && (p.urls.small || p.urls.thumb)) || (p.urls && p.urls.regular),
+            credit: p.user && p.user.name,
+            creditUrl: p.user && p.user.links && p.user.links.html
+          }));
+          return jsonResp({ source, page, images, total: data.total });
+        }
+        return jsonResp({ source, error: 'Unknown photo source: ' + source, images: [] });
       } catch(err) {
-        return jsonResp({ error: 'Photo search exception: ' + err.message + ' | stack: ' + (err.stack||'').slice(0,200) }, 500);
+        return jsonResp({ source, error: 'Photo search exception (' + source + '): ' + err.message });
       }
     }
 
