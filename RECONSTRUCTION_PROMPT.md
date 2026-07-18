@@ -447,8 +447,11 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of ~50 checks grouped as **UI,
-Core, CRUD, Modals, Network, Storage, Backup, CSS, Features, Import/Export**. The modal
+A first‑class feature — recreate it. `SELF_TESTS` is an array of ~60 checks grouped as **UI,
+Core, CRUD, Modals, Network, Storage, Cloud Sync, Backup, CSS, Features, Import/Export** —
+covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
+photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
+persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
 (`openSelfTest`/`runSelfTests`) lets the user pick tests by group, runs them sequentially with
 live ✅/❌ status, and for failures shows a **detail card** with error, impact, a suggested fix
 (`SELF_TEST_FIXES`), and — where available — an **"Apply Runtime Fix"** button that patches the
