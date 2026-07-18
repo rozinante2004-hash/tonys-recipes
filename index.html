@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.3 -->
+<!-- Tony's Recipes Collection v25.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -140,6 +140,34 @@
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
 // Runs after all variables/functions are declared
 // Load local data and render immediately; Firebase updates asynchronously
+
+// ─── DEBUG MODE ───────────────────────────────────────────────────────────────
+// Off by default. Toggle via ⚙️ Settings → Debug mode. ALL debug tracing goes
+// through dlog() so it stays silent normally and can be switched on to troubleshoot.
+// To add more debug output anywhere, just call dlog('[Tag]', ...values).
+var DEBUG_KEY = 'tonys_debug_mode';
+var _debugMode = false;
+try { _debugMode = localStorage.getItem(DEBUG_KEY) === '1'; } catch(e) {}
+
+function dlog() {
+  if (!_debugMode) return;
+  try { console.log.apply(console, arguments); } catch(e) {}
+}
+function updateDebugMenuLabel() {
+  var el = document.getElementById('debugModeItem');
+  if (el) el.textContent = '🐞 Debug mode: ' + (_debugMode ? 'On' : 'Off');
+}
+function setDebugMode(on) {
+  _debugMode = !!on;
+  try { localStorage.setItem(DEBUG_KEY, _debugMode ? '1' : '0'); } catch(e) {}
+  updateDebugMenuLabel();
+  if (_debugMode && window.console) console.info('Debug mode enabled — verbose logging is now on.');
+  if (typeof toast === 'function') toast(_debugMode ? '🐞 Debug mode ON — see browser console' : 'Debug mode off');
+}
+function toggleDebugMode() { setDebugMode(!_debugMode); }
+window.dlog = dlog;
+window.toggleDebugMode = toggleDebugMode;
+window.setDebugMode = setDebugMode;
 
 // ─── SELECT MODE ─────────────────────────────────────────────────────────────
 function toggleSelectMode() {
@@ -373,7 +401,7 @@ function handleShareTarget() {
   // Clean up common suffixes that get appended (spaces, trailing punctuation)
   urlToUse = urlToUse.trim().replace(/[.,;!?)]+$/, '');
 
-  console.log('[ShareTarget] url:', sharedUrl, 'text:', sharedText, 'extracted:', urlToUse);
+  dlog('[ShareTarget] url:', sharedUrl, 'text:', sharedText, 'extracted:', urlToUse);
 
   if (urlToUse) {
     setTimeout(function() {
@@ -913,6 +941,23 @@ const SELF_TESTS = [
       if(!document.getElementById('gridSettingsOverlay')) throw new Error('#gridSettingsOverlay missing');
       if(typeof openGridSettings!=='function') throw new Error('openGridSettings not defined');
     } },
+  { id:'feat_debug', group:'Features', name:'Debug mode toggle persists',
+    test: async()=>{
+      if(typeof dlog!=='function'||typeof toggleDebugMode!=='function') throw new Error('debug logging functions not defined');
+      var prev=null; try{ prev=localStorage.getItem('tonys_debug_mode'); }catch(e){}
+      setDebugMode(true);  if(localStorage.getItem('tonys_debug_mode')!=='1') throw new Error('debug flag not persisted on');
+      setDebugMode(false); if(_debugMode!==false) throw new Error('debug flag not turned off');
+      if(prev==='1') setDebugMode(true); else setDebugMode(false); // restore
+    } },
+  { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
+    test: async()=>{
+      if(typeof makeDocxBlob!=='function') throw new Error('makeDocxBlob not defined');
+      var blob=makeDocxBlob([{emoji:'🍝',name:'Test',category:'Dinner',difficulty:'Easy',prep:'5 min',servings:'2',ingredients:[{a:'1',n:'egg'}],steps:['Cook it'],photo:'',notes:'note',diets:['Keto'],source:'https://example.com/r'}]);
+      if(!(blob instanceof Blob)) throw new Error('makeDocxBlob did not return a Blob');
+      if(blob.size<200) throw new Error('DOCX blob suspiciously small ('+blob.size+' bytes)');
+      var buf=new Uint8Array(await blob.arrayBuffer());
+      if(buf[0]!==0x50||buf[1]!==0x4B) throw new Error('DOCX is not a valid ZIP — missing PK signature');
+    } },
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1100,6 +1145,8 @@ var SELF_TEST_FIXES = {
   feat_escape:       { fix:'escH is not escaping &, <, >. Recipe text is injected into innerHTML in many places — broken escaping risks layout breakage or injection.', autofix: null },
   ui_version_badge:  { fix:'#appVersionBadge missing or empty. checkAppVersion() targets this id; a malformed/duplicate id attribute breaks the dynamic version display.', autofix: null },
   ui_gridsettings:   { fix:'#gridSettingsOverlay or openGridSettings missing. Check the Grid Layout modal HTML and the Settings menu wiring.', autofix: null },
+  feat_debug:        { fix:'Debug mode plumbing missing. dlog()/setDebugMode()/toggleDebugMode() must exist and persist tonys_debug_mode; the ⚙️ Settings menu item (#debugModeItem) toggles it.', autofix: null },
+  export_docx_build: { fix:'Word export is broken. makeDocxBlob → buildZip must emit a store-method ZIP starting with the PK signature. Check the OOXML XML parts and the crc32/central-directory code in buildZip.', autofix: null },
 };
 
 function showSelfTestDetail(testId) {
@@ -1258,7 +1305,7 @@ async function requestWakeLock() {
   try {
     _wakeLock = await navigator.wakeLock.request('screen');
     _wakeLock.addEventListener('release', function() { _wakeLock = null; });
-    console.log('[WakeLock] Screen will stay on while recipe is open');
+    dlog('[WakeLock] Screen will stay on while recipe is open');
   } catch(err) {
     console.warn('[WakeLock]', err.message);
   }
@@ -1492,7 +1539,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.3';
+var APP_VERSION = 'v25.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -1565,7 +1612,7 @@ async function importViaFilePicker() {
     var fileHandle = handles[0];
     toast('📂 Getting file via native picker…');
     var file = await fileHandle.getFile();
-    console.log('[picker] file:', file.name, 'size:', file.size, 'type:', file.type);
+    dlog('[picker] file:', file.name, 'size:', file.size, 'type:', file.type);
     if(file.size === 0) {
       showImportError('File still reports 0 bytes via native picker.\n\nPlease try:\n1. Open the file in LibreOffice\n2. File → Save As → Word 2007-365 (.docx)\n3. Import the new .docx file\n\nOr copy the recipe text and use ✍️ Free-hand text import.');
       return;
@@ -1611,7 +1658,7 @@ async function handleFileDrop(event) {
   }
 
   status.textContent = '📂 Reading: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)…';
-  console.log('[drop] file:', file.name, 'size:', file.size, 'type:', file.type);
+  dlog('[drop] file:', file.name, 'size:', file.size, 'type:', file.type);
 
   if(file.size === 0) {
     status.innerHTML = '❌ File reports 0 bytes. Try:<br>1. Copy file to home folder first<br>2. Use Free-hand text import instead';
@@ -1889,9 +1936,6 @@ async function getGmailToken() {
       reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
       return;
     }
-    var OAUTH_CLIENT_ID = '397837948839-qp0sn3f6r0r2dv0k4k0j7v3k5m9n5t6a.apps.googleusercontent.com';
-    // Use the Firebase project OAuth client ID
-    // Get it from: console.cloud.google.com → APIs & Credentials → OAuth 2.0 Client IDs
     if(!window._gmailOAuthClientId) {
       reject(new Error('Gmail OAuth Client ID not configured.\n\nPlease go to:\nGoogle Cloud Console → APIs & Credentials → OAuth 2.0 Client IDs\nCopy your Web Client ID and set it in ⚙️ Settings → Gmail Setup'));
       return;
@@ -1918,10 +1962,15 @@ async function sendViaGmailApi(to, subject, htmlBody, plainText) {
   var token = await getGmailToken();
   if(!token) throw new Error('Gmail access token not received. Please try again.');
 
-  // Build RFC 2822 MIME email
+  // Build RFC 2822 MIME email. Body parts are base64-encoded (not quoted-printable)
+  // so UTF-8 content — e.g. Hebrew — renders correctly in strict mail clients.
   var boundary = 'tony_recipes_' + Date.now();
   var toLine   = to ? 'To: ' + to + '\r\n' : '';
   var from     = window._fbUser ? window._fbUser.email : '';
+  var b64part  = function(s) {
+    // UTF-8 → base64, wrapped at 76 chars per RFC 2045
+    return btoa(unescape(encodeURIComponent(String(s || '')))).replace(/(.{76})/g, '$1\r\n');
+  };
   var mime = [
     'MIME-Version: 1.0',
     'From: ' + from,
@@ -1931,15 +1980,15 @@ async function sendViaGmailApi(to, subject, htmlBody, plainText) {
     '',
     '--' + boundary,
     'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: quoted-printable',
+    'Content-Transfer-Encoding: base64',
     '',
-    plainText,
+    b64part(plainText),
     '',
     '--' + boundary,
     'Content-Type: text/html; charset=UTF-8',
-    'Content-Transfer-Encoding: quoted-printable',
+    'Content-Transfer-Encoding: base64',
     '',
-    htmlBody,
+    b64part(htmlBody),
     '',
     '--' + boundary + '--'
   ].join('\r\n');
@@ -2166,7 +2215,7 @@ function saveDirSetting() {
   var dir = (input ? input.value.trim() : '') || '';
   if(dir) {
     localStorage.setItem('save_helper_dir', dir);
-    console.log('[SaveHelper] Directory set to:', dir);
+    dlog('[SaveHelper] Directory set to:', dir);
     if(status) status.textContent = '✅ Saved — exports will go to: ' + dir;
     toast('📁 Save location updated: ' + dir, 5000);
   } else {
@@ -3501,7 +3550,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3519,6 +3568,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
+          <button class="drop-item" id="debugModeItem" onclick="closeDrop('settingsDrop');toggleDebugMode()">🐞 Debug mode: Off</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
@@ -4051,7 +4101,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5126,14 +5176,12 @@ function makeDocxBlob(recipeList){
       bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="3A7D44"/></w:rPr><w:t>Diet: ${esc(r.diets.join(', '))}</w:t></w:r></w:p>`;
     }
 
-    // Source — as clickable hyperlink
+    // Source — as clickable hyperlink. The relationship id must match the entry
+    // built from srcUrls below, so derive it from srcUrls length (not the recipe
+    // index) — otherwise recipes without an http source desync the ids.
     if(r.source && r.source.startsWith('http')) {
-      const srcId = 'srcRel' + idx;
-      // Store hyperlink — we add relationships dynamically per recipe
-      if(!bodyXml.includes('w:hyperlink')) {
-        // Add hyperlink relationship to rels (simplified — use external hyperlink)
-      }
-      bodyXml+=`<w:p><w:r><w:rPr><w:rStyle w:val="Hyperlink"/><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">Source: </w:t></w:r><w:hyperlink r:id="rId${idx+10}" w:history="1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:r><w:rPr><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr><w:t>${esc(r.source)}</w:t></w:r></w:hyperlink></w:p>`;
+      var relId = 10 + srcUrls.length;
+      bodyXml+=`<w:p><w:r><w:rPr><w:rStyle w:val="Hyperlink"/><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">Source: </w:t></w:r><w:hyperlink r:id="rId${relId}" w:history="1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:r><w:rPr><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr><w:t>${esc(r.source)}</w:t></w:r></w:hyperlink></w:p>`;
       srcUrls.push(r.source);
     } else if(r.source) {
       bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>Source: ${esc(r.source)}</w:t></w:r></w:p>`;
@@ -5424,22 +5472,22 @@ async function importFromFile(event){
   var fileText;
   try {
     toast('📂 Step 1: Reading file into memory…');
-    console.log('[import] file:', file.name, 'size:', file.size, 'type:', file.type);
+    dlog('[import] file:', file.name, 'size:', file.size, 'type:', file.type);
     fileBuffer = await new Promise(function(resolve, reject) {
       var fr = new FileReader();
       fr.onload  = function(e){
-        console.log('[import] FileReader success, bytes:', e.target.result.byteLength);
+        dlog('[import] FileReader success, bytes:', e.target.result.byteLength);
         resolve(e.target.result);
       };
       fr.onerror = function(e){
         console.error('[import] FileReader error:', fr.error);
         reject(new Error('FileReader error: ' + (fr.error ? (fr.error.message || fr.error.name) : 'unknown')));
       };
-      fr.onprogress = function(e){ console.log('[import] progress:', e.loaded, '/', e.total); };
+      fr.onprogress = function(e){ dlog('[import] progress:', e.loaded, '/', e.total); };
       fr.readAsArrayBuffer(file);
     });
     toast('📂 Step 2: File read OK (' + Math.round(fileBuffer.byteLength/1024) + ' KB), processing…');
-    console.log('[import] buffer ready, ext:', ext, 'mime:', mime);
+    dlog('[import] buffer ready, ext:', ext, 'mime:', mime);
   } catch(readErr) {
     console.error('[import] read failed:', readErr);
     var sizeMsg = file.size === 0
@@ -5471,14 +5519,14 @@ async function importFromFile(event){
                mime.includes('wordprocessingml') || mime.includes('msword')) {
       // ── Word .doc / .docx — try mammoth first, fall back to raw XML ────────
       var buf2 = fileBuffer;
-      console.log('[import] mammoth available:', typeof mammoth !== 'undefined');
+      dlog('[import] mammoth available:', typeof mammoth !== 'undefined');
       toast('📂 Step 3: Extracting text from Word file…');
       if(typeof mammoth !== 'undefined') {
         try {
-          console.log('[import] calling mammoth.extractRawText, buf size:', buf2.byteLength);
+          dlog('[import] calling mammoth.extractRawText, buf size:', buf2.byteLength);
           var mResult = await mammoth.extractRawText({arrayBuffer: buf2});
           text = mResult.value || '';
-          console.log('[import] mammoth result length:', text.length, 'messages:', mResult.messages);
+          dlog('[import] mammoth result length:', text.length, 'messages:', mResult.messages);
           if(text.trim()) { toast('📄 Step 4: Text extracted (' + text.length + ' chars), sending to AI…'); }
         } catch(e) { console.warn('[mammoth] error:', e); text = ''; }
       } else {
@@ -7148,7 +7196,7 @@ function loadFirebaseDynamically() {
             _fbAuth = firebase.auth(app);
             _fbProvider = new firebase.auth.GoogleAuthProvider();
             _fbDb = firebase.firestore(app);
-            console.log('[Firebase] Dynamically loaded and initialised');
+            dlog('[Firebase] Dynamically loaded and initialised');
           } catch(e) {
             console.warn('[Firebase] Re-init error:', e);
           }
@@ -7304,7 +7352,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/tonys-recipes/sw.js')
       .then(function(reg) {
-        console.log('[SW] Registered:', reg.scope);
+        dlog('[SW] Registered:', reg.scope);
 
         // Check for updates every time the page gains focus
         document.addEventListener('visibilitychange', function() {
@@ -7318,7 +7366,7 @@ if ('serviceWorker' in navigator) {
           newWorker.addEventListener('statechange', function() {
             // New SW installed and waiting — show update banner
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[SW] New version available');
+              dlog('[SW] New version available');
               var banner = document.getElementById('swUpdateBanner');
               if (banner) banner.style.display = 'flex';
             }
@@ -8362,6 +8410,7 @@ function updateFilterBarTop() {
   }
   applyMobileCols();
   initViewMode();
+  updateDebugMenuLabel();
   renderFilters();
   renderGrid();
   handleShareTarget();
