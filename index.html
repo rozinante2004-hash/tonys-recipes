@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.4 -->
+<!-- Tony's Recipes Collection v25.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -374,10 +374,24 @@ async function applyTranslation(id, btn) {
 
 
 // ─── SHARE TARGET (iOS Shortcut) ─────────────────────────────────────────────
-function handleShareTarget() {
-  var params = new URLSearchParams(window.location.search);
+// Find the first real http(s) link across every field a share might carry.
+// Different apps put the link in url / text / title (or none at all), so we scan
+// them all rather than trusting one field or falling back to raw text.
+function extractSharedUrl(sharedUrl, sharedText, sharedTitle, rawSearch) {
+  var urlRe = /https?:\/\/[^\s"'<>]+/;
+  var clean = function(u){ return u.trim().replace(/[.,;!?)]+$/, ''); };
+  if (/^https?:\/\//i.test((sharedUrl || '').trim())) return clean(sharedUrl);
+  var hay = [sharedUrl || '', sharedText || '', sharedTitle || '', rawSearch || ''].join(' ');
+  var decoded = hay; try { decoded = decodeURIComponent(hay); } catch(e) {}
+  var m = decoded.match(urlRe) || hay.match(urlRe);
+  return m ? clean(m[0]) : '';
+}
+window.extractSharedUrl = extractSharedUrl;
 
-  // Collect all possible URL params
+function handleShareTarget() {
+  var params    = new URLSearchParams(window.location.search);
+  var rawSearch = window.location.search || '';
+
   var sharedUrl   = params.get('url') || params.get('share-target') || '';
   var sharedText  = params.get('text') || '';
   var sharedTitle = params.get('title') || '';
@@ -388,27 +402,35 @@ function handleShareTarget() {
   try { window.history.replaceState({}, '', window.location.pathname); } catch(e) {}
 
   // Decode unicode/percent-encoded values
-  try { sharedUrl  = decodeURIComponent(sharedUrl);  } catch(e) {}
-  try { sharedText = decodeURIComponent(sharedText);  } catch(e) {}
+  try { sharedUrl   = decodeURIComponent(sharedUrl);   } catch(e) {}
+  try { sharedText  = decodeURIComponent(sharedText);  } catch(e) {}
+  try { sharedTitle = decodeURIComponent(sharedTitle); } catch(e) {}
 
-  // If no direct URL, extract URL from text (YouTube sends full text with embedded URL)
-  var urlToUse = sharedUrl;
-  if (!urlToUse) {
-    var urlMatch = sharedText.match(/https?:\/\/[^\s]+/);
-    urlToUse = urlMatch ? urlMatch[0] : sharedText;
+  dlog('[ShareTarget] url:', sharedUrl, '| text:', sharedText, '| title:', sharedTitle);
+
+  var urlToUse = extractSharedUrl(sharedUrl, sharedText, sharedTitle, rawSearch);
+
+  if (urlToUse && /^https?:\/\//i.test(urlToUse)) {
+    setTimeout(function() { openUrlImportModal(urlToUse); }, 600);
+    return;
   }
 
-  // Clean up common suffixes that get appended (spaces, trailing punctuation)
-  urlToUse = urlToUse.trim().replace(/[.,;!?)]+$/, '');
-
-  dlog('[ShareTarget] url:', sharedUrl, 'text:', sharedText, 'extracted:', urlToUse);
-
-  if (urlToUse) {
-    setTimeout(function() {
-      // Pass the URL straight into the modal — opening it must not clear the prefill
-      openUrlImportModal(urlToUse);
-    }, 600);
-  }
+  // Something was shared but it contained no web link. Open the box empty (never
+  // paste a title/author) and show exactly what arrived so the cause is obvious.
+  setTimeout(function() {
+    openUrlImportModal('');
+    var res = document.getElementById('urlImportResult');
+    if (!res) return;
+    var got = [];
+    if (sharedTitle) got.push('title: ' + sharedTitle);
+    if (sharedText)  got.push('text: ' + sharedText);
+    if (sharedUrl)   got.push('url: ' + sharedUrl);
+    res.innerHTML = '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:12px;font-size:13px;color:#5C3D2E;line-height:1.6;">'
+      + '⚠️ <strong>No web link was found in what you shared.</strong> The app you shared from sent only text (a title or author), not the page address.<br><br>'
+      + 'To fix: in that app tap <strong>Share → Copy Link</strong> and paste it above, or open the recipe in a browser and share from there.'
+      + '<div style="margin-top:8px;font-size:11px;color:#8A8279;word-break:break-all;">Received — ' + escH(got.join('  |  ').slice(0,240)) + '</div>'
+      + '</div>';
+  }, 600);
 }
 window.handleShareTarget = handleShareTarget;
 
@@ -907,6 +929,14 @@ const SELF_TESTS = [
       document.getElementById('urlImportInput').value='';
       if(v!=='https://example.com/recipe') throw new Error('openUrlImportModal cleared the prefilled URL — shared links would be lost');
     } },
+  { id:'feat_shareurl', group:'Features', name:'URL found across all shared fields',
+    test: async()=>{
+      if(typeof extractSharedUrl!=='function') throw new Error('extractSharedUrl not defined');
+      if(extractSharedUrl('https://a.com/r','','','')!=='https://a.com/r') throw new Error('did not use the url field');
+      if(extractSharedUrl('','look https://b.com/x here','','')!=='https://b.com/x') throw new Error('did not extract a URL from shared text');
+      if(extractSharedUrl('','','Recipe https://c.com/y','')!=='https://c.com/y') throw new Error('did not extract a URL from shared title');
+      if(extractSharedUrl('','Source: אורי מאיר-ציזיק','','')!=='') throw new Error('must return empty (not the author) when no URL is present');
+    } },
   { id:'feat_migrate', group:'Features', name:'Recipe migration backfills fields',
     test: async()=>{
       if(typeof migrateRecipes!=='function') throw new Error('migrateRecipes not defined');
@@ -1140,6 +1170,7 @@ var SELF_TEST_FIXES = {
   feat_gridcols:     { fix:'Phone grid column setting broken. getMobileCols must clamp to 1–5 and setMobileCols must update the --mobile-cols CSS variable. Check Settings → Grid Layout code.', autofix: null },
   feat_viewmode:     { fix:'setView must persist the choice to localStorage key tonys_view_mode, and initViewMode must restore it. Check the view-toggle code.', autofix: null },
   feat_sharetarget:  { fix:'openUrlImportModal must accept a prefill URL and NOT clear it. If it resets the input, shared links (iOS share/Shortcut) arrive empty. Check openUrlImportModal(prefillUrl).', autofix: null },
+  feat_shareurl:     { fix:'extractSharedUrl must scan url/text/title/query for the first http(s) link and return empty (never raw text) when none exists. If broken, shares paste a title/author instead of the recipe URL.', autofix: null },
   feat_migrate:      { fix:'migrateRecipes must backfill diets/cookCount/notes/nutrition/originalPhoto/updatedAt on load so older or partial recipes render safely.', autofix: null },
   feat_convert:      { fix:'convertUnits math is wrong. Check CALC_CATS factors (Weight/Volume/Length) and the special-cased Temperature formulas.', autofix: null },
   feat_escape:       { fix:'escH is not escaping &, <, >. Recipe text is injected into innerHTML in many places — broken escaping risks layout breakage or injection.', autofix: null },
@@ -1539,7 +1570,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.4';
+var APP_VERSION = 'v25.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3550,7 +3581,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4101,7 +4132,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
