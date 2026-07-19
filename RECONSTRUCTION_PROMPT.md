@@ -126,6 +126,14 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 
 ## 4. `cloudflare-worker.js` — the API proxy
 
+> ⚠️ **The repo copy of this file can lag the LIVE deployment.** The Worker is edited/deployed
+> directly in the Cloudflare dashboard, so the version in git may be behind what's actually
+> running (e.g. the repo held v22 while production was v29). Before changing the Worker, always
+> start from the **currently‑deployed** code (export/paste it), apply the change onto that, and
+> bump the `// … Worker vNN` header — never assume the repo copy is current. Live‑only additions
+> to watch for: the **GET file‑download handler** + **`download-store`** action (KV one‑time
+> download links), and the **`instagram-fetch`** action.
+
 A single ES‑module Worker (`export default { async fetch(request, env) }`). Handles CORS
 (allow `*`, methods `POST, OPTIONS`), rejects non‑POST with 405, parses a JSON body, and
 dispatches on `body.action`. If **no** `action` is present, the body is forwarded verbatim to
