@@ -1,5 +1,6 @@
-// Tony's Recipes — Cloudflare Worker v22
-// Added: YouTube Data API for video description extraction
+// Tony's Recipes — Cloudflare Worker v29
+// v29: multi-source photo search (Pixabay + Pexels + Unsplash)
+// Prior: YouTube Data API, Instagram oEmbed, KV file-download store
 
 const BRING_LIST_UUID = 'c00cd610-3865-4120-8e6d-769fcfc952ce';
 const BRING_USER_UUID = '998f9b84-613e-45ed-8c5d-49c1e27b3658';
@@ -56,10 +57,38 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Max-Age': '86400',
       }});
+    }
+
+    // GET: serve stored file with correct Content-Disposition header
+    if (request.method === 'GET') {
+      const dlKey = new URL(request.url).searchParams.get('dl');
+      // URL path may contain encoded filename (for Chrome filename detection)
+      if (dlKey && env.BRING_KV) {
+        try {
+          const stored = await env.BRING_KV.get(dlKey);
+          if (!stored) return new Response('File expired', { status: 404 });
+          const { data, filename, mime } = JSON.parse(stored);
+          await env.BRING_KV.delete(dlKey);
+          const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+          const encodedName = encodeURIComponent(filename);
+          return new Response(bytes, {
+            status: 200,
+            headers: {
+              'Content-Type': mime || 'application/octet-stream',
+              'Content-Disposition': "attachment; filename*=UTF-8''" + encodedName,
+              'Access-Control-Allow-Origin': '*',
+              'Cache-Control': 'no-store',
+            }
+          });
+        } catch(e) {
+          return new Response('Error: ' + e.message, { status: 500 });
+        }
+      }
+      return new Response('OK', { status: 200, headers: {'Access-Control-Allow-Origin': '*'} });
     }
 
     if (request.method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405);
@@ -67,6 +96,39 @@ export default {
     let body;
     try { body = JSON.parse(await request.text()); }
     catch(e) { return jsonResp({ error: 'Invalid JSON' }, 400); }
+
+    // ── instagram-fetch ──────────────────────────────────────────────────────
+    if (body.action === 'instagram-fetch') {
+      const { shortcode } = body;
+      if (!shortcode) return jsonResp({ error: 'No shortcode' }, 400);
+      // Instagram's oEmbed API now requires authentication and is no longer publicly accessible.
+      // We attempt multiple endpoints but gracefully degrade — never returning 500.
+      try {
+        // Try the graph.facebook.com oEmbed endpoint (most reliable)
+        const endpoints = [
+          `https://graph.facebook.com/v18.0/instagram_oembed?url=https://www.instagram.com/p/${shortcode}/&fields=title,author_name,thumbnail_url`,
+          `https://api.instagram.com/oembed/?url=https://www.instagram.com/p/${shortcode}/`,
+          `https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/p/${shortcode}/&hidecaption=0`,
+        ];
+        for (const url of endpoints) {
+          try {
+            const r = await fetch(url, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; recipe-importer/1.0)', 'Accept': 'application/json' },
+              signal: AbortSignal.timeout(6000),
+            });
+            if (r.ok) {
+              const data = await r.json();
+              const text = [data.title || '', data.author_name ? 'By: ' + data.author_name : ''].filter(Boolean).join('\n\n');
+              return jsonResp({ title: data.title || '', author: data.author_name || '', text, thumbnail: data.thumbnail_url || '' });
+            }
+          } catch(e) { /* try next endpoint */ }
+        }
+        // All endpoints failed — Instagram requires auth. Return 404 (not 500) so app can show user-friendly message.
+        return jsonResp({ error: 'Instagram import is not available. Instagram now requires authentication for their API. Please copy and paste the caption text manually using the Free-hand import option.', unavailable: true }, 404);
+      } catch(err) {
+        return jsonResp({ error: 'Instagram fetch failed: ' + err.message, unavailable: true }, 404);
+      }
+    }
 
     // ── fetch-url ─────────────────────────────────────────────────────────────
     if (body.action === 'fetch-url') {
@@ -89,9 +151,9 @@ export default {
           if (ytData.error) {
             const reason = ytData.error.errors && ytData.error.errors[0] && ytData.error.errors[0].reason;
             if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded') {
-              return jsonResp({ 
+              return jsonResp({
                 error: 'YOUTUBE_QUOTA: YouTube API daily quota exceeded.\n\nQuota resets at midnight Pacific Time.\n\nCheck usage: https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas\n\nFree quota: 10,000 units/day (each video lookup = 1 unit)',
-                isYouTube: true 
+                isYouTube: true
               }, 429);
             }
             if (reason === 'keyInvalid' || ytData.error.code === 400) {
@@ -201,8 +263,8 @@ export default {
     // Multi-source: Pixabay (PIXABAY_API_KEY), Pexels (PEXELS_API_KEY),
     // Unsplash (UNSPLASH_ACCESS_KEY). The app cycles sources via a "See more" button.
     // A source with no key set returns { notConfigured:true } so the app can skip it.
-    // Per-source failures return HTTP 200 with an { error } field (not 500) so one
-    // bad source never breaks the others.
+    // Per-source failures return HTTP 200 with an { error } field so one bad source
+    // never breaks the others.
     if (body.action === 'photo-search') {
       const query = body.query;
       if (!query) return jsonResp({ error: 'No query' }, 400);
@@ -267,6 +329,23 @@ export default {
         return jsonResp({ source, error: 'Unknown photo source: ' + source, images: [] });
       } catch(err) {
         return jsonResp({ source, error: 'Photo search exception (' + source + '): ' + err.message });
+      }
+    }
+
+    // ── File download: store in KV, return one-time GET URL ──────────────────
+    if (body.action === 'download-store') {
+      try {
+        const { data, filename, mime } = body;
+        if (!data || !filename) return jsonResp({ error: 'Missing data or filename' }, 400);
+        const key = 'dl_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+        await env.BRING_KV.put(key, JSON.stringify({ data, filename, mime }), { expirationTtl: 60 });
+        // Put filename in URL path — Chrome uses path segment as filename
+        const baseUrl = request.url.split('?')[0];
+        const encodedFilename = encodeURIComponent(filename);
+        const getUrl = baseUrl + encodedFilename + '?dl=' + encodeURIComponent(key);
+        return jsonResp({ url: getUrl });
+      } catch(err) {
+        return jsonResp({ error: 'download-store failed: ' + err.message }, 500);
       }
     }
 

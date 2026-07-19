@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.7 -->
+<!-- Tony's Recipes Collection v25.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1599,7 +1599,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.7';
+var APP_VERSION = 'v25.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3610,7 +3610,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4161,7 +4161,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8720,6 +8720,36 @@ function updateFilterBarTop() {
           </div>
         </div>
         <a href="https://pixabay.com/api/docs/" target="_blank" class="payment-link">Docs ↗</a>
+      </div>
+
+      <!-- Pexels -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#E6F7F1;">📸</div>
+        <div class="payment-body">
+          <div class="payment-name">Pexels API <span class="payment-badge free">Free Plan</span></div>
+          <div class="payment-desc">Extra photo source for “Search web for photo” (via the See more button). 200 requests/hour, 20,000/month free.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">No attribution required</span>
+          </div>
+        </div>
+        <a href="https://www.pexels.com/api/" target="_blank" class="payment-link">Get key ↗</a>
+      </div>
+
+      <!-- Unsplash -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#EFEFEF;">🖼️</div>
+        <div class="payment-body">
+          <div class="payment-name">Unsplash API <span class="payment-badge free">Free Plan</span></div>
+          <div class="payment-desc">Third photo source for “Search web for photo”. Demo tier 50 requests/hour (5,000/hour once approved for production).</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">Attribution appreciated</span>
+          </div>
+        </div>
+        <a href="https://unsplash.com/developers" target="_blank" class="payment-link">Get key ↗</a>
       </div>
 
       <!-- YouTube -->
