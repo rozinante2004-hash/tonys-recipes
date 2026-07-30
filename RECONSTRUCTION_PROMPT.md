@@ -266,6 +266,16 @@ Save errors are classified honestly (`handleFirestoreSaveError`/`isSizeError`): 
 `permission-denied` vs. quota vs. genuine `unavailable`/offline — only real network errors get the
 auto‑retry; oversized photos are named and skipped while the rest sync.
 
+**Photo‑loss safety net (`loadFromFirestore`/`applyRemoteUpdate`):** a normal cloud load fully
+replaces the in‑memory `recipes` array, so if a photo never made it to the cloud (e.g. an old save
+failed before this fix existed, or another device hasn't synced yet), a plain load would silently
+erase it locally too. Both functions snapshot local photos (`id → {photo, updatedAt}`) *before*
+overwriting `recipes`; afterward, any incoming recipe with no photo whose local `updatedAt` is
+**not older** than the incoming one gets its local photo restored (and the recovery is pushed back
+to Firestore so other devices pick it up). Only a cloud copy that is **strictly newer** and
+genuinely has no photo is treated as an intentional deletion and left alone. A toast reports how
+many photos were recovered.
+
 **Local photo storage (IndexedDB — same reasoning as the cloud, for `localStorage`'s ~5 MB cap):**
 `localStorage` stores strings as UTF‑16, so inline base64 photos overflow it fast and saves then
 fail silently. Photos are therefore kept in **IndexedDB** (`db tonys_recipes_db`, store `photos`,
@@ -333,8 +343,10 @@ panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow scree
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
 (`.card-category-badge`, bottom‑left over the image), title (right‑aligned for Hebrew),
-prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a video
-badge for bookmarks. On phone‑width screens the grid uses a configurable column count
+prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a green
+video/clip circle badge for `r.isVideoBookmark || r.isClip` (not `isVideoBookmark` alone — a
+recipe can be flagged as a clip without being a video bookmark, e.g. auto‑detected as having no
+ingredients/steps, and must still show the indicator). On phone‑width screens the grid uses a configurable column count
 (`--mobile-cols`, 1–5, default 3) with square (`aspect-ratio:1/1`) cubes — see **Settings → Grid
 Layout** (`openGridSettings`, stored in `tonys_mobile_cols`). Desktop grid uses
 `repeat(auto-fill, minmax(220px, 1fr))`. There is a **sort** control (`setSort`): default /
@@ -422,7 +434,11 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 - **Send** (`openBringModal`→`bringConfirmSend`→`sendItemsToBring`): pick ingredients as
   checkboxes, POST `bring-add` to the Worker. On success, deep‑link `bring://` then fall back to
-  `web.getbring.com`.
+  `web.getbring.com`. **Amounts sent match the recipe view's current scale/unit** — `openBringModal`
+  runs each ingredient through `cvtIng()`/`scaleAmt()` using `viewMult`/`viewUnit` (only when
+  `recipeId === viewId`, since Send‑to‑Bring is reached from the view screen) and both the
+  displayed checkbox labels and the amounts actually sent (`_bringScaledAmounts`) use that scaled
+  value — never the raw unscaled `ingredient.a`.
 - **Token lifecycle**: Bring tokens expire ~weekly. `bring_token_expiry` drives a status pill
   (`renderBringTokenStatus`) — connected / expires soon / expired. Refresh flows:
   - **Auto relay** (`openBringAutoRefresh` → `bring-relay.html` popup) tries to read the token
