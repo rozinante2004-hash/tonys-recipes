@@ -230,6 +230,17 @@ forwards whatever the client sends.)
 }
 ```
 
+**`normalizeRecipe(r)` (required — not optional hardening):** render code reads
+`r.difficulty.toLowerCase()`, `r.ingredients.some(...)`, `r.steps.map(...)` etc. **without guards**,
+so a single malformed recipe throws and blanks the ENTIRE grid. `normalizeRecipe` coerces one
+recipe into the assumed shape — backfilling name/emoji/category/difficulty/prep/servings/bg/fav,
+forcing `ingredients` to `[{a:String,n:String}]` (AI imports sometimes return plain strings like
+`"200g flour"`, which it splits into `{a,n}`), forcing `steps` to non‑empty strings, and setting
+`updatedAt` (a fresh import without it would lose every cloud‑merge tie‑break). Apply it in
+`migrateRecipes` (every load/restore/remote‑update) **and** on every import path
+(`confirmImportParsed`, `addSuggestion`, import previews). `renderGrid`'s search/sort are ALSO
+written defensively, so bad data degrades instead of crashing.
+
 **Constants (in the DATA section):**
 ```js
 const EMOJIS = ['🍝','🍕','🥗','🍛','🥘','🍲','🥩','🍗','🐟','🥚','🍜','🫕','🥞','🍰','🎂','🫙','🥦','🥑','🫔','🌮','🍣','🍤','🥨','🧆','🫛'];
@@ -476,8 +487,22 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   each dismissible and remembered.
 - **Version check** (`checkAppVersion`): poll `version.json` (no‑store); when it differs from
   `APP_VERSION` show an update banner (`swUpdateNow` posts `SKIP_WAITING` to the SW and reloads).
-- **Toasts** (`toast`), **HTML‑escape** (`escH`), **dropdown/modal helpers** (`toggleDrop`,
-  `closeDrop`, `closeM`, `bgClose`).
+- **Toasts** (`toast`), **dropdown/modal helpers** (`toggleDrop`, `closeDrop`, `closeM`, `bgClose`).
+- **Print** (`buildPrintHtml`/`printRecipes`/`printRecipe`): builds one **valid** document for one
+  or many recipes (page‑break between them) and opens it to `window.print()`. The `<style>` MUST be
+  closed — an unclosed one makes the parser swallow the whole body as CSS and print a blank page.
+  A blocked pop‑up must be detected (`window.open` → null) and reported, not thrown.
+- **Bulk actions** on the `#selectBar`: `exportRecipesToExcel`/`exportRecipesToWord` take a list and
+  back both "export all" and "export selected"; `uniqueSheetName` de‑duplicates Excel sheet names
+  (XLSX throws on duplicates). `printSelected` prints all selections as ONE document.
+
+**Escaping (security‑critical):** recipes are AI‑parsed from arbitrary web pages *and* shared
+between family members through Firestore, so recipe text is untrusted. Every field interpolated
+into `innerHTML` must go through **`escH()`** (text; null‑safe, newlines → `<br>`) or **`escA()`**
+(attribute values; also escapes quotes). This covers name/category/prep/servings/difficulty/emoji/
+ingredients/steps/diets/source/photo in `renderGrid`, `drawView`, `rHtml` and `buildPrintHtml`.
+Unescaped, a recipe named `<img src=x onerror=…>` executes JavaScript in every family member's app.
+Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML`.
 
 ---
 

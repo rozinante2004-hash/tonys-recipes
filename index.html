@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.10 -->
+<!-- Tony's Recipes Collection v26.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -216,13 +216,13 @@ function deleteSelected() {
 function exportSelExcel() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
   var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
-  exportRecipesToExcel(sel);
+  exportRecipesToExcel(sel, 'Tonys_Recipes_Selected.xlsx');
 }
 
 function exportSelWord() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
   var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
-  exportRecipesToWord(sel);
+  exportRecipesToWord(sel, 'Tonys_Recipes_Selected.docx');
 }
 
 function shareSelected() {
@@ -238,7 +238,10 @@ function shareSelected() {
 
 function printSelected() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
-  selectedIds.forEach(function(id) { printRecipe(id); });
+  // One document with page breaks — previously this opened a separate popup per
+  // recipe, so every window after the first was blocked by the browser.
+  var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
+  printRecipes(sel);
 }
 
 window.toggleSelectMode  = toggleSelectMode;
@@ -307,19 +310,18 @@ async function calcNutrition(id) {
 window.calcNutrition = calcNutrition;
 
 // ─── PHOTO TOGGLE ─────────────────────────────────────────────────────────────
+// Show/hide the original full-res scan beneath the recipe. (It lives in
+// #origPhotoBox-<id>, rendered hidden by drawView.) The button label tracks state.
 function toggleOriginalPhoto(id) {
   var r = recipes.find(function(x) { return x.id===id; });
   if (!r || !r.originalPhoto) return;
-  var heroImg = document.getElementById('viewHeroImg');
-  if (!heroImg) return;
-  var showingOriginal = heroImg.getAttribute('data-showing') === 'original';
-  if (showingOriginal) {
-    heroImg.src = r.photo;
-    heroImg.removeAttribute('data-showing');
-  } else {
-    heroImg.src = r.originalPhoto;
-    heroImg.setAttribute('data-showing', 'original');
-  }
+  var box = document.getElementById('origPhotoBox-' + id);
+  if (!box) return;
+  var showing = box.style.display !== 'none';
+  box.style.display = showing ? 'none' : 'block';
+  var btn = document.getElementById('origPhotoBtn-' + id);
+  if (btn) btn.textContent = showing ? '📸 Show Original' : '🙈 Hide Original';
+  if (!showing && box.scrollIntoView) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function removeOriginalPhoto(id) {
@@ -610,7 +612,7 @@ const SELF_TESTS = [
       const r=await fetch('https://lively-bread-273a.rozinante2004.workers.dev',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          model:'claude-sonnet-4-6',
+          model: AI_MODEL,
           max_tokens:5,
           messages:[{role:'user',content:'Reply OK'}]
         }),signal:AbortSignal.timeout(10000)});
@@ -760,12 +762,23 @@ const SELF_TESTS = [
     test: async()=>{
       if(!recipes.length) throw new Error('No recipes');
       const id=recipes[0].id;
-      localStorage.setItem('scale_'+id,'3');
-      openView(id);
-      await wait(200);
-      if(viewMult!==3) throw new Error('Scale not restored — got '+viewMult+' expected 3');
-      closeM('viewOverlay');
-      localStorage.removeItem('scale_'+id); // revert
+      const prev=localStorage.getItem('scale_'+id);
+      try {
+        // Exercise the REAL flow: tapping ×3 must persist, and reopening must restore it.
+        // (Previously this test wrote the key itself, so it passed even though setMult
+        // never saved anything and the feature did not actually work.)
+        openView(id); await wait(150);
+        setMult(3);
+        if(localStorage.getItem('scale_'+id)!=='3') throw new Error('setMult did not persist the scale — reopening the recipe will not restore it');
+        closeM('viewOverlay');
+        viewMult=1;
+        openView(id); await wait(150);
+        if(viewMult!==3) throw new Error('Scale not restored on reopen — got '+viewMult+' expected 3');
+        closeM('viewOverlay');
+      } finally {
+        if(prev===null) localStorage.removeItem('scale_'+id); else localStorage.setItem('scale_'+id,prev);
+        viewMult=1;
+      }
     }
   },
   { id:'feat_wakelock',  group:'Features', name:'Wake lock API available',
@@ -1056,6 +1069,86 @@ const SELF_TESTS = [
         recipes=recipes.filter(function(r){return r.id!==testId;});
       }
     } },
+  { id:'sec_escape_render', group:'Features', name:'Recipe text is escaped (no HTML injection)',
+    test: async()=>{
+      if(typeof escA!=='function') throw new Error('escA (attribute escaper) not defined');
+      if(escH(undefined)!=='') throw new Error('escH must be null-safe');
+      if(escA('a"b')!=='a&quot;b') throw new Error('escA must escape double quotes');
+      var testId=888890;
+      recipes.unshift(normalizeRecipe({id:testId,name:'<b>BOLD</b>',category:'Dinner',difficulty:'Easy',prep:'',servings:'',bg:'#fff',ingredients:[{a:'1',n:'<i>x</i>'}],steps:['<h1>H</h1>'],updatedAt:Date.now()}));
+      try {
+        renderGrid();
+        if(document.querySelector('#recipeGrid b')) throw new Error('recipe name rendered as live HTML in the grid — injection possible');
+        openView(testId); await wait(120);
+        if(document.querySelector('#viewModal h1, #viewModal i')) throw new Error('ingredients/steps rendered as live HTML in the view — injection possible');
+        closeM('viewOverlay');
+      } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+    } },
+  { id:'data_normalize', group:'Core', name:'Malformed recipes cannot break the grid',
+    test: async()=>{
+      if(typeof normalizeRecipe!=='function') throw new Error('normalizeRecipe not defined');
+      var n=normalizeRecipe({id:1}); // nothing but an id
+      if(typeof n.difficulty!=='string'||!Array.isArray(n.ingredients)||!Array.isArray(n.steps)) throw new Error('normalizeRecipe did not backfill required fields');
+      // string ingredients (a shape AI imports sometimes return) become {a,n}
+      var s=normalizeRecipe({ingredients:['200g flour']}).ingredients[0];
+      if(!s||typeof s.n!=='string'||!s.n) throw new Error('string ingredients not converted to {a,n}');
+      // a recipe missing difficulty/ingredients must still render
+      var saved=recipes.slice(), testId=888891;
+      try {
+        recipes=[normalizeRecipe({id:testId,name:'Sparse'})];
+        renderGrid(); // must not throw
+        var q=document.getElementById('searchInput'); var old=q.value; q.value='zz'; renderGrid(); q.value=old;
+      } finally { recipes=saved; renderGrid(); }
+    } },
+  { id:'feat_scale_range', group:'Features', name:'Ranged amounts scale correctly',
+    test: async()=>{
+      if(scaleAmt('2-3 cups',3)!=='6-9 cups') throw new Error('range scaling wrong: got "'+scaleAmt('2-3 cups',3)+'" expected "6-9 cups"');
+      if(scaleAmt('a pinch',3)!=='a pinch') throw new Error('non-numeric amounts must pass through unchanged');
+      if(scaleAmt('1/2 tsp',4)!=='2 tsp') throw new Error('fraction scaling wrong: got "'+scaleAmt('1/2 tsp',4)+'"');
+    } },
+  { id:'feat_orig_photo', group:'Features', name:'Show Original photo toggle works',
+    test: async()=>{
+      var testId=888892;
+      recipes.unshift(normalizeRecipe({id:testId,name:'OrigTest',photo:'data:image/gif;base64,AAA',originalPhoto:'data:image/gif;base64,BBB',updatedAt:Date.now()}));
+      try {
+        openView(testId); await wait(120);
+        var box=document.getElementById('origPhotoBox-'+testId);
+        if(!box) throw new Error('#origPhotoBox missing from the view');
+        if(box.style.display!=='none') throw new Error('original photo should start hidden');
+        toggleOriginalPhoto(testId);
+        if(box.style.display==='none') throw new Error('Show Original did nothing — the toggle is broken');
+        toggleOriginalPhoto(testId);
+        if(box.style.display!=='none') throw new Error('second tap should hide the original again');
+        closeM('viewOverlay');
+      } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+    } },
+  { id:'export_print', group:'Import/Export', name:'Print builds a valid, non-empty document',
+    test: async()=>{
+      if(typeof buildPrintHtml!=='function') throw new Error('buildPrintHtml not defined');
+      if(!recipes.length) throw new Error('No recipes');
+      var html=buildPrintHtml([recipes[0]]);
+      if(!/<\/style>/i.test(html)) throw new Error('unclosed <style> — the whole document would be swallowed as CSS and print blank');
+      var doc=new DOMParser().parseFromString(html,'text/html');
+      if(!doc.querySelector('h1')) throw new Error('print document has no heading — it would print blank');
+      if(!(doc.body.textContent||'').trim()) throw new Error('print document body is empty');
+    } },
+  { id:'export_bulk', group:'Import/Export', name:'Bulk export of selected recipes works',
+    test: async()=>{
+      ['exportRecipesToExcel','exportRecipesToWord','exportSelExcel','exportSelWord','printRecipes'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      if(!document.querySelector('#selectBar button[onclick*="exportSelExcel"]')) throw new Error('Excel button missing from the select bar');
+      if(!document.querySelector('#selectBar button[onclick*="exportSelWord"]'))  throw new Error('Word button missing from the select bar');
+      // duplicate recipe names must not collide as Excel sheet names
+      var used={};
+      if(uniqueSheetName(used,'Soup')===uniqueSheetName(used,'Soup')) throw new Error('duplicate sheet names would make the Excel export throw');
+    } },
+  { id:'perf_search_debounce', group:'Core', name:'Search input is debounced',
+    test: async()=>{
+      if(typeof onSearchInput!=='function') throw new Error('onSearchInput not defined');
+      var inp=document.getElementById('searchInput');
+      if((inp.getAttribute('oninput')||'').indexOf('onSearchInput')===-1) throw new Error('search box still re-renders on every keystroke — typing lags on large collections');
+    } },
   { id:'feat_refresh_foreground', group:'Cloud Sync', name:'Cloud re-checks when app returns to foreground',
     test: async()=>{
       if(typeof _lastVisibleRefresh==='undefined') throw new Error('_lastVisibleRefresh not defined — foreground refresh not wired up');
@@ -1261,6 +1354,13 @@ var SELF_TEST_FIXES = {
   stor_photo_race:   { fix:'stripPhotosLocal must set _ph/_po whenever the flag was ALREADY set, not only when r.photo/r.originalPhoto is currently populated — otherwise a save that lands mid-hydration permanently orphans the photo in IndexedDB.', autofix: null },
   feat_clip_badge:   { fix:'The card templates must show the video/clip badge for (r.isVideoBookmark || r.isClip), not isVideoBookmark alone — otherwise recipes flagged as clips (no full recipe content) show no visual indicator.', autofix: null },
   feat_bring_scale:  { fix:'openBringModal must scale ingredient amounts via cvtIng()/scaleAmt() using the current viewMult/viewUnit (when recipeId===viewId) and bringConfirmSend must send _bringScaledAmounts, not the raw recipe.ingredients amounts.', autofix: null },
+  sec_escape_render: { fix:'Recipe fields must be escaped with escH() (text) / escA() (attributes) in renderGrid and drawView. Recipes are AI-parsed from arbitrary web pages and shared between family members, so unescaped fields allow HTML/script injection and break layout on names containing < or &.', autofix: null },
+  data_normalize:    { fix:'normalizeRecipe() must backfill difficulty/ingredients/steps etc. and be applied in migrateRecipes and on import. Render code calls r.difficulty.toLowerCase() and r.ingredients.some() without guards, so one malformed recipe otherwise throws and blanks the whole grid.', autofix: null },
+  feat_scale_range:  { fix:'scaleAmt must scale BOTH ends of a range ("2-3 cups" x3 = "6-9 cups") and pass non-numeric amounts through unchanged. This also feeds the amounts sent to Bring!.', autofix: null },
+  feat_orig_photo:   { fix:'toggleOriginalPhoto must show/hide #origPhotoBox-<id> (rendered hidden by drawView) and update #origPhotoBtn-<id>. It previously targeted a #viewHeroImg element that did not exist, so the button silently did nothing.', autofix: null },
+  export_print:      { fix:'buildPrintHtml must emit valid HTML with a closed </style> and real body content, and printRecipes must handle a blocked pop-up. An unclosed <style> makes the browser swallow the body as CSS and print a blank page.', autofix: null },
+  export_bulk:       { fix:'exportRecipesToExcel/exportRecipesToWord must exist and the #selectBar must expose Excel/Word buttons; uniqueSheetName must de-duplicate sheet names (XLSX throws on duplicates).', autofix: null },
+  perf_search_debounce: { fix:'The search box must call onSearchInput() (debounced), not renderGrid() directly — with inline base64 photos a full re-render per keystroke is multi-MB and lags badly on phones.', autofix: null },
   feat_refresh_foreground: { fix:'The visibilitychange listener that re-runs loadFromFirestore() when the app returns to the foreground is missing. Without it, a remote change (e.g. a photo added on another device) only applies if the transient "New changes available" banner is seen within 30s, or after a full reload.', autofix: null },
 };
 
@@ -1654,7 +1754,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.10';
+var APP_VERSION = 'v26.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3665,7 +3765,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.10</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3694,7 +3794,7 @@ body.banner-shown .header {
   <div class="header-row" style="padding-top:0;padding-bottom:10px;gap:8px;flex-wrap:wrap;">
     <div style="flex:1;min-width:180px;position:relative;">
       <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.45);font-size:13px;pointer-events:none;">🔍</span>
-      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" oninput="renderGrid()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
+      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" oninput="onSearchInput()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
     </div>
     <div class="header-actions">
       <div class="drop-group">
@@ -3827,8 +3927,10 @@ body.banner-shown .header {
   background:var(--warm-brown);padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));
   flex-direction:row;align-items:center;justify-content:space-between;gap:10px;
   box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
-  <span id="selectedCount" style="color:white;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;">0 selected</span>
-  <div style="display:flex;gap:8px;">
+  <span id="selectedCount" style="color:white;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;">0 selected</span>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+    <button class="del-bar-btn del-bar-action" onclick="exportSelExcel()">📊 Excel</button>
+    <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
     <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
     <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
     <button class="del-bar-btn del-bar-delete" onclick="deleteSelected()">🗑️ Delete</button>
@@ -4216,7 +4318,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.10</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4307,18 +4409,8 @@ body.banner-shown .header {
 </div>
 
 
-<!-- MULTI-SELECT ACTION BAR -->
-<div id="deleteSelBar">
-  <span id="deleteSelCount" style="font-size:13px;font-weight:600;">0 selected</span>
-  <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">
-    <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
-    <button class="del-bar-btn del-bar-action" onclick="exportSelExcel()">📊 Excel</button>
-    <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
-    <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
-    <button class="del-bar-btn del-bar-delete" onclick="deleteSelected()">🗑️ Delete</button>
-    <button class="del-bar-btn del-bar-cancel" onclick="cancelSelectMode()">✕</button>
-  </div>
-</div>
+<!-- (Removed #deleteSelBar: a second, duplicate select-action bar that no code ever
+     made visible. Its Excel/Word buttons are now on the live #selectBar above.) -->
 
 
 <!-- MEASUREMENT CALCULATOR -->
@@ -4681,12 +4773,22 @@ function setSort(mode) {
 }
 window.setSort = setSort;
 
+// Search re-renders the whole grid, and with inline base64 photos that markup can be
+// many MB — running it on every keystroke made typing visibly lag on phones. Debounce
+// so we render once the user pauses instead of once per character.
+var _searchTimer = null;
+function onSearchInput() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(function(){ renderGrid(); }, 180);
+}
+window.onSearchInput = onSearchInput;
+
 function renderGrid() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   // Apply sort
   var sortedRecipes = recipes.slice();
   if (sortMode === 'alpha') {
-    sortedRecipes.sort(function(a,b){ return a.name.localeCompare(b.name); });
+    sortedRecipes.sort(function(a,b){ return String(a.name==null?'':a.name).localeCompare(String(b.name==null?'':b.name)); });
   } else if (sortMode === 'prep') {
     sortedRecipes.sort(function(a,b){
       var pa = parseInt(a.prep)||999, pb = parseInt(b.prep)||999;
@@ -4727,10 +4829,12 @@ function renderGrid() {
     }
     // Search query
     if (!q) return true;
-    return r.name.toLowerCase().includes(q)
-      || r.category.toLowerCase().includes(q)
-      || r.ingredients.some(i => i.n.toLowerCase().includes(q))
-      || r.steps.some(s => s.toLowerCase().includes(q));
+    // Defensive: a recipe with a missing field must never break the whole grid.
+    const lc = v => String(v == null ? '' : v).toLowerCase();
+    return lc(r.name).includes(q)
+      || lc(r.category).includes(q)
+      || (Array.isArray(r.ingredients) && r.ingredients.some(i => lc(i && i.n).includes(q)))
+      || (Array.isArray(r.steps) && r.steps.some(s => lc(s).includes(q)));
   });
   var labelParts = [];
   if (showFavOnly) labelParts.push('Favourites');
@@ -4759,17 +4863,17 @@ function renderGrid() {
     g.innerHTML = list.map(r => `
       <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
-        <div class="recipe-list-thumb" style="background:${r.bg};position:relative;overflow:hidden;">
-          ${r.photo ? `<img src="${r.photo}" alt="">` : `<span style="font-size:26px;">${r.emoji}</span>`}
+        <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
+          ${r.photo ? `<img src="${escA(r.photo)}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
           ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:28px;height:28px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div></div>` : ''}
         </div>
         <div class="recipe-list-info">
-          <div class="recipe-list-name" style="text-align:right;">${r.name}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
+          <div class="recipe-list-name" style="text-align:right;">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
-            <span>${r.category}</span>
-            <span>⏱ ${r.prep}</span>
-            <span>🍽 ${r.servings} srv</span>
-            <span class="difficulty ${r.difficulty.toLowerCase()}" style="padding:1px 6px;">${r.difficulty}</span>
+            <span>${escH(r.category)}</span>
+            <span>⏱ ${escH(r.prep)}</span>
+            <span>🍽 ${escH(r.servings)} srv</span>
+            <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(r.difficulty)}</span>
           </div>
         </div>
         <div class="recipe-list-right">
@@ -4781,17 +4885,17 @@ function renderGrid() {
     g.innerHTML = list.map(r => `
       <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
-        <div class="card-image" style="background:${r.bg}">
-          ${r.photo ? `<img src="${r.photo}" alt="">` : `<span style="font-size:52px;line-height:1;">${r.emoji}</span>`}
-          <div class="card-category-badge">${r.category}</div>
+        <div class="card-image" style="background:${escA(r.bg)}">
+          ${r.photo ? `<img src="${escA(r.photo)}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
+          <div class="card-category-badge">${escH(r.category)}</div>
           ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
         </div>
         <div class="card-body">
-          <div class="card-title" style="text-align:right;">${r.name}</div>
-          <div class="card-meta"><span>⏱ ${r.prep}</span><div class="card-meta-dot"></div><span>${r.servings} srv</span></div>
+          <div class="card-title" style="text-align:right;">${escH(r.name)}</div>
+          <div class="card-meta"><span>⏱ ${escH(r.prep)}</span><div class="card-meta-dot"></div><span>${escH(r.servings)} srv</span></div>
         </div>
         <div class="card-footer">
-          <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
+          <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>
           <button class="fav-btn" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
         </div>
       </div>`).join('');
@@ -4827,26 +4931,26 @@ function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
   const ings=r.ingredients.map(i=>{
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
-    return `<li dir="auto"><span>${i.n}</span><span class="ing-amount">${sc}</span></li>`;
+    return `<li dir="auto"><span>${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
   }).join('');
   requestWakeLock();
   document.getElementById('viewModal').innerHTML=`
     <div style="position:sticky;top:max(60px, env(safe-area-inset-top) + 52px);display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
       <button onclick="closeM('viewOverlay')" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);touch-action:manipulation;flex-shrink:0;">✕</button>
     </div>
-    <div class="modal-hero" style="background:${r.bg}">
-      ${r.photo?`<img src="${r.photo}" alt="">`:''}
-      <span class="emoji-over"${r.photo?' style="display:none"':''}>${r.emoji}</span>
+    <div class="modal-hero" style="background:${escA(r.bg)}">
+      ${r.photo?`<img id="viewHeroImg" src="${escA(r.photo)}" alt="">`:''}
+      <span class="emoji-over"${r.photo?' style="display:none"':''}>${escH(r.emoji)}</span>
       <button class="hero-photo-btn" onclick="changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
     </div>
     <div class="modal-content">
-      <div class="modal-category">${r.category}</div>
-      <div class="modal-title" dir="auto">${r.name}</div>
+      <div class="modal-category">${escH(r.category)}</div>
+      <div class="modal-title" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
-        <span>⏱ ${r.prep}</span><span>🍽 ${r.servings} servings</span>
-        <span class="difficulty ${r.difficulty.toLowerCase()}">${r.difficulty}</span>
+        <span>⏱ ${escH(r.prep)}</span><span>🍽 ${escH(r.servings)} servings</span>
+        <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${r.source.startsWith('http') ? r.source : '#'}" target="_blank" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escH(r.source||'')} " placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel">
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -4874,7 +4978,7 @@ function drawView(){
           <button class="conv-opt${viewUnit==='imperial'?' active':''}" onclick="setUnit('imperial')">Imperial</button>
         </div>
       </div>
-      ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + d + '</span>'; }).join('') + '</div>' : ''}
+      ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + escH(d) + '</span>'; }).join('') + '</div>' : ''}
       ${r.cookCount ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="background:#FFF0E8;border-radius:12px;padding:2px 10px;color:var(--terracotta);font-weight:600;">🍳 Cooked ${r.cookCount} time${r.cookCount!==1?'s':''}</span>${r.lastCooked?`<span>· last ${new Date(r.lastCooked).toLocaleDateString()}</span>`:''}</div>` : ''}
       ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
       <div class="modal-section-title">Ingredients</div>
@@ -4883,7 +4987,7 @@ function drawView(){
       <ol class="steps-list" dir="auto">${r.steps.map((s,i)=>{
         const isHebrew = /[\u0590-\u05FF]/.test(s);
         const num = `<span class="step-num">${i+1}</span>`;
-        const txt = `<span class="step-text">${s}</span>`;
+        const txt = `<span class="step-text">${escH(s)}</span>`;
         if (isHebrew) {
           return `<li dir="rtl" class="step-rtl">${num}${txt}</li>`;
         }
@@ -4898,16 +5002,22 @@ function drawView(){
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
         <button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
-        ${r.originalPhoto ? `<button class="action-btn" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
+        ${r.originalPhoto ? `<button class="action-btn" id="origPhotoBtn-${r.id}" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
-      ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><img src="${r.originalPhoto}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
+      ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;letter-spacing:0.5px;">ORIGINAL SCAN</div><img src="${escA(r.originalPhoto)}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
       
     </div>`;
   document.getElementById('viewOverlay').classList.add('open');
 }
 
-function setMult(m){viewMult=m;drawView();}
+function setMult(m){
+  viewMult=m;
+  // Persist per-recipe so reopening the recipe restores the chosen scale.
+  // (openView reads this key — without saving it here the feature never worked.)
+  try { if(viewId!=null) localStorage.setItem('scale_'+viewId, String(m)); } catch(e){}
+  drawView();
+}
 function setUnit(u){viewUnit=u;drawView();}
 function toggleShare(id){
   var r=recipes.find(function(x){return x.id===id;});
@@ -5111,13 +5221,23 @@ function parseFraction(s) {
   }
   return parseFloat(s);
 }
+function fmtAmt(n){ return n%1===0 ? String(n) : String(parseFloat(n.toFixed(2))); }
 function scaleAmt(amt,mult){
+  amt = (amt==null ? '' : String(amt));
   if(mult===1)return amt;
+  // Ranges ("2-3 cups", "2–3 cups") must scale BOTH ends — scaling only the first
+  // produced nonsense like "6 -3 cups".
+  const range=amt.match(/^([\d./]+)\s*[-–—]\s*([\d./]+)\s*(.*)/);
+  if(range){
+    const a=parseFraction(range[1])*mult, b=parseFraction(range[2])*mult;
+    if(!isNaN(a)&&!isNaN(b)) return `${fmtAmt(a)}-${fmtAmt(b)}${range[3]?' '+range[3]:''}`;
+  }
   const m=amt.match(/^([\d./]+)\s*(.*)/);
   if(!m)return amt;
   let n=parseFraction(m[1]);
+  if(isNaN(n))return amt; // e.g. a stray "/" — leave the text untouched
   const scaled=n*mult;
-  return`${scaled%1===0?scaled:parseFloat(scaled.toFixed(2))}${m[2]?' '+m[2]:''}`;
+  return`${fmtAmt(scaled)}${m[2]?' '+m[2]:''}`;
 }
 
 // ═══════════════════════════════════
@@ -5212,7 +5332,17 @@ function styleExcelSheet(ws, rows, r) {
   });
 }
 
+// The Excel library is a CDN script. If it didn't load (offline, blocked, CDN down)
+// every XLSX.* call throws an unhandled TypeError with no user feedback — check first.
+function requireXLSX(){
+  if (typeof XLSX !== 'undefined') return true;
+  toast('📊 Excel support could not load (you may be offline). Try again when online, or export to Word instead.');
+  return false;
+}
+window.requireXLSX = requireXLSX;
+
 function expOneExcel(id){
+  if(!requireXLSX())return;
   const r=recipes.find(x=>x.id===id);if(!r)return;
   const wb=XLSX.utils.book_new();
   const rows=sheetRows(r);
@@ -5225,20 +5355,49 @@ function expOneExcel(id){
   downloadExcelWb(wb, fname);
   toast('📊 Preparing: ' + fname + '…', 5000);
 }
-function exportAllExcel(){
-  if(!recipes.length){toast('No recipes to export');return;}
+// Excel sheet names must be unique and ≤31 chars — two recipes with the same (or
+// same-truncated) name previously made book_append_sheet throw and killed the export.
+function uniqueSheetName(used, name){
+  var base = String(name||'Recipe').replace(/[:\\/?*\[\]]/g,'').trim().slice(0,31) || 'Recipe';
+  var n = base, i = 2;
+  while (used[n.toLowerCase()]) {
+    var suffix = ' (' + i + ')';
+    n = base.slice(0, 31 - suffix.length) + suffix;
+    i++;
+  }
+  used[n.toLowerCase()] = true;
+  return n;
+}
+
+// Shared by "export all" and "export selected".
+function exportRecipesToExcel(list, filename){
+  if(!requireXLSX())return;
+  if(!list || !list.length){toast('No recipes to export');return;}
   const wb=XLSX.utils.book_new();
-  const sumWs=XLSX.utils.aoa_to_sheet([["Tony's Recipes Collection"],[],['Name','Category','Difficulty','Prep','Servings'],...recipes.map(r=>[r.name,r.category,r.difficulty,r.prep,r.servings])]);
+  const used={};
+  const sumWs=XLSX.utils.aoa_to_sheet([["Tony's Recipes Collection"],[],['Name','Category','Difficulty','Prep','Servings'],...list.map(r=>[r.name,r.category,r.difficulty,r.prep,r.servings])]);
   sumWs['!cols']=[{wch:28},{wch:14},{wch:12},{wch:12},{wch:10}];
-  XLSX.utils.book_append_sheet(wb,sumWs,'All Recipes');
-  recipes.forEach(r=>{
+  XLSX.utils.book_append_sheet(wb,sumWs,uniqueSheetName(used,'All Recipes'));
+  list.forEach(r=>{
     const ws=XLSX.utils.aoa_to_sheet(sheetRows(r));
     ws['!cols']=[{wch:18},{wch:60}];
-    var sn2 = r.name.replace(/[:\\/?*\[\]]/g,'').trim().slice(0,31)||'Recipe';
-    XLSX.utils.book_append_sheet(wb,ws,sn2);
+    XLSX.utils.book_append_sheet(wb,ws,uniqueSheetName(used,r.name));
   });
-  downloadExcelWb(wb,'Tonys_Recipes_Collection.xlsx');
-  toast(`📊 Exported ${recipes.length} recipes to Excel!`);
+  downloadExcelWb(wb, filename || 'Tonys_Recipes_Collection.xlsx');
+  toast(`📊 Exported ${list.length} recipe${list.length!==1?'s':''} to Excel!`);
+}
+window.exportRecipesToExcel = exportRecipesToExcel;
+
+function exportRecipesToWord(list, filename){
+  if(!list || !list.length){toast('No recipes to export');return;}
+  var date = new Date().toISOString().slice(0,10);
+  downloadBlob(makeDocxBlob(list), filename || ('Tonys_Recipes_' + date + '.docx'));
+  toast('📄 Exported ' + list.length + ' recipe' + (list.length!==1?'s':'') + ' to Word!');
+}
+window.exportRecipesToWord = exportRecipesToWord;
+
+function exportAllExcel(){
+  exportRecipesToExcel(recipes, 'Tonys_Recipes_Collection.xlsx');
 }
 
 // ═══════════════════════════════════
@@ -5548,10 +5707,7 @@ function expOneWord(id){
   downloadBlob(makeDocxBlob([r]), fname);
 }
 function exportAllWord(){
-  if(!recipes.length){toast('No recipes to export');return;}
-  var date = new Date().toISOString().slice(0,10);
-  downloadBlob(makeDocxBlob(recipes),'Tonys_Recipes_' + date + '.docx');
-  toast('📄 Exported ' + recipes.length + ' recipes to Word!');
+  exportRecipesToWord(recipes);
 }
 
 // ═══════════════════════════════════
@@ -5680,7 +5836,7 @@ async function importFromFile(event){
       var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          model:'claude-sonnet-4-6', max_tokens:2000,
+          model: AI_MODEL, max_tokens:2000,
           messages:[{role:'user', content:[
             {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
             {type:'text', text:'Extract all recipe text from this document. Return the full text exactly as it appears, preserving all ingredient lists and method steps. Keep the original language — do NOT translate.'}
@@ -5694,9 +5850,11 @@ async function importFromFile(event){
     } else if(ext === 'html' || ext === 'htm') {
       // ── HTML — strip tags ───────────────────────────────────────────────────
       var raw2 = new TextDecoder('utf-8', {fatal:false}).decode(new Uint8Array(fileBuffer));
-      var tmp = document.createElement('div');
-      tmp.innerHTML = raw2;
-      text = tmp.innerText || tmp.textContent || '';
+      // Parse into an inert document rather than assigning innerHTML: DOMParser does not
+      // fetch remote resources or fire handlers such as <img onerror> from the file.
+      var pdoc = new DOMParser().parseFromString(raw2, 'text/html');
+      pdoc.querySelectorAll('script,style,nav,footer,header,aside,noscript,iframe').forEach(function(el){ el.remove(); });
+      text = (pdoc.body && (pdoc.body.innerText || pdoc.body.textContent)) || '';
 
     } else if(ext === 'txt') {
       text = new TextDecoder('utf-8', {fatal:false}).decode(new Uint8Array(fileBuffer));
@@ -6097,7 +6255,7 @@ function renderSuggestions(suggestions, containerId) {
       <div class="sug-card-body" dir="auto">
         <em>${escH(s.why||'')}</em><br><br>
         <strong>Key ingredients:</strong> ${(s.ingredients||[]).slice(0,5).map(i=>escH(i.n)).join(', ')}${(s.ingredients||[]).length>5?' &amp; more':''}
-        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${s.source.startsWith('http') ? s.source : '#'}" target="_blank" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
+        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${s.source.startsWith('http') ? s.source : '#'}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
       </div>
       <div class="sug-card-footer">
         <button class="sug-add-btn" id="sugadd-${containerId}-${i}" onclick="addSuggestion(${i},'${containerId}')">+ Add to My Recipes</button>
@@ -6111,7 +6269,7 @@ function addSuggestion(idx, containerId) {
   const res = document.getElementById(containerId);
   const s = (res._suggestions || [])[idx];
   if (!s) return;
-  recipes.unshift({
+  recipes.unshift(normalizeRecipe({
     id: nextId++,
     name: s.name || 'Imported Recipe',
     emoji: rndEmoji(),
@@ -6124,8 +6282,9 @@ function addSuggestion(idx, containerId) {
     bg: rndBg(),
     fav: false,
     ingredients: Array.isArray(s.ingredients) && s.ingredients.length ? s.ingredients : [{a:'',n:'See full recipe'}],
-    steps: Array.isArray(s.steps) && s.steps.length ? s.steps : ['See full recipe online']
-  });
+    steps: Array.isArray(s.steps) && s.steps.length ? s.steps : ['See full recipe online'],
+    updatedAt: Date.now()
+  }));
   const btn = document.getElementById(`sugadd-${containerId}-${idx}`);
   if (btn) { btn.textContent = '✓ Added!'; btn.classList.add('added'); btn.disabled = true; }
   renderGrid();
@@ -6212,6 +6371,12 @@ function extractJSON(raw) {
 }
 function sleep(ms) { return new Promise(function(r){ setTimeout(r,ms); }); }
 
+// Single source of truth for the AI model. Several call sites (PDF import, the self
+// test) previously hard-coded a different id than aiCall used, so they could fail
+// independently of the rest of the app. Change it here and every path follows.
+var AI_MODEL = 'claude-sonnet-4-5-20250929';
+window.AI_MODEL = AI_MODEL;
+
 async function aiCall(prompt, maxTokens=2000, tools=null) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
@@ -6223,7 +6388,7 @@ async function aiCall(prompt, maxTokens=2000, tools=null) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const body = {
-        model: 'claude-sonnet-4-5-20250929',
+        model: AI_MODEL,
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }]
       };
@@ -6300,7 +6465,7 @@ function showServiceError(message) {
     if (!line) return;
     // Make URLs clickable
     line = line.replace(/(https?:\/\/[^\s]+)/g, function(url) {
-      return '<a href="' + url + '" target="_blank" style="color:#1565C0;text-decoration:underline;">' + url + '</a>';
+      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="color:#1565C0;text-decoration:underline;">' + url + '</a>';
     });
     html += '<div style="font-size:13px;color:var(--ink);margin-bottom:6px;line-height:1.6;">' + line + '</div>';
   });
@@ -6395,7 +6560,13 @@ function toast(msg, duration){
   clearTimeout(t._tid);
   t._tid = setTimeout(()=>t.classList.remove('show'), duration);
 }
-function escH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+// Escape for HTML *text* content. Null-safe (callers pass optional recipe fields).
+// Newlines become <br> because notes/steps rely on that when displayed.
+function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');}
+// Escape for use inside an HTML *attribute* value. Also escapes quotes (escH does not)
+// and never emits <br>, so a crafted value can't break out of the attribute.
+function escA(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+window.escA = escA;
 function rndEmoji(){return EMOJIS[Math.floor(Math.random()*EMOJIS.length)];}
 function rndBg(){return BGS[Math.floor(Math.random()*BGS.length)];}
 
@@ -6404,7 +6575,6 @@ function rndBg(){return BGS[Math.floor(Math.random()*BGS.length)];}
 // TRANSLATE
 // ═══════════════════════════════════
 let translateId = null;
-let translateDir = 'en'; // 'en' = EN→HE, 'he' = HE→EN
 
 function openTranslate(id) {
   translateId = id;
@@ -6413,12 +6583,8 @@ function openTranslate(id) {
   document.getElementById('translateResult').innerHTML = '';
   document.getElementById('translateOverlay').classList.add('open');
 }
-function setLang(dir) {
-  translateDir = dir;
-  document.getElementById('langEN').classList.toggle('active', dir === 'en');
-  document.getElementById('langHE').classList.toggle('active', dir === 'he');
-  document.getElementById('translateResult').innerHTML = '';
-}
+// (Removed setLang(): dead code from an older EN/HE toggle. #langEN/#langHE no longer
+// exist, so calling it threw. The translate modal now uses the from/to dropdowns.)
 
 async function runTranslate() {
   const r = recipes.find(x => x.id === translateId);
@@ -6689,7 +6855,7 @@ async function runUrlImport() {
     res.innerHTML = `<div class="explore-result" style="color:#B03030;">
       <strong>&#10060; Could not fetch this page.</strong><br><br>
       The site blocks automated access. Please:<br><br>
-      1. Open <a href="${url}" target="_blank" style="color:var(--terracotta)">${escH(url)}</a><br>
+      1. Open <a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta)">${escH(url)}</a><br>
       2. Select all &amp; copy the text (Ctrl+A, Ctrl+C)<br>
       3. Use <strong>Import &rarr; &#9997;&#65039; Paste free-hand text</strong>
     </div>`;
@@ -6723,6 +6889,11 @@ function spinner(msg) {
 }
 
 function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
+  // AI sometimes returns ingredients as plain strings ("200g flour") rather than
+  // {a,n} objects — normalise up front so the preview and the saved recipe match.
+  var _n = normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
+  parsed.ingredients = _n.ingredients;
+  parsed.steps = _n.steps;
   var ingsHtml = (parsed.ingredients||[]).map(function(i) {
     return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
   }).join('');
@@ -6758,7 +6929,10 @@ function showOriginalPhotoPreview(btn) {
 window.showOriginalPhotoPreview = showOriginalPhotoPreview;
 
 function confirmImportParsed(parsed, overlayId) {
-  recipes.unshift({
+  // normalizeRecipe coerces AI output into the expected shape (ingredients sometimes
+  // come back as plain strings) and sets updatedAt — without it a freshly imported
+  // recipe had updatedAt undefined and could lose to an older copy during cloud merge.
+  recipes.unshift(normalizeRecipe({
     id: nextId++, name: parsed.name || 'Imported Recipe', emoji: rndEmoji(), photo: '',
     category: CATS.includes(parsed.category) ? parsed.category : 'Dinner',
     difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
@@ -6767,8 +6941,9 @@ function confirmImportParsed(parsed, overlayId) {
     originalPhoto: parsed._originalPhoto || '',
     bg: rndBg(), fav: false,
     ingredients: parsed.ingredients || [],
-    steps: parsed.steps || []
-  });
+    steps: parsed.steps || [],
+    updatedAt: Date.now()
+  }));
   closeM(overlayId);
   activeCat = 'All'; renderFilters(); renderGrid();
   saveData();
@@ -6822,6 +6997,14 @@ function idbGetAll() {
   return idbStore('readonly').then(function(s) { return new Promise(function(res) {
     var r = s.getAll(); r.onsuccess = function(){res(r.result || []);}; r.onerror = function(){res([]);}; }); });
 }
+// Wipe every stored photo (used by Reset — otherwise photos would be orphaned in IDB).
+function idbClearAll() {
+  if (!_idbAvailable) return Promise.resolve();
+  return idbStore('readwrite').then(function(s) { return new Promise(function(res) {
+    var r = s.clear(); r.onsuccess = function(){res();}; r.onerror = function(){res();}; }); })
+    .then(function(){ _idbPhotoStamps = {}; });
+}
+window.idbClearAll = idbClearAll;
 
 // Copy of the recipe list with photo data removed, for localStorage. `_ph`/`_po` flag
 // that a photo / originalPhoto exists in IndexedDB and should be hydrated on load.
@@ -6882,19 +7065,61 @@ function saveLocal() {
   if (_idbAvailable) savePhotosToIDB();
 }
 
+// Coerce one recipe into the shape the rest of the app assumes. Rendering reads
+// r.difficulty.toLowerCase(), r.ingredients.some(...) etc. without guards, so a single
+// malformed recipe (bad AI import, hand-edited backup, older schema) could otherwise
+// throw and blank the ENTIRE grid. Also normalises ingredients/steps, which AI imports
+// sometimes return as plain strings instead of {a,n} objects.
+function normalizeRecipe(r) {
+  if (!r || typeof r !== 'object') r = {};
+  if (typeof r.name !== 'string')  r.name = String(r.name == null ? 'Untitled recipe' : r.name);
+  if (typeof r.emoji !== 'string' || !r.emoji) r.emoji = '🍽️';
+  if (typeof r.category !== 'string' || !r.category) r.category = 'Dinner';
+  if (['Easy','Medium','Hard'].indexOf(r.difficulty) === -1) r.difficulty = 'Medium';
+  if (typeof r.prep !== 'string') r.prep = r.prep == null ? '—' : String(r.prep);
+  if (typeof r.servings !== 'string') r.servings = r.servings == null ? '—' : String(r.servings);
+  if (typeof r.bg !== 'string' || !r.bg) r.bg = BGS[0];
+  if (typeof r.photo !== 'string') r.photo = '';
+  r.fav = !!r.fav;
+
+  // Ingredients → always an array of {a:String, n:String}
+  if (!Array.isArray(r.ingredients)) r.ingredients = [];
+  r.ingredients = r.ingredients.map(function(i) {
+    if (typeof i === 'string') {
+      // "200g flour" → split leading amount from name; fall back to all-name
+      var m = i.match(/^\s*([\d./]+\s*[A-Za-z"']*)\s+(.*)$/);
+      return m ? { a: m[1].trim(), n: m[2].trim() } : { a: '', n: i.trim() };
+    }
+    if (!i || typeof i !== 'object') return { a: '', n: String(i == null ? '' : i) };
+    return { a: typeof i.a === 'string' ? i.a : (i.a == null ? '' : String(i.a)),
+             n: typeof i.n === 'string' ? i.n : (i.n == null ? '' : String(i.n)) };
+  }).filter(function(i) { return i.a || i.n; });
+
+  // Steps → always an array of non-empty strings
+  if (!Array.isArray(r.steps)) r.steps = [];
+  r.steps = r.steps.map(function(s) {
+    if (typeof s === 'string') return s;
+    if (s && typeof s === 'object') return String(s.text || s.step || s.description || '');
+    return String(s == null ? '' : s);
+  }).filter(function(s) { return s.trim(); });
+
+  if (!Array.isArray(r.diets)) r.diets = [];
+  if (typeof r.cookCount !== 'number' || isNaN(r.cookCount)) r.cookCount = 0;
+  if (typeof r.notes !== 'string') r.notes = '';
+  // Auto-flag as clip if isVideoBookmark or no recipe content
+  if (r.isVideoBookmark && !r.isClip) r.isClip = true;
+  if (typeof r.source !== 'string') r.source = '';
+  if (r.nutrition === undefined) r.nutrition = null;
+  if (typeof r.originalPhoto !== 'string') r.originalPhoto = '';
+  if (typeof r.updatedAt !== 'number' || isNaN(r.updatedAt)) r.updatedAt = 0;
+  return r;
+}
+window.normalizeRecipe = normalizeRecipe;
+
 function migrateRecipes(list) {
-  return list.map(function(r) {
-    if (!r.diets) r.diets = [];
-    if (!r.cookCount) r.cookCount = 0;
-    if (!r.notes) r.notes = '';
-    // Auto-flag as clip if isVideoBookmark or no recipe content
-    if (r.isVideoBookmark && !r.isClip) r.isClip = true;
-    if (r.source === undefined) r.source = '';
-    if (r.nutrition === undefined) r.nutrition = null;
-    if (r.originalPhoto === undefined) r.originalPhoto = '';
-    if (r.updatedAt === undefined) r.updatedAt = 0;
-    return r;
-  });
+  if (!Array.isArray(list)) return [];
+  return list.filter(function(r) { return r && typeof r === 'object'; })
+             .map(normalizeRecipe);
 }
 
 // Pull photos back out of IndexedDB into the in-memory recipes, then re-render.
@@ -7505,18 +7730,23 @@ function setDriveStatus(state, text) {
 }
 
 async function clearAllData() {
+  // Be honest about scope: this clears THIS DEVICE only. The shared cloud copy is
+  // deliberately left intact (recipes belong to the whole family), which also means a
+  // signed-in user will simply re-download everything on reload — the old wording
+  // claimed it deleted the cloud data too, which was untrue and misleading.
   var msg = window._driveMode
-    ? 'Reset all data? This will delete ALL recipes from BOTH this device AND the cloud (Firestore). This cannot be undone.'
-    : 'Reset all data? This will delete all recipes from this device.';
+    ? 'Reset this device?\n\nAll recipes and photos stored on THIS device will be erased.\n\n'
+      + 'Your shared cloud collection is NOT deleted — because you are signed in, your recipes '
+      + 'will sync back down after the reload. To keep this device empty, sign out first.'
+    : 'Reset this device?\n\nAll recipes and photos stored on this device will be erased. This cannot be undone.';
   if (!confirm(msg)) return;
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(NEXTID_KEY);
-  if (window._driveMode && window._fbUser && _fbDb) {
-    try {
-      // Shared collection — sign-out does NOT delete data
-      // (recipes belong to the family, not the individual user)
-    } catch(e) { console.warn('Sign-out cleanup error:', e); }
-  }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(NEXTID_KEY);
+    localStorage.removeItem('tonys_offline_queue');
+  } catch(e) {}
+  // Photos live in IndexedDB now — clearing only localStorage would orphan them forever.
+  try { await idbClearAll(); } catch(e) { console.warn('IndexedDB clear failed:', e); }
   location.reload();
 }
 
@@ -7619,7 +7849,7 @@ async function processCameraImage(event) {
       res.innerHTML = spinner('Step 1: Reading text (2500px, ' + sizeKB + 'KB)...');
       const step1 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-5-20250929', max_tokens: 1500,
+        body: JSON.stringify({ model: AI_MODEL, max_tokens: 1500,
           messages: [{ role: 'user', content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
             { type: 'text', text: 'Transcribe ALL text visible in this image word for word in the original language. Watch for similar Hebrew letters. Do NOT translate. If unclear write [?].' }
@@ -7635,7 +7865,7 @@ async function processCameraImage(event) {
         + spinner('Step 2: Extracting recipe...');
       const step2 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-5-20250929', max_tokens: 2000,
+        body: JSON.stringify({ model: AI_MODEL, max_tokens: 2000,
           messages: [{ role: 'user', content: 'Extract recipe from this text. Keep original language. Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. If no recipe return {"error":"no recipe"}. Text:\n\n' + transcription }]
         })
       });
@@ -7674,14 +7904,65 @@ function resizeImageForVision(dataUrl, maxDim, quality) {
   });
 }
 
+// Build a complete, valid print document for one or more recipes.
+// (The previous version never closed its <style> tag, so the entire body was parsed
+// as CSS and the print window came out blank.)
+function buildPrintHtml(list) {
+  var css = 'body{font-family:Georgia,serif;max-width:680px;margin:40px auto;color:#1C1A18;padding:0 16px;}'
+    + 'h1{font-size:28px;color:#5C3D2E;margin-bottom:4px;}'
+    + 'h2{font-size:16px;color:#C1440E;border-bottom:1px solid #E8E0D5;padding-bottom:4px;margin-top:24px;}'
+    + 'table{width:100%;border-collapse:collapse;}'
+    + 'td{vertical-align:top;}'
+    + '.meta{font-size:13px;color:#8A8279;margin-bottom:16px;}'
+    + '.source{font-size:12px;color:#888;margin-top:12px;}'
+    + '.notes{background:#FFF8E8;border-left:3px solid #D4A843;padding:10px 14px;margin-top:16px;font-size:14px;}'
+    + '.recipe + .recipe{page-break-before:always;margin-top:48px;}'
+    + '@media print{button{display:none;}}';
+
+  var body = list.map(function(r) {
+    var ings = (r.ingredients||[]).map(function(i){
+      return '<tr><td style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
+        + escH(i.a) + '</td><td style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
+    }).join('');
+    var steps = (r.steps||[]).map(function(s,si){
+      return '<div style="display:flex;gap:12px;margin-bottom:10px;">'
+        + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + (si+1) + '</span>'
+        + '<span dir="auto">' + escH(s) + '</span></div>';
+    }).join('');
+    return '<div class="recipe">'
+      + '<h1 dir="auto">' + escH(r.emoji) + ' ' + escH(r.name) + '</h1>'
+      + '<div class="meta">' + escH(r.category) + ' | ' + escH(r.difficulty) + ' | ' + escH(r.prep) + ' | ' + escH(r.servings) + ' servings</div>'
+      + '<h2>Ingredients</h2><table>' + ings + '</table>'
+      + '<h2>Method</h2>' + steps
+      + (r.notes ? '<div class="notes" dir="auto"><strong>Notes:</strong> ' + escH(r.notes) + '</div>' : '')
+      + (r.source ? '<div class="source">Source: ' + escH(r.source) + '</div>' : '')
+      + '</div>';
+  }).join('');
+
+  var title = list.length === 1 ? escH(list[0].name) : ("Tony's Recipes (" + list.length + ')');
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + title + '</title>'
+    + '<style>' + css + '</style></head><body>' + body
+    + '<scr' + 'ipt>window.onload=function(){window.print();}</scr' + 'ipt>'
+    + '</body></html>';
+}
+
+function printRecipes(list) {
+  if (!list || !list.length) { toast('Nothing to print'); return; }
+  var pw = window.open('', '_blank', 'width=800,height=600');
+  if (!pw || !pw.document) {
+    toast('⚠️ Printing was blocked by your browser. Allow pop-ups for this site, then try again.');
+    return;
+  }
+  pw.document.write(buildPrintHtml(list));
+  pw.document.close();
+}
+window.buildPrintHtml = buildPrintHtml;
+window.printRecipes   = printRecipes;
+
 function printRecipe(id) {
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r) return;
-  var ings = r.ingredients.map(function(i){ return '<tr><td style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;">' + escH(i.a) + '</td><td>' + escH(i.n) + '</td></tr>'; }).join('');
-  var steps = r.steps.map(function(s,si){ return '<div style="display:flex;gap:12px;margin-bottom:10px;"><span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + (si+1) + '</span><span>' + escH(s) + '</span></div>'; }).join('');
-  var pw = window.open('','_blank','width=800,height=600');
-  pw.document.write('<!DOCTYPE html><html><head><title>' + escH(r.name) + '</title>\n</' + 'script>\n<' + 'style>body{font-family:Georgia,serif;max-width:680px;margin:40px auto;color:#1C1A18;}h1{font-size:28px;color:#5C3D2E;}h2{font-size:16px;color:#C1440E;border-bottom:1px solid #E8E0D5;padding-bottom:4px;margin-top:24px;}table{width:100%;border-collapse:collapse;}.source{font-size:12px;color:#888;margin-top:12px;}@media print{button{display:none;}}</head><body>' + '<h1>' + r.emoji + ' ' + escH(r.name) + '</h1>' + '<div style="font-size:13px;color:#8A8279;margin-bottom:16px;">' + escH(r.category) + ' | ' + escH(r.difficulty) + ' | ' + escH(r.prep) + ' | ' + escH(r.servings) + ' servings</div>' + (r.source ? '<div class="source">Source: ' + escH(r.source) + '</div>' : '') + '<h2>Ingredients</h2><table>' + ings + '</table>' + '<h2>Method</h2>' + steps + '<scr' + 'ipt>window.onload=function(){window.print();}</' + 'script></body></html>');
-  pw.document.close();
+  printRecipes([r]);
 }
 
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
@@ -8100,7 +8381,7 @@ function showHelpDetail(topic, context) {
 var BRING_TOKEN_STORAGE_KEY='bring_token_expiry';
 var BRING_WORKER_URL='https://lively-bread-273a.rozinante2004.workers.dev';
 var BRING_TOKEN_SECRET='tonys-recipes-2024';
-var _bringPopup=null; var _bringTokenCheckInterval=null;
+// (_bringPopup / _bringTokenCheckInterval are declared with the other state vars above.)
 
 function getBringTokenExpiry(){ try{ var s=localStorage.getItem(BRING_TOKEN_STORAGE_KEY); return s?parseInt(s):null; }catch(e){return null;} }
 function setBringTokenExpiry(ts){ try{ localStorage.setItem(BRING_TOKEN_STORAGE_KEY,String(ts)); }catch(e){} }
@@ -8345,8 +8626,8 @@ window.doCalc        = doCalc;
 window.doCalcReverse = doCalcReverse;
 
 // ─── BRING! MODAL ─────────────────────────────────────────────────────────────
-var _bringRecipeId = null;
-
+// (_bringRecipeId is declared once with the other state vars in the DATA section —
+// re-declaring it here previously re-initialised it to null on load.)
 var _bringScaledAmounts = []; // amounts actually sent — matches the recipe view's current scale/unit
 
 function openBringModal(recipeId) {
@@ -8770,7 +9051,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">Recurring subscription</span>
           </div>
         </div>
-        <a href="https://console.anthropic.com/settings/billing" target="_blank" class="payment-link">Manage ↗</a>
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer" class="payment-link">Manage ↗</a>
       </div>
 
       <!-- Anthropic API Credits -->
@@ -8785,7 +9066,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">~$5 lasts months of personal use</span>
           </div>
         </div>
-        <a href="https://console.anthropic.com/settings/billing" target="_blank" class="payment-link">Top up ↗</a>
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer" class="payment-link">Top up ↗</a>
       </div>
 
       <!-- FREE SERVICES -->
@@ -8803,7 +9084,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">Quota resets daily</span>
           </div>
         </div>
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" class="payment-link">Dashboard ↗</a>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" rel="noopener noreferrer" class="payment-link">Dashboard ↗</a>
       </div>
 
       <!-- Firebase -->
@@ -8818,7 +9099,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">1 GB storage, 50K reads/day free</span>
           </div>
         </div>
-        <a href="https://console.firebase.google.com/project/recipes-f379d" target="_blank" class="payment-link">Console ↗</a>
+        <a href="https://console.firebase.google.com/project/recipes-f379d" target="_blank" rel="noopener noreferrer" class="payment-link">Console ↗</a>
       </div>
 
       <!-- GitHub -->
@@ -8831,7 +9112,7 @@ function updateFilterBarTop() {
             <span class="payment-cost free">$0 / month</span>
           </div>
         </div>
-        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" class="payment-link">Repo ↗</a>
+        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" rel="noopener noreferrer" class="payment-link">Repo ↗</a>
       </div>
 
       <!-- Pixabay -->
@@ -8846,7 +9127,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">No attribution required</span>
           </div>
         </div>
-        <a href="https://pixabay.com/api/docs/" target="_blank" class="payment-link">Docs ↗</a>
+        <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener noreferrer" class="payment-link">Docs ↗</a>
       </div>
 
       <!-- Pexels -->
@@ -8861,7 +9142,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">No attribution required</span>
           </div>
         </div>
-        <a href="https://www.pexels.com/api/" target="_blank" class="payment-link">Get key ↗</a>
+        <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer" class="payment-link">Get key ↗</a>
       </div>
 
       <!-- Unsplash -->
@@ -8876,7 +9157,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">Attribution appreciated</span>
           </div>
         </div>
-        <a href="https://unsplash.com/developers" target="_blank" class="payment-link">Get key ↗</a>
+        <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" class="payment-link">Get key ↗</a>
       </div>
 
       <!-- YouTube -->
@@ -8891,7 +9172,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">Via Google Cloud Console</span>
           </div>
         </div>
-        <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com" target="_blank" class="payment-link">Console ↗</a>
+        <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com" target="_blank" rel="noopener noreferrer" class="payment-link">Console ↗</a>
       </div>
 
       <!-- Bring! -->
@@ -8906,7 +9187,7 @@ function updateFilterBarTop() {
             <span style="color:var(--muted);font-size:12px;">Token refresh needed ~every 7 days</span>
           </div>
         </div>
-        <a href="https://web.getbring.com" target="_blank" class="payment-link">Open ↗</a>
+        <a href="https://web.getbring.com" target="_blank" rel="noopener noreferrer" class="payment-link">Open ↗</a>
       </div>
 
       <!-- Monthly total -->
@@ -8941,9 +9222,9 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Hosts the app — the <code>index.html</code> file lives here and is served to users via GitHub Pages</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://github.com/rozinante2004-hash/tonys-recipes/upload/main" target="_blank" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
-        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
-        <a href="https://rozinante2004-hash.github.io/tonys-recipes/" target="_blank" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
+        <a href="https://github.com/rozinante2004-hash/tonys-recipes/upload/main" target="_blank" rel="noopener noreferrer" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
+        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" rel="noopener noreferrer" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
+        <a href="https://rozinante2004-hash.github.io/tonys-recipes/" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -8954,9 +9235,9 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Secure API proxy — routes all AI calls, photo search, URL imports, Bring! and YouTube through a server so API keys stay private</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint">lively-bread-273a</span></a>
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" rel="noopener noreferrer" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint">lively-bread-273a</span></a>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" rel="noopener noreferrer" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
+        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -8967,9 +9248,9 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Free stock-photo APIs behind “🔍 Search web for photo”. The app cycles through them with the <strong>See more</strong> button. Add each key as a Worker secret (⚙️ Worker settings above) — a source with no key is simply skipped.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://pixabay.com/api/docs/" target="_blank" class="deploy-link">🟢 Pixabay — get API key <span class="deploy-hint">secret: PIXABAY_API_KEY · free</span></a>
-        <a href="https://www.pexels.com/api/" target="_blank" class="deploy-link">🔵 Pexels — get API key <span class="deploy-hint">secret: PEXELS_API_KEY · free</span></a>
-        <a href="https://unsplash.com/developers" target="_blank" class="deploy-link">⚫ Unsplash — get Access Key <span class="deploy-hint">secret: UNSPLASH_ACCESS_KEY · free</span></a>
+        <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener noreferrer" class="deploy-link">🟢 Pixabay — get API key <span class="deploy-hint">secret: PIXABAY_API_KEY · free</span></a>
+        <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer" class="deploy-link">🔵 Pexels — get API key <span class="deploy-hint">secret: PEXELS_API_KEY · free</span></a>
+        <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" class="deploy-link">⚫ Unsplash — get Access Key <span class="deploy-hint">secret: UNSPLASH_ACCESS_KEY · free</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -8980,8 +9261,8 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Cloud database & authentication — stores your recipes in the cloud so they sync across all devices, and handles Google sign-in</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data" target="_blank" class="deploy-link">🗄️ Firestore database <span class="deploy-hint">recipes-f379d</span></a>
-        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/overview" target="_blank" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
+        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Firestore database <span class="deploy-hint">recipes-f379d</span></a>
+        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -8992,8 +9273,8 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">AI engine — powers recipe import, translation, suggestions, nutrition calculation, help assistant, and diet auto-tagging</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.anthropic.com/settings/billing" target="_blank" class="deploy-link">💳 Billing & API credits <span class="deploy-hint">Top up credits</span></a>
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" class="deploy-link">🔑 API keys <span class="deploy-hint">Regenerate if compromised</span></a>
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer" class="deploy-link">💳 Billing & API credits <span class="deploy-hint">Top up credits</span></a>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API keys <span class="deploy-hint">Regenerate if compromised</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -9004,8 +9285,8 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">YouTube Data API — fetches video descriptions when you import a recipe from a YouTube URL</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="deploy-link">🔑 API credentials <span class="deploy-hint">YouTube & other keys</span></a>
-        <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" class="deploy-link">▶️ YouTube API quota <span class="deploy-hint">10,000 units/day free</span></a>
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API credentials <span class="deploy-hint">YouTube & other keys</span></a>
+        <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ YouTube API quota <span class="deploy-hint">10,000 units/day free</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -9115,7 +9396,7 @@ function updateFilterBarTop() {
       <div style="margin-top:10px;">
         <button onclick="toggleAccessRules()" style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;padding:4px 0;font-family:'DM Sans',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:8px;">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" style="color:var(--terracotta);">Firebase Console → Firestore → Rules</a></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">Firebase Console → Firestore → Rules</a></div>
           <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
           <button onclick="copyAccessRules()" style="margin-top:6px;padding:6px 14px;background:var(--warm-brown);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy Rules</button>
         </div>
