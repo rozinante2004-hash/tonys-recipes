@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v26.0 -->
+<!-- Tony's Recipes Collection v26.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -203,15 +203,47 @@ function toggleRecipeSelect(e, id) {
   }
 }
 
+// Deleting is now undo-able: we keep the removed recipe objects (and their original
+// positions) in memory and offer an Undo button on the toast. The kept objects still
+// hold their photo data inline, so restoring re-writes the photo to IndexedDB and the
+// cloud — the undo is lossless even though the stored copies are pruned immediately.
+var _pendingUndo = null;
+
 function deleteSelected() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
-  if (!confirm('Delete ' + selectedIds.size + ' recipe(s)? This cannot be undone.')) return;
+  var count = selectedIds.size;
+  if (!confirm('Delete ' + count + ' recipe' + (count!==1?'s':'') + '?\n\nYou can undo this straight afterwards.')) return;
+
+  // Remember each deleted recipe with its index so Undo restores the exact order
+  var removed = [];
+  recipes.forEach(function(r, idx) { if (selectedIds.has(r.id)) removed.push({ idx: idx, recipe: r }); });
+  _pendingUndo = { items: removed, at: Date.now() };
+
   recipes = recipes.filter(function(r) { return !selectedIds.has(r.id); });
   selectedIds.clear();
   cancelSelectMode();
   saveData();
-  toast('🗑️ Deleted');
+  renderGrid();
+
+  toastAction('🗑️ Deleted ' + count + ' recipe' + (count!==1?'s':''), '↩︎ Undo', undoDelete);
 }
+
+function undoDelete() {
+  if (!_pendingUndo || !_pendingUndo.items.length) { toast('Nothing to undo'); return; }
+  // Re-insert lowest index first so later positions stay correct
+  _pendingUndo.items.slice().sort(function(a,b){ return a.idx - b.idx; })
+    .forEach(function(entry) {
+      if (recipes.some(function(r){ return r.id === entry.recipe.id; })) return; // already back
+      recipes.splice(Math.min(entry.idx, recipes.length), 0, entry.recipe);
+    });
+  var n = _pendingUndo.items.length;
+  _pendingUndo = null;
+  saveData();
+  renderFilters();
+  renderGrid();
+  toast('↩︎ Restored ' + n + ' recipe' + (n!==1?'s':''));
+}
+window.undoDelete = undoDelete;
 
 function exportSelExcel() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
@@ -1122,6 +1154,57 @@ const SELF_TESTS = [
         closeM('viewOverlay');
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
+  { id:'perf_photo_blob', group:'Features', name:'Photos render as blob URLs (fast grid)',
+    test: async()=>{
+      if(typeof photoSrc!=='function') throw new Error('photoSrc not defined');
+      var png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC';
+      var testId=888893;
+      recipes.unshift(normalizeRecipe({id:testId,name:'BlobTest',photo:png,updatedAt:Date.now()}));
+      try {
+        var src=photoSrc(recipes[0]);
+        if(src.indexOf('blob:')!==0) throw new Error('photo not converted to a blob URL — the grid will rebuild megabytes of markup per render');
+        if(photoSrc(recipes[0])!==src) throw new Error('blob URL not cached — a new URL per render leaks memory');
+        // exports must still receive the original data URL, not a blob: URL
+        if(JSON.stringify(recipes[0]).indexOf('data:image/png')===-1) throw new Error('stored photo must remain a data URL for backup/export/sync');
+      } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+    } },
+  { id:'feat_undo_delete', group:'CRUD', name:'Delete can be undone',
+    test: async()=>{
+      if(typeof undoDelete!=='function'||typeof toastAction!=='function') throw new Error('undo plumbing not defined');
+      var testId=888894;
+      recipes.splice(1,0,normalizeRecipe({id:testId,name:'UndoTest',updatedAt:Date.now()}));
+      var before=recipes.length;
+      var realConfirm=window.confirm; window.confirm=function(){return true;};
+      try {
+        selectMode=true; selectedIds.clear(); selectedIds.add(testId);
+        deleteSelected();
+        if(recipes.length!==before-1) throw new Error('recipe was not deleted');
+        undoDelete();
+        if(recipes.length!==before) throw new Error('undo did not restore the recipe');
+        var back=recipes.findIndex(function(r){return r.id===testId;});
+        if(back!==1) throw new Error('undo restored the recipe at position '+back+' instead of its original position 1');
+      } finally {
+        window.confirm=realConfirm;
+        recipes=recipes.filter(function(r){return r.id!==testId;});
+        selectedIds.clear(); cancelSelectMode();
+      }
+    } },
+  { id:'a11y_basics', group:'UI', name:'Accessibility basics (labels, Escape, focus)',
+    test: async()=>{
+      if(typeof closeTopModal!=='function') throw new Error('closeTopModal (Escape handling) not defined');
+      applyAriaLabels();
+      var iconOnly=Array.prototype.slice.call(document.querySelectorAll('button')).filter(function(b){
+        var t=(b.textContent||'').trim(); return t && !/[A-Za-z0-9]/.test(t);
+      });
+      var bad=iconOnly.filter(function(b){ return !b.getAttribute('aria-label'); });
+      if(bad.length) throw new Error(bad.length+' icon-only button(s) have no accessible name');
+      if(!document.getElementById('searchInput').getAttribute('aria-label')) throw new Error('search box has no accessible name');
+      if(document.getElementById('toast').getAttribute('aria-live')!=='polite') throw new Error('toast is not announced to screen readers');
+      // Escape must close an open dialog
+      openCalcModal();
+      if(!closeTopModal()) throw new Error('closeTopModal did not close the open dialog');
+      if(document.getElementById('calcOverlay').classList.contains('open')) throw new Error('dialog still open after Escape');
+    } },
   { id:'export_print', group:'Import/Export', name:'Print builds a valid, non-empty document',
     test: async()=>{
       if(typeof buildPrintHtml!=='function') throw new Error('buildPrintHtml not defined');
@@ -1358,6 +1441,9 @@ var SELF_TEST_FIXES = {
   data_normalize:    { fix:'normalizeRecipe() must backfill difficulty/ingredients/steps etc. and be applied in migrateRecipes and on import. Render code calls r.difficulty.toLowerCase() and r.ingredients.some() without guards, so one malformed recipe otherwise throws and blanks the whole grid.', autofix: null },
   feat_scale_range:  { fix:'scaleAmt must scale BOTH ends of a range ("2-3 cups" x3 = "6-9 cups") and pass non-numeric amounts through unchanged. This also feeds the amounts sent to Bring!.', autofix: null },
   feat_orig_photo:   { fix:'toggleOriginalPhoto must show/hide #origPhotoBox-<id> (rendered hidden by drawView) and update #origPhotoBtn-<id>. It previously targeted a #viewHeroImg element that did not exist, so the button silently did nothing.', autofix: null },
+  perf_photo_blob:   { fix:'photoSrc() must convert stored data-URL photos to cached blob: URLs for display (keeping the stored value a data URL for backup/export/sync). Without it every render rebuilds megabytes of markup and the grid crawls.', autofix: null },
+  feat_undo_delete:  { fix:'deleteSelected must stash the removed recipes with their indexes in _pendingUndo and offer toastAction(…, undoDelete); undoDelete restores them at their original positions.', autofix: null },
+  a11y_basics:       { fix:'Run applyAriaLabels() after render/init so icon-only buttons get accessible names, keep aria-label on #searchInput and aria-live on #toast, and keep the Escape handler (closeTopModal).', autofix: ()=>{ if(typeof applyAriaLabels==='function') applyAriaLabels(); } },
   export_print:      { fix:'buildPrintHtml must emit valid HTML with a closed </style> and real body content, and printRecipes must handle a blocked pop-up. An unclosed <style> makes the browser swallow the body as CSS and print a blank page.', autofix: null },
   export_bulk:       { fix:'exportRecipesToExcel/exportRecipesToWord must exist and the #selectBar must expose Excel/Word buttons; uniqueSheetName must de-duplicate sheet names (XLSX throws on duplicates).', autofix: null },
   perf_search_debounce: { fix:'The search box must call onSearchInput() (debounced), not renderGrid() directly — with inline base64 photos a full re-render per keystroke is multi-MB and lags badly on phones.', autofix: null },
@@ -1754,7 +1840,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v26.0';
+var APP_VERSION = 'v26.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2489,6 +2575,26 @@ window.addEventListener('error', function(e) {
 
 body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
 *, *::before, *::after { box-sizing: border-box; }
+
+/* Accessibility: a clear keyboard focus ring (only for keyboard users, so mouse/touch
+   interaction looks unchanged), and respect for reduced-motion preferences. */
+:focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
 
 
 
@@ -3765,7 +3871,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -3794,7 +3900,8 @@ body.banner-shown .header {
   <div class="header-row" style="padding-top:0;padding-bottom:10px;gap:8px;flex-wrap:wrap;">
     <div style="flex:1;min-width:180px;position:relative;">
       <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.45);font-size:13px;pointer-events:none;">🔍</span>
-      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" oninput="onSearchInput()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
+      <label for="searchInput" class="sr-only">Search recipes and ingredients</label>
+      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" aria-label="Search recipes and ingredients" oninput="onSearchInput()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
     </div>
     <div class="header-actions">
       <div class="drop-group">
@@ -4318,7 +4425,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4549,7 +4656,7 @@ body.banner-shown .header {
   </div>
 </div>
 
-<div class="toast" id="toast"><div class="toast-icon-wrap" id="toastIcon"></div><span id="toastMsg"></span></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><div class="toast-icon-wrap" id="toastIcon"></div><span id="toastMsg"></span></div>
 
 <script>
 // ═══════════════════════════════════
@@ -4773,6 +4880,109 @@ function setSort(mode) {
 }
 window.setSort = setSort;
 
+// ─── KEYBOARD & ACCESSIBILITY ─────────────────────────────────────────────────
+// Escape closes the top-most open dialog. Previously the only way out of a modal
+// was finding the ✕ (or tapping the backdrop), which is awkward on a keyboard.
+function closeTopModal() {
+  // Dynamically-created overlays are removed rather than closed
+  var transient = document.getElementById('stDetailOverlay') || document.getElementById('serviceErrorOverlay');
+  if (transient) { transient.remove(); return true; }
+  var open = Array.prototype.slice.call(document.querySelectorAll('.open'))
+    .filter(function(el) {
+      if (!el.id) return false;
+      var cs = window.getComputedStyle(el);
+      return cs.position === 'fixed' && cs.display !== 'none' && cs.visibility !== 'hidden';
+    });
+  if (!open.length) return false;
+  closeM(open[open.length - 1].id); // last in DOM order sits on top
+  return true;
+}
+window.closeTopModal = closeTopModal;
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  // Don't steal Escape from an input that handles it itself (e.g. the source editor)
+  var t = e.target;
+  if (t && t.tagName === 'INPUT' && t.id && t.id.indexOf('srcInput-') === 0) return;
+  if (closeTopModal()) e.preventDefault();
+});
+
+// Label icon-only controls for screen readers. Done in JS so the (many) inline
+// buttons in the markup don't each need editing, and so dynamically rendered
+// controls get labelled too.
+var ARIA_LABELS = {
+  '✕': 'Close', '✕ Cancel': 'Cancel', '?': 'Help', '⚙️': 'Settings',
+  '❤️': 'Remove from favourites', '🤍': 'Add to favourites',
+  '📤 Share': 'Share', '🖨️ Print': 'Print', '🗑️ Delete': 'Delete',
+  '📊 Excel': 'Export to Excel', '📄 Word': 'Export to Word',
+  '✏️': 'Edit', '📷': 'Add or change photo'
+};
+function applyAriaLabels(root) {
+  (root || document).querySelectorAll('button').forEach(function(b) {
+    if (b.getAttribute('aria-label')) return;
+    var txt = (b.textContent || '').trim();
+    var label = ARIA_LABELS[txt];
+    if (!label && b.title) label = b.title;
+    // Any button whose visible text is only emoji/symbols needs a spoken name
+    if (!label && txt && !/[A-Za-z0-9֐-׿]/.test(txt)) label = b.title || 'Button';
+    if (label) b.setAttribute('aria-label', label);
+  });
+}
+window.applyAriaLabels = applyAriaLabels;
+
+// ─── PHOTO OBJECT URLs ────────────────────────────────────────────────────────
+// Photos are stored as base64 data URLs (needed for backup/export/cloud sync), but
+// putting a 60–80 KB data URL into markup for every card means each render builds
+// multi-MB strings that the browser must re-parse and re-decode. Instead we convert
+// each photo to a Blob once and render the short blob: URL, keeping the DOM tiny.
+// Cached per recipe and revoked when the photo changes or the recipe disappears.
+var _photoUrlCache = {}; // id -> { sig, url }
+
+function photoSignature(dataUrl){ return dataUrl.length + ':' + dataUrl.slice(-32); }
+
+function dataUrlToBlobUrl(dataUrl) {
+  try {
+    var comma = dataUrl.indexOf(',');
+    if (comma === -1) return '';
+    var meta = dataUrl.slice(5, comma);           // e.g. "image/jpeg;base64"
+    if (meta.indexOf('base64') === -1) return ''; // not base64 — use as-is
+    var mime = meta.split(';')[0] || 'image/jpeg';
+    var bin  = atob(dataUrl.slice(comma + 1));
+    var len  = bin.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  } catch(e) { return ''; }
+}
+
+// Display source for a recipe photo. Falls back to the raw value if conversion
+// fails, so a broken cache can never hide a photo.
+function photoSrc(r) {
+  if (!r || !r.photo) return '';
+  if (!/^data:/i.test(r.photo)) return r.photo; // already an http(s)/blob URL
+  var sig = photoSignature(r.photo);
+  var hit = _photoUrlCache[r.id];
+  if (hit && hit.sig === sig) return hit.url;
+  if (hit) { try { URL.revokeObjectURL(hit.url); } catch(e) {} }
+  var url = dataUrlToBlobUrl(r.photo);
+  if (!url) return r.photo;
+  _photoUrlCache[r.id] = { sig: sig, url: url };
+  return url;
+}
+window.photoSrc = photoSrc;
+
+// Release blob URLs for recipes that no longer exist (called after each render).
+function prunePhotoUrlCache() {
+  var live = {};
+  recipes.forEach(function(r){ live[r.id] = true; });
+  Object.keys(_photoUrlCache).forEach(function(id) {
+    if (!live[id]) {
+      try { URL.revokeObjectURL(_photoUrlCache[id].url); } catch(e) {}
+      delete _photoUrlCache[id];
+    }
+  });
+}
+
 // Search re-renders the whole grid, and with inline base64 photos that markup can be
 // many MB — running it on every keystroke made typing visibly lag on phones. Debounce
 // so we render once the user pauses instead of once per character.
@@ -4864,7 +5074,7 @@ function renderGrid() {
       <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
-          ${r.photo ? `<img src="${escA(r.photo)}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
+          ${r.photo ? `<img src="${escA(photoSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
           ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:28px;height:28px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div></div>` : ''}
         </div>
         <div class="recipe-list-info">
@@ -4886,7 +5096,7 @@ function renderGrid() {
       <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${escA(r.bg)}">
-          ${r.photo ? `<img src="${escA(r.photo)}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
+          ${r.photo ? `<img src="${escA(photoSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
           <div class="card-category-badge">${escH(r.category)}</div>
           ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
         </div>
@@ -4900,6 +5110,8 @@ function renderGrid() {
         </div>
       </div>`).join('');
   }
+  prunePhotoUrlCache(); // release blob URLs for recipes that are gone
+  applyAriaLabels(g);   // label the freshly rendered ❤/🤍 buttons
 }
 
 function toggleFav(e,id){
@@ -4939,7 +5151,7 @@ function drawView(){
       <button onclick="closeM('viewOverlay')" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);touch-action:manipulation;flex-shrink:0;">✕</button>
     </div>
     <div class="modal-hero" style="background:${escA(r.bg)}">
-      ${r.photo?`<img id="viewHeroImg" src="${escA(r.photo)}" alt="">`:''}
+      ${r.photo?`<img id="viewHeroImg" src="${escA(photoSrc(r))}" alt="">`:''}
       <span class="emoji-over"${r.photo?' style="display:none"':''}>${escH(r.emoji)}</span>
       <button class="hero-photo-btn" onclick="changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
     </div>
@@ -6546,7 +6758,38 @@ function openExploreModal(){
   document.getElementById('dietPills').innerHTML='';
   document.getElementById('exploreOverlay').classList.add('open');
 }
+// Toast with an action button (used by Undo). Stays up longer and is tappable.
+function toastAction(msg, actionLabel, onAction, duration){
+  duration = duration || 9000;
+  var t = document.getElementById('toast');
+  if (!t) { toast(msg); return; }
+  clearTimeout(t._tid);
+  t.style.cursor = ''; t.style.maxWidth = '90vw'; t.style.whiteSpace = 'normal';
+  t.textContent = '';
+  var span = document.createElement('span');
+  span.textContent = msg;
+  var btn = document.createElement('button');
+  btn.textContent = actionLabel;
+  btn.style.cssText = 'margin-left:4px;padding:5px 12px;border-radius:8px;border:none;background:var(--terracotta);color:#fff;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;';
+  btn.onclick = function(e){
+    e.stopPropagation();
+    clearTimeout(t._tid);
+    t.classList.remove('show');
+    try { onAction(); } catch(err) { console.warn('toast action failed:', err); }
+  };
+  t.appendChild(span); t.appendChild(btn);
+  t.style.pointerEvents = 'auto';
+  t.classList.add('show');
+  t._tid = setTimeout(function(){
+    t.classList.remove('show');
+    t.style.pointerEvents = '';
+  }, duration);
+}
+window.toastAction = toastAction;
+
 function toast(msg, duration){
+  var _t = document.getElementById('toast');
+  if (_t) _t.style.pointerEvents = ''; // clear any lingering action-toast state
   duration = duration || (msg.includes('❌') || msg.includes('⚠️') ? 8000 : 2800);
   const t=document.getElementById('toast');
   // Allow tapping toast to dismiss early
@@ -8943,6 +9186,7 @@ function updateFilterBarTop() {
   applyMobileCols();
   initViewMode();
   updateDebugMenuLabel();
+  applyAriaLabels();
   renderFilters();
   renderGrid();
   handleShareTarget();

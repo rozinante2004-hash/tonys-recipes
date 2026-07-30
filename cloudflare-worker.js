@@ -1,21 +1,40 @@
-// Tony's Recipes — Cloudflare Worker v29
+// Tony's Recipes — Cloudflare Worker v30
+// v30: no secrets in source — Bring! token/API key/UUIDs now come from Worker
+//      environment variables or KV (see BRING SETUP below)
 // v29: multi-source photo search (Pixabay + Pexels + Unsplash)
 // Prior: YouTube Data API, Instagram oEmbed, KV file-download store
+//
+// ── BRING SETUP (one-time) ───────────────────────────────────────────────────
+// Add these in Cloudflare → Worker → Settings → Variables & Secrets:
+//   BRING_TOKEN     – current Bring! access token (or leave unset and let the
+//                     bookmarklet/relay store it in KV, which takes precedence)
+//   BRING_API_KEY   – the X-BRING-API-KEY value
+//   BRING_LIST_UUID – the shopping list to add items to
+//   BRING_USER_UUID – your Bring! user uuid
+// Nothing Bring!-related is hard-coded here any more, so this file is safe to
+// commit publicly. Rotate the old token: it was previously in the repo.
 
-const BRING_LIST_UUID = 'c00cd610-3865-4120-8e6d-769fcfc952ce';
-const BRING_USER_UUID = '998f9b84-613e-45ed-8c5d-49c1e27b3658';
-const BRING_API_V2    = 'https://api.getbring.com/rest/v2';
+const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
-let BRING_TOKEN = 'eyJraWQiOiJwcm9kX2FjY2Vzc3Rva2VuXzIwMjAtMDUtMTEiLCJhbGciOiJIUzUxMiJ9.eyJleHAiOjE3ODAwNzY2MjgsInN1YiI6ImJybjpicmluZzp1c2VyOmIwZThlZWI1LTU2MjItNDdiOS1hMGJhLTZhZjRlOTUwNmJhZCIsInJvbGVzIjoiUk9MRV9VU0VSIiwiYnJuIjoiYnJuOmJyaW5nOnVzZXI6YjBlOGVlYjUtNTYyMi00N2I5LWEwYmEtNmFmNGU5NTA2YmFkIiwicHJpdmF0ZVV1aWQiOiJiMGU4ZWViNS01NjIyLTQ3YjktYTBiYS02YWY0ZTk1MDZiYWQiLCJlbWFpbCI6InJvemluYW50ZTIwMDRAZ21haWwuY29tIn0.iPYVn9GJzJNioBPBkz8H_Ppstz_aklkIV3ztqiiEBl81KEDmV2ClA9hSbA6XhX3H0MLOgRsp37WpOv8QCvZcrA';
+function bringHeaders(env) {
+  return {
+    'X-BRING-CLIENT':        'WebApp',
+    'X-BRING-CLIENT-SOURCE': 'webApp',
+    'X-BRING-COUNTRY':       env.BRING_COUNTRY || 'IL',
+    'X-BRING-API-KEY':       env.BRING_API_KEY || '',
+    'Origin':                'https://web.getbring.com',
+    'Referer':               'https://web.getbring.com/',
+  };
+}
 
-const BRING_HEADERS = {
-  'X-BRING-CLIENT':        'WebApp',
-  'X-BRING-CLIENT-SOURCE': 'webApp',
-  'X-BRING-COUNTRY':       'IL',
-  'X-BRING-API-KEY':       'cof4Nc6D8saplXjE3h3HXqHH8m7VU2i1Gs0g85Ef',
-  'Origin':                'https://web.getbring.com',
-  'Referer':               'https://web.getbring.com/',
-};
+// Human-readable error when Bring! config is missing, instead of a confusing 401.
+function bringConfigError(missing) {
+  return jsonResp({
+    error: 'BRING_CONFIG: Bring! is not configured on the server. Missing: ' + missing.join(', ')
+      + '.\n\nAdd them in Cloudflare → your Worker → Settings → Variables & Secrets, then redeploy.',
+    needsConfig: true
+  }, 503);
+}
 
 function jsonResp(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -37,6 +56,7 @@ function extractYouTubeId(url) {
   return null;
 }
 
+// KV (refreshed by the bookmarklet/relay) wins; otherwise fall back to the env var.
 async function getToken(env) {
   if (env.BRING_KV) {
     try {
@@ -44,7 +64,7 @@ async function getToken(env) {
       if (stored) return stored;
     } catch(e) {}
   }
-  return BRING_TOKEN;
+  return env.BRING_TOKEN || '';
 }
 
 export default {
@@ -209,9 +229,14 @@ export default {
     if (body.action === 'bring-add') {
       const { items, listUuid } = body;
       if (!items || !items.length) return jsonResp({ error: 'No items' }, 400);
-      const targetList = listUuid || BRING_LIST_UUID;
+      const targetList = listUuid || env.BRING_LIST_UUID;
+      const token = await getToken(env);
+      const missing = [];
+      if (!token) missing.push('BRING_TOKEN (or a token in KV)');
+      if (!env.BRING_API_KEY) missing.push('BRING_API_KEY');
+      if (!targetList) missing.push('BRING_LIST_UUID');
+      if (missing.length) return bringConfigError(missing);
       try {
-        const token = await getToken(env);
         const results = [];
         for (const item of items) {
           const form = new URLSearchParams();
@@ -219,7 +244,7 @@ export default {
           form.append('specification', item.spec || '');
           const r = await fetch(BRING_API_V2 + '/bringlists/' + targetList, {
             method: 'PUT',
-            headers: { ...BRING_HEADERS, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { ...bringHeaders(env), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
             body: form.toString()
           });
           results.push({ item: item.name, status: r.status, ok: r.ok });
@@ -233,10 +258,15 @@ export default {
 
     // ── bring-lists ───────────────────────────────────────────────────────────
     if (body.action === 'bring-lists') {
+      const token = await getToken(env);
+      const missing = [];
+      if (!token) missing.push('BRING_TOKEN (or a token in KV)');
+      if (!env.BRING_API_KEY) missing.push('BRING_API_KEY');
+      if (!env.BRING_USER_UUID) missing.push('BRING_USER_UUID');
+      if (missing.length) return bringConfigError(missing);
       try {
-        const token = await getToken(env);
-        const r = await fetch(BRING_API_V2 + '/bringlists/' + BRING_USER_UUID, {
-          headers: { ...BRING_HEADERS, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+        const r = await fetch(BRING_API_V2 + '/bringlists/' + env.BRING_USER_UUID, {
+          headers: { ...bringHeaders(env), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
         });
         const text = await r.text();
         let data = {};
@@ -248,7 +278,9 @@ export default {
     // ── bring-settoken ────────────────────────────────────────────────────────
     if (body.action === 'bring-settoken') {
       const { token, secret } = body;
-      if (secret !== 'tonys-recipes-2024') return jsonResp({ error: 'Unauthorized' }, 403);
+      // Override with a BRING_SETTOKEN_SECRET env var if you want a different one
+      // (the default matches the bookmarklet the app generates today).
+      if (secret !== (env.BRING_SETTOKEN_SECRET || 'tonys-recipes-2024')) return jsonResp({ error: 'Unauthorized' }, 403);
       if (!token || token.split('.').length !== 3) return jsonResp({ error: 'Invalid token' }, 400);
       if (env.BRING_KV) {
         try {

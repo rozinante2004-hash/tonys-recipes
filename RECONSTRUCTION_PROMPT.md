@@ -101,14 +101,14 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 | **Cloudflare Worker** | Single POST endpoint proxying everything | The Worker itself |
 | **Pixabay / Pexels / Unsplash** | Food photo search / auto‑fetch (app cycles sources via "See more") | Worker secrets `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` (any subset; unset sources are skipped) |
 | **YouTube Data API** | Fetch video description for recipe extraction | Worker secret `YOUTUBE_API_KEY` |
-| **Bring!** | Push ingredients to a shopping list | Token in Worker KV `BRING_KV` (key `accessToken`) or fallback constant |
+| **Bring!** | Push ingredients to a shopping list | Worker KV `BRING_KV` (key `accessToken`), else env `BRING_TOKEN`; plus env `BRING_API_KEY`, `BRING_LIST_UUID`, `BRING_USER_UUID` — **no Bring! values in source** |
 | **GitHub Pages** | Hosting | n/a |
 
-> **SECURITY — do NOT re-commit live secrets.** The historical `cloudflare-worker.js` in this
-> repo hardcodes a **real Bring! bearer token and `X-BRING-API-KEY`** (plus UUIDs) in plaintext.
-> When reconstructing, replace these with placeholders and load them from Worker env/KV. Treat
-> any real token found in git history as **compromised — rotate it**. The Firebase web config
-> below is *designed* to be public and is fine to ship.
+> **SECURITY — never put secrets in this file.** Worker v30 removed the previously hard-coded
+> Bring! bearer token, `X-BRING-API-KEY` and UUIDs; they now come from Worker env/KV only, so
+> `cloudflare-worker.js` is safe to commit. **The old token is in git history and must be treated
+> as compromised — rotate it in Bring!.** The Firebase web config below is *designed* to be
+> public and is fine to ship.
 
 **Firebase web config (public, safe to embed):**
 ```js
@@ -143,7 +143,7 @@ the **Anthropic Messages API** (this is the AI path).
 - Bring: `BRING_LIST_UUID`, `BRING_USER_UUID`, `BRING_API_V2 = 'https://api.getbring.com/rest/v2'`,
   `BRING_HEADERS` (`X-BRING-CLIENT: WebApp`, `X-BRING-CLIENT-SOURCE: webApp`,
   `X-BRING-COUNTRY: IL`, `X-BRING-API-KEY: <secret>`, `Origin`/`Referer: web.getbring.com`).
-- `getToken(env)` reads `env.BRING_KV.get('accessToken')`, else a fallback constant.
+- `getToken(env)` reads `env.BRING_KV.get('accessToken')`, else `env.BRING_TOKEN` (no hard-coded fallback). `bringHeaders(env)` builds the Bring! headers from env; missing config returns a clear `BRING_CONFIG` 503 rather than a confusing 401.
 - Env secrets: `ANTHROPIC_API_KEY`, `PIXABAY_API_KEY`, `YOUTUBE_API_KEY`, KV binding `BRING_KV`.
 
 **Actions:**
@@ -259,6 +259,12 @@ logic only pushes local recipes to the cloud if the user has **more than 5** (i.
 **Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }` —
 but the JSON is **photo‑free** (see below). The whole family reads/writes this one shared list.
 Doc `shared/access` = `{ members, updatedAt }`. Legacy `users/{uid}/…` rules kept for safety.
+
+**Photo display (`photoSrc`)**: stored photos are base64 data URLs (needed for backup/export/
+sync), but rendering them inline makes every grid render build multi‑MB markup. `photoSrc(r)`
+converts each photo to a **cached `blob:` URL** for display only (revoked when the photo changes;
+`prunePhotoUrlCache()` releases URLs for deleted recipes). Exports/backup/sync must keep using the
+original data URL — a `blob:` URL is dead outside the page.
 
 **Cloud photo storage (critical — Firestore's 1 MiB/doc limit):** photos are base64 and must
 NOT live inline in the `shared/recipes` doc or it overflows 1 MiB after a dozen or so photos and
