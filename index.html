@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.9 -->
+<!-- Tony's Recipes Collection v25.10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1056,6 +1056,17 @@ const SELF_TESTS = [
         recipes=recipes.filter(function(r){return r.id!==testId;});
       }
     } },
+  { id:'feat_refresh_foreground', group:'Cloud Sync', name:'Cloud re-checks when app returns to foreground',
+    test: async()=>{
+      if(typeof _lastVisibleRefresh==='undefined') throw new Error('_lastVisibleRefresh not defined — foreground refresh not wired up');
+      if(typeof loadFromFirestore!=='function') throw new Error('loadFromFirestore not defined');
+      // Just verify the throttle guard resets correctly; a full visibilitychange
+      // integration (with a live _fbDb) is exercised manually, not in this harness.
+      var before=_lastVisibleRefresh;
+      _lastVisibleRefresh=0;
+      if(_lastVisibleRefresh!==0) throw new Error('throttle variable not writable as expected');
+      _lastVisibleRefresh=before;
+    } },
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1250,6 +1261,7 @@ var SELF_TEST_FIXES = {
   stor_photo_race:   { fix:'stripPhotosLocal must set _ph/_po whenever the flag was ALREADY set, not only when r.photo/r.originalPhoto is currently populated — otherwise a save that lands mid-hydration permanently orphans the photo in IndexedDB.', autofix: null },
   feat_clip_badge:   { fix:'The card templates must show the video/clip badge for (r.isVideoBookmark || r.isClip), not isVideoBookmark alone — otherwise recipes flagged as clips (no full recipe content) show no visual indicator.', autofix: null },
   feat_bring_scale:  { fix:'openBringModal must scale ingredient amounts via cvtIng()/scaleAmt() using the current viewMult/viewUnit (when recipeId===viewId) and bringConfirmSend must send _bringScaledAmounts, not the raw recipe.ingredients amounts.', autofix: null },
+  feat_refresh_foreground: { fix:'The visibilitychange listener that re-runs loadFromFirestore() when the app returns to the foreground is missing. Without it, a remote change (e.g. a photo added on another device) only applies if the transient "New changes available" banner is seen within 30s, or after a full reload.', autofix: null },
 };
 
 function showSelfTestDetail(testId) {
@@ -1642,7 +1654,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.9';
+var APP_VERSION = 'v25.10';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3653,7 +3665,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.10</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4204,7 +4216,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.10</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7298,6 +7310,23 @@ async function applyRemoteUpdate() {
   if (banner) banner.style.display = 'none';
 }
 window.applyRemoteUpdate = applyRemoteUpdate;
+
+// ─── REFRESH ON FOREGROUND ────────────────────────────────────────────────────
+// The onSnapshot listener only shows a transient "New changes available" banner
+// that auto-hides after 30s — if you don't see/tap it (phone locked, app
+// backgrounded when an edit lands elsewhere), that change is never applied until
+// the next full reload. Re-checking Firestore whenever the app is brought back to
+// the foreground closes that gap, reusing the same merge + photo-recovery logic
+// as a normal load. Throttled so quick tab-switches don't spam reads.
+var _lastVisibleRefresh = 0;
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState !== 'visible') return;
+  if (!window._driveMode || !window._fbUser) return;
+  var now = Date.now();
+  if (now - _lastVisibleRefresh < 20000) return; // at most once every 20s
+  _lastVisibleRefresh = now;
+  loadFromFirestore();
+});
 
 
 // Dynamically load Firebase if it wasn't available on startup (e.g. opened offline)

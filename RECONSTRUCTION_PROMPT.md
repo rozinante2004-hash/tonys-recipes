@@ -305,8 +305,13 @@ wipes its cloud photo.
   Then `loadFromFirestore()`, render, and set drive status to `☁️ Shared · <name/email>`.
 - **`loadFromFirestore()`**: one‑time `get()`, then an `onSnapshot` listener that **skips the
   first (echo) snapshot**, ignores `hasPendingWrites`/`fromCache`/own‑write‑settling, and for a
-  genuine remote change shows a "refresh" banner (`window._pendingRemoteData`, auto‑hide 30s).
-  `applyRemoteUpdate()` applies it. On `permission-denied` it unsubscribes.
+  genuine remote change shows a "refresh" banner (`#refreshBanner`, `window._pendingRemoteData`,
+  auto‑hide 30s). `applyRemoteUpdate()` applies it. On `permission-denied` it unsubscribes.
+  Because that banner is transient and easy to miss (phone locked/backgrounded when the change
+  lands), a **`visibilitychange` listener re‑runs `loadFromFirestore()` whenever the app returns
+  to the foreground** while signed in (throttled to once per 20s via `_lastVisibleRefresh`) — this
+  reuses the same merge + photo‑recovery logic as a normal load, so returning to the app always
+  catches up with the cloud even if the banner was never seen or tapped.
 - **Offline‑merge:** if `tonys_offline_queue==='1'`, merge local into remote by keeping the
   higher `updatedAt` per id and unshifting local‑only recipes, then push merged back.
 - **`saveData()`** = `saveLocal()` + debounced (1.5s) `saveToFirestore()` when signed in &
