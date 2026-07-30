@@ -99,7 +99,7 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 | **Anthropic Claude API** | All AI (import/extract, translate, suggest, explore, nutrition, help, diet auto‑tag) | Worker secret `ANTHROPIC_API_KEY` |
 | **Firebase** (Auth + Firestore) | Google sign‑in + shared cloud recipe doc | Public web config (safe to ship) |
 | **Cloudflare Worker** | Single POST endpoint proxying everything | The Worker itself |
-| **Pixabay** | Food photo search / auto‑fetch | Worker secret `PIXABAY_API_KEY` |
+| **Pixabay / Pexels / Unsplash** | Food photo search / auto‑fetch (app cycles sources via "See more") | Worker secrets `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` (any subset; unset sources are skipped) |
 | **YouTube Data API** | Fetch video description for recipe extraction | Worker secret `YOUTUBE_API_KEY` |
 | **Bring!** | Push ingredients to a shopping list | Token in Worker KV `BRING_KV` (key `accessToken`) or fallback constant |
 | **GitHub Pages** | Hosting | n/a |
@@ -126,6 +126,14 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 
 ## 4. `cloudflare-worker.js` — the API proxy
 
+> ⚠️ **The repo copy of this file can lag the LIVE deployment.** The Worker is edited/deployed
+> directly in the Cloudflare dashboard, so the version in git may be behind what's actually
+> running (e.g. the repo held v22 while production was v29). Before changing the Worker, always
+> start from the **currently‑deployed** code (export/paste it), apply the change onto that, and
+> bump the `// … Worker vNN` header — never assume the repo copy is current. Live‑only additions
+> to watch for: the **GET file‑download handler** + **`download-store`** action (KV one‑time
+> download links), and the **`instagram-fetch`** action.
+
 A single ES‑module Worker (`export default { async fetch(request, env) }`). Handles CORS
 (allow `*`, methods `POST, OPTIONS`), rejects non‑POST with 405, parses a JSON body, and
 dispatches on `body.action`. If **no** `action` is present, the body is forwarded verbatim to
@@ -151,8 +159,14 @@ the **Anthropic Messages API** (this is the AI path).
 3. **`bring-lists`** — GET `/bringlists/{BRING_USER_UUID}`; return `{status, ok, lists:[{name,uuid}]}`.
 4. **`bring-settoken`** `{token, secret}` — require `secret === 'tonys-recipes-2024'`, validate
    the JWT has 3 segments, store in `BRING_KV` under `accessToken`.
-5. **`photo-search`** `{query}` — Pixabay `?image_type=photo&per_page=9&safesearch=true&order=popular`;
-   return `{images:[{url,thumb,credit,creditUrl}], total}`.
+5. **`photo-search`** `{query, source?, page?}` — multi‑source (`source` = `pixabay` |
+   `pexels` | `unsplash`, default `pixabay`; 9 per page). Pixabay
+   `?image_type=photo&per_page=9&safesearch=true&order=popular`; Pexels `/v1/search`
+   (Authorization: key); Unsplash `/search/photos` (Authorization: `Client-ID key`,
+   `content_filter=high`). A source with no key returns `{notConfigured:true}`; per‑source
+   failures return HTTP 200 with an `{error}` field so one bad source never breaks the others.
+   The app cycles sources via a **"See more"** button (`PHOTO_SOURCES`/`photoSearchMore`).
+   Each source returns `{source, page, images:[{url,thumb,credit,creditUrl}], total}`.
 6. **(default, no action)** — forward the whole body to
    `https://api.anthropic.com/v1/messages` with headers `x-api-key: env.ANTHROPIC_API_KEY`,
    `anthropic-version: 2023-06-01`; return the JSON response with `Access-Control-Allow-Origin: *`.
@@ -252,6 +266,16 @@ Save errors are classified honestly (`handleFirestoreSaveError`/`isSizeError`): 
 `permission-denied` vs. quota vs. genuine `unavailable`/offline — only real network errors get the
 auto‑retry; oversized photos are named and skipped while the rest sync.
 
+**Photo‑loss safety net (`loadFromFirestore`/`applyRemoteUpdate`):** a normal cloud load fully
+replaces the in‑memory `recipes` array, so if a photo never made it to the cloud (e.g. an old save
+failed before this fix existed, or another device hasn't synced yet), a plain load would silently
+erase it locally too. Both functions snapshot local photos (`id → {photo, updatedAt}`) *before*
+overwriting `recipes`; afterward, any incoming recipe with no photo whose local `updatedAt` is
+**not older** than the incoming one gets its local photo restored (and the recovery is pushed back
+to Firestore so other devices pick it up). Only a cloud copy that is **strictly newer** and
+genuinely has no photo is treated as an intentional deletion and left alone. A toast reports how
+many photos were recovered.
+
 **Local photo storage (IndexedDB — same reasoning as the cloud, for `localStorage`'s ~5 MB cap):**
 `localStorage` stores strings as UTF‑16, so inline base64 photos overflow it fast and saves then
 fail silently. Photos are therefore kept in **IndexedDB** (`db tonys_recipes_db`, store `photos`,
@@ -319,8 +343,10 @@ panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow scree
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
 (`.card-category-badge`, bottom‑left over the image), title (right‑aligned for Hebrew),
-prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a video
-badge for bookmarks. On phone‑width screens the grid uses a configurable column count
+prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a green
+video/clip circle badge for `r.isVideoBookmark || r.isClip` (not `isVideoBookmark` alone — a
+recipe can be flagged as a clip without being a video bookmark, e.g. auto‑detected as having no
+ingredients/steps, and must still show the indicator). On phone‑width screens the grid uses a configurable column count
 (`--mobile-cols`, 1–5, default 3) with square (`aspect-ratio:1/1`) cubes — see **Settings → Grid
 Layout** (`openGridSettings`, stored in `tonys_mobile_cols`). Desktop grid uses
 `repeat(auto-fill, minmax(220px, 1fr))`. There is a **sort** control (`setSort`): default /
@@ -408,7 +434,11 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 - **Send** (`openBringModal`→`bringConfirmSend`→`sendItemsToBring`): pick ingredients as
   checkboxes, POST `bring-add` to the Worker. On success, deep‑link `bring://` then fall back to
-  `web.getbring.com`.
+  `web.getbring.com`. **Amounts sent match the recipe view's current scale/unit** — `openBringModal`
+  runs each ingredient through `cvtIng()`/`scaleAmt()` using `viewMult`/`viewUnit` (only when
+  `recipeId === viewId`, since Send‑to‑Bring is reached from the view screen) and both the
+  displayed checkbox labels and the amounts actually sent (`_bringScaledAmounts`) use that scaled
+  value — never the raw unscaled `ingredient.a`.
 - **Token lifecycle**: Bring tokens expire ~weekly. `bring_token_expiry` drives a status pill
   (`renderBringTokenStatus`) — connected / expires soon / expired. Refresh flows:
   - **Auto relay** (`openBringAutoRefresh` → `bring-relay.html` popup) tries to read the token

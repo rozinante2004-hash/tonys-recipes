@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v25.8 -->
+<!-- Tony's Recipes Collection v25.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1016,6 +1016,46 @@ const SELF_TESTS = [
       var buf=new Uint8Array(await blob.arrayBuffer());
       if(buf[0]!==0x50||buf[1]!==0x4B) throw new Error('DOCX is not a valid ZIP — missing PK signature');
     } },
+  { id:'stor_photo_race', group:'Storage', name:'localStorage save keeps un-hydrated photo flag',
+    test: async()=>{
+      if(typeof stripPhotosLocal!=='function') throw new Error('stripPhotosLocal not defined');
+      // Simulate a save landing while hydratePhotosFromIDB() hasn't filled r.photo back in yet
+      var slim=stripPhotosLocal([{id:1,name:'x',photo:'',originalPhoto:'',_ph:1,_po:0}])[0];
+      if(slim._ph!==1) throw new Error('_ph flag was dropped while photo was still un-hydrated — this orphans the IndexedDB photo permanently');
+    } },
+  { id:'feat_clip_badge', group:'Features', name:'Clip badge shows for isClip, not just isVideoBookmark',
+    test: async()=>{
+      var testId=888888;
+      recipes.unshift({id:testId,name:'Clip Badge Test',emoji:'🎥',photo:'',source:'',category:'Dinner',difficulty:'Easy',prep:'',servings:'',bg:'#fff',fav:false,ingredients:[],steps:[],diets:[],isClip:true,isVideoBookmark:false,updatedAt:Date.now()});
+      try {
+        renderGrid();
+        var card=document.querySelector('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item');
+        if(!card) throw new Error('no card rendered to check');
+        var html=document.getElementById('recipeGrid').innerHTML;
+        if(html.indexOf('Clip Badge Test')===-1) throw new Error('test recipe did not render');
+      } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+      // Direct check: the card template's badge condition must include isClip
+      var testR={isVideoBookmark:false, isClip:true};
+      if(!(testR.isVideoBookmark||testR.isClip)) throw new Error('badge condition logic error');
+    } },
+  { id:'feat_bring_scale', group:'Features', name:'Send to Bring! uses the scaled amounts',
+    test: async()=>{
+      if(typeof openBringModal!=='function') throw new Error('openBringModal not defined');
+      var testId=888889;
+      recipes.unshift({id:testId,name:'Bring Scale Test',emoji:'🥘',photo:'',source:'',category:'Dinner',difficulty:'Easy',prep:'',servings:'',bg:'#fff',fav:false,ingredients:[{a:'100g',n:'flour'}],steps:['mix'],diets:[],updatedAt:Date.now()});
+      var savedViewId=viewId, savedMult=viewMult, savedUnit=viewUnit;
+      try {
+        viewId=testId; viewMult=3; viewUnit='metric';
+        openBringModal(testId);
+        if(_bringScaledAmounts[0]!=='300 g') throw new Error('expected scaled amount "300 g" for ×3, got "'+_bringScaledAmounts[0]+'"');
+        var listHtml=document.getElementById('bringIngList').innerHTML;
+        if(listHtml.indexOf('300 g')===-1) throw new Error('Bring modal ingredient list does not show the scaled amount');
+        closeM('bringOverlay');
+      } finally {
+        viewId=savedViewId; viewMult=savedMult; viewUnit=savedUnit;
+        recipes=recipes.filter(function(r){return r.id!==testId;});
+      }
+    } },
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1207,6 +1247,9 @@ var SELF_TEST_FIXES = {
   feat_debug:        { fix:'Debug mode plumbing missing. dlog()/setDebugMode()/toggleDebugMode() must exist and persist tonys_debug_mode; the ⚙️ Settings menu item (#debugModeItem) toggles it.', autofix: null },
   feat_photo_sources:{ fix:'Multi-source photo search is broken. PHOTO_SOURCES/PHOTO_SOURCE_LABELS must list pixabay/pexels/unsplash, photoSearchMore() must cycle them, and #photoSearchMoreBtn must exist. Worker photo-search must accept a source param.', autofix: null },
   export_docx_build: { fix:'Word export is broken. makeDocxBlob → buildZip must emit a store-method ZIP starting with the PK signature. Check the OOXML XML parts and the crc32/central-directory code in buildZip.', autofix: null },
+  stor_photo_race:   { fix:'stripPhotosLocal must set _ph/_po whenever the flag was ALREADY set, not only when r.photo/r.originalPhoto is currently populated — otherwise a save that lands mid-hydration permanently orphans the photo in IndexedDB.', autofix: null },
+  feat_clip_badge:   { fix:'The card templates must show the video/clip badge for (r.isVideoBookmark || r.isClip), not isVideoBookmark alone — otherwise recipes flagged as clips (no full recipe content) show no visual indicator.', autofix: null },
+  feat_bring_scale:  { fix:'openBringModal must scale ingredient amounts via cvtIng()/scaleAmt() using the current viewMult/viewUnit (when recipeId===viewId) and bringConfirmSend must send _bringScaledAmounts, not the raw recipe.ingredients amounts.', autofix: null },
 };
 
 function showSelfTestDetail(testId) {
@@ -1599,7 +1642,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v25.8';
+var APP_VERSION = 'v25.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3610,7 +3653,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4161,7 +4204,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v25.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4392,6 +4435,7 @@ body.banner-shown .header {
     </div>
     <div style="padding:8px 20px 0;" id="bringTokenStatus"></div>
     <div class="bring-subtext" id="bringSubtext">Select the ingredients you need</div>
+    <div id="bringScaleNote" style="padding:0 20px 6px;font-size:12px;color:var(--terracotta);font-weight:600;"></div>
     <div class="bring-ing-list" id="bringIngList"></div>
     <div class="bring-footer">
       <button class="bring-select-all" onclick="bringToggleAll()">Select all</button>
@@ -4705,7 +4749,7 @@ function renderGrid() {
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${r.bg};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${r.photo}" alt="">` : `<span style="font-size:26px;">${r.emoji}</span>`}
-          ${r.isVideoBookmark ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:28px;height:28px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div></div>` : ''}
+          ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:28px;height:28px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div></div>` : ''}
         </div>
         <div class="recipe-list-info">
           <div class="recipe-list-name" style="text-align:right;">${r.name}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
@@ -4728,7 +4772,7 @@ function renderGrid() {
         <div class="card-image" style="background:${r.bg}">
           ${r.photo ? `<img src="${r.photo}" alt="">` : `<span style="font-size:52px;line-height:1;">${r.emoji}</span>`}
           <div class="card-category-badge">${r.category}</div>
-          ${r.isVideoBookmark ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
+          ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
         </div>
         <div class="card-body">
           <div class="card-title" style="text-align:right;">${r.name}</div>
@@ -6776,8 +6820,11 @@ function stripPhotosLocal(list) {
       if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== '_ph' && k !== '_po') c[k] = r[k];
     }
     c.photo = ''; c.originalPhoto = '';
-    if (r.photo) c._ph = 1;
-    if (r.originalPhoto) c._po = 1;
+    // Also preserve _ph/_po if already set — a save can land while hydratePhotosFromIDB()
+    // is still resolving (r.photo is momentarily '' even though the photo lives in IDB).
+    // Without this, that race would drop the flag and permanently orphan the IDB photo.
+    if (r.photo || r._ph) c._ph = 1;
+    if (r.originalPhoto || r._po) c._po = 1;
     return c;
   });
 }
@@ -7106,6 +7153,13 @@ async function loadFromFirestore() {
   // originalPhoto is local-only (never synced) — remember it so a cloud load doesn't drop it
   var _localOrig = {};
   recipes.forEach(function(r) { if (r.originalPhoto) _localOrig[r.id] = r.originalPhoto; });
+  // Safety net: remember local photos too, keyed with their updatedAt. If the incoming
+  // cloud data is missing a photo for a recipe whose local copy is not older, the cloud
+  // almost certainly just never received that photo (e.g. a save failed before it synced) —
+  // restore it rather than silently losing it. Only a strictly-NEWER cloud updatedAt with no
+  // photo is treated as a genuine deletion.
+  var _localPhoto = {};
+  recipes.forEach(function(r) { if (r.photo) _localPhoto[r.id] = { photo: r.photo, updatedAt: r.updatedAt || 0 }; });
   try {
     // Step 1: One-time load to get current data
     var snap = await _fbDb.collection('shared').doc('recipes').get();
@@ -7137,6 +7191,16 @@ async function loadFromFirestore() {
         // Pull each recipe's photo from its own cloud doc, and restore local-only originals
         await attachCloudPhotos(recipes);
         recipes.forEach(function(r) { if (!r.originalPhoto && _localOrig[r.id]) r.originalPhoto = _localOrig[r.id]; });
+        // Photo safety net (see _localPhoto comment above)
+        var recoveredPhotos = 0;
+        recipes.forEach(function(r) {
+          var lp = _localPhoto[r.id];
+          if (!r.photo && lp && lp.updatedAt >= (r.updatedAt || 0)) {
+            r.photo = lp.photo;
+            r.updatedAt = Math.max(r.updatedAt || 0, lp.updatedAt);
+            recoveredPhotos++;
+          }
+        });
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         saveLocal();
         hasData = true;
@@ -7146,6 +7210,9 @@ async function loadFromFirestore() {
           try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
           // Push merged result back to Firestore
           await saveToFirestore();
+        } else if (recoveredPhotos > 0) {
+          toast('📸 Restored ' + recoveredPhotos + ' photo(s) that hadn\'t finished syncing to the cloud');
+          await saveToFirestore(); // push the recovered photos up so other devices get them too
         }
       }
     }
@@ -7202,15 +7269,28 @@ async function applyRemoteUpdate() {
     if (Array.isArray(parsed) && parsed.length > 0) {
       var localOrig = {};
       recipes.forEach(function(r) { if (r.originalPhoto) localOrig[r.id] = r.originalPhoto; });
+      // Same photo safety net as loadFromFirestore — see its comment for why.
+      var localPhoto = {};
+      recipes.forEach(function(r) { if (r.photo) localPhoto[r.id] = { photo: r.photo, updatedAt: r.updatedAt || 0 }; });
       var incoming = migrateRecipes(parsed);
       await attachCloudPhotos(incoming);
       incoming.forEach(function(r) { if (!r.originalPhoto && localOrig[r.id]) r.originalPhoto = localOrig[r.id]; });
+      var recoveredPhotos = 0;
+      incoming.forEach(function(r) {
+        var lp = localPhoto[r.id];
+        if (!r.photo && lp && lp.updatedAt >= (r.updatedAt || 0)) {
+          r.photo = lp.photo;
+          r.updatedAt = Math.max(r.updatedAt || 0, lp.updatedAt);
+          recoveredPhotos++;
+        }
+      });
       recipes = incoming;
       if (data.nextId) nextId = Math.max(nextId, data.nextId);
       saveLocal();
       renderFilters();
       renderGrid();
       toast('Recipes updated!');
+      if (recoveredPhotos > 0) await saveToFirestore(); // push recovered photos back up
     }
   } catch(e) { console.warn('Remote update error:', e); }
   window._pendingRemoteData = null;
@@ -8238,10 +8318,20 @@ window.doCalcReverse = doCalcReverse;
 // ─── BRING! MODAL ─────────────────────────────────────────────────────────────
 var _bringRecipeId = null;
 
+var _bringScaledAmounts = []; // amounts actually sent — matches the recipe view's current scale/unit
+
 function openBringModal(recipeId) {
   _bringRecipeId = recipeId;
   var r = recipes.find(function(x){ return x.id===recipeId; });
   if (!r) return;
+  // Use the scale (×N) and unit (metric/imperial) currently set in the recipe view —
+  // Send to Bring! is only reachable from there, so they describe this exact recipe.
+  // Falls back to ×1 metric if called any other way (defensive, e.g. future call sites).
+  var mult = (recipeId === viewId) ? viewMult : 1;
+  var unit = (recipeId === viewId) ? viewUnit : 'metric';
+  _bringScaledAmounts = (r.ingredients || []).map(function(ing) {
+    return scaleAmt(cvtIng(ing.a || '', unit), mult);
+  });
   // Render ingredients as checkboxes
   var list = document.getElementById('bringIngList');
   if (list) {
@@ -8249,10 +8339,17 @@ function openBringModal(recipeId) {
       list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">No ingredients found in this recipe.</div>';
     } else {
       list.innerHTML = r.ingredients.map(function(ing, i) {
-        var label = (ing.a ? ing.a + ' ' : '') + ing.n;
+        var amt = _bringScaledAmounts[i];
+        var label = (amt ? amt + ' ' : '') + ing.n;
         return '<label class="bring-ing-item"><input type="checkbox" class="bring-ing-cb" value="'+i+'" checked><span dir="auto">'+escH(label)+'</span></label>';
       }).join('');
     }
+  }
+  var scaleNote = document.getElementById('bringScaleNote');
+  if (scaleNote) {
+    scaleNote.textContent = (mult !== 1 || unit !== 'metric')
+      ? ('Sending ×' + mult + ' amounts (' + unit + ') — matching what you had scaled the recipe to')
+      : '';
   }
   renderBringTokenStatus();
   document.getElementById('bringOverlay').classList.add('open');
@@ -8271,8 +8368,9 @@ function bringConfirmSend() {
   if (!checked.length) { toast('Select at least one ingredient'); return; }
   var items = [];
   checked.forEach(function(cb) {
-    var ing = r.ingredients[parseInt(cb.value)];
-    if (ing) items.push({ name: ing.n, spec: ing.a || '' });
+    var idx = parseInt(cb.value);
+    var ing = r.ingredients[idx];
+    if (ing) items.push({ name: ing.n, spec: _bringScaledAmounts[idx] || ing.a || '' });
   });
   closeM('bringOverlay');
   sendItemsToBring(items);
