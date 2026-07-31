@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v30
+// Tony's Recipes — Cloudflare Worker v31
+// v31: bring-token-status — the app now asks the Worker for the token's real
+//      expiry (and can probe the live API) instead of trusting a per-device
+//      localStorage copy that goes stale after a refresh on another device
 // v30: no secrets in source — Bring! token/API key/UUIDs now come from Worker
 //      environment variables or KV (see BRING SETUP below)
 // v29: multi-source photo search (Pixabay + Pexels + Unsplash)
@@ -65,6 +68,21 @@ async function getToken(env) {
     } catch(e) {}
   }
   return env.BRING_TOKEN || '';
+}
+
+// Decode a JWT payload without verifying it — we only want the `exp` claim so
+// the app can report the *real* expiry instead of guessing from a per-device
+// localStorage value that goes stale the moment the token is refreshed
+// somewhere else (which is exactly what made the app cry "expired" wrongly).
+function decodeJwtExp(token) {
+  try {
+    const parts = String(token).split('.');
+    if (parts.length !== 3) return null;
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const payload = JSON.parse(atob(b64));
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch (e) { return null; }
 }
 
 export default {
@@ -273,6 +291,46 @@ export default {
         try { data = JSON.parse(text); } catch(e) {}
         return jsonResp({ status: r.status, ok: r.ok, lists: data.lists ? data.lists.map(l => ({ name: l.name, uuid: l.listUuid })) : [] });
       } catch(err) { return jsonResp({ error: err.message }, 500); }
+    }
+
+    // ── bring-token-status ────────────────────────────────────────────────────
+    // The single source of truth for "is the Bring! token still good?".
+    // Returns the token's real expiry (from its JWT `exp`) plus, on request,
+    // a live probe against the Bring! API. No token material is returned.
+    if (body.action === 'bring-token-status') {
+      const token = await getToken(env);
+      if (!token) {
+        return jsonResp({ configured: false, valid: false, exp: null, daysLeft: null,
+                          reason: 'No Bring! token stored (KV empty and BRING_TOKEN unset).' });
+      }
+      const exp = decodeJwtExp(token);
+      const now = Math.floor(Date.now() / 1000);
+      const secondsLeft = exp === null ? null : exp - now;
+      const out = {
+        configured: true,
+        exp,
+        daysLeft: secondsLeft === null ? null : Math.floor(secondsLeft / 86400),
+        secondsLeft,
+        expired: secondsLeft === null ? null : secondsLeft <= 0,
+        source: env.BRING_KV ? 'kv-or-env' : 'env',
+      };
+      // Optional live check — the JWT may be structurally valid but revoked.
+      if (body.probe && env.BRING_API_KEY && env.BRING_USER_UUID) {
+        try {
+          const r = await fetch(BRING_API_V2 + '/bringlists/' + env.BRING_USER_UUID, {
+            headers: { ...bringHeaders(env), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+          });
+          out.probed = true;
+          out.valid = r.ok;
+          out.probeStatus = r.status;
+          if (r.status === 401) out.expired = true;
+        } catch (err) {
+          out.probed = false;
+          out.probeError = err.message;
+        }
+      }
+      if (out.valid === undefined) out.valid = out.expired === false;
+      return jsonResp(out);
     }
 
     // ── bring-settoken ────────────────────────────────────────────────────────

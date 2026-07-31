@@ -41,7 +41,8 @@ slide‑up modal animation.
 | `sw.js` | Service worker. Network‑first for the document, cache‑first for assets. |
 | `version.json` | `{"version": "v23.0"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
-| `bring-relay.html` | Helper popup page that captures a Bring! token and posts it to the Worker. |
+| `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
+| `whatsapp/` | Shared folder of exported WhatsApp chat `.txt` files + `index.json`. Read by every device, including the iPhone. |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
 | `logo.svg` | Brand mark (brown disc, gold ring, fork + terracotta/gold flame). |
@@ -197,10 +198,17 @@ forwards whatever the client sends.)
 - `tonys_mobile_cols` → `1`–`5`, recipe cubes per row on phone‑width screens (Settings → Grid Layout; default `3`, drives the `--mobile-cols` CSS variable)
 - `tonys_offline_queue` → `'1'` when there are unsynced offline edits
 - `tonys_access_members` → family access list (also mirrored to Firestore `shared/access`)
-- `bring_token_expiry` → unix seconds when the Bring token expires
+- `bring_token_expiry` → unix seconds when the Bring token expires. **A cache, never the
+  authority** — see §11; the token lives in the Worker's KV and is shared by all devices, so this
+  per-device copy goes stale the moment the token is refreshed anywhere else
 - `pwa_install_dismissed`, `pwa_install_dismissed_ios` → PWA banner dismissal
 - `tonys_gmail_client_id` → user‑supplied Google OAuth client id for Gmail send
 - `tonys_debug_mode` → `'1'`/`'0'` — Debug mode (⚙️ Settings → Debug mode, off by default); all debug tracing goes through `dlog()`, silent unless enabled
+- `tonys_theme` → `'light'` | `'dark'` | `'auto'` — ⚙️ Settings → Theme. `applyTheme()` stamps
+  `data-theme` on `<html>`; `auto` follows `prefers-color-scheme` and re-applies live on change
+- `tonys_wa_base` → base URL of the shared WhatsApp export folder (default the repo's
+  `whatsapp/`); `tonys_wa_index` → small JSON index of loaded chats (`{id, group, source, file,
+  size, count, first, last}`) — the chat **text** never goes in localStorage or Firestore
 
 **Recipe object shape:**
 ```js
@@ -461,14 +469,56 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   `recipeId === viewId`, since Send‑to‑Bring is reached from the view screen) and both the
   displayed checkbox labels and the amounts actually sent (`_bringScaledAmounts`) use that scaled
   value — never the raw unscaled `ingredient.a`.
-- **Token lifecycle**: Bring tokens expire ~weekly. `bring_token_expiry` drives a status pill
-  (`renderBringTokenStatus`) — connected / expires soon / expired. Refresh flows:
-  - **Auto relay** (`openBringAutoRefresh` → `bring-relay.html` popup) tries to read the token
-    from `web.getbring.com` localStorage (usually blocked cross‑origin → shows a manual method).
+- **Token lifecycle**: Bring tokens expire ~weekly. **The Worker is the only authority on
+  whether a token is still good.** `checkBringTokenStatus(probe)` POSTs `bring-token-status`;
+  the Worker decodes the KV/env token's JWT `exp` (and, with `probe`, makes a live call) and
+  returns `{configured, exp, daysLeft, expired, valid}`. `renderBringTokenStatus()` renders only
+  that answer. A stale `bring_token_expiry` may produce "last known …" or "status unknown", and
+  **must never assert "expired"** — the token is shared via KV, so any device that didn't itself
+  perform the refresh holds an out-of-date copy, which is precisely what used to produce false
+  "Bring! token expired" messages. Refresh flows:
+  - **Relay** (`openBringAutoRefresh` → `bring-relay.html`) opens in a **normal tab, never a
+    sized popup**: a popup window has no bookmarks bar, so the 🛒 bookmarklet is unclickable
+    there. The relay cannot read Bring!'s localStorage (different origin), so it presents the
+    bookmarklet and a copyable one-line console snippet instead of polling pointlessly.
   - **Bookmarklet** (`showBringBookmarklet`): a `javascript:` snippet the user runs on
-    `web.getbring.com` that POSTs `bring-settoken` (shared secret `tonys-recipes-2024`).
+    `web.getbring.com` that POSTs `bring-settoken` (shared secret `tonys-recipes-2024`). The same
+    modal offers a **paste-the-token** field (`submitManualBringToken`) for when no bookmarks bar
+    is available at all.
   - **Expired modal** (`showBringTokenExpired`/`openBringForTokenRefresh`) polls `bring-lists`
-    until the token works again, then retries the queued items.
+    until the token works again, then re-checks the real expiry and retries the queued items.
+
+---
+
+## 11a. WhatsApp group knowledge
+
+WhatsApp exposes **no API** for reading group content, and libraries that automate WhatsApp Web
+breach its Terms of Service and get numbers banned. The feature therefore reads WhatsApp's own
+*Export chat → Without media* `.txt` files, and nothing else.
+
+- **Sources** (⚙️ Settings → 💬 WhatsApp Groups, `openWaSetup`):
+  - **remote** — a folder of `.txt` files served over HTTPS plus an `index.json`
+    (`["a.txt"]` or `[{"file":"a.txt","group":"Family Food"}]`). `waRefreshFolder()` replaces all
+    remote entries, because re-exporting yields the whole history again. This is the only source
+    that works on the iPhone: a file on the laptop is unreachable from the phone.
+  - **local** — files imported into the browser (`waImportFiles`), stored in IndexedDB
+    (`tonys_recipes_db` v2, store `wachats`, `{id, group, text, addedAt}`). Never uploaded.
+  Chat text is deliberately kept out of Firestore and localStorage — a year of group chat is
+  megabytes and the shared recipe document has a 1 MiB ceiling.
+- **Parsing** (`waParse`): handles the iOS `[dd/mm/yyyy, hh:mm:ss] Name: text` and Android
+  `dd/mm/yyyy, hh:mm - Name: text` shapes, strips bidi control characters, joins continuation
+  lines onto the previous message, drops `<Media omitted>`-style system lines.
+- **Retrieval** (`waSearch` → `waBuildContext`): term scoring by **substring** match, which is
+  what makes Hebrew prefixes (ה/ו/ב/ל) work without a stemmer. Each hit drags messages `i-2 … i+5`
+  into the context, because the *answers* almost never repeat the question's words
+  ("230C on a preheated tray" shares nothing with "what temperature for focaccia").
+- **Asking** (More → 💬 Ask my WhatsApp groups, `openWaAsk`/`waAsk`): the prompt requires the AI
+  to collate *every* relevant answer, lead with a single `**Best answer:**`, list other viable
+  options with who suggested them and their trade-offs, name disagreements explicitly, attribute
+  claims, and use only the excerpts. Sources shown behind a `<details>`.
+- **Automation limits, stated honestly:** the export step cannot be automated on any platform.
+  The upload afterwards can — on iPhone, a Shortcut accepting a file from the Share sheet and
+  PUTting it to `/repos/<owner>/<repo>/contents/whatsapp/<file>`.
 
 ---
 

@@ -31,7 +31,7 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | 2.3 | **Unify "clip" vs "video bookmark"** | Two overlapping flags (`isClip`, `isVideoBookmark`) mean the same thing to a user and have caused inconsistent badges. Collapse to one concept. | 🟢 |
 | ~~2.4~~ | ✅ **DONE (v27.2)** — ~~Per-recipe delete~~ | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
 | 2.5 | **Better empty/error states for AI failures** | When the AI returns nothing useful, you get a generic message; offering "try free-hand paste" inline would recover the flow. | 🟢 |
-| 2.6 | **Save Helper — TEST RESULTS IN (do not implement yet)** | Measured on Ubuntu/Chrome: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → inconclusive** (the test page consumed the single-use link before the download; fixed, needs a re-run), **4. Python helper → ✅ correct filename**. The helper stays until test 3 is re-run. | 🟡 |
+| 2.6 | **Save Helper — ON HOLD, one test still outstanding** | Measured on Ubuntu/Chrome 137: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → still not run** (the test page used to consume the single-use link; fixed, needs a re-run), **4. Python helper → ✅ correct Hebrew filename**. The helper stays until test 3 is re-run. | 🟡 |
 | 2.7 | **Consolidate the 2 500-line `<style>` block** | Group by component and drop dead rules (several classes have no matching markup). Pure maintainability. | 🟡 |
 
 ---
@@ -69,6 +69,24 @@ can send a recipe to a friend who doesn't use the app — much nicer than pastin
 "Next step", "repeat" via the Web Speech API. Genuinely useful with dirty hands; works well in
 Chrome/Android, partial on iOS.
 
+### 3.9 WhatsApp group knowledge 🟡 — ✅ **DONE (v27.3)**
+Ask questions of your food-related WhatsApp groups. WhatsApp has **no API** for reading group
+content, and libraries that drive WhatsApp Web breach its Terms of Service and get numbers
+banned — so this works off WhatsApp's own *Export chat → Without media* `.txt` files.
+
+- **⚙️ Settings → 💬 WhatsApp Groups** configures two kinds of source: a **shared folder** of
+  `.txt` files served over HTTPS (the repo's `whatsapp/` folder plus an `index.json`), which
+  every device including the iPhone can read; and **device-local import**, kept in IndexedDB
+  and never uploaded.
+- **More → 💬 Ask my WhatsApp groups** scores every message against the question, pulls each
+  hit's surrounding conversation (the replies rarely repeat the question's words), and asks the
+  AI to collate *all* the answers: one recommended answer first, other viable options listed
+  with who suggested them and their trade-offs, and disagreements called out rather than
+  silently resolved. The source messages are shown behind a disclosure.
+- **What cannot be automated:** the export itself. No platform offers a scheduled or
+  programmatic export. The *upload* afterwards can be — on iPhone, a Shortcut that takes the
+  file from the Share sheet and PUTs it to the repo via the GitHub API makes it a two-tap job.
+
 ### 3.8 Nutrition upgrade 🟢
 Nutrition is currently per-100g and AI-estimated. Add per-serving toggle and show a confidence
 caveat — right now the number looks more authoritative than it is.
@@ -80,15 +98,15 @@ caveat — right now the number looks more authoritative than it is.
 | # | Idea | Why |
 |---|------|-----|
 | ~~4.1~~ | ✅ **DONE (v27.1)** — ~~Card titles hard-coded `text-align:right`~~ | Also found `direction: auto` (not valid CSS) and `direction: rtl` forced on list names. Now `dir="auto"` + `unicode-bidi:plaintext` + `text-align:start` everywhere, including email and print. |
-| 4.2 | **Show *why* a card matched a search** | When searching by ingredient, highlight the matching ingredient on the card — otherwise results look arbitrary. |
-| 4.3 | **Sticky ingredient panel while scrolling steps** | On desktop, a two-column recipe view (ingredients left, method right) removes constant scrolling. |
+| ~~4.2~~ | ✅ **DONE (v27.3)** — ~~Show *why* a card matched~~ | Cards now carry a "🧂 …" / "📋 …" line with the matched run in `<mark>`, escaped before highlighting. |
+| ~~4.3~~ | ✅ **DONE (v27.3)** — ~~Sticky ingredient panel~~ | At ≥1000px the recipe view widens to 900px and splits into a sticky ingredients column beside the method. |
 | 4.4 | **Filter chips should show counts** | "Dinner (12)" tells you where your collection actually is. |
 | ~~4.5~~ | ✅ **DONE (v27.2)** — ~~whole "Add photo" hero clickable~~ | The small 📷 button is easy to miss on a phone. |
-| 4.6 | **Dark mode** | An evening kitchen is dim; the app is bright cream. The CSS variables make this genuinely cheap. |
-| 4.7 | **Skeleton → real content transition** | Skeletons only show on first-ever load; showing them during cloud sync would make the app feel more responsive. |
+| ~~4.6~~ | ✅ **DONE (v27.3)** — ~~Dark mode~~ | ⚙️ Settings → Theme cycles Light / Dark / Auto (Auto follows the OS live). Needed a new `--heading` variable: `--warm-brown` was doing duty as both a surface and heading text, which have to move in opposite directions. |
+| ~~4.7~~ | ✅ **DONE (v27.3)** — ~~Sync feedback~~ | An empty grid gets skeletons during a cloud sync; a populated grid gets a quiet ☁ pulse on the section label, because replacing visible recipes with grey boxes is a downgrade. |
 | 4.8 | **Larger touch targets in the header** | Several header buttons are ~28 px; the accessibility guideline is 44 px, and they're the most-tapped controls. |
 | ~~4.9~~ | ✅ **DONE (v27.2)** — ~~empty state for "no photos yet"~~ | Prompt to auto-fetch, rather than a wall of emoji tiles. |
-| 4.10 | **Consistent iconography** | The app mixes emoji and inline SVG for similar concepts (e.g. the clip badge). Picking one raises the visual polish a lot. |
+| ~~4.10~~ | ✅ **DONE (v27.3)** — ~~Consistent iconography~~ | The two hand-rolled inline-SVG clip badges are now one `.clip-badge` 🎬 component, matching the emoji language used everywhere else. |
 
 ---
 
@@ -111,7 +129,7 @@ caveat — right now the number looks more authoritative than it is.
 
 1. ~~**Cook Mode**~~ ✅ **shipped in v27.0** (with step timers and ingredient check-off).
 2. **Meal planner + merged shopping list** (3.1) — the standout new capability.
-3. **Dark mode** (4.6) — cheap given the CSS variables, and noticeable every evening.
+3. ~~**Dark mode** (4.6)~~ ✅ **shipped in v27.3**.
 4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk.
 5. **Smarter units** (see 3.3 + the note below) — "2 tsp" currently displays as "9.9ml".
 
