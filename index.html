@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.4 -->
+<!-- Tony's Recipes Collection v27.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -902,7 +902,8 @@ const SELF_TESTS = [
         if(r.cookLog.length!==3) throw new Error('expected 3 log entries, got '+r.cookLog.length);
         if(Math.abs(avgRating(r)-4)>0.001) throw new Error('unrated cooks must not drag the average down; expected 4, got '+avgRating(r));
         // A note is a note — deleting one must not rewrite how many times it was cooked.
-        deleteCookLogEntry(testId, r.cookLog[0].at);
+        if(new Set(r.cookLog.map(function(e){return e.id;})).size!==3) throw new Error('log entries logged in the same millisecond must still be distinguishable');
+        deleteCookLogEntry(testId, r.cookLog[0].id);
         if(r.cookLog.length!==2) throw new Error('the entry was not removed');
         if(r.cookCount!==3) throw new Error('deleting a note must not change cookCount');
         // Ratings survive a save/normalise round trip.
@@ -1783,6 +1784,58 @@ const SELF_TESTS = [
       var h=waParse(heb,'אוכל');
       if(h.length!==1||h[0].text.indexOf('מלח')===-1) throw new Error('Hebrew message did not survive parsing');
     } },
+  { id:'wa_zip', group:'WhatsApp', name:'Zipped exports are read without unpacking by hand',
+    test: async()=>{
+      if(typeof waTextFromBuffer!=='function'||typeof waIsZip!=='function') throw new Error('waTextFromBuffer/waIsZip not defined');
+      if(typeof CompressionStream==='undefined') throw new Error('CompressionStream unavailable — cannot build the fixture in this browser');
+      var body='[16/04/2024, 21:03:12] Tony: zipped message about focaccia at 230C\n';
+      var raw=new TextEncoder().encode(body);
+      // Build a real deflate-compressed zip so the test exercises the same path
+      // a WhatsApp export does, rather than a stored-only shortcut.
+      var deflated=new Uint8Array(await new Response(
+        new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+      var name=new TextEncoder().encode('_chat.txt');
+      function crc32(u8){ var c,t=[],n,k; for(n=0;n<256;n++){c=n;for(k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c;}
+        c=0xFFFFFFFF; for(n=0;n<u8.length;n++) c=t[(c^u8[n])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+      var crc=crc32(raw);
+      var lh=30+name.length, cdOff=lh+deflated.length, cdLen=46+name.length;
+      var buf=new ArrayBuffer(cdOff+cdLen+22), dv=new DataView(buf), u8=new Uint8Array(buf);
+      dv.setUint32(0,0x04034b50,true); dv.setUint16(4,20,true); dv.setUint16(8,8,true);
+      dv.setUint32(14,crc,true); dv.setUint32(18,deflated.length,true); dv.setUint32(22,raw.length,true);
+      dv.setUint16(26,name.length,true); u8.set(name,30); u8.set(deflated,lh);
+      dv.setUint32(cdOff,0x02014b50,true); dv.setUint16(cdOff+10,8,true);
+      dv.setUint32(cdOff+16,crc,true); dv.setUint32(cdOff+20,deflated.length,true);
+      dv.setUint32(cdOff+24,raw.length,true); dv.setUint16(cdOff+28,name.length,true);
+      dv.setUint32(cdOff+42,0,true); u8.set(name,cdOff+46);
+      dv.setUint32(cdOff+cdLen,0x06054b50,true); dv.setUint16(cdOff+cdLen+8,1,true);
+      dv.setUint16(cdOff+cdLen+10,1,true); dv.setUint32(cdOff+cdLen+12,cdLen,true);
+      dv.setUint32(cdOff+cdLen+16,cdOff,true);
+
+      if(!waIsZip(u8)) throw new Error('a zip was not recognised as one');
+      var text=await waTextFromBuffer(buf);
+      if(text.indexOf('focaccia at 230C')===-1) throw new Error('the zip did not decompress to its contents, got: '+text.slice(0,80));
+      if(waParse(text,'G').length!==1) throw new Error('the unzipped text did not parse as a chat');
+      // Plain text must still pass straight through untouched.
+      var plain=await waTextFromBuffer(new TextEncoder().encode('hello').buffer);
+      if(plain!=='hello') throw new Error('plain text was mangled by the zip reader');
+    } },
+  { id:'wa_system_noise', group:'WhatsApp', name:'Group joins and leaves are filtered out',
+    test: async()=>{
+      var t=[
+        '[27/05/2024, 9:35:09] Group: ‎Messages and calls are end-to-end encrypted.',
+        '[21/10/2025, 18:57:08] +972 52-452-9054: ‎+972 52-452-9054 joined using a group link',
+        '[21/10/2025, 18:58:00] Dana: You want 55C in the centre for medium rare, then rest it.',
+        '[21/10/2025, 18:59:00] Roni: ‎Roni left',
+        '[21/10/2025, 19:00:00] Tony: I left the brisket in the oven overnight at 90C and it was the best one yet, genuinely worth the wait.'
+      ].join('\n');
+      var m=waParse(t,'G');
+      var texts=m.map(function(x){return x.text;}).join(' | ');
+      if(m.length!==2) throw new Error('expected 2 real messages after filtering, got '+m.length+': '+texts);
+      if(texts.indexOf('joined using a group link')!==-1) throw new Error('a join notice survived filtering');
+      if(texts.indexOf('end-to-end encrypted')!==-1) throw new Error('the encryption notice survived filtering');
+      // A long message that merely contains the word "left" is not housekeeping.
+      if(texts.indexOf('brisket')===-1) throw new Error('a real message containing "left" was wrongly filtered out');
+    } },
   { id:'wa_search', group:'WhatsApp', name:'Query finds the relevant messages, ignores chatter',
     test: async()=>{
       if(typeof waSearch!=='function') throw new Error('waSearch not defined');
@@ -1970,6 +2023,8 @@ var SELF_TEST_FIXES = {
   ui_sync_indicator: { fix:'setSyncing(true/false) must bracket loadFromFirestore() and toggle the "syncing" class on #sectionLabel, counting nested syncs so an inner finish does not clear an outer one.', autofix: null },
   ui_two_col:     { fix:'drawView() must wrap Ingredients and Method in .recipe-columns > .recipe-col-ings / .recipe-col-steps so the ≥900px grid rule can put them side by side.', autofix: null },
   ui_clip_badge:  { fix:'Clip/video badges should render as <div class="clip-badge">🎬</div> (or .clip-badge.clip-badge-sm in list view), not as a hand-rolled inline SVG.', autofix: null },
+  wa_zip:         { fix:'WhatsApp exports arrive as a .zip containing _chat.txt. waTextFromBuffer() must sniff the PK header and unzip via DecompressionStream("deflate-raw") — reading the file as text gives you binary rubbish.', autofix: null },
+  wa_system_noise:{ fix:'waParse must drop short group-housekeeping lines (joined/left/created/changed subject, and the Hebrew equivalents) via WA_SYSTEM_RE, while leaving long real messages that merely contain those words alone.', autofix: null },
   wa_parse:       { fix:'waParse() must handle both the iOS "[dd/mm/yyyy, hh:mm:ss] Name: text" and Android "dd/mm/yyyy, hh:mm - Name: text" shapes, strip bidi control characters, join continuation lines onto the previous message, and drop "<Media omitted>"-style system lines.', autofix: null },
   wa_search:      { fix:'waSearch() must score messages by substring hits of the question\'s terms (substring, so Hebrew prefixes still match), skip very short messages, and return nothing when the query holds only stop words.', autofix: null },
   wa_ui:          { fix:'WhatsApp UI missing: needs #waSetupOverlay (⚙️ Settings → 💬 WhatsApp Groups) and #waAskOverlay with the #waAskItem entry in the More menu, plus openWaSetup()/openWaAsk()/setWaBase().', autofix: null },
@@ -2274,11 +2329,17 @@ function skipCookLog(){
   commitCooked(_cookLogId, 0, '');
   closeM('cookLogOverlay');
 }
+// Unique per entry: two cooks logged in the same millisecond must stay distinct.
+var _cookLogSeq = 0;
+function cookLogId(salt){
+  _cookLogSeq++;
+  return Date.now().toString(36) + '-' + _cookLogSeq.toString(36) + '-' + (salt == null ? '' : salt);
+}
 function commitCooked(id, rating, note) {
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r) return;
   if (!Array.isArray(r.cookLog)) r.cookLog = [];
-  r.cookLog.push({ at: Date.now(), rating: rating||0, note: note||'' });
+  r.cookLog.push({ id: cookLogId(), at: Date.now(), rating: rating||0, note: note||'' });
   if (r.cookLog.length > 50) r.cookLog = r.cookLog.slice(-50);  // keep the doc small
   r.cookCount = (r.cookCount||0) + 1;
   r.lastCooked = Date.now();
@@ -2287,11 +2348,11 @@ function commitCooked(id, rating, note) {
   if (viewId === id) drawView();
   toast('🍳 Cooked! (' + r.cookCount + ' time' + (r.cookCount!==1?'s':'') + ' total)');
 }
-function deleteCookLogEntry(id, at){
+function deleteCookLogEntry(id, entryId){
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r || !Array.isArray(r.cookLog)) return;
   var before = r.cookLog.length;
-  r.cookLog = r.cookLog.filter(function(e){ return e.at !== at; });
+  r.cookLog = r.cookLog.filter(function(e){ return e.id !== entryId; });
   if (r.cookLog.length === before) return;
   // The count is the number of times it was cooked, not the number of notes
   // kept — deleting a note must not rewrite history.
@@ -2309,7 +2370,7 @@ function avgRating(r){
 function stars(n){ var w = Math.round(n); return '★★★★★'.slice(0, w) + '☆☆☆☆☆'.slice(0, 5 - w); }
 window.markCooked = markCooked; window.saveCookLog = saveCookLog; window.skipCookLog = skipCookLog;
 window.setCookLogRating = setCookLogRating; window.commitCooked = commitCooked;
-window.deleteCookLogEntry = deleteCookLogEntry; window.avgRating = avgRating; window.stars = stars;
+window.deleteCookLogEntry = deleteCookLogEntry; window.cookLogId = cookLogId; window.avgRating = avgRating; window.stars = stars;
 
 // ─── AUTO-FETCH MISSING PHOTOS ───────────────────────────────────────────────
 async function autoFetchMissingPhotos() {
@@ -2514,7 +2575,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.4';
+var APP_VERSION = 'v27.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -4812,7 +4873,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5374,7 +5435,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5571,8 +5632,8 @@ body.banner-shown .header {
     <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
       Import exported files straight into this browser. They stay here — nothing is uploaded, and other devices won't see them.
     </p>
-    <input type="file" id="waFileIn" accept=".txt,text/plain" multiple style="display:none" onchange="waImportFiles(this.files);this.value='';">
-    <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt files</button>
+    <input type="file" id="waFileIn" accept=".txt,.zip,text/plain,application/zip" multiple style="display:none" onchange="waImportFiles(this.files);this.value='';">
+    <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt or .zip files</button>
 
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Loaded chats</div>
     <div id="waSourceList" style="margin-bottom:14px;"></div>
@@ -6563,7 +6624,7 @@ function drawView(){
                 return '<div class="cook-log-entry">'
                   + '<div class="cook-log-head"><span>' + new Date(e.at).toLocaleDateString() + '</span>'
                   + (e.rating ? '<span class="rating-stars">' + stars(e.rating) + '</span>' : '')
-                  + '<button class="cook-log-del" onclick="deleteCookLogEntry(' + r.id + ',' + e.at + ')" title="Remove this note">✕</button></div>'
+                  + '<button class="cook-log-del" onclick="deleteCookLogEntry(' + r.id + ',&quot;' + escA(e.id) + '&quot;)" title="Remove this note">✕</button></div>'
                   + (e.note ? '<div class="cook-log-note" dir="auto">' + escH(e.note) + '</div>' : '')
                   + '</div>';
               }).join('')}</div></details>` : '');
@@ -9055,9 +9116,13 @@ function normalizeRecipe(r) {
   // 3.5 — per-attempt log: [{at, rating 0–5, note}]. Older recipes have a
   // cookCount but no log; that's fine, the count stays authoritative.
   if (!Array.isArray(r.cookLog)) r.cookLog = [];
-  r.cookLog = r.cookLog.filter(function(e){ return e && typeof e === 'object'; }).map(function(e){
+  r.cookLog = r.cookLog.filter(function(e){ return e && typeof e === 'object'; }).map(function(e, i){
     var rating = parseInt(e.rating, 10);
-    return { at: (typeof e.at === 'number' && !isNaN(e.at)) ? e.at : 0,
+    return { // `at` is a display timestamp and can repeat; `id` is what identifies
+             // an entry. Keying deletion on the timestamp removed every entry
+             // logged in the same millisecond.
+             id: (typeof e.id === 'string' && e.id) ? e.id : cookLogId(i),
+             at: (typeof e.at === 'number' && !isNaN(e.at)) ? e.at : 0,
              rating: (isNaN(rating) || rating < 0 || rating > 5) ? 0 : rating,
              note: typeof e.note === 'string' ? e.note : String(e.note == null ? '' : e.note) };
   });
@@ -10606,6 +10671,59 @@ function updateWaMenuLabel(){
   el.textContent = '💬 Ask my WhatsApp groups' + (n ? ' (' + n + ')' : '');
 }
 
+// ─── Reading the export ──────────────────────────────────────────────────────
+// "Export chat" gives you a ZIP containing _chat.txt, on both iOS and Android.
+// Renaming it .txt doesn't make it text, so the app unzips it itself rather than
+// asking you to unpack every future update by hand. No library needed:
+// DecompressionStream('deflate-raw') is built into the browser.
+function waIsZip(u8){
+  return u8.length > 4 && u8[0] === 0x50 && u8[1] === 0x4B && (u8[2] === 3 || u8[2] === 5 || u8[2] === 7);
+}
+async function waUnzipText(buf){
+  var u8 = new Uint8Array(buf), dv = new DataView(buf);
+  // End-of-central-directory record, searched from the back (it may carry a comment).
+  var eocd = -1, floor = Math.max(0, u8.length - 65558);
+  for (var i = u8.length - 22; i >= floor; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('this looks like a zip but has no end-of-archive record');
+  var count = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true), best = null;
+  for (var n = 0; n < count && p + 46 <= u8.length; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    var method  = dv.getUint16(p + 10, true);
+    var compSz  = dv.getUint32(p + 20, true);
+    var nameLen = dv.getUint16(p + 28, true);
+    var extra   = dv.getUint16(p + 30, true);
+    var comment = dv.getUint16(p + 32, true);
+    var lho     = dv.getUint32(p + 42, true);
+    var name    = new TextDecoder('utf-8').decode(u8.subarray(p + 46, p + 46 + nameLen));
+    // Prefer _chat.txt (what WhatsApp calls it); accept any .txt otherwise.
+    if (/\.txt$/i.test(name) && (!best || /_chat\.txt$/i.test(name))) {
+      best = { name: name, method: method, compSz: compSz, lho: lho };
+    }
+    p += 46 + nameLen + extra + comment;
+  }
+  if (!best) throw new Error('the zip contains no .txt file — is it a WhatsApp export?');
+  if (dv.getUint32(best.lho, true) !== 0x04034b50) throw new Error('the zip entry is corrupt');
+  var lnLen = dv.getUint16(best.lho + 26, true), leLen = dv.getUint16(best.lho + 28, true);
+  var start = best.lho + 30 + lnLen + leLen;
+  var data  = u8.subarray(start, start + best.compSz);
+  if (best.method === 0) return new TextDecoder('utf-8').decode(data);      // stored
+  if (best.method !== 8) throw new Error('unsupported compression inside the zip');
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('this browser cannot unzip — please extract _chat.txt yourself and upload that');
+  }
+  var stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new TextDecoder('utf-8').decode(await new Response(stream).arrayBuffer());
+}
+// One entry point for both sources: hand it bytes, get text back.
+async function waTextFromBuffer(buf){
+  var u8 = new Uint8Array(buf);
+  if (waIsZip(u8)) return await waUnzipText(buf);
+  return new TextDecoder('utf-8').decode(u8);
+}
+window.waIsZip = waIsZip; window.waUnzipText = waUnzipText; window.waTextFromBuffer = waTextFromBuffer;
+
 // ─── Parsing an exported chat ────────────────────────────────────────────────
 // WhatsApp writes one of two shapes, and sprinkles LTR/RTL marks around them:
 //   iOS      [16/04/2024, 21:03:12] Tony: text
@@ -10616,6 +10734,14 @@ var WA_IOS_RE     = /^‎?\[(\d{1,2}[./]\d{1,2}[./]\d{2,4}),?\s+(\d{1,2}:\d{2}(?
 var WA_ANDROID_RE = /^‎?(\d{1,2}[./]\d{1,2}[./]\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*(?:AM|PM|am|pm)?\s*-\s*([^:]{1,60}?):\s*([\s\S]*)$/;
 // System lines carry no author and are noise for our purposes.
 var WA_NOISE_RE = /^(‎)?(<Media omitted>|image omitted|video omitted|sticker omitted|audio omitted|GIF omitted|document omitted|This message was deleted|You deleted this message|Missed voice call|Missed video call|null)\s*$/i;
+// Group housekeeping. A real export is thick with these — a 11,000-message group
+// can be a third joins and leaves — and they answer no cooking question.
+var WA_SYSTEM_RE = new RegExp(
+  'joined using a group link|joined this group|added you|created this group|created group'
+  + '|left$|was added|was removed|removed you|changed the subject|changed this group|changed their phone number'
+  + '|changed the group description|changed to |Messages and calls are end-to-end encrypted'
+  + '|You joined a group via invite|security code changed|turned on disappearing messages|pinned a message'
+  + '|הצטרף|הצטרפה|עזב|עזבה|הוסיף|הוסיפה|הוסרה|הוסר|יצר את הקבוצה|יצרה את הקבוצה|שינה את|שינתה את', 'i');
 
 function waParse(text, group){
   var out = [], cur = null;
@@ -10633,7 +10759,11 @@ function waParse(text, group){
   if (cur) out.push(cur);
   return out.filter(function(msg){
     var t = (msg.text || '').trim();
-    return t && !WA_NOISE_RE.test(t);
+    if (!t || WA_NOISE_RE.test(t)) return false;
+    // System notices are short and formulaic; a long message that merely
+    // mentions "left" (as in "left it in the oven") must survive.
+    if (t.length < 120 && WA_SYSTEM_RE.test(t)) return false;
+    return true;
   });
 }
 
@@ -10662,10 +10792,10 @@ async function waImportFiles(fileList){
   var idx = waIndex(), added = 0, skipped = [];
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
-    if (!/\.txt$/i.test(f.name)) { skipped.push(f.name + ' (not a .txt)'); continue; }
+    if (!/\.(txt|zip)$/i.test(f.name)) { skipped.push(f.name + ' (not a .txt or .zip)'); continue; }
     var text;
-    try { text = await f.text(); }
-    catch(e) { skipped.push(f.name + ' (could not be read: ' + e.message + ')'); continue; }
+    try { text = await waTextFromBuffer(await f.arrayBuffer()); }
+    catch(e) { skipped.push(f.name + ' (' + e.message + ')'); continue; }
     var group = waGroupNameFromFile(f.name);
     var msgs = waParse(text, group);
     if (!msgs.length) { skipped.push(f.name + ' (no WhatsApp messages recognised in it)'); continue; }
@@ -10722,7 +10852,7 @@ async function waRefreshFolder(){
     try {
       var rr = await fetch(base + encodeURIComponent(file), { cache: 'no-store' });
       if (!rr.ok) throw new Error('HTTP ' + rr.status);
-      var text = await rr.text();
+      var text = await waTextFromBuffer(await rr.arrayBuffer());
       var msgs = waParse(text, group);
       if (!msgs.length) throw new Error('no WhatsApp messages recognised');
       _waRemoteCache[file] = msgs;
@@ -10751,7 +10881,7 @@ async function waLoadAllMessages(){
         if (_waRemoteCache[e.file]) { all = all.concat(_waRemoteCache[e.file]); continue; }
         var r = await fetch(getWaBase() + encodeURIComponent(e.file), { cache: 'no-store' });
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        var msgs = waParse(await r.text(), e.group);
+        var msgs = waParse(await waTextFromBuffer(await r.arrayBuffer()), e.group);
         _waRemoteCache[e.file] = msgs;
         all = all.concat(msgs);
       }

@@ -10,8 +10,13 @@ phone; that is the whole reason this folder exists.
 1. In WhatsApp: open the group → tap the group name → **Export chat** → **Without media**.
    (There is no API and no scheduled export — this step is manual on every platform.
    Anything that automates WhatsApp Web breaches the Terms of Service and gets numbers banned.)
-2. Save the resulting `.txt` file into this folder. Give it a sensible name — the file
-   name becomes the group's label unless `index.json` says otherwise.
+2. Save the resulting file into this folder. **WhatsApp gives you a `.zip` containing
+   `_chat.txt`, not a bare `.txt`** — upload it as-is. The app detects a zip by its contents
+   and unpacks it itself, so the file extension does not matter and you never need to
+   unzip anything by hand. (If your browser saves it as `download` with no extension,
+   that is fine too — just rename it to something meaningful.)
+   Give it a sensible name — the file name becomes the group's label unless `index.json`
+   says otherwise.
 3. Add it to `index.json`.
 4. Commit and push. The app picks it up the next time you press *Load chats from this folder*.
 
@@ -37,6 +42,12 @@ or, when you want nicer labels:
 Re-exporting a chat gives you the **entire** history again, not just the new part, so
 replace the old file rather than appending to it. Loading the folder replaces every
 remote entry for the same reason.
+
+## What gets ignored
+
+Group housekeeping — "joined using a group link", "left", "changed the subject", and their
+Hebrew equivalents — is filtered out during parsing. In a real group that can be a large
+share of the lines, and none of it answers a cooking question.
 
 ## Automating the upload (not the export)
 

@@ -88,6 +88,9 @@ banned — so this works off WhatsApp's own *Export chat → Without media* `.tx
   AI to collate *all* the answers: one recommended answer first, other viable options listed
   with who suggested them and their trade-offs, and disagreements called out rather than
   silently resolved. The source messages are shown behind a disclosure.
+- **Zipped exports are read directly (v27.5):** WhatsApp hands you a `.zip` containing
+  `_chat.txt`; the app sniffs the header and unzips it with `DecompressionStream`, so no manual
+  unpacking, and the file extension is irrelevant. Group joins/leaves are filtered out.
 - **What cannot be automated:** the export itself. No platform offers a scheduled or
   programmatic export. The *upload* afterwards can be — on iPhone, a Shortcut that takes the
   file from the Share sheet and PUTs it to the repo via the GitHub API makes it a two-tap job.
