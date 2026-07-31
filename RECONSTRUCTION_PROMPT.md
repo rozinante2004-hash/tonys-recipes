@@ -510,8 +510,9 @@ shows a note, because that is a rounding decision for the cook, not a measuremen
 
 **Cooking log (3.5):** `markCooked` opens `#cookLogOverlay` for an optional 1–5 star rating and a
 note; *Just log it — no note* preserves the original one-tap behaviour, and a missing modal falls
-straight through to `commitCooked`. Entries append to `r.cookLog` (`{at, rating, note}`, capped at
-50, sanitised in `normalizeRecipe`). `avgRating` averages only the *rated* cooks. Deleting a log
+straight through to `commitCooked`. Entries append to `r.cookLog` (`{id, at, rating, note}`, capped at
+50, sanitised in `normalizeRecipe`). Entries carry a unique `id`: `at` is a display timestamp and
+repeats, so keying deletion on it removed every entry written in the same millisecond. `avgRating` averages only the *rated* cooks. Deleting a log
 entry must **not** change `cookCount` — the count is how many times it was cooked, not how many
 notes survive. `duplicateRecipe` clears the log along with the count.
 
@@ -532,9 +533,17 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
     (`tonys_recipes_db` v2, store `wachats`, `{id, group, text, addedAt}`). Never uploaded.
   Chat text is deliberately kept out of Firestore and localStorage — a year of group chat is
   megabytes and the shared recipe document has a 1 MiB ceiling.
+- **Reading** (`waTextFromBuffer`): "Export chat" produces a **ZIP containing `_chat.txt`**, on
+  both iOS and Android — renaming it `.txt` does not make it text. Both sources read bytes and
+  sniff the `PK` header, unzipping via `DecompressionStream('deflate-raw')` (no library). Central
+  directory is parsed for the entry offsets; `_chat.txt` is preferred, any `.txt` accepted.
 - **Parsing** (`waParse`): handles the iOS `[dd/mm/yyyy, hh:mm:ss] Name: text` and Android
   `dd/mm/yyyy, hh:mm - Name: text` shapes, strips bidi control characters, joins continuation
-  lines onto the previous message, drops `<Media omitted>`-style system lines.
+  lines onto the previous message, drops `<Media omitted>`-style system lines, and drops short
+  group-housekeeping notices via `WA_SYSTEM_RE` (joined / left / created / changed subject, plus
+  Hebrew equivalents). The length guard matters: a long message that merely contains "left"
+  ("I left the brisket in overnight") must survive. A real 11,000-line export reduced to ~5,800
+  actual messages this way.
 - **Retrieval** (`waSearch` → `waBuildContext`): term scoring by **substring** match, which is
   what makes Hebrew prefixes (ה/ו/ב/ל) work without a stemmer. Each hit drags messages `i-2 … i+5`
   into the context, because the *answers* almost never repeat the question's words
