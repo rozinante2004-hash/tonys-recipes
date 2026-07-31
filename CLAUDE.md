@@ -45,7 +45,10 @@ found only because a test was written first and disagreed with the code.
 - **Versioning:** minor bumps (`v27.8` → `v27.9`) for ordinary work; majors reserved
   for genuinely big changes. Bump `version.json` **and** the four `v27.x` strings in
   `index.html` together.
-- **Delivery:** Tony uploads files to `main` **by hand** through the GitHub web UI.
+- **Delivery:** Tony uploads files to `main` **by hand** through the GitHub web UI. Two known
+  side-effects: browsers append ` (N)` to repeat downloads and **strip hyphens** from some
+  filenames, so `main` accumulates `NAME (3).md` duplicates and de-hyphenated names. Check the
+  real filenames on `main` before referencing one.
   Always `git fetch origin main` and merge before starting — the branch and `main`
   diverge routinely. Send changed files as attachments as well as pushing.
 - Branch: `claude/tonys-recipes-app-nv31q1` (PR #1).
@@ -89,8 +92,10 @@ found only because a test was written first and disagreed with the code.
 ## Outstanding
 
 - **5.4 — per-recipe Firestore documents.** The last backlog item and the riskiest.
-  Full brief in `PLAN-5.4-per-recipe-docs.md`. Tony has confirmed he is not the only
-  editor, so today's blind whole-document `.set()` can silently lose someone's edit.
+  Full brief in **`PLAN-5.4-per-recipe-docs.md`** (on `main` it may have landed as
+  `PLAN5.4perrecipedocs.md` — browsers strip hyphens from downloads; glob for `PLAN*5*4*.md`
+  rather than assuming either spelling). Tony has confirmed he is not the only editor, so
+  today's blind whole-document `.set()` can silently lose someone's edit.
 - **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
   (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome.
 - The Bring! token in git history should still be rotated.
