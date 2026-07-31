@@ -1,0 +1,32 @@
+{
+  "_version": "v2.0",
+  "name": "Tony's Recipes Collection",
+  "short_name": "Tony's Recipes",
+  "start_url": "/tonys-recipes/",
+  "scope": "/tonys-recipes/",
+  "display": "standalone",
+  "theme_color": "#5C3D2E",
+  "background_color": "#FAF7F2",
+  "icons": [
+    {
+      "src": "/tonys-recipes/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/tonys-recipes/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "share_target": {
+    "action": "/tonys-recipes/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    },
+    "enctype": "application/x-www-form-urlencoded"
+  }
+}

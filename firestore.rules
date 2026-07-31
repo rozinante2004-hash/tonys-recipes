@@ -1,0 +1,48 @@
+rules_version = '2';
+// ─────────────────────────────────────────────────────────────────────────────
+// Tony's Recipes — Firestore security rules (canonical copy, 5.5)
+//
+// This file is the source of truth. The app fetches it at runtime (⚙️ Settings →
+// 👥 Family Access → Show rules) and substitutes the three placeholders below
+// with the current member list before showing you what to paste into the
+// Firebase console. Edit the structure HERE, not in index.html.
+//
+// Placeholders, each replaced with a comma-separated list of quoted emails:
+//   {{READ}}   owner + everyone with read, write or admin
+//   {{WRITE}}  owner + everyone with write or admin
+//   {{ADMIN}}  owner + admins only
+//
+// The owner's email is always included in all three, so locking yourself out by
+// editing the member list is not possible.
+//
+// To apply: Firebase console → Firestore Database → Rules → paste → Publish.
+// Nothing deploys these automatically; they are pasted by hand on purpose,
+// because a bad rules push locks every device out of the data at once.
+// ─────────────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Shared recipe collection — family access.
+    // Holds `recipes` (the slim, photo-free document) and one `photo_<id>`
+    // document per recipe photo, plus `access` (the member list itself).
+    match /shared/{document=**} {
+      // Read: owner + all members
+      allow read: if request.auth != null &&
+        request.auth.token.email in [{{READ}}];
+
+      // Write: owner + write/admin members
+      allow write: if request.auth != null &&
+        request.auth.token.email in [{{WRITE}}];
+
+      // Delete: owner + admin members only
+      allow delete: if request.auth != null &&
+        request.auth.token.email in [{{ADMIN}}];
+    }
+
+    // Legacy per-user documents (owner only). Kept for data written before the
+    // collection became shared; nothing writes here any more.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
