@@ -49,6 +49,11 @@
     Run each test, then check your Downloads folder. This page saves nothing and changes nothing in the app.
   </div>
 
+  <div class="card" id="originCard" style="display:none;">
+    <h2 id="originTitle"></h2>
+    <div class="why" id="originNote"></div>
+  </div>
+
   <div class="card">
     <div class="name-row">
       <input type="text" id="fname" value="עוגת שוקולד של סבתא.docx">
@@ -192,19 +197,16 @@ async function test3(){
     });
     var data = await resp.json();
     if(!data.url) throw new Error(data.error || 'Worker did not return a URL (is download-store deployed? is BRING_KV bound?)');
-    // Peek at the header the server will send, then trigger the download
-    var head='(could not read header)';
-    try{
-      var probe = await fetch(data.url, {method:'GET'});
-      head = probe.headers.get('content-disposition') || '(none)';
-    }catch(e){}
+    // IMPORTANT: the Worker deletes the KV entry as soon as the URL is fetched, so we must
+    // NOT peek at it first — an earlier version of this test did, which consumed the
+    // single-use link and made the real download report "File expired".
     var a=document.createElement('a'); a.href=data.url; a.style.display='none';
     document.body.appendChild(a); a.click(); setTimeout(function(){a.remove();},500);
     results[3]='ran — CHECK FOLDER (asked for: '+n+')';
-    show('r3','Worker returned a one-time URL and the download was triggered.\n'
-            +'Content-Disposition sent: '+head+'\n\n'
-            +'👉 Check your Downloads folder — was it saved with the correct name?\n'
-            +'(Note: the link is single-use, so a second click will say "expired".)','warn');
+    show('r3','Worker stored the file and the download was triggered.\n'
+            +'The Worker serves it with: Content-Disposition: attachment; filename*=UTF-8\'\'<encoded name>\n\n'
+            +'👉 Check your Downloads folder — was it saved with the correct Hebrew name, or as "download"?\n'
+            +'(The link is single-use; press "Run test 3" again for a fresh one.)','warn');
   }catch(err){
     results[3]='ERROR '+err.message;
     show('r3','Failed: '+err.message+'\n\nIf this says the URL was missing, the Worker may not have the KV binding.','fail');
@@ -235,6 +237,38 @@ async function test4(){
             +'  python3 ~/local-save-helper.py','warn');
   }
 }
+
+// Tell the user upfront which tests can work from wherever they opened this page.
+// (The Python helper only accepts requests from the GitHub Pages origin, and the
+// File System Access API needs a secure context.)
+(function originAdvice(){
+  var card=$('originCard'), title=$('originTitle'), note=$('originNote');
+  var o=location.origin, proto=location.protocol;
+  var isPages = /rozinante2004-hash\.github\.io$/.test(location.hostname);
+  var isLocalhost = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  var isFile = proto === 'file:';
+  var msg, t;
+  if (isPages) {
+    t='✅ Opened from the live site — all four tests can run';
+    msg='This is the ideal place to run the tests.';
+  } else if (isLocalhost) {
+    t='⚠️ Opened from localhost — tests 1, 2 and 3 will run';
+    msg='Test 4 (Python helper) will fail here: the helper only accepts requests from '
+      + 'https://rozinante2004-hash.github.io. That is fine — tests 1–3 are the ones we need. '
+      + 'Current origin: ' + o;
+  } else if (isFile) {
+    t='⚠️ Opened directly from disk — test 2 (and probably 4) will not run';
+    msg='The File System Access API needs a real http(s) origin. For the full set, either upload this '
+      + 'file to the repo and open it from the live site, or serve the folder locally:\n'
+      + '    cd <folder containing this file> && python3 -m http.server 8000\n'
+      + 'then open http://localhost:8000/filename-test.html';
+  } else {
+    t='ℹ️ Origin: ' + o;
+    msg='Test 4 (Python helper) only works from https://rozinante2004-hash.github.io.';
+  }
+  title.textContent=t; note.style.whiteSpace='pre-wrap'; note.textContent=msg;
+  card.style.display='block';
+})();
 
 function refresh(){
   $('summary').value =

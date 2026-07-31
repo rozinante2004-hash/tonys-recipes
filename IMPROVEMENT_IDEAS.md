@@ -31,7 +31,7 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | 2.3 | **Unify "clip" vs "video bookmark"** | Two overlapping flags (`isClip`, `isVideoBookmark`) mean the same thing to a user and have caused inconsistent badges. Collapse to one concept. | 🟢 |
 | 2.4 | **Per-recipe delete** | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
 | 2.5 | **Better empty/error states for AI failures** | When the AI returns nothing useful, you get a generic message; offering "try free-hand paste" inline would recover the flow. | 🟢 |
-| 2.6 | **Possibly retire the local Save Helper — UNVERIFIED** | ⚠️ *Corrected:* I originally implied this was solved. It is **not confirmed**. Hebrew names saving as "Download" is a real, known Chrome-on-Linux behaviour with the `<a download>` method the app falls back to. There are two candidate replacements: (a) the **File System Access API**, and (b) the **Worker's `download-store`**, which already serves `Content-Disposition: filename*=UTF-8''…` — **your Worker supports this today but the app never calls it**. Use `filename-test.html` to find out which actually work on your machine before changing anything. | 🟡 |
+| 2.6 | **Save Helper — TEST RESULTS IN (do not implement yet)** | Measured on Ubuntu/Chrome: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → inconclusive** (the test page consumed the single-use link before the download; fixed, needs a re-run), **4. Python helper → ✅ correct filename**. The helper stays until test 3 is re-run. | 🟡 |
 | 2.7 | **Consolidate the 2 500-line `<style>` block** | Group by component and drop dead rules (several classes have no matching markup). Pure maintainability. | 🟡 |
 
 ---
@@ -79,7 +79,7 @@ caveat — right now the number looks more authoritative than it is.
 
 | # | Idea | Why |
 |---|------|-----|
-| 4.1 | **Card titles are hard-coded `text-align:right`** | This suits Hebrew but looks wrong for English titles. Use `dir="auto"` and let alignment follow the text, as the view modal already does. |
+| ~~4.1~~ | ✅ **DONE (v27.1)** — ~~Card titles hard-coded `text-align:right`~~ | Also found `direction: auto` (not valid CSS) and `direction: rtl` forced on list names. Now `dir="auto"` + `unicode-bidi:plaintext` + `text-align:start` everywhere, including email and print. |
 | 4.2 | **Show *why* a card matched a search** | When searching by ingredient, highlight the matching ingredient on the card — otherwise results look arbitrary. |
 | 4.3 | **Sticky ingredient panel while scrolling steps** | On desktop, a two-column recipe view (ingredients left, method right) removes constant scrolling. |
 | 4.4 | **Filter chips should show counts** | "Dinner (12)" tells you where your collection actually is. |
