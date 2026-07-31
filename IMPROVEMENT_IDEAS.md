@@ -1,7 +1,7 @@
 # Tony's Recipes — Improvement Ideas
 
 A running backlog of suggestions, ordered so the highest value-for-effort items come first
-within each section. Nothing here is implemented yet — it's a menu to pick from.
+within each section. Items marked ✅ have since been built; the rest is a menu to pick from.
 
 **Effort key:** 🟢 small (under an hour) · 🟡 medium (a session) · 🔴 large (multi-session)
 
@@ -11,14 +11,14 @@ within each section. Nothing here is implemented yet — it's a menu to pick fro
 
 | # | Idea | Why it matters | Effort |
 |---|------|----------------|--------|
-| 1.1 | **Cook Mode** — a full-screen, large-type step-by-step view with the screen kept awake and big "next/previous" targets | You already request a wake lock, but the normal view is small-text and scroll-heavy. This is the single biggest *actual cooking* improvement: readable at arm's length with messy hands. | 🟡 |
-| 1.2 | **Tap a step to cross it off** | Trivial to add, hugely useful mid-cook — you never lose your place. Persist per session only. | 🟢 |
-| 1.3 | **Ingredient checkboxes in the recipe view** | Same idea for shopping/prep; pairs naturally with the Bring! feature. | 🟢 |
+| ~~1.1~~ | ✅ **DONE (v27.0)** — ~~Cook Mode~~ — a full-screen, large-type step-by-step view with the screen kept awake and big "next/previous" targets | You already request a wake lock, but the normal view is small-text and scroll-heavy. This is the single biggest *actual cooking* improvement: readable at arm's length with messy hands. | 🟡 |
+| ~~1.2~~ | ✅ **DONE (v27.0)** — ~~Tap a step to cross it off~~ | Trivial to add, hugely useful mid-cook — you never lose your place. Persist per session only. | 🟢 |
+| ~~1.3~~ | ✅ **DONE (v27.0, inside Cook Mode)** — ~~Ingredient checkboxes~~ | Same idea for shopping/prep; pairs naturally with the Bring! feature. | 🟢 |
 | 1.4 | **Duplicate recipe** | The fastest way to create a variant ("…but with chicken"). One menu item, ~10 lines. | 🟢 |
 | 1.5 | **"Recently added" sort** | You have recent-*viewed*; recently-*added* is what you usually want after importing a batch. | 🟢 |
 | 1.6 | **Confirm-before-losing-edits** | Closing the edit modal with unsaved changes silently discards them today. | 🟢 |
 | 1.7 | **Show a photo count / "no photo" filter** | Makes "Auto-fetch missing photos" easier to target. | 🟢 |
-| 1.8 | **Timers detected in steps** — turn "simmer for 20 minutes" into a tappable timer | Delightful, and genuinely useful. Regex + a small countdown UI. | 🟡 |
+| ~~1.8~~ | ✅ **DONE (v27.0)** — ~~Timers detected in steps~~ — turn "simmer for 20 minutes" into a tappable timer | Delightful, and genuinely useful. Regex + a small countdown UI. | 🟡 |
 
 ---
 
@@ -109,8 +109,15 @@ caveat — right now the number looks more authoritative than it is.
 
 ## 6. My top 5 if you only do a few
 
-1. **Cook Mode** (1.1) — the biggest real-world improvement to actually using the app.
+1. ~~**Cook Mode**~~ ✅ **shipped in v27.0** (with step timers and ingredient check-off).
 2. **Meal planner + merged shopping list** (3.1) — the standout new capability.
 3. **Dark mode** (4.6) — cheap given the CSS variables, and noticeable every evening.
 4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk.
-5. **Tap-to-cross-off steps & ingredients** (1.2/1.3) — tiny effort, used every single cook.
+5. **Smarter units** (see 3.3 + the note below) — "2 tsp" currently displays as "9.9ml".
+
+> **Noticed while building Cook Mode:** the Metric/Imperial toggle converts *every*
+> imperial-ish unit, so `2 tsp` renders as `9.9ml` and `1 cup` as `240ml`. Teaspoons,
+> tablespoons and cups are standard kitchen measures in metric kitchens too — converting
+> them makes recipes harder to follow, not easier. Suggested fix: in Metric mode convert
+> only genuinely imperial units (lb, oz, fl oz) and leave tsp/tbsp/cup alone, plus round
+> to sensible cooking values. Small change, noticeable improvement — say the word.

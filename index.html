@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v26.1 -->
+<!-- Tony's Recipes Collection v27.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1154,6 +1154,38 @@ const SELF_TESTS = [
         closeM('viewOverlay');
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
+  { id:'feat_cook_mode', group:'Features', name:'Cook mode steps, timers & ingredients',
+    test: async()=>{
+      ['openCookMode','closeCookMode','cookNext','cookPrev','findStepTimers'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      if(!document.getElementById('cookOverlay')) throw new Error('#cookOverlay missing');
+      // timer parsing
+      var t=findStepTimers('Bake 1 hour then rest 90 seconds');
+      if(t.length!==2||t[0].secs!==3600||t[1].secs!==90) throw new Error('step timer parsing wrong: '+JSON.stringify(t));
+      if(findStepTimers('Stir gently').length!==0) throw new Error('found a timer where there is none');
+      var testId=888895;
+      recipes.unshift(normalizeRecipe({id:testId,name:'CookTest',ingredients:[{a:'100g',n:'x'}],steps:['One','Two for 5 minutes'],updatedAt:Date.now()}));
+      var savedView=viewId, savedMult=viewMult;
+      try {
+        viewId=testId; viewMult=2;
+        openCookMode(testId);
+        if(!document.getElementById('cookOverlay').classList.contains('open')) throw new Error('cook mode did not open');
+        if(document.getElementById('cookStepLabel').textContent!=='Step 1 of 2') throw new Error('wrong initial step');
+        if(document.getElementById('cookIngsList').textContent.indexOf('200 g')===-1) throw new Error('cook mode ingredients ignore the chosen scale');
+        cookNext();
+        if(document.getElementById('cookStepLabel').textContent!=='Step 2 of 2') throw new Error('Next did not advance');
+        if(!document.querySelector('#cookTimers button')) throw new Error('no timer offered for a step containing "5 minutes"');
+        if(document.getElementById('cookNext').textContent.indexOf('Finish')===-1) throw new Error('last step should offer Finish');
+        cookPrev();
+        if(document.getElementById('cookStepLabel').textContent!=='Step 1 of 2') throw new Error('Back did not go back');
+        closeCookMode();
+        if(document.getElementById('cookOverlay').classList.contains('open')) throw new Error('cook mode did not close');
+      } finally {
+        viewId=savedView; viewMult=savedMult;
+        recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
+      }
+    } },
   { id:'perf_photo_blob', group:'Features', name:'Photos render as blob URLs (fast grid)',
     test: async()=>{
       if(typeof photoSrc!=='function') throw new Error('photoSrc not defined');
@@ -1441,6 +1473,7 @@ var SELF_TEST_FIXES = {
   data_normalize:    { fix:'normalizeRecipe() must backfill difficulty/ingredients/steps etc. and be applied in migrateRecipes and on import. Render code calls r.difficulty.toLowerCase() and r.ingredients.some() without guards, so one malformed recipe otherwise throws and blanks the whole grid.', autofix: null },
   feat_scale_range:  { fix:'scaleAmt must scale BOTH ends of a range ("2-3 cups" x3 = "6-9 cups") and pass non-numeric amounts through unchanged. This also feeds the amounts sent to Bring!.', autofix: null },
   feat_orig_photo:   { fix:'toggleOriginalPhoto must show/hide #origPhotoBox-<id> (rendered hidden by drawView) and update #origPhotoBtn-<id>. It previously targeted a #viewHeroImg element that did not exist, so the button silently did nothing.', autofix: null },
+  feat_cook_mode:    { fix:'Cook mode is broken. openCookMode/cookNext/cookPrev/findStepTimers must exist, #cookOverlay must be present, step timers are parsed from text like "for 20 minutes", and the ingredient panel must use the recipe view\'s current scale (viewMult/viewUnit).', autofix: null },
   perf_photo_blob:   { fix:'photoSrc() must convert stored data-URL photos to cached blob: URLs for display (keeping the stored value a data URL for backup/export/sync). Without it every render rebuilds megabytes of markup and the grid crawls.', autofix: null },
   feat_undo_delete:  { fix:'deleteSelected must stash the removed recipes with their indexes in _pendingUndo and offer toastAction(…, undoDelete); undoDelete restores them at their original positions.', autofix: null },
   a11y_basics:       { fix:'Run applyAriaLabels() after render/init so icon-only buttons get accessible names, keep aria-label on #searchInput and aria-live on #toast, and keep the Escape handler (closeTopModal).', autofix: ()=>{ if(typeof applyAriaLabels==='function') applyAriaLabels(); } },
@@ -1840,7 +1873,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v26.1';
+var APP_VERSION = 'v27.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2694,6 +2727,87 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .gridcol-btn { flex: 1; padding: 12px 0; border-radius: 8px; border: 1.5px solid var(--border); background: #fff; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all 0.15s; }
 .gridcol-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 .gridcol-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: #fff; }
+
+/* ── COOK MODE ────────────────────────────────────────────────────────────────
+   Full-screen, large-type, hands-free-ish step view for actually cooking:
+   readable at arm's length, big tap targets, screen kept awake. */
+#cookOverlay {
+  display: none; position: fixed; inset: 0; z-index: 9000;
+  background: var(--cream); flex-direction: column;
+  padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+}
+#cookOverlay.open { display: flex; }
+.cook-top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: var(--warm-brown); color: #fff; flex-shrink: 0;
+}
+.cook-title {
+  font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700;
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cook-icon-btn {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.cook-icon-btn:hover { background: rgba(255,255,255,0.28); }
+.cook-progress-track { height: 5px; background: var(--border); flex-shrink: 0; }
+.cook-progress-fill  { height: 100%; background: var(--terracotta); transition: width 0.25s ease; }
+.cook-body {
+  flex: 1; overflow-y: auto; padding: 24px 22px 12px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.cook-step-label {
+  font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--terracotta); flex-shrink: 0;
+}
+.cook-step-text {
+  font-size: 27px; line-height: 1.55; color: var(--ink); font-weight: 500;
+}
+@media (max-width: 420px) { .cook-step-text { font-size: 23px; } }
+.cook-step-text.done { color: var(--muted); text-decoration: line-through; }
+.cook-timer-btn {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 8px 0 0;
+  padding: 10px 16px; border-radius: 999px; border: 2px solid var(--gold);
+  background: #FFF8E8; color: #7A5C00; font-family: 'DM Sans', sans-serif;
+  font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.cook-timer-btn.running { background: var(--gold); color: var(--warm-brown); }
+.cook-timer-btn.done { background: var(--terracotta); color: #fff; border-color: var(--terracotta); }
+.cook-ings {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; flex-shrink: 0;
+}
+.cook-ings-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.cook-ing {
+  display: flex; align-items: center; gap: 10px; padding: 9px 4px;
+  border-bottom: 1px dashed var(--border); font-size: 16px; cursor: pointer;
+}
+.cook-ing:last-child { border-bottom: none; }
+.cook-ing .box {
+  width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #fff;
+}
+.cook-ing.checked .box { background: var(--green); border-color: var(--green); }
+.cook-ing.checked .cook-ing-text { color: var(--muted); text-decoration: line-through; }
+.cook-ing-amt { color: var(--terracotta); font-weight: 700; }
+.cook-nav {
+  display: flex; gap: 10px; padding: 12px 16px 16px; flex-shrink: 0;
+  border-top: 1px solid var(--border); background: var(--bg);
+}
+.cook-nav-btn {
+  flex: 1; padding: 18px 10px; border-radius: 14px; border: none;
+  font-family: 'DM Sans', sans-serif; font-size: 17px; font-weight: 700; cursor: pointer;
+  min-height: 60px;
+}
+.cook-nav-prev { background: var(--card-bg); color: var(--warm-brown); border: 1.5px solid var(--border); }
+.cook-nav-next { background: var(--terracotta); color: #fff; }
+.cook-nav-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* MODALS */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; }
@@ -3871,7 +3985,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4425,7 +4539,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v26.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4656,6 +4770,31 @@ body.banner-shown .header {
   </div>
 </div>
 
+<!-- COOK MODE -->
+<div id="cookOverlay" role="dialog" aria-modal="true" aria-label="Cook mode">
+  <div class="cook-top">
+    <button class="cook-icon-btn" onclick="closeCookMode()" aria-label="Exit cook mode">✕</button>
+    <div class="cook-title" id="cookTitle"></div>
+    <button class="cook-icon-btn" id="cookIngsBtn" onclick="toggleCookIngs()" aria-label="Show or hide ingredients" title="Ingredients">🥗</button>
+  </div>
+  <div class="cook-progress-track"><div class="cook-progress-fill" id="cookProgress" style="width:0%"></div></div>
+  <div class="cook-body" id="cookBody">
+    <div class="cook-ings" id="cookIngs" style="display:none;">
+      <div class="cook-ings-title" id="cookIngsTitle">Ingredients</div>
+      <div id="cookIngsList"></div>
+    </div>
+    <div>
+      <div class="cook-step-label" id="cookStepLabel"></div>
+      <div class="cook-step-text" id="cookStepText" dir="auto" onclick="toggleCookStepDone()"></div>
+      <div id="cookTimers"></div>
+    </div>
+  </div>
+  <div class="cook-nav">
+    <button class="cook-nav-btn cook-nav-prev" id="cookPrev" onclick="cookPrev()">← Back</button>
+    <button class="cook-nav-btn cook-nav-next" id="cookNext" onclick="cookNext()">Next →</button>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"><div class="toast-icon-wrap" id="toastIcon"></div><span id="toastMsg"></span></div>
 
 <script>
@@ -4880,6 +5019,179 @@ function setSort(mode) {
 }
 window.setSort = setSort;
 
+// ─── COOK MODE ────────────────────────────────────────────────────────────────
+// Full-screen step-by-step view for actually cooking: large type, big targets,
+// screen kept awake, ingredients on demand, and tappable timers parsed from steps.
+var _cookId = null, _cookStep = 0, _cookDone = {}, _cookChecked = {}, _cookTimers = {};
+
+function openCookMode(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  if (!r.steps || !r.steps.length) { toast('This recipe has no method steps to cook through'); return; }
+  _cookId = id; _cookStep = 0; _cookDone = {}; _cookChecked = {};
+  clearCookTimers();
+  document.getElementById('cookTitle').textContent = r.name;
+  document.getElementById('cookIngs').style.display = 'none';
+  renderCookIngs(r);
+  renderCookStep();
+  document.getElementById('cookOverlay').classList.add('open');
+  requestWakeLock(); // don't let the screen sleep mid-recipe
+}
+function closeCookMode() {
+  document.getElementById('cookOverlay').classList.remove('open');
+  clearCookTimers();
+  _cookId = null;
+  // The recipe view underneath is still open and wants the wake lock; only drop it
+  // if the user closed that too.
+  var view = document.getElementById('viewOverlay');
+  if (!view || !view.classList.contains('open')) releaseWakeLock();
+}
+
+function cookRecipe(){ return recipes.find(function(x){ return x.id===_cookId; }); }
+
+// Ingredients honour the scale/units chosen in the recipe view.
+function renderCookIngs(r) {
+  var mult = (r.id === viewId) ? viewMult : 1;
+  var unit = (r.id === viewId) ? viewUnit : 'metric';
+  var title = document.getElementById('cookIngsTitle');
+  if (title) title.textContent = 'Ingredients' + (mult !== 1 ? ' (×' + mult + ')' : '');
+  var list = document.getElementById('cookIngsList');
+  if (!list) return;
+  list.innerHTML = (r.ingredients||[]).map(function(i, idx) {
+    var amt = scaleAmt(cvtIng(i.a||'', unit), mult);
+    return '<div class="cook-ing' + (_cookChecked[idx] ? ' checked' : '') + '" onclick="toggleCookIng(' + idx + ')" role="checkbox" aria-checked="' + (_cookChecked[idx]?'true':'false') + '" tabindex="0">'
+      + '<span class="box">' + (_cookChecked[idx] ? '✓' : '') + '</span>'
+      + '<span class="cook-ing-text" dir="auto">' + (amt ? '<span class="cook-ing-amt">' + escH(amt) + '</span> ' : '') + escH(i.n) + '</span>'
+      + '</div>';
+  }).join('') || '<div style="color:var(--muted);font-size:14px;">No ingredients listed.</div>';
+}
+function toggleCookIng(idx) {
+  _cookChecked[idx] = !_cookChecked[idx];
+  var r = cookRecipe(); if (r) renderCookIngs(r);
+}
+function toggleCookIngs() {
+  var el = document.getElementById('cookIngs');
+  if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+}
+
+// "simmer for 20 minutes", "bake 1 hour", "rest 90 sec" → offer a countdown.
+function findStepTimers(text) {
+  var out = [], seen = {};
+  var re = /(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/gi, m;
+  while ((m = re.exec(String(text||'')))) {
+    var n = parseFloat(m[1].replace(',', '.'));
+    var u = m[2].toLowerCase();
+    var secs = /^h/.test(u) ? n*3600 : /^m/.test(u) ? n*60 : n;
+    secs = Math.round(secs);
+    if (!secs || secs > 24*3600 || seen[secs]) continue;
+    seen[secs] = true;
+    out.push({ secs: secs, label: m[0] });
+  }
+  return out.slice(0, 3);
+}
+function fmtClock(s) {
+  var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return (h ? h + ':' + String(m).padStart(2,'0') : String(m)) + ':' + String(sec).padStart(2,'0');
+}
+function clearCookTimers() {
+  Object.keys(_cookTimers).forEach(function(k){ clearInterval(_cookTimers[k].handle); });
+  _cookTimers = {};
+}
+function startCookTimer(key, secs) {
+  var btn = document.getElementById('cookTimer-' + key);
+  if (!btn) return;
+  var t = _cookTimers[key];
+  if (t) { // tapping a running timer cancels it
+    clearInterval(t.handle); delete _cookTimers[key];
+    btn.classList.remove('running','done');
+    btn.textContent = '⏱ ' + fmtClock(secs);
+    return;
+  }
+  var left = secs;
+  btn.classList.add('running');
+  btn.textContent = '⏱ ' + fmtClock(left) + ' — tap to cancel';
+  _cookTimers[key] = { handle: setInterval(function() {
+    left--;
+    if (left <= 0) {
+      clearInterval(_cookTimers[key].handle); delete _cookTimers[key];
+      btn.classList.remove('running'); btn.classList.add('done');
+      btn.textContent = '⏰ Time! (' + fmtClock(secs) + ')';
+      try { if (navigator.vibrate) navigator.vibrate([200,100,200,100,400]); } catch(e) {}
+      toast('⏰ Timer finished: ' + fmtClock(secs));
+      return;
+    }
+    btn.textContent = '⏱ ' + fmtClock(left) + ' — tap to cancel';
+  }, 1000), secs: secs };
+}
+
+function renderCookStep() {
+  var r = cookRecipe(); if (!r) return;
+  var steps = r.steps || [];
+  var total = steps.length;
+  if (_cookStep >= total) _cookStep = total - 1;
+  if (_cookStep < 0) _cookStep = 0;
+  var text = steps[_cookStep] || '';
+
+  document.getElementById('cookStepLabel').textContent = 'Step ' + (_cookStep+1) + ' of ' + total;
+  var textEl = document.getElementById('cookStepText');
+  textEl.textContent = text;
+  textEl.classList.toggle('done', !!_cookDone[_cookStep]);
+  document.getElementById('cookProgress').style.width = Math.round(((_cookStep+1)/total)*100) + '%';
+
+  // Timers for this step (cancel any still running from a previous step)
+  clearCookTimers();
+  var timers = findStepTimers(text);
+  document.getElementById('cookTimers').innerHTML = timers.map(function(t, i) {
+    return '<button class="cook-timer-btn" id="cookTimer-' + i + '" onclick="startCookTimer(' + i + ',' + t.secs + ')">⏱ ' + fmtClock(t.secs) + '</button>';
+  }).join('');
+
+  document.getElementById('cookPrev').disabled = (_cookStep === 0);
+  var next = document.getElementById('cookNext');
+  next.textContent = (_cookStep === total-1) ? '✓ Finish' : 'Next →';
+  document.getElementById('cookBody').scrollTop = 0;
+}
+function toggleCookStepDone() {
+  _cookDone[_cookStep] = !_cookDone[_cookStep];
+  document.getElementById('cookStepText').classList.toggle('done', !!_cookDone[_cookStep]);
+}
+function cookPrev() { if (_cookStep > 0) { _cookStep--; renderCookStep(); } }
+function cookNext() {
+  var r = cookRecipe(); if (!r) return;
+  var total = (r.steps||[]).length;
+  if (_cookStep < total-1) { _cookDone[_cookStep] = true; _cookStep++; renderCookStep(); return; }
+  // Last step → finishing counts as having cooked it
+  closeCookMode();
+  if (typeof markCooked === 'function') markCooked(r.id);
+}
+window.openCookMode=openCookMode; window.closeCookMode=closeCookMode;
+window.cookPrev=cookPrev; window.cookNext=cookNext; window.toggleCookIng=toggleCookIng;
+window.toggleCookIngs=toggleCookIngs; window.toggleCookStepDone=toggleCookStepDone;
+window.startCookTimer=startCookTimer; window.findStepTimers=findStepTimers;
+
+// Keyboard + swipe navigation
+document.addEventListener('keydown', function(e) {
+  var ov = document.getElementById('cookOverlay');
+  if (!ov || !ov.classList.contains('open')) return;
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); cookNext(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); cookPrev(); }
+});
+(function cookSwipe() {
+  var x0 = null, y0 = null;
+  document.addEventListener('touchstart', function(e) {
+    var ov = document.getElementById('cookOverlay');
+    if (!ov || !ov.classList.contains('open')) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', function(e) {
+    if (x0 === null) return;
+    var dx = e.changedTouches[0].clientX - x0;
+    var dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return; // not a horizontal swipe
+    dx < 0 ? cookNext() : cookPrev();
+  }, { passive: true });
+})();
+
 // ─── KEYBOARD & ACCESSIBILITY ─────────────────────────────────────────────────
 // Escape closes the top-most open dialog. Previously the only way out of a modal
 // was finding the ✕ (or tapping the backdrop), which is awkward on a keyboard.
@@ -4887,6 +5199,9 @@ function closeTopModal() {
   // Dynamically-created overlays are removed rather than closed
   var transient = document.getElementById('stDetailOverlay') || document.getElementById('serviceErrorOverlay');
   if (transient) { transient.remove(); return true; }
+  // Cook mode sits above everything else
+  var cook = document.getElementById('cookOverlay');
+  if (cook && cook.classList.contains('open')) { closeCookMode(); return true; }
   var open = Array.prototype.slice.call(document.querySelectorAll('.open'))
     .filter(function(el) {
       if (!el.id) return false;
@@ -5205,6 +5520,7 @@ function drawView(){
         }
         return `<li dir="ltr">${num}${txt}</li>`;
       }).join('')}</ol>
+      ${(r.steps && r.steps.length) ? `<button onclick="openCookMode(${r.id})" style="width:100%;margin-top:14px;padding:15px;background:var(--terracotta);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;">👨‍🍳 Start Cooking</button>` : ''}
       <div class="recipe-actions">
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
         <button class="action-btn" onclick="markCooked(${r.id})" title="Mark as cooked today">🍳 Cooked!</button>
