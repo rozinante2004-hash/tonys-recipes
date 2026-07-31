@@ -42,6 +42,7 @@ slide‑up modal animation.
 | `version.json` | `{"version": "v23.0"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
+| `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
 | `whatsapp/` | Shared folder of exported WhatsApp chat `.txt` files + `index.json`. Read by every device, including the iPhone. |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
@@ -190,7 +191,10 @@ forwards whatever the client sends.)
 **localStorage keys:**
 - `tonys_recipes_v1` → JSON array of recipe objects (`STORAGE_KEY`) — **photo‑free** when
   IndexedDB is available (see local photo storage below); each recipe carries `_ph`/`_po` flags
-  marking that a photo/originalPhoto lives in IndexedDB
+  marking that a photo/originalPhoto lives elsewhere. **`_ph` is the single name for this, local
+  and cloud alike** (5.8) — the cloud used to spell it `hp`, which made every photo bug read
+  twice as hard. Reads still accept `hp` for documents written by older versions; writes never
+  emit it
 - `tonys_nextId_v1` → the next integer id (`NEXTID_KEY`)
 - `recent_views` → array of recently viewed recipe ids (max 8, most‑recent first)
 - `scale_<id>` → remembered serving multiplier per recipe
@@ -212,6 +216,11 @@ forwards whatever the client sends.)
 - `tonys_wa_base` → base URL of the shared WhatsApp export folder (default the repo's
   `whatsapp/`); `tonys_wa_index` → small JSON index of loaded chats (`{id, group, source, file,
   size, count, first, last}`) — the chat **text** never goes in localStorage or Firestore
+
+> **One flag per idea.** `isClip` is the only clip/video marker (2.3); `normalizeRecipe` folds a
+> legacy `isVideoBookmark` into it and deletes the old field. The edit form's ingredient table is
+> the ingredient data (2.2) — `readIngsTable()` reads the rows; there is no hidden textarea
+> mirroring it, and no "amount — name" flatten/reparse step to mangle names containing dashes.
 
 **Recipe object shape:**
 ```js
@@ -312,6 +321,15 @@ recipe text (`saveLocal` → `stripPhotosLocal`, setting `_ph`/`_po` flags). `sa
 writes only changed photos and prunes deleted ones; `loadLocal` renders text immediately and
 `hydratePhotosFromIDB` re‑attaches photos asynchronously, then re‑renders. Photos stay inline in
 the in‑memory `recipes` array (so rendering/backup/export are unchanged). Legacy inline‑in‑
+**Thumbnails (5.3):** each recipe also gets a ~320 px JPEG thumbnail, generated once by
+`makeThumbBlob()` and stored in the same IDB row as a real **Blob** (5.2) — no base64 in that
+path at all. The grid renders `thumbSrc(r)`, which returns the thumbnail's object URL, falls back
+to the full photo until one exists, and re-renders once (debounced) when a batch lands. Changing
+a photo drops the old thumbnail; deleting a recipe revokes its object URL. Measured on a
+photo-like 1600×1200 image: 252 KB → 10.8 KB, and a 12-tile re-render 288 ms → 1 ms.
+**Full photos deliberately remain base64** in memory and in IDB, because export, backup, cloud
+sync, email and print all consume data URLs.
+
 `localStorage` photos are detected on load and migrated to IndexedDB on the next save. If
 IndexedDB is unavailable (e.g. private mode) it falls back to the old inline‑in‑`localStorage`
 behaviour. The `_ph`/`_po` flags also guard the cloud path so a not‑yet‑hydrated recipe never

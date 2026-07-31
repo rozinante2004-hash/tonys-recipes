@@ -27,8 +27,8 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | # | Idea | Why | Effort |
 |---|------|-----|--------|
 | 2.1 | **Replace `confirm()`/`prompt()` with styled modals** | Native dialogs look out of place, can't be styled, and on iOS PWAs they're jarring. You already have a nice modal system. | 🟡 |
-| 2.2 | **Make the edit form's ingredient table the single source of truth** | There's a table *and* a hidden textarea kept in sync; that dual path is fragile and was the source of past parsing quirks. | 🟡 |
-| 2.3 | **Unify "clip" vs "video bookmark"** | Two overlapping flags (`isClip`, `isVideoBookmark`) mean the same thing to a user and have caused inconsistent badges. Collapse to one concept. | 🟢 |
+| ~~2.2~~ | ✅ **DONE (v27.6)** — ~~Ingredient table is the truth~~ | The hidden textarea is gone. `readIngsTable()` reads the rows directly, so the flatten-to-"amount — name"/reparse round trip — which mangled any name containing a dash, e.g. "self-raising flour" — no longer exists. | 🟡 |
+| ~~2.3~~ | ✅ **DONE (v27.6)** — ~~Unify clip vs video bookmark~~ | `isClip` is the only flag. `normalizeRecipe` folds legacy `isVideoBookmark` in and deletes it, so old data keeps working while nothing new reads two names for one idea. | 🟢 |
 | ~~2.4~~ | ✅ **DONE (v27.2)** — ~~Per-recipe delete~~ | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
 | ~~2.5~~ | ✅ **DONE (v27.4)** — ~~Better AI empty/error states~~ | `aiFailPane()`/`aiEmptyPane()` name the cause in plain language, link to billing or keys where that's the problem, offer a retry where retrying can help, and always leave a free-hand-paste escape. A failed file import now carries whatever text it *did* extract into the free-hand box. | 🟢 |
 | 2.6 | **Save Helper — ON HOLD, one test still outstanding** | Measured on Ubuntu/Chrome 137: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → still not run** (the test page used to consume the single-use link; fixed, needs a re-run), **4. Python helper → ✅ correct Hebrew filename**. The helper stays until test 3 is re-run. | 🟡 |
@@ -122,13 +122,13 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 | # | Idea | Why | Effort |
 |---|------|-----|--------|
 | 5.1 | **Split `index.html` into modules** | It's ~9 200 lines in one file. Even splitting CSS and JS into separate files (still no build step, just `<link>`/`<script src>`) would make everything easier and let the browser cache them separately. | 🟡 |
-| 5.2 | **Store photos as Blobs in IndexedDB, not base64** | Base64 is ~33 % larger than binary and must be decoded on every use. Now that display already goes through blob URLs, storing real Blobs is a natural follow-up. | 🟡 |
-| 5.3 | **Thumbnails** | Generate a ~200 px thumbnail per recipe for the grid and only load the full photo in the recipe view. Would make a 500-recipe collection feel instant. | 🟡 |
+| ~~5.2~~ | ✅ **PARTLY DONE (v27.6)** — ~~Blobs in IndexedDB~~ | **Thumbnails** are stored as real Blobs and go straight to an object URL, with no base64 anywhere in the path. **Full photos are still base64** in memory and in IDB, on purpose: export, backup, cloud sync, email and print all consume data URLs, so converting them is a much wider change than the storage line implies. Worth revisiting only if full-photo memory becomes a real problem. | 🟡 |
+| ~~5.3~~ | ✅ **DONE (v27.6)** — ~~Thumbnails~~ | A 320 px JPEG per recipe, generated once and cached in IndexedDB. Measured on a photo-like 1600×1200 image: **252 KB → 10.8 KB (23×)**, and a 12-tile grid re-render went from **288 ms to 1 ms**. Falls back to the full photo until the thumbnail exists, so a failure is never a blank tile. | 🟡 |
 | 5.4 | **Firestore: one document per recipe** | The whole collection is a single document, so any edit rewrites everything and two people editing at once can clobber each other. Per-recipe docs fix both. | 🔴 |
-| 5.5 | **Move Firestore rules into the repo** | They're generated in-app and pasted manually — easy to drift. | 🟢 |
+| ~~5.5~~ | ✅ **DONE (v27.6)** — ~~Firestore rules in the repo~~ | `firestore.rules` is now the source of truth; the app fetches it and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list. The built-in copy is a labelled fallback for offline use, not a silent second version. Publishing is still a deliberate manual paste. | 🟢 |
 | 5.6 | **Automated tests in CI** | The Self Test suite is excellent but must be run by hand. The same checks could run headlessly on every push via GitHub Actions. | 🟡 |
 | ~~5.7~~ | ✅ **DONE (v27.4)** — ~~Cache AI calls~~ | Keyed on model + token budget + exact prompt, 7-day TTL, capped at 40 entries, evicted oldest-first. Tool-using calls and failures are deliberately never cached, and a quota error drops the cache rather than the recipes. | 🟢 |
-| 5.8 | **Retire the `_ph`/`hp` dual flags** | Local and cloud use different names for "has a photo elsewhere"; one name would be less confusing. | 🟢 |
+| ~~5.8~~ | ✅ **DONE (v27.6)** — ~~Retire the `_ph`/`hp` dual flags~~ | `_ph` is the single name for "the photo lives elsewhere", local and cloud alike. Reads still accept the legacy `hp` so documents written by older versions keep working; writes only ever emit `_ph`. | 🟢 |
 
 ---
 
@@ -137,7 +137,7 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 1. ~~**Cook Mode**~~ ✅ **shipped in v27.0** (with step timers and ingredient check-off).
 2. **Meal planner + merged shopping list** (3.1) — the standout new capability.
 3. ~~**Dark mode** (4.6)~~ ✅ **shipped in v27.3**.
-4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk.
+4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk. *(Batch E)*
 5. ~~**Smarter units**~~ ✅ **shipped in v27.1** (metric leaves tsp/tbsp/cup alone) **and v27.4** (sensible rounding).
 
 > **Noticed while building Cook Mode:** the Metric/Imperial toggle converts *every*
