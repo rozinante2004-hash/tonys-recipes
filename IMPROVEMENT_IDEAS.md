@@ -31,7 +31,7 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | 2.3 | **Unify "clip" vs "video bookmark"** | Two overlapping flags (`isClip`, `isVideoBookmark`) mean the same thing to a user and have caused inconsistent badges. Collapse to one concept. | 🟢 |
 | 2.4 | **Per-recipe delete** | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
 | 2.5 | **Better empty/error states for AI failures** | When the AI returns nothing useful, you get a generic message; offering "try free-hand paste" inline would recover the flow. | 🟢 |
-| 2.6 | **Retire the local Save Helper** | Chromium's File System Access API can now write files directly with correct Hebrew/Russian filenames — no Python daemon, no autostart, no port. Worth testing on your Kubuntu box; if it works, a whole moving part disappears. | 🟡 |
+| 2.6 | **Possibly retire the local Save Helper — UNVERIFIED** | ⚠️ *Corrected:* I originally implied this was solved. It is **not confirmed**. Hebrew names saving as "Download" is a real, known Chrome-on-Linux behaviour with the `<a download>` method the app falls back to. There are two candidate replacements: (a) the **File System Access API**, and (b) the **Worker's `download-store`**, which already serves `Content-Disposition: filename*=UTF-8''…` — **your Worker supports this today but the app never calls it**. Use `filename-test.html` to find out which actually work on your machine before changing anything. | 🟡 |
 | 2.7 | **Consolidate the 2 500-line `<style>` block** | Group by component and drop dead rules (several classes have no matching markup). Pure maintainability. | 🟡 |
 
 ---
