@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.1 -->
+<!-- Tony's Recipes Collection v27.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -227,6 +227,44 @@ function deleteSelected() {
 
   toastAction('🗑️ Deleted ' + count + ' recipe' + (count!==1?'s':''), '↩︎ Undo', undoDelete);
 }
+
+// 1.4 — copy a recipe as the starting point for a variant
+function duplicateRecipe(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  var copy = normalizeRecipe(JSON.parse(JSON.stringify(r)));
+  copy.id = nextId++;
+  copy.name = r.name + ' (copy)';
+  copy.fav = false;
+  copy.cookCount = 0;
+  copy.lastCooked = undefined;
+  copy.updatedAt = Date.now();
+  var idx = recipes.findIndex(function(x){ return x.id===id; });
+  recipes.splice(idx < 0 ? 0 : idx + 1, 0, copy); // sit next to the original
+  saveData();
+  renderFilters();
+  renderGrid();
+  closeM('viewOverlay');
+  toast('⧉ Duplicated — opening the copy to edit');
+  setTimeout(function(){ openAddModal(copy.id); }, 350);
+}
+window.duplicateRecipe = duplicateRecipe;
+
+// 2.4 — delete straight from the recipe (undo-able, same as bulk delete)
+function deleteRecipe(id) {
+  var idx = recipes.findIndex(function(x){ return x.id===id; });
+  if (idx < 0) return;
+  var r = recipes[idx];
+  if (!confirm('Delete “' + r.name + '”?\n\nYou can undo this straight afterwards.')) return;
+  _pendingUndo = { items: [{ idx: idx, recipe: r }], at: Date.now() };
+  recipes.splice(idx, 1);
+  saveData();
+  renderFilters();
+  renderGrid();
+  closeM('viewOverlay');
+  toastAction('🗑️ Deleted “' + r.name + '”', '↩︎ Undo', undoDelete);
+}
+window.deleteRecipe = deleteRecipe;
 
 function undoDelete() {
   if (!_pendingUndo || !_pendingUndo.items.length) { toast('Nothing to undo'); return; }
@@ -1154,6 +1192,82 @@ const SELF_TESTS = [
         closeM('viewOverlay');
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
+  { id:'feat_duplicate', group:'CRUD', name:'Duplicate recipe',
+    test: async()=>{
+      if(typeof duplicateRecipe!=='function') throw new Error('duplicateRecipe not defined');
+      var testId=888900;
+      recipes.unshift(normalizeRecipe({id:testId,name:'DupSrc',cookCount:5,fav:true,ingredients:[{a:'1',n:'x'}],steps:['s'],updatedAt:Date.now()}));
+      var before=recipes.length;
+      try {
+        duplicateRecipe(testId);
+        var copy=recipes.filter(function(r){return r.name==='DupSrc (copy)';})[0];
+        if(recipes.length!==before+1||!copy) throw new Error('no copy was created');
+        if(copy.id===testId) throw new Error('copy must get a new id');
+        if(copy.cookCount!==0||copy.fav) throw new Error('copy should reset cook count and favourite');
+        if(Math.abs(recipes.indexOf(copy)-recipes.findIndex(function(r){return r.id===testId;}))!==1) throw new Error('copy should sit next to the original');
+        recipes=recipes.filter(function(r){return r.id!==copy.id;});
+        closeM('editOverlay');
+      } finally { _editFormSnapshot=null; recipes=recipes.filter(function(r){return r.id!==testId&&r.name!=='DupSrc (copy)';}); renderGrid(); }
+    } },
+  { id:'feat_recipe_delete', group:'CRUD', name:'Per-recipe delete with undo',
+    test: async()=>{
+      if(typeof deleteRecipe!=='function') throw new Error('deleteRecipe not defined');
+      var testId=888901;
+      recipes.splice(1,0,normalizeRecipe({id:testId,name:'DelMe',updatedAt:Date.now()}));
+      var before=recipes.length;
+      var rc=window.confirm; window.confirm=function(){return true;};
+      try {
+        deleteRecipe(testId);
+        if(recipes.length!==before-1) throw new Error('recipe was not deleted');
+        undoDelete();
+        if(recipes.length!==before) throw new Error('undo did not restore it');
+        if(recipes[1].id!==testId) throw new Error('undo restored it to the wrong position');
+      } finally { window.confirm=rc; recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+    } },
+  { id:'feat_dirty_guard', group:'CRUD', name:'Unsaved edits are not lost silently',
+    test: async()=>{
+      if(typeof editFormIsDirty!=='function') throw new Error('editFormIsDirty not defined');
+      var rc=window.confirm;
+      try {
+        openAddModal(null);
+        if(editFormIsDirty()) throw new Error('a freshly opened form must not count as edited');
+        document.getElementById('f-name').value='typed';
+        if(!editFormIsDirty()) throw new Error('typing was not detected as an unsaved change');
+        var asked=false; window.confirm=function(){ asked=true; return false; };
+        closeM('editOverlay');
+        if(!asked) throw new Error('closing a dirty form must ask before discarding');
+        if(!document.getElementById('editOverlay').classList.contains('open')) throw new Error('cancelling the prompt should keep the form open');
+        window.confirm=function(){return true;};
+        closeM('editOverlay');
+        if(document.getElementById('editOverlay').classList.contains('open')) throw new Error('confirming should close the form');
+      } finally { window.confirm=rc; _editFormSnapshot=null; document.getElementById('editOverlay').classList.remove('open'); }
+    } },
+  { id:'feat_nophoto_filter', group:'Features', name:'No-photo filter & auto-fetch prompt',
+    test: async()=>{
+      if(typeof toggleNoPhotoFilter!=='function') throw new Error('toggleNoPhotoFilter not defined');
+      if(!document.getElementById('noPhotoPrompt')) throw new Error('#noPhotoPrompt missing');
+      var testId=888902;
+      recipes.unshift(normalizeRecipe({id:testId,name:'NoPhotoTest',photo:'',updatedAt:Date.now()}));
+      try {
+        renderFilters();
+        if(!document.querySelector('button[onclick*="toggleNoPhotoFilter"]')) throw new Error('no-photo filter chip missing while photoless recipes exist');
+        toggleNoPhotoFilter();
+        if(document.getElementById('noPhotoPrompt').style.display==='none') throw new Error('auto-fetch prompt should appear with the filter on');
+        var shown=Array.prototype.slice.call(document.querySelectorAll('#recipeGrid .recipe-card,#recipeGrid .recipe-list-item'));
+        if(!shown.length) throw new Error('filter hid everything, including photoless recipes');
+        toggleNoPhotoFilter();
+        if(document.getElementById('noPhotoPrompt').style.display!=='none') throw new Error('prompt should hide when the filter is off');
+      } finally { showNoPhotoOnly=false; recipes=recipes.filter(function(r){return r.id!==testId;}); renderFilters(); renderGrid(); }
+    } },
+  { id:'feat_sort_added', group:'Features', name:'Recently-added sort',
+    test: async()=>{
+      var prev=sortMode;
+      try {
+        setSort('added');
+        if(sortMode!=='added') throw new Error('sort mode not applied');
+        if(document.getElementById('sortBtn').textContent.indexOf('Newest')===-1) throw new Error('sort button label not updated');
+      } finally { setSort(prev); }
+    } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{
       // Kitchen measures used in metric kitchens must NOT become millilitres
@@ -1512,6 +1626,11 @@ var SELF_TEST_FIXES = {
   data_normalize:    { fix:'normalizeRecipe() must backfill difficulty/ingredients/steps etc. and be applied in migrateRecipes and on import. Render code calls r.difficulty.toLowerCase() and r.ingredients.some() without guards, so one malformed recipe otherwise throws and blanks the whole grid.', autofix: null },
   feat_scale_range:  { fix:'scaleAmt must scale BOTH ends of a range ("2-3 cups" x3 = "6-9 cups") and pass non-numeric amounts through unchanged. This also feeds the amounts sent to Bring!.', autofix: null },
   feat_orig_photo:   { fix:'toggleOriginalPhoto must show/hide #origPhotoBox-<id> (rendered hidden by drawView) and update #origPhotoBtn-<id>. It previously targeted a #viewHeroImg element that did not exist, so the button silently did nothing.', autofix: null },
+  feat_duplicate:    { fix:'duplicateRecipe must clone the recipe with a new id, "(copy)" name, reset fav/cookCount, insert next to the original and open it for editing.', autofix: null },
+  feat_recipe_delete:{ fix:'deleteRecipe must remove the recipe, close the view and offer Undo via toastAction/undoDelete, restoring it to its original index.', autofix: null },
+  feat_dirty_guard:  { fix:'openAddModal must snapshot the form (_editFormSnapshot = editFormState()) and closeM must call editFormIsDirty() and confirm before discarding. Clear the snapshot on save/close.', autofix: null },
+  feat_nophoto_filter:{ fix:'renderFilters must offer the "No photo" chip when photoless recipes exist, renderGrid must filter on showNoPhotoOnly, and #noPhotoPrompt must appear with an auto-fetch button while that filter is active.', autofix: null },
+  feat_sort_added:   { fix:'setSort must support "added" (sort by descending id — ids increase monotonically, so higher = newer) and label the button "Newest".', autofix: null },
   feat_units:        { fix:'cvtIng in metric mode must leave tsp/tbsp/cup untouched (they are standard kitchen measures) and only convert lb/oz/fl oz, rounded via cookRound to values a cook can measure.', autofix: null },
   i18n_alignment:    { fix:'Recipe text must use dir="auto" + unicode-bidi:plaintext + text-align:start so Hebrew and English each align correctly in the same list. Note direction:auto is NOT valid CSS. Email (rHtml) and print (buildPrintHtml) need the same treatment.', autofix: null },
   feat_cook_mode:    { fix:'Cook mode is broken. openCookMode/cookNext/cookPrev/findStepTimers must exist, #cookOverlay must be present, step timers are parsed from text like "for 20 minutes", and the ingredient panel must use the recipe view\'s current scale (viewMult/viewUnit).', autofix: null },
@@ -1914,7 +2033,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.1';
+var APP_VERSION = 'v27.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -4033,7 +4152,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4179,6 +4298,7 @@ body.banner-shown .header {
         <button class="view-toggle-btn" id="sortBtn" onclick="toggleDrop('sortDrop')" title="Sort recipes">⇅ Sort</button>
         <div class="drop-menu" id="sortDrop" style="min-width:160px;">
           <button class="drop-item sort-opt" data-sort="default"  onclick="setSort('default');closeDrop('sortDrop')">📋 Default (added)</button>
+          <button class="drop-item sort-opt" data-sort="added"    onclick="setSort('added');closeDrop('sortDrop')">🆕 Recently added</button>
           <button class="drop-item sort-opt" data-sort="recent"   onclick="setSort('recent');closeDrop('sortDrop')">🕐 Recently viewed</button>
           <button class="drop-item sort-opt" data-sort="alpha"    onclick="setSort('alpha');closeDrop('sortDrop')">🔤 Alphabetical</button>
           <button class="drop-item sort-opt" data-sort="prep"     onclick="setSort('prep');closeDrop('sortDrop')">⏱ Prep time</button>
@@ -4187,6 +4307,10 @@ body.banner-shown .header {
         </div>
       </div>
     </div>
+  </div>
+  <div id="noPhotoPrompt" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#FFF8E8;border:1px solid #E8D9A8;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+    <span style="flex:1;min-width:180px;font-size:13px;color:#7A5C00;"></span>
+    <button onclick="autoFetchMissingPhotos()" style="padding:9px 16px;border-radius:9px;border:none;background:var(--terracotta);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📸 Auto-fetch photos</button>
   </div>
   <div id="recipeGrid"></div>
 </div>
@@ -4587,7 +4711,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -4890,6 +5014,7 @@ var activeDiets      = new Set(); // Frame 3: diet types
 var showFavOnly      = false;
 var showClipsOnly    = false;
 var showRecentOnly   = false;
+var showNoPhotoOnly  = false; // 1.7 — surface recipes still missing a photo
 var sortMode         = 'default'; // default|alpha|prep|difficulty|recent|popular
 var _bringSelected = new Set();
 var _bringPopup    = null;
@@ -4910,6 +5035,8 @@ function renderFilters() {
     + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
     + (recentIds.length ? '<button class="filter-btn' + (showRecentOnly ? ' active' : '') + '" style="background:' + (showRecentOnly ? '#4F7AFF' : '#EEF2FF') + ';border-color:' + (showRecentOnly ? '#4F7AFF' : '#C0CAFF') + ';color:' + (showRecentOnly ? 'white' : '#3451CC') + ';" onclick="toggleRecentFilter()">🕐 Recent</button>' : '')
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
+    + (function(){ var n = recipes.filter(function(r){ return !r.photo && !r.isVideoBookmark; }).length;
+        return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (' + n + ')</button>' : ''; })()
     + '</div>';
 
   // Frame 2: Meal categories (with icons)
@@ -4941,6 +5068,7 @@ function resetFilters() {
   showFavOnly    = false;
   showClipsOnly  = false;
   showRecentOnly = false;
+  showNoPhotoOnly = false;
   document.querySelectorAll('.mobile-dropdown-panel input[type=checkbox]').forEach(function(cb){ cb.checked=false; });
   if(typeof updateMobileButtons==='function') updateMobileButtons();
   renderFilters();
@@ -4959,6 +5087,13 @@ function toggleClipsFilter() {
   renderGrid();
 }
 window.toggleClipsFilter = toggleClipsFilter;
+
+function toggleNoPhotoFilter() {
+  showNoPhotoOnly = !showNoPhotoOnly;
+  renderFilters();
+  renderGrid();
+}
+window.toggleNoPhotoFilter = toggleNoPhotoFilter;
 
 function toggleRecentFilter() {
   showRecentOnly = !showRecentOnly;
@@ -5061,7 +5196,7 @@ function setSort(mode) {
     b.style.color = b.getAttribute('data-sort')===mode ? 'var(--terracotta)' : '';
   });
   var btn = document.getElementById('sortBtn');
-  var labels = {default:'⇅ Sort',recent:'🕐 Recent',alpha:'🔤 A–Z',prep:'⏱ Prep',difficulty:'📊 Level',popular:'🔥 Popular'};
+  var labels = {default:'⇅ Sort',added:'🆕 Newest',recent:'🕐 Recent',alpha:'🔤 A–Z',prep:'⏱ Prep',difficulty:'📊 Level',popular:'🔥 Popular'};
   if(btn) btn.textContent = mode==='default' ? '⇅ Sort' : labels[mode];
   renderGrid();
 }
@@ -5370,6 +5505,9 @@ function renderGrid() {
   } else if (sortMode === 'difficulty') {
     var dmap = {Easy:1,Medium:2,Hard:3};
     sortedRecipes.sort(function(a,b){ return (dmap[a.difficulty]||2)-(dmap[b.difficulty]||2); });
+  } else if (sortMode === 'added') {
+    // Ids come from a monotonically increasing counter, so a higher id was added later.
+    sortedRecipes.sort(function(a,b){ return (b.id||0) - (a.id||0); });
   } else if (sortMode === 'popular') {
     sortedRecipes.sort(function(a,b){ return (b.cookCount||0)-(a.cookCount||0); });
   } else if (sortMode === 'recent') {
@@ -5384,6 +5522,7 @@ function renderGrid() {
     // Frame 1: Favourites + Clips + Recent filter
     if (showFavOnly && !r.fav) return false;
     if (showClipsOnly && !r.isClip && !r.isVideoBookmark) return false;
+    if (showNoPhotoOnly && (r.photo || r.isVideoBookmark)) return false;
     if (showRecentOnly) {
       var recentIds = []; try { recentIds = JSON.parse(localStorage.getItem('recent_views')||'[]'); } catch(e){}
       if (!recentIds.includes(r.id)) return false;
@@ -5412,9 +5551,20 @@ function renderGrid() {
   var labelParts = [];
   if (showFavOnly) labelParts.push('Favourites');
   if (showClipsOnly) labelParts.push('Clips');
+  if (showNoPhotoOnly) labelParts.push('No photo');
   if (activeCategories.size) labelParts.push(Array.from(activeCategories).join(', '));
   if (activeDiets.size) labelParts.push(Array.from(activeDiets).join(', '));
   document.getElementById('sectionLabel').textContent = labelParts.length ? labelParts.join(' · ') : 'All Recipes';
+  // 4.9 — when viewing photo-less recipes, offer the bulk fix rather than a wall of emoji
+  var npBar = document.getElementById('noPhotoPrompt');
+  if (npBar) {
+    if (showNoPhotoOnly && list.length) {
+      npBar.style.display = 'flex';
+      npBar.querySelector('span').textContent = list.length + ' recipe' + (list.length!==1?'s':'') + ' still without a photo';
+    } else {
+      npBar.style.display = 'none';
+    }
+  }
   const g = document.getElementById('recipeGrid');
 
   if (!list.length) {
@@ -5513,10 +5663,10 @@ function drawView(){
     <div style="position:sticky;top:max(60px, env(safe-area-inset-top) + 52px);display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
       <button onclick="closeM('viewOverlay')" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);touch-action:manipulation;flex-shrink:0;">✕</button>
     </div>
-    <div class="modal-hero" style="background:${escA(r.bg)}">
+    <div class="modal-hero" style="background:${escA(r.bg)};cursor:pointer;" onclick="changeHeroPhoto(${r.id})" title="Tap to change the photo">
       ${r.photo?`<img id="viewHeroImg" src="${escA(photoSrc(r))}" alt="">`:''}
       <span class="emoji-over"${r.photo?' style="display:none"':''}>${escH(r.emoji)}</span>
-      <button class="hero-photo-btn" onclick="changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
+      <button class="hero-photo-btn" onclick="event.stopPropagation();changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
     </div>
     <div class="modal-content">
       <div class="modal-category">${escH(r.category)}</div>
@@ -5577,6 +5727,8 @@ function drawView(){
         <button class="action-btn" onclick="expOneWord(${r.id})">📄 Word</button>
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
+        <button class="action-btn" onclick="duplicateRecipe(${r.id})" title="Create an editable copy">⧉ Duplicate</button>
+        <button class="action-btn" style="color:#B03030;border-color:#E8B0B0;" onclick="deleteRecipe(${r.id})">🗑️ Delete</button>
         <button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
         ${r.originalPhoto ? `<button class="action-btn" id="origPhotoBtn-${r.id}" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
@@ -6653,7 +6805,28 @@ function openAddModal(id){
   var autoClip = r ? (!r.ingredients||!r.ingredients.length) && (!r.steps||!r.steps.length||r.steps[0]==='Enjoy!') : false;
   if(document.getElementById('f-isclip'))document.getElementById('f-isclip').checked=r?(r.isClip||r.isVideoBookmark||autoClip):false;
   document.getElementById('editOverlay').classList.add('open');
+  _editFormSnapshot = editFormState(); // remember the pristine state (see editFormIsDirty)
 }
+
+// 1.6 — snapshot the edit form when it opens so we can tell whether anything changed.
+// Cheap and reliable: compare the serialised field values rather than tracking events.
+var _editFormSnapshot = null;
+function editFormState() {
+  var ids = ['f-name','f-category','f-diff','f-prep','f-srv','f-ings','f-steps','f-source','f-notes'];
+  var vals = ids.map(function(id){ var el=document.getElementById(id); return el ? String(el.value||'') : ''; });
+  var clip = document.getElementById('f-isclip');
+  vals.push(clip ? String(!!clip.checked) : '');
+  vals.push(String(selEmoji||''), String(pendingPhoto||'').length, (typeof getSelectedDiets==='function'?getSelectedDiets().join(','):''));
+  return vals.join('');
+}
+function editFormIsDirty() {
+  if (_editFormSnapshot === null) return false;
+  var ov = document.getElementById('editOverlay');
+  if (!ov || !ov.classList.contains('open')) return false;
+  return editFormState() !== _editFormSnapshot;
+}
+window.editFormIsDirty = editFormIsDirty;
+window.editFormState = editFormState;
 
 var photoUploadInProgress = false;
 function onPhotoFile(event){
@@ -6755,6 +6928,7 @@ async function saveRecipe(){
     recipes.unshift({id:nextId++,bg:rndBg(),...data});
     toast('\u2705 Recipe saved!');
   }
+  _editFormSnapshot = null; // saved — nothing left to warn about
   closeM('editOverlay');resetFilters();renderFilters();renderGrid();saveData();
   // Refresh view modal if user edited from within it
   if (editingId && viewId === editingId) { drawView(); }
@@ -7119,8 +7293,13 @@ function closeDrop(id){document.getElementById(id).classList.remove('open');}
 // MODAL / UTILS
 // ═══════════════════════════════════
 function closeM(id){
+  // 1.6 — don't silently throw away a half-finished recipe
+  if (id === 'editOverlay' && typeof editFormIsDirty === 'function' && editFormIsDirty()) {
+    if (!confirm('Discard your unsaved changes to this recipe?')) return;
+  }
   document.getElementById(id).classList.remove('open');
   if(id==='viewOverlay') releaseWakeLock();
+  if(id==='editOverlay') _editFormSnapshot = null;
 }
 function bgClose(e,id){if(e.target===document.getElementById(id))closeM(id);}
 function openExploreModal(){
