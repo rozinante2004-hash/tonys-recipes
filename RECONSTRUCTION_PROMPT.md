@@ -222,6 +222,10 @@ forwards whatever the client sends.)
 > the ingredient data (2.2) — `readIngsTable()` reads the rows; there is no hidden textarea
 > mirroring it, and no "amount — name" flatten/reparse step to mangle names containing dashes.
 
+> **Dialogs.** `askConfirm()` / `askPrompt()` (promise-based, styled) replace `confirm()`/`prompt()`
+> everywhere. The single remaining native `confirm()` is the fallback inside `showUnsavedChanges()`
+> for when the modal element is missing — without it a dirty edit form could not be closed at all.
+
 **Recipe object shape:**
 ```js
 {
@@ -508,6 +512,32 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
     is available at all.
   - **Expired modal** (`showBringTokenExpired`/`openBringForTokenRefresh`) polls `bring-lists`
     until the token works again, then re-checks the real expiry and retries the queued items.
+
+---
+
+## 10. Keeping your place, and step timers
+
+**There is no Cook Mode.** It existed until v27.6 and was removed on request: the whole recipe
+should be visible at once. Do not reintroduce a step-at-a-time view.
+
+**Line marker.** Every ingredient and step carries `data-line="ing-N"` / `data-line="step-N"` and
+an `onclick="markLine(...)"`. A single absolutely-positioned `#lineMarker` inside `#lineMarkHost`
+is moved by setting `top/left/width/height`, all transitioned — that is what makes it *slide*;
+toggling a class per `<li>` would cross-fade in two places instead. Only one line is ever marked.
+Tapping the **same** line twice within 320 ms clears it, as does double-tapping the recipe body:
+keying the gesture to the line rather than to the clock alone matters, because running a finger
+down a list taps several lines quickly and that must move the marker, not wipe it. The position
+is stored per recipe under `tonys_linemark` and re-applied after every re-render (`drawView`
+re-measures via `positionLineMarker(false)`), so scaling, unit switches and reopening the recipe
+never lose it.
+
+**Step timers.** Durations found by `findStepTimers()` render as `.cook-timer-btn` countdowns
+inside the step. These lived in Cook Mode but were never part of it; they survived its removal.
+`clearCookTimers()` runs on every re-render and when the recipe closes.
+
+**Voice (3.7)** is scoped to the marker: `handleVoiceCommand()` understands next / back / repeat /
+clear / ingredients / steps in English and Hebrew, clamps at the first and last line, and is
+deliberately incapable of reaching any function that writes data.
 
 ---
 

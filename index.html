@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.6 -->
+<!-- Tony's Recipes Collection v27.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -260,10 +260,11 @@ function toggleRecipeSelect(e, id) {
 // cloud — the undo is lossless even though the stored copies are pruned immediately.
 var _pendingUndo = null;
 
-function deleteSelected() {
+async function deleteSelected() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
   var count = selectedIds.size;
-  if (!confirm('Delete ' + count + ' recipe' + (count!==1?'s':'') + '?\n\nYou can undo this straight afterwards.')) return;
+  if (!await askConfirm({ icon:'🗑️', title:'Delete ' + count + ' recipe' + (count!==1?'s':'') + '?',
+      message:'You can undo this straight afterwards.', okLabel:'Delete', danger:true })) return;
 
   // Remember each deleted recipe with its index so Undo restores the exact order
   var removed = [];
@@ -303,11 +304,12 @@ function duplicateRecipe(id) {
 window.duplicateRecipe = duplicateRecipe;
 
 // 2.4 — delete straight from the recipe (undo-able, same as bulk delete)
-function deleteRecipe(id) {
+async function deleteRecipe(id) {
   var idx = recipes.findIndex(function(x){ return x.id===id; });
   if (idx < 0) return;
   var r = recipes[idx];
-  if (!confirm('Delete “' + r.name + '”?\n\nYou can undo this straight afterwards.')) return;
+  if (!await askConfirm({ icon:'🗑️', title:'Delete this recipe?', message:r.name + '\n\nYou can undo this straight afterwards.',
+      okLabel:'Delete', danger:true })) return;
   _pendingUndo = { items: [{ idx: idx, recipe: r }], at: Date.now() };
   recipes.splice(idx, 1);
   saveData();
@@ -446,10 +448,12 @@ function toggleOriginalPhoto(id) {
   if (!showing && box.scrollIntoView) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
-function removeOriginalPhoto(id) {
+async function removeOriginalPhoto(id) {
   var r = recipes.find(function(x) { return x.id===id; });
   if (!r) return;
-  if (!confirm('Remove the original photo backup?')) return;
+  if (!await askConfirm({ icon:'📸', title:'Remove the original photo?',
+      message:'The edited photo stays; only the original scan is discarded. This cannot be undone.',
+      okLabel:'Remove', danger:true })) return;
   delete r.originalPhoto;
   r.updatedAt = Date.now();
   saveData();
@@ -1309,14 +1313,18 @@ const SELF_TESTS = [
       var testId=888901;
       recipes.splice(1,0,normalizeRecipe({id:testId,name:'DelMe',updatedAt:Date.now()}));
       var before=recipes.length;
-      var rc=window.confirm; window.confirm=function(){return true;};
       try {
-        deleteRecipe(testId);
+        var pending=deleteRecipe(testId);
+        await wait(80);
+        var ok=document.querySelector('#askOverlay #askOk');
+        if(!ok) throw new Error('delete did not raise the styled confirmation (2.1)');
+        ok.click(); await pending; await wait(30);
         if(recipes.length!==before-1) throw new Error('recipe was not deleted');
         undoDelete();
         if(recipes.length!==before) throw new Error('undo did not restore it');
         if(recipes[1].id!==testId) throw new Error('undo restored it to the wrong position');
-      } finally { window.confirm=rc; recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+      } finally { var a=document.getElementById('askOverlay'); if(a) a.remove();
+        recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
   { id:'feat_dirty_guard', group:'CRUD', name:'Unsaved edits are not lost silently',
     test: async()=>{
@@ -1430,35 +1438,81 @@ const SELF_TESTS = [
         renderGrid();
       }
     } },
-  { id:'feat_cook_mode', group:'Features', name:'Cook mode steps, timers & ingredients',
+  { id:'feat_step_timers', group:'Features', name:'Step timers live on the steps themselves',
     test: async()=>{
-      ['openCookMode','closeCookMode','cookNext','cookPrev','findStepTimers'].forEach(function(f){
-        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      ['findStepTimers','startCookTimer','clearCookTimers'].forEach(function(f){
+        if(typeof window[f]!=='function' && typeof eval(f)!=='function') throw new Error(f+' not defined');
       });
-      if(!document.getElementById('cookOverlay')) throw new Error('#cookOverlay missing');
-      // timer parsing
+      if(document.getElementById('cookOverlay')) throw new Error('#cookOverlay is still present — Cook Mode was meant to be removed');
+      if(typeof window.openCookMode==='function') throw new Error('openCookMode still exists — Cook Mode was meant to be removed');
       var t=findStepTimers('Bake 1 hour then rest 90 seconds');
       if(t.length!==2||t[0].secs!==3600||t[1].secs!==90) throw new Error('step timer parsing wrong: '+JSON.stringify(t));
       if(findStepTimers('Stir gently').length!==0) throw new Error('found a timer where there is none');
       var testId=888895;
-      recipes.unshift(normalizeRecipe({id:testId,name:'CookTest',ingredients:[{a:'100g',n:'x'}],steps:['One','Two for 5 minutes'],updatedAt:Date.now()}));
-      var savedView=viewId, savedMult=viewMult;
+      recipes.unshift(normalizeRecipe({id:testId,name:'TimerTest',ingredients:[{a:'100g',n:'x'}],steps:['One','Two for 5 minutes'],updatedAt:Date.now()}));
       try {
-        viewId=testId; viewMult=2;
-        openCookMode(testId);
-        if(!document.getElementById('cookOverlay').classList.contains('open')) throw new Error('cook mode did not open');
-        if(document.getElementById('cookStepLabel').textContent!=='Step 1 of 2') throw new Error('wrong initial step');
-        if(document.getElementById('cookIngsList').textContent.indexOf('200g')===-1) throw new Error('cook mode ingredients ignore the chosen scale');
-        cookNext();
-        if(document.getElementById('cookStepLabel').textContent!=='Step 2 of 2') throw new Error('Next did not advance');
-        if(!document.querySelector('#cookTimers button')) throw new Error('no timer offered for a step containing "5 minutes"');
-        if(document.getElementById('cookNext').textContent.indexOf('Finish')===-1) throw new Error('last step should offer Finish');
-        cookPrev();
-        if(document.getElementById('cookStepLabel').textContent!=='Step 1 of 2') throw new Error('Back did not go back');
-        closeCookMode();
-        if(document.getElementById('cookOverlay').classList.contains('open')) throw new Error('cook mode did not close');
+        openView(testId); await wait(80);
+        var btns=document.querySelectorAll('#viewModal .cook-timer-btn');
+        if(!btns.length) throw new Error('no timer offered on a step containing "5 minutes"');
+        if(btns[0].textContent.indexOf('5:00')===-1) throw new Error('timer shows the wrong duration: '+btns[0].textContent);
+        // The whole recipe must be visible at once — that is the point of removing Cook Mode.
+        if(document.querySelectorAll('#viewModal .steps-list li').length!==2) throw new Error('not every step is shown at once');
+        if(!document.querySelector('#viewModal .ingredients-list li')) throw new Error('ingredients are not shown alongside the method');
       } finally {
-        viewId=savedView; viewMult=savedMult;
+        closeM('viewOverlay'); clearCookTimers();
+        recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
+      }
+    } },
+  { id:'feat_line_marker', group:'Features', name:'Line marker: tap to mark, slides, survives re-render',
+    test: async()=>{
+      ['markLine','clearLineMark','loadLineMark','refreshLineMarker'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var testId=888913;
+      recipes.unshift(normalizeRecipe({id:testId,name:'MarkTest',servings:'4',
+        ingredients:[{a:'100g',n:'flour'},{a:'2',n:'eggs'}],steps:['Mix it','Bake it','Eat it'],updatedAt:Date.now()}));
+      var savedMark=null; try{ savedMark=localStorage.getItem('tonys_linemark'); }catch(e){}
+      try {
+        openView(testId); await wait(80);
+        if(!document.getElementById('lineMarker')) throw new Error('#lineMarker missing');
+        if(!document.getElementById('lineMarkHost')) throw new Error('#lineMarkHost missing');
+        if(!document.querySelector('#viewModal [data-line="ing-0"]')) throw new Error('ingredients are not tappable lines');
+        if(!document.querySelector('#viewModal [data-line="step-2"]')) throw new Error('steps are not tappable lines');
+        // Mark a step.
+        markLine('step',1); await wait(50);
+        var marker=document.getElementById('lineMarker');
+        if(!marker.classList.contains('on')) throw new Error('the marker did not appear');
+        if(!document.querySelector('#viewModal [data-line="step-1"]').classList.contains('line-current')) throw new Error('the tapped line is not marked as current');
+        var topAtStep1=parseFloat(marker.style.top);
+        // Moving marks the new line and unmarks the old one — only ever one.
+        await wait(360);
+        markLine('step',2); await wait(50);
+        var cur=document.querySelectorAll('#viewModal .line-current');
+        if(cur.length!==1) throw new Error('expected exactly one highlighted line, got '+cur.length);
+        if(cur[0].getAttribute('data-line')!=='step-2') throw new Error('the highlight did not move to the tapped line');
+        // Running a finger down the list taps several lines fast — that must move
+        // the marker, not be read as a double tap and clear it.
+        markLine('step',0); markLine('step',1); markLine('step',2); await wait(50);
+        if(document.querySelectorAll('#viewModal .line-current').length!==1) throw new Error('quick taps on different lines cleared the marker instead of moving it');
+        if(parseFloat(marker.style.top)===topAtStep1) throw new Error('the marker did not move to the new line');
+        // It must be a real transition, otherwise it cannot slide.
+        if(getComputedStyle(marker).transitionDuration==='0s') throw new Error('the marker has no transition — it would jump rather than slide');
+        // It must survive a re-render (scaling re-renders the whole view).
+        setMult(2); await wait(120);
+        if(!document.getElementById('lineMarker').classList.contains('on')) throw new Error('the marker was lost when the view re-rendered');
+        if(!document.querySelector('#viewModal [data-line="step-2"]').classList.contains('line-current')) throw new Error('the marked line moved after a re-render');
+        // ...and reopening the recipe.
+        setMult(1); closeM('viewOverlay'); await wait(30);
+        openView(testId); await wait(120);
+        if(!document.querySelector('#viewModal [data-line="step-2"]').classList.contains('line-current')) throw new Error('the marked line was not restored when the recipe was reopened');
+        // A double tap on the SAME line clears.
+        await wait(360);
+        markLine('step',0); markLine('step',0); await wait(50);
+        if(document.querySelectorAll('#viewModal .line-current').length!==0) throw new Error('a double tap did not clear the marker');
+        if(document.getElementById('lineMarker').classList.contains('on')) throw new Error('the marker is still visible after clearing');
+      } finally {
+        closeM('viewOverlay');
+        try{ if(savedMark===null) localStorage.removeItem('tonys_linemark'); else localStorage.setItem('tonys_linemark',savedMark); }catch(e){}
         recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
       }
     } },
@@ -1482,17 +1536,20 @@ const SELF_TESTS = [
       var testId=888894;
       recipes.splice(1,0,normalizeRecipe({id:testId,name:'UndoTest',updatedAt:Date.now()}));
       var before=recipes.length;
-      var realConfirm=window.confirm; window.confirm=function(){return true;};
       try {
         selectMode=true; selectedIds.clear(); selectedIds.add(testId);
-        deleteSelected();
+        var pending=deleteSelected();
+        await wait(80);
+        var ok=document.querySelector('#askOverlay #askOk');
+        if(!ok) throw new Error('bulk delete did not raise the styled confirmation (2.1)');
+        ok.click(); await pending; await wait(30);
         if(recipes.length!==before-1) throw new Error('recipe was not deleted');
         undoDelete();
         if(recipes.length!==before) throw new Error('undo did not restore the recipe');
         var back=recipes.findIndex(function(r){return r.id===testId;});
         if(back!==1) throw new Error('undo restored the recipe at position '+back+' instead of its original position 1');
       } finally {
-        window.confirm=realConfirm;
+        var a=document.getElementById('askOverlay'); if(a) a.remove();
         recipes=recipes.filter(function(r){return r.id!==testId;});
         selectedIds.clear(); cancelSelectMode();
       }
@@ -1665,6 +1722,78 @@ const SELF_TESTS = [
         if(!g.querySelector('.clip-badge')) throw new Error('no .clip-badge rendered for a clip');
         if(g.querySelector('.card-image svg')) throw new Error('an inline SVG badge is still being rendered alongside the emoji one');
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
+    } },
+
+  // ── Batch E ─────────────────────────────────────────────────────────────────
+  { id:'ui_styled_dialogs', group:'UI', name:'Styled confirm/prompt replace the native ones',
+    test: async()=>{
+      if(typeof askConfirm!=='function'||typeof askPrompt!=='function') throw new Error('askConfirm/askPrompt not defined');
+      // Only the last-ditch fallback inside showUnsavedChanges may still use confirm().
+      var src=String(deleteRecipe)+String(deleteSelected)+String(signOut)+String(backupRestore)+String(clearAllData);
+      if(/[^.\w]confirm\s*\(/.test(src)) throw new Error('a native confirm() is still in use in a converted function');
+      var p=askConfirm({ title:'T', message:'M', okLabel:'Yes' });
+      await wait(60);
+      var ov=document.getElementById('askOverlay');
+      if(!ov) throw new Error('the dialog did not appear');
+      if(ov.textContent.indexOf('Yes')===-1) throw new Error('the custom OK label was not used');
+      ov.querySelector('#askCancel').click();
+      if(await p!==false) throw new Error('Cancel should resolve false');
+      if(document.getElementById('askOverlay')) throw new Error('the dialog was not removed');
+      // Accepting resolves true.
+      var p2=askConfirm('just a message'); await wait(60);
+      document.querySelector('#askOverlay #askOk').click();
+      if(await p2!==true) throw new Error('OK should resolve true');
+      // A prompt returns its text, and null when cancelled.
+      var p3=askPrompt('Enter it','seed'); await wait(60);
+      var inp=document.querySelector('#askOverlay #askInput');
+      if(!inp) throw new Error('askPrompt rendered no input');
+      if(inp.value!=='seed') throw new Error('the initial value was not filled in');
+      inp.value='typed'; document.querySelector('#askOverlay #askOk').click();
+      if(await p3!=='typed') throw new Error('askPrompt did not return the typed value');
+      var p4=askPrompt('Enter it',''); await wait(60);
+      document.querySelector('#askOverlay #askCancel').click();
+      if(await p4!==null) throw new Error('a cancelled prompt must resolve null, not an empty string');
+      // Message text must be escaped, never injected.
+      var p5=askConfirm({ message:'<img src=x onerror=alert(1)>' }); await wait(60);
+      if(document.querySelector('#askOverlay img')) throw new Error('dialog text was injected as raw HTML');
+      document.querySelector('#askOverlay #askOk').click(); await p5;
+    } },
+  { id:'feat_voice', group:'Features', name:'Voice commands move the line marker',
+    test: async()=>{
+      ['toggleVoice','handleVoiceCommand','voiceSupported','moveMark'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var testId=888914;
+      recipes.unshift(normalizeRecipe({id:testId,name:'VoiceTest',ingredients:[{a:'1',n:'a'},{a:'2',n:'b'}],
+        steps:['One','Two','Three'],updatedAt:Date.now()}));
+      var savedMark=null; try{ savedMark=localStorage.getItem('tonys_linemark'); }catch(e){}
+      try {
+        openView(testId); await wait(90);
+        markLine('step',0); await wait(40);
+        if(handleVoiceCommand('next')!=='next') throw new Error('"next" was not recognised');
+        if(_lineMark.idx!==1) throw new Error('"next" did not advance the marker, idx='+_lineMark.idx);
+        handleVoiceCommand('go back');
+        if(_lineMark.idx!==0) throw new Error('"go back" did not step back');
+        handleVoiceCommand('back');   // already at the first line
+        if(_lineMark.idx!==0) throw new Error('the marker went past the first line');
+        handleVoiceCommand('next'); handleVoiceCommand('next'); handleVoiceCommand('next'); handleVoiceCommand('next');
+        if(_lineMark.idx!==2) throw new Error('the marker went past the last step, idx='+_lineMark.idx);
+        if(handleVoiceCommand('ingredients')!=='ingredients') throw new Error('"ingredients" was not recognised');
+        if(_lineMark.list!=='ing') throw new Error('"ingredients" did not jump to the ingredient list');
+        if(handleVoiceCommand('הבא')!=='next') throw new Error('the Hebrew "next" was not recognised');
+        if(handleVoiceCommand('clear')!=='clear') throw new Error('"clear" was not recognised');
+        if(_lineMark!==null) throw new Error('"clear" did not clear the marker');
+        if(handleVoiceCommand('what is the weather')!==null) throw new Error('an unrelated phrase must not be treated as a command');
+        // Voice must never be able to change the data.
+        var vsrc=String(handleVoiceCommand);
+        ['deleteRecipe','saveRecipe','clearAllData','deleteSelected'].forEach(function(bad){
+          if(vsrc.indexOf(bad)!==-1) throw new Error('voice commands can reach '+bad+' — a misheard word must not be able to change data');
+        });
+      } finally {
+        closeM('viewOverlay'); stopVoice();
+        try{ if(savedMark===null) localStorage.removeItem('tonys_linemark'); else localStorage.setItem('tonys_linemark',savedMark); }catch(e){}
+        recipes=recipes.filter(function(x){return x.id!==testId;}); renderGrid();
+      }
     } },
 
   // ── Batch D ─────────────────────────────────────────────────────────────────
@@ -2109,6 +2238,8 @@ var SELF_TEST_FIXES = {
   ui_dropdown_reopen: { fix:'toggleDrop() must register its outside-click listener through _armDropOutside() and closeDrop() must call _disarmDropOutside(). Otherwise the listener a menu item leaves behind closes the menu again on the very next click of its trigger button.', autofix: null },
   ui_theme:       { fix:'Dark mode plumbing missing. Needs THEME_KEY/tonys_theme, setTheme()/getTheme()/effectiveTheme()/applyTheme() stamping data-theme on <html>, a :root[data-theme="dark"] variable block in the stylesheet, and the #themeModeItem entry in the ⚙️ Settings menu.', autofix: null },
   feat_bring_status_honest: { fix:'The Bring! status bar must be driven by checkBringTokenStatus() (Worker action "bring-token-status"), not by the per-device bring_token_expiry value. A stale local expiry may only ever produce "status unknown" / "last known", never "expired".', autofix: null },
+  ui_styled_dialogs: { fix:'2.1 — askConfirm()/askPrompt() replace native confirm()/prompt(). They must escape their text, resolve true/false (or the typed string / null), and clean up the overlay. Only the last-ditch fallback in showUnsavedChanges may still call confirm().', autofix: null },
+  feat_voice: { fix:'3.7 — handleVoiceCommand must recognise next/back/repeat/clear plus the Hebrew equivalents, clamp at the first and last line, and be incapable of reaching any function that writes data.', autofix: null },
   form_ings_single_source: { fix:'2.2 — the ingredient table is the data. saveRecipe and editFormState must call readIngsTable(); the hidden #f-ings textarea and its flatten-to-"amount — name"/reparse round trip must be gone, since it mangled any name containing a dash.', autofix: null },
   stor_rules_repo: { fix:'5.5 — firestore.rules in the repo is the source of truth. The app must fetch it and substitute {{READ}}/{{WRITE}}/{{ADMIN}}; the built-in fallback must label itself a fallback rather than passing as current.', autofix: null },
   perf_thumbnails: { fix:'5.3/5.2 — the grid must render thumbSrc(r): a ~320px JPEG thumbnail generated once and stored in IndexedDB as a Blob (not base64), falling back to the full photo until it exists. Thumbnails must be dropped when the photo changes and their object URLs revoked when the recipe goes.', autofix: null },
@@ -2201,7 +2332,8 @@ var SELF_TEST_FIXES = {
   feat_sort_added:   { fix:'setSort must support "added" (sort by descending id — ids increase monotonically, so higher = newer) and label the button "Newest".', autofix: null },
   feat_units:        { fix:'cvtIng in metric mode must leave tsp/tbsp/cup untouched (they are standard kitchen measures) and only convert lb/oz/fl oz, rounded via cookRound to values a cook can measure.', autofix: null },
   i18n_alignment:    { fix:'Recipe text must use dir="auto" + unicode-bidi:plaintext + text-align:start so Hebrew and English each align correctly in the same list. Note direction:auto is NOT valid CSS. Email (rHtml) and print (buildPrintHtml) need the same treatment.', autofix: null },
-  feat_cook_mode:    { fix:'Cook mode is broken. openCookMode/cookNext/cookPrev/findStepTimers must exist, #cookOverlay must be present, step timers are parsed from text like "for 20 minutes", and the ingredient panel must use the recipe view\'s current scale (viewMult/viewUnit).', autofix: null },
+  feat_step_timers:  { fix:'Durations in a step ("for 20 minutes") must render as .cook-timer-btn countdowns inside the step itself. Cook Mode is gone: #cookOverlay and openCookMode must not exist, and the whole recipe must be visible at once.', autofix: null },
+  feat_line_marker:  { fix:'The recipe view needs #lineMarkHost + #lineMarker and data-line attributes on every ingredient/step. markLine() moves the single marker (transitioned, so it slides), a second tap within 320ms clears it, and the position is stored per recipe under tonys_linemark so a re-render or reopen never loses it.', autofix: null },
   perf_photo_blob:   { fix:'photoSrc() must convert stored data-URL photos to cached blob: URLs for display (keeping the stored value a data URL for backup/export/sync). Without it every render rebuilds megabytes of markup and the grid crawls.', autofix: null },
   feat_undo_delete:  { fix:'deleteSelected must stash the removed recipes with their indexes in _pendingUndo and offer toastAction(…, undoDelete); undoDelete restores them at their original positions.', autofix: null },
   a11y_basics:       { fix:'Run applyAriaLabels() after render/init so icon-only buttons get accessible names, keep aria-label on #searchInput and aria-live on #toast, and keep the Escape handler (closeTopModal).', autofix: ()=>{ if(typeof applyAriaLabels==='function') applyAriaLabels(); } },
@@ -2474,7 +2606,8 @@ window.deleteCookLogEntry = deleteCookLogEntry; window.cookLogId = cookLogId; wi
 async function autoFetchMissingPhotos() {
   var noPhoto = recipes.filter(function(r){ return !r.photo && !r.isClip; });
   if (!noPhoto.length) { toast('✅ All recipes already have photos!'); return; }
-  if (!confirm('Auto-fetch photos for ' + noPhoto.length + ' recipe(s) without photos?\n\nThis will search Pixabay for each recipe name and use the best match.')) return;
+  if (!await askConfirm({ icon:'📸', title:'Fetch photos for ' + noPhoto.length + ' recipe' + (noPhoto.length!==1?'s':'') + '?',
+      message:'Each recipe name is searched and the best match used. You can change any photo afterwards.', okLabel:'Fetch photos' })) return;
 
   var fetched = 0;
   for (var i = 0; i < noPhoto.length; i++) {
@@ -2695,7 +2828,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.6';
+var APP_VERSION = 'v27.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3062,14 +3195,13 @@ var GMAIL_CLIENT_KEY = 'tonys_gmail_client_id';
   if(stored) window._gmailOAuthClientId = stored;
 })();
 
-function openGmailSetup() {
+async function openGmailSetup() {
   var current = window._gmailOAuthClientId || '';
-  var val = prompt(
-    'Enter your Google OAuth Client ID for Gmail sending.\n\n' +
-    'Find it at:\nconsole.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client IDs\n\n' +
-    'It looks like: 123456789-abc.apps.googleusercontent.com\n\n' +
-    'Make sure gmail.googleapis.com is enabled and your domain is in Authorised origins.',
-    current
+  var val = await askPrompt(
+    'Find it at console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client IDs.\n\n'
+    + 'Make sure gmail.googleapis.com is enabled and your domain is listed under Authorised origins.',
+    current,
+    { icon:'📧', title:'Gmail Client ID', placeholder:'123456789-abc.apps.googleusercontent.com', okLabel:'Save' }
   );
   if(val === null) return; // cancelled
   val = val.trim();
@@ -3694,86 +3826,57 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .gridcol-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 .gridcol-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: #fff; }
 
-/* ── COOK MODE ────────────────────────────────────────────────────────────────
-   Full-screen, large-type, hands-free-ish step view for actually cooking:
-   readable at arm's length, big tap targets, screen kept awake. */
-#cookOverlay {
-  display: none; position: fixed; inset: 0; z-index: 9000;
-  background: var(--cream); flex-direction: column;
-  padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
-}
-#cookOverlay.open { display: flex; }
-.cook-top {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px; background: var(--warm-brown); color: #fff; flex-shrink: 0;
-}
-.cook-title {
-  font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700;
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.cook-icon-btn {
-  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
-  color: #fff; font-size: 18px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.cook-icon-btn:hover { background: rgba(255,255,255,0.28); }
-.cook-progress-track { height: 5px; background: var(--border); flex-shrink: 0; }
-.cook-progress-fill  { height: 100%; background: var(--terracotta); transition: width 0.25s ease; }
-.cook-body {
-  flex: 1; overflow-y: auto; padding: 24px 22px 12px;
-  display: flex; flex-direction: column; gap: 18px;
-}
-.cook-step-label {
-  font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
-  color: var(--terracotta); flex-shrink: 0;
-}
-.cook-step-text {
-  font-size: 27px; line-height: 1.55; color: var(--ink); font-weight: 500;
-}
-@media (max-width: 420px) { .cook-step-text { font-size: 23px; } }
-.cook-step-text.done { color: var(--muted); text-decoration: line-through; }
+/* ── STEP TIMERS ──────────────────────────────────────────────────────────── */
 .cook-timer-btn {
-  display: inline-flex; align-items: center; gap: 6px; margin: 10px 8px 0 0;
-  padding: 10px 16px; border-radius: 999px; border: 2px solid var(--gold);
+  display: inline-flex; align-items: center; gap: 6px; margin: 6px 6px 0 0;
+  padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--gold);
   background: #FFF8E8; color: #7A5C00; font-family: 'DM Sans', sans-serif;
-  font-size: 16px; font-weight: 700; cursor: pointer;
+  font-size: 12px; font-weight: 700; cursor: pointer;
 }
 .cook-timer-btn.running { background: var(--gold); color: var(--warm-brown); }
 .cook-timer-btn.done { background: var(--terracotta); color: #fff; border-color: var(--terracotta); }
-.cook-ings {
-  background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
-  padding: 12px 14px; flex-shrink: 0;
+:root[data-theme="dark"] .cook-timer-btn { background: #33280F; color: #E8C888; }
+
+/* ── "WHERE WAS I?" LINE MARKER ───────────────────────────────────────────────
+   One absolutely-positioned block that moves between lines. Animating a single
+   element is what produces the slide — toggling a class on each <li> would just
+   cross-fade the colour in two places at once. */
+#lineMarkHost { position: relative; }
+#lineMarker {
+  position: absolute; top: 0; left: 0; width: 0; height: 0;
+  border-radius: 8px; pointer-events: none; opacity: 0; z-index: 0;
+  background: linear-gradient(90deg, rgba(224,120,60,0.22), rgba(224,120,60,0.09));
+  box-shadow: inset 3px 0 0 var(--terracotta);
+  transition: top 0.3s cubic-bezier(0.22,0.9,0.3,1),
+              left 0.3s cubic-bezier(0.22,0.9,0.3,1),
+              width 0.3s cubic-bezier(0.22,0.9,0.3,1),
+              height 0.3s cubic-bezier(0.22,0.9,0.3,1),
+              opacity 0.18s ease;
 }
-.cook-ings-title {
-  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 8px;
+#lineMarker.on { opacity: 1; }
+#lineMarker.no-anim { transition: none; }
+:root[data-theme="dark"] #lineMarker {
+  background: linear-gradient(90deg, rgba(255,122,69,0.28), rgba(255,122,69,0.12));
 }
-.cook-ing {
-  display: flex; align-items: center; gap: 10px; padding: 9px 4px;
-  border-bottom: 1px dashed var(--border); font-size: 16px; cursor: pointer;
-}
-.cook-ing:last-child { border-bottom: none; }
-.cook-ing .box {
-  width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--border);
-  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 14px; color: #fff;
-}
-.cook-ing.checked .box { background: var(--green); border-color: var(--green); }
-.cook-ing.checked .cook-ing-text { color: var(--muted); text-decoration: line-through; }
-.cook-ing-amt { color: var(--terracotta); font-weight: 700; }
-.cook-nav {
-  display: flex; gap: 10px; padding: 12px 16px 16px; flex-shrink: 0;
-  border-top: 1px solid var(--border); background: var(--bg);
-}
-.cook-nav-btn {
-  flex: 1; padding: 18px 10px; border-radius: 14px; border: none;
-  font-family: 'DM Sans', sans-serif; font-size: 17px; font-weight: 700; cursor: pointer;
-  min-height: 60px;
-}
-.cook-nav-prev { background: var(--card-bg); color: var(--heading); border: 1.5px solid var(--border); }
-.cook-nav-next { background: var(--terracotta); color: #fff; }
-.cook-nav-btn:disabled { opacity: 0.4; cursor: default; }
+/* Lines sit above the marker so their text stays crisp over it. */
+.ingredients-list li, .steps-list li { position: relative; z-index: 1; }
+[data-line] { cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 8px; }
+[data-line]:hover { background: rgba(0,0,0,0.025); }
+:root[data-theme="dark"] [data-line]:hover { background: rgba(255,255,255,0.05); }
+.line-current { font-weight: 600; }
+.line-mark-hint { font-size: 11px; color: var(--muted); margin: 10px 0 0; text-align: center; }
+.voice-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.ask-card { background: var(--card-bg); border-radius: 16px; width: 92%; max-width: 420px; padding: 22px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); }
+.ask-icon { font-size: 32px; text-align: center; margin-bottom: 6px; }
+.ask-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--heading); text-align: center; margin-bottom: 8px; }
+.ask-body { font-size: 13px; color: var(--muted); line-height: 1.65; text-align: center; margin-bottom: 16px; white-space: pre-wrap; unicode-bidi: plaintext; }
+.ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
+.ask-actions { display: flex; flex-direction: column; gap: 8px; }
+.ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+.ask-btn.danger { background: #C62828; }
+.ask-btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; font-weight: 500; padding: 10px; }
+.voice-btn.voice-on { background: var(--terracotta); color: #fff; border-color: var(--terracotta); animation: syncPulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { #lineMarker { transition: opacity 0.18s ease; } }
 
 /* MODALS */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; }
@@ -4993,7 +5096,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5554,7 +5657,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5910,30 +6013,6 @@ body.banner-shown .header {
 </div>
 
 <!-- COOK MODE -->
-<div id="cookOverlay" role="dialog" aria-modal="true" aria-label="Cook mode">
-  <div class="cook-top">
-    <button class="cook-icon-btn" onclick="closeCookMode()" aria-label="Exit cook mode">✕</button>
-    <div class="cook-title" id="cookTitle"></div>
-    <button class="cook-icon-btn" id="cookIngsBtn" onclick="toggleCookIngs()" aria-label="Show or hide ingredients" title="Ingredients">🥗</button>
-  </div>
-  <div class="cook-progress-track"><div class="cook-progress-fill" id="cookProgress" style="width:0%"></div></div>
-  <div class="cook-body" id="cookBody">
-    <div class="cook-ings" id="cookIngs" style="display:none;">
-      <div class="cook-ings-title" id="cookIngsTitle">Ingredients</div>
-      <div id="cookIngsList"></div>
-    </div>
-    <div>
-      <div class="cook-step-label" id="cookStepLabel"></div>
-      <div class="cook-step-text" id="cookStepText" dir="auto" onclick="toggleCookStepDone()"></div>
-      <div id="cookTimers"></div>
-    </div>
-  </div>
-  <div class="cook-nav">
-    <button class="cook-nav-btn cook-nav-prev" id="cookPrev" onclick="cookPrev()">← Back</button>
-    <button class="cook-nav-btn cook-nav-next" id="cookNext" onclick="cookNext()">Next →</button>
-  </div>
-</div>
-
 <div class="toast" id="toast" role="status" aria-live="polite"><div class="toast-icon-wrap" id="toastIcon"></div><span id="toastMsg"></span></div>
 
 <script>
@@ -6169,62 +6248,12 @@ function setSort(mode) {
 }
 window.setSort = setSort;
 
-// ─── COOK MODE ────────────────────────────────────────────────────────────────
-// Full-screen step-by-step view for actually cooking: large type, big targets,
-// screen kept awake, ingredients on demand, and tappable timers parsed from steps.
-var _cookId = null, _cookStep = 0, _cookDone = {}, _cookChecked = {}, _cookTimers = {};
+// ─── STEP TIMERS ──────────────────────────────────────────────────────────────
+// Durations mentioned in a step ("simmer for 20 minutes") become tappable
+// countdowns. These used to live inside Cook Mode; Cook Mode is gone, but the
+// timers were never really part of it, so they now sit on the steps themselves.
+var _cookTimers = {};
 
-function openCookMode(id) {
-  var r = recipes.find(function(x){ return x.id===id; });
-  if (!r) return;
-  if (!r.steps || !r.steps.length) { toast('This recipe has no method steps to cook through'); return; }
-  _cookId = id; _cookStep = 0; _cookDone = {}; _cookChecked = {};
-  clearCookTimers();
-  document.getElementById('cookTitle').textContent = r.name;
-  document.getElementById('cookIngs').style.display = 'none';
-  renderCookIngs(r);
-  renderCookStep();
-  document.getElementById('cookOverlay').classList.add('open');
-  requestWakeLock(); // don't let the screen sleep mid-recipe
-}
-function closeCookMode() {
-  document.getElementById('cookOverlay').classList.remove('open');
-  clearCookTimers();
-  _cookId = null;
-  // The recipe view underneath is still open and wants the wake lock; only drop it
-  // if the user closed that too.
-  var view = document.getElementById('viewOverlay');
-  if (!view || !view.classList.contains('open')) releaseWakeLock();
-}
-
-function cookRecipe(){ return recipes.find(function(x){ return x.id===_cookId; }); }
-
-// Ingredients honour the scale/units chosen in the recipe view.
-function renderCookIngs(r) {
-  var mult = (r.id === viewId) ? viewMult : 1;
-  var unit = (r.id === viewId) ? viewUnit : 'metric';
-  var title = document.getElementById('cookIngsTitle');
-  if (title) title.textContent = 'Ingredients' + (mult !== 1 ? ' (×' + mult + ')' : '');
-  var list = document.getElementById('cookIngsList');
-  if (!list) return;
-  list.innerHTML = (r.ingredients||[]).map(function(i, idx) {
-    var amt = scaleAmt(cvtIng(i.a||'', unit), mult);
-    return '<div class="cook-ing' + (_cookChecked[idx] ? ' checked' : '') + '" onclick="toggleCookIng(' + idx + ')" role="checkbox" aria-checked="' + (_cookChecked[idx]?'true':'false') + '" tabindex="0">'
-      + '<span class="box">' + (_cookChecked[idx] ? '✓' : '') + '</span>'
-      + '<span class="cook-ing-text" dir="auto">' + (amt ? '<span class="cook-ing-amt">' + escH(amt) + '</span> ' : '') + escH(i.n) + '</span>'
-      + '</div>';
-  }).join('') || '<div style="color:var(--muted);font-size:14px;">No ingredients listed.</div>';
-}
-function toggleCookIng(idx) {
-  _cookChecked[idx] = !_cookChecked[idx];
-  var r = cookRecipe(); if (r) renderCookIngs(r);
-}
-function toggleCookIngs() {
-  var el = document.getElementById('cookIngs');
-  if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
-}
-
-// "simmer for 20 minutes", "bake 1 hour", "rest 90 sec" → offer a countdown.
 function findStepTimers(text) {
   var out = [], seen = {};
   var re = /(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/gi, m;
@@ -6273,74 +6302,203 @@ function startCookTimer(key, secs) {
     btn.textContent = '⏱ ' + fmtClock(left) + ' — tap to cancel';
   }, 1000), secs: secs };
 }
-
-function renderCookStep() {
-  var r = cookRecipe(); if (!r) return;
-  var steps = r.steps || [];
-  var total = steps.length;
-  if (_cookStep >= total) _cookStep = total - 1;
-  if (_cookStep < 0) _cookStep = 0;
-  var text = steps[_cookStep] || '';
-
-  document.getElementById('cookStepLabel').textContent = 'Step ' + (_cookStep+1) + ' of ' + total;
-  var textEl = document.getElementById('cookStepText');
-  textEl.textContent = text;
-  textEl.classList.toggle('done', !!_cookDone[_cookStep]);
-  document.getElementById('cookProgress').style.width = Math.round(((_cookStep+1)/total)*100) + '%';
-
-  // Timers for this step (cancel any still running from a previous step)
-  clearCookTimers();
-  var timers = findStepTimers(text);
-  document.getElementById('cookTimers').innerHTML = timers.map(function(t, i) {
-    return '<button class="cook-timer-btn" id="cookTimer-' + i + '" onclick="startCookTimer(' + i + ',' + t.secs + ')">⏱ ' + fmtClock(t.secs) + '</button>';
-  }).join('');
-
-  document.getElementById('cookPrev').disabled = (_cookStep === 0);
-  var next = document.getElementById('cookNext');
-  next.textContent = (_cookStep === total-1) ? '✓ Finish' : 'Next →';
-  document.getElementById('cookBody').scrollTop = 0;
-}
-function toggleCookStepDone() {
-  _cookDone[_cookStep] = !_cookDone[_cookStep];
-  document.getElementById('cookStepText').classList.toggle('done', !!_cookDone[_cookStep]);
-}
-function cookPrev() { if (_cookStep > 0) { _cookStep--; renderCookStep(); } }
-function cookNext() {
-  var r = cookRecipe(); if (!r) return;
-  var total = (r.steps||[]).length;
-  if (_cookStep < total-1) { _cookDone[_cookStep] = true; _cookStep++; renderCookStep(); return; }
-  // Last step → finishing counts as having cooked it
-  closeCookMode();
-  if (typeof markCooked === 'function') markCooked(r.id);
-}
-window.openCookMode=openCookMode; window.closeCookMode=closeCookMode;
-window.cookPrev=cookPrev; window.cookNext=cookNext; window.toggleCookIng=toggleCookIng;
-window.toggleCookIngs=toggleCookIngs; window.toggleCookStepDone=toggleCookStepDone;
 window.startCookTimer=startCookTimer; window.findStepTimers=findStepTimers;
 
-// Keyboard + swipe navigation
-document.addEventListener('keydown', function(e) {
-  var ov = document.getElementById('cookOverlay');
-  if (!ov || !ov.classList.contains('open')) return;
-  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); cookNext(); }
-  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); cookPrev(); }
-});
-(function cookSwipe() {
-  var x0 = null, y0 = null;
-  document.addEventListener('touchstart', function(e) {
-    var ov = document.getElementById('cookOverlay');
-    if (!ov || !ov.classList.contains('open')) return;
-    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
-  }, { passive: true });
-  document.addEventListener('touchend', function(e) {
-    if (x0 === null) return;
-    var dx = e.changedTouches[0].clientX - x0;
-    var dy = e.changedTouches[0].clientY - y0;
-    x0 = null;
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return; // not a horizontal swipe
-    dx < 0 ? cookNext() : cookPrev();
+// ─── "WHERE WAS I?" LINE MARKER ───────────────────────────────────────────────
+// Replaces Cook Mode. The whole recipe stays on screen; tapping any ingredient
+// or step marks your place, and the marker SLIDES from the old line to the new
+// one rather than blinking out and back. A double tap anywhere clears it.
+// The position is remembered per recipe, so closing the recipe — or scaling it,
+// or switching units, both of which re-render the view — never loses your place.
+var LINEMARK_KEY = 'tonys_linemark';
+var _lineMark = null;          // { list: 'ing'|'step', idx: Number } for the open recipe
+var _lineMarkTapAt = 0, _lineMarkTapKey = '';
+
+function lineMarkStore() {
+  try { var o = JSON.parse(localStorage.getItem(LINEMARK_KEY) || '{}'); return (o && typeof o === 'object') ? o : {}; }
+  catch(e) { return {}; }
+}
+function loadLineMark(id) {
+  var m = lineMarkStore()[id];
+  _lineMark = (m && (m.list === 'ing' || m.list === 'step') && typeof m.idx === 'number') ? m : null;
+}
+function saveLineMark(id) {
+  try {
+    var o = lineMarkStore();
+    if (_lineMark) o[id] = _lineMark; else delete o[id];
+    // One marker per recipe, and only for recipes that still exist.
+    var live = {}; recipes.forEach(function(r){ live[r.id] = true; });
+    Object.keys(o).forEach(function(k){ if (!live[k]) delete o[k]; });
+    localStorage.setItem(LINEMARK_KEY, JSON.stringify(o));
+  } catch(e) {}
+}
+// Tapping a line marks it. Tapping the SAME line twice quickly is a double tap
+// and clears instead. Keying on the line (not just the clock) matters: running
+// your finger down a list taps several lines in quick succession, and that
+// should move the marker along, not wipe it.
+// The first tap always applies immediately, so single taps never feel delayed.
+function markLine(list, idx) {
+  var now = Date.now(), key = list + '-' + idx;
+  if (key === _lineMarkTapKey && now - _lineMarkTapAt < 320) {
+    _lineMarkTapAt = 0; _lineMarkTapKey = '';
+    clearLineMark();
+    return;
+  }
+  _lineMarkTapAt = now; _lineMarkTapKey = key;
+  _lineMark = { list: list, idx: idx };
+  saveLineMark(viewId);
+  positionLineMarker(true);
+}
+// A double tap anywhere else in the recipe clears too — "double-tap the screen",
+// without having to find the marked line again first.
+(function bindDoubleTapClear(){
+  var last = 0;
+  function isControl(t){ return !!(t && t.closest && t.closest('button,a,input,select,textarea,summary,[data-line]')); }
+  document.addEventListener('dblclick', function(e){
+    var ov = document.getElementById('viewOverlay');
+    if (!ov || !ov.classList.contains('open') || !_lineMark) return;
+    if (!e.target.closest('#viewModal') || isControl(e.target)) return;
+    clearLineMark();
+  });
+  // Touch devices don't fire dblclick reliably; detect the pair ourselves.
+  document.addEventListener('touchend', function(e){
+    var ov = document.getElementById('viewOverlay');
+    if (!ov || !ov.classList.contains('open') || !_lineMark) { last = 0; return; }
+    if (!e.target.closest || !e.target.closest('#viewModal') || isControl(e.target)) { last = 0; return; }
+    var now = Date.now();
+    if (now - last < 320) { last = 0; clearLineMark(); } else { last = now; }
   }, { passive: true });
 })();
+function clearLineMark() {
+  _lineMark = null;
+  saveLineMark(viewId);
+  positionLineMarker(false);
+  try { if (navigator.vibrate) navigator.vibrate(15); } catch(e) {}
+}
+function lineMarkEl() {
+  if (!_lineMark) return null;
+  return document.querySelector('#viewModal [data-line="' + _lineMark.list + '-' + _lineMark.idx + '"]');
+}
+// The marker is one absolutely-positioned element that moves. That is what makes
+// it slide: re-styling a class on each <li> would just switch the colour over.
+function positionLineMarker(animate) {
+  var marker = document.getElementById('lineMarker');
+  var host   = document.getElementById('lineMarkHost');
+  if (!marker || !host) return;
+  document.querySelectorAll('#viewModal .line-current').forEach(function(el){ el.classList.remove('line-current'); });
+  var el = lineMarkEl();
+  if (!el) { marker.classList.remove('on'); return; }
+  el.classList.add('line-current');
+  var hb = host.getBoundingClientRect(), eb = el.getBoundingClientRect();
+  // First placement shouldn't slide in from the top-left corner of the modal.
+  if (!marker.classList.contains('on') || !animate) marker.classList.add('no-anim');
+  marker.style.top    = (eb.top  - hb.top  + host.scrollTop)  + 'px';
+  marker.style.left   = (eb.left - hb.left + host.scrollLeft) + 'px';
+  marker.style.width  = eb.width  + 'px';
+  marker.style.height = eb.height + 'px';
+  marker.classList.add('on');
+  if (marker.classList.contains('no-anim')) {
+    // Force a reflow so removing no-anim doesn't animate this placement.
+    void marker.offsetWidth;
+    marker.classList.remove('no-anim');
+  }
+}
+// Re-measure after a render, a resize, or the two-column layout kicking in.
+function refreshLineMarker() { positionLineMarker(false); }
+window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker(); });
+// ─── VOICE CONTROL (3.7) ──────────────────────────────────────────────────────
+// Moving the marker with messy hands. Deliberately narrow: it only moves your
+// place and reads the current line back — it never edits, deletes or saves
+// anything, so a misheard word can't cost you a recipe.
+// Web Speech API: good in Chrome, absent in Firefox and unreliable in iOS
+// Safari, so the button only appears where it actually works.
+var _voiceRec = null, _voiceOn = false;
+
+function voiceSupported() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+function currentLineCount(kind) {
+  return document.querySelectorAll('#viewModal [data-line^="' + kind + '-"]').length;
+}
+function moveMark(delta) {
+  var r = recipes.find(function(x){ return x.id===viewId; });
+  if (!r) return;
+  if (!_lineMark) { markLine('step', 0); return; }
+  var max = currentLineCount(_lineMark.list) - 1;
+  var next = Math.min(max, Math.max(0, _lineMark.idx + delta));
+  _lineMark = { list: _lineMark.list, idx: next };
+  saveLineMark(viewId);
+  positionLineMarker(true);
+  var el = lineMarkEl();
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+function speakCurrentLine() {
+  var el = lineMarkEl();
+  if (!el) { toast('No line marked yet'); return; }
+  try {
+    if (!window.speechSynthesis) { toast('This browser cannot speak'); return; }
+    var u = new SpeechSynthesisUtterance(el.textContent.replace(/\s+/g, ' ').trim());
+    u.lang = /[\u0590-\u05FF]/.test(el.textContent) ? 'he-IL' : 'en-GB';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  } catch(e) { toast('Could not read that out'); }
+}
+// English and Hebrew, because the collection is both.
+function handleVoiceCommand(text) {
+  var t = (text || '').toLowerCase().trim();
+  dlog('[voice] heard:', t);
+  if (/\b(next|forward|continue)\b|הבא|קדימה|ממשיך/.test(t))            { moveMark(1);  return 'next'; }
+  if (/\b(back|previous|go back)\b|אחורה|הקודם/.test(t))                 { moveMark(-1); return 'back'; }
+  if (/\b(repeat|again|read)\b|שוב|תקרא|חזור/.test(t))                    { speakCurrentLine(); return 'repeat'; }
+  if (/\b(clear|reset|stop marking)\b|נקה|בטל/.test(t))                   { clearLineMark(); return 'clear'; }
+  if (/\bingredient/.test(t) || /מרכיב/.test(t))                          { markLine('ing', 0);  return 'ingredients'; }
+  if (/\b(method|steps?)\b/.test(t) || /שלב/.test(t))                     { markLine('step', 0); return 'steps'; }
+  return null;
+}
+function toggleVoice() {
+  if (!voiceSupported()) { toast('Voice control is not available in this browser'); return; }
+  if (_voiceOn) { stopVoice(); return; }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _voiceRec = new SR();
+  _voiceRec.continuous = true;
+  _voiceRec.interimResults = false;
+  _voiceRec.lang = 'en-GB';
+  _voiceRec.onresult = function(e) {
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) handleVoiceCommand(e.results[i][0].transcript);
+    }
+  };
+  _voiceRec.onerror = function(e) {
+    // "no-speech" just means a quiet moment; anything else is worth saying out loud.
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    toast(e.error === 'not-allowed'
+      ? '🎤 Microphone permission was refused'
+      : '🎤 Voice control stopped: ' + e.error);
+    stopVoice();
+  };
+  _voiceRec.onend = function() { if (_voiceOn) { try { _voiceRec.start(); } catch(e) {} } };  // keep listening
+  try { _voiceRec.start(); } catch(e) { toast('Could not start the microphone'); return; }
+  _voiceOn = true;
+  updateVoiceButton();
+  toast('🎤 Listening — say "next", "back", "repeat" or "clear"');
+}
+function stopVoice() {
+  _voiceOn = false;
+  if (_voiceRec) { try { _voiceRec.onend = null; _voiceRec.stop(); } catch(e) {} _voiceRec = null; }
+  updateVoiceButton();
+}
+function updateVoiceButton() {
+  var b = document.getElementById('voiceBtn');
+  if (!b) return;
+  b.textContent = _voiceOn ? '🎤 Listening…' : '🎤 Voice';
+  b.classList.toggle('voice-on', _voiceOn);
+}
+window.toggleVoice = toggleVoice; window.stopVoice = stopVoice;
+window.handleVoiceCommand = handleVoiceCommand; window.voiceSupported = voiceSupported;
+window.moveMark = moveMark; window.speakCurrentLine = speakCurrentLine;
+
+window.markLine = markLine; window.clearLineMark = clearLineMark;
+window.refreshLineMarker = refreshLineMarker; window.loadLineMark = loadLineMark;
 
 // ─── KEYBOARD & ACCESSIBILITY ─────────────────────────────────────────────────
 // Escape closes the top-most open dialog. Previously the only way out of a modal
@@ -6349,9 +6507,6 @@ function closeTopModal() {
   // Dynamically-created overlays are removed rather than closed
   var transient = document.getElementById('stDetailOverlay') || document.getElementById('serviceErrorOverlay');
   if (transient) { transient.remove(); return true; }
-  // Cook mode sits above everything else
-  var cook = document.getElementById('cookOverlay');
-  if (cook && cook.classList.contains('open')) { closeCookMode(); return true; }
   var open = Array.prototype.slice.call(document.querySelectorAll('.open'))
     .filter(function(el) {
       if (!el.id) return false;
@@ -6727,16 +6882,17 @@ function openView(id){
     if(recent.length>8) recent=recent.slice(0,8);
     localStorage.setItem('recent_views', JSON.stringify(recent));
   } catch(e){}
+  loadLineMark(id);   // "never lose the line I'm on" — restored per recipe
   drawView();
 }
 
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
   var _awkward = [];
-  const ings=r.ingredients.map(i=>{
+  const ings=r.ingredients.map((i,_ii)=>{
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
     if (awkwardCount(i.n, sc)) _awkward.push(i.n);
-    return `<li dir="auto"><span>${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
+    return `<li dir="auto" data-line="ing-${_ii}" onclick="markLine('ing',${_ii})"><span>${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
   }).join('');
   // 3.3 — don't pretend "1.5 eggs" is a measurement; say what to do about it.
   const awkwardNote = _awkward.length
@@ -6827,6 +6983,8 @@ function drawView(){
               }).join('')}</div></details>` : '');
       })()}
       ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
+      <div id="lineMarkHost">
+      <div id="lineMarker"></div>
       <div class="recipe-columns">
       <div class="recipe-col-ings">
       <div class="modal-section-title">Ingredients</div>
@@ -6838,15 +6996,22 @@ function drawView(){
       <ol class="steps-list" dir="auto">${r.steps.map((s,i)=>{
         const isHebrew = /[\u0590-\u05FF]/.test(s);
         const num = `<span class="step-num">${i+1}</span>`;
-        const txt = `<span class="step-text">${escH(s)}</span>`;
+        // Durations in the step become tappable countdowns (they used to live in
+        // Cook Mode; the step is where they actually belong).
+        const timers = findStepTimers(s).map((t,ti)=>
+          `<button class="cook-timer-btn" id="cookTimer-${i}-${ti}" onclick="event.stopPropagation();startCookTimer('${i}-${ti}',${t.secs})">⏱ ${fmtClock(t.secs)}</button>`
+        ).join('');
+        const txt = `<span class="step-text">${escH(s)}${timers?`<br>${timers}`:''}</span>`;
+        const attrs = `data-line="step-${i}" onclick="markLine('step',${i})"`;
         if (isHebrew) {
-          return `<li dir="rtl" class="step-rtl">${num}${txt}</li>`;
+          return `<li dir="rtl" class="step-rtl" ${attrs}>${num}${txt}</li>`;
         }
-        return `<li dir="ltr">${num}${txt}</li>`;
+        return `<li dir="ltr" ${attrs}>${num}${txt}</li>`;
       }).join('')}</ol>
       </div>
       </div>
-      ${(r.steps && r.steps.length) ? `<button onclick="openCookMode(${r.id})" style="width:100%;margin-top:14px;padding:15px;background:var(--terracotta);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;">👨‍🍳 Start Cooking</button>` : ''}
+      <p class="line-mark-hint">Tap any line to mark where you are · double-tap to clear${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
+      </div>
       <div class="recipe-actions">
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
         <button class="action-btn" onclick="markCooked(${r.id})" title="Mark as cooked today">🍳 Cooked!</button>
@@ -6865,6 +7030,10 @@ function drawView(){
       
     </div>`;
   document.getElementById('viewOverlay').classList.add('open');
+  // The view re-renders on scaling, unit changes, cooked-count updates and so on.
+  // Re-measure rather than re-animate, so your place never jumps or is lost.
+  clearCookTimers();
+  requestAnimationFrame(function(){ positionLineMarker(false); });
 }
 
 function setMult(m){
@@ -8662,9 +8831,65 @@ function closeM(id){
     return;
   }
   document.getElementById(id).classList.remove('open');
-  if(id==='viewOverlay') releaseWakeLock();
+  if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); }
   if(id==='editOverlay') _editFormSnapshot = null;
 }
+
+// ─── STYLED CONFIRM / PROMPT (2.1) ────────────────────────────────────────────
+// Native confirm()/prompt() can't be styled, look wrong beside the app's own
+// modals, and on an iOS PWA they're genuinely jarring. These are drop-in
+// promise-based replacements built from the existing modal furniture.
+// They stay honest about danger: a destructive action gets a red button and
+// says what it will do, rather than a neutral "OK".
+function askConfirm(opts) {
+  opts = (typeof opts === 'string') ? { message: opts } : (opts || {});
+  return new Promise(function(resolve) {
+    var prev = document.getElementById('askOverlay');
+    if (prev) prev.remove();
+    var ov = document.createElement('div');
+    ov.id = 'askOverlay';
+    ov.className = 'modal-overlay';
+    ov.style.cssText = 'display:flex;z-index:1300;';
+    var danger = !!opts.danger;
+    ov.innerHTML =
+      '<div class="ask-card">'
+      + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
+      + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
+      + '<div class="ask-body" dir="auto">' + escH(opts.message || '') + '</div>'
+      + (opts.input !== undefined
+          ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
+            + ' placeholder="' + escA(opts.placeholder || '') + '">'
+          : '')
+      + '<div class="ask-actions">'
+      + '<button class="ask-btn' + (danger ? ' danger' : '') + '" id="askOk">' + escH(opts.okLabel || 'OK') + '</button>'
+      + '<button class="ask-btn ghost" id="askCancel">' + escH(opts.cancelLabel || 'Cancel') + '</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+    var input = ov.querySelector('#askInput');
+    function done(v) {
+      ov.remove();
+      document.removeEventListener('keydown', onKey, true);
+      resolve(v);
+    }
+    function accept() { done(input ? input.value : true); }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.stopPropagation(); done(input ? null : false); }
+      else if (e.key === 'Enter' && input) { e.preventDefault(); accept(); }
+    }
+    ov.querySelector('#askOk').onclick = accept;
+    ov.querySelector('#askCancel').onclick = function(){ done(input ? null : false); };
+    ov.onclick = function(e){ if (e.target === ov) done(input ? null : false); };
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(function(){ (input || ov.querySelector('#askOk')).focus(); if (input) input.select(); }, 60);
+  });
+}
+function askPrompt(message, initial, opts) {
+  opts = opts || {};
+  opts.message = message;
+  opts.input = initial == null ? '' : String(initial);
+  return askConfirm(opts);
+}
+window.askConfirm = askConfirm; window.askPrompt = askPrompt;
 
 // ─── UNSAVED-CHANGES PROMPT (1.6) ─────────────────────────────────────────────
 function showUnsavedChanges(){
@@ -9914,8 +10139,9 @@ function cancelAutoLogin() {
 }
 window.cancelAutoLogin = cancelAutoLogin;
 
-function signOut() {
-  if (!confirm('Sign out? Your recipes are saved in the cloud.')) return;
+async function signOut() {
+  if (!await askConfirm({ icon:'👋', title:'Sign out?',
+      message:'Your recipes stay safe in the cloud and come back when you sign in again.', okLabel:'Sign out' })) return;
   if (_firestoreUnsubscribe) { _firestoreUnsubscribe(); _firestoreUnsubscribe = null; }
   if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser = null; window._driveMode = false;
@@ -9994,7 +10220,7 @@ async function clearAllData() {
       + 'Your shared cloud collection is NOT deleted — because you are signed in, your recipes '
       + 'will sync back down after the reload. To keep this device empty, sign out first.'
     : 'Reset this device?\n\nAll recipes and photos stored on this device will be erased. This cannot be undone.';
-  if (!confirm(msg)) return;
+  if (!await askConfirm({ icon:'⚠️', title:'Reset this device?', message:msg, okLabel:'Erase this device', danger:true })) return;
   try {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(NEXTID_KEY);
@@ -11291,8 +11517,10 @@ function backupSave() {
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
 }
 
-function backupRestore() {
-  if(!confirm('Restore from backup?\n\nWARNING: This will REPLACE all your current recipes. Continue?')) return;
+async function backupRestore() {
+  if(!await askConfirm({ icon:'📂', title:'Restore from backup?',
+      message:'This REPLACES every recipe currently on this device with the contents of the backup file. It cannot be undone.',
+      okLabel:'Replace everything', danger:true })) return;
   document.getElementById('backupRestoreInput').click();
 }
 
@@ -11521,7 +11749,8 @@ function getSelectedDiets() {
 async function aiTagAllDiets() {
   var untagged = recipes.filter(function(r) { return !r.diets || !r.diets.length; });
   if (!untagged.length) { toast('All recipes already have diet tags!'); return; }
-  if (!confirm('Auto-tag ' + untagged.length + ' recipes with diet types using AI?\n\nThis will analyse each recipe and suggest diet tags.')) return;
+  if (!await askConfirm({ icon:'🏷️', title:'Auto-tag ' + untagged.length + ' recipe' + (untagged.length!==1?'s':'') + '?',
+      message:'Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.', okLabel:'Tag them' })) return;
   toast('Tagging ' + untagged.length + ' recipes...');
   var tagged = 0;
   for (var i = 0; i < untagged.length; i++) {

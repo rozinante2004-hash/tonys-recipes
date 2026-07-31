@@ -26,13 +26,13 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 
 | # | Idea | Why | Effort |
 |---|------|-----|--------|
-| 2.1 | **Replace `confirm()`/`prompt()` with styled modals** | Native dialogs look out of place, can't be styled, and on iOS PWAs they're jarring. You already have a nice modal system. | 🟡 |
+| ~~2.1~~ | ✅ **DONE (v27.7)** — ~~Styled confirm/prompt~~ | `askConfirm()`/`askPrompt()` return promises and replace every native dialog. Destructive actions get a red button and say what they'll do rather than a neutral "OK". The one remaining `confirm()` is the last-ditch fallback if the unsaved-changes modal itself is missing — deliberate, so edits can never become unclosable. | 🟡 |
 | ~~2.2~~ | ✅ **DONE (v27.6)** — ~~Ingredient table is the truth~~ | The hidden textarea is gone. `readIngsTable()` reads the rows directly, so the flatten-to-"amount — name"/reparse round trip — which mangled any name containing a dash, e.g. "self-raising flour" — no longer exists. | 🟡 |
 | ~~2.3~~ | ✅ **DONE (v27.6)** — ~~Unify clip vs video bookmark~~ | `isClip` is the only flag. `normalizeRecipe` folds legacy `isVideoBookmark` in and deletes it, so old data keeps working while nothing new reads two names for one idea. | 🟢 |
 | ~~2.4~~ | ✅ **DONE (v27.2)** — ~~Per-recipe delete~~ | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
 | ~~2.5~~ | ✅ **DONE (v27.4)** — ~~Better AI empty/error states~~ | `aiFailPane()`/`aiEmptyPane()` name the cause in plain language, link to billing or keys where that's the problem, offer a retry where retrying can help, and always leave a free-hand-paste escape. A failed file import now carries whatever text it *did* extract into the free-hand box. | 🟢 |
 | 2.6 | **Save Helper — ON HOLD, one test still outstanding** | Measured on Ubuntu/Chrome 137: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → still not run** (the test page used to consume the single-use link; fixed, needs a re-run), **4. Python helper → ✅ correct Hebrew filename**. The helper stays until test 3 is re-run. | 🟡 |
-| 2.7 | **Consolidate the 2 500-line `<style>` block** | Group by component and drop dead rules (several classes have no matching markup). Pure maintainability. | 🟡 |
+| ~~2.7~~ | ⚠️ **PART DONE (v27.7)** | Dead rules: removing Cook Mode took 3.8 KB of CSS with it, and a strict scan now finds **zero** unreferenced classes, so there is nothing left to drop. The *reorganisation* half is deliberately not done: shuffling 200 KB of stylesheet in a single-file app is a large diff with no behavioural gain and real regression risk. Worth doing as part of 5.1 (splitting the file), not before. | 🟡 |
 
 ---
 
@@ -70,9 +70,13 @@ how many times you've cooked it.
 A read-only public link for a single recipe (a static page rendered from the recipe JSON) so you
 can send a recipe to a friend who doesn't use the app — much nicer than pasting text.
 
-### 3.7 Voice control while cooking 🟡
-"Next step", "repeat" via the Web Speech API. Genuinely useful with dirty hands; works well in
-Chrome/Android, partial on iOS.
+### 3.7 Voice control while cooking 🟡 — ✅ **DONE (v27.7)**
+"Next", "back", "repeat", "clear", "ingredients", "steps" — in English and Hebrew — move the line
+marker without touching the phone. Deliberately narrow: voice can only move your place and read
+the current line back. It cannot edit, delete or save anything, and there is a test asserting the
+command handler can't even reach those functions, so a misheard word can never cost you a recipe.
+The button only appears where the Web Speech API actually works (Chrome yes, Firefox no, iOS Safari
+unreliable).
 
 ### 3.9 WhatsApp group knowledge 🟡 — ✅ **DONE (v27.3)**
 Ask questions of your food-related WhatsApp groups. WhatsApp has **no API** for reading group
@@ -132,9 +136,19 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 
 ---
 
+## 5a. Keeping your place (v27.7)
+
+Cook Mode is gone. In its place, tapping any ingredient or step marks where you are and a single
+highlight **slides** to it; tapping the same line twice, or double-tapping the recipe, clears it.
+The position is stored per recipe, so scaling, switching units, closing the recipe or reopening it
+never loses your place. Quick taps down a list move the marker rather than being read as a double
+tap — keying the gesture to the line, not just the clock, is what makes that work.
+
 ## 6. My top 5 if you only do a few
 
-1. ~~**Cook Mode**~~ ✅ **shipped in v27.0** (with step timers and ingredient check-off).
+1. ~~**Cook Mode**~~ — shipped in v27.0, **removed in v27.7** at Tony's request: he wants the whole
+   recipe visible at once, not one step at a time. Replaced by the line marker (below). The step
+   timers survived the removal and now sit on the steps themselves.
 2. **Meal planner + merged shopping list** (3.1) — the standout new capability.
 3. ~~**Dark mode** (4.6)~~ ✅ **shipped in v27.3**.
 4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk. *(Batch E)*
