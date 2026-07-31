@@ -44,9 +44,10 @@ in one go, with quantities merged (2 recipes × 1 onion = "2 onions"). This is t
 step for an app that already has recipes + Bring! integration, and it's the feature most likely
 to change how you cook week-to-week.
 
-### 3.2 Pantry / "what can I make?" 🟡
-Keep a rough list of staples you always have, then flag recipes you can make with only 1–2 items
-missing. Pairs with the AI you already pay for.
+### 3.2 Pantry / "what can I make?" 🟡 — ✅ **DONE (v27.9)**
+⚙️ Settings → 🥫 My Pantry holds your staples; More → 🥫 What can I make? ranks every recipe by how
+few things you'd need to buy and names the missing ones. Matching is loose in both directions, so
+"olive oil" covers "good olive oil" and Hebrew prefixes still match. No AI call needed.
 
 ### 3.3 Smarter scaling 🟡 — ✅ **DONE (v27.4)**
 A "Make it for [N] servings" stepper sits **alongside** the ×1–×6 buttons, not in place of them,
@@ -56,9 +57,13 @@ and countable things that land on a fraction — "2.5 eggs" — are flagged rath
 a measurement. Scaling also stopped rewriting spacing: "200g" scales to "300g", not "300 g".
 *Not done:* AI weight↔volume conversion for individual ingredients.
 
-### 3.4 Recipe versions / edit history 🟡
-"I've tweaked this three times and the second version was best." Keep the last N revisions in the
-recipe object; huge value for a *family* collection where several people edit.
+### 3.4 Recipe versions / edit history 🟡 — ✅ **DONE (v27.9)**
+Every edit pushes the previous state onto `r.history`, capped at 3, shown in the recipe with a
+Restore button. Restoring snapshots the current state first, so it is never a one-way door.
+**History is deliberately not synced to the cloud:** measured, three revisions take a recipe from
+1.7 KB to 6.2 KB, which would cut the shared document's capacity from ~610 recipes to ~170. It
+stays on the device that made the edits, and is preserved across cloud loads. Once 5.4 gives each
+recipe its own document, history can travel with it.
 
 ### 3.5 Cooking notes & ratings per attempt 🟢 — ✅ **DONE (v27.4)**
 "🍳 Cooked!" now offers an optional 1–5 star rating and a note; *Just log it — no note* keeps the
@@ -66,9 +71,13 @@ old one-tap behaviour. Entries live in `r.cookLog` and show in the recipe as an 
 collapsible log. Unrated cooks don't drag the average down, and deleting a note doesn't rewrite
 how many times you've cooked it.
 
-### 3.6 Better sharing 🟡
-A read-only public link for a single recipe (a static page rendered from the recipe JSON) so you
-can send a recipe to a friend who doesn't use the app — much nicer than pasting text.
+### 3.6 Better sharing 🟡 — ✅ **DONE (v27.9), as a file rather than a link**
+Share → 🌐 Save as a web page produces a self-contained HTML file: photo embedded, no scripts, no
+external requests, bidi-safe, ~2 KB plus the photo. Send it by email or WhatsApp and it opens in
+any browser, on any device, forever.
+*Why a file and not a public URL:* a hosted link needs a server to serve it, and publishing family
+recipes to a public endpoint is a bigger decision than a share button should make on your behalf.
+Say the word if you'd rather have hosted links — the Worker could do it.
 
 ### 3.7 Voice control while cooking 🟡 — ✅ **DONE (v27.7)**
 "Next", "back", "repeat", "clear", "ingredients", "steps" — in English and Hebrew — move the line
