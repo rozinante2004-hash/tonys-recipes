@@ -1,0 +1,54 @@
+# WhatsApp group exports
+
+Files here are read by Tony's Recipes (⚙️ Settings → 💬 WhatsApp Groups → *Load chats
+from this folder*), and because they are served over HTTPS they work on **every**
+device — the iPhone included. A file left on the laptop is not reachable from the
+phone; that is the whole reason this folder exists.
+
+## Adding a group
+
+1. In WhatsApp: open the group → tap the group name → **Export chat** → **Without media**.
+   (There is no API and no scheduled export — this step is manual on every platform.
+   Anything that automates WhatsApp Web breaches the Terms of Service and gets numbers banned.)
+2. Save the resulting `.txt` file into this folder. Give it a sensible name — the file
+   name becomes the group's label unless `index.json` says otherwise.
+3. Add it to `index.json`.
+4. Commit and push. The app picks it up the next time you press *Load chats from this folder*.
+
+## `index.json`
+
+Either a plain list of file names:
+
+```json
+["family-food.txt", "baking-club.txt"]
+```
+
+or, when you want nicer labels:
+
+```json
+[
+  { "file": "family-food.txt", "group": "Family Food" },
+  { "file": "baking-club.txt", "group": "Baking Club" }
+]
+```
+
+## Updating
+
+Re-exporting a chat gives you the **entire** history again, not just the new part, so
+replace the old file rather than appending to it. Loading the folder replaces every
+remote entry for the same reason.
+
+## Automating the upload (not the export)
+
+- **iPhone:** a Shortcut that accepts a file from the Share sheet and PUTs it to
+  `PUT /repos/<owner>/<repo>/contents/whatsapp/<file>` via the GitHub API turns the
+  whole thing into *Export chat → Share → Shortcut*.
+- **Android / desktop:** share or copy the file into a local clone of this folder and
+  let a small commit-and-push script handle the rest.
+
+## Privacy
+
+These files contain other people's messages. This folder is as public as the repository
+is — if the repo is public, so are the chats. Keep the repository private, or import the
+files device-locally instead (⚙️ Settings → 💬 WhatsApp Groups → *Import exported .txt files*),
+which stores them in the browser and uploads nothing.
