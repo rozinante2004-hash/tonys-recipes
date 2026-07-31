@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.8 -->
+<!-- Tony's Recipes Collection v27.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -291,6 +291,7 @@ function duplicateRecipe(id) {
   copy.cookCount = 0;
   copy.lastCooked = undefined;
   copy.cookLog = [];        // a variant hasn't been cooked, and inherits no verdicts
+  copy.history = [];        // ...and it has no past of its own yet either
   copy.updatedAt = Date.now();
   var idx = recipes.findIndex(function(x){ return x.id===id; });
   recipes.splice(idx < 0 ? 0 : idx + 1, 0, copy); // sit next to the original
@@ -1789,6 +1790,104 @@ const SELF_TESTS = [
       if(_voiceRec!==null) throw new Error('stopVoice left the recogniser attached');
     } },
 
+  { id:'feat_versions', group:'Features', name:'Recipe versions: capped, restorable, reversible',
+    test: async()=>{
+      ['pushHistory','restoreVersion','historySnapshot'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var testId=888916;
+      recipes.unshift(normalizeRecipe({id:testId,name:'V1',servings:'4',ingredients:[{a:'1',n:'a'}],steps:['one'],updatedAt:Date.now()}));
+      var r=recipes.find(function(x){return x.id===testId;});
+      try {
+        if(r.history.length!==0) throw new Error('a new recipe should have no history');
+        // Four edits, cap of three.
+        for(var i=2;i<=5;i++){ pushHistory(r); r.name='V'+i; }
+        if(r.history.length!==3) throw new Error('history was not capped at 3, got '+r.history.length);
+        if(r.history[0].name!=='V4') throw new Error('history is not newest-first, got '+r.history[0].name);
+        // Snapshots must not carry photos or nested history — the collection shares one 1 MiB doc.
+        var snap=historySnapshot(r);
+        if('photo' in snap||'history' in snap||'originalPhoto' in snap) throw new Error('a snapshot carries photo/history data and would bloat the cloud document');
+        // History must never reach the shared Firestore document: it more than
+        // triples a recipe's size and would gut the collection's capacity.
+        var slim=stripPhotosForCloud([r])[0];
+        if('history' in slim) throw new Error('history is being synced to the shared document — that cuts capacity from ~610 recipes to ~170');
+        // Editing through the real save path records the previous version.
+        openAddModal(testId); await wait(60);
+        document.getElementById('f-name').value='Edited name';
+        await saveRecipe(); await wait(60);
+        r=recipes.find(function(x){return x.id===testId;});
+        if(r.name!=='Edited name') throw new Error('the edit did not save');
+        if(r.history[0].name!=='V5') throw new Error('saving did not push the previous version, got '+r.history[0].name);
+        // Restoring is itself reversible.
+        var before=r.name;
+        var p=restoreVersion(testId,0); await wait(80);
+        var ok=document.querySelector('#askOverlay #askOk');
+        if(!ok) throw new Error('restore did not confirm first');
+        ok.click(); await p; await wait(40);
+        r=recipes.find(function(x){return x.id===testId;});
+        if(r.name!=='V5') throw new Error('restore did not apply, name is '+r.name);
+        if(r.history[0].name!==before) throw new Error('restoring did not keep the replaced version — it would be a one-way door');
+        // A malformed history must not crash normalisation.
+        var junk=normalizeRecipe({id:1,history:[null,'nope',{name:'ok',at:1,ingredients:[],steps:[]}]});
+        if(junk.history.length!==1) throw new Error('malformed history entries were not filtered out');
+      } finally {
+        var a=document.getElementById('askOverlay'); if(a) a.remove();
+        _editFormSnapshot=null; document.getElementById('editOverlay').classList.remove('open');
+        recipes=recipes.filter(function(x){return x.id!==testId;}); saveData(); renderGrid();
+      }
+    } },
+  { id:'feat_pantry', group:'Features', name:'Pantry ranks recipes by what you would need to buy',
+    test: async()=>{
+      ['getPantry','setPantry','haveIngredient','missingFor','openWhatCanIMake'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('pantryOverlay')) throw new Error('#pantryOverlay missing');
+      if(!document.getElementById('wcimOverlay')) throw new Error('#wcimOverlay missing');
+      var saved=null; try{ saved=localStorage.getItem('tonys_pantry'); }catch(e){}
+      var testId=888917;
+      recipes.unshift(normalizeRecipe({id:testId,name:'PantryTest',
+        ingredients:[{a:'1',n:'good olive oil'},{a:'2',n:'eggs'},{a:'1',n:'saffron threads'}],steps:['s'],updatedAt:Date.now()}));
+      try {
+        setPantry(['olive oil','eggs','flour']);
+        if(getPantry().length!==3) throw new Error('the pantry did not persist');
+        // Loose matching both ways — a staple should cover a more specific name.
+        if(!haveIngredient('good olive oil',['olive oil'])) throw new Error('"olive oil" should cover "good olive oil"');
+        if(!haveIngredient('שמן',['שמן זית'])) throw new Error('Hebrew substring matching failed');
+        if(haveIngredient('saffron',['olive oil'])) throw new Error('an unrelated item was treated as present');
+        var r=recipes.find(function(x){return x.id===testId;});
+        var miss=missingFor(r,getPantry());
+        if(miss.length!==1||miss[0]!=='saffron threads') throw new Error('expected only saffron missing, got '+JSON.stringify(miss));
+        openWhatCanIMake(); await wait(60);
+        var body=document.getElementById('wcimBody').textContent;
+        if(body.indexOf('PantryTest')===-1) throw new Error('the recipe was not listed');
+        if(body.indexOf('saffron threads')===-1) throw new Error('the missing item was not named');
+        closeM('wcimOverlay');
+        // An empty pantry must explain itself, not show an empty list.
+        setPantry([]); openWhatCanIMake(); await wait(60);
+        if(document.getElementById('wcimBody').textContent.indexOf('pantry is empty')===-1) throw new Error('an empty pantry should say so and offer to set one up');
+        closeM('wcimOverlay');
+      } finally {
+        closeM('wcimOverlay'); closeM('pantryOverlay');
+        try{ if(saved===null) localStorage.removeItem('tonys_pantry'); else localStorage.setItem('tonys_pantry',saved); }catch(e){}
+        recipes=recipes.filter(function(x){return x.id!==testId;}); renderGrid();
+      }
+    } },
+  { id:'feat_share_page', group:'Features', name:'Recipe exports as a self-contained web page',
+    test: async()=>{
+      if(typeof buildRecipePage!=='function') throw new Error('buildRecipePage not defined');
+      if(!document.getElementById('sharePageBtn')) throw new Error('#sharePageBtn missing from the share sheet');
+      var r=normalizeRecipe({id:1,name:'עוגת שוקולד <b>test</b>',category:'Dessert',difficulty:'Easy',prep:'1 hr',servings:'8',
+        ingredients:[{a:'200g',n:'flour'}],steps:['Mix & bake'],notes:'note here',updatedAt:Date.now()});
+      var html=buildRecipePage(r);
+      var doc=new DOMParser().parseFromString(html,'text/html');
+      if(!doc.querySelector('h1')) throw new Error('the page has no title');
+      if(doc.querySelector('h1 b')) throw new Error('recipe text was injected as raw HTML into the shared page');
+      if(doc.querySelector('h1').textContent.indexOf('עוגת')===-1) throw new Error('the Hebrew name did not survive');
+      if(!(doc.body.textContent||'').match(/flour/)) throw new Error('ingredients are missing');
+      if(!(doc.body.textContent||'').match(/Mix & bake/)) throw new Error('steps are missing');
+      // Self-contained: no scripts, and nothing fetched from anywhere.
+      if(doc.querySelector('script')) throw new Error('the shared page contains script — it must be inert');
+      if(/https?:\/\//.test(html.replace(/Source:[^<]*/g,''))) throw new Error('the page references an external URL — it must work offline forever');
+      if(!/unicode-bidi\s*:\s*plaintext/.test(html)) throw new Error('the page has no bidi handling — mixed Hebrew/English would misalign');
+    } },
+
   // ── Batch E ─────────────────────────────────────────────────────────────────
   { id:'ui_styled_dialogs', group:'UI', name:'Styled confirm/prompt replace the native ones',
     test: async()=>{
@@ -2303,6 +2402,9 @@ var SELF_TEST_FIXES = {
   ui_dropdown_reopen: { fix:'toggleDrop() must register its outside-click listener through _armDropOutside() and closeDrop() must call _disarmDropOutside(). Otherwise the listener a menu item leaves behind closes the menu again on the very next click of its trigger button.', autofix: null },
   ui_theme:       { fix:'Dark mode plumbing missing. Needs THEME_KEY/tonys_theme, setTheme()/getTheme()/effectiveTheme()/applyTheme() stamping data-theme on <html>, a :root[data-theme="dark"] variable block in the stylesheet, and the #themeModeItem entry in the ⚙️ Settings menu.', autofix: null },
   feat_bring_status_honest: { fix:'The Bring! status bar must be driven by checkBringTokenStatus() (Worker action "bring-token-status"), not by the per-device bring_token_expiry value. A stale local expiry may only ever produce "status unknown" / "last known", never "expired".', autofix: null },
+  feat_versions: { fix:'3.4 — saveRecipe must pushHistory(existing) before overwriting, capped at 3 and with photos/nested history stripped (the collection shares one 1 MiB Firestore document). restoreVersion must snapshot the current state first so it is reversible.', autofix: null },
+  feat_pantry: { fix:'3.2 — getPantry/setPantry (tonys_pantry), haveIngredient() matching loosely both ways so staples cover longer names and Hebrew works, missingFor() per recipe, and openWhatCanIMake() ranking by fewest missing with an explanatory empty state.', autofix: null },
+  feat_share_page: { fix:'3.6 — buildRecipePage() must produce a self-contained, script-free HTML page with escaped text, no external URLs and unicode-bidi:plaintext, offered as "Save as a web page" in the share sheet.', autofix: null },
   feat_ticks: { fix:'Every ingredient/step needs a .tick-box button. toggleTick() must stopPropagation (so ticking does not also move the line marker), strike the line through via the .ticked class, survive a re-render, and be wiped from memory when the recipe closes. Nothing about ticks is persisted.', autofix: null },
   feat_voice_safety: { fix:'voiceSupported() must return false on iOS (the API exists but cannot honour `continuous`), and the onend restart must be deferred via setTimeout, capped by _voiceRestarts and bounded by _voiceWatchdog. A synchronous unbounded restart pegs the main thread and freezes the app with no way out.', autofix: null },
   ui_styled_dialogs: { fix:'2.1 — askConfirm()/askPrompt() replace native confirm()/prompt(). They must escape their text, resolve true/false (or the typed string / null), and clean up the overlay. Only the last-ditch fallback in showUnsavedChanges may still call confirm().', autofix: null },
@@ -2895,7 +2997,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.8';
+var APP_VERSION = 'v27.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3824,6 +3926,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 #bringBookmarkletOverlay.open,
 #unsavedOverlay.open,
 #cookLogOverlay.open,
+#pantryOverlay.open,
+#wcimOverlay.open,
 #waAskOverlay.open,
 #waSetupOverlay.open {
   opacity: 1 !important;
@@ -3949,6 +4053,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .ingredients-list li, .steps-list li { display: flex; align-items: flex-start; }
 .ingredients-list li .line-text { flex: 1; min-width: 0; }
 .line-mark-hint { font-size: 11px; color: var(--muted); margin: 10px 0 0; text-align: center; }
+.wcim-row { display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid var(--border); cursor:pointer; border-radius:8px; }
+.wcim-row:hover { background: var(--bg); }
+.wcim-emoji { font-size:20px; flex-shrink:0; }
+.wcim-name { flex:1; min-width:0; font-size:14px; color:var(--ink); font-weight:600; unicode-bidi:plaintext; text-align:start; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wcim-tag { flex-shrink:0; font-size:11px; color:var(--muted); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; max-width:52%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wcim-tag.have { color:var(--green); border-color:var(--green); font-weight:600; }
 .voice-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .ask-card { background: var(--card-bg); border-radius: 16px; width: 92%; max-width: 420px; padding: 22px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); }
 .ask-icon { font-size: 32px; text-align: center; margin-bottom: 6px; }
@@ -5180,7 +5290,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5195,6 +5305,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
           <button class="drop-item" id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
@@ -5222,6 +5333,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
           <button class="drop-item" id="waAskItem" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make?</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
@@ -5741,7 +5853,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5975,6 +6087,34 @@ body.banner-shown .header {
     <button onclick="skipCookLog()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
       Just log it — no note
     </button>
+  </div>
+</div>
+
+<!-- PANTRY (3.2) -->
+<div id="pantryOverlay" onclick="bgClose(event,'pantryOverlay')" class="modal-overlay" style="z-index:900;">
+  <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:480px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">🥫 My Pantry</div>
+      <button class="modal-close" onclick="closeM('pantryOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+      The things you always have in. One per line (or comma-separated). Matching is loose, so
+      “olive oil” also covers “good olive oil”. Kept on this device only.
+    </p>
+    <textarea id="pantryInput" dir="auto" rows="10" placeholder="olive oil&#10;flour&#10;eggs&#10;salt&#10;שמן זית"
+      style="unicode-bidi:plaintext;text-align:start;width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:12px;"></textarea>
+    <button onclick="savePantry()" style="width:100%;padding:12px;background:var(--terracotta);color:#fff;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Save pantry</button>
+  </div>
+</div>
+
+<!-- WHAT CAN I MAKE? (3.2) -->
+<div id="wcimOverlay" onclick="bgClose(event,'wcimOverlay')" class="modal-overlay" style="z-index:900;">
+  <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">🥫 What can I make?</div>
+      <button class="modal-close" onclick="closeM('wcimOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+    </div>
+    <div id="wcimBody"></div>
   </div>
 </div>
 
@@ -6490,6 +6630,203 @@ function positionLineMarker(animate) {
 // Re-measure after a render, a resize, or the two-column layout kicking in.
 function refreshLineMarker() { positionLineMarker(false); }
 window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker(); });
+// ─── SHARE AS A WEB PAGE (3.6) ────────────────────────────────────────────────
+// A read-only, self-contained HTML file for one recipe: photo embedded, no
+// scripts, no external requests, right-to-left safe. Sending a *file* rather
+// than a hosted link is a deliberate choice — a public URL would need a server
+// to host it, and putting family recipes on a public endpoint is a bigger
+// decision than a share button should make on your behalf. The file opens in
+// any browser, on any device, forever, with nothing to keep running.
+function buildRecipePage(r) {
+  var esc = function(v){ return escH(v).replace(/<br>/g, '<br>'); };
+  var img = r.photo ? '<img class="hero" src="' + escA(r.photo) + '" alt="">' : '';
+  var ings = (r.ingredients||[]).map(function(i){
+    return '<li><span>' + escH(i.n) + '</span><b>' + escH(i.a) + '</b></li>';
+  }).join('');
+  var steps = (r.steps||[]).map(function(st){ return '<li>' + escH(st) + '</li>'; }).join('');
+  return '<!doctype html><html><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>' + escH(r.name) + '</title><style>'
+    + 'body{margin:0;background:#FAF7F2;color:#1C1A18;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.65;}'
+    + '.wrap{max-width:640px;margin:0 auto;background:#fff;box-shadow:0 2px 24px rgba(0,0,0,.08);}'
+    + '.hero{width:100%;display:block;}'
+    + '.pad{padding:26px 24px 34px;}'
+    + 'h1{font-family:Georgia,serif;font-size:30px;margin:0 0 6px;color:#5C3D2E;unicode-bidi:plaintext;text-align:start;}'
+    + '.meta{color:#8A8279;font-size:13px;margin-bottom:22px;}'
+    + 'h2{font-family:Georgia,serif;font-size:17px;color:#5C3D2E;margin:26px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px;}'
+    + 'ul,ol{padding-inline-start:20px;margin:0;}'
+    + 'ul{list-style:none;padding:0;}'
+    + 'ul li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px dashed #eee;unicode-bidi:plaintext;text-align:start;}'
+    + 'ul li b{color:#C1440E;white-space:nowrap;}'
+    + 'ol li{margin-bottom:12px;unicode-bidi:plaintext;text-align:start;}'
+    + '.notes{background:#FFF8E8;border-inline-start:3px solid #D4A843;padding:12px 14px;margin-top:22px;font-size:14px;unicode-bidi:plaintext;text-align:start;}'
+    + '.foot{color:#A79E93;font-size:11px;text-align:center;padding:18px;}'
+    + '@media print{body{background:#fff}.wrap{box-shadow:none}}'
+    + '</style></head><body dir="auto"><div class="wrap">' + img + '<div class="pad">'
+    + '<h1 dir="auto">' + escH(r.name) + '</h1>'
+    + '<div class="meta">' + escH(r.category) + ' &middot; ' + escH(r.difficulty)
+    + ' &middot; ' + escH(r.prep) + ' &middot; ' + escH(r.servings) + ' servings</div>'
+    + '<h2>Ingredients</h2><ul>' + ings + '</ul>'
+    + '<h2>Method</h2><ol>' + steps + '</ol>'
+    + (r.notes ? '<div class="notes" dir="auto">' + escH(r.notes) + '</div>' : '')
+    + (r.source ? '<div class="meta" style="margin-top:18px;">Source: ' + escH(r.source) + '</div>' : '')
+    + '</div><div class="foot">Shared from Tony\'s Recipes Collection</div></div></body></html>';
+}
+function shareAsPage(id) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  var html = buildRecipePage(r);
+  try {
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var url  = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = safeFilename(r.name) + '.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    toast('🌐 Saved as a web page — send it to anyone');
+  } catch(e) {
+    toast('Could not create the page: ' + e.message);
+  }
+}
+window.buildRecipePage = buildRecipePage; window.shareAsPage = shareAsPage;
+
+// ─── RECIPE VERSIONS (3.4) ────────────────────────────────────────────────────
+// "I've tweaked this three times and the second version was best." Each edit
+// pushes the PREVIOUS state onto r.history before the new one is written.
+// Capped hard at 3, and photos/history are stripped from each entry: the whole
+// collection's text shares one Firestore document with a 1 MiB ceiling, so an
+// uncapped history would eat the headroom that the recipes themselves need.
+var HISTORY_MAX = 3;
+
+function historySnapshot(r) {
+  return {
+    at: Date.now(),
+    name: r.name, category: r.category, difficulty: r.difficulty,
+    prep: r.prep, servings: r.servings, notes: r.notes || '',
+    ingredients: JSON.parse(JSON.stringify(r.ingredients || [])),
+    steps: (r.steps || []).slice()
+  };
+}
+function pushHistory(r) {
+  if (!Array.isArray(r.history)) r.history = [];
+  r.history.unshift(historySnapshot(r));
+  if (r.history.length > HISTORY_MAX) r.history = r.history.slice(0, HISTORY_MAX);
+}
+// Restoring is itself an edit, so the current state is pushed onto history
+// first — restoring the wrong version must never be a one-way door.
+async function restoreVersion(id, idx) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r || !r.history || !r.history[idx]) return;
+  var v = r.history[idx];
+  if (!await askConfirm({ icon:'🕘', title:'Restore this version?',
+      message:'“' + v.name + '” as it was on ' + new Date(v.at).toLocaleString()
+        + '.\n\nThe current version is kept in the history, so you can undo this.',
+      okLabel:'Restore' })) return;
+  pushHistory(r);
+  r.name = v.name; r.category = v.category; r.difficulty = v.difficulty;
+  r.prep = v.prep; r.servings = v.servings; r.notes = v.notes;
+  r.ingredients = JSON.parse(JSON.stringify(v.ingredients));
+  r.steps = v.steps.slice();
+  r.nutrition = null;           // the numbers described the other version
+  r.updatedAt = Date.now();
+  saveData(); drawView(); renderGrid();
+  toast('🕘 Restored the version from ' + new Date(v.at).toLocaleDateString());
+}
+function historyDiffLabel(r, v) {
+  var bits = [];
+  if (v.name !== r.name) bits.push('name');
+  if (JSON.stringify(v.ingredients) !== JSON.stringify(r.ingredients)) bits.push('ingredients');
+  if (JSON.stringify(v.steps) !== JSON.stringify(r.steps)) bits.push('method');
+  if ((v.notes||'') !== (r.notes||'')) bits.push('notes');
+  return bits.length ? bits.join(', ') + ' differ' : 'no visible differences';
+}
+window.restoreVersion = restoreVersion; window.pushHistory = pushHistory;
+window.historySnapshot = historySnapshot; window.historyDiffLabel = historyDiffLabel;
+
+// ─── PANTRY / "WHAT CAN I MAKE?" (3.2) ────────────────────────────────────────
+// A rough list of staples you always have, used to rank recipes by how few
+// things you'd need to buy. Matching is deliberately fuzzy and substring-based:
+// "olive oil" in the pantry should satisfy "good olive oil", and Hebrew
+// prefixes (ה/ו/ב/ל) rule out whole-word matching.
+var PANTRY_KEY = 'tonys_pantry';
+
+function getPantry() {
+  try { var a = JSON.parse(localStorage.getItem(PANTRY_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e) { return []; }
+}
+function setPantry(list) {
+  try { localStorage.setItem(PANTRY_KEY, JSON.stringify(list)); } catch(e) {}
+}
+function haveIngredient(name, pantry) {
+  var n = String(name||'').toLowerCase();
+  if (!n) return true;
+  return pantry.some(function(p){
+    p = String(p||'').toLowerCase().trim();
+    return p && (n.indexOf(p) !== -1 || p.indexOf(n) !== -1);
+  });
+}
+function missingFor(r, pantry) {
+  return (r.ingredients || [])
+    .map(function(i){ return i && i.n; })
+    .filter(function(n){ return n && !haveIngredient(n, pantry); });
+}
+window.getPantry = getPantry; window.setPantry = setPantry;
+window.haveIngredient = haveIngredient; window.missingFor = missingFor;
+
+// ─── PANTRY UI (3.2) ──────────────────────────────────────────────────────────
+function openPantry() {
+  document.getElementById('pantryInput').value = getPantry().join('\n');
+  document.getElementById('pantryOverlay').classList.add('open');
+}
+function savePantry() {
+  var list = (document.getElementById('pantryInput').value || '')
+    .split(/[\n,]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  // Keep it a set, and keep it sane — this is a staples list, not an inventory.
+  var seen = {}, out = [];
+  list.forEach(function(x){ var k = x.toLowerCase(); if (!seen[k]) { seen[k] = 1; out.push(x); } });
+  setPantry(out.slice(0, 200));
+  closeM('pantryOverlay');
+  toast('🥫 Pantry saved — ' + out.length + ' staple' + (out.length===1?'':'s'));
+}
+function openWhatCanIMake() {
+  var pantry = getPantry();
+  var body = document.getElementById('wcimBody');
+  document.getElementById('wcimOverlay').classList.add('open');
+  if (!pantry.length) {
+    body.innerHTML = '<div class="ai-fail"><div class="ai-fail-icon">🥫</div>'
+      + '<div class="ai-fail-title">Your pantry is empty</div>'
+      + '<div class="ai-fail-body">List the things you always have in — oil, flour, eggs, salt — and this ranks your recipes by how little you\'d need to buy.</div>'
+      + '<div class="ai-fail-actions"><button class="ai-fail-btn" onclick="closeM(\'wcimOverlay\');openPantry()">Set up my pantry</button></div></div>';
+    return;
+  }
+  var scored = recipes.map(function(r){
+    var miss = missingFor(r, pantry);
+    return { r: r, miss: miss, total: (r.ingredients||[]).length };
+  }).filter(function(x){ return x.total > 0; });
+  scored.sort(function(a,b){ return a.miss.length - b.miss.length || a.total - b.total; });
+  var top = scored.filter(function(x){ return x.miss.length <= 3; }).slice(0, 40);
+  if (!top.length) {
+    body.innerHTML = '<div class="ai-fail"><div class="ai-fail-icon">🤔</div>'
+      + '<div class="ai-fail-title">Nothing is within three items</div>'
+      + '<div class="ai-fail-body">Every recipe needs four or more things you haven\'t listed. Adding more staples to your pantry will bring recipes into range.</div>'
+      + '<div class="ai-fail-actions"><button class="ai-fail-btn" onclick="closeM(\'wcimOverlay\');openPantry()">Edit my pantry</button></div></div>';
+    return;
+  }
+  body.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">'
+    + 'Ranked by how few things you\'d need to buy, against ' + pantry.length + ' staple' + (pantry.length===1?'':'s') + '.</div>'
+    + top.map(function(x){
+      var n = x.miss.length;
+      var tag = n === 0
+        ? '<span class="wcim-tag have">✓ you have everything</span>'
+        : '<span class="wcim-tag">need ' + n + ': ' + escH(x.miss.slice(0,3).join(', ')) + '</span>';
+      return '<div class="wcim-row" onclick="closeM(\'wcimOverlay\');openView(' + x.r.id + ')">'
+        + '<span class="wcim-emoji">' + escH(x.r.emoji) + '</span>'
+        + '<span class="wcim-name" dir="auto">' + escH(x.r.name) + '</span>' + tag + '</div>';
+    }).join('');
+}
+window.openPantry = openPantry; window.savePantry = savePantry; window.openWhatCanIMake = openWhatCanIMake;
+
 // ─── TICK-OFF CHECKBOXES ──────────────────────────────────────────────────────
 // A checkbox beside every ingredient and step: ticking it strikes the line
 // through, so you can see what's already in the bowl and what's done.
@@ -7151,6 +7488,16 @@ function drawView(){
               }).join('')}</div></details>` : '');
       })()}
       ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
+      ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (${r.history.length})</summary>
+          <div class="cook-log-body">${r.history.map(function(v,vi){
+            return '<div class="cook-log-entry">'
+              + '<div class="cook-log-head"><span>' + new Date(v.at).toLocaleString() + '</span>'
+              + '<span style="color:var(--muted);">' + escH(historyDiffLabel(r, v)) + '</span>'
+              + '<button class="cook-log-del" style="margin-inline-start:auto;color:var(--terracotta);" onclick="restoreVersion(' + r.id + ',' + vi + ')" title="Restore this version">↩ Restore</button></div>'
+              + '<div class="cook-log-note" dir="auto">' + escH(v.name) + ' · '
+              + (v.ingredients||[]).length + ' ingredients · ' + (v.steps||[]).length + ' steps</div>'
+              + '</div>';
+          }).join('')}</div></details>` : ''}
       <div id="lineMarkHost">
       <div id="lineMarker"></div>
       <div class="recipe-columns">
@@ -7262,6 +7609,8 @@ function toggleShare(id){
     showEmailModal(id);
   };
   document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
+  var pageBtn = document.getElementById('sharePageBtn');
+  if (pageBtn) pageBtn.onclick = function(){ closeM('shareRecipeOverlay'); shareAsPage(id); };
   document.getElementById('shareCopyBtn').onclick   = function(){ doCopy(id); };
   // navigator.share only works reliably on mobile — hide on desktop
   var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -8464,9 +8813,11 @@ async function saveRecipe(){
       var ingsChanged = JSON.stringify(existing.ingredients) !== JSON.stringify(data.ingredients);
       var stepsChanged = JSON.stringify(existing.steps) !== JSON.stringify(data.steps);
       var nutritionToKeep = (ingsChanged || stepsChanged) ? null : existing.nutrition;
+      pushHistory(existing);          // 3.4 — remember what it was before this edit
       recipes[idx] = {
         ...existing,
         ...data,
+        history: existing.history,
         fav: existing.fav,           // preserve favourite status
         bg: existing.bg,             // preserve background colour
         nutrition: nutritionToKeep,  // cleared if ingredients/steps changedrition
@@ -9707,6 +10058,9 @@ function normalizeRecipe(r) {
   if (!Array.isArray(r.diets)) r.diets = [];
   if (typeof r.cookCount !== 'number' || isNaN(r.cookCount)) r.cookCount = 0;
   if (typeof r.notes !== 'string') r.notes = '';
+  // 3.4 — last few revisions, capped. See pushHistory for why the cap matters.
+  if (!Array.isArray(r.history)) r.history = [];
+  r.history = r.history.filter(function(v){ return v && typeof v === 'object' && v.name !== undefined; }).slice(0, 3);
   // 3.5 — per-attempt log: [{at, rating 0–5, note}]. Older recipes have a
   // cookCount but no log; that's fine, the count stays authoritative.
   if (!Array.isArray(r.cookLog)) r.cookLog = [];
@@ -9835,8 +10189,13 @@ function stripPhotosForCloud(list) {
   return list.map(function(r) {
     var c = {};
     for (var k in r) {
+      // 3.4 — `history` is deliberately NOT synced. Three revisions more than
+      // triple a recipe's serialised size (measured: 1.7 KB → 6.2 KB), which
+      // would cut the shared document's capacity from ~610 recipes to ~170.
+      // History stays on the device that made the edits until 5.4 gives each
+      // recipe its own document, at which point it can travel with it.
       if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== 'hp'
-          && k !== '_ph' && k !== '_po') c[k] = r[k];
+          && k !== '_ph' && k !== '_po' && k !== 'history') c[k] = r[k];
     }
     c.photo = '';
     if (r.photo || r._ph) c._ph = 1;
@@ -10040,6 +10399,10 @@ async function _loadFromFirestoreInner(user) {
   // originalPhoto is local-only (never synced) — remember it so a cloud load doesn't drop it
   var _localOrig = {};
   recipes.forEach(function(r) { if (r.originalPhoto) _localOrig[r.id] = r.originalPhoto; });
+  // History is local-only (see stripPhotosForCloud), so a cloud load would
+  // otherwise wipe it — the incoming records simply don't have the field.
+  var _localHist = {};
+  recipes.forEach(function(r) { if (r.history && r.history.length) _localHist[r.id] = r.history; });
   // Safety net: remember local photos too, keyed with their updatedAt. If the incoming
   // cloud data is missing a photo for a recipe whose local copy is not older, the cloud
   // almost certainly just never received that photo (e.g. a save failed before it synced) —
@@ -10078,6 +10441,7 @@ async function _loadFromFirestoreInner(user) {
         // Pull each recipe's photo from its own cloud doc, and restore local-only originals
         await attachCloudPhotos(recipes);
         recipes.forEach(function(r) { if (!r.originalPhoto && _localOrig[r.id]) r.originalPhoto = _localOrig[r.id]; });
+        recipes.forEach(function(r) { if ((!r.history || !r.history.length) && _localHist[r.id]) r.history = _localHist[r.id]; });
         // Photo safety net (see _localPhoto comment above)
         var recoveredPhotos = 0;
         recipes.forEach(function(r) {
@@ -11432,10 +11796,12 @@ function waGroupNameFromFile(name){
 // ─── Remote folder ───────────────────────────────────────────────────────────
 // Expects <base>index.json — either ["a.txt","b.txt"] or
 // [{"file":"a.txt","group":"Family Food"}]. Any other shape is reported, not guessed at.
-async function waRefreshFolder(){
-  var st = document.getElementById('waFolderStatus');
+var _waLastFolderError = '';
+async function waRefreshFolder(quiet){
+  var st = quiet ? null : document.getElementById('waFolderStatus');
   var base = getWaBase();
-  if (!base) { if(st) st.innerHTML = '<span style="color:#c62828;">Set a folder URL first.</span>'; return; }
+  _waLastFolderError = '';
+  if (!base) { _waLastFolderError = 'no folder URL is set'; if(st) st.innerHTML = '<span style="color:#c62828;">Set a folder URL first.</span>'; return; }
   if (st) st.textContent = 'Reading ' + base + 'index.json …';
   var list;
   try {
@@ -11443,11 +11809,18 @@ async function waRefreshFolder(){
     if (!r.ok) throw new Error('the folder returned HTTP ' + r.status);
     list = await r.json();
   } catch(e) {
+    _waLastFolderError = "couldn't read " + base + 'index.json — ' + e.message;
     if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read ' + escH(base) + 'index.json — ' + escH(e.message) + '</span>';
     return;
   }
   if (!Array.isArray(list)) {
+    _waLastFolderError = 'index.json does not contain a JSON array';
     if (st) st.innerHTML = '<span style="color:#c62828;">index.json must contain a JSON array of file names.</span>';
+    return;
+  }
+  if (!list.length) {
+    _waLastFolderError = 'index.json is an empty list — the chat files are not listed in it';
+    if (st) st.innerHTML = '<span style="color:#8A6D00;">index.json is empty, so there is nothing to load. Add your chat files to it.</span>';
     return;
   }
   var idx = waIndex().filter(function(e){ return e.source !== 'remote'; });
@@ -11552,19 +11925,58 @@ function waBuildContext(messages, hits, charBudget){
 }
 
 // ─── The modal ───────────────────────────────────────────────────────────────
-function openWaAsk(){
+function waAskCountLabel(){
   var idx = waIndex();
+  return idx.length
+    ? idx.length + ' chat' + (idx.length===1?'':'s') + ' · ' + idx.reduce(function(s,e){return s+(e.count||0);},0).toLocaleString() + ' messages'
+    : '';
+}
+function openWaAsk(){
   document.getElementById('waAskAnswer').style.display = 'none';
   document.getElementById('waAskAnswer').innerHTML = '';
   document.getElementById('waAskLoading').style.display = 'none';
-  var none = document.getElementById('waAskEmpty');
-  none.style.display = idx.length ? 'none' : 'block';
-  document.getElementById('waAskCount').textContent = idx.length
-    ? idx.length + ' chat' + (idx.length===1?'':'s') + ' · ' + idx.reduce(function(s,e){return s+(e.count||0);},0).toLocaleString() + ' messages'
-    : '';
   document.getElementById('waAskOverlay').classList.add('open');
   setTimeout(function(){ var q=document.getElementById('waAskInput'); if(q) q.focus(); }, 120);
+  refreshWaAskState();
 }
+// The chat index is per-device localStorage, but the chats themselves live in a
+// shared folder. Requiring a manual "load" tap on every device turned a working
+// setup into a dead end that only said "No chats loaded yet". Now the folder is
+// checked automatically the first time you ask, and the empty state says what
+// is actually wrong and offers the fix.
+async function refreshWaAskState(){
+  var none  = document.getElementById('waAskEmpty');
+  var count = document.getElementById('waAskCount');
+  var idx   = waIndex();
+  count.textContent = waAskCountLabel();
+  if (idx.length) { none.style.display = 'none'; return; }
+
+  var base = getWaBase();
+  if (!base) {
+    none.style.display = 'block';
+    none.innerHTML = 'No chat folder is configured. Open <strong>⚙️ Settings → 💬 WhatsApp Groups</strong> to set one, or import files from this device.';
+    return;
+  }
+  none.style.display = 'block';
+  none.innerHTML = 'Checking the shared folder for chats…';
+  try {
+    await waRefreshFolder(true);   // quiet: don't require the setup modal to be open
+  } catch(e) { /* reported below */ }
+  idx = waIndex();
+  count.textContent = waAskCountLabel();
+  if (idx.length) {
+    none.style.display = 'none';
+    return;
+  }
+  none.innerHTML =
+    'No chats found in <code>' + escH(base) + '</code>.<br><br>'
+    + (_waLastFolderError ? '<strong>Reason:</strong> ' + escH(_waLastFolderError) + '<br><br>' : '')
+    + 'Most often this means <code>index.json</code> in that folder is still empty — '
+    + 'uploading the chat file is only half of it, the file also has to be listed there. '
+    + 'See <strong>⚙️ Settings → 💬 WhatsApp Groups</strong>.'
+    + '<div style="margin-top:10px;"><button class="help-btn" onclick="openWaSetup()">Open WhatsApp settings</button></div>';
+}
+window.refreshWaAskState = refreshWaAskState;
 async function waAsk(){
   var q = (document.getElementById('waAskInput').value || '').trim();
   if (!q) { toast('Type a question first'); return; }
@@ -12522,6 +12934,10 @@ function updateFilterBarTop() {
       <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#4A90D9;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
         <span style="font-size:20px;">✉️</span> Send by Email
         <span style="font-size:11px;opacity:0.8;">(copy & paste)</span>
+      </button>
+      <button id="sharePageBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2E7D32;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+        <span style="font-size:20px;">🌐</span> Save as a web page
+        <span style="font-size:11px;opacity:0.85;">(one file, opens anywhere)</span>
       </button>
       <button id="shareCopyBtn" onclick="closeM('shareRecipeOverlay')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
         <span style="font-size:20px;">📋</span> Copy to Clipboard
