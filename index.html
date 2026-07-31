@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.7 -->
+<!-- Tony's Recipes Collection v27.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1724,6 +1724,71 @@ const SELF_TESTS = [
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
 
+  { id:'feat_ticks', group:'Features', name:'Tick-off boxes strike lines through, cleared on close',
+    test: async()=>{
+      ['toggleTick','clearTicks','applyTicks'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var testId=888915;
+      recipes.unshift(normalizeRecipe({id:testId,name:'TickTest',servings:'4',
+        ingredients:[{a:'100g',n:'flour'},{a:'2',n:'eggs'}],steps:['Mix','Bake'],updatedAt:Date.now()}));
+      try {
+        openView(testId); await wait(90);
+        var boxes=document.querySelectorAll('#viewModal .tick-box');
+        if(boxes.length!==4) throw new Error('expected a box on 2 ingredients + 2 steps, got '+boxes.length);
+        var ing0=document.querySelector('#viewModal [data-line="ing-0"]');
+        toggleTick('ing-0'); await wait(30);
+        if(!ing0.classList.contains('ticked')) throw new Error('ticking did not mark the line');
+        if(getComputedStyle(ing0.querySelector('.line-text')).textDecorationLine.indexOf('line-through')===-1)
+          throw new Error('a ticked ingredient is not struck through');
+        if(!ing0.querySelector('.tick-box').classList.contains('on')) throw new Error('the box does not show as ticked');
+        toggleTick('ing-0'); await wait(30);
+        if(ing0.classList.contains('ticked')) throw new Error('unticking did not clear the line');
+        if(getComputedStyle(ing0.querySelector('.line-text')).textDecorationLine.indexOf('line-through')!==-1)
+          throw new Error('unticking left the strike-through in place');
+        // Ticking must not also move the line marker.
+        clearLineMark(); toggleTick('step-1'); await wait(30);
+        if(_lineMark) throw new Error('ticking a box also moved the line marker');
+        // Ticks survive a re-render within the session...
+        toggleTick('ing-1'); setMult(2); await wait(140);
+        if(!document.querySelector('#viewModal [data-line="ing-1"]').classList.contains('ticked'))
+          throw new Error('ticks were lost when the view re-rendered');
+        // ...but must NOT survive closing the recipe.
+        setMult(1); closeM('viewOverlay'); await wait(40);
+        if(Object.keys(_ticks).length!==0) throw new Error('ticks survived closing the recipe — they are meant to be session-only');
+        openView(testId); await wait(90);
+        if(document.querySelectorAll('#viewModal .ticked').length!==0) throw new Error('reopening the recipe showed old ticks');
+        // Nothing may be persisted.
+        var dump=JSON.stringify(localStorage);
+        if(dump.indexOf('"ing-0"')!==-1||dump.indexOf('tonys_ticks')!==-1) throw new Error('ticks were written to storage');
+      } finally {
+        closeM('viewOverlay'); _ticks={};
+        recipes=recipes.filter(function(x){return x.id!==testId;}); saveData(); renderGrid();
+      }
+    } },
+  { id:'feat_voice_safety', group:'Features', name:'Voice cannot lock the app up (iPhone freeze)',
+    test: async()=>{
+      if(typeof isIOS!=='function') throw new Error('isIOS not defined');
+      var src=String(toggleVoice);
+      // The freeze was a synchronous onend->start() loop. It must be deferred
+      // AND bounded, or a failing engine spins the main thread.
+      if(!/setTimeout/.test(src)) throw new Error('the restart is still synchronous — that is what froze the app');
+      if(!/_voiceRestarts/.test(src)) throw new Error('there is no cap on restarts');
+      if(!/_voiceWatchdog/.test(src)) throw new Error('there is no watchdog to switch listening off');
+      // iOS defines the API but cannot honour it — the button must not appear.
+      var ua=Object.getOwnPropertyDescriptor(Navigator.prototype,'userAgent');
+      try {
+        Object.defineProperty(navigator,'userAgent',{ value:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', configurable:true });
+        if(isIOS()!==true) throw new Error('an iPhone user agent was not detected');
+        if(voiceSupported()!==false) throw new Error('the voice button would still be offered on an iPhone, where it freezes the app');
+      } finally {
+        delete navigator.userAgent;
+        if(ua) try { Object.defineProperty(Navigator.prototype,'userAgent',ua); } catch(e) {}
+      }
+      // Stopping must always be possible and must fully detach the engine.
+      stopVoice();
+      if(_voiceOn) throw new Error('stopVoice did not switch listening off');
+      if(_voiceRec!==null) throw new Error('stopVoice left the recogniser attached');
+    } },
+
   // ── Batch E ─────────────────────────────────────────────────────────────────
   { id:'ui_styled_dialogs', group:'UI', name:'Styled confirm/prompt replace the native ones',
     test: async()=>{
@@ -2238,6 +2303,8 @@ var SELF_TEST_FIXES = {
   ui_dropdown_reopen: { fix:'toggleDrop() must register its outside-click listener through _armDropOutside() and closeDrop() must call _disarmDropOutside(). Otherwise the listener a menu item leaves behind closes the menu again on the very next click of its trigger button.', autofix: null },
   ui_theme:       { fix:'Dark mode plumbing missing. Needs THEME_KEY/tonys_theme, setTheme()/getTheme()/effectiveTheme()/applyTheme() stamping data-theme on <html>, a :root[data-theme="dark"] variable block in the stylesheet, and the #themeModeItem entry in the ⚙️ Settings menu.', autofix: null },
   feat_bring_status_honest: { fix:'The Bring! status bar must be driven by checkBringTokenStatus() (Worker action "bring-token-status"), not by the per-device bring_token_expiry value. A stale local expiry may only ever produce "status unknown" / "last known", never "expired".', autofix: null },
+  feat_ticks: { fix:'Every ingredient/step needs a .tick-box button. toggleTick() must stopPropagation (so ticking does not also move the line marker), strike the line through via the .ticked class, survive a re-render, and be wiped from memory when the recipe closes. Nothing about ticks is persisted.', autofix: null },
+  feat_voice_safety: { fix:'voiceSupported() must return false on iOS (the API exists but cannot honour `continuous`), and the onend restart must be deferred via setTimeout, capped by _voiceRestarts and bounded by _voiceWatchdog. A synchronous unbounded restart pegs the main thread and freezes the app with no way out.', autofix: null },
   ui_styled_dialogs: { fix:'2.1 — askConfirm()/askPrompt() replace native confirm()/prompt(). They must escape their text, resolve true/false (or the typed string / null), and clean up the overlay. Only the last-ditch fallback in showUnsavedChanges may still call confirm().', autofix: null },
   feat_voice: { fix:'3.7 — handleVoiceCommand must recognise next/back/repeat/clear plus the Hebrew equivalents, clamp at the first and last line, and be incapable of reaching any function that writes data.', autofix: null },
   form_ings_single_source: { fix:'2.2 — the ingredient table is the data. saveRecipe and editFormState must call readIngsTable(); the hidden #f-ings textarea and its flatten-to-"amount — name"/reparse round trip must be gone, since it mangled any name containing a dash.', autofix: null },
@@ -2828,7 +2895,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.7';
+var APP_VERSION = 'v27.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3864,6 +3931,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 [data-line]:hover { background: rgba(0,0,0,0.025); }
 :root[data-theme="dark"] [data-line]:hover { background: rgba(255,255,255,0.05); }
 .line-current { font-weight: 600; }
+.tick-box {
+  flex-shrink: 0; width: 22px; height: 22px; margin-inline-end: 10px;
+  border: 2px solid var(--border); border-radius: 6px; background: var(--card-bg);
+  cursor: pointer; font-size: 13px; font-weight: 700; line-height: 1; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent; padding: 0;
+}
+.tick-box:hover { border-color: var(--terracotta); }
+.tick-box:active { transform: scale(0.88); }
+.tick-box.on { background: var(--green); border-color: var(--green); }
+/* Striking through the text, not the amount or the tick itself. */
+.ticked .line-text, .ticked .step-text { text-decoration: line-through; color: var(--muted); }
+.ticked .ing-amount { text-decoration: line-through; opacity: 0.55; }
+.ticked .step-num { opacity: 0.45; }
+.ingredients-list li, .steps-list li { display: flex; align-items: flex-start; }
+.ingredients-list li .line-text { flex: 1; min-width: 0; }
 .line-mark-hint { font-size: 11px; color: var(--muted); margin: 10px 0 0; text-align: center; }
 .voice-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .ask-card { background: var(--card-bg); border-radius: 16px; width: 92%; max-width: 420px; padding: 22px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); }
@@ -5096,7 +5180,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5657,7 +5741,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6406,6 +6490,40 @@ function positionLineMarker(animate) {
 // Re-measure after a render, a resize, or the two-column layout kicking in.
 function refreshLineMarker() { positionLineMarker(false); }
 window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker(); });
+// ─── TICK-OFF CHECKBOXES ──────────────────────────────────────────────────────
+// A checkbox beside every ingredient and step: ticking it strikes the line
+// through, so you can see what's already in the bowl and what's done.
+// Deliberately session-only — held in memory, never written to storage — so
+// closing the recipe wipes every tick and the next cook starts clean.
+var _ticks = {};        // "ing-3" / "step-1" -> true, for the open recipe only
+
+function isTicked(key) { return !!_ticks[key]; }
+function toggleTick(key, ev) {
+  if (ev) ev.stopPropagation();   // ticking must not also move the line marker
+  if (_ticks[key]) delete _ticks[key]; else _ticks[key] = true;
+  applyTicks();
+}
+// Applied to the DOM directly rather than by re-rendering: a full drawView()
+// would rebuild the marker and scroll position for what is a one-line change.
+function applyTicks() {
+  document.querySelectorAll('#viewModal [data-line]').forEach(function(li) {
+    var key = li.getAttribute('data-line');
+    var on  = isTicked(key);
+    li.classList.toggle('ticked', on);
+    var box = li.querySelector('.tick-box');
+    if (box) {
+      box.classList.toggle('on', on);
+      box.textContent = on ? '✓' : '';
+      box.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+  });
+  var n = Object.keys(_ticks).length;
+  var btn = document.getElementById('clearTicksBtn');
+  if (btn) btn.style.display = n ? 'inline-block' : 'none';
+}
+function clearTicks() { _ticks = {}; applyTicks(); }
+window.toggleTick = toggleTick; window.clearTicks = clearTicks; window.applyTicks = applyTicks;
+
 // ─── VOICE CONTROL (3.7) ──────────────────────────────────────────────────────
 // Moving the marker with messy hands. Deliberately narrow: it only moves your
 // place and reads the current line back — it never edits, deletes or saves
@@ -6413,8 +6531,19 @@ window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker()
 // Web Speech API: good in Chrome, absent in Firefox and unreliable in iOS
 // Safari, so the button only appears where it actually works.
 var _voiceRec = null, _voiceOn = false;
+var _voiceRestarts = 0, _voiceLastStart = 0, _voiceRestartTimer = null, _voiceWatchdog = null;
 
+// iOS defines webkitSpeechRecognition but does not honour `continuous`: the
+// engine ends immediately, and the old onend->start() restart had no guard, so
+// it span in a tight loop that pegged the main thread. That is what froze the
+// app with "Listening…" and no way out. Every browser on iOS is WebKit, so
+// checking the engine rather than the browser name is the right test.
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS
+}
 function voiceSupported() {
+  if (isIOS()) return false;   // present but non-functional — see above
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 function currentLineCount(kind) {
@@ -6476,15 +6605,49 @@ function toggleVoice() {
       : '🎤 Voice control stopped: ' + e.error);
     stopVoice();
   };
-  _voiceRec.onend = function() { if (_voiceOn) { try { _voiceRec.start(); } catch(e) {} } };  // keep listening
-  try { _voiceRec.start(); } catch(e) { toast('Could not start the microphone'); return; }
+  // Restarting on `onend` is what keeps listening between phrases, but it must
+  // never be able to spin. If the engine ends immediately several times over,
+  // it is not working here — stop and say so rather than locking the app up.
+  _voiceRestarts = 0;
+  _voiceRec.onend = function() {
+    if (!_voiceOn) return;
+    var since = Date.now() - _voiceLastStart;
+    if (since < 900) {
+      _voiceRestarts++;
+      if (_voiceRestarts >= 4) {
+        toast('🎤 Voice control is not working in this browser — switched off');
+        stopVoice();
+        return;
+      }
+    } else {
+      _voiceRestarts = 0;      // it ran for a while, so this is a normal gap
+    }
+    // Always resume on a timer, never synchronously: a synchronous restart is
+    // what turned a failing engine into a busy loop.
+    _voiceRestartTimer = setTimeout(function() {
+      if (!_voiceOn || !_voiceRec) return;
+      _voiceLastStart = Date.now();
+      try { _voiceRec.start(); } catch(e) { stopVoice(); }
+    }, 400);
+  };
+  _voiceLastStart = Date.now();
+  try { _voiceRec.start(); } catch(e) { toast('Could not start the microphone'); _voiceRec = null; return; }
   _voiceOn = true;
+  // A safety net: listening never stays on indefinitely, whatever else happens.
+  clearTimeout(_voiceWatchdog);
+  _voiceWatchdog = setTimeout(function(){ if (_voiceOn) { toast('🎤 Voice control switched off after 10 minutes'); stopVoice(); } }, 10*60*1000);
   updateVoiceButton();
   toast('🎤 Listening — say "next", "back", "repeat" or "clear"');
 }
 function stopVoice() {
   _voiceOn = false;
-  if (_voiceRec) { try { _voiceRec.onend = null; _voiceRec.stop(); } catch(e) {} _voiceRec = null; }
+  clearTimeout(_voiceRestartTimer); clearTimeout(_voiceWatchdog);
+  _voiceRestarts = 0;
+  if (_voiceRec) {
+    try { _voiceRec.onend = null; _voiceRec.onerror = null; _voiceRec.onresult = null; } catch(e) {}
+    try { _voiceRec.abort ? _voiceRec.abort() : _voiceRec.stop(); } catch(e) {}
+    _voiceRec = null;
+  }
   updateVoiceButton();
 }
 function updateVoiceButton() {
@@ -6493,7 +6656,7 @@ function updateVoiceButton() {
   b.textContent = _voiceOn ? '🎤 Listening…' : '🎤 Voice';
   b.classList.toggle('voice-on', _voiceOn);
 }
-window.toggleVoice = toggleVoice; window.stopVoice = stopVoice;
+window.toggleVoice = toggleVoice; window.stopVoice = stopVoice; window.isIOS = isIOS;
 window.handleVoiceCommand = handleVoiceCommand; window.voiceSupported = voiceSupported;
 window.moveMark = moveMark; window.speakCurrentLine = speakCurrentLine;
 
@@ -6504,6 +6667,9 @@ window.refreshLineMarker = refreshLineMarker; window.loadLineMark = loadLineMark
 // Escape closes the top-most open dialog. Previously the only way out of a modal
 // was finding the ✕ (or tapping the backdrop), which is awkward on a keyboard.
 function closeTopModal() {
+  // Never leave the microphone running behind a closing dialog.
+  if (typeof _voiceOn !== 'undefined' && _voiceOn) { stopVoice(); return true; }
+  
   // Dynamically-created overlays are removed rather than closed
   var transient = document.getElementById('stDetailOverlay') || document.getElementById('serviceErrorOverlay');
   if (transient) { transient.remove(); return true; }
@@ -6892,7 +7058,9 @@ function drawView(){
   const ings=r.ingredients.map((i,_ii)=>{
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
     if (awkwardCount(i.n, sc)) _awkward.push(i.n);
-    return `<li dir="auto" data-line="ing-${_ii}" onclick="markLine('ing',${_ii})"><span>${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
+    return `<li dir="auto" data-line="ing-${_ii}" onclick="markLine('ing',${_ii})">`
+      + `<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ${escA(i.n)} as added" onclick="toggleTick('ing-${_ii}',event)"></button>`
+      + `<span class="line-text">${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
   }).join('');
   // 3.3 — don't pretend "1.5 eggs" is a measurement; say what to do about it.
   const awkwardNote = _awkward.length
@@ -7002,15 +7170,16 @@ function drawView(){
           `<button class="cook-timer-btn" id="cookTimer-${i}-${ti}" onclick="event.stopPropagation();startCookTimer('${i}-${ti}',${t.secs})">⏱ ${fmtClock(t.secs)}</button>`
         ).join('');
         const txt = `<span class="step-text">${escH(s)}${timers?`<br>${timers}`:''}</span>`;
+        const box = `<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ${i+1} as done" onclick="toggleTick('step-${i}',event)"></button>`;
         const attrs = `data-line="step-${i}" onclick="markLine('step',${i})"`;
         if (isHebrew) {
-          return `<li dir="rtl" class="step-rtl" ${attrs}>${num}${txt}</li>`;
+          return `<li dir="rtl" class="step-rtl" ${attrs}>${box}${num}${txt}</li>`;
         }
-        return `<li dir="ltr" ${attrs}>${num}${txt}</li>`;
+        return `<li dir="ltr" ${attrs}>${box}${num}${txt}</li>`;
       }).join('')}</ol>
       </div>
       </div>
-      <p class="line-mark-hint">Tap any line to mark where you are · double-tap to clear${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
+      <p class="line-mark-hint">Tap a box to tick a line off · tap the line to mark where you are · double-tap to clear <button id="clearTicksBtn" class="voice-btn" style="display:none;" onclick="clearTicks()">Clear ticks</button>${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
       </div>
       <div class="recipe-actions">
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
@@ -7033,6 +7202,7 @@ function drawView(){
   // The view re-renders on scaling, unit changes, cooked-count updates and so on.
   // Re-measure rather than re-animate, so your place never jumps or is lost.
   clearCookTimers();
+  applyTicks();   // ticks survive a re-render (scaling, units) within the session
   requestAnimationFrame(function(){ positionLineMarker(false); });
 }
 
@@ -8831,7 +9001,7 @@ function closeM(id){
     return;
   }
   document.getElementById(id).classList.remove('open');
-  if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); }
+  if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
   if(id==='editOverlay') _editFormSnapshot = null;
 }
 

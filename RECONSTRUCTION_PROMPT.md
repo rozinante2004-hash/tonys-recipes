@@ -535,9 +535,19 @@ never lose it.
 inside the step. These lived in Cook Mode but were never part of it; they survived its removal.
 `clearCookTimers()` runs on every re-render and when the recipe closes.
 
+**Tick-off boxes.** Each ingredient/step carries a `.tick-box`; `toggleTick()` strikes the line
+through via `.ticked`. It calls `stopPropagation()` so ticking doesn't also move the marker.
+Ticks live in the in-memory `_ticks` object **only** — never persisted, wiped when the recipe
+closes, re-applied (not re-rendered) after a scaling/unit re-render.
+
 **Voice (3.7)** is scoped to the marker: `handleVoiceCommand()` understands next / back / repeat /
 clear / ingredients / steps in English and Hebrew, clamps at the first and last line, and is
 deliberately incapable of reaching any function that writes data.
+> **Never restart recognition synchronously.** iOS defines `webkitSpeechRecognition` but cannot
+> honour `continuous`, so it ends immediately; an unguarded `onend → start()` becomes a tight loop
+> that pegs the main thread and freezes the whole app with no way out. `voiceSupported()` therefore
+> returns false on iOS, restarts are deferred via `setTimeout` and capped by `_voiceRestarts`, and
+> `_voiceWatchdog` plus Escape always switch listening off.
 
 ---
 

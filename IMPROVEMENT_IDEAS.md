@@ -136,7 +136,19 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 
 ---
 
-## 5a. Keeping your place (v27.7)
+## 5a. Keeping your place (v27.7–v27.8)
+
+**Tick-off boxes (v27.8).** Every ingredient and step has a checkbox; ticking strikes the line
+through so you can see what's in the bowl and what's done. Session-only by design — held in
+memory, never written to storage, wiped when the recipe closes, so the next cook starts clean.
+
+> **iPhone voice freeze (fixed in v27.8).** `onend` restarted recognition synchronously with no
+> guard. iOS defines `webkitSpeechRecognition` but cannot honour `continuous`, so it ended
+> instantly, restarted instantly, and the resulting tight loop pegged the main thread — the app
+> froze showing "Listening…" with no way out. Three fixes: iOS is excluded from `voiceSupported()`
+> so the button never appears there; restarts are deferred and capped, so a failing engine switches
+> itself off instead of spinning; and a watchdog plus Escape always stop listening.
+
 
 Cook Mode is gone. In its place, tapping any ingredient or step marks where you are and a single
 highlight **slides** to it; tapping the same line twice, or double-tapping the recipe, clears it.
