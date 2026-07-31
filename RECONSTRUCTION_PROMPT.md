@@ -204,6 +204,9 @@ forwards whatever the client sends.)
 - `pwa_install_dismissed`, `pwa_install_dismissed_ios` → PWA banner dismissal
 - `tonys_gmail_client_id` → user‑supplied Google OAuth client id for Gmail send
 - `tonys_debug_mode` → `'1'`/`'0'` — Debug mode (⚙️ Settings → Debug mode, off by default); all debug tracing goes through `dlog()`, silent unless enabled
+- `tonys_ai_cache` → AI response cache (5.7): `{ <key>: {v, at} }`, keyed on a digest of
+  model + max_tokens + prompt. 7-day TTL, 40 entries, oldest evicted first. Tool-using calls and
+  failed calls are never cached. On a quota error the **cache** is dropped, never the recipes
 - `tonys_theme` → `'light'` | `'dark'` | `'auto'` — ⚙️ Settings → Theme. `applyTheme()` stamps
   `data-theme` on `<html>`; `auto` follows `prefers-color-scheme` and re-applies live on change
 - `tonys_wa_base` → base URL of the shared WhatsApp export folder (default the repo's
@@ -487,6 +490,30 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
     is available at all.
   - **Expired modal** (`showBringTokenExpired`/`openBringForTokenRefresh`) polls `bring-lists`
     until the token works again, then re-checks the real expiry and retries the queued items.
+
+---
+
+## 10a. Scaling, and the cooking log
+
+**Scaling (3.3)** offers two routes to the same multiplier, both kept on purpose:
+- the `×1`–`×6` buttons (`setMult`), and
+- a **"Make it for [N] servings"** stepper (`setServings`/`nudgeServings`), rendered only when
+  `parseServings(r.servings)` finds a number — a recipe whose servings field reads "—" gets no
+  control rather than a broken one. `viewMult` becomes fractional (6 from a base of 4 → ×1.5),
+  which the persisted `scale_<id>` key and the Bring! integration both already handle.
+
+`fmtAmt` rounds to what a cook can measure: nearest 5 above 100, whole above 20, half above 2,
+quarter above 0.5. `scaleAmt` **preserves the author's spacing** — "200g" → "300g", never
+"300 g"; the old code inserted a space into every scaled amount, including those sent to Bring!.
+`awkwardCount()` flags a bare fractional count of a countable thing ("2.5 eggs") and the view
+shows a note, because that is a rounding decision for the cook, not a measurement.
+
+**Cooking log (3.5):** `markCooked` opens `#cookLogOverlay` for an optional 1–5 star rating and a
+note; *Just log it — no note* preserves the original one-tap behaviour, and a missing modal falls
+straight through to `commitCooked`. Entries append to `r.cookLog` (`{at, rating, note}`, capped at
+50, sanitised in `normalizeRecipe`). `avgRating` averages only the *rated* cooks. Deleting a log
+entry must **not** change `cookCount` — the count is how many times it was cooked, not how many
+notes survive. `duplicateRecipe` clears the log along with the count.
 
 ---
 

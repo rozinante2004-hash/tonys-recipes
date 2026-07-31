@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.3 -->
+<!-- Tony's Recipes Collection v27.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -289,6 +289,7 @@ function duplicateRecipe(id) {
   copy.fav = false;
   copy.cookCount = 0;
   copy.lastCooked = undefined;
+  copy.cookLog = [];        // a variant hasn't been cooked, and inherits no verdicts
   copy.updatedAt = Date.now();
   var idx = recipes.findIndex(function(x){ return x.id===id; });
   recipes.splice(idx < 0 ? 0 : idx + 1, 0, copy); // sit next to the original
@@ -870,15 +871,48 @@ const SELF_TESTS = [
   { id:'feat_cook',      group:'Features', name:'Cook count (mark as cooked)',
     test: async()=>{
       if(typeof markCooked!=='function') throw new Error('markCooked not defined');
+      if(typeof commitCooked!=='function') throw new Error('commitCooked not defined');
       if(!recipes.length) throw new Error('No recipes');
-      const r=recipes[0]; const before=r.cookCount||0;
-      markCooked(r.id);
-      await wait(200);
-      closeM('viewOverlay');
-      if((r.cookCount||0)!==before+1) throw new Error('cookCount not incremented');
-      r.cookCount=before; r.updatedAt=Date.now(); saveLocal(); // revert
+      const r=recipes[0]; const before=r.cookCount||0; const logBefore=(r.cookLog||[]).length;
+      try {
+        markCooked(r.id);
+        await wait(150);
+        if(!document.getElementById('cookLogOverlay').classList.contains('open')) throw new Error('markCooked should offer to record how it went');
+        skipCookLog();          // the one-tap path must still work
+        if((r.cookCount||0)!==before+1) throw new Error('cookCount not incremented');
+        if((r.cookLog||[]).length!==logBefore+1) throw new Error('the attempt was not added to the cooking log');
+      } finally {
+        r.cookCount=before; r.cookLog=(r.cookLog||[]).slice(0,logBefore);
+        r.updatedAt=Date.now(); saveLocal(); closeM('cookLogOverlay'); closeM('viewOverlay');
+      }
     }
   },
+  { id:'feat_cook_log', group:'Features', name:'Cook notes & ratings per attempt',
+    test: async()=>{
+      if(typeof avgRating!=='function') throw new Error('avgRating not defined');
+      if(!document.getElementById('cookLogOverlay')) throw new Error('#cookLogOverlay missing');
+      var testId=888907;
+      recipes.unshift(normalizeRecipe({id:testId,name:'CookLogTest',servings:'4',ingredients:[{a:'1',n:'x'}],steps:['s'],updatedAt:Date.now()}));
+      var r=recipes.find(function(x){return x.id===testId;});
+      try {
+        commitCooked(testId,5,'too salty — halve the soy');
+        commitCooked(testId,3,'');
+        commitCooked(testId,0,'');            // unrated cook
+        if(r.cookCount!==3) throw new Error('expected 3 cooks, got '+r.cookCount);
+        if(r.cookLog.length!==3) throw new Error('expected 3 log entries, got '+r.cookLog.length);
+        if(Math.abs(avgRating(r)-4)>0.001) throw new Error('unrated cooks must not drag the average down; expected 4, got '+avgRating(r));
+        // A note is a note — deleting one must not rewrite how many times it was cooked.
+        deleteCookLogEntry(testId, r.cookLog[0].at);
+        if(r.cookLog.length!==2) throw new Error('the entry was not removed');
+        if(r.cookCount!==3) throw new Error('deleting a note must not change cookCount');
+        // Ratings survive a save/normalise round trip.
+        var round=normalizeRecipe(JSON.parse(JSON.stringify(r)));
+        if(round.cookLog.length!==2||round.cookLog[0].rating!==3) throw new Error('the log did not survive normalizeRecipe');
+        // Junk in the log must not crash the view.
+        var junk=normalizeRecipe({id:1,cookLog:[null,{rating:'99',note:5},'nope']});
+        if(junk.cookLog.length!==1||junk.cookLog[0].rating!==0) throw new Error('a malformed log entry was not sanitised');
+      } finally { recipes=recipes.filter(function(x){return x.id!==testId;}); saveData(); renderGrid(); }
+    } },
   { id:'feat_scale',     group:'Features', name:'Scaling memory persists',
     test: async()=>{
       if(!recipes.length) throw new Error('No recipes');
@@ -1181,11 +1215,15 @@ const SELF_TESTS = [
       try {
         viewId=testId; viewMult=3; viewUnit='metric';
         openBringModal(testId);
-        if(_bringScaledAmounts[0]!=='300 g') throw new Error('expected scaled amount "300 g" for ×3, got "'+_bringScaledAmounts[0]+'"');
+        // Spacing follows the source: "100g" scales to "300g", not "300 g".
+        if(_bringScaledAmounts[0]!=='300g') throw new Error('expected scaled amount "300g" for ×3, got "'+_bringScaledAmounts[0]+'"');
         var listHtml=document.getElementById('bringIngList').innerHTML;
-        if(listHtml.indexOf('300 g')===-1) throw new Error('Bring modal ingredient list does not show the scaled amount');
-        closeM('bringOverlay');
+        if(listHtml.indexOf('300g')===-1) throw new Error('Bring modal ingredient list does not show the scaled amount');
       } finally {
+        // Closing here, not in the try: a failed assertion used to leave this
+        // modal open, which then broke the Escape-closes-a-dialog test further
+        // down the suite — one failure masquerading as two.
+        closeM('bringOverlay');
         viewId=savedViewId; viewMult=savedMult; viewUnit=savedUnit;
         recipes=recipes.filter(function(r){return r.id!==testId;});
       }
@@ -1405,7 +1443,7 @@ const SELF_TESTS = [
         openCookMode(testId);
         if(!document.getElementById('cookOverlay').classList.contains('open')) throw new Error('cook mode did not open');
         if(document.getElementById('cookStepLabel').textContent!=='Step 1 of 2') throw new Error('wrong initial step');
-        if(document.getElementById('cookIngsList').textContent.indexOf('200 g')===-1) throw new Error('cook mode ingredients ignore the chosen scale');
+        if(document.getElementById('cookIngsList').textContent.indexOf('200g')===-1) throw new Error('cook mode ingredients ignore the chosen scale');
         cookNext();
         if(document.getElementById('cookStepLabel').textContent!=='Step 2 of 2') throw new Error('Next did not advance');
         if(!document.querySelector('#cookTimers button')) throw new Error('no timer offered for a step containing "5 minutes"');
@@ -1624,6 +1662,105 @@ const SELF_TESTS = [
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
 
+  // ── Batch C ─────────────────────────────────────────────────────────────────
+  { id:'feat_scale_servings', group:'Features', name:'Scale by target servings (alongside ×N)',
+    test: async()=>{
+      if(typeof setServings!=='function'||typeof parseServings!=='function') throw new Error('setServings/parseServings not defined');
+      if(parseServings('4')!==4) throw new Error('plain "4" should parse to 4');
+      if(parseServings('6 servings')!==6) throw new Error('"6 servings" should parse to 6');
+      if(parseServings('4-6')!==4) throw new Error('"4-6" should take the first number');
+      if(parseServings('—')!==null) throw new Error('"—" has no number and must return null, not a broken control');
+      if(parseServings('0')!==null) throw new Error('zero servings must not become a divisor');
+      var testId=888908;
+      recipes.unshift(normalizeRecipe({id:testId,name:'ServTest',servings:'4',ingredients:[{a:'200g',n:'flour'},{a:'2',n:'eggs'}],steps:['s'],updatedAt:Date.now()}));
+      var prevView=viewId, prevMult=viewMult;
+      try {
+        openView(testId); await wait(60);
+        setServings(8);
+        if(Math.abs(viewMult-2)>0.001) throw new Error('8 servings from a base of 4 should be ×2, got '+viewMult);
+        // The ×N buttons must still be there — this is an addition, not a replacement.
+        if(document.querySelectorAll('#viewModal .mult-btn').length!==6) throw new Error('the ×1–×6 buttons were removed; 3.3 was meant to add an option, not replace them');
+        if(!document.querySelector('#viewModal .serv-input')) throw new Error('the servings control is missing');
+        setServings(6);   // ×1.5 — the fractional case
+        if(Math.abs(viewMult-1.5)>0.001) throw new Error('6 from 4 should be ×1.5, got '+viewMult);
+        var amounts=Array.prototype.map.call(document.querySelectorAll('#viewModal .ing-amount'),function(e){return e.textContent;});
+        if(amounts.join(' ').indexOf('300g')===-1) throw new Error('200g ×1.5 should read 300g, got: '+amounts.join(' / '));
+        // "3 eggs" is fine; the warning is for when it isn't a whole number.
+        setServings(5);   // ×1.25 → 2.5 eggs
+        if(!document.querySelector('#viewModal .scale-warning')) throw new Error('a fractional egg count should be flagged, not shown as "2.5 eggs" silently');
+        // A recipe with no serving number must not get a broken control.
+        setMult(1); closeM('viewOverlay');
+        recipes.find(function(x){return x.id===testId;}).servings='—';
+        openView(testId); await wait(60);
+        if(document.querySelector('#viewModal .serv-input')) throw new Error('a recipe with no serving count must not show the servings control');
+      } finally {
+        closeM('viewOverlay'); recipes=recipes.filter(function(x){return x.id!==testId;});
+        try{localStorage.removeItem('scale_'+testId);}catch(e){}
+        viewId=prevView; viewMult=prevMult; saveData(); renderGrid();
+      }
+    } },
+  { id:'feat_amount_rounding', group:'Features', name:'Scaled amounts round to measurable values',
+    test: async()=>{
+      if(typeof fmtAmt!=='function') throw new Error('fmtAmt not defined');
+      if(fmtAmt(266.666)!=='265') throw new Error('large amounts should round to the nearest 5, got '+fmtAmt(266.666));
+      if(fmtAmt(33.33)!=='33') throw new Error('mid amounts should round to a whole number, got '+fmtAmt(33.33));
+      if(fmtAmt(2.4)!=='2.5') throw new Error('small amounts should round to the nearest half, got '+fmtAmt(2.4));
+      if(fmtAmt(4)!=='4') throw new Error('whole numbers must pass through untouched, got '+fmtAmt(4));
+      if(scaleAmt('200g',1.5)!=='300g') throw new Error('scaleAmt lost the unit or mis-rounded: '+scaleAmt('200g',1.5));
+      if(!awkwardCount('eggs','2.5')) throw new Error('2.5 eggs should be flagged as awkward');
+      if(awkwardCount('eggs','3')) throw new Error('3 eggs is a whole number and must not be flagged');
+      if(awkwardCount('flour','250')) throw new Error('flour is not a countable item');
+      if(awkwardCount('eggs','2.5 kg')) throw new Error('an amount with a unit is measurable and must not be flagged');
+    } },
+  { id:'feat_ai_cache', group:'Features', name:'AI answers are cached, failures are not',
+    test: async()=>{
+      if(typeof aiCacheKey!=='function'||typeof aiCacheGet!=='function'||typeof aiCachePut!=='function')
+        throw new Error('AI cache functions not defined');
+      var k1=aiCacheKey('hello world',2000), k2=aiCacheKey('hello world',2000), k3=aiCacheKey('hello worlds',2000);
+      if(k1!==k2) throw new Error('the same prompt must produce the same key');
+      if(k1===k3) throw new Error('different prompts must not collide');
+      if(aiCacheKey('hello world',2000)===aiCacheKey('hello world',3000)) throw new Error('the token budget must be part of the key');
+      var saved=null; try{ saved=localStorage.getItem('tonys_ai_cache'); }catch(e){}
+      try {
+        localStorage.removeItem('tonys_ai_cache');
+        if(aiCacheGet(k1)!==null) throw new Error('an empty cache must miss');
+        aiCachePut(k1,'the answer');
+        if(aiCacheGet(k1)!=='the answer') throw new Error('a stored answer was not returned');
+        // Expiry is honoured.
+        var o=JSON.parse(localStorage.getItem('tonys_ai_cache'));
+        o[k1].at=Date.now()-(8*24*60*60*1000);
+        localStorage.setItem('tonys_ai_cache',JSON.stringify(o));
+        if(aiCacheGet(k1)!==null) throw new Error('an entry older than the TTL must not be served');
+        // The cache is capped so it can never crowd out the recipes.
+        for(var i=0;i<50;i++) aiCachePut(aiCacheKey('p'+i,2000),'v'+i);
+        var n=Object.keys(JSON.parse(localStorage.getItem('tonys_ai_cache'))).length;
+        if(n>40) throw new Error('the cache grew past its cap: '+n+' entries');
+      } finally {
+        try{ if(saved===null) localStorage.removeItem('tonys_ai_cache'); else localStorage.setItem('tonys_ai_cache',saved); }catch(e){}
+      }
+    } },
+  { id:'feat_ai_error_states', group:'Features', name:'AI failures offer a way forward',
+    test: async()=>{
+      if(typeof aiFailPane!=='function'||typeof aiEmptyPane!=='function') throw new Error('aiFailPane/aiEmptyPane not defined');
+      if(typeof closeAllModalsThenFreehand!=='function') throw new Error('closeAllModalsThenFreehand not defined');
+      var billing=aiFailPane(new Error('BILLING: credits gone'),'runExplore');
+      if(billing.indexOf('console.anthropic.com/settings/billing')===-1) throw new Error('a billing failure should link to billing');
+      if(/BILLING:/.test(billing)) throw new Error('the raw error prefix leaked into the UI');
+      var key=aiFailPane(new Error('API_KEY: bad key'),'runExplore');
+      if(key.indexOf('settings/keys')===-1) throw new Error('a key failure should link to the keys page');
+      var net=aiFailPane(new Error('Failed to fetch'),'runExplore');
+      if(net.indexOf('runExplore()')===-1) throw new Error('a network failure should offer a retry');
+      // Every pane must offer the manual route out.
+      [billing,key,net,aiEmptyPane('ideas','runSuggest')].forEach(function(h,i){
+        if(h.indexOf('closeAllModalsThenFreehand')===-1) throw new Error('pane '+i+' offers no free-hand fallback — that is the dead end 2.5 was about');
+      });
+      // Error text must be escaped, not injected.
+      var evil=aiFailPane(new Error('<img src=x onerror=alert(1)>'),null);
+      if(evil.indexOf('<img')!==-1) throw new Error('an error message was injected as raw HTML');
+      // The free-hand importer must actually exist for that button to work.
+      if(!document.getElementById('freehandText')) throw new Error('#freehandText missing — the fallback button would open an empty box');
+    } },
+
   // ── WhatsApp groups (3.9) ───────────────────────────────────────────────────
   { id:'wa_parse', group:'WhatsApp', name:'Exported chats parse (iOS + Android formats)',
     test: async()=>{
@@ -1824,6 +1961,11 @@ var SELF_TEST_FIXES = {
   ui_dropdown_reopen: { fix:'toggleDrop() must register its outside-click listener through _armDropOutside() and closeDrop() must call _disarmDropOutside(). Otherwise the listener a menu item leaves behind closes the menu again on the very next click of its trigger button.', autofix: null },
   ui_theme:       { fix:'Dark mode plumbing missing. Needs THEME_KEY/tonys_theme, setTheme()/getTheme()/effectiveTheme()/applyTheme() stamping data-theme on <html>, a :root[data-theme="dark"] variable block in the stylesheet, and the #themeModeItem entry in the ⚙️ Settings menu.', autofix: null },
   feat_bring_status_honest: { fix:'The Bring! status bar must be driven by checkBringTokenStatus() (Worker action "bring-token-status"), not by the per-device bring_token_expiry value. A stale local expiry may only ever produce "status unknown" / "last known", never "expired".', autofix: null },
+  feat_scale_servings: { fix:'3.3 — drawView must render a .serv-input servings stepper (setServings/nudgeServings) *in addition to* the ×1–×6 buttons, only when parseServings(r.servings) returns a number, and flag ingredients that scale to a fractional count.', autofix: null },
+  feat_amount_rounding: { fix:'fmtAmt must round to values a cook can measure (nearest 5 above 100, whole above 20, half above 2, quarter above 0.5) and awkwardCount() must flag fractional bare counts of countable items like eggs.', autofix: null },
+  feat_ai_cache:  { fix:'5.7 — aiCall must consult aiCacheGet() before calling out and aiCachePut() only on a successful non-empty answer. Key on model + max_tokens + prompt; skip tool calls; cap by count and TTL so it never crowds out the recipes.', autofix: null },
+  feat_ai_error_states: { fix:'2.5 — AI failures must render aiFailPane()/aiEmptyPane(): plain-language cause, the right link or retry, and always a free-hand paste fallback. Error text must be escaped.', autofix: null },
+  feat_cook_log:  { fix:'3.5 — markCooked must open #cookLogOverlay for an optional rating and note; commitCooked appends to r.cookLog and increments cookCount. avgRating ignores unrated cooks, and deleting a note must not change cookCount.', autofix: null },
   ui_match_why:   { fix:'renderGrid() must call matchReason(r, q) for both card and list layouts, and hlMatch() must escape before wrapping the match in <mark> (never the reverse — that is an XSS hole).', autofix: null },
   ui_sync_indicator: { fix:'setSyncing(true/false) must bracket loadFromFirestore() and toggle the "syncing" class on #sectionLabel, counting nested syncs so an inner finish does not clear an outer one.', autofix: null },
   ui_two_col:     { fix:'drawView() must wrap Ingredients and Method in .recipe-columns > .recipe-col-ings / .recipe-col-steps so the ≥900px grid rule can put them side by side.', autofix: null },
@@ -2091,17 +2233,83 @@ document.addEventListener('visibilitychange', function() {
 });
 
 // ─── COOK COUNT ───────────────────────────────────────────────────────────────
+// 3.5 — "Cooked!" now offers to capture how it went. Rating and note are both
+// optional: "Just log it" keeps the one-tap behaviour this button always had.
+var _cookLogId = null, _cookLogRating = 0;
+
 function markCooked(id) {
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r) return;
+  _cookLogId = id; _cookLogRating = 0;
+  var ov = document.getElementById('cookLogOverlay');
+  if (!ov) { commitCooked(id, 0, ''); return; }   // never block logging on a missing modal
+  document.getElementById('cookLogTitle').textContent = r.name;
+  document.getElementById('cookLogNote').value = '';
+  renderCookLogStars();
+  ov.classList.add('open');
+  setTimeout(function(){ var n=document.getElementById('cookLogNote'); if(n) n.focus(); }, 120);
+}
+function renderCookLogStars(){
+  var wrap = document.getElementById('cookLogStars'); if(!wrap) return;
+  var html = '';
+  for (var s = 1; s <= 5; s++) {
+    html += '<button class="star-btn' + (s <= _cookLogRating ? ' on' : '') + '" onclick="setCookLogRating(' + s + ')"'
+          + ' aria-label="' + s + ' star' + (s===1?'':'s') + '">' + (s <= _cookLogRating ? '★' : '☆') + '</button>';
+  }
+  html += '<span id="cookLogRatingLabel" class="serv-note" style="margin-inline-start:6px;">'
+        + (_cookLogRating ? ['','too poor to repeat','needs work','good','very good','perfect'][_cookLogRating] : 'optional')
+        + '</span>';
+  wrap.innerHTML = html;
+}
+function setCookLogRating(n){
+  _cookLogRating = (_cookLogRating === n) ? 0 : n;   // tapping the same star clears it
+  renderCookLogStars();
+}
+function saveCookLog(){
+  var note = (document.getElementById('cookLogNote')||{value:''}).value.trim();
+  commitCooked(_cookLogId, _cookLogRating, note);
+  closeM('cookLogOverlay');
+}
+function skipCookLog(){
+  commitCooked(_cookLogId, 0, '');
+  closeM('cookLogOverlay');
+}
+function commitCooked(id, rating, note) {
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r) return;
+  if (!Array.isArray(r.cookLog)) r.cookLog = [];
+  r.cookLog.push({ at: Date.now(), rating: rating||0, note: note||'' });
+  if (r.cookLog.length > 50) r.cookLog = r.cookLog.slice(-50);  // keep the doc small
   r.cookCount = (r.cookCount||0) + 1;
   r.lastCooked = Date.now();
   r.updatedAt  = Date.now();
   saveData();
-  drawView(id); // refresh view to show updated count
+  if (viewId === id) drawView();
   toast('🍳 Cooked! (' + r.cookCount + ' time' + (r.cookCount!==1?'s':'') + ' total)');
 }
-window.markCooked = markCooked;
+function deleteCookLogEntry(id, at){
+  var r = recipes.find(function(x){ return x.id===id; });
+  if (!r || !Array.isArray(r.cookLog)) return;
+  var before = r.cookLog.length;
+  r.cookLog = r.cookLog.filter(function(e){ return e.at !== at; });
+  if (r.cookLog.length === before) return;
+  // The count is the number of times it was cooked, not the number of notes
+  // kept — deleting a note must not rewrite history.
+  r.updatedAt = Date.now();
+  saveData();
+  if (viewId === id) drawView();
+  toast('Note removed');
+}
+// Average of the ratings actually given (unrated cooks don't drag it down).
+function avgRating(r){
+  var rated = (r.cookLog||[]).filter(function(e){ return e.rating > 0; });
+  if (!rated.length) return null;
+  return rated.reduce(function(s,e){ return s + e.rating; }, 0) / rated.length;
+}
+function stars(n){ var w = Math.round(n); return '★★★★★'.slice(0, w) + '☆☆☆☆☆'.slice(0, 5 - w); }
+window.markCooked = markCooked; window.saveCookLog = saveCookLog; window.skipCookLog = skipCookLog;
+window.setCookLogRating = setCookLogRating; window.commitCooked = commitCooked;
+window.deleteCookLogEntry = deleteCookLogEntry; window.avgRating = avgRating; window.stars = stars;
 
 // ─── AUTO-FETCH MISSING PHOTOS ───────────────────────────────────────────────
 async function autoFetchMissingPhotos() {
@@ -2306,7 +2514,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.3';
+var APP_VERSION = 'v27.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3235,6 +3443,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 #bringTokenExpiredOverlay.open,
 #bringBookmarkletOverlay.open,
 #unsavedOverlay.open,
+#cookLogOverlay.open,
 #waAskOverlay.open,
 #waSetupOverlay.open {
   opacity: 1 !important;
@@ -3449,6 +3658,41 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* Scale & unit */
 .control-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
 .multiplier-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+/* 3.3 — scale by target servings, sitting under the ×N buttons */
+.servings-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.serv-step { width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.serv-step:hover { border-color: var(--terracotta); color: var(--terracotta); }
+.serv-input { width: 58px; height: 30px; text-align: center; border-radius: 7px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; }
+.serv-reset { background: none; border: none; color: var(--terracotta); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; text-decoration: underline; padding: 0 2px; }
+.serv-note { font-size: 11px; color: var(--muted); }
+.scale-warning { margin-top: 8px; font-size: 12px; line-height: 1.5; color: #8A6A00; background: #FFF8E8; border-left: 3px solid var(--gold); border-radius: 0 8px 8px 0; padding: 8px 12px; unicode-bidi: plaintext; text-align: start; }
+:root[data-theme="dark"] .scale-warning { color: #E8C888; background: #33280F; }
+
+/* 3.5 — cooking log: rating + note per attempt */
+.cooked-pill { background: #FFF0E8; border-radius: 12px; padding: 2px 10px; color: var(--terracotta); font-weight: 600; }
+:root[data-theme="dark"] .cooked-pill { background: #3A241A; }
+.star-btn { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 1px; transition: transform 0.1s; }
+.star-btn.on { color: var(--gold); }
+.star-btn:hover { transform: scale(1.15); }
+.rating-stars { color: var(--gold); letter-spacing: 1px; font-weight: 600; }
+.cook-log { margin-bottom: 12px; }
+.cook-log > summary { cursor: pointer; font-size: 12px; color: var(--muted); font-weight: 600; }
+.cook-log-body { margin-top: 8px; max-height: 240px; overflow-y: auto; }
+.cook-log-entry { border-left: 3px solid var(--border); padding: 6px 0 6px 10px; margin-bottom: 6px; }
+.cook-log-head { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.cook-log-del { margin-inline-start: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0 4px; }
+.cook-log-del:hover { color: #c62828; }
+.cook-log-note { font-size: 13px; color: var(--ink); line-height: 1.55; margin-top: 3px; unicode-bidi: plaintext; text-align: start; white-space: pre-wrap; }
+
+/* 2.5 — AI failure and empty states that offer a way forward */
+.ai-fail { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 16px; margin-top: 11px; text-align: center; }
+.ai-fail-icon { font-size: 26px; margin-bottom: 6px; }
+.ai-fail-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--heading); margin-bottom: 6px; }
+.ai-fail-body { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; word-break: break-word; }
+.ai-fail-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.ai-fail-btn { display: inline-block; padding: 9px 16px; border-radius: 8px; border: none; background: var(--terracotta); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.ai-fail-btn.ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+.ai-fail-btn.ghost:hover { color: var(--terracotta); border-color: var(--terracotta); }
 .mult-btn { padding: 4px 9px; border-radius: 5px; border: 1.5px solid var(--border); background: white; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--muted); transition: all 0.15s; }
 .mult-btn:hover, .mult-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; }
 .conv-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
@@ -4568,7 +4812,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5130,7 +5374,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5344,6 +5588,26 @@ body.banner-shown .header {
         • Re-exporting produces the <em>whole</em> history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.
       </div>
     </details>
+  </div>
+</div>
+
+<!-- COOK LOG — rating + note per attempt (3.5) -->
+<div id="cookLogOverlay" onclick="bgClose(event,'cookLogOverlay')" class="modal-overlay" style="z-index:1100;">
+  <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:420px;padding:22px;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+    <div style="font-size:30px;text-align:center;margin-bottom:6px;">🍳</div>
+    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--heading);text-align:center;margin-bottom:2px;">How did it go?</div>
+    <div id="cookLogTitle" dir="auto" style="unicode-bidi:plaintext;text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;"></div>
+    <div class="control-label">Rating</div>
+    <div id="cookLogStars" style="display:flex;align-items:center;gap:2px;margin-bottom:14px;"></div>
+    <div class="control-label">Note for next time</div>
+    <textarea id="cookLogNote" dir="auto" rows="3" placeholder="e.g. too salty — halve the soy next time"
+      style="unicode-bidi:plaintext;text-align:start;width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:14px;"></textarea>
+    <button onclick="saveCookLog()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+      ✅ Save
+    </button>
+    <button onclick="skipCookLog()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
+      Just log it — no note
+    </button>
   </div>
 </div>
 
@@ -6210,10 +6474,18 @@ function openView(id){
 
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
+  var _awkward = [];
   const ings=r.ingredients.map(i=>{
     const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
+    if (awkwardCount(i.n, sc)) _awkward.push(i.n);
     return `<li dir="auto"><span>${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
   }).join('');
+  // 3.3 — don't pretend "1.5 eggs" is a measurement; say what to do about it.
+  const awkwardNote = _awkward.length
+    ? `<div class="scale-warning" dir="auto">⚠️ ${escH(_awkward.slice(0,3).join(', '))}`
+      + `${_awkward.length>3 ? ' and '+(_awkward.length-3)+' more' : ''}`
+      + ` can't be split — round up or down, or pick a serving count that divides evenly.</div>`
+    : '';
   requestWakeLock();
   document.getElementById('viewModal').innerHTML=`
     <div style="position:sticky;top:max(60px, env(safe-area-inset-top) + 52px);display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
@@ -6252,6 +6524,22 @@ function drawView(){
       <div class="multiplier-row">
         ${[1,2,3,4,5,6].map(m=>`<button class="mult-btn${viewMult===m?' active':''}" onclick="setMult(${m})">×${m}</button>`).join('')}
       </div>
+      ${(function(){
+        var base = parseServings(r.servings);
+        if (base === null) return '';   // no number to scale from — no control
+        var cur = Math.round(base * viewMult);
+        var exact = Math.abs(base * viewMult - cur) > 0.01;
+        return `<div class="servings-row">
+          <span class="control-label" style="margin:0;">Make it for</span>
+          <button class="serv-step" onclick="nudgeServings(-1)" aria-label="One fewer serving">−</button>
+          <input class="serv-input" type="number" min="1" max="200" value="${cur}"
+                 onchange="servingsInputChanged(this)" aria-label="Target servings">
+          <button class="serv-step" onclick="nudgeServings(1)" aria-label="One more serving">+</button>
+          <span class="control-label" style="margin:0;">servings</span>
+          ${viewMult !== 1 ? `<button class="serv-reset" onclick="setMult(1)">reset to ${base}</button>` : ''}
+          ${exact ? `<span class="serv-note">≈ rounded</span>` : ''}
+        </div>`;
+      })()}
       <div class="conv-row">
         <span class="control-label">Units:</span>
         <div class="conv-toggle">
@@ -6260,12 +6548,32 @@ function drawView(){
         </div>
       </div>
       ${r.diets && r.diets.length ? '<div class="recipe-diet-tags" style="margin-bottom:10px;">' + r.diets.map(function(d){ return '<span class="recipe-diet-tag">' + escH(d) + '</span>'; }).join('') + '</div>' : ''}
-      ${r.cookCount ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="background:#FFF0E8;border-radius:12px;padding:2px 10px;color:var(--terracotta);font-weight:600;">🍳 Cooked ${r.cookCount} time${r.cookCount!==1?'s':''}</span>${r.lastCooked?`<span>· last ${new Date(r.lastCooked).toLocaleDateString()}</span>`:''}</div>` : ''}
+      ${(function(){
+        if (!r.cookCount) return '';
+        var avg = avgRating(r);
+        var log = (r.cookLog||[]).slice().sort(function(a,b){ return b.at - a.at; });
+        var withNotes = log.filter(function(e){ return e.note || e.rating; });
+        return `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="cooked-pill">🍳 Cooked ${r.cookCount} time${r.cookCount!==1?'s':''}</span>
+            ${r.lastCooked?`<span>· last ${new Date(r.lastCooked).toLocaleDateString()}</span>`:''}
+            ${avg!==null?`<span class="rating-stars" title="Average of ${(r.cookLog||[]).filter(function(e){return e.rating>0;}).length} rated cook(s)">${stars(avg)} <span style="color:var(--muted);font-weight:400;">${avg.toFixed(1)}</span></span>`:''}
+          </div>`
+          + (withNotes.length ? `<details class="cook-log"><summary>📓 Cooking log (${withNotes.length})</summary>
+              <div class="cook-log-body">${withNotes.map(function(e){
+                return '<div class="cook-log-entry">'
+                  + '<div class="cook-log-head"><span>' + new Date(e.at).toLocaleDateString() + '</span>'
+                  + (e.rating ? '<span class="rating-stars">' + stars(e.rating) + '</span>' : '')
+                  + '<button class="cook-log-del" onclick="deleteCookLogEntry(' + r.id + ',' + e.at + ')" title="Remove this note">✕</button></div>'
+                  + (e.note ? '<div class="cook-log-note" dir="auto">' + escH(e.note) + '</div>' : '')
+                  + '</div>';
+              }).join('')}</div></details>` : '');
+      })()}
       ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
       <div class="recipe-columns">
       <div class="recipe-col-ings">
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
+      ${awkwardNote}
       </div>
       <div class="recipe-col-steps">
       <div class="modal-section-title">Method</div>
@@ -6308,6 +6616,45 @@ function setMult(m){
   try { if(viewId!=null) localStorage.setItem('scale_'+viewId, String(m)); } catch(e){}
   drawView();
 }
+
+// ─── SCALE BY SERVINGS (3.3) ─────────────────────────────────────────────────
+// An *addition* to the ×1–×6 buttons, not a replacement: "make it for 6" is how
+// you actually think, but ×2 is quicker when that's what you want.
+// Needs a base serving count to divide by; recipes whose servings field is "—"
+// or prose simply don't get the control, rather than getting a broken one.
+function parseServings(s){
+  var m = String(s==null?'':s).match(/\d+(?:\.\d+)?/);
+  if (!m) return null;
+  var n = parseFloat(m[0]);
+  return (isNaN(n) || n <= 0) ? null : n;
+}
+function currentServings(r){
+  var base = parseServings(r.servings);
+  return base === null ? null : base * viewMult;
+}
+function setServings(target){
+  var r = recipes.find(function(x){ return x.id===viewId; });
+  if (!r) return;
+  var base = parseServings(r.servings);
+  if (base === null) return;
+  target = Math.max(1, Math.min(200, Math.round(target)));
+  setMult(target / base);
+}
+function nudgeServings(delta){
+  var r = recipes.find(function(x){ return x.id===viewId; });
+  if (!r) return;
+  var cur = currentServings(r);
+  if (cur === null) return;
+  setServings(Math.round(cur) + delta);
+}
+function servingsInputChanged(el){
+  var v = parseInt(el.value, 10);
+  if (isNaN(v) || v < 1) { drawView(); return; }   // reject junk, restore the real value
+  setServings(v);
+}
+window.parseServings = parseServings; window.setServings = setServings;
+window.nudgeServings = nudgeServings; window.servingsInputChanged = servingsInputChanged;
+window.currentServings = currentServings;
 function setUnit(u){viewUnit=u;drawView();}
 function toggleShare(id){
   var r=recipes.find(function(x){return x.id===id;});
@@ -6521,7 +6868,30 @@ function parseFraction(s) {
   }
   return parseFloat(s);
 }
-function fmtAmt(n){ return n%1===0 ? String(n) : String(parseFloat(n.toFixed(2))); }
+// Scaling by servings produces multipliers like 8/6 = 1.333, and "266.67 g flour"
+// is not a measurement anyone uses. Round to what a cook can actually measure:
+// big numbers to the nearest 5/10, small ones to a half or a quarter.
+function fmtAmt(n){
+  if (n % 1 === 0) return String(n);
+  var a = Math.abs(n);
+  if (a >= 100) return String(Math.round(n / 5) * 5);
+  if (a >= 20)  return String(Math.round(n));
+  if (a >= 2)   return String(Math.round(n * 2) / 2);       // nearest half
+  if (a >= 0.5) return String(Math.round(n * 4) / 4);       // nearest quarter
+  return String(parseFloat(n.toFixed(2)));
+}
+// Things you can't have a fraction of. "1.5 eggs" is a bug report, not a recipe.
+var COUNTABLE_RE = /\b(egg|eggs|ביצה|ביצים|onion|onions|בצל|clove|cloves|שן שום|שיני שום|lemon|lemons|לימון|banana|bananas|בננה|apple|apples|תפוח|potato|potatoes|תפוח אדמה|תפוחי אדמה|carrot|carrots|גזר|sheet|sheets|can|cans|קופסה|קופסאות)\b/i;
+// An amount is "awkward" when it's a bare count (no unit) of a countable thing
+// and scaling has left it fractional.
+function awkwardCount(name, scaledAmt){
+  if (!COUNTABLE_RE.test(String(name||''))) return false;
+  var m = String(scaledAmt||'').match(/^([\d.]+)\s*$/);   // bare number, no unit
+  if (!m) return false;
+  var v = parseFloat(m[1]);
+  return !isNaN(v) && v % 1 !== 0;
+}
+window.fmtAmt = fmtAmt; window.awkwardCount = awkwardCount;
 function scaleAmt(amt,mult){
   amt = (amt==null ? '' : String(amt));
   if(mult===1)return amt;
@@ -6532,12 +6902,15 @@ function scaleAmt(amt,mult){
     const a=parseFraction(range[1])*mult, b=parseFraction(range[2])*mult;
     if(!isNaN(a)&&!isNaN(b)) return `${fmtAmt(a)}-${fmtAmt(b)}${range[3]?' '+range[3]:''}`;
   }
-  const m=amt.match(/^([\d./]+)\s*(.*)/);
+  // Keep whatever spacing the author used: "200g" scales to "300g", "200 g" to
+  // "300 g". The old code always inserted a space, which rewrote every amount
+  // the moment you scaled — including the ones sent to Bring!.
+  const m=amt.match(/^([\d./]+)(\s*)(.*)/);
   if(!m)return amt;
   let n=parseFraction(m[1]);
   if(isNaN(n))return amt; // e.g. a stray "/" — leave the text untouched
   const scaled=n*mult;
-  return`${fmtAmt(scaled)}${m[2]?' '+m[2]:''}`;
+  return`${fmtAmt(scaled)}${m[3]?m[2]+m[3]:''}`;
 }
 
 // ═══════════════════════════════════
@@ -7214,7 +7587,9 @@ async function importFromFile(event){
 
   } catch(err) {
     console.error('[importFromFile]', err);
-    showImportError(err.message);
+    // `text` is var-scoped, so whatever we managed to extract is still here —
+    // hand it to the free-hand importer rather than making the user start over.
+    showImportError(err.message, typeof text === 'string' ? text : '');
   } finally {
     // Safe to clear now — file has been fully read
     try { event.target.value = ''; } catch(e) {}
@@ -7222,9 +7597,12 @@ async function importFromFile(event){
 }
 window.importFromFile = importFromFile;
 
-function showImportError(msg) {
+// salvage: any text we did manage to extract before failing, so the user can
+// carry on from it instead of starting over.
+function showImportError(msg, salvage) {
   var existing = document.getElementById('importErrorModal');
   if(existing) existing.remove();
+  salvage = (typeof salvage === 'string' && salvage.trim()) ? salvage : '';
 
   // Overlay
   var overlay = document.createElement('div');
@@ -7233,7 +7611,7 @@ function showImportError(msg) {
 
   // Card
   var card = document.createElement('div');
-  card.style.cssText = 'background:white;border-radius:14px;padding:24px;max-width:420px;width:100%;font-family:DM Sans,sans-serif;';
+  card.style.cssText = 'background:var(--card-bg);color:var(--ink);border-radius:14px;padding:24px;max-width:420px;width:100%;font-family:DM Sans,sans-serif;';
 
   // Icon
   var icon = document.createElement('div');
@@ -7242,30 +7620,50 @@ function showImportError(msg) {
 
   // Title
   var title = document.createElement('div');
-  title.style.cssText = 'font-size:16px;font-weight:700;color:#1C1A18;margin-bottom:8px;';
+  title.style.cssText = 'font-size:16px;font-weight:700;color:var(--heading);margin-bottom:8px;';
   title.textContent = 'Import Failed';
 
   // Message
   var msgEl = document.createElement('div');
-  msgEl.style.cssText = 'font-size:13px;color:#5C3D2E;background:#FFF0E8;border-radius:8px;padding:12px;margin-bottom:12px;line-height:1.6;word-break:break-word;';
+  msgEl.style.cssText = 'font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;line-height:1.6;word-break:break-word;';
   msgEl.textContent = msg;
 
-  // Tip
+  // 2.5 — a dead end plus "OK" wastes the work already done. Offer the recovery
+  // route as a button, and carry any text we managed to extract straight into it.
   var tip = document.createElement('div');
-  tip.style.cssText = 'font-size:12px;color:#8A8279;margin-bottom:16px;';
-  tip.textContent = 'Tip: Try the Free-hand text import — copy the recipe text and paste it there.';
+  tip.style.cssText = 'font-size:12px;color:#8A8279;margin-bottom:14px;line-height:1.6;';
+  tip.textContent = salvage
+    ? 'The text was read successfully — only the recipe structure could not be worked out. You can paste it into the free-hand importer, where you can fix it by hand.'
+    : 'Free-hand import lets you paste the recipe text yourself, which works when file reading does not.';
 
-  // Button
+  var actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:8px;';
+
+  var freehand = document.createElement('button');
+  freehand.style.cssText = 'flex:1;padding:12px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  freehand.textContent = salvage ? '✍️ Open with this text' : '✍️ Free-hand import';
+  freehand.onclick = function(){
+    overlay.remove();
+    openFreehandModal();
+    if (salvage) {
+      var ta = document.getElementById('freehandText');
+      if (ta) { ta.value = salvage; ta.focus(); }
+    }
+  };
+
   var btn = document.createElement('button');
-  btn.style.cssText = 'width:100%;padding:12px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;';
-  btn.textContent = 'OK';
+  btn.style.cssText = 'padding:12px 18px;background:transparent;color:#8A8279;border:1px solid #E0DAD2;border-radius:8px;font-size:14px;cursor:pointer;font-family:DM Sans,sans-serif;';
+  btn.textContent = 'Close';
   btn.onclick = function(){ overlay.remove(); };
+
+  actions.appendChild(freehand);
+  actions.appendChild(btn);
 
   card.appendChild(icon);
   card.appendChild(title);
   card.appendChild(msgEl);
   card.appendChild(tip);
-  card.appendChild(btn);
+  card.appendChild(actions);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 }
@@ -7536,6 +7934,64 @@ function renderIngTags(){
   wrap.appendChild(inp);inp.focus();
 }
 
+// ─── AI EMPTY / ERROR STATES (2.5) ───────────────────────────────────────────
+// A red sentence and nothing to click is a dead end. Every AI failure now names
+// what went wrong in plain language and offers the way out that actually fits it.
+// `retryFn` is a global function name (these panes are rendered as HTML strings).
+function aiFailPane(err, retryFn, opts){
+  opts = opts || {};
+  var msg = (err && err.message) || String(err || 'Something went wrong');
+  var icon = '⚠️', title, body, actions = [];
+
+  if (msg.startsWith('BILLING:')) {
+    icon = '💳'; title = 'Anthropic credits have run out';
+    body = 'AI features stay unavailable until the account is topped up. Everything else in the app works normally.';
+    actions.push('<a class="ai-fail-btn" href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer">Top up credits</a>');
+  } else if (msg.startsWith('API_KEY:')) {
+    icon = '🔑'; title = 'The API key was rejected';
+    body = 'The key in the Cloudflare Worker is invalid or expired, so this is a settings problem rather than anything you did.';
+    actions.push('<a class="ai-fail-btn" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">Check the key</a>');
+  } else if (/rate limit/i.test(msg)) {
+    icon = '⏰'; title = 'Too many requests just now';
+    body = 'The API is throttling us. Waiting a minute usually clears it.';
+    if (retryFn) actions.push('<button class="ai-fail-btn" onclick="' + escA(retryFn) + '()">Try again</button>');
+  } else if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    icon = '📡'; title = 'Could not reach the AI service';
+    body = 'That is usually the network or the Cloudflare Worker being unavailable, not the recipe.';
+    if (retryFn) actions.push('<button class="ai-fail-btn" onclick="' + escA(retryFn) + '()">Try again</button>');
+  } else {
+    title = 'The AI could not complete this';
+    body = msg;
+    if (retryFn) actions.push('<button class="ai-fail-btn" onclick="' + escA(retryFn) + '()">Try again</button>');
+  }
+  if (opts.freehand !== false) {
+    actions.push('<button class="ai-fail-btn ghost" onclick="closeAllModalsThenFreehand()">✍️ Paste a recipe by hand</button>');
+  }
+  return '<div class="ai-fail"><div class="ai-fail-icon">' + icon + '</div>'
+    + '<div class="ai-fail-title">' + escH(title) + '</div>'
+    + '<div class="ai-fail-body">' + escH(body) + '</div>'
+    + (actions.length ? '<div class="ai-fail-actions">' + actions.join('') + '</div>' : '')
+    + '</div>';
+}
+// The AI answered, but with nothing usable — a different problem from a failure.
+function aiEmptyPane(what, retryFn, hint){
+  return '<div class="ai-fail"><div class="ai-fail-icon">🤔</div>'
+    + '<div class="ai-fail-title">No ' + escH(what) + ' came back</div>'
+    + '<div class="ai-fail-body">' + escH(hint || 'The AI returned nothing usable. Fewer or broader filters usually help.') + '</div>'
+    + '<div class="ai-fail-actions">'
+    + (retryFn ? '<button class="ai-fail-btn" onclick="' + escA(retryFn) + '()">Try again</button>' : '')
+    + '<button class="ai-fail-btn ghost" onclick="closeAllModalsThenFreehand()">✍️ Paste a recipe by hand</button>'
+    + '</div></div>';
+}
+function closeAllModalsThenFreehand(){
+  ['exploreOverlay','suggestOverlay','urlImportOverlay','freehandOverlay'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.classList.remove('open');
+  });
+  openFreehandModal();
+}
+window.aiFailPane = aiFailPane; window.aiEmptyPane = aiEmptyPane;
+window.closeAllModalsThenFreehand = closeAllModalsThenFreehand;
+
 async function runExplore() {
   if (!ingTags.length) { toast("Add some ingredients first"); return; }
   const res = document.getElementById("exploreResult");
@@ -7555,10 +8011,10 @@ async function runExplore() {
       res.innerHTML = "<div class=\"explore-result\" style=\"color:#B05E00;\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026<div class=\"ai-spinner\" style=\"margin:8px auto;display:block;width:20px;height:20px;\"></div></div>";
       setTimeout(async () => {
         try { renderSuggestions(extractJSON(await aiCall(prompt, 3000)), "exploreResult"); }
-        catch(e2) { res.innerHTML = "<div class=\"explore-result\" style=\"color:#B03030;\">Still rate limited. Wait a minute.</div>"; }
+        catch(e2) { res.innerHTML = aiFailPane(e2, 'runExplore'); }
       }, 15000);
     } else {
-      res.innerHTML = "<div class=\"explore-result\" style=\"color:#B03030;\">Error: " + escH(err.message) + "</div>";
+      res.innerHTML = aiFailPane(err, 'runExplore');
     }
   }
 }
@@ -7567,7 +8023,12 @@ async function runExplore() {
 function renderSuggestions(suggestions, containerId) {
   const res = document.getElementById(containerId);
   if (!Array.isArray(suggestions) || !suggestions.length) {
-    res.innerHTML = `<div class="explore-result" style="color:#B03030;">No suggestions returned. Try different filters.</div>`;
+    // 2.5 — say which knob to turn, and leave a way out.
+    res.innerHTML = aiEmptyPane('ideas',
+      containerId === 'exploreResult' ? 'runExplore' : 'runSuggest',
+      containerId === 'exploreResult'
+        ? 'The AI returned nothing usable for those ingredients. Try fewer ingredients, or drop a diet filter.'
+        : 'The AI returned nothing usable for those filters. Try fewer chips, or clear the keywords.');
     return;
   }
   res.innerHTML = suggestions.map((s, i) => `
@@ -7663,10 +8124,10 @@ async function runSuggest() {
       res.innerHTML = "<div class=\"explore-result\" style=\"color:#B05E00;\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026</div>";
       setTimeout(async function(){
         try { renderSuggestions(extractJSON(await aiCall(prompt,3000)),"suggestResult"); }
-        catch(e2){res.innerHTML="<div class=\"explore-result\" style=\"color:#B03030;\">Still rate limited. Wait a minute.</div>";}
+        catch(e2){res.innerHTML=aiFailPane(e2,'runSuggest');}
       },15000);
     } else {
-      res.innerHTML = "<div class=\"explore-result\" style=\"color:#B03030;\">Error: "+escH(err.message)+"</div>";
+      res.innerHTML = aiFailPane(err,'runSuggest');
     }
   }
 }
@@ -7699,7 +8160,71 @@ function sleep(ms) { return new Promise(function(r){ setTimeout(r,ms); }); }
 var AI_MODEL = 'claude-sonnet-4-5-20250929';
 window.AI_MODEL = AI_MODEL;
 
+// ─── AI RESPONSE CACHE (5.7) ─────────────────────────────────────────────────
+// Re-importing the same URL, re-translating the same recipe or re-running a
+// suggestion costs money and a round trip for an answer we already have.
+// Keyed on the exact prompt + model + token budget, so any difference misses.
+// Deliberately NOT cached: tool-using calls (their result depends on live data)
+// and anything that failed. Entries live in localStorage under one key, capped
+// by both age and count so it can never grow into the recipe data's way.
+var AI_CACHE_KEY = 'tonys_ai_cache';
+var AI_CACHE_MAX = 40;                    // entries
+var AI_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;  // 7 days
+var _aiCacheHits = 0, _aiCacheMisses = 0;
+
+function aiCacheKey(prompt, maxTokens){
+  // FNV-1a — a short stable digest, so the cache holds keys not whole prompts.
+  var s = AI_MODEL + '|' + maxTokens + '|' + prompt, h = 2166136261;
+  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36) + '-' + s.length;
+}
+function aiCacheRead(){
+  try { var o = JSON.parse(localStorage.getItem(AI_CACHE_KEY) || '{}'); return (o && typeof o === 'object') ? o : {}; }
+  catch(e) { return {}; }
+}
+function aiCacheWrite(o){
+  try { localStorage.setItem(AI_CACHE_KEY, JSON.stringify(o)); }
+  catch(e) { try { localStorage.removeItem(AI_CACHE_KEY); } catch(e2) {} }  // quota — drop the cache, never the recipes
+}
+function aiCacheGet(key){
+  var o = aiCacheRead(), e = o[key];
+  if (!e) return null;
+  if (Date.now() - (e.at || 0) > AI_CACHE_TTL) { delete o[key]; aiCacheWrite(o); return null; }
+  return e.v;
+}
+function aiCachePut(key, value){
+  var o = aiCacheRead();
+  o[key] = { v: value, at: Date.now() };
+  var keys = Object.keys(o);
+  if (keys.length > AI_CACHE_MAX) {
+    keys.sort(function(a,b){ return (o[a].at||0) - (o[b].at||0); });      // oldest first
+    keys.slice(0, keys.length - AI_CACHE_MAX).forEach(function(k){ delete o[k]; });
+  }
+  aiCacheWrite(o);
+}
+function clearAiCache(){
+  try { localStorage.removeItem(AI_CACHE_KEY); } catch(e) {}
+  _aiCacheHits = 0; _aiCacheMisses = 0;
+  toast('AI cache cleared');
+}
+window.aiCacheKey = aiCacheKey; window.aiCacheGet = aiCacheGet;
+window.aiCachePut = aiCachePut; window.clearAiCache = clearAiCache;
+
 async function aiCall(prompt, maxTokens=2000, tools=null) {
+  // Cache lookup — skipped for tool calls, whose answers depend on live data.
+  var _ck = tools ? null : aiCacheKey(prompt, maxTokens);
+  if (_ck) {
+    var cached = aiCacheGet(_ck);
+    if (cached !== null) {
+      _aiCacheHits++;
+      dlog('[ai] cache hit', _ck, '(hits', _aiCacheHits, '/ misses', _aiCacheMisses + ')');
+      return cached;
+    }
+    _aiCacheMisses++;
+  }
+  return _aiCallUncached(prompt, maxTokens, tools, _ck);
+}
+async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
   const WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
@@ -7750,7 +8275,10 @@ async function aiCall(prompt, maxTokens=2000, tools=null) {
         }
         throw new Error('API error: ' + (d.error.message || JSON.stringify(d.error)).slice(0,100));
       }
-      return (d.content || []).map(function(b){ return b.text || ''; }).join('\n');
+      var _out = (d.content || []).map(function(b){ return b.text || ''; }).join('\n');
+      // Only successful, non-empty answers are worth remembering.
+      if (_ck && _out && _out.trim()) aiCachePut(_ck, _out);
+      return _out;
     } catch(e) {
       if (attempt === MAX_RETRIES) throw e;
       if (e.message && (e.message.startsWith('BILLING:') || e.message.startsWith('API_KEY:'))) throw e;
@@ -8524,6 +9052,15 @@ function normalizeRecipe(r) {
   if (!Array.isArray(r.diets)) r.diets = [];
   if (typeof r.cookCount !== 'number' || isNaN(r.cookCount)) r.cookCount = 0;
   if (typeof r.notes !== 'string') r.notes = '';
+  // 3.5 — per-attempt log: [{at, rating 0–5, note}]. Older recipes have a
+  // cookCount but no log; that's fine, the count stays authoritative.
+  if (!Array.isArray(r.cookLog)) r.cookLog = [];
+  r.cookLog = r.cookLog.filter(function(e){ return e && typeof e === 'object'; }).map(function(e){
+    var rating = parseInt(e.rating, 10);
+    return { at: (typeof e.at === 'number' && !isNaN(e.at)) ? e.at : 0,
+             rating: (isNaN(rating) || rating < 0 || rating > 5) ? 0 : rating,
+             note: typeof e.note === 'string' ? e.note : String(e.note == null ? '' : e.note) };
+  });
   // Auto-flag as clip if isVideoBookmark or no recipe content
   if (r.isVideoBookmark && !r.isClip) r.isClip = true;
   if (typeof r.source !== 'string') r.source = '';
