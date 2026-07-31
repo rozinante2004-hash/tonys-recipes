@@ -14,10 +14,10 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | ~~1.1~~ | ✅ **DONE (v27.0)** — ~~Cook Mode~~ — a full-screen, large-type step-by-step view with the screen kept awake and big "next/previous" targets | You already request a wake lock, but the normal view is small-text and scroll-heavy. This is the single biggest *actual cooking* improvement: readable at arm's length with messy hands. | 🟡 |
 | ~~1.2~~ | ✅ **DONE (v27.0)** — ~~Tap a step to cross it off~~ | Trivial to add, hugely useful mid-cook — you never lose your place. Persist per session only. | 🟢 |
 | ~~1.3~~ | ✅ **DONE (v27.0, inside Cook Mode)** — ~~Ingredient checkboxes~~ | Same idea for shopping/prep; pairs naturally with the Bring! feature. | 🟢 |
-| 1.4 | **Duplicate recipe** | The fastest way to create a variant ("…but with chicken"). One menu item, ~10 lines. | 🟢 |
-| 1.5 | **"Recently added" sort** | You have recent-*viewed*; recently-*added* is what you usually want after importing a batch. | 🟢 |
-| 1.6 | **Confirm-before-losing-edits** | Closing the edit modal with unsaved changes silently discards them today. | 🟢 |
-| 1.7 | **Show a photo count / "no photo" filter** | Makes "Auto-fetch missing photos" easier to target. | 🟢 |
+| ~~1.4~~ | ✅ **DONE (v27.2)** — ~~Duplicate recipe~~ | The fastest way to create a variant ("…but with chicken"). One menu item, ~10 lines. | 🟢 |
+| ~~1.5~~ | ✅ **DONE (v27.2)** — ~~"Recently added" sort~~ | You have recent-*viewed*; recently-*added* is what you usually want after importing a batch. | 🟢 |
+| ~~1.6~~ | ✅ **DONE (v27.2)** — ~~Confirm-before-losing-edits~~ | Closing the edit modal with unsaved changes silently discards them today. | 🟢 |
+| ~~1.7~~ | ✅ **DONE (v27.2)** — ~~photo count / "no photo" filter~~ | Makes "Auto-fetch missing photos" easier to target. | 🟢 |
 | ~~1.8~~ | ✅ **DONE (v27.0)** — ~~Timers detected in steps~~ — turn "simmer for 20 minutes" into a tappable timer | Delightful, and genuinely useful. Regex + a small countdown UI. | 🟡 |
 
 ---
@@ -29,7 +29,7 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | 2.1 | **Replace `confirm()`/`prompt()` with styled modals** | Native dialogs look out of place, can't be styled, and on iOS PWAs they're jarring. You already have a nice modal system. | 🟡 |
 | 2.2 | **Make the edit form's ingredient table the single source of truth** | There's a table *and* a hidden textarea kept in sync; that dual path is fragile and was the source of past parsing quirks. | 🟡 |
 | 2.3 | **Unify "clip" vs "video bookmark"** | Two overlapping flags (`isClip`, `isVideoBookmark`) mean the same thing to a user and have caused inconsistent badges. Collapse to one concept. | 🟢 |
-| 2.4 | **Per-recipe delete** | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
+| ~~2.4~~ | ✅ **DONE (v27.2)** — ~~Per-recipe delete~~ | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
 | 2.5 | **Better empty/error states for AI failures** | When the AI returns nothing useful, you get a generic message; offering "try free-hand paste" inline would recover the flow. | 🟢 |
 | 2.6 | **Save Helper — TEST RESULTS IN (do not implement yet)** | Measured on Ubuntu/Chrome: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → inconclusive** (the test page consumed the single-use link before the download; fixed, needs a re-run), **4. Python helper → ✅ correct filename**. The helper stays until test 3 is re-run. | 🟡 |
 | 2.7 | **Consolidate the 2 500-line `<style>` block** | Group by component and drop dead rules (several classes have no matching markup). Pure maintainability. | 🟡 |
@@ -83,11 +83,11 @@ caveat — right now the number looks more authoritative than it is.
 | 4.2 | **Show *why* a card matched a search** | When searching by ingredient, highlight the matching ingredient on the card — otherwise results look arbitrary. |
 | 4.3 | **Sticky ingredient panel while scrolling steps** | On desktop, a two-column recipe view (ingredients left, method right) removes constant scrolling. |
 | 4.4 | **Filter chips should show counts** | "Dinner (12)" tells you where your collection actually is. |
-| 4.5 | **Make the whole "Add photo" hero clickable** | The small 📷 button is easy to miss on a phone. |
+| ~~4.5~~ | ✅ **DONE (v27.2)** — ~~whole "Add photo" hero clickable~~ | The small 📷 button is easy to miss on a phone. |
 | 4.6 | **Dark mode** | An evening kitchen is dim; the app is bright cream. The CSS variables make this genuinely cheap. |
 | 4.7 | **Skeleton → real content transition** | Skeletons only show on first-ever load; showing them during cloud sync would make the app feel more responsive. |
 | 4.8 | **Larger touch targets in the header** | Several header buttons are ~28 px; the accessibility guideline is 44 px, and they're the most-tapped controls. |
-| 4.9 | **A real empty state for "no photos yet"** | Prompt to auto-fetch, rather than a wall of emoji tiles. |
+| ~~4.9~~ | ✅ **DONE (v27.2)** — ~~empty state for "no photos yet"~~ | Prompt to auto-fetch, rather than a wall of emoji tiles. |
 | 4.10 | **Consistent iconography** | The app mixes emoji and inline SVG for similar concepts (e.g. the clip badge). Picking one raises the visual polish a lot. |
 
 ---
