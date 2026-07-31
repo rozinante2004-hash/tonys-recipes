@@ -30,7 +30,7 @@ within each section. Items marked ✅ have since been built; the rest is a menu 
 | 2.2 | **Make the edit form's ingredient table the single source of truth** | There's a table *and* a hidden textarea kept in sync; that dual path is fragile and was the source of past parsing quirks. | 🟡 |
 | 2.3 | **Unify "clip" vs "video bookmark"** | Two overlapping flags (`isClip`, `isVideoBookmark`) mean the same thing to a user and have caused inconsistent badges. Collapse to one concept. | 🟢 |
 | ~~2.4~~ | ✅ **DONE (v27.2)** — ~~Per-recipe delete~~ | Deleting currently requires entering Select mode; a delete option inside the recipe (now that Undo exists) is more discoverable. | 🟢 |
-| 2.5 | **Better empty/error states for AI failures** | When the AI returns nothing useful, you get a generic message; offering "try free-hand paste" inline would recover the flow. | 🟢 |
+| ~~2.5~~ | ✅ **DONE (v27.4)** — ~~Better AI empty/error states~~ | `aiFailPane()`/`aiEmptyPane()` name the cause in plain language, link to billing or keys where that's the problem, offer a retry where retrying can help, and always leave a free-hand-paste escape. A failed file import now carries whatever text it *did* extract into the free-hand box. | 🟢 |
 | 2.6 | **Save Helper — ON HOLD, one test still outstanding** | Measured on Ubuntu/Chrome 137: **1. `<a download>` → "download" ❌**, **2. File System Access API → "download" ❌** (so my original suggestion was simply wrong), **3. Worker UTF-8 download → still not run** (the test page used to consume the single-use link; fixed, needs a re-run), **4. Python helper → ✅ correct Hebrew filename**. The helper stays until test 3 is re-run. | 🟡 |
 | 2.7 | **Consolidate the 2 500-line `<style>` block** | Group by component and drop dead rules (several classes have no matching markup). Pure maintainability. | 🟡 |
 
@@ -48,18 +48,23 @@ to change how you cook week-to-week.
 Keep a rough list of staples you always have, then flag recipes you can make with only 1–2 items
 missing. Pairs with the AI you already pay for.
 
-### 3.3 Smarter scaling 🟡
-Scale by **target servings** ("make it for 6") rather than ×2/×3, and handle awkward units
-(1 egg → "1½ eggs" is silly; round sensibly and warn). Also convert between weight and volume for
-common ingredients using the AI.
+### 3.3 Smarter scaling 🟡 — ✅ **DONE (v27.4)**
+A "Make it for [N] servings" stepper sits **alongside** the ×1–×6 buttons, not in place of them,
+and only appears when the recipe's servings field actually holds a number. Amounts now round to
+values a cook can measure (nearest 5 above 100, whole above 20, half above 2, quarter above 0.5),
+and countable things that land on a fraction — "2.5 eggs" — are flagged rather than presented as
+a measurement. Scaling also stopped rewriting spacing: "200g" scales to "300g", not "300 g".
+*Not done:* AI weight↔volume conversion for individual ingredients.
 
 ### 3.4 Recipe versions / edit history 🟡
 "I've tweaked this three times and the second version was best." Keep the last N revisions in the
 recipe object; huge value for a *family* collection where several people edit.
 
-### 3.5 Cooking notes & ratings per attempt 🟢
-You already track `cookCount`; add a short note + 1–5 stars per cook ("too salty, halve the soy").
-Very low effort, high long-term value.
+### 3.5 Cooking notes & ratings per attempt 🟢 — ✅ **DONE (v27.4)**
+"🍳 Cooked!" now offers an optional 1–5 star rating and a note; *Just log it — no note* keeps the
+old one-tap behaviour. Entries live in `r.cookLog` and show in the recipe as an average plus a
+collapsible log. Unrated cooks don't drag the average down, and deleting a note doesn't rewrite
+how many times you've cooked it.
 
 ### 3.6 Better sharing 🟡
 A read-only public link for a single recipe (a static page rendered from the recipe JSON) so you
@@ -87,9 +92,8 @@ banned — so this works off WhatsApp's own *Export chat → Without media* `.tx
   programmatic export. The *upload* afterwards can be — on iPhone, a Shortcut that takes the
   file from the Share sheet and PUTs it to the repo via the GitHub API makes it a two-tap job.
 
-### 3.8 Nutrition upgrade 🟢
-Nutrition is currently per-100g and AI-estimated. Add per-serving toggle and show a confidence
-caveat — right now the number looks more authoritative than it is.
+### 3.8 Nutrition upgrade 🟢 — ❌ **Declined (Jul 2026)**
+Tony is happy with per-100g figures; no per-serving toggle or confidence caveat wanted.
 
 ---
 
@@ -120,7 +124,7 @@ caveat — right now the number looks more authoritative than it is.
 | 5.4 | **Firestore: one document per recipe** | The whole collection is a single document, so any edit rewrites everything and two people editing at once can clobber each other. Per-recipe docs fix both. | 🔴 |
 | 5.5 | **Move Firestore rules into the repo** | They're generated in-app and pasted manually — easy to drift. | 🟢 |
 | 5.6 | **Automated tests in CI** | The Self Test suite is excellent but must be run by hand. The same checks could run headlessly on every push via GitHub Actions. | 🟡 |
-| 5.7 | **Rate-limit / cache AI calls** | Identical imports re-hit the API. A small cache would cut cost and latency. | 🟢 |
+| ~~5.7~~ | ✅ **DONE (v27.4)** — ~~Cache AI calls~~ | Keyed on model + token budget + exact prompt, 7-day TTL, capped at 40 entries, evicted oldest-first. Tool-using calls and failures are deliberately never cached, and a quota error drops the cache rather than the recipes. | 🟢 |
 | 5.8 | **Retire the `_ph`/`hp` dual flags** | Local and cloud use different names for "has a photo elsewhere"; one name would be less confusing. | 🟢 |
 
 ---
@@ -131,7 +135,7 @@ caveat — right now the number looks more authoritative than it is.
 2. **Meal planner + merged shopping list** (3.1) — the standout new capability.
 3. ~~**Dark mode** (4.6)~~ ✅ **shipped in v27.3**.
 4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk.
-5. **Smarter units** (see 3.3 + the note below) — "2 tsp" currently displays as "9.9ml".
+5. ~~**Smarter units**~~ ✅ **shipped in v27.1** (metric leaves tsp/tbsp/cup alone) **and v27.4** (sensible rounding).
 
 > **Noticed while building Cook Mode:** the Metric/Imperial toggle converts *every*
 > imperial-ish unit, so `2 tsp` renders as `9.9ml` and `1 cup` as `240ml`. Teaspoons,
