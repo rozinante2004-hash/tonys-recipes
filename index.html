@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.0 -->
+<!-- Tony's Recipes Collection v27.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1154,6 +1154,45 @@ const SELF_TESTS = [
         closeM('viewOverlay');
       } finally { recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid(); }
     } },
+  { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
+    test: async()=>{
+      // Kitchen measures used in metric kitchens must NOT become millilitres
+      if(cvtIng('2 tsp','metric')!=='2 tsp') throw new Error('tsp should be left alone in metric, got "'+cvtIng('2 tsp','metric')+'"');
+      if(cvtIng('1 tbsp','metric')!=='1 tbsp') throw new Error('tbsp should be left alone in metric');
+      if(cvtIng('1 cup','metric')!=='1 cup') throw new Error('cup should be left alone in metric');
+      // Genuinely imperial units should convert, rounded to cookable values
+      if(cvtIng('1 lb','metric')!=='450g') throw new Error('1 lb should be ~450g, got "'+cvtIng('1 lb','metric')+'"');
+      if(cvtIng('8 oz','metric')!=='230g') throw new Error('8 oz should be ~230g, got "'+cvtIng('8 oz','metric')+'"');
+      if(!/^\d+ml$/.test(cvtIng('4 fl oz','metric'))) throw new Error('fl oz should convert to a whole ml value');
+      // No ugly trailing zeros the other way
+      if(cvtIng('500ml','imperial')!=='2 cups') throw new Error('500ml should be "2 cups", got "'+cvtIng('500ml','imperial')+'"');
+    } },
+  { id:'i18n_alignment', group:'UI', name:'Hebrew/English align correctly side by side',
+    test: async()=>{
+      var he=888896, en=888897;
+      recipes.unshift(normalizeRecipe({id:en,name:'Grandma Cake',ingredients:[{a:'1',n:'egg'}],steps:['Mix well.'],updatedAt:Date.now()}));
+      recipes.unshift(normalizeRecipe({id:he,name:'עוגת שוקולד',ingredients:[{a:'200 גרם',n:'שוקולד'}],steps:['ערבבו היטב.'],updatedAt:Date.now()}));
+      try {
+        var prevView=viewMode;
+        setView('list'); renderGrid();
+        var names=Array.prototype.slice.call(document.querySelectorAll('.recipe-list-name'));
+        var heEl=names.filter(function(n){return n.textContent.indexOf('עוגת')===0;})[0];
+        var enEl=names.filter(function(n){return n.textContent.indexOf('Grandma')===0;})[0];
+        if(!heEl||!enEl) throw new Error('test recipes did not render');
+        if(getComputedStyle(heEl).direction!=='rtl') throw new Error('Hebrew name is not right-to-left');
+        if(getComputedStyle(enEl).direction!=='ltr') throw new Error('English name is forced RTL — it should follow its own text');
+        if(getComputedStyle(enEl).textAlign!=='start') throw new Error('names should align to text start, not a hard-coded side');
+        // Email + print must carry per-item direction too
+        var mail=rHtml(recipes[0]);
+        if(mail.indexOf('<td dir="auto"')===-1) throw new Error('email ingredients lack dir="auto" — Hebrew would misalign in the mail');
+        var pr=buildPrintHtml([recipes[0]]);
+        if(pr.indexOf('unicode-bidi:plaintext')===-1) throw new Error('print stylesheet lacks bidi handling');
+        setView(prevView);
+      } finally {
+        recipes=recipes.filter(function(r){return r.id!==he&&r.id!==en;});
+        renderGrid();
+      }
+    } },
   { id:'feat_cook_mode', group:'Features', name:'Cook mode steps, timers & ingredients',
     test: async()=>{
       ['openCookMode','closeCookMode','cookNext','cookPrev','findStepTimers'].forEach(function(f){
@@ -1473,6 +1512,8 @@ var SELF_TEST_FIXES = {
   data_normalize:    { fix:'normalizeRecipe() must backfill difficulty/ingredients/steps etc. and be applied in migrateRecipes and on import. Render code calls r.difficulty.toLowerCase() and r.ingredients.some() without guards, so one malformed recipe otherwise throws and blanks the whole grid.', autofix: null },
   feat_scale_range:  { fix:'scaleAmt must scale BOTH ends of a range ("2-3 cups" x3 = "6-9 cups") and pass non-numeric amounts through unchanged. This also feeds the amounts sent to Bring!.', autofix: null },
   feat_orig_photo:   { fix:'toggleOriginalPhoto must show/hide #origPhotoBox-<id> (rendered hidden by drawView) and update #origPhotoBtn-<id>. It previously targeted a #viewHeroImg element that did not exist, so the button silently did nothing.', autofix: null },
+  feat_units:        { fix:'cvtIng in metric mode must leave tsp/tbsp/cup untouched (they are standard kitchen measures) and only convert lb/oz/fl oz, rounded via cookRound to values a cook can measure.', autofix: null },
+  i18n_alignment:    { fix:'Recipe text must use dir="auto" + unicode-bidi:plaintext + text-align:start so Hebrew and English each align correctly in the same list. Note direction:auto is NOT valid CSS. Email (rHtml) and print (buildPrintHtml) need the same treatment.', autofix: null },
   feat_cook_mode:    { fix:'Cook mode is broken. openCookMode/cookNext/cookPrev/findStepTimers must exist, #cookOverlay must be present, step timers are parsed from text like "for 20 minutes", and the ingredient panel must use the recipe view\'s current scale (viewMult/viewUnit).', autofix: null },
   perf_photo_blob:   { fix:'photoSrc() must convert stored data-URL photos to cached blob: URLs for display (keeping the stored value a data URL for backup/export/sync). Without it every render rebuilds megabytes of markup and the grid crawls.', autofix: null },
   feat_undo_delete:  { fix:'deleteSelected must stash the removed recipes with their indexes in _pendingUndo and offer toastAction(…, undoDelete); undoDelete restores them at their original positions.', autofix: null },
@@ -1873,7 +1914,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.0';
+var APP_VERSION = 'v27.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -2023,8 +2064,8 @@ function rHtml(r) {
     : '';
 
   var ingredients = r.ingredients.map(function(i){
-    return '<tr><td style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;">' + (i.a||'') + '</td>' +
-           '<td style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;">' + (i.n||'') + '</td></tr>';
+    return '<tr><td dir="auto" style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.a||'') + '</td>' +
+           '<td dir="auto" style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.n||'') + '</td></tr>';
   }).join('');
 
   var steps = r.steps.map(function(s, i){
@@ -2032,14 +2073,14 @@ function rHtml(r) {
     var numCell = '<td style="padding:0 ' + (isHeb?'0':'12px') + ' 0 ' + (isHeb?'12px':'0') + ';vertical-align:top;">' +
       '<div style="width:28px;height:28px;border-radius:50%;background:#C1440E;color:white;font-size:12px;font-weight:700;text-align:center;line-height:28px;min-width:28px;">' + (i+1) + '</div>' +
       '</td>';
-    var txtCell = '<td dir="' + (isHeb?'rtl':'ltr') + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';width:100%;">' + s + '</td>';
+    var txtCell = '<td dir="' + (isHeb?'rtl':'ltr') + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';width:100%;">' + escH(s) + '</td>';
     // For Hebrew: text cell first (left col), number cell second (right col) — table reads LTR so right col = right side
     return '<tr>' + (isHeb ? txtCell + numCell : numCell + txtCell) + '</tr>';
   }).join('');
 
   var notesBlock = r.notes ? '<div style="margin:24px 0 0;padding:16px;background:#FFFBEB;border-left:4px solid #D4A843;border-radius:0 8px 8px 0;">' +
     '<div style="font-size:12px;font-weight:700;color:#8B6914;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Notes</div>' +
-    '<div style="font-size:14px;color:#1C1A18;line-height:1.6;">' + r.notes + '</div></div>' : '';
+    '<div dir="auto" style="font-size:14px;color:#1C1A18;line-height:1.6;unicode-bidi:plaintext;">' + escH(r.notes) + '</div></div>' : '';
 
   var sourceBlock = r.source ? '<div style="margin-top:8px;font-size:12px;color:#8A8279;">Source: <a href="' + r.source + '" style="color:#C1440E;">' + r.source + '</a></div>' : '';
 
@@ -2059,7 +2100,7 @@ function rHtml(r) {
 
     // Header band
     '<div style="background:#5C3D2E;padding:24px 32px;">',
-    '<div style="font-size:28px;font-weight:700;color:#FFFFFF;font-family:Georgia,serif;line-height:1.3;">' + r.name + '</div>',
+    '<div dir="auto" style="font-size:28px;font-weight:700;color:#FFFFFF;font-family:Georgia,serif;line-height:1.3;unicode-bidi:plaintext;">' + escH(r.name) + '</div>',
     dietTags ? '<div style="margin-top:10px;">' + dietTags + '</div>' : '',
     '</div>',
 
@@ -2704,7 +2745,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.55); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-body { padding: 11px 13px 13px; }
 .card-category { font-size: 10px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 3px; }
-.card-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3;; text-align: right; }
+.card-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3; text-align: start; unicode-bidi: plaintext; }
 .card-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
 .card-footer { padding: 8px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .difficulty { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
@@ -3161,7 +3202,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .recipe-list-thumb img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .recipe-list-info { flex: 1; min-width: 0; }
-.recipe-list-name { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;; text-align: right; direction: rtl; }
+.recipe-list-name { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; unicode-bidi: plaintext; }
 .recipe-list-meta { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
 .recipe-list-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -3447,18 +3488,25 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .calc-quick-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 
 
-/* ── BIDIRECTIONAL TEXT (Hebrew / RTL support) ── */
-/* dir=auto makes browser auto-detect text direction per element */
+/* ── BIDIRECTIONAL TEXT (Hebrew / RTL support) ──
+   NOTE: `direction: auto` is NOT valid CSS (direction only accepts ltr/rtl), so the
+   previous rule here did nothing. The correct pair is `unicode-bidi: plaintext`, which
+   makes each element follow its own first strong character, plus `text-align: start`
+   so the text aligns to whichever side that direction implies. Combined with a
+   `dir="auto"` attribute in the markup this gives consistent behaviour: Hebrew reads
+   right-aligned, English left-aligned, in the same list. */
 .modal-title, .translate-block-title,
 .translate-ing-row, .translate-step,
 .ing-amount, .recipe-list-name,
-.card-name, .card-category,
-.view-title { direction: auto; unicode-bidi: plaintext; }
+.card-name, .card-category, .card-title,
+.view-title { unicode-bidi: plaintext; text-align: start; }
 
 /* Recipe view: ingredients and steps auto-direction */
 .recipe-ingredients li,
 .recipe-steps li,
-.recipe-step span { direction: auto; unicode-bidi: plaintext; text-align: start; }
+.ingredients-list li,
+.steps-list li,
+.recipe-step span { unicode-bidi: plaintext; text-align: start; }
 
 /* Source field */
 .source-link { direction: auto; unicode-bidi: plaintext; }
@@ -3985,7 +4033,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -4539,7 +4587,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -5393,7 +5441,7 @@ function renderGrid() {
           ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:28px;height:28px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div></div>` : ''}
         </div>
         <div class="recipe-list-info">
-          <div class="recipe-list-name" style="text-align:right;">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
+          <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${escH(r.category)}</span>
             <span>⏱ ${escH(r.prep)}</span>
@@ -5416,7 +5464,7 @@ function renderGrid() {
           ${(r.isVideoBookmark || r.isClip) ? `<div style="position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:#2E7D32;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.35);"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg></div>` : ''}
         </div>
         <div class="card-body">
-          <div class="card-title" style="text-align:right;">${escH(r.name)}</div>
+          <div class="card-title" dir="auto">${escH(r.name)}</div>
           <div class="card-meta"><span>⏱ ${escH(r.prep)}</span><div class="card-meta-dot"></div><span>${escH(r.servings)} srv</span></div>
         </div>
         <div class="card-footer">
@@ -5716,22 +5764,32 @@ function heroPhotoChanged(event){
 // ═══════════════════════════════════
 // UNIT CONVERSION
 // ═══════════════════════════════════
+// Drop pointless trailing zeros ("1.10 lb" → "1.1 lb", "2.00 cups" → "2 cups").
+function trimNum(n, dp){ return String(parseFloat(Number(n).toFixed(dp == null ? 2 : dp))); }
+// Cups are measured in quarters in practice, so snap to the nearest ¼.
+function cupsRound(v){ return trimNum(Math.round(v*4)/4); }
 const M2I={
-  'g': v=>v>=453?`${(v/453.592).toFixed(2)} lb`:`${(v*0.035274).toFixed(1)} oz`,
-  'kg':v=>`${(v*2.20462).toFixed(2)} lb`,
-  'ml':v=>v>=240?`${(v/240).toFixed(2)} cups`:`${(v*0.033814).toFixed(1)} fl oz`,
-  'l': v=>`${(v*4.22675).toFixed(2)} cups`,
+  'g': v=>v>=453?`${trimNum(v/453.592,2)} lb`:`${trimNum(v*0.035274,1)} oz`,
+  'kg':v=>`${trimNum(v*2.20462,2)} lb`,
+  'ml':v=>v>=240?`${cupsRound(v/240)} cups`:`${trimNum(v*0.033814,1)} fl oz`,
+  'l': v=>`${cupsRound(v*4.22675)} cups`,
   '°c':v=>`${((v*9/5)+32).toFixed(0)}°F`,
 };
+// Round to values a cook can actually measure, rather than 9.9ml / 237ml.
+function cookRound(v){
+  if (v >= 100) return String(Math.round(v/10)*10);   // 237 → 240
+  if (v >= 10)  return String(Math.round(v));         // 28.3 → 28
+  if (v >= 1)   return String(Math.round(v*2)/2);     // 4.9 → 5
+  return String(Math.round(v*10)/10);                 // 0.42 → 0.4
+}
+// Metric conversion deliberately leaves tsp / tbsp / cup ALONE: they are standard
+// kitchen measures in metric kitchens too, and "9.9ml" is harder to cook from than
+// "2 tsp". Only genuinely imperial units (lb, oz, fl oz) are converted.
 const I2M={
-  'lb':  v=>`${(v*453.592).toFixed(0)}g`,
-  'oz':  v=>`${(v*28.3495).toFixed(0)}g`,
-  'fl oz':v=>`${(v*29.5735).toFixed(0)}ml`,
-  'cup': v=>`${(v*240).toFixed(0)}ml`,
-  'cups':v=>`${(v*240).toFixed(0)}ml`,
-  'tbsp':v=>`${(v*14.787).toFixed(0)}ml`,
-  'tsp': v=>`${(v*4.929).toFixed(1)}ml`,
-  '°f':  v=>`${((v-32)*5/9).toFixed(0)}°C`,
+  'lb':  v=>`${cookRound(v*453.592)}g`,
+  'oz':  v=>`${cookRound(v*28.3495)}g`,
+  'fl oz':v=>`${cookRound(v*29.5735)}ml`,
+  '°f':  v=>`${(((v-32)*5/9)).toFixed(0)}°C`,
 };
 function cvtIng(amt,targetUnit){
   const tbl=targetUnit==='imperial'?M2I:I2M;
@@ -8471,7 +8529,8 @@ function buildPrintHtml(list) {
     + 'h1{font-size:28px;color:#5C3D2E;margin-bottom:4px;}'
     + 'h2{font-size:16px;color:#C1440E;border-bottom:1px solid #E8E0D5;padding-bottom:4px;margin-top:24px;}'
     + 'table{width:100%;border-collapse:collapse;}'
-    + 'td{vertical-align:top;}'
+    + 'td{vertical-align:top;unicode-bidi:plaintext;text-align:start;}'
+    + 'h1,.notes,.meta{unicode-bidi:plaintext;text-align:start;}'
     + '.meta{font-size:13px;color:#8A8279;margin-bottom:16px;}'
     + '.source{font-size:12px;color:#888;margin-top:12px;}'
     + '.notes{background:#FFF8E8;border-left:3px solid #D4A843;padding:10px 14px;margin-top:16px;font-size:14px;}'
@@ -8480,8 +8539,8 @@ function buildPrintHtml(list) {
 
   var body = list.map(function(r) {
     var ings = (r.ingredients||[]).map(function(i){
-      return '<tr><td style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
-        + escH(i.a) + '</td><td style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
+      return '<tr><td dir="auto" style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
+        + escH(i.a) + '</td><td dir="auto" style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
     }).join('');
     var steps = (r.steps||[]).map(function(s,si){
       return '<div style="display:flex;gap:12px;margin-bottom:10px;">'
