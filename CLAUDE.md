@@ -10,7 +10,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~12 000 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~13 200 lines,
   no build step. CDN scripts: xlsx, mammoth, qrcodejs, Firebase compat 10.12.0, GSI.
 - `cloudflare-worker.js` is pasted into the Cloudflare dashboard, **not** deployed
   from the repo. It proxies Anthropic, photo search, YouTube, Instagram and Bring!.
@@ -30,7 +30,7 @@ python3 -m http.server 8137          # some checks need http://, not file://
 # → page.evaluate over SELF_TESTS, calling each t.test()
 ```
 
-**As of v28.1: 125 checks, 119 passing.** The 6 failures are `net_*` and
+**As of v28.3: 128 checks, 122 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -48,13 +48,15 @@ found only because a test was written first and disagreed with the code.
 
 ## Conventions
 
-- **Versioning:** minor bumps (`v27.8` → `v27.9`) for ordinary work; majors reserved
-  for genuinely big changes. Bump `version.json` **and** the four `v27.x` strings in
-  `index.html` together.
-- **Delivery:** Tony uploads files to `main` **by hand** through the GitHub web UI.
-  Always `git fetch origin main` and merge before starting — the branch and `main`
-  diverge routinely. Send changed files as attachments as well as pushing.
-- Branch: `claude/tonys-recipes-app-nv31q1` (PR #1).
+- **Versioning:** minor bumps (`v28.2` → `v28.3`) for ordinary work; majors reserved
+  for genuinely big changes. Bump `version.json` **and** the four version strings in
+  `index.html` together (line-1 comment, `APP_VERSION`, two badges in the markup).
+- **Delivery: push straight to `main`.** Standing instruction from Tony, 1 Aug 2026 —
+  he would rather not upload files by hand. Pushing deploys to Pages within minutes,
+  so **tell him in advance when a change is risky** (anything touching cloud data or
+  migrations) so he can take a backup first. Still `git fetch origin main` before
+  starting. The old convention — hand-uploads through the web UI, branch
+  `claude/tonys-recipes-app-nv31q1`, PR #1 — is retired; that PR was closed unmerged.
 - Keep `RECONSTRUCTION_PROMPT.md` and `IMPROVEMENT_IDEAS.md` current in the same commit.
 - Tony values **honest error messages** highly. Never let the UI assert something the
   code hasn't verified (see the Bring! note below). A dead end with no way forward is
@@ -82,8 +84,9 @@ found only because a test was written first and disagreed with the code.
   + `text-align: start`. This applies to email, print and shared pages too.
 - **Escape before highlighting/interpolating, never after.** `hlMatch`, `aiFailPane`
   and `buildRecipePage` all have tests pinning this.
-- **Firestore documents have a 1 MiB limit** (`FIRESTORE_DOC_LIMIT`). The *whole
-  collection's* text shares one document today. Anything added per recipe multiplies.
+- **Firestore documents have a 1 MiB limit** (`FIRESTORE_DOC_LIMIT`). Since 5.4 each
+  recipe has its own document, so the limit is per recipe rather than per collection —
+  but the legacy `shared/recipes` document is still *read*, and it is still capped.
 - **Dropdown menus:** `closeDrop` must disarm the outside-click listener, or the next
   click on the trigger reopens and instantly recloses the menu.
 - **Test isolation:** close modals in `finally`, not in `try`. A failed assertion that

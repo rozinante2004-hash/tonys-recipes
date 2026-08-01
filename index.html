@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.2 -->
+<!-- Tony's Recipes Collection v28.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1171,6 +1171,54 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'css_phone_card', group:'CSS', name:'Phone grid card drops prep/servings, keeps the rest',
+    test: async()=>{
+      // Read the real CSSOM rather than matching text, and read it from the
+      // phone media block specifically — the desktop grid still shows this line.
+      var phoneRules=[];
+      for(var i=0;i<document.styleSheets.length;i++){
+        var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+        for(var j=0;j<rules.length;j++){
+          if(rules[j].type===4 && /max-width:\s*700px/.test(rules[j].conditionText||rules[j].media.mediaText)){
+            for(var k=0;k<rules[j].cssRules.length;k++) phoneRules.push(rules[j].cssRules[k]);
+          }
+        }
+      }
+      var meta=phoneRules.filter(function(r){ return (r.selectorText||'')==='.recipe-grid .card-meta'; })[0];
+      if(!meta) throw new Error('no phone-width rule for .recipe-grid .card-meta — prep/servings are back on the phone card');
+      if(meta.style.display!=='none') throw new Error('.card-meta is "'+meta.style.display+'" on phones, expected none');
+      // Nothing else on the card may be hidden at phone width. Checked here in
+      // the CSSOM rather than by querySelector, because display:none leaves the
+      // element in the DOM — an existence check would sail straight past it.
+      var keep={'card-category-badge':'the category badge','difficulty':'the difficulty pill',
+                'fav-btn':'the favourite heart','card-image':'the photo tile','card-title':'the recipe name'};
+      phoneRules.forEach(function(r){
+        if(r.style && r.style.display==='none'){
+          Object.keys(keep).forEach(function(cls){
+            if((r.selectorText||'').indexOf('.'+cls)>-1)
+              throw new Error(keep[cls]+' is hidden on phones by "'+r.selectorText+'" — it is one of the four things that should stay');
+          });
+        }
+      });
+      // ...and the things that must survive are still rendered. Desktop defaults
+      // to list view, so switch to grid deliberately and put it back afterwards.
+      var prevView=viewMode, prevStored=null;
+      try{ prevStored=localStorage.getItem('tonys_view_mode'); }catch(e){}
+      try{
+        setView('grid');
+        var card=document.querySelector('.recipe-grid .recipe-card');
+        if(!card) throw new Error('no recipe card rendered in grid view');
+        if(!card.querySelector('.card-category-badge')) throw new Error('the category badge is gone from the card');
+        if(!card.querySelector('.difficulty')) throw new Error('the difficulty pill is gone from the card');
+        if(!card.querySelector('.fav-btn')) throw new Error('the favourite heart is gone from the card');
+        if(!card.querySelector('.card-image')) throw new Error('the photo/emoji tile is gone from the card');
+        if(!card.querySelector('.card-title')) throw new Error('the recipe name is gone from the card — it is what you pick by');
+      } finally {
+        setView(prevView);
+        try{ if(prevStored===null) localStorage.removeItem('tonys_view_mode'); else localStorage.setItem('tonys_view_mode',prevStored); }catch(e){}
+      }
+    } },
+
   { id:'ui_owner_contrast', group:'CSS', name:'Owner row stays readable in BOTH themes',
     test: async()=>{
       // The owner row hard-coded a cream background while .access-name is
@@ -3319,7 +3367,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.2';
+var APP_VERSION = 'v28.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -4310,7 +4358,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   .recipe-grid .card-image { height: auto; aspect-ratio: 1 / 1; font-size: 34px; }
   .recipe-grid .card-body { padding: 8px 9px 9px; }
   .recipe-grid .card-title { font-size: 13px; }
-  .recipe-grid .card-meta { font-size: 10px; gap: 6px; }
+  /* Phone grid: the photo, the category badge, the difficulty pill and the heart
+     are enough to pick a recipe. Prep time and servings cost a whole line on a
+     card barely wider than a thumb, and both are one tap away inside the recipe.
+     LIST view keeps them on purpose — it has the width, and it is the view you
+     switch to when those numbers are what you are actually scanning for. */
+  .recipe-grid .card-meta { display: none; }
   .recipe-grid .card-footer { padding: 6px 9px; }
 }
 
@@ -5612,7 +5665,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6175,7 +6228,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
