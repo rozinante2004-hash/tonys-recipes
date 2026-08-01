@@ -93,4 +93,5 @@ found only because a test was written first and disagreed with the code.
   editor, so today's blind whole-document `.set()` can silently lose someone's edit.
 - **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
   (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome.
-- The Bring! token in git history should still be rotated.
+- The Bring! token that leaked into git history **was rotated on 1 Aug 2026**. The old value is
+  still in the history and always will be; it is simply dead now. Nothing further to do.
