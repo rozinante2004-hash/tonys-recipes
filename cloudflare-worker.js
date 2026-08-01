@@ -15,7 +15,8 @@
 //   BRING_LIST_UUID – the shopping list to add items to
 //   BRING_USER_UUID – your Bring! user uuid
 // Nothing Bring!-related is hard-coded here any more, so this file is safe to
-// commit publicly. Rotate the old token: it was previously in the repo.
+// commit publicly. The token that used to be hard-coded here is still in git
+// history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
 
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 

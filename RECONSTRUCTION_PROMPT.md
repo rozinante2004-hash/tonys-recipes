@@ -6,7 +6,7 @@
 > specified."* It is written to be self‑contained: every file, data shape, external service,
 > secret placeholder, and UX behaviour is described so the app can be recreated to parity.
 >
-> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~8,300
+> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~13,100
 > lines) plus a handful of supporting files. No build step, no framework, no bundler, no npm.
 > Plain ES5‑flavoured vanilla JavaScript (mostly `var`/`function`, some template literals and
 > `async/await`), inline `<style>`, and CDN `<script>` tags. Keep it that way.
@@ -24,7 +24,8 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v23.0` (see `version.json`, the HTML comment on line 1, and `APP_VERSION`).
+**Current version:** `v27.9` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+the two version badges in the markup — four `v27.x` strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
 **DM Sans** for body. Cream/brown/terracotta/gold palette. Rounded cards, soft shadows,
@@ -36,15 +37,16 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~8,300 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Network‑first for the document, cache‑first for assets. |
-| `version.json` | `{"version": "v23.0"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v27.9"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
 | `whatsapp/` | Shared folder of exported WhatsApp chat `.txt` files + `index.json`. Read by every device, including the iPhone. |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
+| `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
 | `logo.svg` | Brand mark (brown disc, gold ring, fork + terracotta/gold flame). |
 | `icons/icon-192.png`, `icons/icon-512.png` | PWA icons. `icon-512.png` also duplicated at repo root. |
@@ -108,9 +110,9 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 
 > **SECURITY — never put secrets in this file.** Worker v30 removed the previously hard-coded
 > Bring! bearer token, `X-BRING-API-KEY` and UUIDs; they now come from Worker env/KV only, so
-> `cloudflare-worker.js` is safe to commit. **The old token is in git history and must be treated
-> as compromised — rotate it in Bring!.** The Firebase web config below is *designed* to be
-> public and is fine to ship.
+> `cloudflare-worker.js` is safe to commit. The old token is still in git history — it always will
+> be — but it **was rotated on 1 Aug 2026**, so the leaked value is dead. The Firebase web config
+> below is *designed* to be public and is fine to ship.
 
 **Firebase web config (public, safe to embed):**
 ```js
@@ -248,8 +250,9 @@ forwards whatever the client sends.)
   nutrition: null | { calories, protein, carbs, fat },  // per 100g
   cookCount: Number,          // times "Cooked!" tapped
   lastCooked: Number,         // ms timestamp
-  isClip: Boolean,            // "clip"/bookmark (no full recipe)
-  isVideoBookmark: Boolean,   // saved video link with no extracted recipe
+  cookLog: [{ id, at, rating, note }],  // 3.5 — one entry per cook, capped at 50
+  history: [{...}],           // 3.4 — last 3 revisions. LOCAL ONLY, never synced
+  isClip: Boolean,            // "clip"/bookmark (no full recipe). The ONLY clip flag (2.3)
   updatedAt: Number           // ms timestamp — used for offline-merge conflict resolution
 }
 ```
@@ -276,9 +279,11 @@ Ship with **5 seed recipes** (Spaghetti Carbonara, Greek Salad, Chicken Tikka Ma
 Toast, Chocolate Lava Cake) so a fresh install isn't empty; `nextId` starts at `10`. Auto‑login
 logic only pushes local recipes to the cloud if the user has **more than 5** (i.e. beyond seeds).
 
-**`migrateRecipes(list)`** — defensively backfills missing fields (`diets=[]`, `cookCount=0`,
-`notes=''`, `source=''`, `nutrition=null`, `originalPhoto=''`, `updatedAt=0`; if
-`isVideoBookmark && !isClip` set `isClip=true`). Run on every load/restore/remote‑update.
+**`migrateRecipes(list)`** — drops non‑objects and maps `normalizeRecipe` over the rest, which is
+what backfills the missing fields (`diets=[]`, `cookCount=0`, `notes=''`, `source=''`,
+`nutrition=null`, `originalPhoto=''`, `updatedAt=0`, `history`/`cookLog` sanitised and capped) and
+folds a legacy `isVideoBookmark` into `isClip` before deleting it. Run on every
+load/restore/remote‑update.
 
 **Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }` —
 but the JSON is **photo‑free** (see below). The whole family reads/writes this one shared list.
@@ -293,13 +298,14 @@ original data URL — a `blob:` URL is dead outside the page.
 **Cloud photo storage (critical — Firestore's 1 MiB/doc limit):** photos are base64 and must
 NOT live inline in the `shared/recipes` doc or it overflows 1 MiB after a dozen or so photos and
 every write fails. Instead, `saveToFirestore` writes a **slim** recipes doc via
-`stripPhotosForCloud` (each recipe's `photo` blanked, an `hp:1` flag set when a photo exists, and
+`stripPhotosForCloud` (each recipe's `photo` blanked, a `_ph:1` flag set when a photo exists, and
 `originalPhoto` omitted entirely), then `syncCloudPhotos` writes each recipe's display photo to
 its **own** doc `shared/photo_<id>` = `{ photo:<base64>, updatedAt }` (only when changed; deletes
 docs for removed/deleted photos). These per‑photo docs sit in the `shared` collection so the
 existing `match /shared/{document=**}` rule already permits them — no rules change needed.
 `loadFromFirestore`/`applyRemoteUpdate` re‑attach photos via `attachCloudPhotos` (fetch
-`shared/photo_<id>` for `hp` recipes; legacy inline photos are kept and migrated on next save).
+`shared/photo_<id>` for `_ph` recipes — reads also accept the pre‑5.8 spelling `hp`, writes never
+emit it; legacy inline photos are kept and migrated on next save).
 Photos remain inline in memory + localStorage, so rendering/backup/export are unchanged.
 **`originalPhoto` (the full‑res scan backup, potentially many MB) is never synced — local‑only**;
 it is captured before a cloud load and re‑attached afterward so a load doesn't drop it.
@@ -398,10 +404,10 @@ panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow scree
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
 (`.card-category-badge`, bottom‑left over the image), title (right‑aligned for Hebrew),
-prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a green
-video/clip circle badge for `r.isVideoBookmark || r.isClip` (not `isVideoBookmark` alone — a
-recipe can be flagged as a clip without being a video bookmark, e.g. auto‑detected as having no
-ingredients/steps, and must still show the indicator). On phone‑width screens the grid uses a configurable column count
+prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a
+`.clip-badge` 🎬 circle for `r.isClip` (4.10 — one shared component, not the two hand‑rolled
+inline SVGs it replaced; `.clip-badge-sm` in list view). `isClip` is the only flag read here:
+`isVideoBookmark` was folded into it in 2.3. On phone‑width screens the grid uses a configurable column count
 (`--mobile-cols`, 1–5, default 3) with square (`aspect-ratio:1/1`) cubes — see **Settings → Grid
 Layout** (`openGridSettings`, stored in `tonys_mobile_cols`). Desktop grid uses
 `repeat(auto-fill, minmax(220px, 1fr))`. There is a **sort** control (`setSort`): default /
@@ -515,7 +521,7 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 ---
 
-## 10. Keeping your place, and step timers
+## 11a. Keeping your place, and step timers
 
 **There is no Cook Mode.** It existed until v27.6 and was removed on request: the whole recipe
 should be visible at once. Do not reintroduce a step-at-a-time view.
@@ -541,7 +547,7 @@ deliberately incapable of reaching any function that writes data.
 
 ---
 
-## 10a. Scaling, and the cooking log
+## 11b. Scaling, and the cooking log
 
 **Scaling (3.3)** offers two routes to the same multiplier, both kept on purpose:
 - the `×1`–`×6` buttons (`setMult`), and
@@ -566,7 +572,7 @@ notes survive. `duplicateRecipe` clears the log along with the count.
 
 ---
 
-## 11a. WhatsApp group knowledge
+## 11c. WhatsApp group knowledge
 
 WhatsApp exposes **no API** for reading group content, and libraries that automate WhatsApp Web
 breach its Terms of Service and get numbers banned. The feature therefore reads WhatsApp's own
@@ -648,9 +654,9 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of ~60 checks grouped as **UI,
-Core, CRUD, Modals, Network, Storage, Cloud Sync, Backup, CSS, Features, Import/Export** —
-covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **115 checks** in 13 groups —
+**Features (40), UI (16), Import/Export (11), CRUD (10), Storage (9), Core, Modals, Network,
+Cloud Sync, WhatsApp (5 each), CSS (2), Backup and Performance (1 each)** — covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
 (`openSelfTest`/`runSelfTests`) lets the user pick tests by group, runs them sequentially with
