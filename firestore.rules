@@ -7,10 +7,15 @@ rules_version = '2';
 // with the current member list before showing you what to paste into the
 // Firebase console. Edit the structure HERE, not in index.html.
 //
-// Placeholders, each replaced with a comma-separated list of quoted emails:
-//   {{READ}}   owner + everyone with read, write or admin
-//   {{WRITE}}  owner + everyone with write or admin
-//   {{ADMIN}}  owner + admins only
+// Three placeholders below are each replaced with a comma-separated list of
+// quoted emails. They are named here WITHOUT their braces on purpose: the
+// substitution is a blind text replace, so a second mention of a literal token
+// in this comment gets swapped too — which is exactly how the generated rules
+// once ended up with the member list in the comment and a bare placeholder left
+// in the `allow read` line, where Firebase rejects it.
+//   READ    owner + everyone with read, write or admin
+//   WRITE   owner + everyone with write or admin
+//   ADMIN   owner + admins only
 //
 // The owner's email is always included in all three, so locking yourself out by
 // editing the member list is not possible.
