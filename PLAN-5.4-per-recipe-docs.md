@@ -1,7 +1,19 @@
 # 5.4 — One Firestore document per recipe
 
-**Status:** not started. Everything else in the backlog is done as of v27.9.
-**Why it's worth doing:** Tony has confirmed he is *not* the only editor, which makes the
+**Status: step 1 of 3 shipped in v28.0** — per-recipe reads with a legacy fallback, dual-write,
+migration on first load after sign-in, and `schema: 2` in `shared/meta`. Still to do:
+
+- **v28.1 — stop writing `shared/recipes`,** only once Tony confirms every device has run v28.0
+  at least once. It is the block labelled *DUAL-WRITE* in `saveToFirestore` plus the `recipes`
+  entry in the listener pair in `_loadFromFirestoreInner`.
+- **Later — delete the legacy document by hand,** after a backup. Never in the same release
+  that stops writing it.
+- **The two-browser checks in §7 have NOT been run.** They can't be here: they need two
+  signed-in sessions against the real Firebase project, and this sandbox has neither network
+  nor Firebase. The unit tests below cover the decision logic; §7 covers the thing that
+  actually bites. **Do §7.6 (back up first) before trusting any of this with real data.**
+
+**Why it was worth doing:** Tony has confirmed he is *not* the only editor, which makes the
 lost-edit problem below a live risk rather than a theoretical one.
 
 ---
@@ -114,12 +126,19 @@ Consider caching by `updatedAt` so a load only fetches changed documents.
 
 ## 7. Test plan — this must not ship on unit tests alone
 
-Add to the Self Test suite:
-- migration is idempotent (run twice, same result)
-- a legacy-only account migrates on first load
-- deleting a recipe removes its document *and* its `photo_<id>`
-- `nextId` never regresses
-- a stale-base write is refused, not silently applied
+Added to the Self Test suite in v28.0 (Cloud Sync group), all driving the real functions
+against `_fakeFirestore`, an in-memory stand-in:
+- ✅ `cloud_migrate_idempotent` — migration is idempotent, and leaves the legacy doc alone
+- ✅ `cloud_migrate_legacy` — a legacy-only account migrates, and the documents round-trip
+- ✅ `cloud_delete_docs` — deleting a recipe removes its document *and* its `photo_<id>`
+- ✅ `cloud_nextid` — `nextId` never regresses, including against a higher cloud value
+- ✅ `cloud_stale_base` — a stale-base write is refused, not silently applied
+- ✅ `cloud_doc_range` — the legacy `recipes` doc falls outside the `recipe_*` id range
+- ✅ `cloud_history_split` — history travels per-recipe but never in the legacy document
+- ✅ `cloud_dirty` — only changed recipes are written
+
+Each was mutation-checked: the code was deliberately broken and the test confirmed to fail.
+That matters more than the tests passing, and it found a real defect in one of them.
 
 Then, by hand, with two browsers signed into the same account:
 1. Edit **different** recipes simultaneously on both → both survive. *(Fails today.)*

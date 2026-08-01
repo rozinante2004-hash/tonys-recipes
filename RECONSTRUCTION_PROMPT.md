@@ -24,8 +24,8 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v27.9` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
-the two version badges in the markup — four `v27.x` strings in `index.html` in all, bumped together).
+**Current version:** `v28.0` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
 **DM Sans** for body. Cream/brown/terracotta/gold palette. Rounded cards, soft shadows,
@@ -40,7 +40,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Network‑first for the document, cache‑first for assets. |
-| `version.json` | `{"version": "v27.9"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v28.0"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
@@ -251,7 +251,7 @@ forwards whatever the client sends.)
   cookCount: Number,          // times "Cooked!" tapped
   lastCooked: Number,         // ms timestamp
   cookLog: [{ id, at, rating, note }],  // 3.5 — one entry per cook, capped at 50
-  history: [{...}],           // 3.4 — last 3 revisions. LOCAL ONLY, never synced
+  history: [{...}],           // 3.4 — last 3 revisions. Travels in recipe_<id> (5.4), never in the legacy doc
   isClip: Boolean,            // "clip"/bookmark (no full recipe). The ONLY clip flag (2.3)
   updatedAt: Number           // ms timestamp — used for offline-merge conflict resolution
 }
@@ -285,9 +285,46 @@ what backfills the missing fields (`diets=[]`, `cookCount=0`, `notes=''`, `sourc
 folds a legacy `isVideoBookmark` into `isClip` before deleting it. Run on every
 load/restore/remote‑update.
 
-**Firestore layout:** doc `shared/recipes` = `{ recipes: <JSON string>, nextId, updatedAt }` —
-but the JSON is **photo‑free** (see below). The whole family reads/writes this one shared list.
-Doc `shared/access` = `{ members, updatedAt }`. Legacy `users/{uid}/…` rules kept for safety.
+**Firestore layout (5.4, v28.0):** one document per recipe.
+
+| Document | Contents |
+|---|---|
+| `shared/recipe_<id>` | `{ r: <JSON of one photo‑free recipe>, updatedAt, id }`. Carries `history`. |
+| `shared/meta` | `{ nextId, ids: [...], schema: 2, updatedAt }` |
+| `shared/photo_<id>` | `{ photo: <base64>, updatedAt }` — unchanged, photos were already split |
+| `shared/recipes` | The **legacy** single document, `{ recipes: <JSON string>, nextId, updatedAt }`, photo‑ *and* history‑free. Still written through v28.0 so a device on v27.9 keeps working; v28.1 stops writing it, and it is deleted by hand later still. |
+| `shared/access` | `{ members, updatedAt }` |
+
+Legacy `users/{uid}/…` rules kept for safety.
+
+**Why per‑recipe:** the single document was overwritten whole by every save, so two people
+editing inside the same window meant the second save replaced the first person's work
+silently. It also capped the collection at ~610 recipes and re‑uploaded everything to record
+one favourite.
+
+**Reading:** `shared/meta` first. Per‑recipe documents are authoritative **only when
+`meta.schema >= 2`** — a migration interrupted half way leaves some `recipe_*` documents
+written and `schema` still below 2, and trusting their mere existence would silently drop
+everything not yet written. Otherwise read `shared/recipes` and migrate. The documents are
+fetched with a `documentId()` range query over `['recipe_', 'recipe` ')` — note the upper
+bound is `'_' + 1`, which excludes the legacy `recipes` document; falling back to fetching
+`meta.ids` one at a time if the range query is unavailable.
+
+**Writing:** only recipes whose serialised form changed (`cloudDirtyIds`). Each write is a
+transaction that compares the cloud document's `updatedAt` against the base we last read
+(`cloudWriteAllowed`) and **refuses** if another device wrote in between, telling the user
+plainly. Deliberately not a field‑by‑field merge: a wrong silent merge is worse than an
+honest refusal. `nextId` is merged upward, never lowered, or two devices mint the same id.
+
+**Deleting:** propagated **explicitly** (`queueCloudDelete`, persisted in
+`tonys_cloud_deletes`, flushed by `flushCloudDeletes`), never inferred by diffing the cloud
+against memory — a partial read would otherwise look exactly like a mass deletion. Undo takes
+the id back off the queue. Deleting removes `recipe_<id>` *and* `photo_<id>`.
+
+**Change notification:** two `onSnapshot` listeners during the transition — `shared/meta`
+(touched by every v28 save) and `shared/recipes` (all a v27.9 device ever writes). Watching
+one would miss half the family. The snapshot no longer carries the recipes, so
+`applyRemoteUpdate()` re‑reads via `loadFromFirestore()`.
 
 **Photo display (`photoSrc`)**: stored photos are base64 data URLs (needed for backup/export/
 sync), but rendering them inline makes every grid render build multi‑MB markup. `photoSrc(r)`
@@ -654,9 +691,9 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **115 checks** in 13 groups —
-**Features (40), UI (16), Import/Export (11), CRUD (10), Storage (9), Core, Modals, Network,
-Cloud Sync, WhatsApp (5 each), CSS (2), Backup and Performance (1 each)** — covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **123 checks** in 13 groups —
+**Features (40), UI (16), Cloud Sync (13), Import/Export (11), CRUD (10), Storage (9), Core,
+Modals, Network, WhatsApp (5 each), CSS (2), Backup and Performance (1 each)** — covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
 (`openSelfTest`/`runSelfTests`) lets the user pick tests by group, runs them sequentially with

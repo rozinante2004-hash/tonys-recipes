@@ -30,9 +30,15 @@ python3 -m http.server 8137          # some checks need http://, not file://
 # → page.evaluate over SELF_TESTS, calling each t.test()
 ```
 
-**As of v27.9: 115 checks, 109 passing.** The 6 failures are `net_*` and
+**As of v28.0: 123 checks, 117 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
+
+**Run the suite with `#selfTestOverlay` open**, not just by calling each `t.test()`.
+Some tests interact with modals, and "topmost dialog" means something different
+when the Self Test screen is itself open — `a11y_basics` used to close the suite
+out from under itself and strand the converter on screen, and a runner that
+didn't open the overlay could not see it.
 
 Always also run a syntax check over the inline `<script>` blocks (`new Function(src)`),
 because a single-file app fails silently and completely on a syntax error.
@@ -59,7 +65,7 @@ found only because a test was written first and disagreed with the code.
 | Decision | Why |
 |---|---|
 | **No Cook Mode.** Removed in v27.7. | Tony wants the whole recipe visible at once. Do not reintroduce a step-at-a-time view. |
-| **`history` is not synced to Firestore.** | Measured: 3 revisions take a recipe from 1.7 KB → 6.2 KB, cutting the shared document's capacity from ~610 recipes to ~170. Re-enable only once 5.4 gives each recipe its own document. |
+| **`history` syncs per-recipe but never in the legacy doc.** | 3 revisions take a recipe from 1.7 KB → 6.2 KB. Per-document that is irrelevant; in the single shared document it cut capacity from ~610 recipes to ~170. `slimRecipeForCloud(r, keepHistory)` is the one switch — `true` for `recipe_<id>`, `false` for `recipes`. |
 | **Voice is disabled on iOS.** | iOS defines `webkitSpeechRecognition` but cannot honour `continuous`; an unguarded `onend → start()` froze the whole app. Restarts must stay deferred and capped. |
 | **Ticks are session-only.** | Explicitly requested. In memory only, wiped when the recipe closes. Never persist them. |
 | **Bring! status comes from the Worker.** | The token lives in KV and is shared; the per-device `bring_token_expiry` is a cache. It may say "unknown" but must **never** assert "expired". |
@@ -88,9 +94,16 @@ found only because a test was written first and disagreed with the code.
 
 ## Outstanding
 
-- **5.4 — per-recipe Firestore documents.** The last backlog item and the riskiest.
-  Full brief in `PLAN-5.4-per-recipe-docs.md`. Tony has confirmed he is not the only
-  editor, so today's blind whole-document `.set()` can silently lose someone's edit.
+- **5.4 — per-recipe Firestore documents. Step 1 of 3 shipped in v28.0.** v28.0 reads
+  per-recipe with a legacy fallback, migrates on first load, and **dual-writes**.
+  Next: v28.1 stops writing `shared/recipes`, but **only once every device has run
+  v28.0** — Tony deploys by hand, so a phone can sit on the old version for days.
+  The two-browser concurrency checks in `PLAN-5.4-per-recipe-docs.md` §7 have **not**
+  been run; they need two real signed-in sessions. Back up before trusting it.
+- **Firestore `allow write` already includes delete.** The narrower `allow delete`
+  in `firestore.rules` restricts nothing, because allow rules are OR'd. Tightening it
+  means splitting `write` into `create, update` — a real change to who can delete, so
+  it needs Tony's say-so rather than being folded into something else.
 - **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
   (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome.
 - The Bring! token that leaked into git history **was rotated on 1 Aug 2026**. The old value is

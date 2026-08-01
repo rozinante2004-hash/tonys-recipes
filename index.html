@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v27.9 -->
+<!-- Tony's Recipes Collection v28.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -271,6 +271,9 @@ async function deleteSelected() {
   recipes.forEach(function(r, idx) { if (selectedIds.has(r.id)) removed.push({ idx: idx, recipe: r }); });
   _pendingUndo = { items: removed, at: Date.now() };
 
+  // 5.4 — each recipe has its own cloud document now, so a deletion has to be
+  // stated rather than inferred from its absence.
+  removed.forEach(function(entry) { queueCloudDelete(entry.recipe.id); });
   recipes = recipes.filter(function(r) { return !selectedIds.has(r.id); });
   selectedIds.clear();
   cancelSelectMode();
@@ -312,6 +315,7 @@ async function deleteRecipe(id) {
   if (!await askConfirm({ icon:'🗑️', title:'Delete this recipe?', message:r.name + '\n\nYou can undo this straight afterwards.',
       okLabel:'Delete', danger:true })) return;
   _pendingUndo = { items: [{ idx: idx, recipe: r }], at: Date.now() };
+  queueCloudDelete(r.id);   // 5.4 — remove its own document too, not just the entry
   recipes.splice(idx, 1);
   saveData();
   renderFilters();
@@ -326,6 +330,10 @@ function undoDelete() {
   // Re-insert lowest index first so later positions stay correct
   _pendingUndo.items.slice().sort(function(a,b){ return a.idx - b.idx; })
     .forEach(function(entry) {
+      // 5.4 — take the cloud deletion back off the queue. Undo usually lands
+      // inside saveData's 1.5s debounce so nothing was sent yet; if it did go,
+      // the restored recipe is dirty again and gets rewritten on the next save.
+      unqueueCloudDelete(entry.recipe.id);
       if (recipes.some(function(r){ return r.id === entry.recipe.id; })) return; // already back
       recipes.splice(Math.min(entry.idx, recipes.length), 0, entry.recipe);
     });
@@ -573,6 +581,63 @@ window.handleShareTarget = handleShareTarget;
 
 // ─── SELF TEST ──────────────────────────────────────────────────────────────
 // ─── SELF TEST ENGINE ────────────────────────────────────────────────────────
+
+// ── Test scaffolding for 5.4 ────────────────────────────────────────────────
+// An in-memory stand-in for the slice of Firestore the per-recipe sync uses.
+// Enough to drive the real functions: get/set/delete on a document, and a
+// transaction that reads then writes. It deliberately makes `where()` throw, so
+// the tests also exercise readCloudRecipeDocs' meta.ids fallback — the range
+// query on __name__ is the one piece that needs a real Firestore to try.
+function _fakeFirestore(seed) {
+  var docs = {};
+  if (seed) Object.keys(seed).forEach(function(k){ docs[k] = JSON.parse(JSON.stringify(seed[k])); });
+  function ref(id) {
+    return {
+      id: id,
+      get: function(){ return Promise.resolve({
+        id: id,
+        exists: Object.prototype.hasOwnProperty.call(docs, id),
+        data: function(){ return docs[id]; }
+      }); },
+      set: function(v){ docs[id] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); },
+      delete: function(){ delete docs[id]; return Promise.resolve(); }
+    };
+  }
+  return {
+    _docs: docs,
+    collection: function(){
+      return { doc: ref, where: function(){ throw new Error('fake Firestore has no range query'); } };
+    },
+    runTransaction: function(fn){
+      return Promise.resolve(fn({
+        get: function(r){ return r.get(); },
+        set: function(r, v){ return r.set(v); }
+      }));
+    }
+  };
+}
+// The 5.4 sync keeps module-level maps (what we last wrote, what the cloud had,
+// what is queued for deletion). A test that left those altered would corrupt the
+// running session's idea of the cloud, so every test that touches them snapshots
+// first and restores in a `finally`.
+function _cloudSnapshotForTest() {
+  var ls = null;
+  try { ls = localStorage.getItem(CLOUD_DELETES_KEY); } catch(e) {}
+  return {
+    base: window._cloudRecipeBase, stamp: window._cloudRecipeStamp,
+    ids: window._cloudRecipeIds, del: window._pendingCloudDeletes,
+    schema: window._cloudSchema, ls: ls
+  };
+}
+function _cloudRestoreForTest(s) {
+  window._cloudRecipeBase = s.base; window._cloudRecipeStamp = s.stamp;
+  window._cloudRecipeIds = s.ids;   window._pendingCloudDeletes = s.del;
+  window._cloudSchema = s.schema;
+  try {
+    if (s.ls === null) localStorage.removeItem(CLOUD_DELETES_KEY);
+    else localStorage.setItem(CLOUD_DELETES_KEY, s.ls);
+  } catch(e) {}
+}
 
 const SELF_TESTS = [
   // ── UI ELEMENTS ────────────────────────────────────────────────────────────
@@ -1093,6 +1158,130 @@ const SELF_TESTS = [
       });
     } },
 
+  // ── 5.4 — ONE DOCUMENT PER RECIPE ────────────────────────────────────────────
+  // These drive the real functions against an in-memory stand-in for Firestore.
+  // They are unit tests and cannot prove the live behaviour on their own — the
+  // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
+  // hand — but every rule below is one whose breakage is silent in production.
+  { id:'cloud_doc_range', group:'Cloud Sync', name:'recipe_* range excludes the legacy `recipes` doc',
+    test: async()=>{
+      if(typeof RECIPE_DOC_LO!=='string'||typeof RECIPE_DOC_HI!=='string') throw new Error('the recipe_* document-id bounds are not defined');
+      var inRange=function(id){ return id>=RECIPE_DOC_LO && id<RECIPE_DOC_HI; };
+      ['recipe_1','recipe_12','recipe_999999'].forEach(function(id){
+        if(!inRange(id)) throw new Error(id+' should be inside the recipe_* range but is not');
+      });
+      // The one that matters: the legacy single document is called `recipes`, and
+      // reading it as though it were a recipe would parse the whole collection as one.
+      if(inRange('recipes')) throw new Error('the legacy `recipes` document falls inside the recipe_* range — a load would parse it as a single recipe');
+      ['photo_1','meta','access'].forEach(function(id){
+        if(inRange(id)) throw new Error(id+' must not be read as a recipe document');
+      });
+    } },
+
+  { id:'cloud_stale_base', group:'Cloud Sync', name:'A stale-base write is refused, not applied',
+    test: async()=>{
+      if(typeof cloudWriteAllowed!=='function') throw new Error('cloudWriteAllowed not defined');
+      if(!cloudWriteAllowed(null,123)) throw new Error('the first write of a recipe (no cloud document yet) must be allowed');
+      if(!cloudWriteAllowed(500,500)) throw new Error('writing over the exact version we read must be allowed');
+      if(!cloudWriteAllowed(400,500)) throw new Error('a cloud copy older than our base must be writable');
+      // The whole point of 5.4: someone else wrote after we last read.
+      if(cloudWriteAllowed(600,500)) throw new Error('a write whose base is older than the cloud copy was allowed — this is the lost-edit bug');
+      if(cloudWriteAllowed(600,undefined)) throw new Error('writing a recipe we have never read must be refused, not allowed to clobber');
+    } },
+
+  { id:'cloud_nextid', group:'Cloud Sync', name:'nextId never regresses',
+    test: async()=>{
+      if(mergeNextId(10,20)!==20) throw new Error('a higher cloud nextId must win');
+      if(mergeNextId(20,10)!==20) throw new Error('a higher local nextId must win');
+      if(mergeNextId(0,7)!==7||mergeNextId(7,0)!==7) throw new Error('a missing side must not drag nextId to 0');
+      if(mergeNextId(undefined,undefined)!==0) throw new Error('two missing sides should be 0, not NaN');
+      var s=_cloudSnapshotForTest();
+      try{
+        var db=_fakeFirestore({ meta:{ nextId:99, ids:[], schema:2 } });
+        await writeCloudMeta([{id:1}], 5, db);
+        if(db._docs.meta.nextId!==99) throw new Error('writeCloudMeta lowered nextId from 99 to '+db._docs.meta.nextId+' — two devices would then mint the same recipe id');
+      } finally { _cloudRestoreForTest(s); }
+    } },
+
+  { id:'cloud_migrate_idempotent', group:'Cloud Sync', name:'Migration is idempotent and interruptible',
+    test: async()=>{
+      var s=_cloudSnapshotForTest();
+      try{
+        var list=[{id:1,name:'A',updatedAt:10,ingredients:[],steps:[]},{id:2,name:'B',updatedAt:20,ingredients:[],steps:[]}];
+        var db=_fakeFirestore({ recipes:{ recipes:JSON.stringify(list), nextId:3 } });
+        // Compare everything except meta.updatedAt, which is a wall-clock stamp
+        // and legitimately differs between two runs — comparing it made this
+        // test fail whenever the two migrations straddled a millisecond.
+        var shot=function(){
+          var c=JSON.parse(JSON.stringify(db._docs));
+          if(c.meta) delete c.meta.updatedAt;
+          return JSON.stringify(c);
+        };
+        await migrateToPerRecipeDocs(list,3,db);
+        var first=shot();
+        await migrateToPerRecipeDocs(list,3,db);   // run it again — a re-run must be a no-op
+        if(shot()!==first) throw new Error('running the migration twice changed the result, so an interrupted migration cannot safely be retried');
+        if(db._docs.meta.schema!==2) throw new Error('meta.schema was not stamped to 2');
+        if(!db._docs.recipe_1||!db._docs.recipe_2) throw new Error('a per-recipe document is missing after migration');
+        if(!db._docs.recipes) throw new Error('the legacy document must NOT be deleted by the migration — it is the fallback for devices still on v27.9');
+      } finally { _cloudRestoreForTest(s); }
+    } },
+
+  { id:'cloud_migrate_legacy', group:'Cloud Sync', name:'A legacy-only account migrates, keeping every recipe',
+    test: async()=>{
+      var s=_cloudSnapshotForTest();
+      try{
+        var list=[];
+        for(var i=1;i<=25;i++) list.push({id:i,name:'R'+i,updatedAt:i,ingredients:[],steps:[]});
+        var db=_fakeFirestore({ recipes:{ recipes:JSON.stringify(list), nextId:26 } });
+        var res=await migrateToPerRecipeDocs(list,26,db);
+        if(res.written!==25) throw new Error('migrated '+res.written+' of 25 recipes');
+        var docs=Object.keys(db._docs).filter(function(k){ return k.indexOf('recipe_')===0; });
+        if(docs.length!==25) throw new Error('expected 25 per-recipe documents, found '+docs.length);
+        if(db._docs.meta.ids.length!==25) throw new Error('meta.ids does not list every recipe, so the fallback read path would lose some');
+        // Round-trip: the documents must parse back to the same recipes.
+        var back=parseCloudRecipeDocs(docs.map(function(k){ return { id:k, data:db._docs[k] }; }));
+        if(back.length!==25) throw new Error('re-reading the migrated documents produced '+back.length+' recipes');
+        if(back.map(function(r){return r.id;}).sort(function(a,b){return a-b;}).join()!==list.map(function(r){return r.id;}).join())
+          throw new Error('the migrated documents do not round-trip to the same recipe ids');
+      } finally { _cloudRestoreForTest(s); }
+    } },
+
+  { id:'cloud_delete_docs', group:'Cloud Sync', name:'Deleting a recipe removes its doc AND its photo doc',
+    test: async()=>{
+      var s=_cloudSnapshotForTest();
+      try{
+        var db=_fakeFirestore({ recipe_7:{ r:'{}', updatedAt:1 }, photo_7:{ photo:'x' }, recipe_8:{ r:'{}', updatedAt:1 } });
+        window._pendingCloudDeletes={}; queueCloudDelete(7);
+        await flushCloudDeletes(db);
+        if(db._docs.recipe_7) throw new Error('recipe_7 survived the delete');
+        if(db._docs.photo_7) throw new Error('photo_7 was orphaned — its recipe is gone but the photo document remains, and nothing will ever clean it up');
+        if(!db._docs.recipe_8) throw new Error('deleting one recipe removed another');
+        if(Object.keys(window._pendingCloudDeletes).length) throw new Error('the delete queue was not cleared after flushing');
+      } finally { _cloudRestoreForTest(s); }
+    } },
+
+  { id:'cloud_history_split', group:'Cloud Sync', name:'History travels per-recipe but not in the legacy doc',
+    test: async()=>{
+      var r={id:1,name:'x',history:[{name:'old'}],photo:'',updatedAt:1};
+      // 3.4 — per-recipe documents have no shared ceiling, so history can travel.
+      if(!slimRecipeForCloud(r,true).history) throw new Error('history is missing from the per-recipe document — 5.4 was the whole reason it could start syncing');
+      // ...but the legacy single document still has one, and history tripled it.
+      if(slimRecipeForCloud(r,false).history) throw new Error('history leaked into the legacy-shaped copy — that document is size-capped and history triples each recipe');
+      if(stripPhotosForCloud([r])[0].history) throw new Error('stripPhotosForCloud writes the legacy document and must stay history-free');
+    } },
+
+  { id:'cloud_dirty', group:'Cloud Sync', name:'Only changed recipes are written',
+    test: async()=>{
+      var a={id:1,name:'A',photo:'',updatedAt:1}, b={id:2,name:'B',photo:'',updatedAt:1};
+      var stamps={}; stamps[1]=JSON.stringify(slimRecipeForCloud(a,true)); stamps[2]=JSON.stringify(slimRecipeForCloud(b,true));
+      if(cloudDirtyIds([a,b],stamps).length!==0) throw new Error('unchanged recipes were queued for writing — favouriting one recipe would re-upload the collection again');
+      b.fav=true;
+      var dirty=cloudDirtyIds([a,b],stamps);
+      if(dirty.length!==1||dirty[0]!==2) throw new Error('expected only the edited recipe to be dirty, got '+JSON.stringify(dirty));
+      if(cloudDirtyIds([a,b,{id:3,name:'C',photo:''}],stamps).indexOf(3)===-1) throw new Error('a brand new recipe was not queued for writing');
+    } },
+
   // ── FEATURES (recent additions) ──────────────────────────────────────────────
   { id:'feat_gridcols', group:'Features', name:'Phone grid columns (1–5) & clamp',
     test: async()=>{
@@ -1566,10 +1755,25 @@ const SELF_TESTS = [
       if(bad.length) throw new Error(bad.length+' icon-only button(s) have no accessible name');
       if(!document.getElementById('searchInput').getAttribute('aria-label')) throw new Error('search box has no accessible name');
       if(document.getElementById('toast').getAttribute('aria-live')!=='polite') throw new Error('toast is not announced to screen readers');
-      // Escape must close an open dialog
-      openCalcModal();
-      if(!closeTopModal()) throw new Error('closeTopModal did not close the open dialog');
-      if(document.getElementById('calcOverlay').classList.contains('open')) throw new Error('dialog still open after Escape');
+      // Escape must close an open dialog.
+      // This used to open the Measurement Converter and call closeTopModal() on
+      // it — but closeTopModal closes the LAST open overlay in DOM order, and
+      // #selfTestOverlay sits after #calcOverlay in the markup. Run from the
+      // Self Test screen (i.e. the only way anyone actually runs it) the call
+      // therefore closed the suite out from under itself, the assertion below
+      // failed because the converter was of course still open, and with no
+      // cleanup the converter was left stranded on screen while the remaining
+      // tests ran invisibly. Use a probe overlay appended last in the document
+      // instead: it tests the same mechanism and cannot be anything but topmost.
+      var probe=document.createElement('div');
+      probe.id='a11yEscProbe';
+      probe.className='modal-overlay open';
+      probe.style.cssText='position:fixed;inset:0;display:block;visibility:visible;';
+      document.body.appendChild(probe);
+      try{
+        if(!closeTopModal()) throw new Error('closeTopModal did not close the open dialog');
+        if(probe.classList.contains('open')) throw new Error('dialog still open after Escape');
+      } finally { probe.remove(); }   // in finally: a failed assertion must not strand a dialog
     } },
   { id:'export_print', group:'Import/Export', name:'Print builds a valid, non-empty document',
     test: async()=>{
@@ -3001,7 +3205,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v27.9';
+var APP_VERSION = 'v28.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5294,7 +5498,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5857,7 +6061,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v27.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10189,22 +10393,14 @@ function isSizeError(err) {
 // (`_ph` vs `hp`), which made every photo bug twice as hard to read. There is
 // now one name, `_ph` ("photo lives elsewhere"). Documents written by older
 // versions still carry `hp`, so reads accept both; writes only ever emit `_ph`.
+// The LEGACY single document only. 5.4 keeps writing it through v28.0 so a phone
+// still on v27.9 keeps working, and it stays history-free: three revisions more
+// than triple a recipe's serialised size (measured 1.7 KB → 6.2 KB), which would
+// cut that one document's capacity from ~610 recipes to ~170. Per-recipe
+// documents have no such ceiling, so `slimRecipeForCloud(r, true)` — the shape
+// written to `shared/recipe_<id>` — does carry history.
 function stripPhotosForCloud(list) {
-  return list.map(function(r) {
-    var c = {};
-    for (var k in r) {
-      // 3.4 — `history` is deliberately NOT synced. Three revisions more than
-      // triple a recipe's serialised size (measured: 1.7 KB → 6.2 KB), which
-      // would cut the shared document's capacity from ~610 recipes to ~170.
-      // History stays on the device that made the edits until 5.4 gives each
-      // recipe its own document, at which point it can travel with it.
-      if (r.hasOwnProperty(k) && k !== 'photo' && k !== 'originalPhoto' && k !== 'hp'
-          && k !== '_ph' && k !== '_po' && k !== 'history') c[k] = r[k];
-    }
-    c.photo = '';
-    if (r.photo || r._ph) c._ph = 1;
-    return c;
-  });
+  return list.map(function(r) { return slimRecipeForCloud(r, false); });
 }
 
 // Write each changed photo to its own doc; remove docs for cleared/deleted photos.
@@ -10271,6 +10467,255 @@ async function attachCloudPhotos(list) {
   return list;
 }
 
+// ─── 5.4 — ONE FIRESTORE DOCUMENT PER RECIPE ─────────────────────────────────
+// Until v27.9 the whole collection lived in one `shared/recipes` document that
+// every save overwrote entire. Two people editing inside the same window meant
+// whoever saved second replaced the first person's work — not merged, replaced,
+// with nothing said. It also capped the collection (~610 recipes at a measured
+// 1.7 KB each) and made favouriting one recipe re-upload all of them.
+//
+// v28.0 gives each recipe its own document:
+//   shared/recipe_<id>  { r: <JSON of one photo-free recipe>, updatedAt, id }
+//   shared/meta         { nextId, ids: [...], schema: 2, updatedAt }
+//   shared/photo_<id>   unchanged — photos were already split out
+//
+// TRANSITION — this release DUAL-WRITES. Per-recipe documents are authoritative
+// for v28 devices; `shared/recipes` is still written so a phone left on v27.9
+// keeps working. Tony deploys by hand, so assume a device runs the old version
+// for days. v28.1 stops writing the legacy document once every device is on
+// v28.0; the document itself gets deleted by hand later still, after a backup.
+var CLOUD_SCHEMA = 2;
+
+// Document-id range covering exactly `recipe_*`. The legacy document is called
+// `recipes`, and it MUST fall outside this range or a read would parse it as a
+// recipe: '_' is 0x5F and the character after it is '`' (0x60), so 'recipes'
+// (0x73 at that position) sorts above the upper bound and is excluded. There is
+// a self test pinning this, because getting it wrong is silent and ugly.
+var RECIPE_DOC_LO = 'recipe_';
+var RECIPE_DOC_HI = 'recipe' + String.fromCharCode(96);
+
+var _cloudRecipeBase  = {};   // id -> updatedAt of the cloud doc as we last saw it
+var _cloudRecipeStamp = {};   // id -> serialised form last synced (skips no-op writes)
+var _cloudRecipeIds   = {};   // id -> true when shared/recipe_<id> is known to exist
+var _cloudSchema      = 0;    // schema of the cloud data as last read
+
+// Deletions are propagated EXPLICITLY, never inferred by diffing the cloud
+// against memory. Inferring would mean a partial read (flaky connection, a
+// half-finished query) looked identical to "the user deleted 300 recipes".
+var CLOUD_DELETES_KEY = 'tonys_cloud_deletes';
+var _pendingCloudDeletes = {};
+function loadPendingCloudDeletes() {
+  try {
+    var raw = JSON.parse(localStorage.getItem(CLOUD_DELETES_KEY) || '[]');
+    if (Array.isArray(raw)) raw.forEach(function(id){ _pendingCloudDeletes[id] = true; });
+  } catch(e) {}
+}
+function savePendingCloudDeletes() {
+  try { localStorage.setItem(CLOUD_DELETES_KEY, JSON.stringify(Object.keys(_pendingCloudDeletes))); } catch(e) {}
+}
+// Survives a reload: a delete made offline still has to reach the cloud later.
+function queueCloudDelete(id) {
+  _pendingCloudDeletes[id] = true;
+  savePendingCloudDeletes();
+}
+function unqueueCloudDelete(id) {
+  delete _pendingCloudDeletes[id];
+  savePendingCloudDeletes();
+}
+window.queueCloudDelete = queueCloudDelete;
+window.unqueueCloudDelete = unqueueCloudDelete;
+
+function recipeDocId(id) { return 'recipe_' + id; }
+
+// One recipe, photo-free, ready for its own document.
+// 3.4 — `history` DOES travel now. It was excluded only because three revisions
+// took a recipe from 1.7 KB to 6.2 KB and would have cut the single shared
+// document's capacity from ~610 recipes to ~170. Per-document that cost is
+// irrelevant. The legacy document still gets a history-free copy, because for a
+// v27.9 device that ceiling is still very much real.
+function slimRecipeForCloud(r, keepHistory) {
+  var c = {};
+  for (var k in r) {
+    if (!r.hasOwnProperty(k)) continue;
+    if (k === 'photo' || k === 'originalPhoto' || k === 'hp' || k === '_ph' || k === '_po') continue;
+    if (k === 'history' && !keepHistory) continue;
+    c[k] = r[k];
+  }
+  c.photo = '';
+  if (r.photo || r._ph) c._ph = 1;
+  return c;
+}
+
+// Which recipes actually need writing. Comparing the serialised form rather than
+// updatedAt alone means a load that hands back identical data writes nothing.
+function cloudDirtyIds(list, stamps) {
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    if (stamps[r.id] !== JSON.stringify(slimRecipeForCloud(r, true))) out.push(r.id);
+  }
+  return out;
+}
+
+// Optimistic concurrency. Refuse a write whose base is older than what is in the
+// cloud: that means another device wrote this recipe after we last read it, and
+// overwriting would be exactly the lost-edit bug 5.4 exists to remove. This is
+// deliberately NOT a field-by-field merge — a wrong silent merge is worse than an
+// honest refusal, because nobody finds out about it.
+function cloudWriteAllowed(cloudUpdatedAt, base) {
+  if (cloudUpdatedAt === null || cloudUpdatedAt === undefined) return true;  // no cloud doc yet
+  if (base === null || base === undefined) return false;                     // never read it — don't clobber
+  return cloudUpdatedAt <= base;
+}
+
+function mergeNextId(local, cloud) {
+  return Math.max(parseInt(local, 10) || 0, parseInt(cloud, 10) || 0);
+}
+
+window.slimRecipeForCloud = slimRecipeForCloud;
+window.cloudDirtyIds      = cloudDirtyIds;
+window.cloudWriteAllowed  = cloudWriteAllowed;
+window.mergeNextId        = mergeNextId;
+window.recipeDocId        = recipeDocId;
+
+// Write one recipe's document, refusing a stale-base write.
+// Returns {id, ok} | {id, skipped:'conflict'} | {id, skipped:'too-big', bytes}
+async function saveRecipeDoc(r, db) {
+  db = db || _fbDb;
+  var ref  = db.collection('shared').doc(recipeDocId(r.id));
+  var base = _cloudRecipeBase[r.id];
+  var json = JSON.stringify(slimRecipeForCloud(r, true));
+  var bytes = byteLen(json);
+  if (bytes > FIRESTORE_DOC_LIMIT) return { id: r.id, skipped: 'too-big', bytes: bytes };
+  var stamped = r.updatedAt || Date.now();
+  var refused = false;
+  await db.runTransaction(async function(tx) {
+    var snap = await tx.get(ref);
+    var cloudAt = snap.exists ? ((snap.data() || {}).updatedAt) : null;
+    if (!cloudWriteAllowed(cloudAt, base)) { refused = true; return; }
+    tx.set(ref, { r: json, updatedAt: stamped, id: r.id });
+  });
+  if (refused) return { id: r.id, skipped: 'conflict' };
+  _cloudRecipeBase[r.id]  = stamped;
+  _cloudRecipeStamp[r.id] = json;
+  _cloudRecipeIds[r.id]   = true;
+  return { id: r.id, ok: true };
+}
+
+// `ids` is a FALLBACK membership list for when the range query is unavailable, so
+// it is grow-only apart from explicit deletes: a device that merely hasn't seen a
+// new recipe yet must not drop it from the list on its next save.
+async function writeCloudMeta(list, nextIdVal, db) {
+  db = db || _fbDb;
+  var ref = db.collection('shared').doc('meta');
+  await db.runTransaction(async function(tx) {
+    var snap = await tx.get(ref);
+    var cur  = snap.exists ? (snap.data() || {}) : {};
+    var ids  = {};
+    (cur.ids || []).forEach(function(i){ ids[i] = true; });
+    list.forEach(function(r){ ids[r.id] = true; });
+    Object.keys(_pendingCloudDeletes).forEach(function(i){ delete ids[i]; delete ids[parseInt(i,10)]; });
+    tx.set(ref, {
+      // nextId must never regress — two devices minting the same id would hand
+      // two different recipes the same document.
+      nextId: mergeNextId(nextIdVal, cur.nextId),
+      ids: Object.keys(ids).map(function(i){ return parseInt(i, 10); }).filter(function(i){ return !isNaN(i); }),
+      schema: CLOUD_SCHEMA,
+      updatedAt: Date.now()
+    });
+  });
+}
+
+// Remove the documents for recipes the user actually deleted.
+async function flushCloudDeletes(db) {
+  db = db || _fbDb;
+  var ids = Object.keys(_pendingCloudDeletes);
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    try {
+      await db.collection('shared').doc(recipeDocId(id)).delete();
+      await db.collection('shared').doc('photo_' + id).delete();
+    } catch(e) {
+      if (e && e.code === 'permission-denied') throw e;  // real problem — surface it
+      // anything else: the document is already gone, or will be retried next save
+    }
+    delete _pendingCloudDeletes[id];
+    delete _cloudRecipeIds[id];
+    delete _cloudRecipeBase[id];
+    delete _cloudRecipeStamp[id];
+    delete _cloudPhotoIds[id];
+    delete _cloudPhotoStamps[id];
+  }
+  savePendingCloudDeletes();
+  return ids.length;
+}
+
+// Read every `recipe_*` document. The range query is one round trip; the
+// meta.ids fallback exists because a range query on __name__ is the one piece of
+// this that cannot be exercised without a real Firestore.
+async function readCloudRecipeDocs(db, metaIds) {
+  db = db || _fbDb;
+  var out = [];
+  try {
+    var fp = firebase.firestore.FieldPath.documentId();
+    var q  = await db.collection('shared')
+      .where(fp, '>=', RECIPE_DOC_LO).where(fp, '<', RECIPE_DOC_HI).get();
+    q.forEach(function(doc) { out.push({ id: doc.id, data: doc.data() }); });
+    return out;
+  } catch(e) {
+    dlog('[5.4] documentId range query unavailable, falling back to meta.ids:', e && e.message);
+    var ids = metaIds || [];
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        var s = await db.collection('shared').doc(recipeDocId(ids[i])).get();
+        if (s.exists) out.push({ id: s.id, data: s.data() });
+      } catch(e2) {}
+    }
+    return out;
+  }
+}
+
+// Turn raw documents into a recipe list, recording each one's concurrency base.
+function parseCloudRecipeDocs(docs) {
+  var list = [];
+  for (var i = 0; i < docs.length; i++) {
+    var d = docs[i].data || {};
+    var r;
+    try { r = JSON.parse(d.r || 'null'); } catch(e) { r = null; }
+    if (!r || typeof r !== 'object') continue;   // one corrupt document must not blank the collection
+    list.push(r);
+    _cloudRecipeBase[r.id]  = d.updatedAt === undefined ? null : d.updatedAt;
+    _cloudRecipeStamp[r.id] = d.r;
+    _cloudRecipeIds[r.id]   = true;
+  }
+  return list;
+}
+window.parseCloudRecipeDocs = parseCloudRecipeDocs;
+
+// One-way migration from the legacy single document. Idempotent and safe to
+// interrupt: `schema` is stamped LAST and only once every document has landed, so
+// a migration killed half way leaves schema < 2, the read path keeps using the
+// legacy document, and re-running simply rewrites the same documents.
+async function migrateToPerRecipeDocs(list, nextIdVal, db) {
+  db = db || _fbDb;
+  var written = 0, skipped = [];
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    var json = JSON.stringify(slimRecipeForCloud(r, true));
+    if (byteLen(json) > FIRESTORE_DOC_LIMIT) { skipped.push(r.name || ('#' + r.id)); continue; }
+    var at = r.updatedAt || 0;
+    await db.collection('shared').doc(recipeDocId(r.id)).set({ r: json, updatedAt: at, id: r.id });
+    _cloudRecipeBase[r.id]  = at;
+    _cloudRecipeStamp[r.id] = json;
+    _cloudRecipeIds[r.id]   = true;
+    written++;
+  }
+  await writeCloudMeta(list, nextIdVal, db);
+  _cloudSchema = CLOUD_SCHEMA;
+  return { written: written, skipped: skipped };
+}
+window.migrateToPerRecipeDocs = migrateToPerRecipeDocs;
+
 function handleFirestoreSaveError(err) {
   setDriveStatus('error', 'Sync failed');
   console.error('[Firestore] Save FAILED:', err && err.code, err && err.message, err);
@@ -10329,27 +10774,66 @@ async function saveToFirestore() {
   try {
     window._justSaved = true;
 
-    // 1) Slim recipes doc (no photo data) — stays comfortably under the 1 MiB limit
+    // 1) 5.4 — one document per changed recipe. Only what actually changed is
+    //    written, so favouriting one recipe no longer re-uploads all of them.
+    var conflicts = [], oversized = [];
+    var dirty = cloudDirtyIds(recipes, _cloudRecipeStamp);
+    for (var di = 0; di < dirty.length; di++) {
+      var dr = recipes.find(function(x) { return x.id === dirty[di]; });
+      if (!dr) continue;
+      var res = await saveRecipeDoc(dr);
+      if (res.skipped === 'conflict') conflicts.push(dr);
+      else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
+    }
+
+    // 2) Deletions the user actually made, and the membership/nextId document
+    await flushCloudDeletes();
+    await writeCloudMeta(recipes, nextId);
+
+    // 3) DUAL-WRITE (transitional, see the 5.4 note above): keep the legacy
+    //    single document current so a device still on v27.9 keeps working. This
+    //    write is still a blind whole-collection overwrite — it is the old
+    //    behaviour, kept deliberately and only until v28.1 drops it.
     var recipesJson = JSON.stringify(stripPhotosForCloud(recipes));
     var docBytes = byteLen(recipesJson);
     if (docBytes > FIRESTORE_DOC_LIMIT) {
-      window._justSaved = false;
-      setDriveStatus('error', 'Sync failed');
-      showServiceError('DOC_TOO_BIG: Your recipe text alone is too large for one cloud document ('
-        + Math.round(docBytes / 1024) + ' KB, limit ~1024 KB), even with photos removed.\n\n'
-        + 'This usually means one recipe has an enormous notes or steps field. Trim it and try again.');
-      return;
+      // The per-recipe documents above already succeeded, so this is no longer
+      // fatal — say what actually happened rather than claiming the save failed.
+      dlog('[5.4] legacy document skipped, over the 1 MiB limit at', docBytes, 'bytes');
+      toast('⚠️ Too big for the old shared document — synced per-recipe only. Devices on v27.9 will not see these changes.');
+    } else {
+      await _fbDb.collection('shared').doc('recipes').set({
+        recipes: recipesJson, nextId: nextId, updatedAt: new Date().toISOString()
+      });
     }
-    await _fbDb.collection('shared').doc('recipes').set({
-      recipes: recipesJson, nextId: nextId, updatedAt: new Date().toISOString()
-    });
 
-    // 2) Each changed photo into its own doc
+    // 4) Each changed photo into its own doc
     var photoErrors = await syncCloudPhotos();
 
     setTimeout(function() { window._justSaved = false; }, 5000);
     _offlineQueue = false;
     try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
+
+    // A refused write is the whole point of 5.4 — say so plainly and leave the
+    // recipe alone. Silently merging someone else's edit is the bug, not the fix.
+    if (conflicts.length) {
+      setDriveStatus('error', 'Not saved — changed elsewhere');
+      showServiceError('EDITED_ELSEWHERE: ' + conflicts.length + ' recipe(s) were changed on another '
+        + 'device after this one last synced, so they were NOT overwritten:\n\n'
+        + conflicts.map(function(r) { return '• ' + (r.name || ('#' + r.id)); }).join('\n')
+        + '\n\nYour version is still safe on this device. Reload to pull the other device\'s copy '
+        + 'down first, then re-apply your change — nothing has been lost, but the two versions '
+        + 'have to be reconciled by you rather than guessed at.');
+      return;
+    }
+    if (oversized.length) {
+      setDriveStatus('error', 'Sync failed');
+      showServiceError('DOC_TOO_BIG: ' + oversized.length + ' recipe(s) exceed Firestore\'s ~1 MB '
+        + 'per-document limit even with photos removed:\n\n'
+        + oversized.map(function(e) { return '• ' + e; }).join('\n')
+        + '\n\nThis usually means an enormous notes or steps field. Retrying will not help — trim it and save again.');
+      return;
+    }
 
     if (photoErrors.length) {
       setDriveStatus('error', 'Some photos not synced');
@@ -10415,12 +10899,33 @@ async function _loadFromFirestoreInner(user) {
   var _localPhoto = {};
   recipes.forEach(function(r) { if (r.photo) _localPhoto[r.id] = { photo: r.photo, updatedAt: r.updatedAt || 0 }; });
   try {
-    // Step 1: One-time load to get current data
-    var snap = await _fbDb.collection('shared').doc('recipes').get();
+    // Step 1: One-time load to get current data.
+    // 5.4 — per-recipe documents are authoritative, but ONLY once meta.schema
+    // says the migration finished. A migration interrupted half way leaves some
+    // recipe_* documents written and schema still below 2; trusting their mere
+    // existence would silently drop everything that hadn't been written yet.
+    var metaSnap = await _fbDb.collection('shared').doc('meta').get();
+    var meta = metaSnap.exists ? (metaSnap.data() || {}) : {};
+    _cloudSchema = meta.schema || 0;
+
     var hasData = false;
-    if (snap.exists) {
-      var data = snap.data();
-      var fsRecipes = JSON.parse(data.recipes || '[]');
+    var fsRecipes = null, cloudNextId = 0, needMigration = false;
+
+    if (_cloudSchema >= CLOUD_SCHEMA) {
+      var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
+      fsRecipes = parseCloudRecipeDocs(docs);
+      cloudNextId = meta.nextId || 0;
+    } else {
+      var snap = await _fbDb.collection('shared').doc('recipes').get();
+      if (snap.exists) {
+        var data = snap.data();
+        try { fsRecipes = JSON.parse(data.recipes || '[]'); } catch(e) { fsRecipes = null; }
+        cloudNextId = data.nextId || 0;
+        needMigration = Array.isArray(fsRecipes) && fsRecipes.length > 0;
+      }
+    }
+
+    {
       if (Array.isArray(fsRecipes) && fsRecipes.length > 0) {
         fsRecipes = migrateRecipes(fsRecipes);
         // Check both memory flag AND localStorage (in case timing caused memory flag to be missed)
@@ -10456,9 +10961,30 @@ async function _loadFromFirestoreInner(user) {
             recoveredPhotos++;
           }
         });
-        if (data.nextId) nextId = Math.max(nextId, data.nextId);
+        nextId = mergeNextId(nextId, cloudNextId);
         saveLocal();
         hasData = true;
+
+        // 5.4 — a legacy-only account migrates on its first load after sign-in.
+        // Done before any push-back below so those writes go to the new layout.
+        if (needMigration) {
+          try {
+            var mig = await migrateToPerRecipeDocs(recipes, nextId);
+            dlog('[5.4] migrated', mig.written, 'recipes to per-recipe documents');
+            if (mig.skipped.length) {
+              toast('⚠️ ' + mig.skipped.length + ' recipe(s) too large to migrate — still in the old shared document');
+            } else {
+              toast('☁️ Cloud storage upgraded — each recipe now has its own document');
+            }
+            needMigration = false;
+          } catch(e) {
+            // Leave schema below 2 and keep using the legacy document; the next
+            // load simply tries again. An interrupted migration is not a failure
+            // state, it is just an unfinished one.
+            console.warn('[5.4] migration did not finish, will retry on next load:', e && e.message);
+          }
+        }
+
         if (hasOfflineChanges) {
           toast('✅ Offline changes merged with cloud data');
           _offlineQueue = false;
@@ -10472,42 +10998,51 @@ async function _loadFromFirestoreInner(user) {
       }
     }
 
-    // Step 2: Set up listener for FUTURE remote changes only
-    // Use a flag to skip the first snapshot (which echoes the current state)
+    // Step 2: Set up listeners for FUTURE remote changes only.
+    // 5.4 — TWO listeners during the transition. A v28 device touches
+    // `shared/meta` on every save; a device still on v27.9 only ever writes
+    // `shared/recipes`. Watching one of them would miss half the family.
     if (_firestoreUnsubscribe) _firestoreUnsubscribe();
-    var isFirstSnapshot = true;
-    _firestoreUnsubscribe = _fbDb.collection('shared').doc('recipes')
-      .onSnapshot({includeMetadataChanges: false}, function(docSnap) {
-        // Skip the first snapshot — it always fires immediately with current data
-        if (isFirstSnapshot) { isFirstSnapshot = false; return; }
-        if (!docSnap.exists) return;
-        if (docSnap.metadata.hasPendingWrites) return;
-        // Only suppress if we just saved AND it's coming from server cache
-        // _justSaved alone is unreliable — Firestore can fire after save settles
-        if (window._justSaved && !docSnap.metadata.fromCache) {
-          // This is our own write settling — skip it
-          return;
-        }
-        if (docSnap.metadata.fromCache) return; // local cache, not a remote change
-        // Genuine remote change from another device — show banner
-        window._pendingRemoteData = docSnap.data();
-        var banner = document.getElementById('refreshBanner');
-        if (banner) {
-          banner.style.display = 'block';
-          document.body.classList.add('banner-shown');
-          // Auto-hide after 30 seconds if not tapped
-          setTimeout(function() { banner.style.display = 'none'; }, 30000);
-        }
-      }, function(err) {
-        console.warn('onSnapshot error:', err.message);
-        // If permission denied, unsubscribe to stop repeated errors
-        if (err.code === 'permission-denied' || err.message.includes('permissions')) {
-          if (_firestoreUnsubscribe) {
-            _firestoreUnsubscribe();
-            _firestoreUnsubscribe = null;
+    var subs = [];
+    ['meta', 'recipes'].forEach(function(docName) {
+      // Each listener skips its own first snapshot, which always fires
+      // immediately with current data and is not a remote change.
+      var isFirstSnapshot = true;
+      subs.push(_fbDb.collection('shared').doc(docName)
+        .onSnapshot({includeMetadataChanges: false}, function(docSnap) {
+          if (isFirstSnapshot) { isFirstSnapshot = false; return; }
+          if (!docSnap.exists) return;
+          if (docSnap.metadata.hasPendingWrites) return;
+          // Only suppress if we just saved AND it's coming from server cache
+          // _justSaved alone is unreliable — Firestore can fire after save settles
+          if (window._justSaved && !docSnap.metadata.fromCache) {
+            // This is our own write settling — skip it
+            return;
           }
-        }
-      });
+          if (docSnap.metadata.fromCache) return; // local cache, not a remote change
+          // Genuine remote change from another device — show banner.
+          // The payload is no longer the recipes themselves: with per-recipe
+          // documents the only honest way to apply an update is to re-read.
+          window._pendingRemoteData = { source: docName };
+          var banner = document.getElementById('refreshBanner');
+          if (banner) {
+            banner.style.display = 'block';
+            document.body.classList.add('banner-shown');
+            // Auto-hide after 30 seconds if not tapped
+            setTimeout(function() { banner.style.display = 'none'; }, 30000);
+          }
+        }, function(err) {
+          console.warn('onSnapshot error (' + docName + '):', err.message);
+          // If permission denied, unsubscribe to stop repeated errors
+          if (err.code === 'permission-denied' || err.message.includes('permissions')) {
+            if (_firestoreUnsubscribe) {
+              _firestoreUnsubscribe();
+              _firestoreUnsubscribe = null;
+            }
+          }
+        }));
+    });
+    _firestoreUnsubscribe = function() { subs.forEach(function(u) { try { u(); } catch(e) {} }); };
 
     return hasData;
   } catch(err) {
@@ -10516,40 +11051,22 @@ async function _loadFromFirestoreInner(user) {
   }
 }
 
+// 5.4 — the snapshot no longer carries the recipes, so this re-reads rather than
+// parsing a payload. That is not a detour: with one document per recipe the
+// listener can only ever say "something changed", and re-reading reuses the load
+// path's merge, photo-recovery and local-only-field preservation instead of
+// keeping a second, subtly different copy of all of it here.
 async function applyRemoteUpdate() {
-  var data = window._pendingRemoteData;
-  if (!data) { location.reload(); return; }
+  var banner = document.getElementById('refreshBanner');
   try {
-    var parsed = JSON.parse(data.recipes || '[]');
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      var localOrig = {};
-      recipes.forEach(function(r) { if (r.originalPhoto) localOrig[r.id] = r.originalPhoto; });
-      // Same photo safety net as loadFromFirestore — see its comment for why.
-      var localPhoto = {};
-      recipes.forEach(function(r) { if (r.photo) localPhoto[r.id] = { photo: r.photo, updatedAt: r.updatedAt || 0 }; });
-      var incoming = migrateRecipes(parsed);
-      await attachCloudPhotos(incoming);
-      incoming.forEach(function(r) { if (!r.originalPhoto && localOrig[r.id]) r.originalPhoto = localOrig[r.id]; });
-      var recoveredPhotos = 0;
-      incoming.forEach(function(r) {
-        var lp = localPhoto[r.id];
-        if (!r.photo && lp && lp.updatedAt >= (r.updatedAt || 0)) {
-          r.photo = lp.photo;
-          r.updatedAt = Math.max(r.updatedAt || 0, lp.updatedAt);
-          recoveredPhotos++;
-        }
-      });
-      recipes = incoming;
-      if (data.nextId) nextId = Math.max(nextId, data.nextId);
-      saveLocal();
+    var ok = await loadFromFirestore();
+    if (ok) {
       renderFilters();
       renderGrid();
       toast('Recipes updated!');
-      if (recoveredPhotos > 0) await saveToFirestore(); // push recovered photos back up
     }
   } catch(e) { console.warn('Remote update error:', e); }
   window._pendingRemoteData = null;
-  var banner = document.getElementById('refreshBanner');
   if (banner) banner.style.display = 'none';
 }
 window.applyRemoteUpdate = applyRemoteUpdate;
@@ -10763,7 +11280,12 @@ async function clearAllData() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(NEXTID_KEY);
     localStorage.removeItem('tonys_offline_queue');
+    // 5.4 — drop any queued cloud deletions too. This reset promises the shared
+    // cloud copy is left alone, and a queued delete firing after the reload
+    // would quietly break that promise.
+    localStorage.removeItem(CLOUD_DELETES_KEY);
   } catch(e) {}
+  _pendingCloudDeletes = {};
   // Photos live in IndexedDB now — clearing only localStorage would orphan them forever.
   try { await idbClearAll(); } catch(e) { console.warn('IndexedDB clear failed:', e); }
   location.reload();
@@ -12539,6 +13061,7 @@ function updateFilterBarTop() {
   try {
     if (localStorage.getItem('tonys_offline_queue') === '1') { _offlineQueue = true; }
   } catch(e) {}
+  loadPendingCloudDeletes();   // 5.4 — a delete made offline still has to reach the cloud
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously
   if (hasLocal) {

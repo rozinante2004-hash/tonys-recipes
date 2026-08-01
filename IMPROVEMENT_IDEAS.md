@@ -137,7 +137,7 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 | 5.1 | **Split `index.html` into modules** | It's ~9 200 lines in one file. Even splitting CSS and JS into separate files (still no build step, just `<link>`/`<script src>`) would make everything easier and let the browser cache them separately. | 🟡 |
 | ~~5.2~~ | ✅ **PARTLY DONE (v27.6)** — ~~Blobs in IndexedDB~~ | **Thumbnails** are stored as real Blobs and go straight to an object URL, with no base64 anywhere in the path. **Full photos are still base64** in memory and in IDB, on purpose: export, backup, cloud sync, email and print all consume data URLs, so converting them is a much wider change than the storage line implies. Worth revisiting only if full-photo memory becomes a real problem. | 🟡 |
 | ~~5.3~~ | ✅ **DONE (v27.6)** — ~~Thumbnails~~ | A 320 px JPEG per recipe, generated once and cached in IndexedDB. Measured on a photo-like 1600×1200 image: **252 KB → 10.8 KB (23×)**, and a 12-tile grid re-render went from **288 ms to 1 ms**. Falls back to the full photo until the thumbnail exists, so a failure is never a blank tile. | 🟡 |
-| 5.4 | **Firestore: one document per recipe** | The whole collection is a single document, so any edit rewrites everything and two people editing at once can clobber each other. Per-recipe docs fix both. | 🔴 |
+| ~~5.4~~ | ⚠️ **STEP 1 OF 3 DONE (v28.0)** — ~~one document per recipe~~ | `shared/recipe_<id>` per recipe plus `shared/meta` (`nextId`, `ids`, `schema: 2`). A save now writes **only what changed**, and a write whose base is older than the cloud copy is **refused with an honest message** rather than silently overwriting someone — that lost-edit case was the whole point. Migration runs on first load, is idempotent and safe to interrupt (`schema` is stamped last). v28.0 **dual-writes** the old `shared/recipes` document so a phone still on v27.9 keeps working; v28.1 stops writing it once every device has updated, and only then is it deleted by hand. **The two-browser checks in PLAN §7 have not been run** — they need two real signed-in sessions. | 🔴 |
 | ~~5.5~~ | ✅ **DONE (v27.6)** — ~~Firestore rules in the repo~~ | `firestore.rules` is now the source of truth; the app fetches it and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list. The built-in copy is a labelled fallback for offline use, not a silent second version. Publishing is still a deliberate manual paste. | 🟢 |
 | 5.6 | **Automated tests in CI** | The Self Test suite is excellent but must be run by hand. The same checks could run headlessly on every push via GitHub Actions. | 🟡 |
 | ~~5.7~~ | ✅ **DONE (v27.4)** — ~~Cache AI calls~~ | Keyed on model + token budget + exact prompt, 7-day TTL, capped at 40 entries, evicted oldest-first. Tool-using calls and failures are deliberately never cached, and a quota error drops the cache rather than the recipes. | 🟢 |
@@ -172,7 +172,8 @@ tap — keying the gesture to the line, not just the clock, is what makes that w
    timers survived the removal and now sit on the steps themselves.
 2. **Meal planner + merged shopping list** (3.1) — the standout new capability.
 3. ~~**Dark mode** (4.6)~~ ✅ **shipped in v27.3**.
-4. **Per-recipe Firestore documents** (5.4) — removes the last structural sync risk. *(Batch E)*
+4. ~~**Per-recipe Firestore documents** (5.4)~~ ⚠️ **step 1 shipped in v28.0** — the structural
+   sync risk is addressed, but the transition is not finished until v28.1 drops the dual-write.
 5. ~~**Smarter units**~~ ✅ **shipped in v27.1** (metric leaves tsp/tbsp/cup alone) **and v27.4** (sensible rounding).
 
 > **Noticed while building Cook Mode:** the Metric/Imperial toggle converts *every*
