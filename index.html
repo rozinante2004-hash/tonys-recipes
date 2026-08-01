@@ -2933,10 +2933,14 @@ function updateAccessRules() {
   if(!rulesEl) return;
   rulesEl.textContent = 'Loading firestore.rules…';
   fetchRulesTemplate().then(function(tpl){
+    // Global, not first-occurrence. `String.replace('{{READ}}', …)` swaps only the
+    // first match, and firestore.rules mentions each placeholder in its header
+    // comment as well as in the rule — so the comment got the member list and the
+    // actual `allow read` line kept a literal {{READ}}, which Firebase rejects.
     rulesEl.textContent = tpl
-      .replace('{{READ}}',  allRead)
-      .replace('{{WRITE}}', allWrite)
-      .replace('{{ADMIN}}', allAdmin);
+      .replace(/\{\{READ\}\}/g,  allRead)
+      .replace(/\{\{WRITE\}\}/g, allWrite)
+      .replace(/\{\{ADMIN\}\}/g, allAdmin);
   });
 }
 
