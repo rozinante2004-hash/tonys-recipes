@@ -1,17 +1,28 @@
 # 5.4 — One Firestore document per recipe
 
-**Status: step 1 of 3 shipped in v28.0** — per-recipe reads with a legacy fallback, dual-write,
-migration on first load after sign-in, and `schema: 2` in `shared/meta`. Still to do:
+**Status: steps 1 and 2 of 3 shipped (v28.0, v28.1).**
 
-- **v28.1 — stop writing `shared/recipes`,** only once Tony confirms every device has run v28.0
-  at least once. It is the block labelled *DUAL-WRITE* in `saveToFirestore` plus the `recipes`
-  entry in the listener pair in `_loadFromFirestoreInner`.
-- **Later — delete the legacy document by hand,** after a backup. Never in the same release
-  that stops writing it.
+- **v28.0** — per-recipe reads with a legacy fallback, dual-write, migration on first load
+  after sign-in, `schema: 2` in `shared/meta`.
+- **v28.1** — **stopped writing `shared/recipes`**, removing the last blind whole-collection
+  overwrite in the app. The plan said to wait until every device had run v28.0; v28.1 instead
+  makes the waiting unnecessary. It still *reads* the legacy document once per load
+  (`reconcileLegacyStragglers`) and adopts anything a device left on v27.9 wrote there, so a
+  straggler cannot lose edits. `meta.legacyAt` is the high-water mark that keeps that check
+  cheap and — the part that matters — stops it resurrecting a deleted recipe.
+
+Still to do:
+
+- **Delete the legacy document by hand,** after a backup, once no device can possibly still be
+  on v27.9. Remove `reconcileLegacyStragglers` and the `recipes` listener in the same pass.
 - **The two-browser checks in §7 have NOT been run.** They can't be here: they need two
   signed-in sessions against the real Firebase project, and this sandbox has neither network
   nor Firebase. The unit tests below cover the decision logic; §7 covers the thing that
-  actually bites. **Do §7.6 (back up first) before trusting any of this with real data.**
+  actually bites.
+- **`firestore.rules` changed and must be published by hand** (Firebase console → Firestore
+  Database → Rules → paste → Publish). `write` was split into `create, update` so the
+  admin-only `delete` rule finally restricts something. Until it is published, deletion stays
+  open to every write-role member.
 
 **Why it was worth doing:** Tony has confirmed he is *not* the only editor, which makes the
 lost-edit problem below a live risk rather than a theoretical one.
