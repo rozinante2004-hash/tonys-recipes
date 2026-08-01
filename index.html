@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.0 -->
+<!-- Tony's Recipes Collection v28.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -588,7 +588,7 @@ window.handleShareTarget = handleShareTarget;
 // transaction that reads then writes. It deliberately makes `where()` throw, so
 // the tests also exercise readCloudRecipeDocs' meta.ids fallback — the range
 // query on __name__ is the one piece that needs a real Firestore to try.
-function _fakeFirestore(seed) {
+function _fakeFirestore(seed, opts) {
   var docs = {};
   if (seed) Object.keys(seed).forEach(function(k){ docs[k] = JSON.parse(JSON.stringify(seed[k])); });
   function ref(id) {
@@ -600,7 +600,15 @@ function _fakeFirestore(seed) {
         data: function(){ return docs[id]; }
       }); },
       set: function(v){ docs[id] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); },
-      delete: function(){ delete docs[id]; return Promise.resolve(); }
+      delete: function(){
+        if (opts && opts.denyDelete) {
+          var err = new Error('Missing or insufficient permissions.');
+          err.code = 'permission-denied';
+          return Promise.reject(err);
+        }
+        delete docs[id];
+        return Promise.resolve();
+      }
     };
   }
   return {
@@ -1269,6 +1277,49 @@ const SELF_TESTS = [
       // ...but the legacy single document still has one, and history tripled it.
       if(slimRecipeForCloud(r,false).history) throw new Error('history leaked into the legacy-shaped copy — that document is size-capped and history triples each recipe');
       if(stripPhotosForCloud([r])[0].history) throw new Error('stripPhotosForCloud writes the legacy document and must stay history-free');
+    } },
+
+  { id:'cloud_straggler', group:'Cloud Sync', name:'A v27.9 straggler is picked up, a deletion is not resurrected',
+    test: async()=>{
+      var s=_cloudSnapshotForTest();
+      try{
+        var mark='2026-01-01T00:00:00.000Z', markMs=Date.parse(mark);
+        var mine=[{id:1,name:'mine-1',updatedAt:1000},{id:2,name:'mine-2',updatedAt:900}];
+        var legacy=[
+          {id:1,name:'older-device-edited-this',updatedAt:2000},   // newer than ours -> adopt
+          {id:2,name:'stale',updatedAt:500},                        // older than ours -> ignore
+          {id:3,name:'added-on-old-device',updatedAt:markMs+1000},  // new since the mark -> adopt
+          {id:4,name:'we-deleted-this',updatedAt:markMs-1000}       // predates the mark -> must NOT come back
+        ];
+        var db=_fakeFirestore({ recipes:{ recipes:JSON.stringify(legacy), updatedAt:'2026-02-01T00:00:00.000Z' } });
+        var res=await reconcileLegacyStragglers(mine,{legacyAt:mark},db);
+        if(!res.changed) throw new Error('a changed legacy document was not noticed, so a straggler\'s edits would be invisible');
+        var ids=res.adopted.map(function(r){return r.id;}).sort();
+        if(ids.join()!=='1,3') throw new Error('expected to adopt recipes 1 and 3, adopted '+JSON.stringify(ids));
+        // The one that matters most: absence from the new layout means we deleted it.
+        if(ids.indexOf(4)>-1) throw new Error('a recipe deleted after the high-water mark was resurrected from the legacy document');
+        if(res.legacyAt!=='2026-02-01T00:00:00.000Z') throw new Error('the high-water mark did not advance, so this would re-run on every load');
+        // Untouched since we last looked -> nothing to do, and no needless writes.
+        var quiet=_fakeFirestore({ recipes:{ recipes:JSON.stringify(legacy), updatedAt:mark } });
+        var res2=await reconcileLegacyStragglers(mine,{legacyAt:mark},quiet);
+        if(res2.changed||res2.adopted.length) throw new Error('an unchanged legacy document was treated as a straggler edit');
+      } finally { _cloudRestoreForTest(s); }
+    } },
+
+  { id:'cloud_delete_denied', group:'Cloud Sync', name:'An admin-only delete refusal is reported, not swallowed',
+    test: async()=>{
+      var s=_cloudSnapshotForTest();
+      try{
+        // firestore.rules makes deletion admin-only, so a write-role member
+        // genuinely cannot do this. It must not abort their whole save, and it
+        // must not retry forever — it must be said out loud.
+        var db=_fakeFirestore({ recipe_5:{ r:'{}', updatedAt:1 }, photo_5:{ photo:'x' } },{ denyDelete:true });
+        window._pendingCloudDeletes={}; queueCloudDelete(5);
+        var res=await flushCloudDeletes(db);
+        if(!res.denied||res.denied.length!==1) throw new Error('a permission-denied delete was not reported back to the caller');
+        if(!db._docs.recipe_5) throw new Error('the document was removed despite the rules refusing it');
+        if(Object.keys(window._pendingCloudDeletes).length) throw new Error('a denied delete stayed queued — it would be retried and re-fail on every single save');
+      } finally { _cloudRestoreForTest(s); }
     } },
 
   { id:'cloud_dirty', group:'Cloud Sync', name:'Only changed recipes are written',
@@ -3205,7 +3256,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.0';
+var APP_VERSION = 'v28.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5498,7 +5549,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6061,7 +6112,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10393,8 +10444,9 @@ function isSizeError(err) {
 // (`_ph` vs `hp`), which made every photo bug twice as hard to read. There is
 // now one name, `_ph` ("photo lives elsewhere"). Documents written by older
 // versions still carry `hp`, so reads accept both; writes only ever emit `_ph`.
-// The LEGACY single document only. 5.4 keeps writing it through v28.0 so a phone
-// still on v27.9 keeps working, and it stays history-free: three revisions more
+// The LEGACY single document's shape. No longer written as of v28.1 — kept
+// because the straggler reconciliation still PARSES that document, and because
+// it stays history-free: three revisions more
 // than triple a recipe's serialised size (measured 1.7 KB → 6.2 KB), which would
 // cut that one document's capacity from ~610 recipes to ~170. Per-recipe
 // documents have no such ceiling, so `slimRecipeForCloud(r, true)` — the shape
@@ -10479,11 +10531,12 @@ async function attachCloudPhotos(list) {
 //   shared/meta         { nextId, ids: [...], schema: 2, updatedAt }
 //   shared/photo_<id>   unchanged — photos were already split out
 //
-// TRANSITION — this release DUAL-WRITES. Per-recipe documents are authoritative
-// for v28 devices; `shared/recipes` is still written so a phone left on v27.9
-// keeps working. Tony deploys by hand, so assume a device runs the old version
-// for days. v28.1 stops writing the legacy document once every device is on
-// v28.0; the document itself gets deleted by hand later still, after a backup.
+// TRANSITION — v28.0 dual-wrote the legacy `shared/recipes` document so a phone
+// left on v27.9 kept working. v28.1 STOPPED writing it: that removes the last
+// blind whole-collection overwrite in the app. It is still READ once per load by
+// reconcileLegacyStragglers, so a device genuinely still on v27.9 does not lose
+// its edits. The document itself is deleted by hand later, never in the same
+// release that stopped writing it.
 var CLOUD_SCHEMA = 2;
 
 // Document-id range covering exactly `recipe_*`. The legacy document is called
@@ -10605,7 +10658,7 @@ async function saveRecipeDoc(r, db) {
 // `ids` is a FALLBACK membership list for when the range query is unavailable, so
 // it is grow-only apart from explicit deletes: a device that merely hasn't seen a
 // new recipe yet must not drop it from the list on its next save.
-async function writeCloudMeta(list, nextIdVal, db) {
+async function writeCloudMeta(list, nextIdVal, db, legacyAt) {
   db = db || _fbDb;
   var ref = db.collection('shared').doc('meta');
   await db.runTransaction(async function(tx) {
@@ -10621,22 +10674,71 @@ async function writeCloudMeta(list, nextIdVal, db) {
       nextId: mergeNextId(nextIdVal, cur.nextId),
       ids: Object.keys(ids).map(function(i){ return parseInt(i, 10); }).filter(function(i){ return !isNaN(i); }),
       schema: CLOUD_SCHEMA,
+      // High-water mark for the legacy document (v28.1). Only moves when we have
+      // actually looked at it, so it never silently skips a straggler's edit.
+      legacyAt: (legacyAt === undefined ? (cur.legacyAt === undefined ? null : cur.legacyAt) : legacyAt),
       updatedAt: Date.now()
     });
   });
 }
 
+// v28.1 — `shared/recipes` is no longer written by this app, so if it CHANGES,
+// some device is still on v27.9 and writing to it. Without this pass that
+// person's edits would be invisible to every updated device and then quietly
+// overwritten. Narrow on purpose: adopt an existing recipe only when the legacy
+// copy is strictly newer, and an unknown recipe only when it was touched after
+// our high-water mark. A recipe deleted since then is older than the mark, so
+// this can never resurrect a deletion. Delete this pass along with the legacy
+// document, by hand, once no device can possibly be on v27.9.
+async function reconcileLegacyStragglers(list, meta, db) {
+  db = db || _fbDb;
+  var mark = (meta && meta.legacyAt) || null;
+  var out = { adopted: [], legacyAt: mark, changed: false };
+  var snap;
+  try { snap = await db.collection('shared').doc('recipes').get(); }
+  catch(e) { return out; }                       // unreadable — not a reason to fail the load
+  if (!snap.exists) return out;
+  var data = snap.data() || {};
+  if (!data.updatedAt || data.updatedAt === mark) return out;   // untouched since we last looked
+  var legacy;
+  try { legacy = JSON.parse(data.recipes || '[]'); } catch(e) { return out; }
+  if (!Array.isArray(legacy)) return out;
+
+  var markMs = mark ? (Date.parse(mark) || 0) : 0;
+  var byId = {};
+  list.forEach(function(r){ byId[r.id] = r; });
+  legacy.forEach(function(L) {
+    if (!L || typeof L !== 'object' || L.id === undefined) return;
+    var mine = byId[L.id];
+    if (mine) {
+      if ((L.updatedAt || 0) > (mine.updatedAt || 0)) out.adopted.push(L);
+    } else if ((L.updatedAt || 0) > markMs) {
+      out.adopted.push(L);   // created on an old device since we last reconciled
+    }
+  });
+  out.legacyAt = data.updatedAt;
+  out.changed  = true;
+  return out;
+}
+window.reconcileLegacyStragglers = reconcileLegacyStragglers;
+
 // Remove the documents for recipes the user actually deleted.
+// Deletion is admin-only in firestore.rules, so a write-role member genuinely
+// cannot do this. That is not an error to retry forever and not something to
+// hide: the ids are dropped from the queue (a permission denial will not fix
+// itself on the next save) and reported, so the person is told the recipe will
+// come back rather than being left to think the app is broken.
 async function flushCloudDeletes(db) {
   db = db || _fbDb;
   var ids = Object.keys(_pendingCloudDeletes);
+  var denied = [];
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i];
     try {
       await db.collection('shared').doc(recipeDocId(id)).delete();
       await db.collection('shared').doc('photo_' + id).delete();
     } catch(e) {
-      if (e && e.code === 'permission-denied') throw e;  // real problem — surface it
+      if (e && e.code === 'permission-denied') denied.push(id);
       // anything else: the document is already gone, or will be retried next save
     }
     delete _pendingCloudDeletes[id];
@@ -10647,7 +10749,7 @@ async function flushCloudDeletes(db) {
     delete _cloudPhotoStamps[id];
   }
   savePendingCloudDeletes();
-  return ids.length;
+  return { attempted: ids.length, denied: denied };
 }
 
 // Read every `recipe_*` document. The range query is one round trip; the
@@ -10696,7 +10798,7 @@ window.parseCloudRecipeDocs = parseCloudRecipeDocs;
 // interrupt: `schema` is stamped LAST and only once every document has landed, so
 // a migration killed half way leaves schema < 2, the read path keeps using the
 // legacy document, and re-running simply rewrites the same documents.
-async function migrateToPerRecipeDocs(list, nextIdVal, db) {
+async function migrateToPerRecipeDocs(list, nextIdVal, db, legacyAt) {
   db = db || _fbDb;
   var written = 0, skipped = [];
   for (var i = 0; i < list.length; i++) {
@@ -10710,7 +10812,9 @@ async function migrateToPerRecipeDocs(list, nextIdVal, db) {
     _cloudRecipeIds[r.id]   = true;
     written++;
   }
-  await writeCloudMeta(list, nextIdVal, db);
+  // The legacy document's stamp at migration time becomes the high-water mark,
+  // so its existing contents are not mistaken for a straggler's later edits.
+  await writeCloudMeta(list, nextIdVal, db, legacyAt === undefined ? null : legacyAt);
   _cloudSchema = CLOUD_SCHEMA;
   return { written: written, skipped: skipped };
 }
@@ -10787,25 +10891,15 @@ async function saveToFirestore() {
     }
 
     // 2) Deletions the user actually made, and the membership/nextId document
-    await flushCloudDeletes();
+    var delRes = await flushCloudDeletes();
     await writeCloudMeta(recipes, nextId);
 
-    // 3) DUAL-WRITE (transitional, see the 5.4 note above): keep the legacy
-    //    single document current so a device still on v27.9 keeps working. This
-    //    write is still a blind whole-collection overwrite — it is the old
-    //    behaviour, kept deliberately and only until v28.1 drops it.
-    var recipesJson = JSON.stringify(stripPhotosForCloud(recipes));
-    var docBytes = byteLen(recipesJson);
-    if (docBytes > FIRESTORE_DOC_LIMIT) {
-      // The per-recipe documents above already succeeded, so this is no longer
-      // fatal — say what actually happened rather than claiming the save failed.
-      dlog('[5.4] legacy document skipped, over the 1 MiB limit at', docBytes, 'bytes');
-      toast('⚠️ Too big for the old shared document — synced per-recipe only. Devices on v27.9 will not see these changes.');
-    } else {
-      await _fbDb.collection('shared').doc('recipes').set({
-        recipes: recipesJson, nextId: nextId, updatedAt: new Date().toISOString()
-      });
-    }
+    // 3) v28.1 — the legacy `shared/recipes` document is no longer written.
+    //    That removes the last blind whole-collection overwrite in the app: up
+    //    to v28.0 every save still rewrote all of it, which was both the cost
+    //    and the remaining clobbering risk. It is still READ once per load, to
+    //    catch a device left on v27.9 (see reconcileLegacyStragglers), and it is
+    //    deleted by hand later — never in the same release that stopped writing.
 
     // 4) Each changed photo into its own doc
     var photoErrors = await syncCloudPhotos();
@@ -10824,6 +10918,17 @@ async function saveToFirestore() {
         + '\n\nYour version is still safe on this device. Reload to pull the other device\'s copy '
         + 'down first, then re-apply your change — nothing has been lost, but the two versions '
         + 'have to be reconciled by you rather than guessed at.');
+      return;
+    }
+    // Deletion is admin-only. Say so, and say what it means, rather than letting
+    // the recipe silently reappear on the next sync and look like a bug.
+    if (delRes.denied.length) {
+      setDriveStatus('error', 'Delete not permitted');
+      showServiceError('DELETE_NOT_PERMITTED: ' + delRes.denied.length + ' recipe(s) were removed on '
+        + 'this device, but your account is not allowed to delete from the shared collection — '
+        + 'that is reserved for admins.\n\nThey are still in the cloud, so they will come back the '
+        + 'next time this device syncs. Ask Tony to delete them, or to give your account the admin '
+        + 'role in ⚙️ Settings → 👥 Family Access.');
       return;
     }
     if (oversized.length) {
@@ -10911,16 +11016,27 @@ async function _loadFromFirestoreInner(user) {
     var hasData = false;
     var fsRecipes = null, cloudNextId = 0, needMigration = false;
 
+    var straggler = null, legacyAtAtMigration;
+
     if (_cloudSchema >= CLOUD_SCHEMA) {
       var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
       fsRecipes = parseCloudRecipeDocs(docs);
       cloudNextId = meta.nextId || 0;
+      // v28.1 — catch a device still on v27.9 writing to the legacy document
+      straggler = await reconcileLegacyStragglers(fsRecipes, meta);
+      if (straggler.adopted.length) {
+        straggler.adopted.forEach(function(L) {
+          var i = fsRecipes.findIndex(function(r){ return r.id === L.id; });
+          if (i >= 0) fsRecipes[i] = L; else fsRecipes.push(L);
+        });
+      }
     } else {
       var snap = await _fbDb.collection('shared').doc('recipes').get();
       if (snap.exists) {
         var data = snap.data();
         try { fsRecipes = JSON.parse(data.recipes || '[]'); } catch(e) { fsRecipes = null; }
         cloudNextId = data.nextId || 0;
+        legacyAtAtMigration = data.updatedAt || null;
         needMigration = Array.isArray(fsRecipes) && fsRecipes.length > 0;
       }
     }
@@ -10969,7 +11085,7 @@ async function _loadFromFirestoreInner(user) {
         // Done before any push-back below so those writes go to the new layout.
         if (needMigration) {
           try {
-            var mig = await migrateToPerRecipeDocs(recipes, nextId);
+            var mig = await migrateToPerRecipeDocs(recipes, nextId, _fbDb, legacyAtAtMigration);
             dlog('[5.4] migrated', mig.written, 'recipes to per-recipe documents');
             if (mig.skipped.length) {
               toast('⚠️ ' + mig.skipped.length + ' recipe(s) too large to migrate — still in the old shared document');
@@ -10994,6 +11110,19 @@ async function _loadFromFirestoreInner(user) {
         } else if (recoveredPhotos > 0) {
           toast('📸 Restored ' + recoveredPhotos + ' photo(s) that hadn\'t finished syncing to the cloud');
           await saveToFirestore(); // push the recovered photos up so other devices get them too
+        }
+
+        // v28.1 — a straggler on v27.9 wrote to the legacy document. Pull its
+        // edits into the per-recipe documents, then move the high-water mark so
+        // the same change isn't re-examined on every load. Say plainly which
+        // device needs attention: silently absorbing it forever would hide that
+        // someone is running a version that can still lose edits.
+        if (straggler && straggler.changed) {
+          if (straggler.adopted.length) {
+            toast('📥 Picked up ' + straggler.adopted.length + ' change(s) from a device still on v27.9 — update it when you can');
+            await saveToFirestore();
+          }
+          try { await writeCloudMeta(recipes, nextId, _fbDb, straggler.legacyAt); } catch(e) {}
         }
       }
     }

@@ -31,28 +31,30 @@ service cloud.firestore {
     //   recipe_<id>  one photo-free document per recipe          (5.4, v28.0+)
     //   meta         { nextId, ids, schema } for the above       (5.4, v28.0+)
     //   photo_<id>   one document per recipe photo
-    //   recipes      the legacy single document — still written through v28.0
-    //                so devices on v27.9 keep working, dropped in v28.1
+    //   recipes      the legacy single document — no longer written from v28.1,
+    //                still READ once per load to catch a device left on v27.9
     //   access       the member list itself
     // The {document=**} wildcard already covers all of these, so 5.4 needed no
     // rules change. Verified rather than assumed, per PLAN-5.4 §5.
-    //
-    // NOTE, pre-existing and deliberate to leave alone here: in Firestore rules
-    // `write` means create + update + DELETE, and allow rules are OR'd. The
-    // narrower `allow delete` below therefore does not restrict anything — a
-    // write-role member can already delete. Tightening it means splitting write
-    // into `create, update`, which changes who can delete. That is Tony's call,
-    // not a refactor to slip into a storage change.
     match /shared/{document=**} {
       // Read: owner + all members
       allow read: if request.auth != null &&
         request.auth.token.email in [{{READ}}];
 
-      // Write: owner + write/admin members
-      allow write: if request.auth != null &&
+      // Create + update: owner + write/admin members.
+      // NOT `write`. In Firestore rules `write` expands to create + update +
+      // DELETE, and allow rules are OR'd, so granting `write` here would hand
+      // every write-role member deletion as well and make the `allow delete`
+      // below decorative. Spelling out create and update is what makes the
+      // delete rule mean something.
+      allow create, update: if request.auth != null &&
         request.auth.token.email in [{{WRITE}}];
 
-      // Delete: owner + admin members only
+      // Delete: owner + admin members only. This now genuinely restricts.
+      // Consequence worth knowing: a write-role member deleting a recipe removes
+      // it from their own device but cannot remove the cloud documents, so it
+      // reappears on their next sync. The app says so plainly rather than
+      // letting it look like a bug — see flushCloudDeletes.
       allow delete: if request.auth != null &&
         request.auth.token.email in [{{ADMIN}}];
     }

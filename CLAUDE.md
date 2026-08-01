@@ -30,7 +30,7 @@ python3 -m http.server 8137          # some checks need http://, not file://
 # → page.evaluate over SELF_TESTS, calling each t.test()
 ```
 
-**As of v28.0: 123 checks, 117 passing.** The 6 failures are `net_*` and
+**As of v28.1: 125 checks, 119 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -94,16 +94,18 @@ found only because a test was written first and disagreed with the code.
 
 ## Outstanding
 
-- **5.4 — per-recipe Firestore documents. Step 1 of 3 shipped in v28.0.** v28.0 reads
-  per-recipe with a legacy fallback, migrates on first load, and **dual-writes**.
-  Next: v28.1 stops writing `shared/recipes`, but **only once every device has run
-  v28.0** — Tony deploys by hand, so a phone can sit on the old version for days.
-  The two-browser concurrency checks in `PLAN-5.4-per-recipe-docs.md` §7 have **not**
-  been run; they need two real signed-in sessions. Back up before trusting it.
-- **Firestore `allow write` already includes delete.** The narrower `allow delete`
-  in `firestore.rules` restricts nothing, because allow rules are OR'd. Tightening it
-  means splitting `write` into `create, update` — a real change to who can delete, so
-  it needs Tony's say-so rather than being folded into something else.
+- **5.4 — per-recipe Firestore documents. Steps 1 and 2 of 3 shipped (v28.0, v28.1).**
+  The legacy `shared/recipes` document is no longer written, only read once per load by
+  `reconcileLegacyStragglers` to catch a device still on v27.9. Remaining: delete that
+  document by hand once no device can be on v27.9, and remove the reconciliation pass
+  and the `recipes` listener with it. The two-browser concurrency checks in
+  `PLAN-5.4-per-recipe-docs.md` §7 have **not** been run; they need two real signed-in
+  sessions.
+- **`firestore.rules` is ahead of what is published.** v28.1 split `write` into
+  `create, update` so the admin-only `delete` rule actually restricts something —
+  `write` in Firestore means create + update + delete, and allow rules are OR'd, so it
+  previously did not. **This must be pasted into the Firebase console by hand** before
+  it takes effect.
 - **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
   (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome.
 - The Bring! token that leaked into git history **was rotated on 1 Aug 2026**. The old value is
