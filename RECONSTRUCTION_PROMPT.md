@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v28.1` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+**Current version:** `v28.3` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
 the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
@@ -40,7 +40,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Network‑first for the document, cache‑first for assets. |
-| `version.json` | `{"version": "v28.1"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v28.3"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
@@ -446,7 +446,7 @@ panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow scree
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
 (`.card-category-badge`, bottom‑left over the image), title (right‑aligned for Hebrew),
-prep/servings, difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a
+prep/servings (**desktop only** — hidden in the phone grid, where the card is barely wider than a thumb and both are one tap away inside the recipe; list view keeps them at every width), difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a
 `.clip-badge` 🎬 circle for `r.isClip` (4.10 — one shared component, not the two hand‑rolled
 inline SVGs it replaced; `.clip-badge-sm` in list view). `isClip` is the only flag read here:
 `isVideoBookmark` was folded into it in 2.3. On phone‑width screens the grid uses a configurable column count
@@ -696,9 +696,9 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **125 checks** in 13 groups —
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **128 checks** in 13 groups —
 **Features (40), UI (16), Cloud Sync (15), Import/Export (11), CRUD (10), Storage (9), Core,
-Modals, Network, WhatsApp (5 each), CSS (2), Backup and Performance (1 each)** — covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
+Modals, Network, WhatsApp (5 each), CSS (4), Backup and Performance (1 each)** — covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
 (`openSelfTest`/`runSelfTests`) lets the user pick tests by group, runs them sequentially with
