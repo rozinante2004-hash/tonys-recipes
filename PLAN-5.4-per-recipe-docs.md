@@ -19,10 +19,8 @@ Still to do:
   signed-in sessions against the real Firebase project, and this sandbox has neither network
   nor Firebase. The unit tests below cover the decision logic; §7 covers the thing that
   actually bites.
-- **`firestore.rules` changed and must be published by hand** (Firebase console → Firestore
-  Database → Rules → paste → Publish). `write` was split into `create, update` so the
-  admin-only `delete` rule finally restricts something. Until it is published, deletion stays
-  open to every write-role member.
+- ~~`firestore.rules` must be published by hand~~ ✅ **published 1 Aug 2026.** `write` was
+  split into `create, update` so the admin-only `delete` rule finally restricts something.
 
 **Why it was worth doing:** Tony has confirmed he is *not* the only editor, which makes the
 lost-edit problem below a live risk rather than a theoretical one.

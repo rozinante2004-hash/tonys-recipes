@@ -101,11 +101,14 @@ found only because a test was written first and disagreed with the code.
   and the `recipes` listener with it. The two-browser concurrency checks in
   `PLAN-5.4-per-recipe-docs.md` §7 have **not** been run; they need two real signed-in
   sessions.
-- **`firestore.rules` is ahead of what is published.** v28.1 split `write` into
-  `create, update` so the admin-only `delete` rule actually restricts something —
-  `write` in Firestore means create + update + delete, and allow rules are OR'd, so it
-  previously did not. **This must be pasted into the Firebase console by hand** before
-  it takes effect.
+- **Deletion is genuinely admin-only, published 1 Aug 2026.** v28.1 split `write` into
+  `create, update` — `write` in Firestore means create + update + delete and allow rules
+  are OR'd, so the `allow delete` line below it had been restricting nothing. Consequences
+  now live: a write-role member deleting a recipe removes it locally but not from the
+  cloud, so it returns on their next sync (`flushCloudDeletes` reports this honestly);
+  and `syncCloudPhotos` silently fails to remove their orphaned `photo_<id>` documents.
+  The role labels in Family Access — "Read + Write" vs "Full (incl. delete)" — describe
+  what actually happens now, which they did not before.
 - **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
   (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome.
 - The Bring! token that leaked into git history **was rotated on 1 Aug 2026**. The old value is
