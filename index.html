@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.1 -->
+<!-- Tony's Recipes Collection v28.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1171,6 +1171,69 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'ui_owner_contrast', group:'CSS', name:'Owner row stays readable in BOTH themes',
+    test: async()=>{
+      // The owner row hard-coded a cream background while .access-name is
+      // var(--ink) — which inverts to near-white in dark mode, so the name
+      // vanished. Checking both themes is the point: a single-theme check is
+      // exactly what let this through.
+      var parse=function(c){
+        var m=(c||'').match(/[\d.]+/g)||[];
+        return { r:+m[0]||0, g:+m[1]||0, b:+m[2]||0, a:(m.length>3?+m[3]:(c==='transparent'?0:1)) };
+      };
+      // A translucent tint has to be composited over what is behind it, or the
+      // measurement is of a colour nobody ever sees. Walk up to the first opaque
+      // layer, then blend back down.
+      var effBg=function(el){
+        var layers=[];
+        for(var n=el; n && n.nodeType===1; n=n.parentElement){
+          var c=parse(window.getComputedStyle(n).backgroundColor);
+          if(c.a>0){ layers.push(c); if(c.a>=1) break; }
+        }
+        var out=layers.length?layers[layers.length-1]:{r:255,g:255,b:255};
+        for(var i=layers.length-2;i>=0;i--){
+          var t=layers[i];
+          out={ r:t.r*t.a+out.r*(1-t.a), g:t.g*t.a+out.g*(1-t.a), b:t.b*t.a+out.b*(1-t.a) };
+        }
+        return out;
+      };
+      var lum=function(c){
+        var v=['r','g','b'].map(function(k){ var x=c[k]/255; return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); });
+        return 0.2126*v[0]+0.7152*v[1]+0.0722*v[2];
+      };
+      var prev=getTheme(), worst=null;
+      try{
+        ['light','dark'].forEach(function(t){
+          setTheme(t);
+          var name=document.querySelector('#accessOverlay .access-name');
+          var row=name && name.closest('.access-row');
+          if(!name||!row) throw new Error('the owner row is gone from Family Access');
+          var a=lum(parse(window.getComputedStyle(name).color)), b=lum(effBg(row));
+          var ratio=(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+          if(worst===null||ratio<worst.ratio) worst={theme:t,ratio:ratio};
+        });
+      } finally { setTheme(prev); }
+      if(worst.ratio<4.5) throw new Error('owner name contrast is '+worst.ratio.toFixed(2)+':1 in '+worst.theme+' mode (needs 4.5:1) — it is unreadable there');
+    } },
+
+  { id:'ui_rules_cta', group:'UI', name:'The Firestore rules step is legible, not a footnote',
+    test: async()=>{
+      // Publishing the rules is the only step that actually grants anyone
+      // access, and at 12px in --muted this was missed altogether. Pinned so a
+      // later tidy-up cannot quietly shrink it back.
+      var btn=Array.prototype.slice.call(document.querySelectorAll('button'))
+        .filter(function(b){ return (b.getAttribute('onclick')||'').indexOf('toggleAccessRules')>-1; })[0];
+      if(!btn) throw new Error('the "Show Firestore security rules" button is gone');
+      var fs=parseFloat(window.getComputedStyle(btn).fontSize);
+      if(!(fs>=14)) throw new Error('the rules toggle is '+fs+'px — too small for the one step that activates access');
+      var note=document.querySelector('#accessRulesPanel div');
+      if(!note) throw new Error('the "copy these rules to..." note is gone');
+      var nfs=parseFloat(window.getComputedStyle(note).fontSize);
+      if(!(nfs>=13)) throw new Error('the Firebase Console instruction is '+nfs+'px — that is footnote size');
+      var link=note.querySelector('a[href*="security/rules"]');
+      if(!link) throw new Error('the note no longer links to the Firebase rules editor');
+    } },
+
   { id:'cloud_doc_range', group:'Cloud Sync', name:'recipe_* range excludes the legacy `recipes` doc',
     test: async()=>{
       if(typeof RECIPE_DOC_LO!=='string'||typeof RECIPE_DOC_HI!=='string') throw new Error('the recipe_* document-id bounds are not defined');
@@ -3256,7 +3319,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.1';
+var APP_VERSION = 'v28.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5549,7 +5612,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6112,7 +6175,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13618,7 +13681,11 @@ function updateFilterBarTop() {
       <!-- Owner row -->
       <div style="margin:12px 0 8px;">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Owner</div>
-        <div class="access-row" style="background:#FFF8E8;border-color:var(--gold);">
+        <!-- Gold as a translucent tint over --card-bg, not the literal #FFF8E8 it
+             used to be: .access-name is var(--ink), which inverts to near-white in
+             dark mode, and on a hard-coded cream row the owner's name disappeared.
+             Same trap as --warm-brown being both a surface and heading text. -->
+        <div class="access-row" style="background:rgba(212,168,67,0.14);border-color:var(--gold);">
           <div class="access-avatar" style="background:var(--gold);">👑</div>
           <div class="access-info">
             <div class="access-name">Tony Schvekher</div>
@@ -13652,17 +13719,22 @@ function updateFilterBarTop() {
         <div style="font-size:12px;color:#2255AA;line-height:1.6;">
           <strong>How it works:</strong> Family members sign in with their own Google account at the same URL: <strong>rozinante2004-hash.github.io/tonys-recipes/</strong><br><br>
         All accounts read and write to the <strong>same shared recipe collection</strong> — changes sync in real-time across everyone's devices, just like your PC↔iPhone sync today.<br><br>
-        After adding members below, tap <em>"Show Firestore security rules"</em>, copy the rules, and paste them into Firebase Console to activate access.
+        After adding members below, tap <strong>"🔧 Show Firestore security rules"</strong>, copy the rules, and paste them into Firebase Console to activate access. <strong>Nothing takes effect until you do</strong> — the member list here is only half of it.
         </div>
       </div>
 
-      <!-- Firestore rules -->
-      <div style="margin-top:10px;">
-        <button onclick="toggleAccessRules()" style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;padding:4px 0;font-family:'DM Sans',sans-serif;">🔧 Show Firestore security rules →</button>
-        <div id="accessRulesPanel" style="display:none;margin-top:8px;">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">Firebase Console → Firestore → Rules</a></div>
-          <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
-          <button onclick="copyAccessRules()" style="margin-top:6px;padding:6px 14px;background:var(--warm-brown);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy Rules</button>
+      <!-- Firestore rules.
+           Sizing here is deliberate: this is the only step that actually grants
+           anyone access, and at 12px in --muted it read as a footnote and got
+           missed entirely. It is a primary action on this screen and is sized
+           like one. Colours go through --heading/--ink rather than --warm-brown,
+           which is a surface as well as a text colour and inverts in dark mode. -->
+      <div style="margin-top:14px;">
+        <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans',sans-serif;">🔧 Show Firestore security rules →</button>
+        <div id="accessRulesPanel" style="display:none;margin-top:10px;">
+          <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>
+          <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
+          <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy Rules</button>
         </div>
       </div>
 
