@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.3 -->
+<!-- Tony's Recipes Collection v29.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1745,6 +1745,76 @@ const SELF_TESTS = [
         try{ if(prev===null) localStorage.removeItem(CLOUD_BASE_KEY); else localStorage.setItem(CLOUD_BASE_KEY,prev); }catch(e){}
         loadCloudBase();
       }
+    } },
+
+  { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
+    test: async()=>{
+      // Found from a real Sync Health report: 26 recipes locally, 25 documents
+      // read back. A document whose payload would not parse was skipped
+      // outright, so no base was recorded for it — and every later save then
+      // refused it as a "conflict" with no way out, because a corrupt payload
+      // never becomes readable on its own.
+      var st=_cloudSnapshotForTest();
+      try{
+        window._cloudRecipeBase={}; window._cloudRecipeIds={};
+        var good={ id:'recipe_1', data:{ r:JSON.stringify({id:1,name:'fine'}), updatedAt:100 } };
+        var bad ={ id:'recipe_2', data:{ r:'{not json at all', updatedAt:200 } };
+        var list=parseCloudRecipeDocs([good,bad]);
+        if(list.length!==1) throw new Error('a damaged document should not blank the collection, got '+list.length+' recipes');
+        if(_cloudRecipeBase[2]!==200)
+          throw new Error('no base recorded for the damaged document — every save of it would be refused forever');
+        if(!cloudWriteAllowed(200,_cloudRecipeBase[2],0))
+          throw new Error('the local copy still cannot replace the damaged cloud document');
+        if(typeof cloudUnreadableIds!=='function'||cloudUnreadableIds().indexOf('2')===-1)
+          throw new Error('the damaged document is not reported anywhere the user could see it');
+      } finally { _cloudRestoreForTest(st); }
+    } },
+
+  { id:'cloud_edit_session', group:'Cloud Sync', name:'An open edit form notices a change underneath it (v29.4)',
+    test: async()=>{
+      // Tony's two-browser test: browser 1 opens the edit form, browser 2 edits
+      // and saves, browser 1 saves and silently overwrites browser 2. The 5.4
+      // guard protects the recipes ARRAY, but an open form is a snapshot from
+      // minutes ago and a background refresh quietly replaces what it was based on.
+      if(typeof openAddModal!=='function') throw new Error('openAddModal not defined');
+      var r=recipes[0];
+      var wasAt=r.updatedAt;
+      try{
+        openAddModal(r.id);
+        if(typeof _editBaseAt!=='number') throw new Error('the edit session does not record the version it started from');
+        if(_editBaseAt!==(r.updatedAt||0)) throw new Error('the recorded edit base does not match the recipe');
+        // simulate the other device landing while the form is open
+        r.updatedAt=(r.updatedAt||0)+5000;
+        if((r.updatedAt||0)===_editBaseAt) throw new Error('test setup failed to move the recipe');
+        // Drive the real save with the user choosing "Keep editing". Checking the
+        // source for a mention of _editBaseAt was not enough — gutting the
+        // condition left the mention in place and the test still passed.
+        var realAsk=window.askConfirm, asked=false;
+        window.askConfirm=function(){ asked=true; return Promise.resolve(false); };
+        var moved=r.updatedAt;
+        try{
+          await saveRecipe();
+          if(!asked) throw new Error('saveRecipe did not ask — it overwrote the other device silently');
+          if(r.updatedAt!==moved) throw new Error('the other device\'s version was overwritten despite the user choosing to keep editing');
+          if(!document.getElementById('editOverlay').classList.contains('open'))
+            throw new Error('the edit form closed although nothing was saved');
+        } finally { window.askConfirm=realAsk; }
+      } finally {
+        r.updatedAt=wasAt;
+        _editBaseAt=null;
+        closeM('editOverlay');
+      }
+    } },
+
+  { id:'vis_health_copy', group:'UI', name:'Sync health can be copied as text (v29.4)',
+    test: async()=>{
+      if(typeof syncHealthText!=='function'||typeof copySyncHealth!=='function') throw new Error('the copy helpers are not defined');
+      var t=syncHealthText();
+      if(t.indexOf(APP_VERSION)===-1) throw new Error('the copied text omits the app version, which is the first thing a bug report needs');
+      ['last successful save','writes refused','recipes on this device','damaged cloud documents'].forEach(function(k){
+        if(t.indexOf(k)===-1) throw new Error('the copied text omits "'+k+'"');
+      });
+      if(!document.querySelector('#syncHealthOverlay button[onclick*="copySyncHealth"]')) throw new Error('no Copy button on the panel');
     } },
 
   { id:'cloud_no_refusal_loop', group:'Cloud Sync', name:'A fresh load can save — no stuck refusal loop (v29.3)',
@@ -3627,7 +3697,11 @@ function renderSyncHealth() {
   out += healthRow('Unsent local edits', h.offlineQueued ? 'yes — will retry' : 'none', h.offlineQueued ? 'warn' : 'good');
   out += healthRow('Deletions not yet sent', String(h.pendingDeletes), h.pendingDeletes ? 'warn' : 'good');
   out += healthRow('Writes refused this session', String(h.conflicts), h.conflicts ? 'warn' : 'good',
-                   h.conflicts ? 'someone else edited the same recipe — reload before re-editing' : '');
+                   h.conflicts ? 'another device wrote the same recipe after this one last read it' : '');
+  if (h.unreadable) {
+    out += healthRow('Damaged cloud documents', String(h.unreadable), 'warn',
+                     'unreadable in the cloud — this device will replace them on the next save');
+  }
 
   out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Collection</div>';
   out += healthRow('Recipes on this device', String(h.localRecipes), '');
@@ -3649,6 +3723,43 @@ function renderSyncHealth() {
 
   el.innerHTML = out;
 }
+// Plain text rather than the rendered markup, so it pastes into a message
+// legibly. Includes the app version and the unreadable-document ids, because
+// those are the two things that turn a bug report into a diagnosis.
+function syncHealthText() {
+  var h = syncHealth();
+  var L = [];
+  L.push('Sync Health — ' + APP_VERSION + ' — ' + new Date().toISOString());
+  L.push('account: ' + (h.signedIn ? (h.account || 'signed in') : 'signed out'));
+  L.push('network: ' + (h.online ? 'online' : 'offline'));
+  L.push('last successful sync: ' + fmtAgo(h.lastSyncOkAt));
+  L.push('last successful save: ' + fmtAgo(h.lastSaveOkAt));
+  L.push('unsent local edits: ' + (h.offlineQueued ? 'yes' : 'none'));
+  L.push('deletions not yet sent: ' + h.pendingDeletes);
+  L.push('writes refused this session: ' + h.conflicts);
+  L.push('damaged cloud documents: ' + h.unreadable
+    + (h.unreadable ? ' (ids ' + cloudUnreadableIds().join(', ') + ')' : ''));
+  L.push('recipes on this device: ' + h.localRecipes);
+  L.push('recipe documents seen in cloud: ' + (h.signedIn ? h.cloudRecipes : 'unknown — signed out'));
+  L.push('cloud storage layout: schema ' + h.schema);
+  L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
+  L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
+  L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
+  return L.join('\n');
+}
+function copySyncHealth() {
+  var text = syncHealthText();
+  navigator.clipboard.writeText(text)
+    .then(function(){ toast('\u{1F4CB} Sync health copied'); })
+    .catch(function(){
+      // Clipboard can be refused (permissions, insecure context). Don't claim
+      // success — show the text so it can be selected by hand.
+      showServiceError('Could not reach the clipboard. Here it is to copy manually:\n\n' + text);
+    });
+}
+window.syncHealthText = syncHealthText;
+window.copySyncHealth = copySyncHealth;
+
 function openSyncHealth() {
   renderSyncHealth();
   document.getElementById('syncHealthOverlay').classList.add('open');
@@ -3835,7 +3946,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.3';
+var APP_VERSION = 'v29.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6171,7 +6282,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6735,7 +6846,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9630,9 +9741,18 @@ function parseWordText(text){
 // ═══════════════════════════════════
 // ADD / EDIT MODAL
 // ═══════════════════════════════════
+// v29.4 — the version of the recipe this edit session started from.
+// An open edit form is a snapshot taken when it opened. The 5.4 conflict guard
+// protects the recipes ARRAY, but not that snapshot: a background refresh can
+// replace the underlying recipe with another device's copy, and the form then
+// overwrites it — with permission, because the base was refreshed too. Tony
+// found this with two browsers, and it is exactly the lost edit 5.4 exists to
+// prevent, one level up.
+var _editBaseAt = null;
 function openAddModal(id){
   editingId=id||null;
   const r=id?recipes.find(x=>x.id===id):null;
+  _editBaseAt = r ? (r.updatedAt || 0) : null;
   document.getElementById('editTitle').textContent=r?'Edit Recipe':'Add a Recipe';
   document.getElementById('editSubmitBtn').textContent=r?'Update Recipe':'Save Recipe';
   document.getElementById('f-category').innerHTML=CATS.filter(c=>c!=='All').map(c=>`<option${r&&r.category===c?' selected':''}>${c}</option>`).join('');
@@ -9759,6 +9879,23 @@ async function saveRecipe(){
     if(idx>=0){
       // Preserve fields not in the edit form
       var existing = recipes[idx];
+      // Did this recipe change underneath us while the form was open?
+      if (_editBaseAt !== null && (existing.updatedAt || 0) !== _editBaseAt) {
+        var when = existing.updatedAt ? new Date(existing.updatedAt).toLocaleString() : 'just now';
+        var go = await askConfirm({
+          icon: '\u26A0\uFE0F',
+          title: 'This recipe changed while you were editing',
+          message: 'Another device saved "' + (existing.name || 'this recipe') + '" at ' + when
+                 + ', after you opened it here.\n\nSaving now replaces their version with yours. '
+                 + 'Their version is kept in this recipe\'s history, so it can be restored — but '
+                 + 'their changes will not be merged into yours.\n\nKeep editing to compare first.',
+          okLabel: 'Replace theirs with mine',
+          cancelLabel: 'Keep editing',
+          danger: true
+        });
+        if (!go) return;   // form stays open, nothing written
+        _editBaseAt = existing.updatedAt || 0;   // decision made; don't ask twice
+      }
       // Clear nutrition if ingredients or steps changed (values would be stale)
       var ingsChanged = JSON.stringify(existing.ingredients) !== JSON.stringify(data.ingredients);
       var stepsChanged = JSON.stringify(existing.steps) !== JSON.stringify(data.steps);
@@ -9780,6 +9917,7 @@ async function saveRecipe(){
     toast('\u2705 Recipe saved!');
   }
   _editFormSnapshot = null; // saved — nothing left to warn about
+  _editBaseAt = null;
   closeM('editOverlay');resetFilters();renderFilters();renderGrid();saveData();
   // Refresh view modal if user edited from within it
   if (editingId && viewId === editingId) { drawView(); }
@@ -10337,7 +10475,7 @@ function closeM(id){
   document.getElementById(id).classList.remove('open');
   releaseFocus();   // 5c.1b — hand focus back to whatever opened this
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
-  if(id==='editOverlay') _editFormSnapshot = null;
+  if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
 }
 
 // ─── STYLED CONFIRM / PROMPT (2.1) ────────────────────────────────────────────
@@ -11323,6 +11461,7 @@ function syncHealth() {
     offlineQueued: !!(_offlineQueue || (function(){ try { return localStorage.getItem('tonys_offline_queue') === '1'; } catch(e) { return false; } })()),
     pendingDeletes: Object.keys(_pendingCloudDeletes).length,
     conflicts:     _conflictCount,
+    unreadable:    Object.keys(_cloudUnreadable).length,
     schema:        _cloudSchema,
     localRecipes:  localCount,
     cloudRecipes:  Object.keys(_cloudRecipeIds).length,
@@ -11654,13 +11793,33 @@ async function readCloudRecipeDocs(db, metaIds) {
 }
 
 // Turn raw documents into a recipe list, recording each one's concurrency base.
+var _cloudUnreadable = {};   // id -> true when the cloud document exists but won't parse
 function parseCloudRecipeDocs(docs) {
   var list = [];
   for (var i = 0; i < docs.length; i++) {
     var d = docs[i].data || {};
     var r;
     try { r = JSON.parse(d.r || 'null'); } catch(e) { r = null; }
-    if (!r || typeof r !== 'object') continue;   // one corrupt document must not blank the collection
+    if (!r || typeof r !== 'object') {
+      // v29.4 — a document we cannot read used to be skipped outright. That left
+      // no base for it, so every later save refused it as a "conflict" and there
+      // was no way out: the payload never becomes readable on its own. We can
+      // still record WHICH VERSION the cloud holds, because updatedAt is a
+      // separate field — and with a base recorded the next save simply replaces
+      // the unreadable document with our good copy. Self-healing rather than
+      // permanently stuck.
+      var idFromDoc = String(docs[i].id || '').replace(/^recipe_/, '');
+      if (idFromDoc) {
+        var numId = parseInt(idFromDoc, 10);
+        var key = isNaN(numId) ? idFromDoc : numId;
+        _cloudRecipeBase[key] = d.updatedAt === undefined ? null : d.updatedAt;
+        _cloudRecipeIds[key]  = true;
+        _cloudUnreadable[key] = true;
+        console.warn('[5.4] cloud document recipe_' + idFromDoc + ' could not be parsed; the local copy will replace it on the next save');
+      }
+      continue;   // it still must not blank the collection
+    }
+    delete _cloudUnreadable[r.id];
     list.push(r);
     _cloudRecipeBase[r.id]  = d.updatedAt === undefined ? null : d.updatedAt;
     _cloudRecipeStamp[r.id] = hashStr(d.r || '');
@@ -11669,6 +11828,7 @@ function parseCloudRecipeDocs(docs) {
   saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
   return list;
 }
+window.cloudUnreadableIds = function(){ return Object.keys(_cloudUnreadable); };
 window.parseCloudRecipeDocs = parseCloudRecipeDocs;
 
 // One-way migration from the legacy single document. Idempotent and safe to
@@ -11823,10 +11983,22 @@ async function saveToFirestore() {
     // A refused write is the whole point of 5.4 — say so plainly and leave the
     // recipe alone. Silently merging someone else's edit is the bug, not the fix.
     if (conflicts.length) {
+      // v29.4 — the rest of the collection DID save. Recording that is not a
+      // detail: the health panel said "last successful save: never" while 25 of
+      // 26 recipes had just been written, which sent me looking in the wrong
+      // place. Report what actually happened.
+      if (dirty.length > conflicts.length) _lastSaveOkAt = Date.now();
       setDriveStatus('error', 'Not saved — changed elsewhere');
+      var saved = dirty.length - conflicts.length;
       showServiceError('EDITED_ELSEWHERE: ' + conflicts.length + ' recipe(s) were changed on another '
         + 'device after this one last synced, so they were NOT overwritten:\n\n'
-        + conflicts.map(function(r) { return '• ' + (r.name || ('#' + r.id)); }).join('\n')
+        + conflicts.map(function(r) {
+            var b = _cloudRecipeBase[r.id];
+            return '• ' + (r.name || ('#' + r.id))
+                 + '   [cloud version ' + (b === undefined ? 'unknown' : b)
+                 + ', this device ' + (r.updatedAt || 0) + ']';
+          }).join('\n')
+        + (saved > 0 ? '\n\n' + saved + ' other recipe(s) saved normally.' : '')
         + '\n\nYour version is still safe on this device. Reload to pull the other device\'s copy '
         + 'down first, then re-apply your change — nothing has been lost, but the two versions '
         + 'have to be reconciled by you rather than guessed at.');
@@ -14296,7 +14468,10 @@ function updateFilterBarTop() {
     </div>
     <div class="modal-body" style="padding:0 16px 20px;">
       <div id="syncHealthBody"></div>
-      <button onclick="renderSyncHealth()" style="margin-top:14px;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;width:100%;">↻ Refresh</button>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button onclick="renderSyncHealth()" style="flex:1;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">↻ Refresh</button>
+        <button onclick="copySyncHealth()" style="flex:1;padding:11px 18px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy</button>
+      </div>
     </div>
   </div>
 </div>

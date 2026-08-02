@@ -35,7 +35,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.3: 142 checks, 136 passing.** The 6 failures are `net_*` and
+**As of v29.4: 145 checks, 139 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -105,6 +105,16 @@ found only because a test was written first and disagreed with the code.
   `saveRecipeDoc` serialises with the new `updatedAt` already applied. Serialising
   first and stamping after means the stored hash describes the old version, the
   next dirty check disagrees, and every recipe is rewritten on every save.
+- **An open edit form is a snapshot, and the 5.4 guard does not protect it.**
+  The guard compares the recipes ARRAY against the cloud; a background refresh
+  replaces the underlying recipe while a form is open, so the form then
+  overwrites another device's work *with permission*. `_editBaseAt` records the
+  version the form opened from and `saveRecipe` asks before replacing. Found by
+  Tony with two browsers — no unit test would have found it.
+- **A cloud document that will not parse must still yield a base.** Skipping it
+  outright left no base, so every later save refused that recipe forever and a
+  corrupt payload never repairs itself. `updatedAt` is a separate field: record
+  it, and the next save replaces the damaged document.
 - **RTL is layout as well as text.** `dir="auto"` per element handles alignment,
   but which SIDE a column sits on needs `dir="rtl"` on the grid container —
   `recipeIsRTL(r)` decides from the recipe body, not just its title.
