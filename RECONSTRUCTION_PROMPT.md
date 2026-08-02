@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v28.9` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+**Current version:** `v29.0` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
 the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
@@ -40,7 +40,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v28.9"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v29.0"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
@@ -177,9 +177,12 @@ the **Anthropic Messages API** (this is the AI path).
 6. **(default, no action)** — forward the whole body to
    `https://api.anthropic.com/v1/messages` with headers `x-api-key: env.ANTHROPIC_API_KEY`,
    `anthropic-version: 2023-06-01`; return the JSON response with `Access-Control-Allow-Origin: *`.
-7. **`instagram-fetch`** `{shortcode}` — (referenced by the app & self‑tests; Instagram oEmbed now
-   needs auth so it typically 404s. Implement to return `{text}` when available, 404 when not, and
-   never 500.)
+7. **`instagram-fetch`** `{shortcode}` — Meta made oEmbed **tokenless again on 15 Jun 2026**, so
+   this calls `graph.facebook.com/v23.0/instagram_oembed` with no token. oEmbed returns the embed
+   HTML, author and thumbnail — **not reliably the caption**, which is where the recipe is; a
+   caption fragment is mined out of the `<blockquote>` when present. Returns
+   `{title, author, text, thumbnail, partial}` where `partial: true` means what came back is too
+   short to be a recipe, so the app must not feed it to Claude. 404 when nothing usable, never 500.
 
 **Client‑side AI contract:** `aiCall(prompt, maxTokens=2000, tools=null)` POSTs
 `{model:'claude-sonnet-4-5-20250929', max_tokens, messages:[{role:'user', content:prompt}], tools?}`
