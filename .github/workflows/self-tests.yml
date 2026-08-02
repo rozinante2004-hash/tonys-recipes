@@ -1,0 +1,86 @@
+name: Self Tests
+
+# 5.6 — the Self Test suite used to be run by hand, which meant a regression
+# reached Tony before it reached anyone else. It runs here on every push now.
+#
+# The net_* and stor_firebase checks are skipped: they need real network and a
+# signed-in Firebase session, so they cannot pass on a runner. Everything else
+# is held to a pass, and the runner also fails the build if a test closes the
+# Self Test modal or strands a dialog — that kind of breakage makes later tests
+# run blind while still reporting green.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright (Chromium only)
+        run: npx --yes playwright@1.56.1 install --with-deps chromium
+
+      # A single-file app fails silently and completely on a syntax error, so
+      # check the inline scripts parse before spending time on a browser.
+      - name: Syntax-check the inline scripts
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+            const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+            let m, bad = 0, i = 0;
+            while ((m = re.exec(html))) {
+              i++;
+              try { new Function(m[1]); }
+              catch (e) { bad++; console.error('inline script #' + i + ': ' + e.message); }
+            }
+            console.log(bad ? 'FAILED' : 'all ' + i + ' inline scripts parse');
+            process.exit(bad ? 1 : 0);
+          "
+
+      - name: Serve the app
+        run: |
+          python3 -m http.server 8137 --bind 127.0.0.1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8137/index.html && break
+            sleep 1
+          done
+
+      - name: Run the Self Test suite
+        run: node tests/run-self-tests.js --port 8137
+
+      # The version banner only fires when version.json and APP_VERSION agree,
+      # so a bump that misses one of them ships an update nobody is told about.
+      - name: Check the version strings agree
+        run: |
+          node -e "
+            const fs = require('fs');
+            const declared = JSON.parse(fs.readFileSync('version.json', 'utf8')).version;
+            const html = fs.readFileSync('index.html', 'utf8');
+            const found = new Set();
+            const patterns = [
+              /<!-- Tony's Recipes Collection (v[\d.]+) -->/,
+              /var APP_VERSION = '(v[\d.]+)'/,
+            ];
+            for (const p of patterns) { const m = html.match(p); if (m) found.add(m[1]); }
+            for (const m of html.matchAll(/letter-spacing:0\.5px;\">(v[\d.]+)<\/div>/g)) found.add(m[1]);
+            const all = [...found];
+            if (all.length !== 1 || all[0] !== declared) {
+              console.error('version.json says ' + declared + ' but index.html carries: ' + all.join(', '));
+              process.exit(1);
+            }
+            console.log('version strings agree: ' + declared);
+          "

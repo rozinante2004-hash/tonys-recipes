@@ -27,12 +27,15 @@ The app has a built-in Self Test suite (`SELF_TESTS` in `index.html`, surfaced a
 ⚙️ Settings → 🧪 Self Test). Drive it headlessly:
 
 ```bash
-python3 -m http.server 8137          # some checks need http://, not file://
-# then Playwright (global install at /opt/node22/lib/node_modules/playwright)
-# → page.evaluate over SELF_TESTS, calling each t.test()
+python3 -m http.server 8137 &        # some checks need http://, not file://
+node tests/run-self-tests.js --port 8137
 ```
 
-**As of v28.7: 132 checks, 126 passing.** The 6 failures are `net_*` and
+That runner is in the repo and is what CI runs (`.github/workflows/self-tests.yml`,
+5.6). It exits non-zero on a failure **and** on a test that closes the suite or
+strands a dialog.
+
+**As of v28.8: 134 checks, 128 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 

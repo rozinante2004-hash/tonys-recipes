@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.7 -->
+<!-- Tony's Recipes Collection v28.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1213,6 +1213,42 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'safety_backup_age', group:'Backup', name:'Backup age is tracked and nagged about (5d.1)',
+    test: async()=>{
+      ['getLastBackupAt','backupIsOverdue','backupAgeDays'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var prev=null; try{ prev=localStorage.getItem(BACKUP_AT_KEY); }catch(e){}
+      try{
+        // Never backed up, with a real collection -> overdue.
+        try{ localStorage.removeItem(BACKUP_AT_KEY); }catch(e){}
+        if(recipes.length>5 && !backupIsOverdue()) throw new Error('a collection that has never been backed up is not reported as overdue');
+        if(backupAgeDays()!==null) throw new Error('backupAgeDays should be null when there has never been a backup');
+        // Just backed up -> not overdue, and the age reads 0.
+        localStorage.setItem(BACKUP_AT_KEY,String(Date.now()));
+        if(backupIsOverdue()) throw new Error('a backup taken just now is reported as overdue');
+        if(backupAgeDays()!==0) throw new Error('a backup taken just now should read 0 days, got '+backupAgeDays());
+        // 40 days ago -> overdue again.
+        localStorage.setItem(BACKUP_AT_KEY,String(Date.now()-40*24*60*60*1000));
+        if(recipes.length>5 && !backupIsOverdue()) throw new Error('a 40-day-old backup is not reported as overdue');
+        if(backupAgeDays()!==40) throw new Error('expected an age of 40 days, got '+backupAgeDays());
+      } finally {
+        try{ if(prev===null) localStorage.removeItem(BACKUP_AT_KEY); else localStorage.setItem(BACKUP_AT_KEY,prev); }catch(e){}
+      }
+    } },
+
+  { id:'safety_orphan_sweep', group:'Cloud Sync', name:'Orphaned photo documents can be swept (5d.2)',
+    test: async()=>{
+      if(typeof sweepOrphanPhotos!=='function') throw new Error('sweepOrphanPhotos not defined');
+      // It must only ever target photos whose recipe is gone. Deleting a photo
+      // belonging to a live recipe would be silent, permanent data loss.
+      var src=String(sweepOrphanPhotos);
+      if(src.indexOf('_cloudPhotoIds')===-1) throw new Error('the sweep does not consult the known cloud photo set');
+      if(src.indexOf('live[')===-1) throw new Error('the sweep does not exclude photos belonging to live recipes');
+      if(src.indexOf('permission-denied')===-1) throw new Error('the sweep does not handle an admin-only refusal honestly');
+      if(!document.querySelector('#settingsDrop button[onclick*="sweepOrphanPhotos"]')) throw new Error('the sweep is not reachable from Settings');
+    } },
+
   { id:'ui_keyboard_cards', group:'UI', name:'Recipe cards are reachable by keyboard (5c.1)',
     test: async()=>{
       // There was not one tabindex in the whole file: the grid could not be
@@ -2764,6 +2800,11 @@ const SELF_TESTS = [
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
+// `const SELF_TESTS` at script top level is NOT a window property (unlike var),
+// so an external driver — tests/run-self-tests.js, CI — cannot reach it without
+// this. Exported explicitly rather than left to a fallback that hid the problem.
+window.SELF_TESTS = SELF_TESTS;
+
 function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -3493,7 +3534,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.7';
+var APP_VERSION = 'v28.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5802,7 +5843,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5823,6 +5864,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
           <button class="drop-item" id="debugModeItem" onclick="closeDrop('settingsDrop');toggleDebugMode()">🐞 Debug mode: Off</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -6364,7 +6406,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11131,6 +11173,38 @@ async function migrateToPerRecipeDocs(list, nextIdVal, db, legacyAt) {
 }
 window.migrateToPerRecipeDocs = migrateToPerRecipeDocs;
 
+// 5d.2 — since deletion became admin-only, a write-role member removing a photo
+// cannot delete its cloud document and syncCloudPhotos swallows the refusal.
+// Nothing ever cleans those up. This finds photo_<id> documents whose recipe is
+// gone and removes them. Admin-only in practice, because the rules say so — a
+// non-admin gets an honest refusal rather than a silent no-op.
+async function sweepOrphanPhotos() {
+  if (!_fbDb || !window._fbUser) { toast('Sign in first'); return; }
+  var live = {};
+  recipes.forEach(function(r){ live[String(r.id)] = true; });
+  var orphans = Object.keys(_cloudPhotoIds).filter(function(id){ return !live[String(id)]; });
+  if (!orphans.length) { toast('\u2728 No orphaned photos to clean up'); return; }
+  if (!await askConfirm({ icon:'\u{1F9F9}', title:'Remove ' + orphans.length + ' orphaned photo' + (orphans.length!==1?'s':'') + '?',
+      message:'These are cloud photo documents whose recipe no longer exists. Removing them frees storage and changes nothing you can see.',
+      okLabel:'Remove ' + orphans.length, danger:true })) return;
+  var removed = 0, denied = 0;
+  for (var i = 0; i < orphans.length; i++) {
+    try {
+      await _fbDb.collection('shared').doc('photo_' + orphans[i]).delete();
+      delete _cloudPhotoIds[orphans[i]];
+      delete _cloudPhotoStamps[orphans[i]];
+      removed++;
+    } catch(e) { if (e && e.code === 'permission-denied') denied++; }
+  }
+  if (denied) {
+    showServiceError('DELETE_NOT_PERMITTED: ' + denied + ' photo document(s) could not be removed — deleting from the '
+      + 'shared collection is reserved for admins. Ask Tony to run this, or to give your account the admin role.');
+  } else {
+    toast('\u{1F9F9} Removed ' + removed + ' orphaned photo document' + (removed!==1?'s':''));
+  }
+}
+window.sweepOrphanPhotos = sweepOrphanPhotos;
+
 function handleFirestoreSaveError(err) {
   setDriveStatus('error', 'Sync failed');
   console.error('[Firestore] Save FAILED:', err && err.code, err && err.message, err);
@@ -13064,6 +13138,38 @@ window.waImportFiles = waImportFiles; window.waRemove = waRemove; window.waParse
 window.waSearch = waSearch; window.waBuildContext = waBuildContext; window.waIndex = waIndex; window.initWhatsAppSources = initWhatsAppSources;
 
 // ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
+// 5d.1 — backup is manual AND desktop-only, so the safety net is missing exactly
+// when it matters: after a schema change, or on the phone. Rather than silently
+// downloading files nobody asked for, the app now keeps track of when a backup
+// last happened and says so when it has been too long. Honest and unobtrusive:
+// it is a nudge with a button, not a modal, and never claims a backup happened.
+var BACKUP_AT_KEY  = 'tonys_last_backup_at';
+var BACKUP_MAX_AGE = 30 * 24 * 60 * 60 * 1000;   // 30 days
+function getLastBackupAt() {
+  try { var v = parseInt(localStorage.getItem(BACKUP_AT_KEY), 10); return isNaN(v) ? null : v; } catch(e) { return null; }
+}
+function markBackupTaken() { try { localStorage.setItem(BACKUP_AT_KEY, String(Date.now())); } catch(e) {} }
+function backupAgeDays() {
+  var at = getLastBackupAt();
+  return at === null ? null : Math.floor((Date.now() - at) / (24*60*60*1000));
+}
+function backupIsOverdue() {
+  if (!recipes || recipes.length <= 5) return false;      // seed data isn't worth nagging about
+  var at = getLastBackupAt();
+  return at === null || (Date.now() - at) > BACKUP_MAX_AGE;
+}
+function checkBackupOverdue() {
+  if (!backupIsOverdue()) return;
+  var days = backupAgeDays();
+  var msg = days === null
+    ? '\u{1F4BE} No backup taken on this device yet'
+    : '\u{1F4BE} Last backup was ' + days + ' days ago';
+  toastAction(msg, 'Back up now', function(){ backupSave(); }, 12000);
+}
+window.getLastBackupAt = getLastBackupAt;
+window.backupIsOverdue = backupIsOverdue;
+window.backupAgeDays   = backupAgeDays;
+
 function backupSave() {
   try {
     var photoMap={}; var photoIndex=0;
@@ -13075,6 +13181,7 @@ function backupSave() {
     });
     var photos={}; Object.keys(photoMap).forEach(function(b64){ photos[String(photoMap[b64])]=b64; });
     var backup={version:1,exportedAt:new Date().toISOString(),nextId:nextId,recipes:exportRecipes,photos:photos,settings:{viewMode:viewMode}};
+    markBackupTaken();
     var json=JSON.stringify(backup,null,2);
     var blob=new Blob([json],{type:'application/json'});
     var url=URL.createObjectURL(blob); var a=document.createElement('a');
@@ -13524,6 +13631,7 @@ function updateFilterBarTop() {
   loadPendingCloudDeletes();   // 5.4 — a delete made offline still has to reach the cloud
   loadLastCloudMetaAt();       // 5.9 — how we know whether the cloud has moved since last time
   initPullToRefresh();         // 5c.3
+  setTimeout(checkBackupOverdue, 6000);   // 5d.1 — after the app has settled
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously
   if (hasLocal) {
