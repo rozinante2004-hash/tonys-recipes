@@ -186,7 +186,7 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 
 | # | Idea | Why | Effort |
 |---|------|-----|--------|
-| 5e.1 | **Sync health panel** | The sync pill is the only window into the cloud. Show last successful sync, pending offline queue, refused-conflict count, `recipe_*` documents vs local recipes, and reads used today against the free tier. The 5.4 migration ran on live data with no way to watch it — this is the fix for that class of blindness, and it fits Tony's standing preference for the UI never asserting anything the code has not verified. | 🟡 |
+| ~~5e.1~~ | ✅ **DONE (v28.9)** — ~~sync health panel~~ | The sync pill is the only window into the cloud. Show last successful sync, pending offline queue, refused-conflict count, `recipe_*` documents vs local recipes, and reads used today against the free tier. The 5.4 migration ran on live data with no way to watch it — ⚙️ Settings → 📡 Sync Health. Every figure is read from live state, and anything not actually observed says **unknown** rather than guessing — signed out, the cloud rows say so instead of showing a number. Reads are tallied per calendar day against the 50 000 free tier, so 5.9's saving is visible rather than claimed. | 🟡 |
 
 ---
 
