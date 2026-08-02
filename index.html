@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.9 -->
+<!-- Tony's Recipes Collection v29.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -587,6 +587,15 @@ function handleShareTarget() {
   var hasRecipeText = textNoUrl.length >= 40; // long enough to be a recipe, not a title/author
 
   setTimeout(function() {
+    // 5f.1 — sharing from Instagram often carries the caption in `text` AND the
+    // post URL in `url`. The URL is the weaker of the two: Instagram will not
+    // give us the caption over the API, so following the link throws away the
+    // one copy of the recipe we were actually handed. Text wins for Instagram.
+    if (directUrl && /instagram\.com/i.test(directUrl) && hasRecipeText && typeof openFreehandModal === 'function') {
+      openFreehandModal(textBlob);
+      toast('📸 Using the caption you shared — Instagram won\'t give it to us any other way');
+      return;
+    }
     if (directUrl) { openUrlImportModal(directUrl); return; }
     if (hasRecipeText && typeof openFreehandModal === 'function') { openFreehandModal(textBlob); return; }
     if (anyUrl && /^https?:\/\//i.test(anyUrl)) { openUrlImportModal(anyUrl); return; }
@@ -1213,6 +1222,26 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'feat_instagram', group:'Features', name:'Instagram failure offers a way forward (5f.1)',
+    test: async()=>{
+      if(typeof showInstagramCaptionFallback!=='function') throw new Error('showInstagramCaptionFallback not defined');
+      var res=document.getElementById('urlImportResult');
+      if(!res) throw new Error('#urlImportResult missing');
+      var before=res.innerHTML;
+      try{
+        showInstagramCaptionFallback('https://www.instagram.com/p/ABC123/', {author:'someone'});
+        var t=res.textContent||'';
+        // A dead end is treated as a bug here, so the pane must offer a route on.
+        if(!/paste/i.test(t)) throw new Error('the Instagram fallback does not offer the paste route');
+        if(!res.querySelector('a[href*="instagram.com"]')) throw new Error('no link to open the actual post');
+        if(!/bookmark/i.test(t)) throw new Error('no option to just keep the post as a bookmark');
+        // ...and it must not blame Instagram for blocking us when it simply did
+        // not hand over the caption. Honest error messages, per CLAUDE.md.
+        if(/blocked|denied|refused/i.test(t)) throw new Error('the message claims Instagram blocked us, which is not what happened');
+        if(res.innerHTML.indexOf('<script')>-1) throw new Error('unescaped markup in the fallback pane');
+      } finally { res.innerHTML=before; }
+    } },
+
   { id:'vis_sync_health', group:'UI', name:'Sync health reports observed state, never guesses (5e.1)',
     test: async()=>{
       ['syncHealth','openSyncHealth','renderSyncHealth','getReadsToday'].forEach(function(f){
@@ -3638,7 +3667,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.9';
+var APP_VERSION = 'v29.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5947,7 +5976,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6511,7 +6540,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10384,7 +10413,10 @@ async function runUrlImport() {
         body: JSON.stringify({ action: 'instagram-fetch', shortcode: igId })
       });
       var igData = await igResp.json();
-      if (igData.text && igData.text.length > 10) {
+      // `partial` means the Worker got the post but not the words. Ten characters
+      // was never enough to be a recipe — it let "View this post on Instagram"
+      // through to Claude, which then invented one.
+      if (igData.text && igData.text.trim().length >= 40 && !igData.partial) {
         // Use the caption text as page content — skip normal fetch
         res.innerHTML = spinner('Extracting recipe from caption...');
         const igPrompt = 'Extract the recipe from this Instagram post caption. '
@@ -10405,12 +10437,13 @@ async function runUrlImport() {
         }
         return;
       } else {
-        // Instagram blocked or no caption — offer bookmark
-        showSaveAsVideoBookmark(url, 'Instagram post', '🎥');
+        // No caption came back. Say why, and give a way forward — a bookmark
+        // alone is a dead end, and Tony treats a dead end as a bug.
+        showInstagramCaptionFallback(url, igData);
         return;
       }
     } catch(igErr) {
-      showSaveAsVideoBookmark(url, 'Instagram post', '📸');
+      showInstagramCaptionFallback(url, null);
       return;
     }
   }
@@ -13605,6 +13638,31 @@ window.aiTagAllDiets     = aiTagAllDiets;
 
 
 // ─── SAVE AS VIDEO / LINK BOOKMARK ───────────────────────────────────────────
+// 5f.1 — Instagram's oEmbed became tokenless again in June 2026, so the fetch is
+// worth attempting, but it returns embed HTML and attribution — NOT reliably the
+// caption, which is where a recipe actually lives. When the caption doesn't come
+// back, this says exactly that and offers the two things that do work: paste the
+// caption, or keep the post as a bookmark. Never a dead end, and never a claim
+// that Instagram "blocked" us when we simply weren't given the text.
+function showInstagramCaptionFallback(url, igData) {
+  var res = document.getElementById('urlImportResult');
+  if (!res) return;
+  var known = igData && (igData.author || igData.title) ? escH([igData.title, igData.author ? 'by ' + igData.author : ''].filter(Boolean).join(' — ')) : '';
+  res.innerHTML =
+      '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:10px;padding:14px;font-size:14px;line-height:1.6;color:#5C3D2E;">'
+    + '<strong>📸 Instagram doesn\'t hand over the caption.</strong><br>'
+    + 'The post was reachable' + (known ? ' (' + known + ')' : '') + ', but Instagram\'s public API returns the embed and the author, not the caption text — and the recipe is in the caption.'
+    + '<div style="margin-top:10px;font-size:13px;">The quickest way in: open the post, copy the caption, and paste it here.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+    + '<button onclick="closeAllModalsThenFreehand()" style="padding:11px 16px;min-height:44px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Paste the caption</button>'
+    + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="padding:11px 16px;min-height:44px;display:inline-flex;align-items:center;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;font-family:\'DM Sans\',\'Heebo\',sans-serif;">↗ Open the post</a>'
+    + '<button onclick="showSaveAsVideoBookmark(' + JSON.stringify(url).replace(/"/g, '&quot;') + ', \'Instagram post\', \'📸\')" style="padding:11px 16px;min-height:44px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🔖 Just bookmark it</button>'
+    + '</div>'
+    + '<div style="margin-top:12px;font-size:12px;color:#8A8279;">Tip: sharing the post to this app straight from Instagram usually carries the caption with it, which skips all of this.</div>'
+    + '</div>';
+}
+window.showInstagramCaptionFallback = showInstagramCaptionFallback;
+
 function showSaveAsVideoBookmark(url, suggestedName, emoji) {
   var res = document.getElementById('urlImportResult');
   var hostname = '';

@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v31
+// Tony's Recipes — Cloudflare Worker v32
+// v32: instagram-fetch rebuilt on Meta's tokenless oEmbed (public again since
+//      15 Jun 2026). Mines the embed blockquote for a caption fragment and
+//      flags `partial` when what came back is too short to be a recipe.
 // v31: bring-token-status — the app now asks the Worker for the token's real
 //      expiry (and can probe the live API) instead of trusting a per-device
 //      localStorage copy that goes stale after a refresh on another device
@@ -140,36 +143,68 @@ export default {
     if (body.action === 'instagram-fetch') {
       const { shortcode } = body;
       if (!shortcode) return jsonResp({ error: 'No shortcode' }, 400);
-      // Instagram's oEmbed API now requires authentication and is no longer publicly accessible.
-      // We attempt multiple endpoints but gracefully degrade — never returning 500.
-      try {
-        // Try the graph.facebook.com oEmbed endpoint (most reliable)
-        const endpoints = [
-          `https://graph.facebook.com/v18.0/instagram_oembed?url=https://www.instagram.com/p/${shortcode}/&fields=title,author_name,thumbnail_url`,
-          `https://api.instagram.com/oembed/?url=https://www.instagram.com/p/${shortcode}/`,
-          `https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/p/${shortcode}/&hidecaption=0`,
-        ];
-        for (const url of endpoints) {
-          try {
-            const r = await fetch(url, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; recipe-importer/1.0)', 'Accept': 'application/json' },
-              signal: AbortSignal.timeout(6000),
-            });
-            if (r.ok) {
-              const data = await r.json();
-              const text = [data.title || '', data.author_name ? 'By: ' + data.author_name : ''].filter(Boolean).join('\n\n');
-              return jsonResp({ title: data.title || '', author: data.author_name || '', text, thumbnail: data.thumbnail_url || '' });
-            }
-          } catch(e) { /* try next endpoint */ }
-        }
-        // All endpoints failed — Instagram requires auth. Return 404 (not 500) so app can show user-friendly message.
-        return jsonResp({ error: 'Instagram import is not available. Instagram now requires authentication for their API. Please copy and paste the caption text manually using the Free-hand import option.', unavailable: true }, 404);
-      } catch(err) {
-        return jsonResp({ error: 'Instagram fetch failed: ' + err.message, unavailable: true }, 404);
+      // v32 — Meta made the oEmbed endpoints TOKENLESS again on 15 June 2026 for
+      // public posts, so this is worth attempting once more. Be clear about what
+      // it can and cannot give you: oEmbed returns the embed HTML, the author and
+      // a thumbnail. It does NOT reliably return the caption, and the caption is
+      // where a recipe lives. Where a caption fragment does appear it is inside
+      // the blockquote in `html`, so that gets mined too — but the honest answer
+      // is often "we got the post, not the words", and the app is told so via
+      // `partial` rather than being left to guess.
+      const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+      const endpoints = [
+        `https://graph.facebook.com/v23.0/instagram_oembed?omitscript=true&url=${encodeURIComponent(postUrl)}`,
+        `https://graph.facebook.com/v20.0/instagram_oembed?omitscript=true&url=${encodeURIComponent(postUrl)}`,
+        `https://api.instagram.com/oembed/?url=${encodeURIComponent(postUrl)}`,
+      ];
+      // Pull whatever human text the embed blockquote carries. Instagram's embed
+      // markup puts the caption (when present) in <p> inside the blockquote.
+      const captionFromHtml = (html) => {
+        if (!html) return '';
+        const block = (html.match(/<blockquote[\s\S]*?<\/blockquote>/i) || [''])[0] || html;
+        return block
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+      for (const endpoint of endpoints) {
+        try {
+          const r = await fetch(endpoint, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; recipe-importer/1.0)', 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(6000),
+          });
+          if (!r.ok) continue;
+          const data = await r.json();
+          const title   = data.title || '';
+          const author  = data.author_name || '';
+          const embedTx = captionFromHtml(data.html);
+          // Boilerplate the embed always carries, which is not a caption.
+          const cleaned = embedTx
+            .replace(/View this post on Instagram/gi, '')
+            .replace(/A post shared by[\s\S]*$/i, '')
+            .trim();
+          const caption = title.length >= cleaned.length ? title : cleaned;
+          const text = [caption, author ? 'By: ' + author : ''].filter(Boolean).join('\n\n');
+          return jsonResp({
+            title, author, text,
+            thumbnail: data.thumbnail_url || '',
+            // < 40 chars is not a recipe. Say so rather than letting the app feed
+            // "View this post on Instagram" to Claude and call the result a recipe.
+            partial: caption.trim().length < 40,
+          });
+        } catch(e) { /* try the next endpoint */ }
       }
+      // 404 rather than 500: this is "no caption available", not a broken Worker.
+      return jsonResp({
+        error: 'Instagram did not return a caption for this post. Copy the caption and paste it into the free-hand importer instead.',
+        unavailable: true,
+      }, 404);
     }
 
-    // ── fetch-url ─────────────────────────────────────────────────────────────
     if (body.action === 'fetch-url') {
       const url = body.url;
       if (!url || !url.startsWith('http')) return jsonResp({ error: 'Invalid URL' }, 400);
