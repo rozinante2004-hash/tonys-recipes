@@ -30,8 +30,15 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Playwright (Chromium only)
-        run: npx --yes playwright@1.56.1 install --with-deps chromium
+      # Two separate things, and conflating them is why the first run of this
+      # workflow failed: `playwright install` downloads the BROWSERS, but the
+      # runner also has to be able to `require('playwright')`, and npx resolves
+      # the package into a temp cache that node cannot see from tests/.
+      - name: Install Playwright (package + Chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
 
       # A single-file app fails silently and completely on a syntax error, so
       # check the inline scripts parse before spending time on a browser.

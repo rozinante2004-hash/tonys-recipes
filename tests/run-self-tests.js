@@ -27,7 +27,10 @@ function loadPlaywright() {
   for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright']) {
     try { return require(p); } catch (e) { /* try the next one */ }
   }
-  console.error('Could not find Playwright. Install it with: npm i -D playwright');
+  console.error('Could not require("playwright").');
+  console.error('Note: `npx playwright install` downloads the browsers but does NOT');
+  console.error('make the package resolvable here. Install it too:');
+  console.error('  npm install playwright@1.56.1 && npx playwright install chromium');
   process.exit(2);
 }
 
