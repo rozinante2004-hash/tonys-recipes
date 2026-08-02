@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.8 -->
+<!-- Tony's Recipes Collection v28.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1213,6 +1213,35 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'vis_sync_health', group:'UI', name:'Sync health reports observed state, never guesses (5e.1)',
+    test: async()=>{
+      ['syncHealth','openSyncHealth','renderSyncHealth','getReadsToday'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var h=syncHealth();
+      ['signedIn','online','lastSyncOkAt','offlineQueued','pendingDeletes','conflicts',
+       'schema','localRecipes','cloudRecipes','readsToday','readsBudget'].forEach(function(k){
+        if(!(k in h)) throw new Error('syncHealth() does not report '+k);
+      });
+      if(h.localRecipes!==recipes.length) throw new Error('the panel disagrees with the actual recipe count');
+      // Tony's standing rule: never assert what the code has not verified. Signed
+      // out, the cloud has not been observed at all, so it must say so.
+      renderSyncHealth();
+      var body=document.getElementById('syncHealthBody');
+      if(!body||!body.innerHTML) throw new Error('the panel rendered nothing');
+      if(!h.signedIn && body.textContent.indexOf('unknown')===-1)
+        throw new Error('signed out, the panel states a cloud figure it cannot possibly know');
+      // The reads tally must roll over per day rather than accumulate forever.
+      var prev=null; try{ prev=localStorage.getItem(CLOUD_READS_KEY); }catch(e){}
+      try{
+        localStorage.setItem(CLOUD_READS_KEY, JSON.stringify({day:'2000-01-01', n:9999}));
+        if(getReadsToday()!==0) throw new Error("yesterday's read tally leaked into today, got "+getReadsToday());
+      } finally {
+        try{ if(prev===null) localStorage.removeItem(CLOUD_READS_KEY); else localStorage.setItem(CLOUD_READS_KEY,prev); }catch(e){}
+      }
+      if(!document.querySelector('#settingsDrop button[onclick*="openSyncHealth"]')) throw new Error('Sync Health is not reachable from Settings');
+    } },
+
   { id:'safety_backup_age', group:'Backup', name:'Backup age is tracked and nagged about (5d.1)',
     test: async()=>{
       ['getLastBackupAt','backupIsOverdue','backupAgeDays'].forEach(function(f){
@@ -3356,6 +3385,81 @@ window.autoFetchMissingPhotos = autoFetchMissingPhotos;
 
 
 // ─── DEPLOYMENTS MODAL ────────────────────────────────────────────────────────
+// 5e.1 — the sync pill was the only window into the cloud, which made the 5.4
+// migration something Tony had to take on trust. Every number here is read from
+// live state; nothing is asserted that the code has not actually observed, and
+// anything unknown says "unknown" rather than guessing.
+function fmtAgo(ts) {
+  if (!ts) return 'never';
+  var secs = Math.floor((Date.now() - ts) / 1000);
+  if (secs < 10) return 'just now';
+  if (secs < 60) return secs + 's ago';
+  var mins = Math.floor(secs / 60);
+  if (mins < 60) return mins + ' min ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' hour' + (hrs !== 1 ? 's' : '') + ' ago';
+  var days = Math.floor(hrs / 24);
+  return days + ' day' + (days !== 1 ? 's' : '') + ' ago';
+}
+function healthRow(label, value, tone, note) {
+  var colour = tone === 'bad' ? '#C62828' : tone === 'warn' ? '#8B6914' : tone === 'good' ? 'var(--green)' : 'var(--ink)';
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);">'
+    + '<div style="font-size:13px;color:var(--muted);flex-shrink:0;">' + escH(label) + '</div>'
+    + '<div style="font-size:14px;font-weight:600;color:' + colour + ';text-align:end;">' + escH(value)
+    + (note ? '<div style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;">' + escH(note) + '</div>' : '')
+    + '</div></div>';
+}
+function renderSyncHealth() {
+  var el = document.getElementById('syncHealthBody');
+  if (!el) return;
+  var h = syncHealth();
+  var out = '';
+
+  if (!h.signedIn) {
+    out += '<div style="background:#FFF8E8;border:1px solid var(--gold);border-radius:10px;padding:12px;font-size:13px;line-height:1.5;color:var(--ink);margin-bottom:12px;">'
+        + 'Not signed in — nothing is syncing. Recipes are saved on this device only, and this device only.</div>';
+  }
+
+  out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:4px 0 2px;">Connection</div>';
+  out += healthRow('Account', h.signedIn ? (h.account || 'signed in') : 'signed out', h.signedIn ? 'good' : 'warn');
+  out += healthRow('Network', h.online ? 'online' : 'offline', h.online ? 'good' : 'bad');
+  out += healthRow('Last successful sync', fmtAgo(h.lastSyncOkAt), h.lastSyncOkAt ? '' : 'warn');
+  out += healthRow('Last successful save', fmtAgo(h.lastSaveOkAt), h.lastSaveOkAt ? '' : '');
+
+  out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Pending</div>';
+  out += healthRow('Unsent local edits', h.offlineQueued ? 'yes — will retry' : 'none', h.offlineQueued ? 'warn' : 'good');
+  out += healthRow('Deletions not yet sent', String(h.pendingDeletes), h.pendingDeletes ? 'warn' : 'good');
+  out += healthRow('Writes refused this session', String(h.conflicts), h.conflicts ? 'warn' : 'good',
+                   h.conflicts ? 'someone else edited the same recipe — reload before re-editing' : '');
+
+  out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Collection</div>';
+  out += healthRow('Recipes on this device', String(h.localRecipes), '');
+  // Only ever report what has actually been observed this session.
+  out += healthRow('Recipe documents seen in cloud', h.signedIn ? String(h.cloudRecipes) : 'unknown — signed out',
+                   (h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes) ? 'warn' : '',
+                   h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes
+                     ? 'a mismatch is normal right after an edit, and should settle on the next sync' : '');
+  out += healthRow('Cloud storage layout', h.schema >= 2 ? 'per-recipe documents (v2)' : (h.signedIn ? 'legacy single document' : 'unknown'),
+                   h.schema >= 2 ? 'good' : (h.signedIn ? 'warn' : ''));
+
+  out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Cost & safety</div>';
+  var pct = Math.round((h.readsToday / h.readsBudget) * 100);
+  out += healthRow('Cloud reads today', h.readsToday + ' of ' + h.readsBudget.toLocaleString(),
+                   pct >= 80 ? 'bad' : pct >= 40 ? 'warn' : 'good',
+                   'free tier, counted on this device only');
+  out += healthRow('Last backup', h.backupDays === null ? 'never on this device' : (h.backupDays + ' day' + (h.backupDays !== 1 ? 's' : '') + ' ago'),
+                   (h.backupDays === null || h.backupDays > 30) ? 'warn' : 'good');
+
+  el.innerHTML = out;
+}
+function openSyncHealth() {
+  renderSyncHealth();
+  document.getElementById('syncHealthOverlay').classList.add('open');
+}
+window.openSyncHealth   = openSyncHealth;
+window.renderSyncHealth = renderSyncHealth;
+window.fmtAgo           = fmtAgo;
+
 function openDeployments() {
   document.getElementById('deploymentsOverlay').classList.add('open');
 }
@@ -3534,7 +3638,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.8';
+var APP_VERSION = 'v28.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5843,7 +5947,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5863,6 +5967,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
           <button class="drop-item" id="debugModeItem" onclick="closeDrop('settingsDrop');toggleDebugMode()">🐞 Debug mode: Off</button>
@@ -6406,7 +6511,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10865,9 +10970,53 @@ var RECIPE_DOC_HI = 'recipe' + String.fromCharCode(96);
 var CLOUD_META_AT_KEY = 'tonys_cloud_meta_at';
 var _lastCloudMetaAt  = null;
 var _cloudReads       = 0;    // counted so the saving is observable, not asserted
-function countCloudRead(n) { _cloudReads += (n || 1); }
+// 5e.1 — a per-day tally, kept so the health panel can report reads against the
+// free tier rather than leaving Tony to guess. Rolls over on the calendar day.
+var CLOUD_READS_KEY   = 'tonys_cloud_reads';
+var FIRESTORE_FREE_READS = 50000;
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+function readTally() {
+  try {
+    var t = JSON.parse(localStorage.getItem(CLOUD_READS_KEY) || '{}');
+    if (t && t.day === todayKey()) return t;
+  } catch(e) {}
+  return { day: todayKey(), n: 0 };
+}
+function countCloudRead(n) {
+  n = n || 1;
+  _cloudReads += n;
+  var t = readTally();
+  t.n += n;
+  try { localStorage.setItem(CLOUD_READS_KEY, JSON.stringify(t)); } catch(e) {}
+}
 function getCloudReads() { return _cloudReads; }
+function getReadsToday() { return readTally().n; }
 window.getCloudReads = getCloudReads;
+window.getReadsToday = getReadsToday;
+
+// When each thing last actually succeeded — not when it was last attempted.
+var _lastSyncOkAt = null, _lastSaveOkAt = null, _conflictCount = 0;
+function syncHealth() {
+  var localCount = (recipes || []).length;
+  return {
+    signedIn:      !!(window._driveMode && window._fbUser),
+    account:       window._fbUser ? (window._fbUser.email || window._fbUser.displayName || '') : '',
+    online:        navigator.onLine,
+    lastSyncOkAt:  _lastSyncOkAt,
+    lastSaveOkAt:  _lastSaveOkAt,
+    offlineQueued: !!(_offlineQueue || (function(){ try { return localStorage.getItem('tonys_offline_queue') === '1'; } catch(e) { return false; } })()),
+    pendingDeletes: Object.keys(_pendingCloudDeletes).length,
+    conflicts:     _conflictCount,
+    schema:        _cloudSchema,
+    localRecipes:  localCount,
+    cloudRecipes:  Object.keys(_cloudRecipeIds).length,
+    readsToday:    getReadsToday(),
+    readsBudget:   FIRESTORE_FREE_READS,
+    backupDays:    (typeof backupAgeDays === 'function') ? backupAgeDays() : null,
+    metaAt:        _lastCloudMetaAt
+  };
+}
+window.syncHealth = syncHealth;
 function loadLastCloudMetaAt() {
   try { var v = parseInt(localStorage.getItem(CLOUD_META_AT_KEY), 10); _lastCloudMetaAt = isNaN(v) ? null : v; } catch(e) {}
 }
@@ -11271,7 +11420,7 @@ async function saveToFirestore() {
       var dr = recipes.find(function(x) { return x.id === dirty[di]; });
       if (!dr) continue;
       var res = await saveRecipeDoc(dr);
-      if (res.skipped === 'conflict') conflicts.push(dr);
+      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; }
       else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
     }
 
@@ -11334,6 +11483,7 @@ async function saveToFirestore() {
         + photoErrors.map(function(e) { return '• ' + e; }).join('\n')
         + '\n\nYour recipes synced fine — only these photos were skipped. Re-add a smaller photo for them.');
     } else {
+      _lastSaveOkAt = Date.now();
       setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
     }
   } catch(err) {
@@ -11419,6 +11569,7 @@ async function _loadFromFirestoreInner(user) {
       countCloudRead();
       if (!quiet.changed) {
         dlog('[5.9] cloud unchanged (meta.updatedAt ' + meta.updatedAt + ') — skipped the per-recipe fan-out');
+        _lastSyncOkAt = Date.now();   // a confirmed no-change IS a successful sync
         nextId = mergeNextId(nextId, meta.nextId || 0);
         skipFanout = true;   // fall through: the change listeners below must still be installed
       } else {
@@ -11495,6 +11646,7 @@ async function _loadFromFirestoreInner(user) {
         // 5.9 — we have just read everything, so this stamp is the point the
         // next load can compare against. Only set after a genuinely full read.
         if (typeof meta.updatedAt === 'number') setLastCloudMetaAt(meta.updatedAt);
+        _lastSyncOkAt = Date.now();
 
         // 5.4 — a legacy-only account migrates on its first load after sign-in.
         // Done before any push-back below so those writes go to the new layout.
@@ -13726,6 +13878,22 @@ function updateFilterBarTop() {
 
 
 <!-- PAYMENTS MODAL -->
+<div class="modal-overlay" id="syncHealthOverlay" onclick="bgClose(event,'syncHealthOverlay')">
+  <div class="modal" style="max-width:520px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('syncHealthOverlay')" aria-label="Close" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">📡 Sync Health</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">What the cloud sync is actually doing</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 20px;">
+      <div id="syncHealthBody"></div>
+      <button onclick="renderSyncHealth()" style="margin-top:14px;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;width:100%;">↻ Refresh</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="paymentsOverlay" onclick="bgClose(event,'paymentsOverlay')">
   <div class="modal" style="max-width:580px;">
     <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
