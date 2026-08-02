@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.1 -->
+<!-- Tony's Recipes Collection v29.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1599,7 +1599,10 @@ const SELF_TESTS = [
       if(!cloudWriteAllowed(400,500)) throw new Error('a cloud copy older than our base must be writable');
       // The whole point of 5.4: someone else wrote after we last read.
       if(cloudWriteAllowed(600,500)) throw new Error('a write whose base is older than the cloud copy was allowed — this is the lost-edit bug');
-      if(cloudWriteAllowed(600,undefined)) throw new Error('writing a recipe we have never read must be refused, not allowed to clobber');
+      if(cloudWriteAllowed(600,undefined,123)) throw new Error('writing over a genuinely different cloud copy with no base must be refused');
+      // v29.2 — but "no base" is NOT the same as "conflict". If the cloud copy is
+      // the same version we hold, we ARE up to date and the write is safe.
+      if(!cloudWriteAllowed(600,undefined,600)) throw new Error('refused a write although our copy is the same version as the cloud — this is what refused an entire collection in v29.1');
     } },
 
   { id:'cloud_nextid', group:'Cloud Sync', name:'nextId never regresses',
@@ -1710,6 +1713,36 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'cloud_base_persist', group:'Cloud Sync', name:'The concurrency base survives a reload (v29.2)',
+    test: async()=>{
+      // The v29.1 failure, reproduced: 5.9 skips re-reading an unchanged cloud, so
+      // nothing populated the base map on a fresh load; every recipe then looked
+      // like a conflict and the whole collection was refused, on every load.
+      ['saveCloudBase','loadCloudBase','hashStr'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var s=_cloudSnapshotForTest();
+      var prev=null; try{ prev=localStorage.getItem(CLOUD_BASE_KEY); }catch(e){}
+      try{
+        window._cloudRecipeBase={7:1700}; window._cloudRecipeStamp={7:hashStr('x')};
+        saveCloudBase();
+        // simulate a reload: memory cleared, storage intact
+        window._cloudRecipeBase={}; window._cloudRecipeStamp={};
+        loadCloudBase();
+        if(_cloudRecipeBase[7]!==1700)
+          throw new Error('the base did not survive a reload — every save would be refused as a conflict');
+        if(_cloudRecipeStamp[7]!==hashStr('x'))
+          throw new Error('the change stamp did not survive a reload — every recipe would be rewritten on every save');
+        // and the stamp must be a digest, not the whole recipe, or persisting it
+        // would roughly double what localStorage already holds.
+        if(hashStr(JSON.stringify({a:1})).length>24) throw new Error('the stamp is not a compact digest');
+      } finally {
+        _cloudRestoreForTest(s);
+        try{ if(prev===null) localStorage.removeItem(CLOUD_BASE_KEY); else localStorage.setItem(CLOUD_BASE_KEY,prev); }catch(e){}
+        loadCloudBase();
+      }
+    } },
+
   { id:'cloud_straggler', group:'Cloud Sync', name:'A v27.9 straggler is picked up, a deletion is not resurrected',
     test: async()=>{
       var s=_cloudSnapshotForTest();
@@ -1756,7 +1789,8 @@ const SELF_TESTS = [
   { id:'cloud_dirty', group:'Cloud Sync', name:'Only changed recipes are written',
     test: async()=>{
       var a={id:1,name:'A',photo:'',updatedAt:1}, b={id:2,name:'B',photo:'',updatedAt:1};
-      var stamps={}; stamps[1]=JSON.stringify(slimRecipeForCloud(a,true)); stamps[2]=JSON.stringify(slimRecipeForCloud(b,true));
+      // v29.2 — stamps are digests now, so persisting them doesn't double storage.
+      var stamps={}; stamps[1]=hashStr(JSON.stringify(slimRecipeForCloud(a,true))); stamps[2]=hashStr(JSON.stringify(slimRecipeForCloud(b,true)));
       if(cloudDirtyIds([a,b],stamps).length!==0) throw new Error('unchanged recipes were queued for writing — favouriting one recipe would re-upload the collection again');
       b.fav=true;
       var dirty=cloudDirtyIds([a,b],stamps);
@@ -3764,7 +3798,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.1';
+var APP_VERSION = 'v29.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6100,7 +6134,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6664,7 +6698,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11290,8 +11324,40 @@ function canSkipCloudFanout(meta, localCount, lastAt, offlineQueued) {
 }
 window.canSkipCloudFanout = canSkipCloudFanout;
 
+// These two used to be in-memory only, which was a real bug (v29.2). 5.9 skips
+// re-reading an unchanged cloud, so on a fresh page load nothing populated them —
+// every recipe then had an "unknown" base, and unknown was treated as a conflict.
+// The result was a modal refusing to save the entire collection, on every load,
+// self-sustaining because the next load took the same fast path. They are
+// persisted now: if meta.updatedAt has not moved, last session's bases are still
+// exactly what is in the cloud, which is the whole premise of the fast path.
+var CLOUD_BASE_KEY    = 'tonys_cloud_base';
 var _cloudRecipeBase  = {};   // id -> updatedAt of the cloud doc as we last saw it
-var _cloudRecipeStamp = {};   // id -> serialised form last synced (skips no-op writes)
+var _cloudRecipeStamp = {};   // id -> HASH of the form last synced (skips no-op writes)
+
+// A cheap, stable digest. The stamp used to hold each recipe's full serialised
+// JSON, which was fine in memory but would roughly double localStorage if
+// persisted — and localStorage is where the recipes already live.
+function hashStr(str) {
+  var h = 5381;
+  for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return String(h);
+}
+function saveCloudBase() {
+  try {
+    localStorage.setItem(CLOUD_BASE_KEY, JSON.stringify({ base: _cloudRecipeBase, stamp: _cloudRecipeStamp }));
+  } catch(e) { /* quota — the guard falls back to the updatedAt match below */ }
+}
+function loadCloudBase() {
+  try {
+    var d = JSON.parse(localStorage.getItem(CLOUD_BASE_KEY) || '{}');
+    if (d && typeof d === 'object') {
+      _cloudRecipeBase  = d.base  && typeof d.base  === 'object' ? d.base  : {};
+      _cloudRecipeStamp = d.stamp && typeof d.stamp === 'object' ? d.stamp : {};
+    }
+  } catch(e) {}
+}
+window.hashStr = hashStr; window.saveCloudBase = saveCloudBase; window.loadCloudBase = loadCloudBase;
 var _cloudRecipeIds   = {};   // id -> true when shared/recipe_<id> is known to exist
 var _cloudSchema      = 0;    // schema of the cloud data as last read
 
@@ -11348,7 +11414,7 @@ function cloudDirtyIds(list, stamps) {
   var out = [];
   for (var i = 0; i < list.length; i++) {
     var r = list[i];
-    if (stamps[r.id] !== JSON.stringify(slimRecipeForCloud(r, true))) out.push(r.id);
+    if (stamps[r.id] !== hashStr(JSON.stringify(slimRecipeForCloud(r, true)))) out.push(r.id);
   }
   return out;
 }
@@ -11358,10 +11424,16 @@ function cloudDirtyIds(list, stamps) {
 // overwriting would be exactly the lost-edit bug 5.4 exists to remove. This is
 // deliberately NOT a field-by-field merge — a wrong silent merge is worse than an
 // honest refusal, because nobody finds out about it.
-function cloudWriteAllowed(cloudUpdatedAt, base) {
+function cloudWriteAllowed(cloudUpdatedAt, base, localUpdatedAt) {
   if (cloudUpdatedAt === null || cloudUpdatedAt === undefined) return true;  // no cloud doc yet
-  if (base === null || base === undefined) return false;                     // never read it — don't clobber
-  return cloudUpdatedAt <= base;
+  if (base !== null && base !== undefined) return cloudUpdatedAt <= base;    // the normal check
+  // No base recorded for this recipe. That is not the same as a conflict, and
+  // treating it as one is what made v29.1 refuse an entire collection. If the
+  // cloud copy carries the same updatedAt as the copy we hold, then what we have
+  // IS the cloud's version and writing over it loses nothing. Only when the two
+  // genuinely differ, with no base to judge from, is refusing the honest answer.
+  if (localUpdatedAt !== null && localUpdatedAt !== undefined && cloudUpdatedAt === localUpdatedAt) return true;
+  return false;
 }
 
 function mergeNextId(local, cloud) {
@@ -11388,12 +11460,12 @@ async function saveRecipeDoc(r, db) {
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
     var cloudAt = snap.exists ? ((snap.data() || {}).updatedAt) : null;
-    if (!cloudWriteAllowed(cloudAt, base)) { refused = true; return; }
+    if (!cloudWriteAllowed(cloudAt, base, r.updatedAt)) { refused = true; return; }
     tx.set(ref, { r: json, updatedAt: stamped, id: r.id });
   });
   if (refused) return { id: r.id, skipped: 'conflict' };
   _cloudRecipeBase[r.id]  = stamped;
-  _cloudRecipeStamp[r.id] = json;
+  _cloudRecipeStamp[r.id] = hashStr(json);
   _cloudRecipeIds[r.id]   = true;
   return { id: r.id, ok: true };
 }
@@ -11534,9 +11606,10 @@ function parseCloudRecipeDocs(docs) {
     if (!r || typeof r !== 'object') continue;   // one corrupt document must not blank the collection
     list.push(r);
     _cloudRecipeBase[r.id]  = d.updatedAt === undefined ? null : d.updatedAt;
-    _cloudRecipeStamp[r.id] = d.r;
+    _cloudRecipeStamp[r.id] = hashStr(d.r || '');
     _cloudRecipeIds[r.id]   = true;
   }
+  saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
   return list;
 }
 window.parseCloudRecipeDocs = parseCloudRecipeDocs;
@@ -11555,7 +11628,7 @@ async function migrateToPerRecipeDocs(list, nextIdVal, db, legacyAt) {
     var at = r.updatedAt || 0;
     await db.collection('shared').doc(recipeDocId(r.id)).set({ r: json, updatedAt: at, id: r.id });
     _cloudRecipeBase[r.id]  = at;
-    _cloudRecipeStamp[r.id] = json;
+    _cloudRecipeStamp[r.id] = hashStr(json);
     _cloudRecipeIds[r.id]   = true;
     written++;
   }
@@ -11674,6 +11747,7 @@ async function saveToFirestore() {
     // 5.9 — record the stamp we just wrote, so our own save doesn't force the
     // next load to re-read the whole collection.
     setLastCloudMetaAt(await writeCloudMeta(recipes, nextId));
+    saveCloudBase();   // v29.2 — so the next session still knows its base
 
     // 3) v28.1 — the legacy `shared/recipes` document is no longer written.
     //    That removes the last blind whole-collection overwrite in the app: up
@@ -12228,9 +12302,11 @@ async function clearAllData() {
     // 5.9 — and the read-cache high-water mark, or the next load would trust a
     // local copy that has just been erased.
     localStorage.removeItem(CLOUD_META_AT_KEY);
+    localStorage.removeItem(CLOUD_BASE_KEY);
   } catch(e) {}
   _pendingCloudDeletes = {};
   _lastCloudMetaAt = null;
+  _cloudRecipeBase = {}; _cloudRecipeStamp = {};
   // Photos live in IndexedDB now — clearing only localStorage would orphan them forever.
   try { await idbClearAll(); } catch(e) { console.warn('IndexedDB clear failed:', e); }
   location.reload();
@@ -14052,6 +14128,7 @@ function updateFilterBarTop() {
   } catch(e) {}
   loadPendingCloudDeletes();   // 5.4 — a delete made offline still has to reach the cloud
   loadLastCloudMetaAt();       // 5.9 — how we know whether the cloud has moved since last time
+  loadCloudBase();             // v29.2 — and what version of each recipe the cloud held
   initPullToRefresh();         // 5c.3
   setTimeout(checkBackupOverdue, 6000);   // 5d.1 — after the app has settled
   // If we have local data, show it immediately and hide login screen

@@ -35,7 +35,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.1: 140 checks, 134 passing.** The 6 failures are `net_*` and
+**As of v29.2: 141 checks, 135 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -92,6 +92,13 @@ found only because a test was written first and disagreed with the code.
 - **Making something focusable is half a keyboard path.** A dialog must also take
   focus, trap Tab while open, and hand focus back on close, or Tab walks the page
   behind it. `trapFocus`/`releaseFocus` do this; `closeM` calls the release.
+- **The 5.4 concurrency base must be PERSISTED.** `_cloudRecipeBase` /
+  `_cloudRecipeStamp` are what the stale-write check compares against. They were
+  in-memory only, and 5.9 skips re-reading an unchanged cloud — so on a fresh load
+  nothing populated them, every recipe looked like a conflict, and v29.1 refused
+  an entire collection on every load, self-sustaining. Also: **"no base" is not
+  "conflict"** — if the cloud copy carries the same `updatedAt` as ours, we hold
+  that version and writing is safe.
 - **RTL is layout as well as text.** `dir="auto"` per element handles alignment,
   but which SIDE a column sits on needs `dir="rtl"` on the grid container —
   `recipeIsRTL(r)` decides from the recipe body, not just its title.
