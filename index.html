@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.6 -->
+<!-- Tony's Recipes Collection v28.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -353,6 +353,35 @@ function undoDelete() {
 }
 window.undoDelete = undoDelete;
 
+
+// 5c.4 — log a cook without opening the recipe. Deliberately placed in select
+// mode rather than on the card: the phone card was just stripped back to photo,
+// category, difficulty and heart, and putting a button back on it would undo
+// that. Select mode already carries bulk actions and has the room — and cooking
+// several things in one session is exactly when you don't want to open each one.
+async function markCookedSelected() {
+  if (!selectedIds.size) { toast('No recipes selected'); return; }
+  var ids = Array.from(selectedIds);
+  var n = ids.length;
+  if (!await askConfirm({ icon:'🍳', title:'Log a cook for ' + n + ' recipe' + (n!==1?'s':'') + '?',
+      message:'Adds one entry to each cooking log. No rating or note — open a recipe if you want to add those.',
+      okLabel:'Log ' + n })) return;
+  ids.forEach(function(id) {
+    var r = recipes.find(function(x){ return x.id===id; });
+    if (!r) return;
+    if (!Array.isArray(r.cookLog)) r.cookLog = [];
+    r.cookLog.push({ id: cookLogId(), at: Date.now(), rating: 0, note: '' });
+    if (r.cookLog.length > 50) r.cookLog = r.cookLog.slice(-50);
+    r.cookCount = (r.cookCount||0) + 1;
+    r.lastCooked = Date.now();
+    r.updatedAt  = Date.now();
+  });
+  cancelSelectMode();
+  saveData();
+  renderGrid();
+  toast('🍳 Logged a cook for ' + n + ' recipe' + (n!==1?'s':''));
+}
+window.markCookedSelected = markCookedSelected;
 
 function exportSelWord() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
@@ -1184,6 +1213,46 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'ui_keyboard_cards', group:'UI', name:'Recipe cards are reachable by keyboard (5c.1)',
+    test: async()=>{
+      // There was not one tabindex in the whole file: the grid could not be
+      // reached or opened without a mouse.
+      var prevView=viewMode, prevStored=null;
+      try{ prevStored=localStorage.getItem('tonys_view_mode'); }catch(e){}
+      try{
+        setView('grid');
+        var card=document.querySelector('.recipe-card');
+        if(!card) throw new Error('no recipe card rendered');
+        if(card.getAttribute('tabindex')!=='0') throw new Error('recipe cards are not focusable — the grid has no keyboard path');
+        if(card.getAttribute('role')!=='button') throw new Error('a card behaves as a button but does not say so to assistive tech');
+        if(!card.getAttribute('aria-label')) throw new Error('a focusable card with no accessible name is unusable by screen reader');
+        if((card.getAttribute('onkeydown')||'').indexOf('cardKey')===-1) throw new Error('cards are focusable but Enter/Space do nothing');
+        if(typeof cardKey!=='function') throw new Error('cardKey not defined');
+        setView('list');
+        var row=document.querySelector('.recipe-list-item');
+        if(row && row.getAttribute('tabindex')!=='0') throw new Error('list rows are not keyboard-reachable either');
+      } finally {
+        setView(prevView);
+        try{ if(prevStored===null) localStorage.removeItem('tonys_view_mode'); else localStorage.setItem('tonys_view_mode',prevStored); }catch(e){}
+      }
+    } },
+
+  { id:'ui_swipe_fav', group:'UI', name:'Swipe favourites only — never deletes (5c.2)',
+    test: async()=>{
+      ['swipeStart','swipeMove','swipeEnd'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      // The explicit requirement: a swipe must never be able to destroy a recipe.
+      var src=String(swipeEnd)+String(swipeStart)+String(swipeMove);
+      ['deleteRecipe','deleteSelected','queueCloudDelete','recipes.splice'].forEach(function(bad){
+        if(src.indexOf(bad)>-1) throw new Error('the swipe handler can reach '+bad+' — swipe must only ever toggle a favourite');
+      });
+      if(src.indexOf('fav')===-1) throw new Error('the swipe handler does not touch the favourite flag, so what does it do?');
+      // Vertical movement must abandon the gesture or scrolling flips hearts.
+      if(String(swipeMove).indexOf('Math.abs(dy) > Math.abs(dx)')===-1)
+        throw new Error('swipeMove does not bail out on a vertical drag — scrolling the grid would toggle favourites');
+    } },
+
   { id:'css_hebrew_font', group:'CSS', name:'Hebrew has a real typeface, not an OS fallback',
     test: async()=>{
       // Playfair Display and DM Sans carry no Hebrew glyphs. Without a Hebrew
@@ -3424,7 +3493,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.6';
+var APP_VERSION = 'v28.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -4398,6 +4467,14 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    pill and heart lower than its neighbours' and the row looks ragged. */
 .recipe-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: 100%; }
 .recipe-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(92,61,46,0.12); }
+/* 5c.1 — the grid had no keyboard path at all: cards were <div onclick> with not
+   one tabindex in the file. :focus-visible keeps the ring for keyboard users
+   without putting an outline round every tapped card. */
+.recipe-card:focus-visible, .recipe-list-item:focus-visible {
+  outline: 3px solid var(--terracotta); outline-offset: 2px;
+}
+.recipe-card:focus, .recipe-list-item:focus { outline: none; }
+.recipe-card:focus-visible { transform: translateY(-3px); }
 .card-image { width: 100%; height: 148px; display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; overflow: hidden; }
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.55); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -5725,7 +5802,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5899,6 +5976,7 @@ body.banner-shown .header {
   box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
   <span id="selectedCount" style="color:white;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">0 selected</span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+    <button class="del-bar-btn del-bar-action" onclick="markCookedSelected()">🍳 Cooked</button>
     <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
     <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
     <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
@@ -6286,7 +6364,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7750,7 +7828,7 @@ function renderGrid() {
   if (viewMode === 'list') {
     g.className = 'recipe-list';
     g.innerHTML = list.map(r => `
-      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
@@ -7773,7 +7851,7 @@ function renderGrid() {
   } else {
     g.className = 'recipe-grid';
     g.innerHTML = list.map(r => `
-      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${escA(r.bg)}">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
@@ -7794,6 +7872,99 @@ function renderGrid() {
   prunePhotoUrlCache(); // release blob URLs for recipes that are gone
   applyAriaLabels(g);   // label the freshly rendered ❤/🤍 buttons
 }
+
+// ── 5c.1 — keyboard activation ────────────────────────────────────────────────
+// Enter and Space open a recipe, matching what the click handler does. Space is
+// preventDefault'ed or the page scrolls underneath the card you just opened.
+function cardKey(e, id) {
+  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+  e.preventDefault();
+  if (selectMode) toggleRecipeSelect(e, id); else openView(id);
+}
+window.cardKey = cardKey;
+
+// ── 5c.2 — swipe a card to favourite it ───────────────────────────────────────
+// Favourite ONLY. Deliberately not delete: destructive actions should not be one
+// careless thumb away, undo or no undo. A swipe must also never fight the page —
+// the gesture is abandoned the moment vertical movement dominates, so scrolling
+// a grid with a thumb does not start flipping hearts.
+var SWIPE_MIN = 55;          // px of horizontal travel before it counts
+var _swipe = null;
+function swipeStart(e, id) {
+  if (selectMode || !e.touches || e.touches.length !== 1) { _swipe = null; return; }
+  _swipe = { id: id, x: e.touches[0].clientX, y: e.touches[0].clientY, el: e.currentTarget, moved: false };
+}
+function swipeMove(e) {
+  if (!_swipe || !e.touches || e.touches.length !== 1) return;
+  var dx = e.touches[0].clientX - _swipe.x, dy = e.touches[0].clientY - _swipe.y;
+  if (Math.abs(dy) > Math.abs(dx)) { _swipe = null; return; }   // this is a scroll, not a swipe
+  _swipe.moved = true;
+  if (_swipe.el) _swipe.el.style.transform = 'translateX(' + (dx * 0.35) + 'px)';
+}
+function swipeEnd(e) {
+  if (!_swipe) return;
+  var el = _swipe.el, id = _swipe.id;
+  var dx = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX - _swipe.x : 0;
+  if (el) { el.style.transition = 'transform 0.18s'; el.style.transform = ''; setTimeout(function(){ if(el) el.style.transition=''; }, 200); }
+  _swipe = null;
+  if (Math.abs(dx) >= SWIPE_MIN) {
+    var r = recipes.find(function(x){ return x.id === id; });
+    if (r) { r.fav = !r.fav; r.updatedAt = Date.now(); renderGrid(); saveData(); toast(r.fav ? '❤️ Added to favorites' : 'Removed from favorites'); }
+  }
+}
+window.swipeStart = swipeStart; window.swipeMove = swipeMove; window.swipeEnd = swipeEnd;
+
+// ── 5c.3 — pull to refresh ────────────────────────────────────────────────────
+// The app already re-syncs when it returns to the foreground; this makes that
+// something you can ask for and watch, rather than invisible magic.
+var PULL_TRIGGER = 70;
+var _pull = null;
+function initPullToRefresh() {
+  document.addEventListener('touchstart', function(e) {
+    if (window.scrollY > 0 || !e.touches || e.touches.length !== 1) { _pull = null; return; }
+    if (document.querySelector('.modal-overlay.open, .calc-overlay.open')) { _pull = null; return; }
+    _pull = { y: e.touches[0].clientY, on: false };
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) {
+    if (!_pull) return;
+    var dy = e.touches[0].clientY - _pull.y;
+    if (dy <= 0 || window.scrollY > 0) { _pull = null; hidePullHint(); return; }
+    _pull.on = dy > PULL_TRIGGER;
+    showPullHint(Math.min(dy, PULL_TRIGGER * 1.5), _pull.on);
+  }, { passive: true });
+  document.addEventListener('touchend', function() {
+    if (!_pull) return;
+    var fire = _pull.on;
+    _pull = null; hidePullHint();
+    if (!fire) return;
+    if (!window._driveMode || !window._fbUser) { toast('Sign in to sync with the cloud'); return; }
+    toast('🔄 Checking for changes…');
+    loadFromFirestore().then(function(changed) {
+      renderFilters(); renderGrid();
+      toast(changed ? '✅ Updated from the cloud' : '✅ Already up to date');
+    });
+  }, { passive: true });
+}
+function pullHintEl() {
+  var el = document.getElementById('pullHint');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pullHint';
+    el.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:999;'
+      + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);'
+      + 'border-top:none;border-radius:0 0 12px 12px;padding:6px 16px;font-size:13px;'
+      + "font-family:'DM Sans','Heebo',sans-serif;box-shadow:0 2px 10px rgba(0,0,0,0.12);";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function showPullHint(dy, armed) {
+  var el = pullHintEl();
+  el.textContent = armed ? '↻ Release to refresh' : '↓ Pull to refresh';
+  el.style.display = 'block';
+  el.style.opacity = Math.min(1, dy / PULL_TRIGGER);
+}
+function hidePullHint() { var el = document.getElementById('pullHint'); if (el) el.style.display = 'none'; }
 
 function toggleFav(e,id){
   e.stopPropagation();
@@ -13352,6 +13523,7 @@ function updateFilterBarTop() {
   } catch(e) {}
   loadPendingCloudDeletes();   // 5.4 — a delete made offline still has to reach the cloud
   loadLastCloudMetaAt();       // 5.9 — how we know whether the cloud has moved since last time
+  initPullToRefresh();         // 5c.3
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously
   if (hasLocal) {

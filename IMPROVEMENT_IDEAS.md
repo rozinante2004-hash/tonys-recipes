@@ -165,10 +165,10 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 
 | # | Idea | Why | Effort |
 |---|------|-----|--------|
-| 5c.1 | **Keyboard access — there is none** | Zero `tabindex` in the file; recipe cards are `<div onclick>`. The grid cannot be reached or opened from the keyboard at all. Focusable cards with Enter/Space and a visible focus ring make the desktop genuinely faster and are the single biggest accessibility gap. | 🟢 |
-| 5c.2 | **Swipe on phone → favourite only** | Swipe a card to toggle the heart. **Never swipe-to-delete** — explicitly rejected: destructive actions should not be one careless thumb away, undo or no undo. | 🟡 |
-| 5c.3 | **Pull-to-refresh** | The app already re-syncs when it returns to the foreground; making that a deliberate gesture turns invisible magic into something you can ask for and watch happen. | 🟢 |
-| 5c.4 | **Log a cook from the grid** | "🍳 Cooked!" currently needs the recipe open. | 🟢 |
+| ~~5c.1~~ | ✅ **DONE (v28.7)** — ~~keyboard access — there is none~~ | Zero `tabindex` in the file; recipe cards are `<div onclick>`. The grid cannot be reached or opened from the keyboard at all. Cards and list rows are now `tabindex=0 role=button` with an accessible name, Enter/Space open them, and `:focus-visible` shows a terracotta ring for keyboard users without outlining every tapped card. Driven in a real browser: tab to a card, press Enter, recipe opens. | 🟢 |
+| ~~5c.2~~ | ✅ **DONE (v28.7)** — ~~swipe on phone → favourite only~~ | Swipe a card to toggle the heart. **Never swipe-to-delete** — explicitly rejected: destructive actions should not be one careless thumb away, undo or no undo. There is a test asserting the swipe handler cannot even reach `deleteRecipe`, `deleteSelected`, `queueCloudDelete` or `recipes.splice`. The gesture is abandoned as soon as vertical movement dominates, so scrolling the grid never flips a heart — all three cases verified with synthetic touches. | 🟡 |
+| ~~5c.3~~ | ✅ **DONE (v28.7)** — ~~pull-to-refresh~~ | The app already re-syncs when it returns to the foreground; making that a deliberate gesture turns invisible magic into something you can ask for and watch happen. Reports honestly afterwards — "Updated from the cloud" or "Already up to date" — rather than always claiming a refresh. | 🟢 |
+| ~~5c.4~~ | ✅ **DONE (v28.7), in select mode** | "🍳 Cooked!" needed the recipe open. It is now a **select-mode bulk action** rather than a button on the card: the phone card was just stripped back to photo/category/difficulty/heart and putting a button back on it would undo that. Select several, tap 🍳 Cooked — which is exactly the shape of cooking a few things in one session. | 🟢 |
 
 ---
 
