@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v28.5` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+**Current version:** `v28.6` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
 the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
@@ -40,7 +40,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v28.5"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v28.6"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
@@ -718,8 +718,10 @@ CSS variables on `:root`:
 --cream:#FAF7F2; --warm-brown:#5C3D2E; --terracotta:#C1440E; --gold:#D4A843;
 --ink:#1C1A18; --muted:#8A8279; --border:#E8E0D5; --card-bg:#FFFFFF; --bg:#FAF7F2; --green:#2E7D32;
 ```
-- Fonts: `Playfair Display` (titles, italic accents in gold) + `DM Sans` (everything else), from
-  Google Fonts.
+- Fonts: `Playfair Display` (titles, italic accents in gold) + `DM Sans` (everything else),
+  each backed by a Hebrew face — **Frank Ruhl Libre** and **Heebo** respectively (5b.1). Neither
+  Latin face has Hebrew glyphs, and CSS resolves font-family per *glyph*, so the Hebrew face must
+  come after the Latin one in every stack. Without it Hebrew titles fall back to an OS serif.
 - Buttons: `.btn-primary` terracotta, `.btn-secondary` translucent‑white on brown,
   `.btn-gold` gold.
 - Cards: 12px radius, 1px `--border`, hover lift + soft brown shadow; difficulty pills
