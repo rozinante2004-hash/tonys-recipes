@@ -11,7 +11,9 @@ is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
 - **`index.html` is the whole app** — inline `<style>`, inline JS, ~13 200 lines,
-  no build step. CDN scripts: xlsx, mammoth, qrcodejs, Firebase compat 10.12.0, GSI.
+  no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
+  mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
+  `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
 - `cloudflare-worker.js` is pasted into the Cloudflare dashboard, **not** deployed
   from the repo. It proxies Anthropic, photo search, YouTube, Instagram and Bring!.
 - `firestore.rules` is the canonical rules file; the app fetches it and substitutes
@@ -74,7 +76,7 @@ found only because a test was written first and disagreed with the code.
 | **Metric leaves tsp/tbsp/cup alone.** | Only lb/oz/fl oz are converted. They are standard kitchen measures in metric kitchens too. |
 | **Full photos stay base64.** | Export, backup, cloud sync, email and print all consume data URLs. Only thumbnails are Blobs. |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
-| **Declined:** 3.8 nutrition per-serving; 3.1 meal planner; 4.4 filter counts; 4.8 header touch targets; 5.6 CI tests. | Asked for and declined. Don't re-propose without reason. |
+| **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 
 ## Traps this codebase has already sprung
 

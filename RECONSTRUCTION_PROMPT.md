@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v28.3` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+**Current version:** `v28.5` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
 the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
@@ -39,8 +39,8 @@ slide‑up modal animation.
 |---|---|
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
-| `sw.js` | Service worker. Network‑first for the document, cache‑first for assets. |
-| `version.json` | `{"version": "v28.3"}` — polled to detect new deployments. Must never be cached. |
+| `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
+| `version.json` | `{"version": "v28.5"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
@@ -84,14 +84,15 @@ uses `actions/checkout@v4`, `actions/configure-pages@v5`, `actions/upload-pages-
 The `share_target` lets Android/iOS "Share to app" send a URL/text; the app reads
 `?url=&text=&title=` on load and opens the URL‑import modal (`handleShareTarget()`).
 
-### 2.3 `sw.js` (service worker, "v3", `CACHE_NAME = 'tonys-recipes-v6'`)
+### 2.3 `sw.js` (service worker, "v4", `CACHE_NAME = 'tonys-recipes-v7'`)
 - On `install`: `skipWaiting()` + pre‑cache core files
   (`/tonys-recipes/`, `index.html`, `manifest.json`, both icons).
 - On `activate`: `clients.claim()` + delete any cache whose name ≠ `CACHE_NAME`.
 - On `fetch`: ignore requests whose URL doesn't include `/tonys-recipes/`.
   `version.json` → always `fetch` with `cache: 'no-store'`. The document (HTML) →
-  **network‑first**, update cache on success, fall back to cache offline. Other assets →
-  **cache‑first**, then network.
+  **stale‑while‑revalidate** (5.12): serve the cached copy immediately, refresh the cache in
+  the background. Safe only because the in‑app version banner tells the user when a newer
+  version has landed. Other assets → **cache‑first**, then network.
 - Listens for `postMessage({type:'SKIP_WAITING'})` and calls `skipWaiting()`.
 
 ---
@@ -734,8 +735,9 @@ CSS variables on `:root`:
 
 `<head>` essentials: viewport with `viewport-fit=cover`; `mobile-web-app-capable` +
 `apple-mobile-web-app-*` metas; `theme-color #5C3D2E`; manifest link; apple‑touch‑icon; an inline
-SVG favicon (the fork/flame mark); Google Fonts; and CDN scripts for **xlsx, mammoth, qrcodejs,
-Google GSI, Firebase compat (app/auth/firestore)**.
+SVG favicon (the fork/flame mark); Google Fonts; and CDN scripts for **Google GSI and Firebase
+compat (app/auth/firestore)**. **xlsx and mammoth are NOT in `<head>`** — they load on first
+use via `loadScriptOnce()` (5.11). qrcodejs and the Excel export were removed in v28.5.
 
 ---
 
