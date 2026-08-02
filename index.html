@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.4 -->
+<!-- Tony's Recipes Collection v29.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1745,6 +1745,31 @@ const SELF_TESTS = [
         try{ if(prev===null) localStorage.removeItem(CLOUD_BASE_KEY); else localStorage.setItem(CLOUD_BASE_KEY,prev); }catch(e){}
         loadCloudBase();
       }
+    } },
+
+  { id:'wa_folder_listing', group:'WhatsApp', name:'A chat folder is listed, so index.json is optional (5f.7)',
+    test: async()=>{
+      ['waRepoFromBase','waListFolder','waMergeFolderList'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var r=waRepoFromBase('https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/');
+      if(!r||r.owner!=='rozinante2004-hash'||r.repo!=='tonys-recipes'||r.path!=='whatsapp')
+        throw new Error('the Pages URL did not resolve to the right repo/path: '+JSON.stringify(r));
+      // a non-Pages folder must fall through to index.json, not guess a repo
+      if(waRepoFromBase('https://example.com/chats/')) throw new Error('a non-GitHub folder was treated as a repo');
+      // uploading a file must be enough on its own
+      var merged=waMergeFolderList(['a.zip','b.txt'], null);
+      if(merged.length!==2) throw new Error('a folder listing alone did not produce a usable list');
+      // ...and index.json keeps its job of naming groups nicely
+      var merged2=waMergeFolderList(['a.zip','b.txt'], [{file:'a.zip', group:'Family Food'}]);
+      var a=merged2.filter(function(e){ return (e.file||e)==='a.zip'; })[0];
+      if(!a||a.group!=='Family Food') throw new Error('index.json labels were lost when the folder was listed');
+      // a file only index.json knows about (private repo, listing unavailable) survives
+      var merged3=waMergeFolderList(['a.zip'], [{file:'c.txt', group:'Other'}]);
+      if(merged3.length!==2) throw new Error('a file named only in index.json was dropped');
+      // and no duplicates when both sources name the same file
+      var merged4=waMergeFolderList(['a.zip'], ['a.zip']);
+      if(merged4.length!==1) throw new Error('the same file was listed twice');
     } },
 
   { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
@@ -3946,7 +3971,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.4';
+var APP_VERSION = 'v29.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6282,7 +6307,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6846,7 +6871,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13562,20 +13587,97 @@ function waGroupNameFromFile(name){
 // Expects <base>index.json — either ["a.txt","b.txt"] or
 // [{"file":"a.txt","group":"Family Food"}]. Any other shape is reported, not guessed at.
 var _waLastFolderError = '';
+// 5f.7 — work out which GitHub repo a Pages folder URL belongs to, so the folder
+// can be LISTED rather than requiring index.json to be maintained by hand. That
+// hand-maintenance is the whole reason uploading a chat from the phone was a
+// two-step job.
+function waRepoFromBase(base) {
+  var b = String(base || '');
+  var m = b.match(/^https?:\/\/([^./]+)\.github\.io\/([^/]+)\/(.*)$/i);
+  if (m) {
+    // A user/org root site is served from a repo literally named <owner>.github.io,
+    // and then the first path segment is a real folder, not the repo.
+    if ((m[2] + '/' + m[3]).toLowerCase().indexOf(m[1].toLowerCase() + '.github.io') === 0) return null;
+    return { owner: m[1], repo: m[2], path: m[3].replace(/\/+$/, '') };
+  }
+  var m2 = b.match(/^https?:\/\/([^./]+)\.github\.io\/(.*)$/i);
+  if (m2) return { owner: m2[1], repo: m2[1] + '.github.io', path: m2[2].replace(/\/+$/, '') };
+  return null;
+}
+window.waRepoFromBase = waRepoFromBase;
+
+// Unauthenticated directory listing. Works for a PUBLIC repo; a private one 404s
+// and we fall back to index.json, which is also what happens for any folder that
+// is not GitHub Pages at all. Never throws — a listing failure must not stop the
+// existing path from working.
+async function waListFolder(base) {
+  var repo = waRepoFromBase(base);
+  if (!repo) return null;
+  try {
+    var url = 'https://api.github.com/repos/' + repo.owner + '/' + repo.repo + '/contents/' + repo.path;
+    var r = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
+    if (!r.ok) return null;
+    var j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return j.filter(function(e) {
+      return e && e.type === 'file' && !/^(index\.json|readme\.md)$/i.test(e.name || '');
+    }).map(function(e) { return e.name; });
+  } catch(e) { return null; }
+}
+window.waListFolder = waListFolder;
+
+// Merge what the folder actually contains with whatever index.json says, so a
+// file that was just uploaded is picked up without anyone editing index.json,
+// while index.json keeps its job of giving a file a nicer group label.
+function waMergeFolderList(listed, indexed) {
+  var out = [], seen = {};
+  var labels = {};
+  (indexed || []).forEach(function(e) {
+    var f = typeof e === 'string' ? e : (e && e.file);
+    if (f && e && e.group) labels[f] = e.group;
+  });
+  (listed || []).forEach(function(f) {
+    if (!f || seen[f]) return;
+    seen[f] = true;
+    out.push(labels[f] ? { file: f, group: labels[f] } : f);
+  });
+  // Anything index.json names that the listing did not return (private repo,
+  // listing unavailable) still gets a chance.
+  (indexed || []).forEach(function(e) {
+    var f = typeof e === 'string' ? e : (e && e.file);
+    if (!f || seen[f]) return;
+    seen[f] = true;
+    out.push(e);
+  });
+  return out;
+}
+window.waMergeFolderList = waMergeFolderList;
+
 async function waRefreshFolder(quiet){
   var st = quiet ? null : document.getElementById('waFolderStatus');
   var base = getWaBase();
   _waLastFolderError = '';
   if (!base) { _waLastFolderError = 'no folder URL is set'; if(st) st.innerHTML = '<span style="color:#c62828;">Set a folder URL first.</span>'; return; }
-  if (st) st.textContent = 'Reading ' + base + 'index.json …';
-  var list;
+  if (st) st.textContent = 'Looking in ' + base + ' …';
+  // 5f.7 — list the folder first. Uploading a file is then the ONLY step needed
+  // to add a chat; index.json is optional and only supplies nicer group labels.
+  var listed = await waListFolder(base);
+  var indexed = null;
   try {
     var r = await fetch(base + 'index.json', { cache: 'no-store' });
-    if (!r.ok) throw new Error('the folder returned HTTP ' + r.status);
-    list = await r.json();
-  } catch(e) {
-    _waLastFolderError = "couldn't read " + base + 'index.json — ' + e.message;
-    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read ' + escH(base) + 'index.json — ' + escH(e.message) + '</span>';
+    if (r.ok) indexed = await r.json();
+  } catch(e) { /* optional now */ }
+  if (!Array.isArray(indexed)) indexed = null;
+
+  var list;
+  if (listed && listed.length) {
+    list = waMergeFolderList(listed, indexed);
+  } else if (indexed) {
+    list = indexed;
+  } else {
+    _waLastFolderError = "couldn't list " + base + ' and no index.json was readable';
+    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read ' + escH(base)
+      + ' — the folder could not be listed and there is no readable index.json.</span>';
     return;
   }
   if (!Array.isArray(list)) {

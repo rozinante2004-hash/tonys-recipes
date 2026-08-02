@@ -17,10 +17,19 @@ phone; that is the whole reason this folder exists.
    that is fine too — just rename it to something meaningful.)
    Give it a sensible name — the file name becomes the group's label unless `index.json`
    says otherwise.
-3. Add it to `index.json`.
-4. Commit and push. The app picks it up the next time you press *Load chats from this folder*.
+3. Commit and push. The app picks it up the next time you press *Load chats from this folder*.
 
-## `index.json`
+**From the iPhone, without a laptop:** see [UPLOAD-FROM-IPHONE.md](UPLOAD-FROM-IPHONE.md) —
+Export chat → Share → a Shortcut that PUTs the file straight into this folder.
+
+## `index.json` — optional since v29.5
+
+The app now **lists this folder** over the GitHub API, so a file that is simply dropped in here
+is picked up on its own. `index.json` is still read, and still does one useful job: giving a file
+a nicer group label than its file name. Without it the label comes from the file name.
+
+(The listing needs the repository to be public, which it is. For a private repo the listing is
+refused and `index.json` becomes required again — the app falls back to it automatically.)
 
 Either a plain list of file names:
 
