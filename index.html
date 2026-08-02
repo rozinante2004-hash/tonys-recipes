@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.3 -->
+<!-- Tony's Recipes Collection v28.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1388,6 +1388,32 @@ const SELF_TESTS = [
       // ...but the legacy single document still has one, and history tripled it.
       if(slimRecipeForCloud(r,false).history) throw new Error('history leaked into the legacy-shaped copy — that document is size-capped and history triples each recipe');
       if(stripPhotosForCloud([r])[0].history) throw new Error('stripPhotosForCloud writes the legacy document and must stay history-free');
+    } },
+
+  { id:'cloud_read_cache', group:'Cloud Sync', name:'An unchanged cloud is not re-read (5.9)',
+    test: async()=>{
+      // 5.4 traded writes for reads; without this the foreground refresh cost
+      // ~350 reads every time the app was focused. The rule has to be strict in
+      // both directions: skip when genuinely unchanged, never skip on doubt.
+      if(typeof canSkipCloudFanout!=='function') throw new Error('canSkipCloudFanout not defined');
+      var meta={updatedAt:500, ids:[1,2,3]};
+      if(!canSkipCloudFanout(meta,3,500,false)) throw new Error('an unchanged cloud was re-read in full — 5.9 is not working');
+      if(canSkipCloudFanout(meta,3,499,false)) throw new Error('a MOVED cloud was skipped — this device would show stale recipes');
+      if(canSkipCloudFanout(meta,3,500,true)) throw new Error('skipped while offline edits were queued — they would never be pushed');
+      if(canSkipCloudFanout(meta,0,500,false)) throw new Error('skipped with nothing held locally — the grid would stay empty');
+      if(canSkipCloudFanout(meta,2,500,false)) throw new Error('skipped while the cloud lists more recipes than we hold — the local copy is incomplete');
+      if(canSkipCloudFanout(meta,3,null,false)) throw new Error('skipped without ever having done a full read on this device');
+      if(canSkipCloudFanout({ids:[1]},1,500,false)) throw new Error('skipped on a meta document with no updatedAt to compare');
+      // The stamp has to survive a reload, or every cold start pays full price.
+      if(typeof setLastCloudMetaAt!=='function'||typeof loadLastCloudMetaAt!=='function') throw new Error('the high-water mark is not persisted');
+      var prev=null; try{ prev=localStorage.getItem(CLOUD_META_AT_KEY); }catch(e){}
+      try{
+        setLastCloudMetaAt(4242); loadLastCloudMetaAt();
+        if(_lastCloudMetaAt!==4242) throw new Error('the high-water mark did not survive a reload — every cold start would re-read everything');
+      } finally {
+        try{ if(prev===null) localStorage.removeItem(CLOUD_META_AT_KEY); else localStorage.setItem(CLOUD_META_AT_KEY,prev); }catch(e){}
+        loadLastCloudMetaAt();
+      }
     } },
 
   { id:'cloud_straggler', group:'Cloud Sync', name:'A v27.9 straggler is picked up, a deletion is not resurrected',
@@ -3367,7 +3393,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.3';
+var APP_VERSION = 'v28.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5665,7 +5691,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6228,7 +6254,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10622,6 +10648,7 @@ async function attachCloudPhotos(list) {
     if (r._ph || r.hp) {   // `hp` = documents written before 5.8 unified the name
       try {
         var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
+        countCloudRead();
         if (snap.exists) {
           var d = snap.data() || {};
           r.photo = d.photo || '';
@@ -10662,6 +10689,46 @@ var CLOUD_SCHEMA = 2;
 // a self test pinning this, because getting it wrong is silent and ugly.
 var RECIPE_DOC_LO = 'recipe_';
 var RECIPE_DOC_HI = 'recipe' + String.fromCharCode(96);
+
+// 5.9 — read budget. 5.4 traded writes for reads and left the trade uncapped: a
+// full load costs 1 (meta) + N recipe documents + M photo documents, and the
+// foreground-refresh listener re-ran all of it every time the app was focused.
+// At 200 recipes with 150 photos that is ~350 reads a refresh against a
+// 50 000/day free tier. `meta.updatedAt` is a cheap high-water mark: if it has
+// not moved, nothing in the collection has, and the whole fan-out can be skipped.
+var CLOUD_META_AT_KEY = 'tonys_cloud_meta_at';
+var _lastCloudMetaAt  = null;
+var _cloudReads       = 0;    // counted so the saving is observable, not asserted
+function countCloudRead(n) { _cloudReads += (n || 1); }
+function getCloudReads() { return _cloudReads; }
+window.getCloudReads = getCloudReads;
+function loadLastCloudMetaAt() {
+  try { var v = parseInt(localStorage.getItem(CLOUD_META_AT_KEY), 10); _lastCloudMetaAt = isNaN(v) ? null : v; } catch(e) {}
+}
+function setLastCloudMetaAt(v) {
+  _lastCloudMetaAt = (typeof v === 'number' && !isNaN(v)) ? v : null;
+  try {
+    if (_lastCloudMetaAt === null) localStorage.removeItem(CLOUD_META_AT_KEY);
+    else localStorage.setItem(CLOUD_META_AT_KEY, String(_lastCloudMetaAt));
+  } catch(e) {}
+}
+
+// Whether a load can skip the per-recipe fan-out entirely. Deliberately
+// conservative: any doubt at all falls through to a full read, because a wrong
+// "nothing changed" shows stale recipes, which is far worse than some reads.
+function canSkipCloudFanout(meta, localCount, lastAt, offlineQueued) {
+  if (offlineQueued) return false;                       // we have edits to push
+  if (!meta || typeof meta.updatedAt !== 'number') return false;
+  if (lastAt === null || lastAt === undefined) return false;   // never fully loaded here
+  if (meta.updatedAt !== lastAt) return false;                 // something changed
+  if (!localCount) return false;                               // nothing to show
+  // If the cloud lists more recipes than we hold, our local copy is incomplete
+  // (cleared storage, half-finished first load) — read properly rather than
+  // trusting a matching timestamp.
+  if (Array.isArray(meta.ids) && meta.ids.length !== localCount) return false;
+  return true;
+}
+window.canSkipCloudFanout = canSkipCloudFanout;
 
 var _cloudRecipeBase  = {};   // id -> updatedAt of the cloud doc as we last saw it
 var _cloudRecipeStamp = {};   // id -> serialised form last synced (skips no-op writes)
@@ -10774,8 +10841,11 @@ async function saveRecipeDoc(r, db) {
 // `ids` is a FALLBACK membership list for when the range query is unavailable, so
 // it is grow-only apart from explicit deletes: a device that merely hasn't seen a
 // new recipe yet must not drop it from the list on its next save.
+// Returns the updatedAt stamp it wrote, so the caller can record it as the
+// high-water mark and its own save doesn't force a full re-read next time.
 async function writeCloudMeta(list, nextIdVal, db, legacyAt) {
   db = db || _fbDb;
+  var stamp = Date.now();
   var ref = db.collection('shared').doc('meta');
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
@@ -10793,9 +10863,10 @@ async function writeCloudMeta(list, nextIdVal, db, legacyAt) {
       // High-water mark for the legacy document (v28.1). Only moves when we have
       // actually looked at it, so it never silently skips a straggler's edit.
       legacyAt: (legacyAt === undefined ? (cur.legacyAt === undefined ? null : cur.legacyAt) : legacyAt),
-      updatedAt: Date.now()
+      updatedAt: stamp
     });
   });
+  return stamp;
 }
 
 // v28.1 — `shared/recipes` is no longer written by this app, so if it CHANGES,
@@ -10811,7 +10882,7 @@ async function reconcileLegacyStragglers(list, meta, db) {
   var mark = (meta && meta.legacyAt) || null;
   var out = { adopted: [], legacyAt: mark, changed: false };
   var snap;
-  try { snap = await db.collection('shared').doc('recipes').get(); }
+  try { snap = await db.collection('shared').doc('recipes').get(); if (typeof countCloudRead==='function') countCloudRead(); }
   catch(e) { return out; }                       // unreadable — not a reason to fail the load
   if (!snap.exists) return out;
   var data = snap.data() || {};
@@ -11008,7 +11079,9 @@ async function saveToFirestore() {
 
     // 2) Deletions the user actually made, and the membership/nextId document
     var delRes = await flushCloudDeletes();
-    await writeCloudMeta(recipes, nextId);
+    // 5.9 — record the stamp we just wrote, so our own save doesn't force the
+    // next load to re-read the whole collection.
+    setLastCloudMetaAt(await writeCloudMeta(recipes, nextId));
 
     // 3) v28.1 — the legacy `shared/recipes` document is no longer written.
     //    That removes the last blind whole-collection overwrite in the app: up
@@ -11126,6 +11199,7 @@ async function _loadFromFirestoreInner(user) {
     // recipe_* documents written and schema still below 2; trusting their mere
     // existence would silently drop everything that hadn't been written yet.
     var metaSnap = await _fbDb.collection('shared').doc('meta').get();
+    countCloudRead();
     var meta = metaSnap.exists ? (metaSnap.data() || {}) : {};
     _cloudSchema = meta.schema || 0;
 
@@ -11134,8 +11208,31 @@ async function _loadFromFirestoreInner(user) {
 
     var straggler = null, legacyAtAtMigration;
 
-    if (_cloudSchema >= CLOUD_SCHEMA) {
+    // 5.9 — nothing has changed in the cloud since this device last loaded, so
+    // skip reading every recipe and every photo. The legacy document is still
+    // checked (one read) because a device on v27.9 never touches `meta`, and
+    // missing its edits is exactly what v28.1 exists to prevent. Two reads
+    // instead of ~350; one, once the legacy document is finally deleted.
+    var offlineQueued = _offlineQueue || localStorage.getItem('tonys_offline_queue') === '1';
+    var skipFanout = false;
+    if (_cloudSchema >= CLOUD_SCHEMA &&
+        canSkipCloudFanout(meta, recipes.length, _lastCloudMetaAt, offlineQueued)) {
+      var quiet = await reconcileLegacyStragglers(recipes, meta);
+      countCloudRead();
+      if (!quiet.changed) {
+        dlog('[5.9] cloud unchanged (meta.updatedAt ' + meta.updatedAt + ') — skipped the per-recipe fan-out');
+        nextId = mergeNextId(nextId, meta.nextId || 0);
+        skipFanout = true;   // fall through: the change listeners below must still be installed
+      } else {
+        dlog('[5.9] legacy document moved — a device is still on v27.9; doing a full read');
+      }
+    }
+
+    if (skipFanout) {
+      // nothing to fetch — fsRecipes stays null and the load block below is a no-op
+    } else if (_cloudSchema >= CLOUD_SCHEMA) {
       var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
+      countCloudRead(docs.length);
       fsRecipes = parseCloudRecipeDocs(docs);
       cloudNextId = meta.nextId || 0;
       // v28.1 — catch a device still on v27.9 writing to the legacy document
@@ -11148,6 +11245,7 @@ async function _loadFromFirestoreInner(user) {
       }
     } else {
       var snap = await _fbDb.collection('shared').doc('recipes').get();
+      countCloudRead();
       if (snap.exists) {
         var data = snap.data();
         try { fsRecipes = JSON.parse(data.recipes || '[]'); } catch(e) { fsRecipes = null; }
@@ -11196,6 +11294,9 @@ async function _loadFromFirestoreInner(user) {
         nextId = mergeNextId(nextId, cloudNextId);
         saveLocal();
         hasData = true;
+        // 5.9 — we have just read everything, so this stamp is the point the
+        // next load can compare against. Only set after a genuinely full read.
+        if (typeof meta.updatedAt === 'number') setLastCloudMetaAt(meta.updatedAt);
 
         // 5.4 — a legacy-only account migrates on its first load after sign-in.
         // Done before any push-back below so those writes go to the new layout.
@@ -11529,8 +11630,12 @@ async function clearAllData() {
     // cloud copy is left alone, and a queued delete firing after the reload
     // would quietly break that promise.
     localStorage.removeItem(CLOUD_DELETES_KEY);
+    // 5.9 — and the read-cache high-water mark, or the next load would trust a
+    // local copy that has just been erased.
+    localStorage.removeItem(CLOUD_META_AT_KEY);
   } catch(e) {}
   _pendingCloudDeletes = {};
+  _lastCloudMetaAt = null;
   // Photos live in IndexedDB now — clearing only localStorage would orphan them forever.
   try { await idbClearAll(); } catch(e) { console.warn('IndexedDB clear failed:', e); }
   location.reload();
@@ -13307,6 +13412,7 @@ function updateFilterBarTop() {
     if (localStorage.getItem('tonys_offline_queue') === '1') { _offlineQueue = true; }
   } catch(e) {}
   loadPendingCloudDeletes();   // 5.4 — a delete made offline still has to reach the cloud
+  loadLastCloudMetaAt();       // 5.9 — how we know whether the cloud has moved since last time
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously
   if (hasLocal) {
