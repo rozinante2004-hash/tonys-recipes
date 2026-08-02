@@ -15,7 +15,14 @@ Still to do:
 
 - **Delete the legacy document by hand,** after a backup, once no device can possibly still be
   on v27.9. Remove `reconcileLegacyStragglers` and the `recipes` listener in the same pass.
-- **The two-browser checks in §7 have NOT been run.** They can't be here: they need two
+- **§7 two-browser checks: RUN by Tony, Aug 2026, and they found a real gap.**
+  Editing the *same recipe* in two browsers did NOT refuse the second writer:
+  browser 1 held an open edit form, browser 2 saved, a background refresh moved
+  browser 1's base, and browser 1's form then overwrote browser 2 legitimately.
+  Fixed in v29.4 by giving the edit *session* its own base. Note what this means:
+  the per-document guard is necessary but not sufficient — anything holding a
+  snapshot of a recipe needs its own base. Re-run §7.1–§7.5 after v29.4.
+- **The remaining §7 checks have NOT been run.** They can't be here: they need two
   signed-in sessions against the real Firebase project, and this sandbox has neither network
   nor Firebase. The unit tests below cover the decision logic; §7 covers the thing that
   actually bites.
