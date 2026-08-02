@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.4 -->
+<!-- Tony's Recipes Collection v28.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,9 +14,10 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
 <title>Tony's Recipes Collection</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- 5.11 — xlsx and mammoth are deliberately NOT loaded here. They are the two
+     heaviest dependencies and only matter when someone imports a spreadsheet or
+     a Word file, which almost no session does; loadScriptOnce() fetches them on
+     first use instead. qrcodejs is gone entirely, along with the QR share code. -->
 <script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase Compat SDK — single combined file for faster loading -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="console.error('Failed to load Firebase app SDK')"></script>
@@ -346,11 +347,6 @@ function undoDelete() {
 }
 window.undoDelete = undoDelete;
 
-function exportSelExcel() {
-  if (!selectedIds.size) { toast('No recipes selected'); return; }
-  var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
-  exportRecipesToExcel(sel, 'Tonys_Recipes_Selected.xlsx');
-}
 
 function exportSelWord() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
@@ -381,7 +377,6 @@ window.toggleSelectMode  = toggleSelectMode;
 window.cancelSelectMode  = cancelSelectMode;
 window.toggleRecipeSelect = toggleRecipeSelect;
 window.deleteSelected    = deleteSelected;
-window.exportSelExcel    = exportSelExcel;
 window.exportSelWord     = exportSelWord;
 window.shareSelected     = shareSelected;
 window.printSelected     = printSelected;
@@ -1064,9 +1059,21 @@ const SELF_TESTS = [
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');
     }
   },
-  { id:'export_excel',    group:'Import/Export', name:'Export Excel function exists',
+  { id:'perf_lazy_libs',  group:'Performance', name:'Heavy libraries are not loaded eagerly (5.11)',
     test: async()=>{
-      if(typeof exportAllExcel!=='function') throw new Error('exportAllExcel not defined');
+      // xlsx and mammoth are the two biggest dependencies and matter only when
+      // someone imports a spreadsheet or a Word file. If either creeps back into
+      // a <script> tag in <head>, every visit silently pays for it again.
+      var eager=Array.prototype.slice.call(document.querySelectorAll('head script[src]'))
+        .map(function(t){ return t.getAttribute('src')||''; })
+        .filter(function(src){ return /xlsx|mammoth|qrcode/i.test(src); });
+      if(eager.length) throw new Error('loaded eagerly in <head>: '+eager.join(', ')+' — these must load on first use');
+      if(typeof loadScriptOnce!=='function') throw new Error('loadScriptOnce not defined — nothing would fetch them on demand');
+      // A failed fetch must reject rather than silently resolve, or the caller
+      // proceeds to call into a library that is not there.
+      var threw=false;
+      try{ await loadScriptOnce('https://127.0.0.1:9/nope.js','__NoSuchGlobal__'); }catch(e){ threw=true; }
+      if(!threw) throw new Error('loadScriptOnce resolved for a script that could not load');
     }
   },
   { id:'export_word',     group:'Import/Export', name:'Export Word function exists',
@@ -1975,14 +1982,11 @@ const SELF_TESTS = [
     } },
   { id:'export_bulk', group:'Import/Export', name:'Bulk export of selected recipes works',
     test: async()=>{
-      ['exportRecipesToExcel','exportRecipesToWord','exportSelExcel','exportSelWord','printRecipes'].forEach(function(f){
+      ['exportRecipesToWord','exportSelWord','printRecipes'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined');
       });
-      if(!document.querySelector('#selectBar button[onclick*="exportSelExcel"]')) throw new Error('Excel button missing from the select bar');
       if(!document.querySelector('#selectBar button[onclick*="exportSelWord"]'))  throw new Error('Word button missing from the select bar');
       // duplicate recipe names must not collide as Excel sheet names
-      var used={};
-      if(uniqueSheetName(used,'Soup')===uniqueSheetName(used,'Soup')) throw new Error('duplicate sheet names would make the Excel export throw');
     } },
   { id:'perf_search_debounce', group:'Core', name:'Search input is debounced',
     test: async()=>{
@@ -2853,7 +2857,7 @@ var SELF_TEST_FIXES = {
   import_url_modal:{ fix:'openUrlImportModal not defined or urlImportOverlay missing. Check function and modal HTML exist in the main script.', autofix: null },
   import_freehand: { fix:'openFreehandModal not defined or freehandOverlay missing. Check function and modal HTML exist.', autofix: null },
   import_camera:   { fix:'openCameraImport not defined. Check the function is in the main script block.', autofix: null },
-  export_excel:    { fix:'exportAllExcel not defined. Check the function is in the main script block.', autofix: null },
+  perf_lazy_libs:  { fix:'5.11 — xlsx and mammoth must NOT be <script> tags in <head>; they load on first use via loadScriptOnce, which must reject when a script fails so the caller can report it.', autofix: null },
   export_word:     { fix:'exportAllWord not defined. Check the function is in the main script block.', autofix: null },
   import_save_recipe:{ fix:'saveRecipe not defined. Check the function is in the main script block.', autofix: null },
   feat_autotag:    { fix:'aiTagAllDiets not defined. Check the function is in the main script block.', autofix: null },
@@ -2899,7 +2903,7 @@ var SELF_TEST_FIXES = {
   feat_undo_delete:  { fix:'deleteSelected must stash the removed recipes with their indexes in _pendingUndo and offer toastAction(…, undoDelete); undoDelete restores them at their original positions.', autofix: null },
   a11y_basics:       { fix:'Run applyAriaLabels() after render/init so icon-only buttons get accessible names, keep aria-label on #searchInput and aria-live on #toast, and keep the Escape handler (closeTopModal).', autofix: ()=>{ if(typeof applyAriaLabels==='function') applyAriaLabels(); } },
   export_print:      { fix:'buildPrintHtml must emit valid HTML with a closed </style> and real body content, and printRecipes must handle a blocked pop-up. An unclosed <style> makes the browser swallow the body as CSS and print a blank page.', autofix: null },
-  export_bulk:       { fix:'exportRecipesToExcel/exportRecipesToWord must exist and the #selectBar must expose Excel/Word buttons; uniqueSheetName must de-duplicate sheet names (XLSX throws on duplicates).', autofix: null },
+  export_bulk:       { fix:'exportRecipesToWord must exist and the #selectBar must expose the Word button. Excel export was removed in v28.5.', autofix: null },
   perf_search_debounce: { fix:'The search box must call onSearchInput() (debounced), not renderGrid() directly — with inline base64 photos a full re-render per keystroke is multi-MB and lags badly on phones.', autofix: null },
   feat_refresh_foreground: { fix:'The visibilitychange listener that re-runs loadFromFirestore() when the app returns to the foreground is missing. Without it, a remote change (e.g. a photo added on another device) only applies if the transient "New changes available" banner is seen within 30s, or after a full reload.', autofix: null },
 };
@@ -3393,7 +3397,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.4';
+var APP_VERSION = 'v28.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5691,7 +5695,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5753,7 +5757,6 @@ body.banner-shown .header {
 
           <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
           <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllExcel()">📊 All to Excel</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllWord()">📄 All to Word</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
@@ -5866,7 +5869,6 @@ body.banner-shown .header {
   box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
   <span id="selectedCount" style="color:white;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;">0 selected</span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <button class="del-bar-btn del-bar-action" onclick="exportSelExcel()">📊 Excel</button>
     <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
     <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
     <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
@@ -6254,7 +6256,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6301,7 +6303,6 @@ body.banner-shown .header {
         <button class="share-app-btn share-whatsapp-app" onclick="shareAppWhatsApp()">💬 WhatsApp</button>
         <button class="share-app-btn share-copy-link" onclick="copyAppLink()">📋 Copy link</button>
       </div>
-      <div class="share-qr-wrap" id="shareAppQr" style="margin-top:14px;"></div>
       <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">Scan QR code to open on another device</div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;">
         <strong>📱 To install on iPhone:</strong> Open link in Safari → tap Share → "Add to Home Screen"<br>
@@ -7933,7 +7934,6 @@ function drawView(){
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
         <button class="action-btn" onclick="markCooked(${r.id})" title="Mark as cooked today">🍳 Cooked!</button>
         <button class="action-btn" onclick="openTranslate(${r.id})">🌐 Translate</button>
-        <button class="action-btn" onclick="expOneExcel(${r.id})">📊 Excel</button>
         <button class="action-btn" onclick="expOneWord(${r.id})">📄 Word</button>
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
@@ -8296,117 +8296,7 @@ function safeFilename(name) {
 // ═══════════════════════════════════
 // EXCEL EXPORT / IMPORT
 // ═══════════════════════════════════
-function sheetRows(r){
-  var rows = [
-    [r.emoji + ' ' + r.name, ''],
-    ['Category', r.category],
-    ['Difficulty', r.difficulty],
-    ['Prep Time', r.prep],
-    ['Servings', r.servings],
-  ];
-  if(r.diets && r.diets.length) rows.push(['Diet', r.diets.join(', ')]);
-  if(r.source) rows.push(['Source', r.source]);
-  rows.push([], ['INGREDIENTS', ''], ['Amount', 'Ingredient']);
-  r.ingredients.forEach(function(i){ rows.push([i.a, i.n]); });
-  rows.push([], ['METHOD', '']);
-  r.steps.forEach(function(s, i){ rows.push(['Step ' + (i+1), s]); });
-  if(r.notes && r.notes.trim()) rows.push([], ['NOTES', r.notes.trim()]);
-  return rows;
-}
-function downloadExcelWb(wb, filename){
-  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-  const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  const blob = new Blob([wbout], {type: mime});
-  downloadBlob(blob, filename);
-}
 // ─── EXCEL STYLING ────────────────────────────────────────────────────────────
-function styleExcelSheet(ws, rows, r) {
-  rows.forEach(function(row, ri) {
-    row.forEach(function(_, ci) {
-      var addr = XLSX.utils.encode_cell({r:ri, c:ci});
-      if(!ws[addr]) return;
-      var val0 = rows[ri][0] ? String(rows[ri][0]) : '';
-      if(ri === 0) {
-        // Title
-        ws[addr].s = {font:{bold:true,sz:16,color:{rgb:'5C3D2E'}},alignment:{wrapText:true,vertical:'top'}};
-      } else if(['INGREDIENTS','METHOD','NOTES'].includes(val0) && ci===0) {
-        // Section headers
-        ws[addr].s = {font:{bold:true,sz:12,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'C1440E'},patternType:'solid'},alignment:{wrapText:true,vertical:'top'}};
-      } else if(['Amount','Ingredient'].includes(val0) || (val0==='Ingredient'&&ci===1)) {
-        // Column headers
-        ws[addr].s = {font:{bold:true,sz:11,color:{rgb:'5C3D2E'}},fill:{fgColor:{rgb:'FAF7F2'},patternType:'solid'},alignment:{wrapText:true,vertical:'top'}};
-      } else if(['Category','Difficulty','Prep Time','Servings','Diet','Source'].includes(val0) && ci===0) {
-        // Meta labels
-        ws[addr].s = {font:{bold:true,sz:11,color:{rgb:'5C3D2E'}},alignment:{wrapText:true,vertical:'top'}};
-      } else if(val0.match && val0.match(/^Step \d+$/) && ci===0) {
-        // Step numbers
-        ws[addr].s = {font:{bold:true,sz:11,color:{rgb:'C1440E'}},alignment:{wrapText:true,vertical:'top'}};
-      } else {
-        ws[addr].s = {font:{sz:11,color:{rgb:'1C1A18'}},alignment:{wrapText:true,vertical:'top'}};
-      }
-    });
-  });
-  ws['!rows'] = rows.map(function(row) {
-    var val = row[1] ? String(row[1]) : '';
-    return {hpt: Math.min(120, Math.max(16, Math.ceil(val.length/60)*16))};
-  });
-}
-
-// The Excel library is a CDN script. If it didn't load (offline, blocked, CDN down)
-// every XLSX.* call throws an unhandled TypeError with no user feedback — check first.
-function requireXLSX(){
-  if (typeof XLSX !== 'undefined') return true;
-  toast('📊 Excel support could not load (you may be offline). Try again when online, or export to Word instead.');
-  return false;
-}
-window.requireXLSX = requireXLSX;
-
-function expOneExcel(id){
-  if(!requireXLSX())return;
-  const r=recipes.find(x=>x.id===id);if(!r)return;
-  const wb=XLSX.utils.book_new();
-  const rows=sheetRows(r);
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:20},{wch:70}];
-  styleExcelSheet(ws, rows, r);
-  var sn1 = r.name.replace(/[:\\/?*\[\]]/g,'').trim().slice(0,31)||'Recipe';
-  XLSX.utils.book_append_sheet(wb,ws,sn1);
-  const fname = safeFilename(r.name) + '.xlsx';
-  downloadExcelWb(wb, fname);
-  toast('📊 Preparing: ' + fname + '…', 5000);
-}
-// Excel sheet names must be unique and ≤31 chars — two recipes with the same (or
-// same-truncated) name previously made book_append_sheet throw and killed the export.
-function uniqueSheetName(used, name){
-  var base = String(name||'Recipe').replace(/[:\\/?*\[\]]/g,'').trim().slice(0,31) || 'Recipe';
-  var n = base, i = 2;
-  while (used[n.toLowerCase()]) {
-    var suffix = ' (' + i + ')';
-    n = base.slice(0, 31 - suffix.length) + suffix;
-    i++;
-  }
-  used[n.toLowerCase()] = true;
-  return n;
-}
-
-// Shared by "export all" and "export selected".
-function exportRecipesToExcel(list, filename){
-  if(!requireXLSX())return;
-  if(!list || !list.length){toast('No recipes to export');return;}
-  const wb=XLSX.utils.book_new();
-  const used={};
-  const sumWs=XLSX.utils.aoa_to_sheet([["Tony's Recipes Collection"],[],['Name','Category','Difficulty','Prep','Servings'],...list.map(r=>[r.name,r.category,r.difficulty,r.prep,r.servings])]);
-  sumWs['!cols']=[{wch:28},{wch:14},{wch:12},{wch:12},{wch:10}];
-  XLSX.utils.book_append_sheet(wb,sumWs,uniqueSheetName(used,'All Recipes'));
-  list.forEach(r=>{
-    const ws=XLSX.utils.aoa_to_sheet(sheetRows(r));
-    ws['!cols']=[{wch:18},{wch:60}];
-    XLSX.utils.book_append_sheet(wb,ws,uniqueSheetName(used,r.name));
-  });
-  downloadExcelWb(wb, filename || 'Tonys_Recipes_Collection.xlsx');
-  toast(`📊 Exported ${list.length} recipe${list.length!==1?'s':''} to Excel!`);
-}
-window.exportRecipesToExcel = exportRecipesToExcel;
 
 function exportRecipesToWord(list, filename){
   if(!list || !list.length){toast('No recipes to export');return;}
@@ -8415,10 +8305,6 @@ function exportRecipesToWord(list, filename){
   toast('📄 Exported ' + list.length + ' recipe' + (list.length!==1?'s':'') + ' to Word!');
 }
 window.exportRecipesToWord = exportRecipesToWord;
-
-function exportAllExcel(){
-  exportRecipesToExcel(recipes, 'Tonys_Recipes_Collection.xlsx');
-}
 
 // ═══════════════════════════════════
 // WORD EXPORT (pure HTML→docx via Blob)
@@ -8800,6 +8686,8 @@ async function importFromFile(event){
       // ── Excel ──────────────────────────────────────────────────────────────
       var buf = fileBuffer;
       if(typeof XLSX === 'undefined') { toast('❌ Excel library not loaded'); return; }
+      try { await loadScriptOnce(CDN_XLSX, 'XLSX'); }
+      catch(e) { showImportError('The spreadsheet reader could not be loaded (you may be offline). Try again when online, or paste the recipe as free-hand text.'); return; }
       var wb = XLSX.read(buf, {type:'array'});
       var rows = [];
       wb.SheetNames.forEach(function(sn){
@@ -8814,6 +8702,8 @@ async function importFromFile(event){
                mime.includes('wordprocessingml') || mime.includes('msword')) {
       // ── Word .doc / .docx — try mammoth first, fall back to raw XML ────────
       var buf2 = fileBuffer;
+      try { await loadScriptOnce(CDN_MAMMOTH, 'mammoth'); }
+      catch(e) { dlog('[import] mammoth could not be loaded; falling back to raw XML extraction'); }
       dlog('[import] mammoth available:', typeof mammoth !== 'undefined');
       toast('📂 Step 3: Extracting text from Word file…');
       if(typeof mammoth !== 'undefined') {
@@ -9495,6 +9385,39 @@ function extractJSON(raw) {
   throw new Error("Could not extract valid JSON from AI response");
 }
 function sleep(ms) { return new Promise(function(r){ setTimeout(r,ms); }); }
+
+// 5.11 — fetch a CDN library on first use. Resolves immediately if the global is
+// already present, and caches the in-flight promise so two imports started at
+// once don't pull the script twice. Rejects honestly on failure so the caller can
+// say "couldn't load the spreadsheet reader" rather than letting a bare
+// TypeError escape from a library that was never there.
+var _scriptPromises = {};
+function loadScriptOnce(url, globalName) {
+  if (globalName && typeof window[globalName] !== 'undefined') return Promise.resolve();
+  if (_scriptPromises[url]) return _scriptPromises[url];
+  _scriptPromises[url] = new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = url;
+    s.async = true;
+    s.onload = function() {
+      if (globalName && typeof window[globalName] === 'undefined') {
+        delete _scriptPromises[url];
+        reject(new Error(globalName + ' did not appear after loading ' + url));
+        return;
+      }
+      resolve();
+    };
+    s.onerror = function() {
+      delete _scriptPromises[url];   // let a later attempt retry instead of reusing the failure
+      reject(new Error('could not load ' + url));
+    };
+    document.head.appendChild(s);
+  });
+  return _scriptPromises[url];
+}
+window.loadScriptOnce = loadScriptOnce;
+var CDN_XLSX    = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+var CDN_MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
 
 // Single source of truth for the AI model. Several call sites (PDF import, the self
 // test) previously hard-coded a different id than aiCall used, so they could fail
@@ -11694,20 +11617,6 @@ window.swUpdateNow = swUpdateNow;
 function openShareAppModal() {
   const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
   document.getElementById('shareAppUrl').textContent = url;
-  // Generate QR code
-  var qrEl = document.getElementById('shareAppQr');
-  if(qrEl) {
-    qrEl.innerHTML = '';
-    if(typeof QRCode !== 'undefined') {
-      new QRCode(qrEl, {
-        text: url,
-        width: 160, height: 160,
-        colorDark: '#5C3D2E',
-        colorLight: '#FAF7F2',
-        correctLevel: QRCode.CorrectLevel.M
-      });
-    }
-  }
   document.getElementById('shareAppOverlay').classList.add('open');
 }
 function shareAppWhatsApp() {

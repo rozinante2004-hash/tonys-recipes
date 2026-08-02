@@ -1,8 +1,9 @@
-// Tony's Recipes — Service Worker v3
-// Strategy: Network first, fall back to cache
-// This ensures updates appear immediately on all devices
+// Tony's Recipes — Service Worker v4
+// Strategy: stale-while-revalidate for the document, cache-first for assets.
+// version.json is never cached, and the in-app update banner is what tells the
+// user a newer version has landed — see the note on the fetch handler below.
 
-const CACHE_NAME = 'tonys-recipes-v6';
+const CACHE_NAME = 'tonys-recipes-v7';
 const URLS_TO_CACHE = [
   '/tonys-recipes/',
   '/tonys-recipes/index.html',
@@ -51,24 +52,42 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // For HTML (the main app): always try network first
+  // For HTML (the main app): stale-while-revalidate (5.12).
+  //
+  // This used to be network-first, which meant every single load waited on a
+  // ~210 KB download before painting anything, even when nothing had changed —
+  // on a phone on mobile data that is the whole startup cost.
+  //
+  // Serving the cached copy first is safe here precisely because the app already
+  // has an honest update path: it polls version.json (never cached, see above)
+  // against the APP_VERSION baked into the HTML it is running, and shows the
+  // update banner when they differ. So a user on a stale copy is TOLD, rather
+  // than left to wonder — and the fresh copy is already downloaded by then, so
+  // tapping Update Now is instant.
   if (event.request.destination === 'document' ||
       event.request.url.endsWith('/tonys-recipes/') ||
       event.request.url.endsWith('/tonys-recipes/index.html')) {
     event.respondWith(
-      fetch(event.request)
-        .then(function(response) {
-          // Got a fresh response — update the cache
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, clone);
+      caches.match(event.request).then(function(cached) {
+        var network = fetch(event.request)
+          .then(function(response) {
+            if (response && response.ok) {
+              var clone = response.clone();
+              caches.open(CACHE_NAME).then(function(cache) {
+                cache.put(event.request, clone);
+              });
+            }
+            return response;
+          })
+          .catch(function() {
+            // Offline. If we had a cached copy we already returned it below;
+            // otherwise there is genuinely nothing to serve.
+            return cached;
           });
-          return response;
-        })
-        .catch(function() {
-          // Network failed — serve from cache (offline support)
-          return caches.match(event.request);
-        })
+        // Cached copy now if we have one, and the network copy lands in the
+        // cache for next time. First ever visit falls through to the network.
+        return cached || network;
+      })
     );
     return;
   }
