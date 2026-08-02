@@ -18,7 +18,9 @@ requirement, not a nice-to-have.
   from the repo. It proxies Anthropic, photo search, YouTube, Instagram and Bring!.
 - `firestore.rules` is the canonical rules file; the app fetches it and substitutes
   `{{READ}}` / `{{WRITE}}` / `{{ADMIN}}`. Edit the structure there, not in `index.html`.
-- `whatsapp/` holds exported chat `.txt`/`.zip` files plus `index.json` listing them.
+- `whatsapp/` holds exported chat `.txt`/`.zip` files. The app LISTS the folder over
+  the GitHub contents API (5f.7), so `index.json` is optional — it only supplies group
+  labels now. See `whatsapp/UPLOAD-FROM-IPHONE.md` for the Share-sheet Shortcut.
 - `sw.js`, `manifest.json` — PWA. GitHub Pages deploys `main` via `.github/workflows/deploy.yml`.
 
 ## How to verify work — this is not optional
@@ -35,7 +37,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.4: 145 checks, 139 passing.** The 6 failures are `net_*` and
+**As of v29.5: 146 checks, 140 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
