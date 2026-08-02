@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v28.5 -->
+<!-- Tony's Recipes Collection v28.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,7 +13,13 @@
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
 <title>Tony's Recipes Collection</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- 5b.1 — Frank Ruhl Libre and Heebo carry the Hebrew. Playfair Display and
+     DM Sans have no Hebrew glyphs at all, so before this every Hebrew title fell
+     back to whatever generic serif the OS happened to pick, beside an English
+     title in Playfair. CSS resolves font-family per GLYPH, so listing the Hebrew
+     face after the Latin one renders each script in its own typeface — including
+     inside a single mixed string. -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&family=Frank+Ruhl+Libre:wght@400;700&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
 <!-- 5.11 — xlsx and mammoth are deliberately NOT loaded here. They are the two
      heaviest dependencies and only matter when someone imports a spreadsheet or
      a Word file, which almost no session does; loadScriptOnce() fetches them on
@@ -1178,6 +1184,27 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'css_hebrew_font', group:'CSS', name:'Hebrew has a real typeface, not an OS fallback',
+    test: async()=>{
+      // Playfair Display and DM Sans carry no Hebrew glyphs. Without a Hebrew
+      // face in the stack every Hebrew title renders in whatever generic serif
+      // the OS picks, beside an English title in Playfair — the grid reads as
+      // two different apps. This is a bilingual collection; it matters.
+      var link=Array.prototype.slice.call(document.querySelectorAll('link[href*="fonts.googleapis.com"]'))
+        .map(function(l){ return l.getAttribute('href')||''; }).join(' ');
+      if(!/Frank\+Ruhl\+Libre/.test(link)) throw new Error('Frank Ruhl Libre is not being requested — Hebrew titles have no serif face');
+      if(!/Heebo/.test(link)) throw new Error('Heebo is not being requested — Hebrew body text has no sans face');
+      // And the stacks must actually name them, after the Latin face so that CSS
+      // per-glyph fallback puts each script in its own typeface.
+      var t=document.querySelector('.card-title')||document.querySelector('h1,h2');
+      var stacks=[];
+      if(t) stacks.push(window.getComputedStyle(t).fontFamily);
+      var b=document.body; stacks.push(window.getComputedStyle(b).fontFamily);
+      var joined=stacks.join(' ');
+      if(!/Frank Ruhl Libre|Heebo/i.test(joined))
+        throw new Error('no Hebrew face in the resolved font stacks ('+joined+') — the link alone does nothing');
+    } },
+
   { id:'css_phone_card', group:'CSS', name:'Phone grid card drops prep/servings, keeps the rest',
     test: async()=>{
       // Read the real CSSOM rather than matching text, and read it from the
@@ -2711,7 +2738,7 @@ function renderSelfTestList() {
           <input type="checkbox" class="st-checkbox" data-id="${t.id}" data-group="${groupKey}" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--terracotta);flex-shrink:0;" onchange="selfTestUpdateGroupHeader('${groupKey}')">
           <span style="flex:1;font-size:13px;color:var(--ink);">${t.name}</span>
           <span class="st-status" id="ststat_${t.id}" style="font-size:18px;min-width:24px;text-align:center;"></span>
-          <button class="st-detail-btn" id="stdetail_${t.id}" onclick="showSelfTestDetail('${t.id}')" style="display:none;padding:3px 10px;font-size:11px;border:1px solid var(--terracotta);background:transparent;color:var(--terracotta);border-radius:5px;cursor:pointer;font-family:DM Sans,sans-serif;">Details</button>
+          <button class="st-detail-btn" id="stdetail_${t.id}" onclick="showSelfTestDetail('${t.id}')" style="display:none;padding:3px 10px;font-size:11px;border:1px solid var(--terracotta);background:transparent;color:var(--terracotta);border-radius:5px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Details</button>
         </div>`).join('')}
     </div>`;
   }).join('');
@@ -2929,7 +2956,7 @@ function showSelfTestDetail(testId) {
 
   card.innerHTML = `
     <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:16px;">
-      <div style="flex:1;font-family:'Playfair Display',serif;font-size:16px;color:var(--heading);">❌ ${test.name}</div>
+      <div style="flex:1;font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:16px;color:var(--heading);">❌ ${test.name}</div>
       <button onclick="document.getElementById('stDetailOverlay').remove()" style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;color:var(--muted);flex-shrink:0;">✕</button>
     </div>
 
@@ -2951,7 +2978,7 @@ function showSelfTestDetail(testId) {
     ${canAutofix ? `
     <div style="padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">⚡ A runtime patch is available for this session only. A permanent code fix will still be needed.</div>
-      <button onclick="selfTestAutoFix('${testId}',this)" style="width:100%;padding:10px;background:#4F7AFF;color:white;border:none;border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;cursor:pointer;">⚡ Apply Runtime Fix</button>
+      <button onclick="selfTestAutoFix('${testId}',this)" style="width:100%;padding:10px;background:#4F7AFF;color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;cursor:pointer;">⚡ Apply Runtime Fix</button>
     </div>` : ''}
   `;
 
@@ -3397,7 +3424,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v28.5';
+var APP_VERSION = 'v28.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -3632,7 +3659,7 @@ function showEmailModal(id) {
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
 
   var card = document.createElement('div');
-  card.style.cssText = 'background:white;border-radius:14px;padding:20px;max-width:560px;width:100%;font-family:DM Sans,sans-serif;max-height:90vh;display:flex;flex-direction:column;gap:12px;';
+  card.style.cssText = 'background:white;border-radius:14px;padding:20px;max-width:560px;width:100%;font-family:DM Sans,Heebo,sans-serif;max-height:90vh;display:flex;flex-direction:column;gap:12px;';
 
   var title = document.createElement('div');
   title.style.cssText = 'font-size:16px;font-weight:700;color:#1C1A18;';
@@ -3647,7 +3674,7 @@ function showEmailModal(id) {
   var toInput = document.createElement('input');
   toInput.type = 'email';
   toInput.placeholder = 'recipient@email.com';
-  toInput.style.cssText = 'flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;outline:none;';
+  toInput.style.cssText = 'flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:6px;font-size:13px;font-family:DM Sans,Heebo,sans-serif;outline:none;';
   toRow.appendChild(toLabel);
   toRow.appendChild(toInput);
 
@@ -3659,7 +3686,7 @@ function showEmailModal(id) {
   var subjectInput = document.createElement('input');
   subjectInput.type = 'text';
   subjectInput.value = '🍴 ' + r.name + ' — Recipe';
-  subjectInput.style.cssText = 'flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;outline:none;';
+  subjectInput.style.cssText = 'flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:6px;font-size:13px;font-family:DM Sans,Heebo,sans-serif;outline:none;';
   subjectRow.appendChild(subjectLabel);
   subjectRow.appendChild(subjectInput);
 
@@ -3679,7 +3706,7 @@ function showEmailModal(id) {
   btnRow.style.cssText = 'display:flex;gap:8px;';
 
   var gmailBtn = document.createElement('button');
-  gmailBtn.style.cssText = 'flex:2;padding:11px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  gmailBtn.style.cssText = 'flex:2;padding:11px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   gmailBtn.textContent = '📧 Send Email';
   gmailBtn.title = 'Will ask for Gmail permission on first use';
   gmailBtn.onclick = async function(){
@@ -3709,14 +3736,14 @@ function showEmailModal(id) {
   };
 
   var copyBtn = document.createElement('button');
-  copyBtn.style.cssText = 'flex:1;padding:11px;background:#5C3D2E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  copyBtn.style.cssText = 'flex:1;padding:11px;background:#5C3D2E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   copyBtn.textContent = '📋 Copy Text';
   copyBtn.onclick = function(){
     navigator.clipboard.writeText(plainText).then(function(){ copyBtn.textContent = '✅ Copied!'; setTimeout(function(){ copyBtn.textContent = '📋 Copy Text'; }, 2000); });
   };
 
   var closeBtn = document.createElement('button');
-  closeBtn.style.cssText = 'padding:11px 14px;background:#F0EBE4;color:#5C3D2E;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;';
+  closeBtn.style.cssText = 'padding:11px 14px;background:#F0EBE4;color:#5C3D2E;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   closeBtn.textContent = '✕';
   closeBtn.onclick = function(){ overlay.remove(); };
 
@@ -3742,14 +3769,14 @@ function showGmailPasteHint() {
   if(existing) existing.remove();
   var div = document.createElement('div');
   div.id = 'gmailPasteHint';
-  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;background:#1C1A18;color:white;border-radius:12px;padding:16px 20px;max-width:340px;width:calc(100vw - 32px);box-shadow:0 8px 32px rgba(0,0,0,0.4);font-family:DM Sans,sans-serif;';
+  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;background:#1C1A18;color:white;border-radius:12px;padding:16px 20px;max-width:340px;width:calc(100vw - 32px);box-shadow:0 8px 32px rgba(0,0,0,0.4);font-family:DM Sans,Heebo,sans-serif;';
   div.innerHTML =
     '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">📋 HTML email copied!</div>' +
     '<div style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.6;">In Gmail compose:<br>' +
     '<strong style="color:#D4A843;">Ctrl+Shift+V</strong> to paste with full formatting<br>' +
     '<span style="font-size:11px;opacity:0.6;">(Ctrl+V pastes plain text only)</span></div>' +
     '<button onclick="var el=document.getElementById(\'gmailPasteHint\');if(el)el.remove();" ' +
-    'style="margin-top:10px;width:100%;padding:8px;background:#C1440E;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Got it</button>';
+    'style="margin-top:10px;width:100%;padding:8px;background:#C1440E;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Got it</button>';
   document.body.appendChild(div);
   setTimeout(function(){ if(div.parentNode) div.remove(); }, 12000);
 }
@@ -3909,7 +3936,7 @@ function showSaveHelperInfo() {
 
   var card = document.createElement('div');
   card.style.cssText = 'background:white;border-radius:14px;padding:0;max-width:500px;width:100%;' +
-    'font-family:DM Sans,sans-serif;overflow:hidden;max-height:90vh;overflow-y:auto;';
+    'font-family:DM Sans,Heebo,sans-serif;overflow:hidden;max-height:90vh;overflow-y:auto;';
 
   // Header
   var header = document.createElement('div');
@@ -3948,7 +3975,7 @@ function showSaveHelperInfo() {
   var startBtn = document.createElement('button');
   startBtn.id = 'helperStartBtn';
   startBtn.style.cssText = 'flex:1;padding:10px;background:#2E7D32;color:white;border:none;' +
-    'border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+    'border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   startBtn.textContent = '▶ Start Helper';
   startBtn.onclick = function() {
     // Can't exec directly — show terminal command to copy
@@ -3963,7 +3990,7 @@ function showSaveHelperInfo() {
   var stopBtn = document.createElement('button');
   stopBtn.id = 'helperStopBtn';
   stopBtn.style.cssText = 'flex:1;padding:10px;background:#c0392b;color:white;border:none;' +
-    'border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+    'border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   stopBtn.textContent = '⏹ Stop Helper';
   stopBtn.onclick = function() {
     // Send stop signal to helper
@@ -3977,7 +4004,7 @@ function showSaveHelperInfo() {
 
   var refreshBtn = document.createElement('button');
   refreshBtn.style.cssText = 'padding:10px 14px;background:#F5F0EA;color:#5C3D2E;border:1px solid #E8E0D5;' +
-    'border-radius:8px;font-size:13px;cursor:pointer;font-family:DM Sans,sans-serif;';
+    'border-radius:8px;font-size:13px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   refreshBtn.textContent = '🔄';
   refreshBtn.title = 'Check status';
   refreshBtn.onclick = function() { updateHelperStatus(); };
@@ -3995,7 +4022,7 @@ function showSaveHelperInfo() {
     '<pre id="autoStartCmd" style="background:#1e1e1e;color:#d4d4d4;border-radius:7px;padding:10px;font-family:monospace;font-size:11px;line-height:1.6;word-break:break-all;white-space:pre-wrap;margin:0;">' +
     'See below for command</pre>' +
     '<button onclick="copyAutoStart()" style="margin-top:8px;width:100%;padding:7px;background:#5C3D2E;' +
-    'color:white;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;" ' +
+    'color:white;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;" ' +
     'id="copyAutoBtn">📋 Copy setup command</button>';
 
   // Save directory setting
@@ -4008,10 +4035,10 @@ function showSaveHelperInfo() {
     '<div style="display:flex;gap:6px;">' +
     '<input id="saveDirInput" type="text" placeholder="e.g. /home/rozinante/Recipes" value="' + currentDir + '" ' +
     'style="flex:1;padding:7px 10px;border:1px solid #E8E0D5;border-radius:7px;font-size:13px;' +
-    'font-family:DM Sans,sans-serif;outline:none;" />' +
+    'font-family:DM Sans,Heebo,sans-serif;outline:none;" />' +
     '<button onclick="saveDirSetting()" style="padding:7px 14px;background:var(--terracotta);color:white;' +
     'border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;' +
-    'font-family:DM Sans,sans-serif;white-space:nowrap;">Save</button>' +
+    'font-family:DM Sans,Heebo,sans-serif;white-space:nowrap;">Save</button>' +
     '</div>' +
     '<div id="saveDirStatus" style="font-size:11px;margin-top:5px;color:var(--muted);"></div>';
 
@@ -4269,7 +4296,7 @@ window.addEventListener('error', function(e) {
 /* Explicitly keep the print stylesheet light — paper is not themeable. */
 @media print { :root[data-theme="dark"] { --ink:#1C1A18; --muted:#6B6259; --bg:#fff; --card-bg:#fff; --border:#ddd; } }
 
-body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
 *, *::before, *::after { box-sizing: border-box; }
 
 /* Accessibility: a clear keyboard focus ring (only for keyboard users, so mouse/touch
@@ -4298,7 +4325,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* HEADER */
 .header { background: var(--warm-brown); position: sticky; top: 0; z-index: 200; }
 .header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; }
-.logo { font-family: 'Playfair Display', serif; font-size: 19px; color: #FAF7F2; white-space: nowrap; }
+.logo { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 19px; color: #FAF7F2; white-space: nowrap; }
 .logo span { color: var(--gold); font-style: italic; }
 .header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .header-actions .btn { height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0 13px; }
@@ -4308,7 +4335,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   .header-actions .btn { flex-shrink: 0; }
   .header-actions .drop-group { flex-shrink: 0; }
 }
-.btn { border: none; padding: 8px 13px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; box-sizing: border-box; }
+.btn { border: none; padding: 8px 13px; border-radius: 6px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; box-sizing: border-box; }
 .btn-primary { background: var(--terracotta); color: white; border: 1px solid transparent; }
 .btn-primary:hover { background: #a83a0c; }
 .btn-secondary { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
@@ -4333,14 +4360,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   opacity: 1 !important;
   pointer-events: auto !important;
 }
-.drop-item { padding: 10px 14px; font-size: 13px; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 8px; transition: background 0.1s; border: none; background: none; width: 100%; font-family: 'DM Sans', sans-serif; text-align: left; }
+.drop-item { padding: 10px 14px; font-size: 13px; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 8px; transition: background 0.1s; border: none; background: none; width: 100%; font-family: 'DM Sans', 'Heebo', sans-serif; text-align: left; }
 .drop-item:hover { background: #FFF0E8; color: var(--terracotta); }
 
 /* SEARCH */
 .search-section { background: var(--warm-brown); padding: 0 1.5rem 1.25rem; }
 .search-wrap { position: relative; max-width: 560px; }
 .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.45); pointer-events: none; }
-.search-input { width: 100%; padding: 10px 14px 10px 38px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; background: rgba(255,255,255,0.12); color: white; outline: none; }
+.search-input { width: 100%; padding: 10px 14px 10px 38px; border: none; border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; background: rgba(255,255,255,0.12); color: white; outline: none; }
 .search-input::placeholder { color: rgba(255,255,255,0.38); }
 .search-input:focus { background: rgba(255,255,255,0.18); }
 
@@ -4348,7 +4375,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; z-index: 150; }
 .filter-frame { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); align-items: center; }
 .filter-frame-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; white-space: nowrap; }
-.filter-btn { padding: 5px 12px; border-radius: 20px; border: 1.5px solid #D4C4B0; background: #F5EFE8; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: #6B5744; transition: all 0.15s; white-space: nowrap; font-weight: 500; }
+.filter-btn { padding: 5px 12px; border-radius: 20px; border: 1.5px solid #D4C4B0; background: #F5EFE8; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; color: #6B5744; transition: all 0.15s; white-space: nowrap; font-weight: 500; }
 .filter-btn:hover { border-color: var(--warm-brown); color: var(--warm-brown); background: #EDE3D8; }
 .filter-btn.active { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 600; }
 .filter-btn.all-btn { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 600; }
@@ -4362,18 +4389,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* GRID */
 .grid-section { padding: 1rem 1.5rem 3rem; }
-.section-label { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 1rem; color: var(--heading); }
+.section-label { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 20px; margin-bottom: 1rem; color: var(--heading); }
 .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
 
 /* CARD */
-.recipe-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+/* 5b.2 — column flex with a growing body so the footer pins to the bottom of
+   every card. Without it a title that wraps to two lines pushes its difficulty
+   pill and heart lower than its neighbours' and the row looks ragged. */
+.recipe-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: 100%; }
 .recipe-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(92,61,46,0.12); }
 .card-image { width: 100%; height: 148px; display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; overflow: hidden; }
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.55); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-body { padding: 11px 13px 13px; }
+.card-body { padding: 11px 13px 13px; flex: 1 1 auto; }
 .card-category { font-size: 10px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 3px; }
-.card-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3; text-align: start; unicode-bidi: plaintext; }
+.card-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3; text-align: start; unicode-bidi: plaintext; }
 .card-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
 .card-footer { padding: 8px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .difficulty { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
@@ -4398,7 +4428,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 
 /* Grid Layout settings — column picker buttons */
-.gridcol-btn { flex: 1; padding: 12px 0; border-radius: 8px; border: 1.5px solid var(--border); background: #fff; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all 0.15s; }
+.gridcol-btn { flex: 1; padding: 12px 0; border-radius: 8px; border: 1.5px solid var(--border); background: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 16px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all 0.15s; }
 .gridcol-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 .gridcol-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: #fff; }
 
@@ -4406,7 +4436,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .cook-timer-btn {
   display: inline-flex; align-items: center; gap: 6px; margin: 6px 6px 0 0;
   padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--gold);
-  background: #FFF8E8; color: #7A5C00; font-family: 'DM Sans', sans-serif;
+  background: #FFF8E8; color: #7A5C00; font-family: 'DM Sans', 'Heebo', sans-serif;
   font-size: 12px; font-weight: 700; cursor: pointer;
 }
 .cook-timer-btn.running { background: var(--gold); color: var(--warm-brown); }
@@ -4464,14 +4494,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .wcim-name { flex:1; min-width:0; font-size:14px; color:var(--ink); font-weight:600; unicode-bidi:plaintext; text-align:start; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wcim-tag { flex-shrink:0; font-size:11px; color:var(--muted); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; max-width:52%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wcim-tag.have { color:var(--green); border-color:var(--green); font-weight:600; }
-.voice-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.voice-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; }
 .ask-card { background: var(--card-bg); border-radius: 16px; width: 92%; max-width: 420px; padding: 22px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); }
 .ask-icon { font-size: 32px; text-align: center; margin-bottom: 6px; }
-.ask-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--heading); text-align: center; margin-bottom: 8px; }
+.ask-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 18px; color: var(--heading); text-align: center; margin-bottom: 8px; }
 .ask-body { font-size: 13px; color: var(--muted); line-height: 1.65; text-align: center; margin-bottom: 16px; white-space: pre-wrap; unicode-bidi: plaintext; }
-.ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
+.ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
 .ask-actions { display: flex; flex-direction: column; gap: 8px; }
-.ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+.ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
 .ask-btn.danger { background: #C62828; }
 .ask-btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; font-weight: 500; padding: 10px; }
 .voice-btn.voice-on { background: var(--terracotta); color: #fff; border-color: var(--terracotta); animation: syncPulse 1.4s ease-in-out infinite; }
@@ -4515,14 +4545,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .modal-hero img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .modal-hero .emoji-over { position: relative; z-index: 1; }
 /* Photo overlay button on hero */
-.hero-photo-btn { position: absolute; bottom: 10px; right: 10px; z-index: 5; background: rgba(0,0,0,0.55); color: white; border: none; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
+.hero-photo-btn { position: absolute; bottom: 10px; right: 10px; z-index: 5; background: rgba(0,0,0,0.55); color: white; border: none; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
 .hero-photo-btn:hover { background: rgba(0,0,0,0.78); }
 
 .modal-content { padding: 1.1rem 1.4rem 1.6rem; }
 .modal-category { font-size: 10px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 4px; }
-.modal-title { font-family: 'Playfair Display', serif; font-size: 23px; font-weight: 700; color: var(--heading); margin-bottom: 9px; }
+.modal-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 23px; font-weight: 700; color: var(--heading); margin-bottom: 9px; }
 .modal-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 1.1rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--border); align-items: center; }
-.modal-section-title { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: var(--heading); margin-bottom: 7px; margin-top: 1rem; }
+.modal-section-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 14px; font-weight: 700; color: var(--heading); margin-bottom: 7px; margin-top: 1rem; }
 .ingredients-list { list-style: none; }
 .ingredients-list li { padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 13px; display: flex; justify-content: space-between; }
 .ingredients-list li:last-child { border: none; }
@@ -4535,7 +4565,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* Recipe action bar */
 .recipe-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
-.action-btn { display: flex; align-items: center; gap: 4px; padding: 6px 11px; border-radius: 6px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--ink); transition: all 0.15s; font-weight: 500; }
+.action-btn { display: flex; align-items: center; gap: 4px; padding: 6px 11px; border-radius: 6px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; color: var(--ink); transition: all 0.15s; font-weight: 500; }
 .action-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 
 /* Scale & unit */
@@ -4543,10 +4573,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .multiplier-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 /* 3.3 — scale by target servings, sitting under the ×N buttons */
 .servings-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.serv-step { width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.serv-step { width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; }
 .serv-step:hover { border-color: var(--terracotta); color: var(--terracotta); }
-.serv-input { width: 58px; height: 30px; text-align: center; border-radius: 7px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; }
-.serv-reset { background: none; border: none; color: var(--terracotta); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; text-decoration: underline; padding: 0 2px; }
+.serv-input { width: 58px; height: 30px; text-align: center; border-radius: 7px; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--ink); font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; font-weight: 600; }
+.serv-reset { background: none; border: none; color: var(--terracotta); font-size: 12px; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; text-decoration: underline; padding: 0 2px; }
 .serv-note { font-size: 11px; color: var(--muted); }
 .scale-warning { margin-top: 8px; font-size: 12px; line-height: 1.5; color: #8A6A00; background: #FFF8E8; border-left: 3px solid var(--gold); border-radius: 0 8px 8px 0; padding: 8px 12px; unicode-bidi: plaintext; text-align: start; }
 :root[data-theme="dark"] .scale-warning { color: #E8C888; background: #33280F; }
@@ -4570,35 +4600,35 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 /* 2.5 — AI failure and empty states that offer a way forward */
 .ai-fail { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 16px; margin-top: 11px; text-align: center; }
 .ai-fail-icon { font-size: 26px; margin-bottom: 6px; }
-.ai-fail-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--heading); margin-bottom: 6px; }
+.ai-fail-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 16px; font-weight: 700; color: var(--heading); margin-bottom: 6px; }
 .ai-fail-body { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; word-break: break-word; }
 .ai-fail-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.ai-fail-btn { display: inline-block; padding: 9px 16px; border-radius: 8px; border: none; background: var(--terracotta); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.ai-fail-btn { display: inline-block; padding: 9px 16px; border-radius: 8px; border: none; background: var(--terracotta); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
 .ai-fail-btn.ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
 .ai-fail-btn.ghost:hover { color: var(--terracotta); border-color: var(--terracotta); }
-.mult-btn { padding: 4px 9px; border-radius: 5px; border: 1.5px solid var(--border); background: white; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--muted); transition: all 0.15s; }
+.mult-btn { padding: 4px 9px; border-radius: 5px; border: 1.5px solid var(--border); background: white; font-size: 12px; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; color: var(--muted); transition: all 0.15s; }
 .mult-btn:hover, .mult-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; }
 .conv-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .conv-toggle { display: flex; background: var(--border); border-radius: 6px; overflow: hidden; }
-.conv-opt { padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--muted); border: none; background: none; transition: all 0.15s; }
+.conv-opt { padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; color: var(--muted); border: none; background: none; transition: all 0.15s; }
 .conv-opt.active { background: var(--warm-brown); color: white; }
 
 /* Share */
 .share-panel { display: none; background: #f0ebe4; border-radius: 8px; padding: 11px 13px; margin-top: 7px; }
 .share-panel.open { display: block; }
 .share-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
-.share-link { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; transition: opacity 0.15s; }
+.share-link { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 500; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; border: none; transition: opacity 0.15s; }
 .share-link:hover { opacity: 0.85; }
 .share-mail { background: #4A90D9; color: white; } .share-whatsapp { background: #25D366; color: white; } .share-copy { background: var(--warm-brown); color: white; }
 
 /* ADD/EDIT MODAL */
 .add-modal { max-width: 540px; }
 .modal-header { padding: 1.1rem 1.4rem 0.7rem; border-bottom: 1px solid var(--border); }
-.modal-header-title { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; color: var(--heading); }
+.modal-header-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 19px; font-weight: 700; color: var(--heading); }
 .modal-body { padding: 0.9rem 1.4rem 1.4rem; }
 .form-group { margin-bottom: 0.8rem; }
 .form-label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-.form-input, .form-select, .form-textarea { width: 100%; padding: 8px 11px; border: 1.5px solid var(--border); border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); background: white; outline: none; transition: border-color 0.15s; }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 8px 11px; border: 1.5px solid var(--border); border-radius: 7px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: white; outline: none; transition: border-color 0.15s; }
 .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--terracotta); }
 .form-textarea { resize: vertical; min-height: 72px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -4614,7 +4644,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .photo-zone-preview { width: 100%; max-height: 130px; object-fit: cover; border-radius: 6px; display: none; }
 .photo-remove { position: absolute; top: 6px; right: 6px; background: var(--terracotta); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 13px; display: none; align-items: center; justify-content: center; font-weight: bold; }
 
-.btn-submit { width: 100%; margin-top: 0.9rem; padding: 11px; background: var(--terracotta); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.btn-submit { width: 100%; margin-top: 0.9rem; padding: 11px; background: var(--terracotta); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
 .btn-submit:hover { background: #a83a0c; }
 
 /* EXPLORE MODAL */
@@ -4628,7 +4658,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 
 /* Diet multi-select */
 .diet-select-wrap { position: relative; }
-.diet-trigger { width: 100%; padding: 8px 11px; border: 1.5px solid var(--border); border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.diet-trigger { width: 100%; padding: 8px 11px; border: 1.5px solid var(--border); border-radius: 7px; background: white; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
 .diet-trigger:focus { outline: none; border-color: var(--terracotta); }
 .diet-trigger.active-dd { border-color: var(--terracotta); }
 .diet-arrow { font-size: 10px; color: var(--muted); transition: transform 0.15s; }
@@ -4645,24 +4675,24 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .tag-wrap { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px; border: 1.5px solid var(--border); border-radius: 7px; background: white; min-height: 38px; cursor: text; }
 .tag-pill { background: #FFF0E8; color: var(--terracotta); border-radius: 12px; padding: 2px 8px; font-size: 12px; display: flex; align-items: center; gap: 4px; }
 .tag-pill button { background: none; border: none; cursor: pointer; font-size: 12px; color: var(--terracotta); line-height: 1; padding: 0; }
-.tag-bare { border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 14px; flex: 1; min-width: 80px; background: transparent; }
+.tag-bare { border: none; outline: none; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; flex: 1; min-width: 80px; background: transparent; }
 
 /* SUGGEST MODAL */
 .suggest-modal { max-width: 600px; }
 
 /* Multi-chip selector (reusable for diet/meal/cuisine) */
 .chip-selector { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
-.sel-chip { padding: 5px 12px; border-radius: 16px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; user-select: none; }
+.sel-chip { padding: 5px 12px; border-radius: 16px; border: 1.5px solid var(--border); background: white; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; user-select: none; }
 .sel-chip:hover { border-color: var(--terracotta); color: var(--terracotta); }
 .sel-chip.active { background: var(--terracotta); border-color: var(--terracotta); color: white; font-weight: 500; }
 
 /* Suggestion cards */
 .sug-card { background: white; border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 10px; }
-.sug-card-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--heading); margin-bottom: 4px; }
+.sug-card-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 16px; font-weight: 700; color: var(--heading); margin-bottom: 4px; }
 .sug-card-meta { font-size: 11px; color: var(--terracotta); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .sug-card-body { font-size: 13px; color: var(--ink); line-height: 1.65; }
 .sug-card-footer { display: flex; justify-content: flex-end; margin-top: 10px; }
-.sug-add-btn { background: var(--terracotta); color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+.sug-add-btn { background: var(--terracotta); color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; cursor: pointer; transition: background 0.15s; }
 .sug-add-btn:hover { background: #a83a0c; }
 .sug-add-btn.added { background: #7A8C6E; cursor: default; }
 
@@ -4836,7 +4866,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   display: flex; align-items: center; gap: 5px;
   padding: 5px 12px; border-radius: 7px;
   border: 1.5px solid var(--border); background: white;
-  font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500;
+  font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500;
   cursor: pointer; color: var(--muted);
   box-shadow: 0 3px 0 #c8c0b5, 0 4px 5px rgba(0,0,0,0.1);
   transform: translateY(0);
@@ -4864,7 +4894,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .recipe-list-thumb img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .recipe-list-info { flex: 1; min-width: 0; }
-.recipe-list-name { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; unicode-bidi: plaintext; }
+.recipe-list-name { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; unicode-bidi: plaintext; }
 .recipe-list-meta { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
 .recipe-list-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -4875,17 +4905,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   z-index: 9999; padding: 2rem; text-align: center;
 }
-.login-logo { font-family: 'Playfair Display', serif; font-size: 32px; color: var(--heading); margin-bottom: 8px; }
+.login-logo { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 32px; color: var(--heading); margin-bottom: 8px; }
 .login-logo span { color: var(--gold); font-style: italic; }
 .login-subtitle { font-size: 14px; color: var(--muted); margin-bottom: 2.5rem; line-height: 1.6; max-width: 360px; }
 .login-card { background: white; border-radius: 16px; padding: 2rem; max-width: 380px; width: 100%; box-shadow: 0 8px 32px rgba(92,61,46,0.12); border: 1px solid var(--border); }
-.login-card h2 { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--heading); margin-bottom: 6px; }
+.login-card h2 { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 20px; color: var(--heading); margin-bottom: 6px; }
 .login-card p { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.5; }
 .google-signin-btn {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   width: 100%; padding: 12px; border-radius: 8px;
   border: 1.5px solid var(--border); background: white;
-  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500;
+  font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 500;
   cursor: pointer; color: var(--ink); margin-bottom: 1rem;
   box-shadow: 0 3px 0 #c8c0b5, 0 4px 6px rgba(0,0,0,0.1);
   transition: all 0.1s ease;
@@ -4898,7 +4928,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .offline-btn {
   width: 100%; padding: 10px; border-radius: 8px;
   border: 1.5px solid var(--border); background: var(--cream);
-  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 13px; font-weight: 500;
   cursor: pointer; color: var(--muted);
   box-shadow: 0 3px 0 #c8c0b5;
   transition: all 0.1s ease;
@@ -4928,7 +4958,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .share-app-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .share-app-btn {
   flex: 1; min-width: 120px; padding: 10px 14px; border-radius: 8px;
-  border: none; font-family: 'DM Sans', sans-serif; font-size: 13px;
+  border: none; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 13px;
   font-weight: 500; cursor: pointer; display: flex; align-items: center;
   justify-content: center; gap: 6px;
   box-shadow: 0 3px 0 rgba(0,0,0,0.2), 0 4px 6px rgba(0,0,0,0.12);
@@ -5007,7 +5037,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   padding: 8px 18px;
   border-radius: 8px;
   border: none;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -5043,7 +5073,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .nutrition-item { display: flex; flex-direction: column; gap: 2px; }
 .nutrition-value {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Playfair Display', 'Frank Ruhl Libre', serif;
   font-size: 18px;
   font-weight: 700;
   color: var(--heading);
@@ -5085,7 +5115,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   padding: 16px 20px;
   display: flex; align-items: center; justify-content: space-between;
 }
-.calc-header-title { font-family: 'Playfair Display',serif; font-size: 18px; color: #FAF7F2; }
+.calc-header-title { font-family: 'Playfair Display','Frank Ruhl Libre',serif; font-size: 18px; color: #FAF7F2; }
 .calc-close {
   background: none; border: none; color: rgba(255,255,255,0.7);
   font-size: 20px; cursor: pointer; padding: 0; line-height: 1;
@@ -5100,7 +5130,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   border: 1.5px solid var(--border);
   background: white; font-size: 12px;
   cursor: pointer; color: var(--muted);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   transition: all 0.15s;
 }
 .calc-cat-btn.active {
@@ -5114,7 +5144,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .calc-input {
   width: 100%; padding: 10px 12px; border-radius: 8px;
   border: 1.5px solid var(--border);
-  font-size: 18px; font-family: 'DM Sans',sans-serif;
+  font-size: 18px; font-family: 'DM Sans','Heebo',sans-serif;
   color: var(--ink); background: white;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
   transition: border-color 0.15s;
@@ -5124,7 +5154,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .calc-unit-select {
   width: 100%; padding: 8px 10px; border-radius: 8px;
   border: 1.5px solid var(--border); background: white;
-  font-size: 13px; font-family: 'DM Sans',sans-serif;
+  font-size: 13px; font-family: 'DM Sans','Heebo',sans-serif;
   color: var(--ink); cursor: pointer;
 }
 .calc-unit-select:focus { outline: none; border-color: var(--terracotta); }
@@ -5135,7 +5165,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   display: flex; align-items: center; justify-content: center;
   flex-direction: column; gap: 2px;
 }
-.calc-result-value { font-size: 26px; font-weight: 700; color: var(--heading); font-family: 'Playfair Display',serif; }
+.calc-result-value { font-size: 26px; font-weight: 700; color: var(--heading); font-family: 'Playfair Display','Frank Ruhl Libre',serif; }
 .calc-result-unit  { font-size: 12px; color: var(--muted); }
 .calc-common-row {
   display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px;
@@ -5144,7 +5174,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   padding: 4px 10px; border-radius: 6px;
   border: 1px solid var(--border); background: white;
   font-size: 11px; cursor: pointer; color: var(--muted);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   transition: all 0.15s;
 }
 .calc-quick-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
@@ -5186,7 +5216,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   padding: 12px 20px;
   padding-top: calc(12px + env(safe-area-inset-top));
   font-size: 14px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   font-weight: 600;
   z-index: 900;
   cursor: pointer;
@@ -5233,7 +5263,7 @@ body.banner-shown .header {
   display: flex; align-items: center; gap: 10px;
 }
 .bring-header-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Playfair Display', 'Frank Ruhl Libre', serif;
   font-size: 17px; color: var(--heading);
   flex: 1;
 }
@@ -5272,13 +5302,13 @@ body.banner-shown .header {
 .bring-select-all {
   font-size: 12px; color: var(--muted); cursor: pointer;
   padding: 8px 0; text-decoration: underline; background: none; border: none;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
 }
 .bring-send-btn {
   flex: 1; padding: 12px;
   background: #E8630A; color: white;
   border: none; border-radius: 10px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   font-size: 15px; font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 0 #b54a00;
@@ -5289,7 +5319,7 @@ body.banner-shown .header {
   padding: 12px 16px;
   background: white; color: var(--muted);
   border: 1.5px solid var(--border); border-radius: 10px;
-  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px;
   cursor: pointer;
 }
 
@@ -5315,7 +5345,7 @@ body.banner-shown .header {
   font-size: 12px; padding: 4px 10px;
   background: #E8630A; color: white;
   border: none; border-radius: 6px;
-  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif;
   font-weight: 600; white-space: nowrap;
 }
 .bring-token-btn:hover { background: #c45508; }
@@ -5366,7 +5396,7 @@ body.banner-shown .header {
   flex: 1; padding: 10px 14px;
   border: 1.5px solid var(--border);
   border-radius: 10px;
-  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-family: 'DM Sans', 'Heebo', sans-serif;
   background: var(--card-bg); color: var(--ink);
 }
 .help-input:focus { outline: none; border-color: var(--terracotta); }
@@ -5375,7 +5405,7 @@ body.banner-shown .header {
   background: var(--terracotta); color: white;
   border: none; border-radius: 10px;
   font-size: 14px; font-weight: 600;
-  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif;
   white-space: nowrap;
 }
 .help-answer {
@@ -5411,7 +5441,7 @@ body.banner-shown .header {
   font-size: 14px; font-weight: 700;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   transition: background 0.15s;
   flex-shrink: 0;
 }
@@ -5434,7 +5464,7 @@ body.banner-shown .header {
   background: transparent;
   padding: 8px 10px;
   font-size: 14px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
   color: var(--ink);
   width: 100%;
   box-sizing: border-box;
@@ -5484,7 +5514,7 @@ body.banner-shown .header {
   padding: 5px 12px; border-radius: 20px;
   border: 1.5px solid var(--border);
   background: transparent;
-  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif;
   cursor: pointer; color: var(--muted);
   transition: all 0.15s;
 }
@@ -5519,7 +5549,7 @@ body.banner-shown .header {
 .mobile-filter-toggle {
   padding: 5px 10px; border-radius: 20px;
   border: 1.5px solid #D4C4B0; background: #F5EFE8;
-  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif;
   cursor: pointer; color: #6B5744; font-weight: 500;
   transition: all 0.15s; white-space: nowrap;
 }
@@ -5536,7 +5566,7 @@ body.banner-shown .header {
 .mobile-dropdown-btn {
   padding: 5px 12px; border-radius: 20px;
   border: 1.5px solid #D4C4B0; background: #F5EFE8;
-  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif;
   cursor: pointer; color: #6B5744; font-weight: 500;
   transition: all 0.15s; position: relative; white-space: nowrap;
 }
@@ -5567,7 +5597,7 @@ body.banner-shown .header {
 .mobile-panel-done {
   width: 100%; margin-top: 12px; padding: 10px;
   background: var(--terracotta); color: white; border: none;
-  border-radius: 8px; font-family: 'DM Sans', sans-serif;
+  border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif;
   font-size: 14px; font-weight: 600; cursor: pointer;
 }
 
@@ -5621,7 +5651,7 @@ body.banner-shown .header {
 .payment-badge.free { background: #EAF5E9; color: var(--green); }
 .payment-link {
   flex-shrink: 0; padding: 6px 12px; border-radius: 7px; font-size: 12px;
-  font-weight: 600; font-family: 'DM Sans', sans-serif; text-decoration: none;
+  font-weight: 600; font-family: 'DM Sans', 'Heebo', sans-serif; text-decoration: none;
   background: var(--bg); border: 1px solid var(--border); color: var(--heading);
   white-space: nowrap; transition: all 0.15s;
 }
@@ -5644,7 +5674,7 @@ body.banner-shown .header {
 /* ── SELECT BAR ── */
 .del-bar-btn {
   padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600; font-family: 'DM Sans', 'Heebo', sans-serif;
   white-space: nowrap; transition: all 0.15s;
 }
 .del-bar-action { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
@@ -5660,10 +5690,10 @@ body.banner-shown .header {
 .access-name { font-size:13px;font-weight:600;color:var(--ink); }
 .access-email { font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .access-badge { font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;flex-shrink:0; }
-.access-role-btn { padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--ink); }
+.access-role-btn { padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--ink); }
 .access-role-btn:hover { border-color:var(--terracotta);color:var(--terracotta); }
-.access-remove-btn { padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;background:#FFE8E8;color:#c0392b; }
-.access-role-opt { display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card-bg);font-family:'DM Sans',sans-serif; }
+.access-remove-btn { padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:none;background:#FFE8E8;color:#c0392b; }
+.access-role-opt { display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card-bg);font-family:'DM Sans','Heebo',sans-serif; }
 .access-role-opt:has(input:checked) { border-color:var(--terracotta);background:#FFF5F2;color:var(--terracotta); }
 
 
@@ -5695,13 +5725,13 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
         <span class="ds-dot"></span><span id="dsText">Offline mode</span>
-        <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;text-decoration:underline;">Sign out</button>
-        <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
+        <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;text-decoration:underline;">Sign out</button>
+        <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
       </div>
       <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app">?</button>
       <div class="drop-group">
@@ -5728,7 +5758,7 @@ body.banner-shown .header {
     <div style="flex:1;min-width:180px;position:relative;">
       <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.45);font-size:13px;pointer-events:none;">🔍</span>
       <label for="searchInput" class="sr-only">Search recipes and ingredients</label>
-      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" aria-label="Search recipes and ingredients" oninput="onSearchInput()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
+      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" aria-label="Search recipes and ingredients" oninput="onSearchInput()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
     </div>
     <div class="header-actions">
       <div class="drop-group">
@@ -5777,7 +5807,7 @@ body.banner-shown .header {
   <div style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
     <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
     <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.55);flex:1;">Sign in to sync across devices</span>
-    <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.25);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans',sans-serif;">Reset</button>
+    <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.25);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans','Heebo',sans-serif;">Reset</button>
   </div>
 </div>
 
@@ -5857,7 +5887,7 @@ body.banner-shown .header {
   </div>
   <div id="noPhotoPrompt" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#FFF8E8;border:1px solid #E8D9A8;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
     <span style="flex:1;min-width:180px;font-size:13px;color:#7A5C00;"></span>
-    <button onclick="autoFetchMissingPhotos()" style="padding:9px 16px;border-radius:9px;border:none;background:var(--terracotta);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📸 Auto-fetch photos</button>
+    <button onclick="autoFetchMissingPhotos()" style="padding:9px 16px;border-radius:9px;border:none;background:var(--terracotta);color:#fff;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📸 Auto-fetch photos</button>
   </div>
   <div id="recipeGrid"></div>
 </div>
@@ -5867,7 +5897,7 @@ body.banner-shown .header {
   background:var(--warm-brown);padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));
   flex-direction:row;align-items:center;justify-content:space-between;gap:10px;
   box-shadow:0 -4px 20px rgba(0,0,0,0.25);">
-  <span id="selectedCount" style="color:white;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;">0 selected</span>
+  <span id="selectedCount" style="color:white;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">0 selected</span>
   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
     <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
     <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
@@ -5944,7 +5974,7 @@ body.banner-shown .header {
           </div>
           <div id="ingsRows"></div>
         </div>
-        <button type="button" onclick="addIngRow()" style="font-size:13px;color:var(--terracotta);background:none;border:1.5px dashed var(--terracotta);border-radius:8px;padding:6px 14px;cursor:pointer;width:100%;font-family:'DM Sans',sans-serif;">+ Add ingredient</button>
+        <button type="button" onclick="addIngRow()" style="font-size:13px;color:var(--terracotta);background:none;border:1.5px dashed var(--terracotta);border-radius:8px;padding:6px 14px;cursor:pointer;width:100%;font-family:'DM Sans','Heebo',sans-serif;">+ Add ingredient</button>
         <!-- Hidden textarea for backward compatibility with saveRecipe parser -->
       </div>
       <div class="form-group">
@@ -6238,7 +6268,7 @@ body.banner-shown .header {
 
 
 <!-- LOGIN / STORAGE SCREEN -->
-<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#8A8279;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
+<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#8A8279;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
     <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
@@ -6256,7 +6286,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;">v28.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v28.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6383,7 +6413,7 @@ body.banner-shown .header {
 <div id="bringTokenExpiredOverlay" onclick="bgClose(event,'bringTokenExpiredOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:420px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
     <div style="font-size:36px;text-align:center;margin-bottom:12px;">⏰</div>
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--heading);margin-bottom:8px;text-align:center;">Bring! Token Expired</div>
+    <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:18px;color:var(--heading);margin-bottom:8px;text-align:center;">Bring! Token Expired</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;line-height:1.6;">Your Bring! connection needs refreshing. This takes 2 clicks and happens automatically after.</p>
     <div style="background:#fff8f0;border:1px solid #f0d9b5;border-radius:10px;padding:12px 14px;margin-bottom:16px;">
       <div style="font-size:12px;font-weight:600;color:var(--heading);margin-bottom:6px;">How to refresh:</div>
@@ -6393,11 +6423,11 @@ body.banner-shown .header {
         <div>3️⃣ Ingredients will send automatically ✅</div>
       </div>
     </div>
-    <button onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       🌐 Open Bring! to Refresh
     </button>
     <div id="bringTokenExpiredStatus" style="text-align:center;font-size:12px;color:var(--muted);min-height:20px;margin-bottom:8px;"></div>
-    <button onclick="closeM('bringTokenExpiredOverlay')" style="width:100%;padding:10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
+    <button onclick="closeM('bringTokenExpiredOverlay')" style="width:100%;padding:10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;cursor:pointer;">
       Cancel
     </button>
   </div>
@@ -6407,7 +6437,7 @@ body.banner-shown .header {
 <div id="waAskOverlay" onclick="bgClose(event,'waAskOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">💬 Ask my WhatsApp groups</div>
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">💬 Ask my WhatsApp groups</div>
       <button class="modal-close" onclick="closeM('waAskOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
     <div id="waAskCount" style="font-size:11px;color:var(--muted);margin-bottom:12px;"></div>
@@ -6427,7 +6457,7 @@ body.banner-shown .header {
 <div id="waSetupOverlay" onclick="bgClose(event,'waSetupOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">💬 WhatsApp Groups</div>
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">💬 WhatsApp Groups</div>
       <button class="modal-close" onclick="closeM('waSetupOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
 
@@ -6445,7 +6475,7 @@ body.banner-shown .header {
       <input id="waBaseInput" class="help-input" placeholder="https://…/whatsapp/">
       <button class="help-btn" onclick="saveWaBase()">Save</button>
     </div>
-    <button onclick="waRefreshFolder()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:6px;">🔄 Load chats from this folder</button>
+    <button onclick="waRefreshFolder()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:6px;">🔄 Load chats from this folder</button>
     <div id="waFolderStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:14px;"></div>
 
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">📱 This device only</div>
@@ -6453,7 +6483,7 @@ body.banner-shown .header {
       Import exported files straight into this browser. They stay here — nothing is uploaded, and other devices won't see them.
     </p>
     <input type="file" id="waFileIn" accept=".txt,.zip,text/plain,application/zip" multiple style="display:none" onchange="waImportFiles(this.files);this.value='';">
-    <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt or .zip files</button>
+    <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt or .zip files</button>
 
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Loaded chats</div>
     <div id="waSourceList" style="margin-bottom:14px;"></div>
@@ -6476,17 +6506,17 @@ body.banner-shown .header {
 <div id="cookLogOverlay" onclick="bgClose(event,'cookLogOverlay')" class="modal-overlay" style="z-index:1100;">
   <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:420px;padding:22px;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
     <div style="font-size:30px;text-align:center;margin-bottom:6px;">🍳</div>
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--heading);text-align:center;margin-bottom:2px;">How did it go?</div>
+    <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:18px;color:var(--heading);text-align:center;margin-bottom:2px;">How did it go?</div>
     <div id="cookLogTitle" dir="auto" style="unicode-bidi:plaintext;text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;"></div>
     <div class="control-label">Rating</div>
     <div id="cookLogStars" style="display:flex;align-items:center;gap:2px;margin-bottom:14px;"></div>
     <div class="control-label">Note for next time</div>
     <textarea id="cookLogNote" dir="auto" rows="3" placeholder="e.g. too salty — halve the soy next time"
-      style="unicode-bidi:plaintext;text-align:start;width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:14px;"></textarea>
-    <button onclick="saveCookLog()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+      style="unicode-bidi:plaintext;text-align:start;width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:14px;"></textarea>
+    <button onclick="saveCookLog()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       ✅ Save
     </button>
-    <button onclick="skipCookLog()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
+    <button onclick="skipCookLog()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;cursor:pointer;">
       Just log it — no note
     </button>
   </div>
@@ -6496,7 +6526,7 @@ body.banner-shown .header {
 <div id="pantryOverlay" onclick="bgClose(event,'pantryOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:480px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">🥫 My Pantry</div>
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">🥫 My Pantry</div>
       <button class="modal-close" onclick="closeM('pantryOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
     <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
@@ -6504,8 +6534,8 @@ body.banner-shown .header {
       “olive oil” also covers “good olive oil”. Kept on this device only.
     </p>
     <textarea id="pantryInput" dir="auto" rows="10" placeholder="olive oil&#10;flour&#10;eggs&#10;salt&#10;שמן זית"
-      style="unicode-bidi:plaintext;text-align:start;width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:12px;"></textarea>
-    <button onclick="savePantry()" style="width:100%;padding:12px;background:var(--terracotta);color:#fff;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Save pantry</button>
+      style="unicode-bidi:plaintext;text-align:start;width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:12px;"></textarea>
+    <button onclick="savePantry()" style="width:100%;padding:12px;background:var(--terracotta);color:#fff;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Save pantry</button>
   </div>
 </div>
 
@@ -6513,7 +6543,7 @@ body.banner-shown .header {
 <div id="wcimOverlay" onclick="bgClose(event,'wcimOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">🥫 What can I make?</div>
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">🥫 What can I make?</div>
       <button class="modal-close" onclick="closeM('wcimOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
     <div id="wcimBody"></div>
@@ -6524,18 +6554,18 @@ body.banner-shown .header {
 <div id="unsavedOverlay" class="modal-overlay" style="z-index:1200;">
   <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:400px;padding:22px;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
     <div style="font-size:34px;text-align:center;margin-bottom:8px;">💾</div>
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--heading);margin-bottom:8px;text-align:center;">Unsaved changes</div>
+    <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:18px;color:var(--heading);margin-bottom:8px;text-align:center;">Unsaved changes</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:18px;text-align:center;line-height:1.6;">
       You have unsaved changes to <span id="unsavedName" dir="auto" style="unicode-bidi:plaintext;color:var(--ink);font-weight:600;">this recipe</span>.
       What would you like to do?
     </p>
-    <button onclick="unsavedSave()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button onclick="unsavedSave()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       💾 Save changes
     </button>
-    <button onclick="unsavedDiscard()" style="width:100%;padding:11px;background:transparent;color:#c62828;border:1px solid #E0BDBD;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;margin-bottom:8px;">
+    <button onclick="unsavedDiscard()" style="width:100%;padding:11px;background:transparent;color:#c62828;border:1px solid #E0BDBD;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;cursor:pointer;margin-bottom:8px;">
       🗑️ Discard changes
     </button>
-    <button onclick="unsavedKeepEditing()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">
+    <button onclick="unsavedKeepEditing()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;cursor:pointer;">
       ✏️ Keep editing
     </button>
   </div>
@@ -6545,7 +6575,7 @@ body.banner-shown .header {
 <div id="photoSearchOverlay" onclick="bgClose(event,'photoSearchOverlay')" class="modal-overlay" style="z-index:800;">
   <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:480px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">🔍 Search Photo</div>
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">🔍 Search Photo</div>
       <button class="modal-close" onclick="closeM('photoSearchOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:4px;">
@@ -6555,10 +6585,10 @@ body.banner-shown .header {
     <div id="photoSearchStatus" style="font-size:12px;color:var(--muted);margin-bottom:8px;min-height:18px;"></div>
     <div id="photoSearchGrid" class="photo-search-grid"></div>
     <div id="photoSearchMoreWrap" style="display:none;margin-top:10px;text-align:center;">
-      <button id="photoSearchMoreBtn" onclick="photoSearchMore()" style="padding:9px 18px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;">🔄 See more →</button>
+      <button id="photoSearchMoreBtn" onclick="photoSearchMore()" style="padding:9px 18px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;">🔄 See more →</button>
     </div>
     <div id="photoSearchUseBtn" style="display:none;margin-top:12px;">
-      <button onclick="useSelectedSearchPhoto()" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Use This Photo</button>
+      <button onclick="useSelectedSearchPhoto()" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Use This Photo</button>
     </div>
   </div>
 </div>
@@ -6567,7 +6597,7 @@ body.banner-shown .header {
 <div id="helpOverlay" onclick="bgClose(event,'helpOverlay')" class="modal-overlay" style="z-index:800;">
   <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:500px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--heading);">💬 Ask About the App</div>
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">💬 Ask About the App</div>
       <button class="modal-close" onclick="closeM('helpOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
     <div class="help-input-row">
@@ -6591,7 +6621,7 @@ body.banner-shown .header {
 <!-- BRING! BOOKMARKLET MODAL -->
 <div id="bringBookmarkletOverlay" onclick="bgClose(event,'bringBookmarkletOverlay')" class="modal-overlay" style="z-index:800;">
   <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:480px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
-    <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--heading);margin-bottom:12px;">🔖 Bring! Token Bookmarklet</div>
+    <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:18px;color:var(--heading);margin-bottom:12px;">🔖 Bring! Token Bookmarklet</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">This bookmarklet refreshes your Bring! connection in one click. <strong>Set it up once, use it whenever needed.</strong></p>
     <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Step 1: Copy the bookmarklet code</div>
     <div style="position:relative;margin-bottom:12px;">
@@ -6613,10 +6643,10 @@ body.banner-shown .header {
       </p>
       <textarea id="bringManualToken" placeholder="eyJhbGciOi…" style="width:100%;height:52px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;box-sizing:border-box;"></textarea>
       <div id="bringManualStatus" style="font-size:12px;color:var(--muted);min-height:16px;margin:4px 0;"></div>
-      <button onclick="submitManualBringToken()" style="width:100%;padding:10px;background:var(--gold);color:var(--warm-brown);border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🔑 Save this token</button>
+      <button onclick="submitManualBringToken()" style="width:100%;padding:10px;background:var(--gold);color:var(--warm-brown);border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🔑 Save this token</button>
     </div>
 
-    <button onclick="closeM('bringBookmarkletOverlay')" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Got it!</button>
+    <button onclick="closeM('bringBookmarkletOverlay')" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Got it!</button>
   </div>
 </div>
 
@@ -7708,10 +7738,10 @@ function renderGrid() {
     var emptyIcon = showFavOnly ? '\u2764\ufe0f' : q ? '\ud83d\udd0d' : '\ud83c\udf7d\ufe0f';
     var emptyTitle = showFavOnly ? 'No favourites yet' : q ? 'No recipes found' : 'No recipes yet';
     var emptySub = showFavOnly ? 'Tap the heart on any recipe to save it here.' : q ? 'Try a different search term.' : 'Add your first recipe or import one from a website.';
-    var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
+    var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
     g.innerHTML = '<div class="empty-state">'
       + '<div style="width:72px;height:72px;border-radius:50%;background:#FFF0E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">' + emptyIcon + '</div>'
-      + '<div style="font-family:Playfair Display,serif;font-size:18px;font-weight:700;color:var(--heading);margin-bottom:8px;">' + emptyTitle + '</div>'
+      + '<div style="font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:18px;font-weight:700;color:var(--heading);margin-bottom:8px;">' + emptyTitle + '</div>'
       + '<p style="font-size:13px;color:var(--muted);line-height:1.6;max-width:280px;margin:0 auto 12px;">' + emptySub + '</p>'
       + emptyBtn + '</div>';
     return;
@@ -7824,7 +7854,7 @@ function drawView(){
         <span>⏱ ${escH(r.prep)}</span><span>🍽 ${escH(r.servings)} servings</span>
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel">
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -8064,11 +8094,11 @@ function showPhotoSourcePicker(id, recipeName) {
   inner.style.cssText = 'background:var(--card-bg);border-radius:16px 16px 0 0;width:100%;max-width:500px;padding:20px 20px 32px;';
 
   var title = document.createElement('div');
-  title.style.cssText = 'font-family:Playfair Display,serif;font-size:16px;color:var(--heading);margin-bottom:16px;text-align:center;';
+  title.style.cssText = 'font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:16px;color:var(--heading);margin-bottom:16px;text-align:center;';
   title.textContent = 'Add Photo';
 
   var uploadBtn = document.createElement('button');
-  uploadBtn.style.cssText = 'width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  uploadBtn.style.cssText = 'width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
   uploadBtn.textContent = '📷 Upload from device';
   uploadBtn.onclick = function() {
     picker.remove();
@@ -8077,7 +8107,7 @@ function showPhotoSourcePicker(id, recipeName) {
   };
 
   var cameraBtn = document.createElement('button');
-  cameraBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  cameraBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
   cameraBtn.textContent = '📸 Take a photo';
   cameraBtn.onclick = function() {
     picker.remove();
@@ -8099,7 +8129,7 @@ function showPhotoSourcePicker(id, recipeName) {
   };
 
   var searchBtn = document.createElement('button');
-  searchBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  searchBtn.style.cssText = 'width:100%;padding:13px;background:var(--bg);color:var(--ink);border:1.5px solid var(--border);border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
   searchBtn.textContent = '🔍 Search web for photo';
   searchBtn.onclick = function() {
     picker.remove();
@@ -8107,7 +8137,7 @@ function showPhotoSourcePicker(id, recipeName) {
   };
 
   var cancelBtn = document.createElement('button');
-  cancelBtn.style.cssText = 'width:100%;padding:10px;background:transparent;color:var(--muted);border:none;font-family:DM Sans,sans-serif;font-size:14px;cursor:pointer;';
+  cancelBtn.style.cssText = 'width:100%;padding:10px;background:transparent;color:var(--muted);border:none;font-family:DM Sans,Heebo,sans-serif;font-size:14px;cursor:pointer;';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.onclick = function() { picker.remove(); };
 
@@ -8557,7 +8587,7 @@ function showRenameHint(filename) {
   div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
     'z-index:9999;background:var(--warm-brown);color:white;border-radius:12px;' +
     'padding:14px 18px;max-width:380px;width:calc(100vw - 32px);' +
-    'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:DM Sans,sans-serif;';
+    'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:DM Sans,Heebo,sans-serif;';
 
   var title = document.createElement('div');
   title.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:6px;';
@@ -8580,7 +8610,7 @@ function showRenameHint(filename) {
   var copyBtn = document.createElement('button');
   copyBtn.style.cssText = 'flex:1;padding:8px;background:var(--terracotta);color:white;' +
     'border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;' +
-    'font-family:DM Sans,sans-serif;';
+    'font-family:DM Sans,Heebo,sans-serif;';
   copyBtn.textContent = '📋 Copy name';
   copyBtn.onclick = function() {
     navigator.clipboard.writeText(filename).then(function() {
@@ -8592,7 +8622,7 @@ function showRenameHint(filename) {
   var closeBtn = document.createElement('button');
   closeBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:white;' +
     'border:1px solid rgba(255,255,255,0.3);border-radius:7px;font-size:12px;cursor:pointer;' +
-    'font-family:DM Sans,sans-serif;';
+    'font-family:DM Sans,Heebo,sans-serif;';
   closeBtn.textContent = '✕';
   closeBtn.onclick = function(){ div.remove(); };
 
@@ -8848,7 +8878,7 @@ function showImportError(msg, salvage) {
 
   // Card
   var card = document.createElement('div');
-  card.style.cssText = 'background:var(--card-bg);color:var(--ink);border-radius:14px;padding:24px;max-width:420px;width:100%;font-family:DM Sans,sans-serif;';
+  card.style.cssText = 'background:var(--card-bg);color:var(--ink);border-radius:14px;padding:24px;max-width:420px;width:100%;font-family:DM Sans,Heebo,sans-serif;';
 
   // Icon
   var icon = document.createElement('div');
@@ -8877,7 +8907,7 @@ function showImportError(msg, salvage) {
   actions.style.cssText = 'display:flex;gap:8px;';
 
   var freehand = document.createElement('button');
-  freehand.style.cssText = 'flex:1;padding:12px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+  freehand.style.cssText = 'flex:1;padding:12px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   freehand.textContent = salvage ? '✍️ Open with this text' : '✍️ Free-hand import';
   freehand.onclick = function(){
     overlay.remove();
@@ -8889,7 +8919,7 @@ function showImportError(msg, salvage) {
   };
 
   var btn = document.createElement('button');
-  btn.style.cssText = 'padding:12px 18px;background:transparent;color:#8A8279;border:1px solid #E0DAD2;border-radius:8px;font-size:14px;cursor:pointer;font-family:DM Sans,sans-serif;';
+  btn.style.cssText = 'padding:12px 18px;background:transparent;color:#8A8279;border:1px solid #E0DAD2;border-radius:8px;font-size:14px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   btn.textContent = 'Close';
   btn.onclick = function(){ overlay.remove(); };
 
@@ -9594,7 +9624,7 @@ function showServiceError(message) {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;';
   var closeBtn = document.createElement('button');
   closeBtn.textContent = 'OK';
-  closeBtn.style.cssText = 'width:100%;padding:12px;background:#c62828;color:white;border:none;border-radius:10px;font-family:DM Sans,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;';
+  closeBtn.style.cssText = 'width:100%;padding:12px;background:#c62828;color:white;border:none;border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;';
   closeBtn.onclick = function() { overlay.remove(); };
   var inner = document.createElement('div');
   inner.style.cssText = 'background:var(--card-bg);border-radius:16px;width:90%;max-width:440px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
@@ -12146,7 +12176,7 @@ async function askHelp() {
       var lineText=document.createElement('div'); lineText.style.cssText='flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;'; lineText.textContent=line;
       row.appendChild(lineText);
       if(line.trim().length>15 && !line.trim().endsWith(':')) {
-        var btn=document.createElement('button'); btn.style.cssText='flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;'; btn.textContent='🔍 Details';
+        var btn=document.createElement('button'); btn.style.cssText='flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,Heebo,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;'; btn.textContent='🔍 Details';
         (function(topic){ btn.onclick=function(){ showHelpDetail(topic,q); }; })(line.trim());
         row.appendChild(btn);
       }
@@ -12155,7 +12185,7 @@ async function askHelp() {
     var followRow=document.createElement('div'); followRow.style.cssText='margin-top:12px;padding-top:10px;border-top:1px solid var(--border);';
     followRow.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Ask a follow-up:</div>';
     var followInp=document.createElement('input'); followInp.className='help-input'; followInp.placeholder='Ask more...';
-    followInp.style.cssText='width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--card-bg);color:var(--ink);box-sizing:border-box;';
+    followInp.style.cssText='width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,Heebo,sans-serif;background:var(--card-bg);color:var(--ink);box-sizing:border-box;';
     followInp.onkeydown=function(e){ if(e.key==='Enter'&&followInp.value.trim()){ document.getElementById('helpInput').value=followInp.value.trim(); askHelp(); } };
     followRow.appendChild(followInp); answerEl.appendChild(followRow);
     answerEl.style.display='block'; loadingEl.style.display='none';
@@ -12172,7 +12202,7 @@ function showHelpDetail(topic, context) {
   overlay.style.cssText='position:fixed;inset:0;background:rgba(28,26,24,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
   var card=document.createElement('div'); card.style.cssText='background:var(--card-bg);border-radius:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);';
   var header=document.createElement('div'); header.style.cssText='display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;';
-  var title=document.createElement('div'); title.style.cssText='flex:1;font-family:Playfair Display,serif;font-size:15px;color:var(--heading);line-height:1.4;'; title.textContent=topic;
+  var title=document.createElement('div'); title.style.cssText='flex:1;font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:15px;color:var(--heading);line-height:1.4;'; title.textContent=topic;
   var closeBtn=document.createElement('button'); closeBtn.style.cssText='flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;color:var(--muted);'; closeBtn.textContent='✕'; closeBtn.onclick=function(){ overlay.remove(); };
   header.appendChild(title); header.appendChild(closeBtn);
   var body=document.createElement('div'); body.style.cssText='font-size:13px;color:var(--muted);text-align:center;padding:16px 0;'; body.textContent='🤔 Loading...';
@@ -13160,9 +13190,9 @@ function showSaveAsVideoBookmark(url, suggestedName, emoji) {
     + '<input id="bookmarkNameInput" class="form-input" value="' + escH(name) + '" style="width:100%;box-sizing:border-box;">'
     + '</div>'
     + '<div style="display:flex;gap:8px;">'
-    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escH(url) + '" data-emoji="' + (emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
+    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escH(url) + '" data-emoji="' + (emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
     + (emoji||'🎥') + ' Save as bookmark</button>'
-    + '<button onclick="clearUrlImportResult()" style="padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>'
+    + '<button onclick="clearUrlImportResult()" style="padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>'
     + '</div>'
     + '</div>';
 }
@@ -13367,16 +13397,16 @@ function updateFilterBarTop() {
     <div class="modal-body" style="padding:0;">
       <!-- Controls -->
       <div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;">
-        <button onclick="selfTestSelectAll(true)" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;">☑ Select all</button>
-        <button onclick="selfTestSelectAll(false)" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;">☐ Deselect all</button>
+        <button onclick="selfTestSelectAll(true)" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">☑ Select all</button>
+        <button onclick="selfTestSelectAll(false)" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">☐ Deselect all</button>
         <div id="selfTestProgress" style="margin-left:auto;font-size:12px;color:var(--muted);"></div>
       </div>
       <!-- Test list -->
       <div id="selfTestList" style="max-height:55vh;overflow-y:auto;padding:8px 0;"></div>
       <!-- Footer -->
       <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
-        <button id="selfTestRunBtn" onclick="runSelfTests()" style="flex:1;padding:11px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">▶ Execute Selected</button>
-        <button onclick="closeM('selfTestOverlay')" style="padding:11px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="selfTestRunBtn" onclick="runSelfTests()" style="flex:1;padding:11px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">▶ Execute Selected</button>
+        <button onclick="closeM('selfTestOverlay')" style="padding:11px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>
       </div>
     </div>
   </div>
@@ -13388,15 +13418,15 @@ function updateFilterBarTop() {
   background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
   box-shadow:0 8px 32px rgba(0,0,0,0.15);padding:14px 18px;
   display:none;align-items:center;gap:14px;z-index:8000;
-  max-width:420px;width:calc(100vw - 32px);font-family:'DM Sans',sans-serif;">
+  max-width:420px;width:calc(100vw - 32px);font-family:'DM Sans','Heebo',sans-serif;">
   <div style="font-size:36px;flex-shrink:0;">📲</div>
   <div style="flex:1;">
     <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:2px;">Install Tony's Recipes</div>
     <div style="font-size:12px;color:var(--muted);">Add to your home screen for quick access — works offline too.</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-    <button onclick="pwaInstall()" style="padding:8px 16px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Install</button>
-    <button onclick="pwaDismiss()" style="padding:6px 16px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;">Not now</button>
+    <button onclick="pwaInstall()" style="padding:8px 16px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Install</button>
+    <button onclick="pwaDismiss()" style="padding:6px 16px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;">Not now</button>
   </div>
 </div>
 
@@ -13405,7 +13435,7 @@ function updateFilterBarTop() {
   background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
   box-shadow:0 8px 32px rgba(0,0,0,0.15);padding:14px 18px;
   align-items:center;gap:12px;z-index:8000;
-  max-width:380px;width:calc(100vw - 32px);font-family:'DM Sans',sans-serif;">
+  max-width:380px;width:calc(100vw - 32px);font-family:'DM Sans','Heebo',sans-serif;">
   <div style="font-size:30px;flex-shrink:0;">📲</div>
   <div style="flex:1;">
     <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:4px;">Install Tony's Recipes</div>
@@ -13712,21 +13742,21 @@ function updateFilterBarTop() {
       <div id="shareModalTitle" style="font-size:13px;color:var(--muted);margin-top:3px;"></div>
     </div>
     <div class="modal-body" style="padding:8px 16px 20px;display:flex;flex-direction:column;gap:10px;">
-      <button id="shareNativeBtn" style="display:none;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+      <button id="shareNativeBtn" style="display:none;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">📲</span> Share via…
       </button>
-      <button id="shareWaBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#25D366;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+      <button id="shareWaBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#25D366;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">💬</span> Share on WhatsApp
       </button>
-      <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#4A90D9;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+      <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#4A90D9;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">✉️</span> Send by Email
         <span style="font-size:11px;opacity:0.8;">(copy & paste)</span>
       </button>
-      <button id="sharePageBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2E7D32;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+      <button id="sharePageBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2E7D32;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">🌐</span> Save as a web page
         <span style="font-size:11px;opacity:0.85;">(one file, opens anywhere)</span>
       </button>
-      <button id="shareCopyBtn" onclick="closeM('shareRecipeOverlay')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;width:100%;">
+      <button id="shareCopyBtn" onclick="closeM('shareRecipeOverlay')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">📋</span> Copy to Clipboard
       </button>
     </div>
@@ -13773,13 +13803,13 @@ function updateFilterBarTop() {
       <div style="margin-top:14px;padding:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
         <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px;">➕ Add family member</div>
         <input id="accessEmailInput" type="email" placeholder="their@gmail.com"
-          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;box-sizing:border-box;margin-bottom:8px;outline:none;" />
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;box-sizing:border-box;margin-bottom:8px;outline:none;" />
         <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
           <label class="access-role-opt"><input type="radio" name="newRole" value="read" checked> 👁 Read only</label>
           <label class="access-role-opt"><input type="radio" name="newRole" value="write"> ✏️ Read + Write</label>
           <label class="access-role-opt"><input type="radio" name="newRole" value="admin"> 🛡 Full (incl. delete)</label>
         </div>
-        <button onclick="addAccessMember()" style="width:100%;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;">Add Member</button>
+        <button onclick="addAccessMember()" style="width:100%;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">Add Member</button>
       </div>
 
       <!-- How it works note -->
@@ -13798,11 +13828,11 @@ function updateFilterBarTop() {
            like one. Colours go through --heading/--ink rather than --warm-brown,
            which is a surface as well as a text colour and inverts in dark mode. -->
       <div style="margin-top:14px;">
-        <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans',sans-serif;">🔧 Show Firestore security rules →</button>
+        <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans','Heebo',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:10px;">
           <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>
           <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
-          <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy Rules</button>
+          <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy Rules</button>
         </div>
       </div>
 
@@ -13814,7 +13844,7 @@ function updateFilterBarTop() {
 <!-- SW UPDATE BANNER -->
 <div id="swUpdateBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9500;
   background:var(--warm-brown);padding:14px 16px;padding-bottom:calc(14px + env(safe-area-inset-bottom));
-  flex-direction:column;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,0.3);font-family:'DM Sans',sans-serif;">
+  flex-direction:column;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,0.3);font-family:'DM Sans','Heebo',sans-serif;">
   <div style="display:flex;align-items:flex-start;gap:10px;">
     <span style="font-size:24px;flex-shrink:0;">🆕</span>
     <div style="flex:1;">
@@ -13828,11 +13858,11 @@ function updateFilterBarTop() {
   </div>
   <div style="display:flex;gap:8px;">
     <button onclick="swUpdateNow()"
-      style="flex:1;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">
+      style="flex:1;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">
       🔄 Update now
     </button>
     <button onclick="document.getElementById('swUpdateBanner').style.display='none'"
-      style="padding:10px 16px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;">
+      style="padding:10px 16px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">
       Later
     </button>
   </div>

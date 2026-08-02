@@ -155,9 +155,9 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 
 | # | Idea | Why | Effort |
 |---|------|-----|--------|
-| 5b.1 | **Hebrew typography** | Playfair Display and DM Sans have **no Hebrew glyphs**, so every Hebrew title renders in whatever generic serif the OS picks while the English title beside it is Playfair — the grid reads as two different apps. For a collection that is bilingual first, this is the most visible polish item in the app. Google Fonts serves Hebrew-capable pairs: **Frank Ruhl Libre** as the Playfair counterpart, **Heebo** or **Assistant** for DM Sans. Fixing the stacks fixes print, email and shared pages too. | 🟢 |
-| 5b.2 | **Card footers do not align across a row** | When one title wraps to two lines its difficulty pill and heart sit lower than its neighbours'. Flex the card body so footers pin to the bottom. | 🟢 |
-| 5b.3 | **List thumbnails are not square-cropped** | Grid tiles are `aspect-ratio: 1/1`; list thumbnails are not, so the same photo is framed two different ways depending on the view. | 🟢 |
+| ~~5b.1~~ | ✅ **DONE (v28.6)** — ~~Hebrew typography~~ | Playfair Display and DM Sans have **no Hebrew glyphs**, so every Hebrew title renders in whatever generic serif the OS picks while the English title beside it is Playfair — the grid reads as two different apps. For a collection that is bilingual first, this is the most visible polish item in the app. Google Fonts serves Hebrew-capable pairs: **Frank Ruhl Libre** as the Playfair counterpart, **Heebo** or **Assistant** for DM Sans. **Frank Ruhl Libre** now backs Playfair and **Heebo** backs DM Sans, in all 165 font stacks, so print, email and shared pages get it too. CSS resolves font-family per *glyph*, so a mixed English/Hebrew string renders each script in its own face. | 🟢 |
+| ~~5b.2~~ | ✅ **DONE (v28.6)** — ~~card footers do not align across a row~~ | When one title wraps to two lines its difficulty pill and heart sit lower than its neighbours'. The card is a column flex with a growing body, so footers pin to the bottom. Measured across a row: 522/522/522 px. | 🟢 |
+| ~~5b.3~~ | ❌ **WITHDRAWN — the claim was wrong** | I suggested list thumbnails were not square-cropped. They are: `.recipe-list-thumb` is a fixed 52×52 box and its `img` is `object-fit: cover`, which is exactly the same framing the grid tiles get. Nothing to fix. Left here rather than deleted so the same non-problem isn't 'found' again. | — |
 
 ---
 
