@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.0 -->
+<!-- Tony's Recipes Collection v29.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1222,6 +1222,103 @@ const SELF_TESTS = [
   // They are unit tests and cannot prove the live behaviour on their own — the
   // two-browser checks in PLAN-5.4-per-recipe-docs.md §7 still have to be done by
   // hand — but every rule below is one whose breakage is silent in production.
+  { id:'ui_skip_link', group:'UI', name:'Skip link reaches the recipes in two keystrokes (5c.1c)',
+    test: async()=>{
+      var link=document.querySelector('.skip-link');
+      if(!link) throw new Error('no skip link — reaching the first recipe takes ~67 tab presses');
+      if(link!==document.body.firstElementChild && !document.body.contains(link)) throw new Error('the skip link is not in the document');
+      if(typeof focusFirstRecipe!=='function') throw new Error('focusFirstRecipe not defined');
+      // It must be the FIRST thing Tab reaches, or it saves nothing.
+      var focusables=focusablesIn(document.body);
+      if(focusables.length && focusables[0]!==link) throw new Error('the skip link is not the first focusable element, so Tab reaches it too late to help');
+      var prevView=viewMode;
+      try{
+        setView('grid');
+        focusFirstRecipe();
+        if(!document.activeElement || !document.activeElement.classList.contains('recipe-card'))
+          throw new Error('the skip link does not land on a recipe card');
+      } finally { setView(prevView); }
+    } },
+
+  { id:'ui_focus_ring', group:'CSS', name:'The keyboard focus ring actually paints (5c.1)',
+    test: async()=>{
+      // Reported by Tony: tabbing to a card showed no ring. The :focus-visible
+      // rule was there, but a `.recipe-card:focus { outline: none }` at equal
+      // specificity sat AFTER it and won every time. Asserting the rule exists is
+      // not enough — this checks the cascade result, which is what he sees.
+      var prevView=viewMode, prevStored=null;
+      try{ prevStored=localStorage.getItem('tonys_view_mode'); }catch(e){}
+      try{
+        setView('grid');
+        var card=document.querySelector('.recipe-card');
+        if(!card) throw new Error('no recipe card rendered');
+        var reset=null, ring=null;   // ring = the first focus-visible rule that sets a real outline
+        for(var i=0;i<document.styleSheets.length;i++){
+          var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+          for(var j=0;j<rules.length;j++){
+            var sel=rules[j].selectorText||'';
+            if(/\.recipe-card:focus-visible/.test(sel)){
+              var css=rules[j].cssText||'';
+              // several focus-visible rules exist (one only sets transform) —
+              // keep the one that actually draws something.
+              if(!ring && /outline\s*:/.test(css) && !/outline\s*:\s*none/.test(css)) ring={i:j, css:css};
+            }
+            // a bare :focus reset that does NOT exempt :focus-visible will win
+            if(/\.recipe-card:focus(?![-a-z])/.test(sel) && !/not\(:focus-visible\)/.test(sel)
+               && (rules[j].style.outline==='none'||rules[j].style.outlineStyle==='none')) reset={i:j};
+          }
+        }
+        if(!ring) throw new Error('no :focus-visible rule for .recipe-card draws an outline — nothing paints when you tab to a card');
+        if(reset) throw new Error('a bare .recipe-card:focus outline reset still exists — it overrides the ring and nothing paints');
+        if(reset && ring && reset.i > ring.i)
+          throw new Error('an outline reset comes after the ring rule and overrides it');
+      } finally {
+        setView(prevView);
+        try{ if(prevStored===null) localStorage.removeItem('tonys_view_mode'); else localStorage.setItem('tonys_view_mode',prevStored); }catch(e){}
+      }
+    } },
+
+  { id:'ui_focus_trap', group:'UI', name:'An open dialog takes focus and gives it back (5c.1b)',
+    test: async()=>{
+      ['trapFocus','releaseFocus','focusablesIn'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      if(!recipes.length) throw new Error('no recipes to open');
+      var grid=document.querySelector('.recipe-card, .recipe-list-item');
+      if(grid) grid.focus();
+      var before=document.activeElement;
+      try{
+        openView(recipes[0].id);
+        await wait(140);
+        var ov=document.getElementById('viewOverlay');
+        if(!ov.contains(document.activeElement))
+          throw new Error('focus stayed outside the open recipe — Tab would walk the grid behind it');
+      } finally { closeM('viewOverlay'); }
+      await wait(60);
+      if(before && document.contains(before) && document.activeElement!==before)
+        throw new Error('focus was not returned to the card that opened the recipe');
+    } },
+
+  { id:'i18n_rtl_columns', group:'UI', name:'Hebrew recipes put ingredients on the right (5b.4)',
+    test: async()=>{
+      if(typeof recipeIsRTL!=='function') throw new Error('recipeIsRTL not defined');
+      if(recipeIsRTL({name:'Shakshuka', ingredients:[{n:'eggs'}], steps:['fry']}))
+        throw new Error('an English recipe was judged right-to-left');
+      if(!recipeIsRTL({name:'שקשוקה', ingredients:[{n:'ביצים'}], steps:['לטגן את הבצל']}))
+        throw new Error('a Hebrew recipe was not judged right-to-left');
+      // The common awkward case: English title, Hebrew body. The body wins.
+      if(!recipeIsRTL({name:'Shakshuka', ingredients:[{n:'ביצים'},{n:'עגבניות'}], steps:['לטגן את הבצל','להוסיף עגבניות']}))
+        throw new Error('a Hebrew-bodied recipe with an English title was judged left-to-right');
+      try{
+        openView(recipes[0].id);
+        var cols=document.querySelector('#viewOverlay .recipe-columns');
+        if(!cols) throw new Error('.recipe-columns missing');
+        var wasRTL=cols.getAttribute('dir')==='rtl';
+        if(recipeIsRTL(recipes[0])!==wasRTL)
+          throw new Error('the columns dir attribute disagrees with the recipe language');
+      } finally { closeM('viewOverlay'); }
+    } },
+
   { id:'feat_instagram', group:'Features', name:'Instagram failure offers a way forward (5f.1)',
     test: async()=>{
       if(typeof showInstagramCaptionFallback!=='function') throw new Error('showInstagramCaptionFallback not defined');
@@ -3667,7 +3764,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.0';
+var APP_VERSION = 'v29.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -4525,6 +4622,14 @@ window.addEventListener('error', function(e) {
      other modal keeps its 600px reading measure. */
   #viewOverlay .modal { max-width: 900px; }
   .recipe-columns { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 32px; align-items: start; }
+  /* A Hebrew recipe reads right-to-left, so the ingredients column belongs on
+     the RIGHT. `dir="rtl"` on the grid container flips the column order without
+     touching grid-template-columns, and drawView sets it from the recipe's own
+     language. (Note: `direction: auto` is not a thing — see CLAUDE.md.) */
+  .recipe-columns[dir="rtl"] { direction: rtl; }
+  .recipe-columns[dir="rtl"] > * { direction: ltr; }
+  .recipe-columns[dir="rtl"] .recipe-col-ings,
+  .recipe-columns[dir="rtl"] .recipe-col-steps { text-align: start; }
   .recipe-col-ings { position: sticky; top: 0; max-height: 72vh; overflow-y: auto; padding-inline-end: 6px; }
   .recipe-col-ings .modal-section-title,
   .recipe-col-steps .modal-section-title { margin-top: 0; }
@@ -4642,12 +4747,26 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .recipe-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: 100%; }
 .recipe-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(92,61,46,0.12); }
 /* 5c.1 — the grid had no keyboard path at all: cards were <div onclick> with not
-   one tabindex in the file. :focus-visible keeps the ring for keyboard users
-   without putting an outline round every tapped card. */
-.recipe-card:focus-visible, .recipe-list-item:focus-visible {
-  outline: 3px solid var(--terracotta); outline-offset: 2px;
+   one tabindex in the file.
+   ORDER AND SELECTOR BOTH MATTER HERE. This was originally written as a
+   :focus-visible rule followed by `.recipe-card:focus { outline: none }` at the
+   same specificity — so the reset won every time and the ring never painted at
+   all. Suppress the ring only for pointer focus, via :not(:focus-visible), and
+   let the keyboard rule come last. */
+.skip-link {
+  position: absolute; left: 50%; transform: translateX(-50%) translateY(-120%);
+  top: 6px; z-index: 3000; background: var(--terracotta); color: #fff;
+  padding: 12px 20px; border-radius: 0 0 10px 10px; font-family: 'DM Sans','Heebo',sans-serif;
+  font-size: 15px; font-weight: 600; text-decoration: none; transition: transform 0.15s;
 }
-.recipe-card:focus, .recipe-list-item:focus { outline: none; }
+.skip-link:focus { transform: translateX(-50%) translateY(0); outline: 3px solid var(--gold); outline-offset: 2px; }
+.recipe-card:focus:not(:focus-visible),
+.recipe-list-item:focus:not(:focus-visible) { outline: none; }
+.recipe-card:focus-visible, .recipe-list-item:focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(193,68,14,0.18);
+}
 .recipe-card:focus-visible { transform: translateY(-3px); }
 .card-image { width: 100%; height: 148px; display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; overflow: hidden; }
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
@@ -5959,6 +6078,11 @@ body.banner-shown .header {
 
 </head>
 <body>
+<!-- 5c.1c — it takes ~67 tab presses to walk the header, filters and view
+     controls before reaching the first recipe. That is not a keyboard path,
+     it is an endurance test. This jumps straight there and is invisible until
+     focused, so it costs sighted mouse users nothing. -->
+<a href="#recipeGrid" class="skip-link" onclick="focusFirstRecipe(event)">Skip to recipes</a>
 <button id="refreshBanner" onclick="applyRemoteUpdate()">🔄 New changes available — tap to refresh</button>
 
 <!-- HEADER -->
@@ -5976,7 +6100,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6540,7 +6664,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7689,6 +7813,64 @@ window.refreshLineMarker = refreshLineMarker; window.loadLineMark = loadLineMark
 // ─── KEYBOARD & ACCESSIBILITY ─────────────────────────────────────────────────
 // Escape closes the top-most open dialog. Previously the only way out of a modal
 // was finding the ✕ (or tapping the backdrop), which is awkward on a keyboard.
+// ── 5c.1b — focus management for dialogs ─────────────────────────────────────
+// Making the cards focusable was only half a keyboard path. Opening a recipe left
+// focus behind on the card in the grid, so Tab walked the page *underneath* the
+// dialog and nothing in the recipe could be operated at all. A dialog has to take
+// focus, keep it while it is open, and hand it back on close.
+var _focusReturn = [];
+function focusablesIn(el) {
+  if (!el) return [];
+  return Array.prototype.slice.call(el.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), '
+    + 'select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+  )).filter(function(n) {
+    if (n.closest('[hidden]')) return false;
+    var cs = window.getComputedStyle(n);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    return !!(n.offsetWidth || n.offsetHeight || n.getClientRects().length);
+  });
+}
+function trapFocus(overlayId) {
+  var el = document.getElementById(overlayId);
+  if (!el) return;
+  _focusReturn.push(document.activeElement);
+  // Give the dialog a moment to finish rendering, then land on the first real
+  // control rather than the close button, which is rarely what you want first.
+  setTimeout(function() {
+    var f = focusablesIn(el);
+    var target = f.find(function(n){ return !/close/i.test(n.getAttribute('aria-label') || ''); }) || f[0] || el;
+    if (target === el) { el.setAttribute('tabindex', '-1'); }
+    try { target.focus({ preventScroll: true }); } catch(e) { try { target.focus(); } catch(e2) {} }
+  }, 60);
+}
+function releaseFocus() {
+  var prev = _focusReturn.pop();
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+    try { prev.focus({ preventScroll: true }); } catch(e) { try { prev.focus(); } catch(e2) {} }
+  }
+}
+window.trapFocus = trapFocus; window.releaseFocus = releaseFocus; window.focusablesIn = focusablesIn;
+
+// Keep Tab inside the topmost open dialog. Without this, Tab leaves the recipe
+// and walks the grid behind it, which is how this bug presented.
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Tab') return;
+  var open = Array.prototype.slice.call(document.querySelectorAll('.open')).filter(function(el) {
+    if (!el.id) return false;
+    var cs = window.getComputedStyle(el);
+    return cs.position === 'fixed' && cs.display !== 'none' && cs.visibility !== 'hidden';
+  });
+  if (!open.length) return;
+  var dlg = open[open.length - 1];
+  var f = focusablesIn(dlg);
+  if (!f.length) return;
+  var first = f[0], last = f[f.length - 1];
+  if (!dlg.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
 function closeTopModal() {
   // Never leave the microphone running behind a closing dialog.
   if (typeof _voiceOn !== 'undefined' && _voiceOn) { stopVoice(); return true; }
@@ -8052,6 +8234,16 @@ function renderGrid() {
 // ── 5c.1 — keyboard activation ────────────────────────────────────────────────
 // Enter and Space open a recipe, matching what the click handler does. Space is
 // preventDefault'ed or the page scrolls underneath the card you just opened.
+// Land on the first recipe rather than the grid container, so the very next key
+// press already does something.
+function focusFirstRecipe(e) {
+  if (e) e.preventDefault();
+  var first = document.querySelector('.recipe-card, .recipe-list-item');
+  if (first) { first.focus(); first.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  else { var g = document.getElementById('recipeGrid'); if (g) g.scrollIntoView({ behavior: 'smooth' }); }
+}
+window.focusFirstRecipe = focusFirstRecipe;
+
 function cardKey(e, id) {
   if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
   e.preventDefault();
@@ -8166,7 +8358,26 @@ function openView(id){
   } catch(e){}
   loadLineMark(id);   // "never lose the line I'm on" — restored per recipe
   drawView();
+  trapFocus('viewOverlay');   // 5c.1b — the dialog takes focus, and gives it back on close
 }
+
+// Which way round does this recipe read? Used for LAYOUT only — which side the
+// ingredients column sits on. Text alignment stays with dir="auto" per element,
+// which is what handles a mixed Hebrew/English string correctly.
+// Hebrew block: U+0590–U+05FF. Judged on the name plus the ingredients and steps,
+// because an English title on a Hebrew recipe is common and the body is the
+// better signal. A simple majority of the strong-directional characters wins.
+function recipeIsRTL(r) {
+  if (!r) return false;
+  var sample = [r.name || ''];
+  (r.ingredients || []).slice(0, 12).forEach(function(i){ sample.push((i && i.n) || ''); });
+  (r.steps || []).slice(0, 6).forEach(function(st){ sample.push(st || ''); });
+  var text = sample.join(' ');
+  var heb = (text.match(/[\u0590-\u05FF]/g) || []).length;
+  var lat = (text.match(/[A-Za-z]/g) || []).length;
+  return heb > lat;
+}
+window.recipeIsRTL = recipeIsRTL;
 
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
@@ -8279,7 +8490,7 @@ function drawView(){
           }).join('')}</div></details>` : ''}
       <div id="lineMarkHost">
       <div id="lineMarker"></div>
-      <div class="recipe-columns">
+      <div class="recipe-columns"${recipeIsRTL(r) ? ' dir="rtl"' : ''}>
       <div class="recipe-col-ings">
       <div class="modal-section-title">Ingredients</div>
       <ul class="ingredients-list">${ings}</ul>
@@ -10053,6 +10264,7 @@ function closeM(id){
     return;
   }
   document.getElementById(id).classList.remove('open');
+  releaseFocus();   // 5c.1b — hand focus back to whatever opened this
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
   if(id==='editOverlay') _editFormSnapshot = null;
 }

@@ -35,7 +35,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.0: 136 checks, 130 passing.** The 6 failures are `net_*` and
+**As of v29.1: 140 checks, 134 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -85,6 +85,16 @@ found only because a test was written first and disagreed with the code.
 
 - **`--warm-brown` is both a surface and heading text.** Headings use `--heading`.
   Flipping the wrong one breaks dark mode in a way that only shows in one theme.
+- **A focus ring needs `:focus:not(:focus-visible)` for the reset, and the ring
+  rule last.** Written the other way round — a `:focus { outline: none }` after
+  the `:focus-visible` rule at equal specificity — the reset wins and nothing
+  ever paints. Asserting the rule exists does not catch it; check the cascade.
+- **Making something focusable is half a keyboard path.** A dialog must also take
+  focus, trap Tab while open, and hand focus back on close, or Tab walks the page
+  behind it. `trapFocus`/`releaseFocus` do this; `closeM` calls the release.
+- **RTL is layout as well as text.** `dir="auto"` per element handles alignment,
+  but which SIDE a column sits on needs `dir="rtl"` on the grid container —
+  `recipeIsRTL(r)` decides from the recipe body, not just its title.
 - **`direction: auto` is not valid CSS.** Use `dir="auto"` + `unicode-bidi: plaintext`
   + `text-align: start`. This applies to email, print and shared pages too.
 - **Escape before highlighting/interpolating, never after.** `hlMatch`, `aiFailPane`
