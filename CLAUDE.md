@@ -30,7 +30,7 @@ python3 -m http.server 8137          # some checks need http://, not file://
 # → page.evaluate over SELF_TESTS, calling each t.test()
 ```
 
-**As of v28.3: 128 checks, 122 passing.** The 6 failures are `net_*` and
+**As of v28.4: 129 checks, 123 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 

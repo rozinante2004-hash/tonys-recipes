@@ -141,9 +141,65 @@ Tony is happy with per-100g figures; no per-serving toggle or confidence caveat 
 | ~~5.3~~ | ✅ **DONE (v27.6)** — ~~Thumbnails~~ | A 320 px JPEG per recipe, generated once and cached in IndexedDB. Measured on a photo-like 1600×1200 image: **252 KB → 10.8 KB (23×)**, and a 12-tile grid re-render went from **288 ms to 1 ms**. Falls back to the full photo until the thumbnail exists, so a failure is never a blank tile. | 🟡 |
 | ~~5.4~~ | ⚠️ **STEPS 1–2 OF 3 DONE (v28.0, v28.1)** — ~~one document per recipe~~ | `shared/recipe_<id>` per recipe plus `shared/meta` (`nextId`, `ids`, `schema: 2`). A save now writes **only what changed**, and a write whose base is older than the cloud copy is **refused with an honest message** rather than silently overwriting someone — that lost-edit case was the whole point. Migration runs on first load, is idempotent and safe to interrupt (`schema` is stamped last). v28.0 dual-wrote the old `shared/recipes` document; **v28.1 stopped writing it**, which removes the last blind whole-collection overwrite. It is still read once per load so a device left on v27.9 cannot lose edits, and is deleted by hand later. **The two-browser checks in PLAN §7 have not been run** — they need two real signed-in sessions. | 🔴 |
 | ~~5.5~~ | ✅ **DONE (v27.6)** — ~~Firestore rules in the repo~~ | `firestore.rules` is now the source of truth; the app fetches it and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list. The built-in copy is a labelled fallback for offline use, not a silent second version. Publishing is still a deliberate manual paste. | 🟢 |
-| 5.6 | **Automated tests in CI** | The Self Test suite is excellent but must be run by hand. The same checks could run headlessly on every push via GitHub Actions. | 🟡 |
+| 5.6 | **Automated tests in CI** — ✅ **ACCEPTED (Aug 2026)**, previously declined | The Self Test suite is excellent but must be run by hand. Reason for revisiting: the suite is now 128 checks, and in Aug 2026 it caught a bug *Tony had to report himself* because the headless runner did not reproduce in-app conditions (`a11y_basics` closed the suite out from under itself). A GitHub Action running it on push would have caught that first. | 🟡 |
 | ~~5.7~~ | ✅ **DONE (v27.4)** — ~~Cache AI calls~~ | Keyed on model + token budget + exact prompt, 7-day TTL, capped at 40 entries, evicted oldest-first. Tool-using calls and failures are deliberately never cached, and a quota error drops the cache rather than the recipes. | 🟢 |
 | ~~5.8~~ | ✅ **DONE (v27.6)** — ~~Retire the `_ph`/`hp` dual flags~~ | `_ph` is the single name for "the photo lives elsewhere", local and cloud alike. Reads still accept the legacy `hp` so documents written by older versions keep working; writes only ever emit `_ph`. | 🟢 |
+| ~~5.9~~ | ✅ **DONE (v28.4)** — ~~cache cloud reads by `updatedAt`~~ | 5.4 traded writes for reads and the trade is currently uncapped: a cold load costs `1 + N recipes + M photos`, and the foreground-refresh listener re-runs the whole fan-out every time the app is focused (throttled 20 s). At 200 recipes with 150 photos that is ~350 reads per refresh against a 50 000/day free tier — ~140 focus events and you are rate-limited. Before 5.4 it was 2 reads. A refresh that finds `meta.updatedAt` unmoved now costs **2 reads instead of ~350** — one for `meta`, one for the legacy document (which a v27.9 device could still have written, and which drops away when that document is finally deleted). The stamp persists, so cold starts benefit too. `canSkipCloudFanout` refuses on any doubt: offline edits queued, nothing held locally, cloud listing more recipes than we hold, or no full read ever done on this device. | 🟡 |
+| 5.10 | **Photos to Firebase Storage instead of base64 in Firestore** — ⏸ **DEFERRED, judged risky (Aug 2026)** | Base64 inflates every photo ~33 %, and Firestore bills document reads where Storage would give a CDN and byte-range fetches. Deferred deliberately: export, backup, cloud sync, email and print **all** consume data URLs (a decision recorded in CLAUDE.md), so this is not a storage swap — it is a change to every path that consumes a photo, plus new Storage rules and a migration of live data. Worth doing only when storage cost or photo latency actually hurts. | 🔴 |
+| 5.11 | **Lazy-load the heavy libraries** | `xlsx`, `mammoth` and `qrcodejs` are blocking `<script>` tags in `<head>`, so every visit pays for them even though most sessions never import a spreadsheet or a Word file. Load on first use instead. | 🟢 |
+| 5.12 | **Faster repeat loads** | The service worker is network-first for the document, so every cold load re-downloads ~209 KB gzipped even when nothing changed. The app already polls `version.json` and shows an update banner, which makes a cache-first-then-revalidate document strategy safe: instant paint, update in the background, banner when a new version really lands. (Serving a pre-compressed file is *not* the answer — GitHub Pages already compresses; the real win beyond this is 5.1, splitting the file so CSS/JS cache separately across releases.) | 🟡 |
+
+---
+
+## 5b. Aesthetics
+
+| # | Idea | Why | Effort |
+|---|------|-----|--------|
+| 5b.1 | **Hebrew typography** | Playfair Display and DM Sans have **no Hebrew glyphs**, so every Hebrew title renders in whatever generic serif the OS picks while the English title beside it is Playfair — the grid reads as two different apps. For a collection that is bilingual first, this is the most visible polish item in the app. Google Fonts serves Hebrew-capable pairs: **Frank Ruhl Libre** as the Playfair counterpart, **Heebo** or **Assistant** for DM Sans. Fixing the stacks fixes print, email and shared pages too. | 🟢 |
+| 5b.2 | **Card footers do not align across a row** | When one title wraps to two lines its difficulty pill and heart sit lower than its neighbours'. Flex the card body so footers pin to the bottom. | 🟢 |
+| 5b.3 | **List thumbnails are not square-cropped** | Grid tiles are `aspect-ratio: 1/1`; list thumbnails are not, so the same photo is framed two different ways depending on the view. | 🟢 |
+
+---
+
+## 5c. UI / UX
+
+| # | Idea | Why | Effort |
+|---|------|-----|--------|
+| 5c.1 | **Keyboard access — there is none** | Zero `tabindex` in the file; recipe cards are `<div onclick>`. The grid cannot be reached or opened from the keyboard at all. Focusable cards with Enter/Space and a visible focus ring make the desktop genuinely faster and are the single biggest accessibility gap. | 🟢 |
+| 5c.2 | **Swipe on phone → favourite only** | Swipe a card to toggle the heart. **Never swipe-to-delete** — explicitly rejected: destructive actions should not be one careless thumb away, undo or no undo. | 🟡 |
+| 5c.3 | **Pull-to-refresh** | The app already re-syncs when it returns to the foreground; making that a deliberate gesture turns invisible magic into something you can ask for and watch happen. | 🟢 |
+| 5c.4 | **Log a cook from the grid** | "🍳 Cooked!" currently needs the recipe open. | 🟢 |
+
+---
+
+## 5d. Backend & safety
+
+| # | Idea | Why | Effort |
+|---|------|-----|--------|
+| 5d.1 | **Automatic backup** | Backup is manual *and* desktop-only, which means the safety net is missing exactly when it matters — after a schema change, or on the phone. A periodic automatic export is cheap insurance and would have been reassuring during the 5.4 migration. | 🟡 |
+| 5d.2 | **Sweep orphaned `photo_<id>` documents** | Now that deletion is admin-only, a write-role member removing a photo silently fails to delete its cloud document (`syncCloudPhotos` swallows the error). Nothing ever cleans those up. Harmless but unbounded. | 🟢 |
+| 5d.3 | **Finish 5.4** | Delete the legacy `shared/recipes` document by hand once no device can be on v27.9, removing `reconcileLegacyStragglers` and the `recipes` listener with it. And run the two-browser concurrency checks in PLAN §7, which still have not been done. | 🟢 |
+
+---
+
+## 5e. Visibility
+
+| # | Idea | Why | Effort |
+|---|------|-----|--------|
+| 5e.1 | **Sync health panel** | The sync pill is the only window into the cloud. Show last successful sync, pending offline queue, refused-conflict count, `recipe_*` documents vs local recipes, and reads used today against the free tier. The 5.4 migration ran on live data with no way to watch it — this is the fix for that class of blindness, and it fits Tony's standing preference for the UI never asserting anything the code has not verified. | 🟡 |
+
+---
+
+## 5f. Functionality
+
+| # | Idea | Why | Effort |
+|---|------|-----|--------|
+| 5f.1 | **Instagram import** | The current `instagram-fetch` path is effectively dead — oEmbed has needed auth, so it 404s, and the self-test treats 404 as a pass. Meta made oEmbed **tokenless again on 15 June 2026** for public posts, so this is worth rebuilding rather than retiring. Note the caption is what carries the recipe, and oEmbed returns a title/caption rather than the full post body, so a paste-the-caption fallback still has to exist. | 🟡 |
+| 5f.2 | **Duplicate detection on import** | Importing the same URL twice silently creates two recipes. Match on source URL and near-identical names, then offer merge or keep-both. | 🟢 |
+| 5f.3 | **Ingredient-level search** | "must contain *all* of: chicken, lemon". Search is currently OR-ish across fields. | 🟡 |
+| 5f.4 | **Bulk re-categorise / bulk diet-tag** | Select mode exists and AI diet tagging exists; they do not meet. | 🟢 |
+| 5f.5 | **"One item away" filter** | The pantry and the missing-ingredient ranking are already built (3.2); surfacing "you are one shop item from cooking this" as a filter chip is a small addition to shipped machinery. | 🟢 |
+| 5f.6 | **Meal planner (3.1)** — ⏸ **low priority, by Tony's own account** | The market treats weekly meal planning as table stakes and pantry + Bring! were the hard half, so it is now a smaller job than when it was declined. But Tony cooks once a week, at the weekend, so a weekly planner solves a problem he does not have. Recorded, not queued. | 🔴 |
 
 ---
 
