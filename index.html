@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.2 -->
+<!-- Tony's Recipes Collection v29.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1694,13 +1694,17 @@ const SELF_TESTS = [
       // both directions: skip when genuinely unchanged, never skip on doubt.
       if(typeof canSkipCloudFanout!=='function') throw new Error('canSkipCloudFanout not defined');
       var meta={updatedAt:500, ids:[1,2,3]};
-      if(!canSkipCloudFanout(meta,3,500,false)) throw new Error('an unchanged cloud was re-read in full — 5.9 is not working');
-      if(canSkipCloudFanout(meta,3,499,false)) throw new Error('a MOVED cloud was skipped — this device would show stale recipes');
-      if(canSkipCloudFanout(meta,3,500,true)) throw new Error('skipped while offline edits were queued — they would never be pushed');
-      if(canSkipCloudFanout(meta,0,500,false)) throw new Error('skipped with nothing held locally — the grid would stay empty');
-      if(canSkipCloudFanout(meta,2,500,false)) throw new Error('skipped while the cloud lists more recipes than we hold — the local copy is incomplete');
-      if(canSkipCloudFanout(meta,3,null,false)) throw new Error('skipped without ever having done a full read on this device');
-      if(canSkipCloudFanout({ids:[1]},1,500,false)) throw new Error('skipped on a meta document with no updatedAt to compare');
+      if(!canSkipCloudFanout(meta,3,500,false,true)) throw new Error('an unchanged cloud was re-read in full — 5.9 is not working');
+      if(canSkipCloudFanout(meta,3,499,false,true)) throw new Error('a MOVED cloud was skipped — this device would show stale recipes');
+      if(canSkipCloudFanout(meta,3,500,true,true)) throw new Error('skipped while offline edits were queued — they would never be pushed');
+      if(canSkipCloudFanout(meta,0,500,false,true)) throw new Error('skipped with nothing held locally — the grid would stay empty');
+      if(canSkipCloudFanout(meta,2,500,false,true)) throw new Error('skipped while the cloud lists more recipes than we hold — the local copy is incomplete');
+      if(canSkipCloudFanout(meta,3,null,false,true)) throw new Error('skipped without ever having done a full read on this device');
+      if(canSkipCloudFanout({ids:[1]},1,500,false,true)) throw new Error('skipped on a meta document with no updatedAt to compare');
+      // v29.3 — the one that caused the stuck loop: skipping the read without
+      // holding the base means the next save has nothing to compare and refuses
+      // the whole collection, and the next load skips again. Never skip blind.
+      if(canSkipCloudFanout(meta,3,500,false,false)) throw new Error('skipped the read without holding the concurrency base — every save would then be refused, on every load, forever');
       // The stamp has to survive a reload, or every cold start pays full price.
       if(typeof setLastCloudMetaAt!=='function'||typeof loadLastCloudMetaAt!=='function') throw new Error('the high-water mark is not persisted');
       var prev=null; try{ prev=localStorage.getItem(CLOUD_META_AT_KEY); }catch(e){}
@@ -1741,6 +1745,39 @@ const SELF_TESTS = [
         try{ if(prev===null) localStorage.removeItem(CLOUD_BASE_KEY); else localStorage.setItem(CLOUD_BASE_KEY,prev); }catch(e){}
         loadCloudBase();
       }
+    } },
+
+  { id:'cloud_no_refusal_loop', group:'Cloud Sync', name:'A fresh load can save — no stuck refusal loop (v29.3)',
+    test: async()=>{
+      // Reproduces exactly what happened on Tony's PC in v29.1 and v29.2:
+      // a cloud that has not changed, a fresh page load (base map empty), and a
+      // recipe old enough that its updatedAt is 0. Every save was refused, and
+      // the next load skipped the read again, so it never recovered.
+      var st=_cloudSnapshotForTest();
+      try{
+        var db=_fakeFirestore({ recipe_1:{ r:JSON.stringify({id:1,name:'old',photo:''}), updatedAt:1710000000000, id:1 } });
+        var local={ id:1, name:'old', photo:'', updatedAt:0 };   // predates the field
+        window._cloudRecipeBase={}; window._cloudRecipeStamp={};
+
+        // 1. With no base and a cloud copy on a different stamp, refusing is right.
+        var res=await saveRecipeDoc(local, db);
+        if(res.skipped!=='conflict') throw new Error('expected a refusal with no base and a differing cloud stamp, got '+JSON.stringify(res));
+
+        // 2. ...so the loader must NOT be allowed to skip the read in that state.
+        if(canSkipCloudFanout({updatedAt:9,ids:[1]},1,9,false,false))
+          throw new Error('the loader would skip the read while holding no base — this is the loop, it never recovers');
+
+        // 3. Once the read has happened, the base is known and the save lands.
+        parseCloudRecipeDocs([{ id:'recipe_1', data:db._docs.recipe_1 }]);
+        var res2=await saveRecipeDoc(local, db);
+        if(!res2.ok) throw new Error('still refused after a full read populated the base: '+JSON.stringify(res2));
+
+        // 4. And local now agrees with what was written, so the next save is clean.
+        if(local.updatedAt!==db._docs.recipe_1.updatedAt)
+          throw new Error('local updatedAt ('+local.updatedAt+') drifted from the cloud ('+db._docs.recipe_1.updatedAt+') — the mismatch that made old recipes unsavable');
+        if(cloudDirtyIds([local], window._cloudRecipeStamp).length)
+          throw new Error('the recipe is still dirty straight after a successful write — it would be rewritten every save');
+      } finally { _cloudRestoreForTest(st); }
     } },
 
   { id:'cloud_straggler', group:'Cloud Sync', name:'A v27.9 straggler is picked up, a deletion is not resurrected',
@@ -3798,7 +3835,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.2';
+var APP_VERSION = 'v29.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6134,7 +6171,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6698,7 +6735,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11310,7 +11347,7 @@ function setLastCloudMetaAt(v) {
 // Whether a load can skip the per-recipe fan-out entirely. Deliberately
 // conservative: any doubt at all falls through to a full read, because a wrong
 // "nothing changed" shows stale recipes, which is far worse than some reads.
-function canSkipCloudFanout(meta, localCount, lastAt, offlineQueued) {
+function canSkipCloudFanout(meta, localCount, lastAt, offlineQueued, haveAllBases) {
   if (offlineQueued) return false;                       // we have edits to push
   if (!meta || typeof meta.updatedAt !== 'number') return false;
   if (lastAt === null || lastAt === undefined) return false;   // never fully loaded here
@@ -11320,6 +11357,13 @@ function canSkipCloudFanout(meta, localCount, lastAt, offlineQueued) {
   // (cleared storage, half-finished first load) — read properly rather than
   // trusting a matching timestamp.
   if (Array.isArray(meta.ids) && meta.ids.length !== localCount) return false;
+  // v29.3 — and we must actually HOLD the concurrency base for what we have.
+  // Skipping the read is only safe if we still know which version of each recipe
+  // the cloud holds; without that, the next save has nothing to compare against
+  // and refuses everything. That is the loop v29.1/v29.2 got stuck in: the fast
+  // path skipped the only read that fills the base map, so it never got filled,
+  // so every save was refused, forever.
+  if (!haveAllBases) return false;
   return true;
 }
 window.canSkipCloudFanout = canSkipCloudFanout;
@@ -11452,10 +11496,22 @@ async function saveRecipeDoc(r, db) {
   db = db || _fbDb;
   var ref  = db.collection('shared').doc(recipeDocId(r.id));
   var base = _cloudRecipeBase[r.id];
-  var json = JSON.stringify(slimRecipeForCloud(r, true));
+  // Decide the version FIRST and serialise with it, so the stored change-stamp
+  // describes exactly the recipe we will hold afterwards. Serialising before
+  // stamping meant the stamp described a recipe with the OLD updatedAt, so the
+  // very next dirty check disagreed and the recipe was rewritten on every single
+  // save — which is what made this fire on every favourite.
+  var stampedAt = r.updatedAt || Date.now();
+  var payload   = slimRecipeForCloud(r, true);
+  payload.updatedAt = stampedAt;
+  var json  = JSON.stringify(payload);
   var bytes = byteLen(json);
   if (bytes > FIRESTORE_DOC_LIMIT) return { id: r.id, skipped: 'too-big', bytes: bytes };
-  var stamped = r.updatedAt || Date.now();
+  // A recipe predating the updatedAt field normalises to 0. Writing Date.now() to
+  // the cloud while the local copy stayed 0 meant the two could never match
+  // again, which defeated the "same version" escape hatch for exactly the oldest
+  // recipes. The local copy is brought into line after a successful write.
+  var stamped = stampedAt;
   var refused = false;
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
@@ -11464,6 +11520,7 @@ async function saveRecipeDoc(r, db) {
     tx.set(ref, { r: json, updatedAt: stamped, id: r.id });
   });
   if (refused) return { id: r.id, skipped: 'conflict' };
+  r.updatedAt             = stamped;   // keep local and cloud in lockstep
   _cloudRecipeBase[r.id]  = stamped;
   _cloudRecipeStamp[r.id] = hashStr(json);
   _cloudRecipeIds[r.id]   = true;
@@ -11881,9 +11938,12 @@ async function _loadFromFirestoreInner(user) {
     // missing its edits is exactly what v28.1 exists to prevent. Two reads
     // instead of ~350; one, once the legacy document is finally deleted.
     var offlineQueued = _offlineQueue || localStorage.getItem('tonys_offline_queue') === '1';
+    var haveAllBases = recipes.length > 0 && recipes.every(function(r) {
+      return _cloudRecipeBase[r.id] !== undefined;
+    });
     var skipFanout = false;
     if (_cloudSchema >= CLOUD_SCHEMA &&
-        canSkipCloudFanout(meta, recipes.length, _lastCloudMetaAt, offlineQueued)) {
+        canSkipCloudFanout(meta, recipes.length, _lastCloudMetaAt, offlineQueued, haveAllBases)) {
       var quiet = await reconcileLegacyStragglers(recipes, meta);
       countCloudRead();
       if (!quiet.changed) {

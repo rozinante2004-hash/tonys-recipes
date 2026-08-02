@@ -35,7 +35,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.2: 141 checks, 135 passing.** The 6 failures are `net_*` and
+**As of v29.3: 142 checks, 136 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -98,7 +98,13 @@ found only because a test was written first and disagreed with the code.
   nothing populated them, every recipe looked like a conflict, and v29.1 refused
   an entire collection on every load, self-sustaining. Also: **"no base" is not
   "conflict"** — if the cloud copy carries the same `updatedAt` as ours, we hold
-  that version and writing is safe.
+  that version and writing is safe. And the fast path must refuse to skip unless
+  it actually holds a base for every local recipe — otherwise it skips the only
+  read that fills the map, so the map never fills. That was a genuine stuck loop.
+- **The change stamp must describe the recipe you KEEP, not the one you had.**
+  `saveRecipeDoc` serialises with the new `updatedAt` already applied. Serialising
+  first and stamping after means the stored hash describes the old version, the
+  next dirty check disagrees, and every recipe is rewritten on every save.
 - **RTL is layout as well as text.** `dir="auto"` per element handles alignment,
   but which SIDE a column sits on needs `dir="rtl"` on the grid container —
   `recipeIsRTL(r)` decides from the recipe body, not just its title.
