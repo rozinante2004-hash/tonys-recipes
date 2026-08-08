@@ -15,6 +15,10 @@ a nicer group label than its file name.
 > open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
 > A few more taps per export than the Share sheet, but nothing to build and nothing to go wrong.
 >
+> **The pictures below are mock-ups, not screenshots** — drawn to match what the Shortcuts editor
+> shows so you can compare at a glance. Colours and spacing will differ slightly from your screen;
+> the *words and the blue chips* are what to check against.
+>
 > **Written against the Shortcuts app as it looks in 2026**, and corrected against real
 > screenshots. The **ⓘ is in the BOTTOM toolbar** — see 2.1. If your screen still doesn't match a
 > step, say so rather than working around it; the layout moves between iOS versions and guessing
@@ -71,6 +75,9 @@ So:
    *"Receive Text and images input from Share Sheet"*
 4. Tap the blue **Text and images** in that row → **deselect everything**, select **Files** only
 
+![The Receive action, set to Files](img/01-receive.svg)
+
+
 If your Shortcuts app does not match even this, skip the whole thing and use the upload page —
 see the top of this document. It does the same job and needs no Shortcuts archaeology.
 
@@ -91,6 +98,9 @@ Keep it **plain ASCII** — letters, digits, dashes, and an extension. Hebrew be
 > The word **Text** at the end is a blue chip, not typed — Shortcuts fills it in because the Text
 > action is directly above. If it says `Set variable FILENAME to Shortcut Input`, tap that chip
 > and choose **Text** instead.
+
+![Text action and Set variable FILENAME](img/02-filename.svg)
+
 
 ### 2.3 The token
 
@@ -128,6 +138,9 @@ letters and digits. That is all this step does.
 > variable bar works too.
 >
 > The chip you want is the file WhatsApp handed you. Nothing else belongs here.
+
+![Base64 Encode: wrong with two chips, right with one and Line Breaks None](img/03-base64.svg)
+
 
 **12.** Tap the small **⌄** (or **Show More**) on that action and set **Line Breaks** to **None**
 
@@ -190,6 +203,9 @@ suggestions — your variables live there. Tap **FILENAME**.
 > If you cannot see the variable bar, tap the URL box once more — it appears only while that field
 > has the cursor.
 
+![Get contents of URL with the FILENAME chip and Method GET](img/04-get-url.svg)
+
+
 **17.** Tap **Show More** on this action to reveal Method, Headers and Request Body.
 
 **18.** Set **Method** to **GET**
@@ -213,6 +229,9 @@ bar above the keyboard.
 >
 > This one is plain text — no variable.
 
+![The two headers](img/05-headers.svg)
+
+
 **21.** Leave **Request Body** alone. A GET sends nothing.
 
 **22.** Search for `Get Dictionary Value` → tap it. Set **Key** to `sha`.
@@ -226,7 +245,11 @@ bar above the keyboard.
 
 > ✅ **Should read:** `Set variable SHA to Dictionary Value`
 
-**At this point the shortcut, top to bottom, should be:**
+**At this point the shortcut, top to bottom, should look like this:**
+
+![The whole shortcut so far — nine actions](img/07-full.svg)
+
+In text, if you prefer to compare that way:
 
 ```
 Receive Files from Share Sheet
@@ -254,6 +277,9 @@ Nine actions. If yours matches, 2.6 is the last part.
 > ✅ **Should read:** `If SHA has any value`
 >
 > In plain English: *"if GitHub gave me a sha, the file is already there."*
+
+![The If / Otherwise / End If block with both upload actions](img/06-if-block.svg)
+
 
 Now one upload action in each half. They are **identical except for one field**.
 
