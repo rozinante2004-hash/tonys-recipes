@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Uploading a chat export from the iPhone — Tony's Recipes</title>
+<meta name="theme-color" content="#5C3D2E">
+<style>
+  :root{--cream:#FAF7F2;--warm-brown:#5C3D2E;--terracotta:#C1440E;--gold:#D4A843;
+        --ink:#1C1A18;--muted:#8A8279;--border:#E8E0D5;--card:#fff;}
+  @media (prefers-color-scheme: dark){
+    :root{--cream:#171310;--ink:#F2EDE6;--muted:#A29A90;--border:#332A22;--card:#211A15;}
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,'DM Sans',system-ui,Arial,sans-serif;background:var(--cream);
+       color:var(--ink);margin:0;padding:26px 18px calc(60px + env(safe-area-inset-bottom));
+       line-height:1.65;font-size:16.5px;}
+  .wrap{max-width:760px;margin:0 auto;}
+  h1{font-family:Georgia,serif;color:var(--warm-brown);font-size:27px;line-height:1.25;margin:0 0 18px;}
+  h2{font-family:Georgia,serif;color:var(--warm-brown);font-size:22px;margin:34px 0 10px;
+     padding-top:16px;border-top:1px solid var(--border);}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--terracotta);}
+  @media (prefers-color-scheme: dark){ h1,h2{color:var(--gold);} }
+  a{color:var(--terracotta);}
+  code{background:rgba(128,128,128,0.14);border-radius:4px;padding:1.5px 5px;font-size:14px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word;}
+  pre{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;
+      overflow-x:auto;font-size:13.5px;line-height:1.5;}
+  pre code{background:none;padding:0;font-size:13.5px;}
+  blockquote{margin:14px 0;padding:12px 15px;background:var(--card);border:1px solid var(--border);
+             border-inline-start:4px solid var(--gold);border-radius:0 10px 10px 0;font-size:15.5px;}
+  blockquote p{margin:7px 0;}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;display:block;overflow-x:auto;}
+  th,td{border:1px solid var(--border);padding:9px 11px;text-align:start;vertical-align:top;}
+  th{background:rgba(128,128,128,0.10);font-weight:600;}
+  figure{margin:16px 0;}
+  svg.mock{width:100%;height:auto;display:block;border:1px solid var(--border);border-radius:12px;}
+  figcaption{font-size:13px;color:var(--muted);margin-top:6px;text-align:center;}
+  hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
+  li{margin:5px 0;}
+  .note{background:#FFF8E8;border:1px solid #E8D9A8;color:#7A5C00;border-radius:10px;
+        padding:12px 14px;font-size:14.5px;margin-bottom:20px;}
+  @media print{
+    body{background:#fff;color:#000;font-size:11pt;padding:0;}
+    h1,h2{color:#000;} blockquote,pre,svg.mock{break-inside:avoid;}
+    a{color:#000;text-decoration:underline;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="note">Self-contained copy — the pictures are embedded, so this works offline and prints.
+The living version is in the repo at <code>whatsapp/UPLOAD-FROM-IPHONE.md</code>; this file is
+generated from it by <code>tools/build-upload-guide.js</code>.</div>
+<h1>Uploading a chat export straight from the iPhone</h1>
+<p>Goal: <strong>WhatsApp → Export chat → Share → Shortcut → done.</strong> No laptop in the middle.</p>
+<p>The export step itself cannot be automated on any platform — WhatsApp has no API for it, and
+anything driving WhatsApp Web breaches their terms and gets numbers banned. The <em>upload</em>
+afterwards can be, and that is what this builds.</p>
+<p><strong>As of v29.5 you only upload the file.</strong> The app lists the folder over the GitHub API, so
+<code>index.json</code> no longer has to be edited. It is still read, and still does one job: giving a file
+a nicer group label than its file name.</p>
+<blockquote>
+<p><strong>Prefer to read this away from GitHub?</strong>
+<strong><a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload-guide.html">upload-guide.html</a></strong>
+is this same guide as one self-contained file — pictures embedded, works offline, prints tidily.
+Handy open on the iPad, or printed, while you build the Shortcut on the phone.</p>
+<p><strong>Don&#39;t fancy this?</strong> There is a simpler route that needs no Shortcut at all:
+<strong><a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html">upload.html</a></strong> —
+open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
+A few more taps per export than the Share sheet, but nothing to build and nothing to go wrong.</p>
+<p><strong>The pictures below are mock-ups, not screenshots</strong> — drawn to match what the Shortcuts editor
+shows so you can compare at a glance. Colours and spacing will differ slightly from your screen;
+the <em>words and the blue chips</em> are what to check against.</p>
+<p><strong>Written against the Shortcuts app as it looks in 2026</strong>, and corrected against real
+screenshots. The <strong>ⓘ is in the BOTTOM toolbar</strong> — see 2.1. If your screen still doesn&#39;t match a
+step, say so rather than working around it; the layout moves between iOS versions and guessing
+at it has already cost two rounds here.</p>
+</blockquote>
+<hr>
+<h2>Part 1 — Get a token first</h2>
+<p>Do this on the phone, in Safari, so you can paste the token straight into the Shortcut.</p>
+<ol>
+<li>Go to <a href="https://github.com/settings/personal-access-tokens/new">https://github.com/settings/personal-access-tokens/new</a></li>
+<li><strong>Token name:</strong> <code>iPhone chat upload</code></li>
+<li><strong>Expiration:</strong> pick a date you&#39;ll remember. When it lapses the Shortcut returns 401 —
+annoying, not dangerous.</li>
+<li><strong>Repository access:</strong> tap <strong>Only select repositories</strong> → choose
+<code>rozinante2004-hash/tonys-recipes</code></li>
+<li><strong>Permissions</strong> → <strong>Repository permissions</strong> → find <strong>Contents</strong> → set it to
+<strong>Read and write</strong>. Leave everything else alone.</li>
+<li><strong>Generate token</strong>, then <strong>copy it</strong>. It is shown once and never again.</li>
+</ol>
+<p>Paste it somewhere you can get at in a moment — Notes will do, and you can delete it after.</p>
+<p><strong>Treat it like a password.</strong> It goes into the shortcut in step 9, where it is visible to anyone
+who opens the shortcut for editing — so it is also visible in any screenshot of that screen. If
+one ever escapes, revoking and regenerating takes a minute:
+<a href="https://github.com/settings/personal-access-tokens">https://github.com/settings/personal-access-tokens</a>.</p>
+<hr>
+<h2>Part 2 — Build the Shortcut</h2>
+<p>Open <strong>Shortcuts</strong> → <strong>+</strong> (top right) to create a new one. You should be on the screen from
+your screenshot: the name at the top, &quot;Add actions from below&quot;, and a search box.</p>
+<h3>2.1 Make it appear in the Share sheet</h3>
+<p><strong>The ⓘ button is in the BOTTOM toolbar</strong>, not at the top. While editing a shortcut the bar along
+the bottom reads <code>↶  ↷  ⓘ  ⬆  ▶</code> — undo, redo, <strong>info</strong>, share, run. Tap the <strong>ⓘ</strong> in the middle.</p>
+<p>Two things that will otherwise waste your time:</p>
+<ul>
+<li>The <strong>⌄ chevron beside the shortcut&#39;s name</strong> is <em>not</em> it. That menu only has Rename, Choose
+Icon, Duplicate, Move and Add to Home Screen.</li>
+<li><strong>Searching the actions for &quot;Receive&quot; finds nothing</strong>, because in this version it is not an
+action you can add. It is purely a setting, and the &quot;Receive … from Share Sheet&quot; row appears at
+the top of your shortcut <em>by itself</em> once the setting is on.</li>
+</ul>
+<p>So:</p>
+<ol>
+<li>Tap <strong>ⓘ</strong> in the bottom toolbar</li>
+<li>Turn on <strong>Show in Share Sheet</strong></li>
+<li>Close the panel. A row now sits at the top of the shortcut reading something like
+<em>&quot;Receive Text and images input from Share Sheet&quot;</em></li>
+<li>Tap the blue <strong>Text and images</strong> in that row → <strong>deselect everything</strong>, select <strong>Files</strong> only</li>
+</ol>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="120" viewBox="0 0 700 120" role="img" aria-label="Receive Files from Share Sheet"><rect width="700" height="120" fill="#F2F2F7"/><rect x="16" y="12" width="668" height="96" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="34" y="20" width="30" height="30" rx="8" fill="#3B7BE8"/><text x="49.0" y="40.400000000000006" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">⇩</text><text x="78" y="42" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">Receive</text><rect x="155.45" y="25" width="67" height="27" rx="6" fill="#E3EEFC"/><text x="164.45" y="43" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">Files</text><text x="228.75" y="42" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">from</text><rect x="278.15" y="25" width="126" height="27" rx="6" fill="#E3EEFC"/><text x="287.15" y="43" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">Share Sheet</text><text x="34" y="78" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#8A8A8E" font-weight="400">If there&#x27;s no input:</text><rect x="190" y="63" width="88" height="25" rx="6" fill="#E3EEFC"/><text x="199" y="79" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">Continue</text></svg><figcaption>The Receive action, set to Files</figcaption></figure></p>
+<p>If your Shortcuts app does not match even this, skip the whole thing and use the upload page —
+see the top of this document. It does the same job and needs no Shortcuts archaeology.</p>
+<h3>2.2 The file name</h3>
+<p><strong>5.</strong> Search actions for <code>Text</code> → tap <strong>Text</strong>. <strong>6.</strong> Tap inside its box and type the name you
+want the file to have in the repo, e.g. <code>Meat-prep.zip</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> a yellow <strong>Text</strong> action containing <code>Meat-prep.zip</code></p>
+</blockquote>
+<p>Keep it <strong>plain ASCII</strong> — letters, digits, dashes, and an extension. Hebrew belongs in the group
+<em>label</em>, not the file name (Part 4).</p>
+<p><strong>7.</strong> Search for <code>Set Variable</code> → tap it. <strong>8.</strong> Tap <strong>Variable Name</strong>, type <code>FILENAME</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Set variable FILENAME to Text</code></p>
+<p>The word <strong>Text</strong> at the end is a blue chip, not typed — Shortcuts fills it in because the Text
+action is directly above. If it says <code>Set variable FILENAME to Shortcut Input</code>, tap that chip
+and choose <strong>Text</strong> instead.</p>
+</blockquote>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="210" viewBox="0 0 700 210" role="img" aria-label="Text and Set variable FILENAME"><rect width="700" height="210" fill="#F2F2F7"/><rect x="16" y="12" width="668" height="110" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="34" y="20" width="30" height="30" rx="8" fill="#F5C518"/><text x="49.0" y="40.400000000000006" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">≡</text><text x="78" y="42" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">Text</text><line x1="16" y1="62" x2="684" y2="62" stroke="#EEE"/><text x="34" y="92" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">Meat-prep.zip</text><rect x="16" y="140" width="668" height="56" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="34" y="148" width="30" height="30" rx="8" fill="#F08A24"/><text x="49.0" y="168.4" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">x</text><text x="78" y="170" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">Set variable</text><rect x="202.2" y="153" width="97" height="27" rx="6" fill="#E3EEFC"/><text x="211.2" y="171" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">FILENAME</text><text x="305.08" y="170" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">to</text><rect x="333.78" y="153" width="57" height="27" rx="6" fill="#E3EEFC"/><text x="342.78" y="171" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">Text</text></svg><figcaption>Text action and Set variable FILENAME</figcaption></figure></p>
+<h3>2.3 The token</h3>
+<p><strong>9.</strong> Add another <strong>Text</strong> action → paste your token into it.
+<strong>10.</strong> Add another <strong>Set Variable</strong> → name it <code>TOKEN</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Set variable TOKEN to Text</code></p>
+<p>The capitalisation is only a label — <code>Token</code> works identically to <code>TOKEN</code>, as long as you insert
+<em>that same chip</em> later. Matching the guide exactly just makes the later steps easier to check.</p>
+</blockquote>
+<blockquote>
+<p>⚠️ <strong>The token is now visible whenever this shortcut is open for editing</strong> — so it is visible in
+any screenshot of this screen. Do not send one to anyone, including me. If one escapes, revoke
+at <a href="https://github.com/settings/personal-access-tokens">https://github.com/settings/personal-access-tokens</a> and paste a fresh one in. To show
+someone the shortcut, clear this Text action first, screenshot, then paste it back.</p>
+</blockquote>
+<h3>2.4 Turn the file into text</h3>
+<p>GitHub&#39;s API will not take a raw file. It takes <strong>Base64</strong> — a way of writing any file as plain
+letters and digits. That is all this step does.</p>
+<p><strong>11.</strong> Search for <code>Base64</code> → tap <strong>Base64 Encode</strong></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Shortcut Input with base64</code> — <strong>exactly one blue chip</strong>, and it must say
+<strong>Shortcut Input</strong>.</p>
+<p>⚠️ <strong>Check for a second chip.</strong> Shortcuts helpfully drops the <em>previous</em> action&#39;s output into
+this field, so it very often arrives reading <code>Shortcut Input  Token  with base64</code> — with a
+stray <strong>Token</strong> chip alongside. That is wrong twice over: it encodes your token together with
+the file, and then <strong>uploads your token into the public repository</strong> as part of the file&#39;s
+contents.</p>
+<p>To fix: tap the field, put the cursor after the stray chip, and press <strong>⌫ backspace</strong> until only
+<strong>Shortcut Input</strong> remains. Deleting the whole field and re-inserting <strong>Shortcut Input</strong> from the
+variable bar works too.</p>
+<p>The chip you want is the file WhatsApp handed you. Nothing else belongs here.</p>
+</blockquote>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="268" viewBox="0 0 700 268" role="img" aria-label="Base64 Encode: one chip only, line breaks none"><rect width="700" height="268" fill="#F2F2F7"/><rect x="16" y="22" width="668" height="88" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="590" y="34" width="82" height="26" rx="13" fill="#D93025"/><text x="631.0" y="52" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="700">WRONG</text><rect x="34" y="30" width="30" height="30" rx="8" fill="#4A4A4A"/><text x="49.0" y="50.400000000000006" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">●</text><rect x="78" y="35" width="156" height="27" rx="6" fill="#E3EEFC"/><text x="87" y="53" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">Shortcut Input</text><rect x="240.04" y="35" width="67" height="27" rx="6" fill="#E3EEFC"/><text x="249.04" y="53" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">Token</text><text x="313.34" y="52" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">with base64</text><text x="34" y="92" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#B3261E" font-weight="400">encodes your token into the file, and uploads it to a public repo</text><rect x="16" y="150" width="668" height="100" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="590" y="162" width="82" height="26" rx="13" fill="#1E8E3E"/><text x="631.0" y="180" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="700">RIGHT</text><rect x="34" y="158" width="30" height="30" rx="8" fill="#4A4A4A"/><text x="49.0" y="178.4" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">●</text><rect x="78" y="163" width="156" height="27" rx="6" fill="#E3EEFC"/><text x="87" y="181" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">Shortcut Input</text><text x="240.04" y="180" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">with base64</text><line x1="16" y1="200" x2="684" y2="200" stroke="#EEE"/><text x="34" y="228" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#444" font-weight="400">Line Breaks</text><text x="604" y="228" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#0A74E8" font-weight="400">None</text></svg><figcaption>Base64 Encode: wrong with two chips, right with one and Line Breaks None</figcaption></figure></p>
+<p><strong>12.</strong> Tap the small <strong>⌄</strong> (or <strong>Show More</strong>) on that action and set <strong>Line Breaks</strong> to <strong>None</strong></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> the action expands to show <code>Line Breaks: None</code></p>
+<p><strong>This is the single most common failure.</strong> The default chops the text into lines, and GitHub
+answers <strong>422</strong> because a file&#39;s contents may not contain line breaks.</p>
+</blockquote>
+<p><strong>13.</strong> Add a <strong>Set Variable</strong> → name it <code>CONTENT</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Set variable CONTENT to Base64 Encoded</code></p>
+</blockquote>
+<hr>
+<h3>2.5 Ask GitHub whether the file is already there</h3>
+<p><strong>First, why this step exists</strong> — this is the part that is genuinely confusing, and it is worth
+one paragraph before you tap anything.</p>
+<p>GitHub treats <em>creating</em> a file and <em>replacing</em> a file as two different requests:</p>
+<ul>
+<li><strong>Creating</strong> — you just send the contents.</li>
+<li><strong>Replacing</strong> — you must also quote the <strong><code>sha</code></strong>, an ID GitHub gives the version currently
+stored. It is GitHub asking <em>&quot;you did look at what&#39;s there before overwriting it, didn&#39;t you?&quot;</em></li>
+</ul>
+<p>You do not know in advance which case you are in — the first time you send <code>Meat-prep.zip</code> it is a
+create, every time after that it is a replace. <strong>So you ask.</strong> You request the file&#39;s details:</p>
+<ul>
+<li><strong>File exists</strong> → GitHub returns its details, including a <code>sha</code>.</li>
+<li><strong>File does not exist</strong> → GitHub returns <strong>404 Not Found</strong>, and there is no <code>sha</code>.</li>
+</ul>
+<p>That difference — <em>did I get a <code>sha</code> or not?</em> — is what section 2.6 branches on. Nothing here
+uploads anything; this step only asks a question.</p>
+<p>A 404 here is <strong>not an error</strong>. It is the expected answer for a new file.</p>
+<hr>
+<p><strong>14.</strong> Search for <code>Get Contents of URL</code> → tap it</p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Get contents of</code> followed by an empty URL box</p>
+</blockquote>
+<p><strong>15.</strong> Tap the URL box and type this <strong>exactly</strong>, ending with the slash:</p>
+<pre><code>https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/
+</code></pre>
+<p><strong>16.</strong> With the cursor still at the end, look <strong>just above the keyboard</strong>. There is a bar of
+suggestions — your variables live there. Tap <strong>FILENAME</strong>.</p>
+<blockquote>
+<p>✅ <strong>Should read:</strong>
+<code>Get contents of https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/FILENAME</code></p>
+<p><strong>FILENAME must be a blue chip</strong>, not black text. If it is black you typed the word instead of
+inserting the variable — the shortcut will then ask GitHub for a file literally called
+&quot;FILENAME&quot;, get a 404, and you will spend an hour suspecting your token. Tap the word, delete
+it, and pick it from the bar above the keyboard instead.</p>
+<p>If you cannot see the variable bar, tap the URL box once more — it appears only while that field
+has the cursor.</p>
+</blockquote>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="226" viewBox="0 0 700 226" role="img" aria-label="Get contents of URL with FILENAME variable"><rect width="700" height="226" fill="#F2F2F7"/><rect x="16" y="12" width="668" height="200" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="34" y="24" width="30" height="30" rx="8" fill="#34C759"/><text x="49.0" y="44.400000000000006" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">↓</text><text x="78" y="46" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">Get contents of</text><text x="34" y="84" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8" font-weight="400">https://api.github.com/repos/rozinante2004-hash/</text><text x="34" y="110" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8" font-weight="400">tonys-recipes/contents/whatsapp/</text><rect x="34" y="126" width="92" height="26" rx="6" fill="#E3EEFC"/><text x="43" y="143" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#0A74E8">FILENAME</text><text x="190" y="142" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#B3261E" font-weight="400">← a blue chip, NOT the typed word</text><line x1="16" y1="162" x2="684" y2="162" stroke="#EEE"/><text x="34" y="190" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#444" font-weight="400">Method</text><text x="614" y="190" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#0A74E8" font-weight="400">GET</text></svg><figcaption>Get contents of URL with the FILENAME chip and Method GET</figcaption></figure></p>
+<p><strong>17.</strong> Tap <strong>Show More</strong> on this action to reveal Method, Headers and Request Body.</p>
+<p><strong>18.</strong> Set <strong>Method</strong> to <strong>GET</strong></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Method: GET</code></p>
+<p>(It is usually GET already.)</p>
+</blockquote>
+<p><strong>19.</strong> Under <strong>Headers</strong>, tap <strong>Add new field</strong>. Key: <code>Authorization</code>. For the value, type
+<code>Bearer </code> — <strong>including the space after &quot;Bearer&quot;</strong> — then insert the <strong>TOKEN</strong> variable from the
+bar above the keyboard.</p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Authorization</code> → <code>Bearer TOKEN</code></p>
+<p>with <strong>TOKEN</strong> as a blue chip. The space matters: <code>BearerTOKEN</code> is rejected as a <strong>401</strong>, which
+looks exactly like a bad token and sends you off regenerating one that was fine.</p>
+</blockquote>
+<p><strong>20.</strong> <strong>Add new field</strong> again. Key: <code>Accept</code>. Value: <code>application/vnd.github+json</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Accept</code> → <code>application/vnd.github+json</code></p>
+<p>This one is plain text — no variable.</p>
+</blockquote>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="196" viewBox="0 0 700 196" role="img" aria-label="The two headers"><rect width="700" height="196" fill="#F2F2F7"/><rect x="16" y="12" width="668" height="172" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><text x="34" y="40" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#444" font-weight="600">Headers</text><line x1="16" y1="54" x2="684" y2="54" stroke="#EEE"/><text x="34" y="84" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Authorization</text><text x="210" y="84" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Bearer</text><rect x="277.6" y="69" width="62" height="25" rx="6" fill="#E3EEFC"/><text x="286.6" y="85" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">TOKEN</text><text x="34" y="110" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#B3261E" font-weight="400">mind the space after &quot;Bearer&quot; — no space gives a 401</text><line x1="16" y1="126" x2="684" y2="126" stroke="#EEE"/><text x="34" y="156" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Accept</text><text x="210" y="156" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#111" font-weight="400">application/vnd.github+json</text></svg><figcaption>The two headers</figcaption></figure></p>
+<p><strong>21.</strong> Leave <strong>Request Body</strong> alone. A GET sends nothing.</p>
+<p><strong>22.</strong> Search for <code>Get Dictionary Value</code> → tap it. Set <strong>Key</strong> to <code>sha</code>.</p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Get sha from Contents of URL</code></p>
+<p>The <strong>Contents of URL</strong> chip is the answer from step 14. If it says something else, tap it and
+choose <strong>Contents of URL</strong>.</p>
+</blockquote>
+<p><strong>23.</strong> Add a <strong>Set Variable</strong> → name it <code>SHA</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Set variable SHA to Dictionary Value</code></p>
+</blockquote>
+<p><strong>At this point the shortcut, top to bottom, should look like this:</strong></p>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="520" viewBox="0 0 700 520" role="img" aria-label="The whole shortcut, nine actions"><rect width="700" height="520" fill="#F2F2F7"/><rect x="16" y="12" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="23" width="26" height="26" rx="8" fill="#3B7BE8"/><text x="43.0" y="40.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">⇩</text><text x="68" y="44" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Receive</text><rect x="139.60000000000002" y="29" width="62" height="25" rx="6" fill="#E3EEFC"/><text x="148.60000000000002" y="45" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">Files</text><text x="207.10000000000002" y="44" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">from Share Sheet</text><rect x="16" y="68" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="79" width="26" height="26" rx="8" fill="#F5C518"/><text x="43.0" y="96.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">≡</text><text x="68" y="100" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Text</text><text x="113.2" y="100" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">Meat-prep.zip</text><rect x="16" y="124" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="135" width="26" height="26" rx="8" fill="#F08A24"/><text x="43.0" y="152.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">x</text><text x="68" y="156" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Set variable</text><rect x="183.60000000000002" y="141" width="88" height="25" rx="6" fill="#E3EEFC"/><text x="192.60000000000002" y="157" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">FILENAME</text><text x="277.20000000000005" y="156" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">to Text</text><rect x="16" y="180" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="191" width="26" height="26" rx="8" fill="#F5C518"/><text x="43.0" y="208.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">≡</text><text x="68" y="212" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Text</text><text x="113.2" y="212" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">github_pat_… (your token)</text><rect x="16" y="236" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="247" width="26" height="26" rx="8" fill="#F08A24"/><text x="43.0" y="264.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">x</text><text x="68" y="268" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Set variable</text><rect x="183.60000000000002" y="253" width="62" height="25" rx="6" fill="#E3EEFC"/><text x="192.60000000000002" y="269" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">TOKEN</text><text x="251.10000000000002" y="268" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">to Text</text><rect x="16" y="292" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="303" width="26" height="26" rx="8" fill="#4A4A4A"/><text x="43.0" y="320.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">●</text><text x="68" y="324" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Base64 Encode</text><rect x="192.4" y="309" width="140" height="25" rx="6" fill="#E3EEFC"/><text x="201.4" y="325" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">Shortcut Input</text><text x="338.20000000000005" y="324" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">Line Breaks: None</text><rect x="16" y="348" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="359" width="26" height="26" rx="8" fill="#F08A24"/><text x="43.0" y="376.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">x</text><text x="68" y="380" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Set variable</text><rect x="183.60000000000002" y="365" width="79" height="25" rx="6" fill="#E3EEFC"/><text x="192.60000000000002" y="381" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">CONTENT</text><text x="268.5" y="380" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">to Base64 Encoded</text><rect x="16" y="404" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="415" width="26" height="26" rx="8" fill="#34C759"/><text x="43.0" y="432.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">↓</text><text x="68" y="436" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Get contents of</text><rect x="210.0" y="421" width="88" height="25" rx="6" fill="#E3EEFC"/><text x="219.0" y="437" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">FILENAME</text><text x="303.6" y="436" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">GET · 2 headers</text><rect x="16" y="460" width="668" height="48" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="30" y="471" width="26" height="26" rx="8" fill="#F08A24"/><text x="43.0" y="488.68" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">x</text><text x="68" y="492" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#111" font-weight="400">Set variable</text><rect x="183.60000000000002" y="477" width="44" height="25" rx="6" fill="#E3EEFC"/><text x="192.60000000000002" y="493" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#0A74E8">SHA</text><text x="233.70000000000002" y="492" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#666" font-weight="400">to Dictionary Value</text></svg><figcaption>The whole shortcut so far — nine actions</figcaption></figure></p>
+<p>In text, if you prefer to compare that way:</p>
+<pre><code>Receive Files from Share Sheet
+Text                         → Meat-prep.zip
+Set variable FILENAME to Text
+Text                         → github_pat_…
+Set variable TOKEN to Text
+Base64 Encode Shortcut Input   (Line Breaks: None)
+Set variable CONTENT to Base64 Encoded
+Get contents of https://api.github.com/…/whatsapp/FILENAME
+Set variable SHA to Dictionary Value
+</code></pre>
+<p>Nine actions. If yours matches, 2.6 is the last part.</p>
+<hr>
+<h3>2.6 Upload it</h3>
+<p><strong>24.</strong> Search for <code>If</code> → tap it. Three rows appear: <strong>If</strong>, <strong>Otherwise</strong>, <strong>End If</strong>.</p>
+<p><strong>25.</strong> Tap the blue field after <strong>If</strong> and choose <strong>SHA</strong>. Tap the condition and choose
+<strong>has any value</strong>.</p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>If SHA has any value</code></p>
+<p>In plain English: <em>&quot;if GitHub gave me a sha, the file is already there.&quot;</em></p>
+</blockquote>
+<p><figure><svg class="mock" xmlns="http://www.w3.org/2000/svg" width="700" height="364" viewBox="0 0 700 364" role="img" aria-label="The If / Otherwise / End If block"><rect width="700" height="364" fill="#F2F2F7"/><rect x="16" y="12" width="668" height="56" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><rect x="34" y="20" width="30" height="30" rx="8" fill="#5E9BF5"/><text x="49.0" y="40.400000000000006" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#fff" text-anchor="middle" font-weight="600">?</text><text x="78" y="42" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">If</text><rect x="106.7" y="25" width="48" height="27" rx="6" fill="#E3EEFC"/><text x="115.7" y="43" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#0A74E8">SHA</text><text x="160.28" y="42" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="400">has any value</text><rect x="16" y="78" width="668" height="68" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><text x="52" y="104" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#111" font-weight="400">Get contents of …/whatsapp/</text><text x="52" y="128" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#1E8E3E" font-weight="400">PUT · JSON body: message, content, sha</text><rect x="16" y="158" width="668" height="40" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><text x="34" y="184" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="600">Otherwise</text><rect x="16" y="210" width="668" height="88" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><text x="52" y="236" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" fill="#111" font-weight="400">Get contents of …/whatsapp/</text><text x="52" y="260" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#1E8E3E" font-weight="400">PUT · JSON body: message, content</text><text x="52" y="282" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#B3261E" font-weight="400">no sha — sending an empty one is an error</text><rect x="16" y="310" width="668" height="40" rx="16" fill="#FFFFFF" stroke="#E3E3E8"/><text x="34" y="336" font-family="-apple-system, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" fill="#111" font-weight="600">End If</text></svg><figcaption>The If / Otherwise / End If block with both upload actions</figcaption></figure></p>
+<p>Now one upload action in each half. They are <strong>identical except for one field</strong>.</p>
+<p><strong>26.</strong> With the cursor between <strong>If</strong> and <strong>Otherwise</strong>, add <strong>Get Contents of URL</strong>. If it lands
+in the wrong place, press and hold it and drag it between those two rows.</p>
+<p><strong>27.</strong> URL: the same as step 15 — type the address, then insert <strong>FILENAME</strong> from the bar.</p>
+<p><strong>28.</strong> <strong>Show More</strong> → <strong>Method: PUT</strong></p>
+<p><strong>29.</strong> Headers: the same two as steps 19–20 (<code>Authorization</code> → <code>Bearer TOKEN</code>, and <code>Accept</code>).</p>
+<p><strong>30.</strong> <strong>Request Body: JSON</strong>, then <strong>Add new field</strong> three times, each of type <strong>Text</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>message</code></td>
+<td><code>Update chat export</code> (any text — it becomes the commit message)</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>insert the <strong>CONTENT</strong> variable</td>
+</tr>
+<tr>
+<td><code>sha</code></td>
+<td>insert the <strong>SHA</strong> variable</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>✅ <strong>Should read</strong>, inside the If branch:
+<code>Get contents of https://…/whatsapp/FILENAME</code> with <code>Method: PUT</code>, two headers, and a JSON body
+of three fields: <code>message</code>, <code>content</code>, <code>sha</code></p>
+</blockquote>
+<p><strong>31.</strong> Now the other half. Between <strong>Otherwise</strong> and <strong>End If</strong>, add another
+<strong>Get Contents of URL</strong> and set it up <strong>exactly the same way</strong> — <em>but with only two body fields:</em>
+<code>message</code> and <code>content</code>. <strong>No <code>sha</code>.</strong></p>
+<blockquote>
+<p>✅ <strong>Should read</strong>, inside the Otherwise branch: the same action, JSON body of <strong>two</strong> fields</p>
+<p>Sending an empty <code>sha</code> is an error, which is the entire reason this is split in two. If you find
+yourself wondering why you are building the same thing twice — that is why.</p>
+</blockquote>
+<h3>2.7 Tell yourself it worked</h3>
+<p><strong>32.</strong> After <strong>End If</strong>, add <strong>Show Notification</strong> with text <code>Uploaded to Recipes</code></p>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Show notification Uploaded to Recipes</code></p>
+</blockquote>
+<p>Worth having: without it, a silent failure looks exactly like success.</p>
+<p><strong>33.</strong> Tap the shortcut&#39;s name at the top → <strong>Rename</strong> → <code>Send chat to Recipes</code></p>
+<h3>2.8 Test it before you need it</h3>
+<p>Tap <strong>▶</strong> (bottom right). With no file shared in, it should fail at the Base64 step — that is
+fine and expected. The real test is Part 3.</p>
+<p>Better first test: share <strong>any small file</strong> to it from the Files app. If you get <em>&quot;Uploaded to
+Recipes&quot;</em>, check it landed:</p>
+<p><a href="https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp">https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp</a></p>
+<p>Then delete the test file from GitHub in a browser.</p>
+<hr>
+<h2>Part 3 — Use it</h2>
+<ol>
+<li>WhatsApp → open the group → tap the group name at the top</li>
+<li>Scroll down → <strong>Export Chat</strong> → <strong>Without Media</strong></li>
+<li>In the Share sheet, pick <strong>Send chat to Recipes</strong></li>
+<li>In the app: ⚙️ Settings → 💬 WhatsApp Groups → <strong>Load chats from this folder</strong></li>
+</ol>
+<p>WhatsApp gives you a <code>.zip</code> containing <code>_chat.txt</code>. <strong>Upload it exactly as it is</strong> — the app
+sniffs the zip header and unpacks it itself. The file extension does not matter.</p>
+<p>Re-exporting a chat gives you the <strong>entire</strong> history again, not just the new part — so upload it
+under the <strong>same file name</strong> to replace the old one. That is what the <code>sha</code> branch is for.</p>
+<hr>
+<h2>Part 4 — Giving a group a proper name</h2>
+<p>By default the group label comes from the file name. For something better — Hebrew, say — add it
+to <code>index.json</code> once:</p>
+<pre><code class="language-json">[
+  { &quot;file&quot;: &quot;family-food.zip&quot;, &quot;group&quot;: &quot;אוכל משפחתי&quot; }
+]
+</code></pre>
+<p>The file is picked up without this. <code>index.json</code> only supplies the label now.</p>
+<hr>
+<h2>When it doesn&#39;t work</h2>
+<table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shortcut isn&#39;t in the Share sheet</td>
+<td>The <strong>Receive … from Share Sheet</strong> action isn&#39;t first, or its &quot;what&quot; isn&#39;t set to <strong>Files</strong>. Also check WhatsApp&#39;s sheet — scroll right and tap <strong>More</strong>.</td>
+</tr>
+<tr>
+<td><strong>401</strong></td>
+<td>Token expired or mistyped. Check the <code>Authorization</code> value is <code>Bearer </code> <strong>with a space</strong> then the variable.</td>
+</tr>
+<tr>
+<td><strong>404</strong> on the upload</td>
+<td>Token can&#39;t reach this repo — recheck <em>Only select repositories</em> and <em>Contents: Read and write</em>.</td>
+</tr>
+<tr>
+<td><strong>422</strong></td>
+<td>Almost always Base64 line breaks. Step 13.</td>
+</tr>
+<tr>
+<td><strong>409</strong></td>
+<td>Two uploads raced. Run it again.</td>
+</tr>
+<tr>
+<td>Uploads fine, app shows nothing</td>
+<td>Tap <em>Load chats from this folder</em> again. If still nothing, the file may not be a real export — the app needs the <code>[date, time] Name: message</code> shape and will say so.</td>
+</tr>
+</tbody></table>
+<p>To see what actually landed — no token needed, works in Safari:</p>
+<p><a href="https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp">https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp</a></p>
+<p>That&#39;s the same listing the app itself reads.</p>
+<hr>
+<h2>Two things worth deciding first</h2>
+<p><strong>The token lives on your phone.</strong> Scoped to one repo with only Contents write, the worst someone
+with your unlocked phone could do is edit this repository. That is why it is a fine-grained token
+rather than a classic one.</p>
+<p><strong>This repository is public, so the chats are public.</strong> That is equally true of the laptop route —
+this changes nothing — but it is worth a conscious decision before uploading a family group. If
+you&#39;d rather they weren&#39;t, ⚙️ Settings → 💬 WhatsApp Groups → <em>Import exported .txt files</em> keeps
+them in the browser and uploads nothing.</p>
+
+</div>
+</body>
+</html>
