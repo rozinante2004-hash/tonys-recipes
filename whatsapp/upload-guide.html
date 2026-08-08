@@ -135,11 +135,10 @@ any shortcut in the Gallery to run it once — anything at all, it does not matt
 back to Settings and search again. This catches most people.</p>
 </blockquote>
 <blockquote>
-<p>If it is still missing after that, stop rather than hunting: a managed device (a work profile or
-Screen Time restrictions) can remove the option entirely, and no amount of menu-searching brings
-it back. Build the Shortcut by hand instead, or use
-<a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html">upload.html</a> — neither
-route needs this setting.</p>
+<p><strong>Still missing after running one?</strong> Then it is almost certainly <strong>Screen Time</strong>, which removes
+this toggle entirely rather than greying it out. See <em>Screen Time blocks the upload</em> below — the
+same setting also blocks <code>api.github.com</code>, so it has to be dealt with for <strong>every</strong> route on this
+page, not just this one. Fix that first and the toggle comes back.</p>
 </blockquote>
 <h3>B. Install it</h3>
 <ol start="3">
@@ -480,11 +479,27 @@ place; prefer the chip.</p>
 case-sensitive here, so <code>SHA</code> as a <em>key</em> will not work even though the <em>variable</em> is called SHA.</p>
 </blockquote>
 <h4>The second upload — the &quot;brand new file&quot; half</h4>
-<p><strong>31.</strong> Rather than building it again from scratch, <strong>copy it</strong>: press and hold the action you just
-finished → <strong>Duplicate</strong>. The copy lands directly beneath it. Now drag the copy down into the gap
-<strong>between <code>Otherwise</code> and <code>End If</code></strong>.</p>
-<p>Then make the one and only change: tap the copy, and in <strong>Request Body</strong> delete the <strong><code>sha</code></strong>
-field (swipe it left, or tap the ⊗ beside it).</p>
+<blockquote>
+<p><strong>You can skip this step for now and still have a working shortcut.</strong> This half only runs the
+<em>first</em> time a given file name is uploaded. <code>Meat_Whatsapp.txt</code> already exists in the repo, so
+for re-exporting that chat — the everyday case — the <strong>If</strong> half is the one that runs and this
+one never does. Get it working first, and come back to this before you add a <em>new</em> group.</p>
+<p>The catch if you leave it empty: uploading a file name that isn&#39;t in the repo yet will do
+nothing at all, while still showing &quot;Uploaded to Recipes&quot;. Until this half exists, create a new
+file on github.com first, then let the shortcut replace it.</p>
+</blockquote>
+<p><strong>31.</strong> Build a second <strong>Get Contents of URL</strong> in the gap <strong>between <code>Otherwise</code> and <code>End If</code></strong>,
+set up exactly like the first — <em>but with only two body fields: <code>message</code> and <code>content</code>.</em> <strong>No
+<code>sha</code>.</strong></p>
+<p>Repeat steps 26–30, stopping short of the third body field. Six fields in total: URL, Method,
+two headers, and two body rows.</p>
+<blockquote>
+<p><strong>If your iOS offers Duplicate, use it</strong> — press and hold the finished action and look for it in
+the menu, then drag the copy down and delete its <code>sha</code> row. On current iOS a press-and-hold may
+simply pick the card up to drag it rather than opening any menu, in which case there is nothing
+to find and nothing you are doing wrong. Building it again is six fields; it is not worth
+fighting the gesture.</p>
+</blockquote>
 <blockquote>
 <p>✅ <strong>Should read</strong>, the second copy:</p>
 <pre><code>Get contents of  https://api.github.com/.../whatsapp/[FILENAME]
@@ -548,6 +563,27 @@ to <code>index.json</code> once:</p>
 </code></pre>
 <p>The file is picked up without this. <code>index.json</code> only supplies the label now.</p>
 <hr>
+<h2>Screen Time blocks the upload</h2>
+<blockquote>
+<p><strong>&quot;The action could not run because &quot;api.github.com&quot; was blocked by the Content Restrictions on
+this device.&quot;</strong></p>
+</blockquote>
+<p>This is not a fault in the shortcut — the OS refused the request before it left the phone. It hits
+<strong>every</strong> route on this page, including <code>upload.html</code>, because they all talk to the same API.</p>
+<p><strong>Settings → Screen Time → Content &amp; Privacy Restrictions → Content Restrictions → Web Content</strong>,
+then either:</p>
+<ul>
+<li>set it to <strong>Unrestricted Access</strong>, or</li>
+<li>leave it on <strong>Limit Adult Websites</strong> and add <code>https://api.github.com</code> under
+<strong>ALWAYS ALLOW</strong> → <strong>Add Website</strong> — the narrower fix, and the one to prefer if the restriction
+is there deliberately.</li>
+</ul>
+<p>You will need the Screen Time passcode. If the path does not match your phone, search Settings for
+<code>Content Restrictions</code> rather than hunting through menus.</p>
+<p><strong>The same setting is why &quot;Private Sharing&quot; is missing</strong> from Settings → Shortcuts. Screen Time
+removes that toggle rather than greying it out, so fixing this brings it back and makes the
+prebuilt Shortcut installable.</p>
+<hr>
 <h2>When it doesn&#39;t work</h2>
 <table>
 <thead>
@@ -557,6 +593,10 @@ to <code>index.json</code> once:</p>
 </tr>
 </thead>
 <tbody><tr>
+<td><strong>&quot;blocked by the Content Restrictions on this device&quot;</strong></td>
+<td>Screen Time — see the section directly above. Nothing to do with the shortcut.</td>
+</tr>
+<tr>
 <td>Shortcut isn&#39;t in the Share sheet</td>
 <td>The <strong>Receive … from Share Sheet</strong> action isn&#39;t first, or its &quot;what&quot; isn&#39;t set to <strong>Files</strong>. Also check WhatsApp&#39;s sheet — scroll right and tap <strong>More</strong>.</td>
 </tr>

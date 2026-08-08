@@ -92,11 +92,10 @@ is what every older article uses, and searching Settings for it finds nothing.
 > any shortcut in the Gallery to run it once — anything at all, it does not matter which — then go
 > back to Settings and search again. This catches most people.
 
-> If it is still missing after that, stop rather than hunting: a managed device (a work profile or
-> Screen Time restrictions) can remove the option entirely, and no amount of menu-searching brings
-> it back. Build the Shortcut by hand instead, or use
-> [upload.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html) — neither
-> route needs this setting.
+> **Still missing after running one?** Then it is almost certainly **Screen Time**, which removes
+> this toggle entirely rather than greying it out. See *Screen Time blocks the upload* below — the
+> same setting also blocks `api.github.com`, so it has to be dealt with for **every** route on this
+> page, not just this one. Fix that first and the toggle comes back.
 
 ### B. Install it
 
@@ -453,12 +452,27 @@ exactly as in step 15. It is the same URL as the GET.
 
 #### The second upload — the "brand new file" half
 
-**31.** Rather than building it again from scratch, **copy it**: press and hold the action you just
-finished → **Duplicate**. The copy lands directly beneath it. Now drag the copy down into the gap
-**between `Otherwise` and `End If`**.
+> **You can skip this step for now and still have a working shortcut.** This half only runs the
+> *first* time a given file name is uploaded. `Meat_Whatsapp.txt` already exists in the repo, so
+> for re-exporting that chat — the everyday case — the **If** half is the one that runs and this
+> one never does. Get it working first, and come back to this before you add a *new* group.
+>
+> The catch if you leave it empty: uploading a file name that isn't in the repo yet will do
+> nothing at all, while still showing "Uploaded to Recipes". Until this half exists, create a new
+> file on github.com first, then let the shortcut replace it.
 
-Then make the one and only change: tap the copy, and in **Request Body** delete the **`sha`**
-field (swipe it left, or tap the ⊗ beside it).
+**31.** Build a second **Get Contents of URL** in the gap **between `Otherwise` and `End If`**,
+set up exactly like the first — *but with only two body fields: `message` and `content`.* **No
+`sha`.**
+
+Repeat steps 26–30, stopping short of the third body field. Six fields in total: URL, Method,
+two headers, and two body rows.
+
+> **If your iOS offers Duplicate, use it** — press and hold the finished action and look for it in
+> the menu, then drag the copy down and delete its `sha` row. On current iOS a press-and-hold may
+> simply pick the card up to drag it rather than opening any menu, in which case there is nothing
+> to find and nothing you are doing wrong. Building it again is six fields; it is not worth
+> fighting the gesture.
 
 > ✅ **Should read**, the second copy:
 >
@@ -547,10 +561,36 @@ The file is picked up without this. `index.json` only supplies the label now.
 
 ---
 
+## Screen Time blocks the upload
+
+> **"The action could not run because "api.github.com" was blocked by the Content Restrictions on
+> this device."**
+
+This is not a fault in the shortcut — the OS refused the request before it left the phone. It hits
+**every** route on this page, including `upload.html`, because they all talk to the same API.
+
+**Settings → Screen Time → Content & Privacy Restrictions → Content Restrictions → Web Content**,
+then either:
+
+- set it to **Unrestricted Access**, or
+- leave it on **Limit Adult Websites** and add `https://api.github.com` under
+  **ALWAYS ALLOW** → **Add Website** — the narrower fix, and the one to prefer if the restriction
+  is there deliberately.
+
+You will need the Screen Time passcode. If the path does not match your phone, search Settings for
+`Content Restrictions` rather than hunting through menus.
+
+**The same setting is why "Private Sharing" is missing** from Settings → Shortcuts. Screen Time
+removes that toggle rather than greying it out, so fixing this brings it back and makes the
+prebuilt Shortcut installable.
+
+---
+
 ## When it doesn't work
 
 | What you see | What it means |
 |---|---|
+| **"blocked by the Content Restrictions on this device"** | Screen Time — see the section directly above. Nothing to do with the shortcut. |
 | Shortcut isn't in the Share sheet | The **Receive … from Share Sheet** action isn't first, or its "what" isn't set to **Files**. Also check WhatsApp's sheet — scroll right and tap **More**. |
 | **401** | Token expired or mistyped. Check the `Authorization` value is `Bearer ` **with a space** then the variable. |
 | **404** on the upload | Token can't reach this repo — recheck *Only select repositories* and *Contents: Read and write*. |
