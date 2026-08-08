@@ -25,6 +25,12 @@ requirement, not a nice-to-have.
   `tools/build-upload-guide.js` (`npm i marked@14` first) — it inlines the seven
   `whatsapp/img/*.svg` mock-ups so the one file works offline and prints. Edit the
   markdown and re-run the builder; never hand-edit the HTML.
+  **`whatsapp/Send-chat-to-Recipes.shortcut` is also generated**, by `tools/build-shortcut.py` —
+  a plist of the 15-action Shortcut so it can be installed instead of built by hand. The GitHub
+  token in it is the placeholder `PASTE-YOUR-GITHUB-TOKEN-HERE` and **must never be a real one**;
+  the builder asserts no `github_pat_`/`ghp_` string reaches the file. It has not been verified on
+  a real iPhone — Apple's shortcut format is undocumented — so the hand-built route stays in the
+  guide as the known-good one.
 - `sw.js`, `manifest.json` — PWA. GitHub Pages deploys `main` via `.github/workflows/deploy.yml`.
 
 ## How to verify work — this is not optional

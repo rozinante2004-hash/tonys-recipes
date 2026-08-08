@@ -15,6 +15,14 @@ a nicer group label than its file name.
 > is this same guide as one self-contained file — pictures embedded, works offline, prints tidily.
 > Handy open on the iPad, or printed, while you build the Shortcut on the phone.
 >
+> **Three routes, easiest first.** Part 1 (the token) is needed by all three.
+>
+> 1. **Install the prebuilt Shortcut** — Part 2, short way. One file, one field to fill in.
+>    Untested on a real phone, so treat it as the fast option rather than the sure one.
+> 2. **[upload.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html)** —
+>    no Shortcut at all. Tested end to end. A few more taps per export.
+> 3. **Build the Shortcut by hand** — Part 2, long way. Longest, and the one known to work.
+
 > **Don't fancy this?** There is a simpler route that needs no Shortcut at all:
 > **[upload.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html)** —
 > open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
@@ -54,7 +62,60 @@ one ever escapes, revoking and regenerating takes a minute:
 
 ---
 
-## Part 2 — Build the Shortcut
+## Part 2 — the short way: install the prebuilt Shortcut
+
+**All 33 steps of Part 2 are already done in a file in this folder.** Install it, paste your token
+into one field, and you're finished. Part 3 onwards applies unchanged.
+
+**[Send-chat-to-Recipes.shortcut](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/Send-chat-to-Recipes.shortcut)**
+
+> ⚠️ **This file has never been run on a real iPhone.** It was generated from Apple's shortcut
+> file format, which is undocumented and changes between iOS releases. It is very likely correct
+> and it is quick to check — but if it refuses to import, or a row looks wrong, that is a fault in
+> the file and worth reporting rather than working around. Building it by hand (below) is the
+> route that is known to work.
+
+### A. Allow it to install
+
+A shortcut that did not come from an iCloud link is *untrusted*, and iOS blocks those by default.
+
+1. **Settings** → **Shortcuts** → turn on **Allow Untrusted Shortcuts** (some iOS versions call it
+   **Private Sharing**).
+2. If the switch is greyed out, open Shortcuts and **run any shortcut once**, then come back. iOS
+   deliberately will not let you enable it until you have used the app at least once.
+
+### B. Install it
+
+3. Open the link above in **Safari on the phone**. It downloads.
+4. Open **Files** → **Downloads** → tap **Send-chat-to-Recipes.shortcut**.
+5. Shortcuts opens and shows the actions. Scroll to the bottom and tap **Add Shortcut**.
+
+### C. The one field that is yours
+
+The token is **not** in the file — a token committed to a public repository is a leaked token.
+
+6. Open the shortcut for editing. The **third** action is a **Text** action reading
+   `PASTE-YOUR-GITHUB-TOKEN-HERE`.
+7. Tap it, select all, and paste the token from Part 1.
+
+> ✅ **Should read:** `Set variable TOKEN to Text`, with the Text action above it holding your token
+> (it starts `github_pat_`).
+
+### D. Worth checking before the first real use
+
+Two rows are worth a glance, because they are the two the generated file is least certain about:
+
+| Row | Should read |
+|---|---|
+| The **first** Text action | `Meat_Whatsapp.txt` — the file name to write to. Change it if you want a different one. |
+| The **If** row | `If SHA has any value`. If it reads something else, tap the condition and pick **has any value**. |
+
+Then go to **2.8** to test it, and Part 3 to use it. If anything about the shortcut looks unlike
+the pictures below, build it by hand instead — the rest of this document is that route, in full.
+
+---
+
+## Part 2 (the long way) — Build the Shortcut by hand
 
 Open **Shortcuts** → **+** (top right) to create a new one. You should be on the screen from
 your screenshot: the name at the top, "Add actions from below", and a search box.
