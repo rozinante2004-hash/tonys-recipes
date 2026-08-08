@@ -274,49 +274,149 @@ Nine actions. If yours matches, 2.6 is the last part.
 
 ### 2.6 Upload it
 
-**24.** Search for `If` → tap it. Three rows appear: **If**, **Otherwise**, **End If**.
+#### What this section is doing, before you tap anything
 
-**25.** Tap the blue field after **If** and choose **SHA**. Tap the condition and choose
-**has any value**.
+Everything so far has been preparation. This is the part that actually sends the file.
 
-> ✅ **Should read:** `If SHA has any value`
+GitHub uploads a file with a **PUT** to the same address you just read from. It wants the request
+phrased slightly differently depending on whether the file is already there:
+
+| Situation | What GitHub wants | What it does if you get it wrong |
+|---|---|---|
+| File **already there** (a sha came back) | the content **and** that `sha` | without the sha: `409 Conflict` |
+| File **not there yet** (no sha) | the content, and **no `sha` field at all** | with an empty sha: `422 Unprocessable` |
+
+A single action cannot say *"include this field only sometimes"*. So you build the upload action
+**twice** — once in each half of the If — and the two copies are **identical except that one has a
+third body field and the other doesn't**.
+
+> **You are meant to build the same thing twice. That is not a mistake in the guide.**
+> If it feels redundant while you're doing it, you're doing it right. It is eight taps of
+> duplication to avoid an error that would otherwise bite you the first time you re-export a chat.
+
+Step 2.5 was the question — *"is it already there?"*. Step 2.6 is the two possible answers.
+
+#### Where you are now
+
+You have this — the block exists but both halves are empty:
+
+![The empty If block, with the two gaps where the upload actions go](img/08-if-empty.svg)
+
+> ⚠️ **Do not tap the `+` inside the If card.** It looks like "add an action here", but it adds a
+> **second condition** to the If (as in *"if SHA has any value **and** …"*). You want it to keep
+> exactly one condition. If you tapped it and got an extra row, tap the ⊗ on that row to remove it.
+
+**How to get an action into a gap.** Tapping an action in the search panel puts it at the **very
+bottom of the shortcut**, below `End If` — every time, no matter what you had selected. That is
+normal. You then **press and hold the action and drag it up** into the gap. While you drag, the
+other cards part to show where it will land. This drag is the only fiddly moment in the whole
+build; everything after it is filling in fields.
+
+#### The first upload — the "file is already there" half
+
+**26.** Search for `Get Contents of URL` → tap it. It appears at the bottom, under `End If`.
+Press and hold it and **drag it into the gap between `If` and `Otherwise`.**
+
+> ✅ **Should read**, once dragged — the new action visibly **indented** under `If`:
 >
-> In plain English: *"if GitHub gave me a sha, the file is already there."*
+> ```
+> If  SHA  has any value
+>     Get contents of              ← indented: it is inside the If
+> Otherwise
+> End If
+> ```
+>
+> If it is *not* indented, it is sitting after the block instead of inside it. Drag again.
+> Indentation is the only way to tell, so check it now rather than at the end.
 
-![The If / Otherwise / End If block with both upload actions](img/06-if-block.svg)
+**27.** Tap the URL field. Type the address, then insert **FILENAME** from the variable bar —
+exactly as in step 15. It is the same URL as the GET.
 
+> ✅ **Should read:** `https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/` followed by a blue **FILENAME** chip
+>
+> The chip must be blue. The typed word `FILENAME` in black is the single most common slip here.
 
-Now one upload action in each half. They are **identical except for one field**.
+**28.** Tap **Show More** → **Method** → change `GET` to **PUT**.
 
-**26.** With the cursor between **If** and **Otherwise**, add **Get Contents of URL**. If it lands
-in the wrong place, press and hold it and drag it between those two rows.
+> ✅ **Should read:** `Method   PUT`
 
-**27.** URL: the same as step 15 — type the address, then insert **FILENAME** from the bar.
+**29.** **Headers** → add the same two as steps 19–20:
 
-**28.** **Show More** → **Method: PUT**
-
-**29.** Headers: the same two as steps 19–20 (`Authorization` → `Bearer TOKEN`, and `Accept`).
-
-**30.** **Request Body: JSON**, then **Add new field** three times, each of type **Text**:
-
-| Key | Value |
+| Header | Value |
 |---|---|
-| `message` | `Update chat export` (any text — it becomes the commit message) |
-| `content` | insert the **CONTENT** variable |
-| `sha` | insert the **SHA** variable |
+| `Authorization` | `Bearer ` then the blue **TOKEN** chip — *mind the space after "Bearer"* |
+| `Accept` | `application/vnd.github+json` |
 
-> ✅ **Should read**, inside the If branch:
-> `Get contents of https://…/whatsapp/FILENAME` with `Method: PUT`, two headers, and a JSON body
-> of three fields: `message`, `content`, `sha`
+> ✅ **Should read:** two header rows, and the Authorization value showing `Bearer` followed by a
+> blue chip — not a long string of characters. If you can *read* your token on screen, you have
+> typed it in rather than inserted the variable. That works, but it puts the token in a second
+> place; prefer the chip.
 
-**31.** Now the other half. Between **Otherwise** and **End If**, add another
-**Get Contents of URL** and set it up **exactly the same way** — *but with only two body fields:*
-`message` and `content`. **No `sha`.**
+**30.** **Request Body** → **JSON**. Then **Add new field** → **Text**, three times:
 
-> ✅ **Should read**, inside the Otherwise branch: the same action, JSON body of **two** fields
+| # | Key | Value |
+|---|---|---|
+| 1 | `message` | `Update chat export` — plain typed text; it becomes the commit message |
+| 2 | `content` | the blue **CONTENT** chip |
+| 3 | `sha` | the blue **SHA** chip |
+
+> ✅ **Should read**, the whole action:
 >
-> Sending an empty `sha` is an error, which is the entire reason this is split in two. If you find
-> yourself wondering why you are building the same thing twice — that is why.
+> ```
+> Get contents of  https://api.github.com/.../whatsapp/[FILENAME]
+>   Method         PUT
+>   Headers        Authorization: Bearer [TOKEN]
+>                  Accept: application/vnd.github+json
+>   Request Body   JSON
+>     message      Update chat export
+>     content      [CONTENT]
+>     sha          [SHA]
+> ```
+>
+> Three body fields. Two of the three values are blue chips. Keys are lower-case — GitHub is
+> case-sensitive here, so `SHA` as a *key* will not work even though the *variable* is called SHA.
+
+#### The second upload — the "brand new file" half
+
+**31.** Rather than building it again from scratch, **copy it**: press and hold the action you just
+finished → **Duplicate**. The copy lands directly beneath it. Now drag the copy down into the gap
+**between `Otherwise` and `End If`**.
+
+Then make the one and only change: tap the copy, and in **Request Body** delete the **`sha`**
+field (swipe it left, or tap the ⊗ beside it).
+
+> ✅ **Should read**, the second copy:
+>
+> ```
+> Get contents of  https://api.github.com/.../whatsapp/[FILENAME]
+>   Method         PUT
+>   Headers        Authorization: Bearer [TOKEN]
+>                  Accept: application/vnd.github+json
+>   Request Body   JSON
+>     message      Update chat export
+>     content      [CONTENT]
+> ```
+>
+> **TWO** body fields, not three. No `sha` row at all — not an empty one, not a blank one.
+> Deleting the row is the point; leaving it there with nothing in it is the error this whole
+> section exists to avoid.
+
+#### The finished block
+
+![The finished If / Otherwise / End If block, both halves filled in](img/06-if-block.svg)
+
+> ✅ **Should read**, the shape of the whole thing — note which lines are indented:
+>
+> ```
+> If  SHA  has any value
+>     Get contents of …/FILENAME   PUT · body: message, content, sha
+> Otherwise
+>     Get contents of …/FILENAME   PUT · body: message, content
+> End If
+> ```
+>
+> Four things to confirm: **one** action inside each half; both **indented**; both **PUT**; and the
+> upper one has **three** body fields while the lower one has **two**.
 
 ### 2.7 Tell yourself it worked
 
@@ -379,8 +479,9 @@ The file is picked up without this. `index.json` only supplies the label now.
 | Shortcut isn't in the Share sheet | The **Receive … from Share Sheet** action isn't first, or its "what" isn't set to **Files**. Also check WhatsApp's sheet — scroll right and tap **More**. |
 | **401** | Token expired or mistyped. Check the `Authorization` value is `Bearer ` **with a space** then the variable. |
 | **404** on the upload | Token can't reach this repo — recheck *Only select repositories* and *Contents: Read and write*. |
-| **422** | Almost always Base64 line breaks. Step 13. |
-| **409** | Two uploads raced. Run it again. |
+| **422** | Almost always Base64 line breaks (step 13). Otherwise: the **Otherwise** branch still has a `sha` field. It must be deleted, not blank — step 31. |
+| **409** | The **If** branch is missing its `sha` field, or has it as a typed word rather than the blue chip — step 30. (Rarely: two uploads genuinely raced; run it again.) |
+| Uploads, but always creates a second file rather than replacing | Both halves are outside the If block, so only one ever runs. Check the indentation in the finished-block picture at the end of 2.6. |
 | Uploads fine, app shows nothing | Tap *Load chats from this folder* again. If still nothing, the file may not be a real export — the app needs the `[date, time] Name: message` shape and will say so. |
 
 To see what actually landed — no token needed, works in Safari:
