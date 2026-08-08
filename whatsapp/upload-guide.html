@@ -65,6 +65,16 @@ a nicer group label than its file name.</p>
 <strong><a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload-guide.html">upload-guide.html</a></strong>
 is this same guide as one self-contained file — pictures embedded, works offline, prints tidily.
 Handy open on the iPad, or printed, while you build the Shortcut on the phone.</p>
+<p><strong>Three routes, easiest first.</strong> Part 1 (the token) is needed by all three.</p>
+<ol>
+<li><strong>Install the prebuilt Shortcut</strong> — Part 2, short way. One file, one field to fill in.
+Untested on a real phone, so treat it as the fast option rather than the sure one.</li>
+<li><strong><a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html">upload.html</a></strong> —
+no Shortcut at all. Tested end to end. A few more taps per export.</li>
+<li><strong>Build the Shortcut by hand</strong> — Part 2, long way. Longest, and the one known to work.</li>
+</ol>
+</blockquote>
+<blockquote>
 <p><strong>Don&#39;t fancy this?</strong> There is a simpler route that needs no Shortcut at all:
 <strong><a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html">upload.html</a></strong> —
 open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
@@ -97,7 +107,64 @@ who opens the shortcut for editing — so it is also visible in any screenshot o
 one ever escapes, revoking and regenerating takes a minute:
 <a href="https://github.com/settings/personal-access-tokens">https://github.com/settings/personal-access-tokens</a>.</p>
 <hr>
-<h2>Part 2 — Build the Shortcut</h2>
+<h2>Part 2 — the short way: install the prebuilt Shortcut</h2>
+<p><strong>All 33 steps of Part 2 are already done in a file in this folder.</strong> Install it, paste your token
+into one field, and you&#39;re finished. Part 3 onwards applies unchanged.</p>
+<p><strong><a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/Send-chat-to-Recipes.shortcut">Send-chat-to-Recipes.shortcut</a></strong></p>
+<blockquote>
+<p>⚠️ <strong>This file has never been run on a real iPhone.</strong> It was generated from Apple&#39;s shortcut
+file format, which is undocumented and changes between iOS releases. It is very likely correct
+and it is quick to check — but if it refuses to import, or a row looks wrong, that is a fault in
+the file and worth reporting rather than working around. Building it by hand (below) is the
+route that is known to work.</p>
+</blockquote>
+<h3>A. Allow it to install</h3>
+<p>A shortcut that did not come from an iCloud link is <em>untrusted</em>, and iOS blocks those by default.</p>
+<ol>
+<li><strong>Settings</strong> → <strong>Shortcuts</strong> → turn on <strong>Allow Untrusted Shortcuts</strong> (some iOS versions call it
+<strong>Private Sharing</strong>).</li>
+<li>If the switch is greyed out, open Shortcuts and <strong>run any shortcut once</strong>, then come back. iOS
+deliberately will not let you enable it until you have used the app at least once.</li>
+</ol>
+<h3>B. Install it</h3>
+<ol start="3">
+<li>Open the link above in <strong>Safari on the phone</strong>. It downloads.</li>
+<li>Open <strong>Files</strong> → <strong>Downloads</strong> → tap <strong>Send-chat-to-Recipes.shortcut</strong>.</li>
+<li>Shortcuts opens and shows the actions. Scroll to the bottom and tap <strong>Add Shortcut</strong>.</li>
+</ol>
+<h3>C. The one field that is yours</h3>
+<p>The token is <strong>not</strong> in the file — a token committed to a public repository is a leaked token.</p>
+<ol start="6">
+<li>Open the shortcut for editing. The <strong>third</strong> action is a <strong>Text</strong> action reading
+<code>PASTE-YOUR-GITHUB-TOKEN-HERE</code>.</li>
+<li>Tap it, select all, and paste the token from Part 1.</li>
+</ol>
+<blockquote>
+<p>✅ <strong>Should read:</strong> <code>Set variable TOKEN to Text</code>, with the Text action above it holding your token
+(it starts <code>github_pat_</code>).</p>
+</blockquote>
+<h3>D. Worth checking before the first real use</h3>
+<p>Two rows are worth a glance, because they are the two the generated file is least certain about:</p>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Should read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>The <strong>first</strong> Text action</td>
+<td><code>Meat_Whatsapp.txt</code> — the file name to write to. Change it if you want a different one.</td>
+</tr>
+<tr>
+<td>The <strong>If</strong> row</td>
+<td><code>If SHA has any value</code>. If it reads something else, tap the condition and pick <strong>has any value</strong>.</td>
+</tr>
+</tbody></table>
+<p>Then go to <strong>2.8</strong> to test it, and Part 3 to use it. If anything about the shortcut looks unlike
+the pictures below, build it by hand instead — the rest of this document is that route, in full.</p>
+<hr>
+<h2>Part 2 (the long way) — Build the Shortcut by hand</h2>
 <p>Open <strong>Shortcuts</strong> → <strong>+</strong> (top right) to create a new one. You should be on the screen from
 your screenshot: the name at the top, &quot;Add actions from below&quot;, and a search box.</p>
 <h3>2.1 Make it appear in the Share sheet</h3>
