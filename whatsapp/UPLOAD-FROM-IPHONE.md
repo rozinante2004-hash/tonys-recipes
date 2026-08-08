@@ -15,9 +15,10 @@ a nicer group label than its file name.
 > open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
 > A few more taps per export than the Share sheet, but nothing to build and nothing to go wrong.
 >
-> **Written against the Shortcuts app as it looks in 2026.** Apple moved the shortcut's settings
-> out of an ⓘ button and onto the **⌄ chevron next to the shortcut's name**. If your screen
-> doesn't match a step, say so — the layout does move between iOS versions.
+> **Written against the Shortcuts app as it looks in 2026**, and corrected against real
+> screenshots. The **ⓘ is in the BOTTOM toolbar** — see 2.1. If your screen still doesn't match a
+> step, say so rather than working around it; the layout moves between iOS versions and guessing
+> at it has already cost two rounds here.
 
 ---
 
