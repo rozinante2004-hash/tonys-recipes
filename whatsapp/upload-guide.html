@@ -563,13 +563,38 @@ to <code>index.json</code> once:</p>
 </code></pre>
 <p>The file is picked up without this. <code>index.json</code> only supplies the label now.</p>
 <hr>
+<h2>Before you build anything: can the phone reach GitHub?</h2>
+<p><strong>Thirty seconds, and it saves the whole afternoon if the answer is no.</strong> Open this in Safari on
+the phone:</p>
+<p><a href="https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp">https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp</a></p>
+<p>A page of JSON means you are fine. <strong>&quot;Website Not Allowed — api.github.com is a restricted
+website&quot;</strong> means the device blocks GitHub, and <em>nothing</em> on this page can work — the Shortcut and
+<code>upload.html</code> both talk to that one API.</p>
+<p>That block is a device restriction, not a network error, and it comes from one of two places:</p>
+<ul>
+<li><strong>Screen Time</strong>, if it is your own phone — see below.</li>
+<li><strong>A configuration profile</strong>, if the phone is managed by an employer or school. Check
+Settings → General → <strong>VPN &amp; Device Management</strong>. Blocking code-hosting sites is a common
+corporate rule, and <code>github.com</code> and <code>api.github.com</code> are usually both on it.</li>
+</ul>
+<p><strong>On a managed phone, that is the end of the road, and it should be</strong> — the restriction belongs to
+whoever administers the device. Ask them to allow <code>api.github.com</code> if the use case warrants it.
+Do not try to tunnel around it. Uploading from a computer that can reach GitHub still works exactly
+as it always has; see <a href="README.md">README.md</a>.</p>
+<hr>
 <h2>Screen Time blocks the upload</h2>
 <blockquote>
 <p><strong>&quot;The action could not run because &quot;api.github.com&quot; was blocked by the Content Restrictions on
 this device.&quot;</strong></p>
 </blockquote>
+<p>This applies to a phone <strong>you</strong> control. If a configuration profile is doing the blocking, the
+section above applies instead and none of this will help.</p>
 <p>This is not a fault in the shortcut — the OS refused the request before it left the phone. It hits
 <strong>every</strong> route on this page, including <code>upload.html</code>, because they all talk to the same API.</p>
+<p>Note that Apple&#39;s <strong>&quot;Unrestricted Access&quot;</strong> is meant to permit everything, Never-Allow entries
+included. If Web Content already reads Unrestricted and sites are still blocked, the policy being
+enforced is not the one on that screen — look for a profile, a family organiser named at the top of
+Settings → Screen Time, or <strong>Share Across Devices</strong> pulling a policy from an iPad or Mac.</p>
 <p><strong>Settings → Screen Time → Content &amp; Privacy Restrictions → Content Restrictions → Web Content</strong>,
 then either:</p>
 <ul>

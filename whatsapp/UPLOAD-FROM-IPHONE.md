@@ -561,13 +561,46 @@ The file is picked up without this. `index.json` only supplies the label now.
 
 ---
 
+## Before you build anything: can the phone reach GitHub?
+
+**Thirty seconds, and it saves the whole afternoon if the answer is no.** Open this in Safari on
+the phone:
+
+<https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp>
+
+A page of JSON means you are fine. **"Website Not Allowed — api.github.com is a restricted
+website"** means the device blocks GitHub, and *nothing* on this page can work — the Shortcut and
+`upload.html` both talk to that one API.
+
+That block is a device restriction, not a network error, and it comes from one of two places:
+
+- **Screen Time**, if it is your own phone — see below.
+- **A configuration profile**, if the phone is managed by an employer or school. Check
+  Settings → General → **VPN & Device Management**. Blocking code-hosting sites is a common
+  corporate rule, and `github.com` and `api.github.com` are usually both on it.
+
+**On a managed phone, that is the end of the road, and it should be** — the restriction belongs to
+whoever administers the device. Ask them to allow `api.github.com` if the use case warrants it.
+Do not try to tunnel around it. Uploading from a computer that can reach GitHub still works exactly
+as it always has; see [README.md](README.md).
+
+---
+
 ## Screen Time blocks the upload
 
 > **"The action could not run because "api.github.com" was blocked by the Content Restrictions on
 > this device."**
 
+This applies to a phone **you** control. If a configuration profile is doing the blocking, the
+section above applies instead and none of this will help.
+
 This is not a fault in the shortcut — the OS refused the request before it left the phone. It hits
 **every** route on this page, including `upload.html`, because they all talk to the same API.
+
+Note that Apple's **"Unrestricted Access"** is meant to permit everything, Never-Allow entries
+included. If Web Content already reads Unrestricted and sites are still blocked, the policy being
+enforced is not the one on that screen — look for a profile, a family organiser named at the top of
+Settings → Screen Time, or **Share Across Devices** pulling a policy from an iPad or Mac.
 
 **Settings → Screen Time → Content & Privacy Restrictions → Content Restrictions → Web Content**,
 then either:
