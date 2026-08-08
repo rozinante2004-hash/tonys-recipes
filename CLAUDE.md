@@ -31,7 +31,14 @@ requirement, not a nice-to-have.
   the builder asserts no `github_pat_`/`ghp_` string reaches the file. It has not been verified on
   a real iPhone — Apple's shortcut format is undocumented — so the hand-built route stays in the
   guide as the known-good one.
+  **None of the `whatsapp/` routes work on Tony's iPhone.** It is employer-managed
+  and a configuration profile blocks `github.com` *and* `api.github.com` outright —
+  Safari shows "Website Not Allowed". That is not ours to route around, and the
+  Worker must not be turned into a GitHub proxy to evade it. Chats reach that phone
+  through Firestore instead (5f.8, below).
 - `sw.js`, `manifest.json` — PWA. GitHub Pages deploys `main` via `.github/workflows/deploy.yml`.
+  Note that **Pages (`*.github.io`) is reachable from that phone even though `github.com` is not**,
+  which is why the app itself and the chat files still load there — only the API is blocked.
 
 ## How to verify work — this is not optional
 
@@ -47,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.5: 146 checks, 140 passing.** The 6 failures are `net_*` and
+**As of v29.6: 149 checks, 143 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -144,6 +151,21 @@ found only because a test was written first and disagreed with the code.
 - **`localStorage` is per-device.** Anything stored there (pantry, line marker, chat
   index, AI cache, theme) does not travel between Tony's phone and PC. Say so in the UI
   rather than letting it look broken.
+- **Chunk by BYTES, never by characters.** Hebrew is two bytes per character in UTF-8
+  and emoji are four, so a chunk budgeted in characters is double or quadruple what
+  you asked for — and this collection is mostly Hebrew, so the 1 MiB document limit
+  is hit on the very first real export. `waChunkText` binary-searches on `byteLen`.
+- **A split surrogate pair survives an in-memory `join` and dies in the round trip.**
+  JS strings are UTF-16 code units, so concatenating chunks reunites a pair that was
+  split; the corruption only appears once each chunk has been through UTF-8, which is
+  what Firestore does. A `chunks.join('') === original` assertion therefore passes with
+  the surrogate guard deliberately removed — it was written that way here and mutation
+  testing caught it. Assert on `TextDecoder(TextEncoder(chunk))` per chunk instead.
+- **Keep list-time reads away from bulk text.** `chat_<slug>` holds metadata and
+  `chatpart_<slug>_<n>` holds the text, specifically so the head range query
+  (`chat_` … `` chat` ``) cannot see the parts. Name a part `chat_<slug>_p1` and every
+  chat is read in full just to draw a list of group names. `'_'` (0x5F) sorting before
+  `` '`' `` (0x60) is what makes that boundary work; there is a test.
 
 ## Outstanding
 

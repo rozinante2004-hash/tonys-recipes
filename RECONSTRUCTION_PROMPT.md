@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v29.5` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+**Current version:** `v29.6` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
 the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
@@ -40,11 +40,11 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v29.5"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v29.6"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
-| `whatsapp/` | Shared folder of exported WhatsApp chat `.txt`/`.zip` files. The app **lists the folder** over the GitHub contents API (5f.7), so `index.json` is optional and only supplies group labels. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut. |
+| `whatsapp/` | Shared folder of exported WhatsApp chat `.txt`/`.zip` files. The app **lists the folder** over the GitHub contents API (5f.7), so `index.json` is optional and only supplies group labels. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
 | `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
@@ -629,12 +629,22 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
 - **Sources** (⚙️ Settings → 💬 WhatsApp Groups, `openWaSetup`):
   - **remote** — a folder of `.txt` files served over HTTPS plus an `index.json`
     (`["a.txt"]` or `[{"file":"a.txt","group":"Family Food"}]`). `waRefreshFolder()` replaces all
-    remote entries, because re-exporting yields the whole history again. This is the only source
-    that works on the iPhone: a file on the laptop is unreachable from the phone.
+    remote entries, because re-exporting yields the whole history again. Reachable from the phone
+    only while the phone can reach GitHub — see **cloud** below.
   - **local** — files imported into the browser (`waImportFiles`), stored in IndexedDB
-    (`tonys_recipes_db` v2, store `wachats`, `{id, group, text, addedAt}`). Never uploaded.
-  Chat text is deliberately kept out of Firestore and localStorage — a year of group chat is
-  megabytes and the shared recipe document has a 1 MiB ceiling.
+    (`tonys_recipes_db` v2, store `wachats`, `{id, group, text, addedAt}`).
+  - **cloud** — Firestore, added in **5f.8 (v29.6)** for devices that cannot reach GitHub at all
+    (Tony's employer-managed iPhone blocks `github.com` and `api.github.com` outright, which kills
+    the folder *and* every upload route to it). `chat_<slug>` holds metadata only; the text lives
+    in `chatpart_<slug>_<n>` documents chunked to `WA_CLOUD_CHUNK` (700 000) **bytes**. The head
+    range query (`chat_` … `` chat` ``) cannot see the parts, so listing chats never drags the
+    text down with it; `loadCloudChatText` fetches on demand and caches in IndexedDB under
+    `cloud:<file>`, keyed by the head's `updatedAt`. `waRefreshCloud` merges these into the index,
+    and a cloud copy supersedes the folder copy of the same file. Covered by the existing
+    `match /shared/{document=**}` rules — no rules change was needed.
+  Chat text stays out of **localStorage** and out of the legacy single recipe document — a year of
+  group chat is megabytes. Per-document storage (5.4) is what made the cloud source viable at all:
+  the 1 MiB ceiling is now per chat part rather than per collection.
 - **Reading** (`waTextFromBuffer`): "Export chat" produces a **ZIP containing `_chat.txt`**, on
   both iOS and Android — renaming it `.txt` does not make it text. Both sources read bytes and
   sniff the `PK` header, unzipping via `DecompressionStream('deflate-raw')` (no library). Central
@@ -656,7 +666,9 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
   claims, and use only the excerpts. Sources shown behind a `<details>`.
 - **Automation limits, stated honestly:** the export step cannot be automated on any platform.
   The upload afterwards can — on iPhone, a Shortcut accepting a file from the Share sheet and
-  PUTting it to `/repos/<owner>/<repo>/contents/whatsapp/<file>`.
+  PUTting it to `/repos/<owner>/<repo>/contents/whatsapp/<file>`. **That whole route dies on a
+  device where GitHub is blocked** — a managed phone — which is what the `cloud` source above is
+  for: import the export on the phone and it syncs through Firestore instead.
 
 ---
 
@@ -702,9 +714,10 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **128 checks** in 13 groups —
-**Features (40), UI (16), Cloud Sync (15), Import/Export (11), CRUD (10), Storage (9), Core,
-Modals, Network, WhatsApp (5 each), CSS (4), Backup and Performance (1 each)** — covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **149 checks** in 13 groups —
+**Features (41), UI (24), Cloud Sync (21), CRUD (10), Import/Export (10), Storage (9),
+WhatsApp (9), CSS (6), Core, Modals and Network (5 each), Backup and Performance (2 each)** —
+covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
 (`openSelfTest`/`runSelfTests`) lets the user pick tests by group, runs them sequentially with

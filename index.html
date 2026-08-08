@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.5 -->
+<!-- Tony's Recipes Collection v29.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1770,6 +1770,87 @@ const SELF_TESTS = [
       // and no duplicates when both sources name the same file
       var merged4=waMergeFolderList(['a.zip'], ['a.zip']);
       if(merged4.length!==1) throw new Error('the same file was listed twice');
+    } },
+
+  { id:'wa_cloud_ids', group:'WhatsApp', name:'Cloud chat ids are stable, ASCII, and never collide (5f.8)',
+    test: async()=>{
+      ['waSlug','waChatDocId','waChatPartId','waChunkText'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      // A Hebrew file name strips to nothing under a naive ASCII filter. Two of
+      // them would then share one document and silently overwrite each other —
+      // exactly the overwrite hazard already fixed once in whatsapp/upload.html.
+      var a=waSlug('שאלות בשר.txt'), b=waSlug('מתכוני עוגות.txt');
+      if(a===b) throw new Error('two Hebrew chat names collapsed to the same document id: '+a);
+      if(!/^[A-Za-z0-9_-]+$/.test(a)) throw new Error('the id is not safe for a document name: '+a);
+      if(waSlug('Meat_Whatsapp.txt')!==waSlug('Meat_Whatsapp.txt')) throw new Error('the id is not stable across calls');
+      if(waSlug('a.txt')===waSlug('b.txt')) throw new Error('different files shared an id');
+      // The head range query must not sweep up the part documents; if it does,
+      // listing chats drags every byte of every export back down the wire.
+      var lo=CHAT_DOC_LO, hi=CHAT_DOC_HI;
+      var head=waChatDocId('x'), part=waChatPartId('x',1);
+      if(!(head>=lo&&head<hi)) throw new Error('the head document falls outside its own range query');
+      if(part>=lo&&part<hi) throw new Error('a part document is inside the head range — listing would read every chat in full');
+    } },
+
+  { id:'wa_cloud_chunking', group:'WhatsApp', name:'A big chat is split by BYTES and rejoins exactly (5f.8)',
+    test: async()=>{
+      // Hebrew is two bytes per character in UTF-8 and emoji are four, so a
+      // chunk budgeted in characters is double what you asked for and blows the
+      // 1 MiB document cap. The bug only appears on a big Hebrew export — which
+      // is precisely what this collection is.
+      var heb='שלום עולם בישול בשר ';
+      var big=''; while(big.length<40000) big+=heb;
+      var chunks=waChunkText(big, 5000);
+      if(chunks.length<2) throw new Error('a large text was not split at all');
+      chunks.forEach(function(c,i){
+        var n=new Blob([c]).size;
+        if(n>5000) throw new Error('chunk '+i+' is '+n+' bytes, over the '+5000+' budget — sized in characters, not bytes');
+      });
+      // Each part goes to Firestore as a UTF-8 string, so the honest check is the
+      // ROUND TRIP, not an in-memory join. JS strings hold UTF-16 code units, so
+      // concatenating a split surrogate pair silently reunites it — a join-based
+      // assertion here passed even with the surrogate guard deliberately removed.
+      var enc=new TextEncoder(), dec=new TextDecoder();
+      var roundTrip=function(parts){ return parts.map(function(c){ return dec.decode(enc.encode(c)); }).join(''); };
+      if(roundTrip(chunks)!==big) throw new Error('the chunks do not rejoin to the original text');
+      // Emoji must survive that round trip. A pair split across two documents
+      // comes back as two U+FFFD — one wrong emoji, in one message, in one chat,
+      // which is near-undebuggable months later.
+      var emo=''; while(emo.length<3000) emo+='קציצות 🍖🥩🔥 ';
+      var ec=waChunkText(emo, 700);
+      if(ec.length<2) throw new Error('the emoji text was not split, so the surrogate case went untested');
+      var rejoined=roundTrip(ec);
+      if(/�/.test(rejoined)) throw new Error('a surrogate pair was split across two chunks');
+      if(rejoined!==emo) throw new Error('emoji were corrupted by the split');
+      // Degenerate inputs must not loop forever or throw.
+      if(waChunkText('',100).join('')!=='') throw new Error('empty text did not round-trip');
+      if(waChunkText('abc',10000).length!==1) throw new Error('a small text was split needlessly');
+    } },
+
+  { id:'wa_cloud_wiring', group:'WhatsApp', name:'Synced chats are a real third source, end to end (5f.8)',
+    test: async()=>{
+      ['saveChatDoc','readCloudChatIndex','loadCloudChatText','deleteCloudChat','waRefreshCloud','waPushToCloud']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // The reason this feature exists: a device that cannot reach GitHub must
+      // still be able to read a chat. So the loader has to handle 'cloud'
+      // WITHOUT falling through to the folder fetch.
+      var src=String(waLoadAllMessages);
+      if(src.indexOf("'cloud'")===-1) throw new Error('waLoadAllMessages does not handle the cloud source');
+      if(src.indexOf('loadCloudChatText')===-1) throw new Error('the cloud branch does not read the cloud text');
+      // Import must offer to sync, or the phone stays a dead end.
+      if(String(waImportFiles).indexOf('saveChatDoc')===-1)
+        throw new Error('importing a chat never syncs it, so the phone case is unsolved');
+      // Removing a shared chat affects everyone; it must ask first.
+      if(String(waRemove).indexOf('askConfirm')===-1)
+        throw new Error('a cloud chat is deleted for every device without asking');
+      // The UI has to exist, or none of the above is reachable.
+      if(!document.getElementById('waCloudSyncBox')) throw new Error('#waCloudSyncBox missing from the setup panel');
+      var health=waChatHealth();
+      if(typeof health.synced!=='number'||typeof health.bytes!=='number')
+        throw new Error('Sync Health does not report the chat footprint');
+      if(syncHealthText().indexOf('whatsapp chats:')===-1)
+        throw new Error('the copyable Sync Health text omits the chats line');
     } },
 
   { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
@@ -3770,6 +3851,8 @@ function syncHealthText() {
   L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
   L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
+  L.push('whatsapp chats: ' + h.chats.synced + ' synced (' + Math.round(h.chats.bytes / 1024) + ' KB), '
+    + h.chats.folder + ' from the folder, ' + h.chats.local + ' on this device only');
   return L.join('\n');
 }
 function copySyncHealth() {
@@ -3971,7 +4054,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.5';
+var APP_VERSION = 'v29.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6307,7 +6390,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6871,7 +6954,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7063,10 +7146,23 @@ body.banner-shown .header {
     <button onclick="waRefreshFolder()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:6px;">🔄 Load chats from this folder</button>
     <div id="waFolderStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:14px;"></div>
 
-    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">📱 This device only</div>
+    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">🔄 Synced chats — the option that works everywhere</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
-      Import exported files straight into this browser. They stay here — nothing is uploaded, and other devices won't see them.
+      Chats stored alongside your recipes, in the same cloud and behind the same sign-in. <strong>Use this if a device
+      cannot reach GitHub</strong> — a work phone often blocks it — because nothing here touches the repo.
+      Import below and it appears on every signed-in device.
     </p>
+    <button onclick="waRefreshCloud()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">🔄 Load synced chats</button>
+
+    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">📂 Import an export</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
+      Reads the file straight from this device. With the box below ticked it is also synced to your other
+      devices; untick it and the chat stays in this browser and nowhere else.
+    </p>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px;cursor:pointer;">
+      <input type="checkbox" id="waCloudSyncBox" onchange="setWaCloudSync(this.checked)" style="width:16px;height:16px;cursor:pointer;">
+      <span>Also sync imported chats to my other devices</span>
+    </label>
     <input type="file" id="waFileIn" accept=".txt,.zip,text/plain,application/zip" multiple style="display:none" onchange="waImportFiles(this.files);this.value='';">
     <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt or .zip files</button>
 
@@ -11493,9 +11589,26 @@ function syncHealth() {
     readsToday:    getReadsToday(),
     readsBudget:   FIRESTORE_FREE_READS,
     backupDays:    (typeof backupAgeDays === 'function') ? backupAgeDays() : null,
-    metaAt:        _lastCloudMetaAt
+    metaAt:        _lastCloudMetaAt,
+    // 5f.8 — chat exports are far bigger than recipes, so their footprint is
+    // worth showing next to the recipe counts rather than being invisible.
+    chats:         waChatHealth()
   };
 }
+// Counted from the local index rather than by reading the cloud: this panel must
+// never itself cost a round of reads to open.
+function waChatHealth() {
+  var synced = 0, bytes = 0, local = 0, folder = 0;
+  try {
+    (waIndex() || []).forEach(function(e) {
+      if (e.source === 'cloud') { synced++; bytes += (e.size || 0); }
+      else if (e.source === 'local') local++;
+      else folder++;
+    });
+  } catch(e) {}
+  return { synced: synced, bytes: bytes, local: local, folder: folder };
+}
+window.waChatHealth = waChatHealth;
 window.syncHealth = syncHealth;
 function loadLastCloudMetaAt() {
   try { var v = parseInt(localStorage.getItem(CLOUD_META_AT_KEY), 10); _lastCloudMetaAt = isNaN(v) ? null : v; } catch(e) {}
@@ -13552,6 +13665,7 @@ async function waImportFiles(fileList){
   var files = Array.prototype.slice.call(fileList || []);
   if (!files.length) return;
   var idx = waIndex(), added = 0, skipped = [];
+  var pushed = 0, cloudFailed = [], notSignedIn = false;
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     if (!/\.(txt|zip)$/i.test(f.name)) { skipped.push(f.name + ' (not a .txt or .zip)'); continue; }
@@ -13568,10 +13682,24 @@ async function waImportFiles(fileList){
     idx.push({ id: id, group: group, source: 'local', file: f.name, size: text.length,
                count: msgs.length, first: msgs[0].date, last: msgs[msgs.length-1].date, addedAt: Date.now() });
     added++;
+    // 5f.8 — a device-local import is invisible to every other device, which is
+    // exactly the problem on a phone that cannot reach GitHub. Push it to
+    // Firestore too when we can, and say plainly when we cannot rather than
+    // leaving Tony to discover on the PC that nothing arrived.
+    if (waCloudSyncOn() && _fbDb) {
+      try { await saveChatDoc(f.name, group, text); pushed++; }
+      catch(e2) { cloudFailed.push(f.name + ' (' + e2.message + ')'); }
+    } else if (waCloudSyncOn() && !_fbDb) {
+      notSignedIn = true;
+    }
   }
   waSaveIndex(idx);
+  if (pushed) { try { await waRefreshCloud(true); } catch(e) {} }
   renderWaSources(); updateWaMenuLabel();
   if (added) toast('✅ Imported ' + added + ' chat' + (added>1?'s':''));
+  if (pushed) toast('☁️ ' + pushed + ' synced to the cloud — they will appear on your other devices');
+  if (notSignedIn) toast('📱 Stored on this device only — sign in to sync chats to your other devices');
+  if (cloudFailed.length) toast('⚠️ Imported here, but not synced: ' + cloudFailed.join('; '));
   if (skipped.length) toast('⚠️ Skipped: ' + skipped.join('; '));
 }
 function waGroupNameFromFile(name){
@@ -13715,6 +13843,229 @@ async function waRefreshFolder(quiet){
     + (bad.length ? ' Failed: ' + escH(bad.join('; ')) : '') + '</span>';
 }
 
+// ─── Chat files in Firestore (5f.8) ──────────────────────────────────────────
+// The repo folder is unreachable from a device that blocks github.com — a
+// managed phone, most often — and so is the API that uploads to it. Firestore is
+// already how every recipe travels between Tony's devices, so chat exports get
+// to travel the same way: import on the phone, read on the PC.
+//
+// Shape, deliberately split in two:
+//   chat_<slug>            metadata only — name, group, size, message count, parts
+//   chatpart_<slug>_<n>    the text itself, in byte-bounded pieces
+// Listing chats must stay cheap. A single export is ~300 KB, and holding the text
+// in the head document would mean re-reading all of it just to draw a list of
+// group names. The prefixes are chosen so the head range query cannot see the
+// parts: '_' (0x5F) sorts before '`' (0x60), and 'chatpart_' begins 'chatp'.
+var CHAT_DOC_LO = 'chat_';
+var CHAT_DOC_HI = 'chat' + String.fromCharCode(96);
+var WA_CLOUD_CHUNK = 700000;          // bytes per part, well under the 1 MiB cap
+var WA_CLOUD_SYNC_KEY = 'tonys_wa_cloud_sync';
+var _waCloudCache = {};               // slug -> parsed messages, per session
+
+// A stable ASCII id for a file name. A Hebrew group name strips to nothing, so
+// the hash — not the readable part — is what actually carries identity; the
+// readable part is there to make the Firebase console browsable.
+function waSlug(file) {
+  var ascii = String(file || '')
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24)
+    .toLowerCase();
+  return (ascii ? ascii + '-' : '') + hashStr(String(file || '')).replace(/-/, 'n');
+}
+function waChatDocId(slug) { return CHAT_DOC_LO + slug; }
+function waChatPartId(slug, n) { return 'chatpart_' + slug + '_' + n; }
+
+// Split on byte length, not character count: Hebrew is two bytes per character
+// in UTF-8 and emoji are four, so a chunk sized in characters can be double what
+// you budgeted for and blow the document limit.
+function waChunkText(text, maxBytes) {
+  maxBytes = maxBytes || WA_CLOUD_CHUNK;
+  var s = String(text == null ? '' : text);
+  if (!s) return [''];
+  var out = [], start = 0;
+  while (start < s.length) {
+    var lo = 1, hi = Math.min(s.length - start, maxBytes), best = 1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (byteLen(s.substr(start, mid)) <= maxBytes) { best = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    // Never end a chunk on a lone high surrogate — rejoining would give U+FFFD
+    // where an emoji used to be, and only in the one message that straddles it.
+    var end = start + best;
+    if (end < s.length && best > 1) {
+      var c = s.charCodeAt(end - 1);
+      if (c >= 0xD800 && c <= 0xDBFF) best--;
+    }
+    out.push(s.substr(start, best));
+    start += best;
+  }
+  return out;
+}
+window.waSlug = waSlug; window.waChunkText = waChunkText; window.waChatDocId = waChatDocId;
+window.waChatPartId = waChatPartId;
+
+function waCloudSyncOn() {
+  try { return localStorage.getItem(WA_CLOUD_SYNC_KEY) !== '0'; } catch(e) { return true; }
+}
+function setWaCloudSync(on) {
+  try { localStorage.setItem(WA_CLOUD_SYNC_KEY, on ? '1' : '0'); } catch(e) {}
+}
+
+// Write one chat to Firestore. Parts are written BEFORE the head document, so a
+// half-finished upload leaves orphaned parts rather than a head that promises
+// text nobody can read — the former is invisible, the latter looks like data
+// loss to every other device.
+async function saveChatDoc(file, group, text, db) {
+  db = db || _fbDb;
+  if (!db) throw new Error('not signed in to the cloud');
+  var slug   = waSlug(file);
+  var chunks = waChunkText(text);
+  for (var i = 0; i < chunks.length; i++) {
+    if (byteLen(chunks[i]) > FIRESTORE_DOC_LIMIT) throw new Error('a chunk exceeded the document limit');
+    await db.collection('shared').doc(waChatPartId(slug, i + 1)).set({ t: chunks[i], slug: slug, n: i + 1 });
+  }
+  var msgs = waParse(text, group);
+  var head = {
+    file: String(file), group: String(group || ''), slug: slug,
+    parts: chunks.length, chars: String(text || '').length, size: byteLen(text),
+    count: msgs.length,
+    first: msgs.length ? msgs[0].date : '',
+    last:  msgs.length ? msgs[msgs.length - 1].date : '',
+    updatedAt: Date.now()
+  };
+  await db.collection('shared').doc(waChatDocId(slug)).set(head);
+  // Older uploads may have had more parts than this one does. Leaving them
+  // behind would be harmless but untidy, and they would count against storage
+  // forever; a delete failure is not worth failing the upload over.
+  for (var j = chunks.length + 1; j <= chunks.length + 8; j++) {
+    try { await db.collection('shared').doc(waChatPartId(slug, j)).delete(); } catch(e) { break; }
+  }
+  return head;
+}
+
+// Head documents only — metadata, no text. Cheap enough to run whenever the
+// WhatsApp panel opens.
+async function readCloudChatIndex(db) {
+  db = db || _fbDb;
+  if (!db) return [];
+  var out = [];
+  var fp = firebase.firestore.FieldPath.documentId();
+  var q = await db.collection('shared')
+    .where(fp, '>=', CHAT_DOC_LO).where(fp, '<', CHAT_DOC_HI).get();
+  q.forEach(function(doc) {
+    var d = doc.data() || {};
+    if (!d.file) return;                      // not a chat head; ignore rather than guess
+    out.push({ id: doc.id, file: d.file, group: d.group || waGroupNameFromFile(d.file),
+               slug: d.slug || String(doc.id).slice(CHAT_DOC_LO.length), parts: d.parts || 1,
+               size: d.size || 0, count: d.count || 0, first: d.first || '', last: d.last || '',
+               updatedAt: d.updatedAt || 0 });
+  });
+  return out;
+}
+
+// Fetch the text on demand and cache it in IndexedDB, keyed by the head's
+// updatedAt so a chat is pulled once rather than on every question.
+async function loadCloudChatText(entry, db) {
+  db = db || _fbDb;
+  if (!db) throw new Error('not signed in to the cloud');
+  var cacheId = 'cloud:' + entry.file;
+  if (_idbAvailable) {
+    try {
+      var hit = await waGet(cacheId);
+      if (hit && hit.updatedAt === entry.updatedAt && typeof hit.text === 'string') return hit.text;
+    } catch(e) {}
+  }
+  var text = '';
+  for (var n = 1; n <= (entry.parts || 1); n++) {
+    var snap = await db.collection('shared').doc(waChatPartId(entry.slug, n)).get();
+    if (!snap.exists) throw new Error('part ' + n + ' of ' + entry.parts + ' is missing from the cloud');
+    text += (snap.data() || {}).t || '';
+  }
+  if (_idbAvailable) {
+    try { await waPut({ id: cacheId, group: entry.group, text: text, updatedAt: entry.updatedAt, addedAt: Date.now() }); } catch(e) {}
+  }
+  return text;
+}
+
+async function deleteCloudChat(entry, db) {
+  db = db || _fbDb;
+  if (!db) throw new Error('not signed in to the cloud');
+  for (var n = 1; n <= (entry.parts || 1); n++) {
+    await db.collection('shared').doc(waChatPartId(entry.slug, n)).delete();
+  }
+  await db.collection('shared').doc(waChatDocId(entry.slug)).delete();
+}
+window.saveChatDoc = saveChatDoc; window.readCloudChatIndex = readCloudChatIndex;
+window.loadCloudChatText = loadCloudChatText; window.deleteCloudChat = deleteCloudChat;
+
+// Merge cloud chats into the index. A chat present both in the repo folder and in
+// the cloud is ONE chat, not two — the cloud copy wins, because it is the one a
+// phone can actually reach and the one that was uploaded most recently.
+async function waRefreshCloud(quiet) {
+  var st = quiet ? null : document.getElementById('waFolderStatus');
+  if (!_fbDb) {
+    if (st) st.innerHTML = '<span style="color:#8A6D00;">Not signed in — cloud chats need the same sign-in as recipes.</span>';
+    return { added: 0, error: 'not signed in' };
+  }
+  var cloud;
+  try { cloud = await readCloudChatIndex(_fbDb); }
+  catch(e) {
+    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read cloud chats: ' + escH(e.message) + '</span>';
+    return { added: 0, error: e.message };
+  }
+  var byFile = {};
+  cloud.forEach(function(c){ byFile[c.file] = true; });
+  var idx = waIndex().filter(function(e){
+    if (e.source === 'cloud') return false;              // rebuilt below
+    return !(e.source === 'remote' && byFile[e.file]);   // superseded by the cloud copy
+  });
+  cloud.forEach(function(c){
+    idx.push({ id: 'cloud:' + c.file, group: c.group, source: 'cloud', file: c.file, slug: c.slug,
+               parts: c.parts, size: c.size, count: c.count, first: c.first, last: c.last,
+               updatedAt: c.updatedAt, addedAt: Date.now() });
+  });
+  waSaveIndex(idx);
+  renderWaSources(); updateWaMenuLabel();
+  if (st) st.innerHTML = '<span style="color:' + (cloud.length ? '#2e7d32' : '#8A6D00') + ';">'
+    + cloud.length + ' chat' + (cloud.length === 1 ? '' : 's') + ' in the cloud.</span>';
+  return { added: cloud.length };
+}
+
+// Push a chat the app already holds up to the cloud — the one-time step that
+// gets an existing repo chat onto a phone that cannot reach GitHub.
+async function waPushToCloud(id) {
+  var entry = waIndex().filter(function(e){ return e.id === id; })[0];
+  if (!entry) { toast('⚠️ That chat is no longer in the list'); return; }
+  if (!_fbDb) { toast('⚠️ Sign in first — cloud chats use the same sign-in as recipes'); return; }
+  var st = document.getElementById('waFolderStatus');
+  if (st) st.textContent = 'Uploading ' + entry.group + ' …';
+  try {
+    var text;
+    if (entry.source === 'local') {
+      var rec = await waGet(entry.id);
+      if (!rec) throw new Error('it is no longer in this browser\'s storage');
+      text = rec.text;
+    } else if (entry.source === 'cloud') {
+      toast('That chat is already in the cloud'); if (st) st.textContent = ''; return;
+    } else {
+      var r = await fetch(getWaBase() + encodeURIComponent(entry.file), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' reading it from the folder');
+      text = await waTextFromBuffer(await r.arrayBuffer());
+    }
+    await saveChatDoc(entry.file, entry.group, text);
+    await waRefreshCloud(true);
+    if (st) st.innerHTML = '<span style="color:#2e7d32;">Uploaded ' + escH(entry.group) + ' to the cloud.</span>';
+    toast('☁️ ' + entry.group + ' is now in the cloud');
+  } catch(e) {
+    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t upload: ' + escH(e.message) + '</span>';
+  }
+}
+window.waRefreshCloud = waRefreshCloud; window.waPushToCloud = waPushToCloud;
+window.waCloudSyncOn = waCloudSyncOn; window.setWaCloudSync = setWaCloudSync;
+
 // ─── Loading messages for a query ────────────────────────────────────────────
 async function waLoadAllMessages(){
   var idx = waIndex(), all = [], problems = [];
@@ -13725,6 +14076,12 @@ async function waLoadAllMessages(){
         var rec = await waGet(e.id);
         if (!rec) { problems.push(e.group + ' (no longer in this browser\'s storage)'); continue; }
         all = all.concat(waParse(rec.text, e.group));
+      } else if (e.source === 'cloud') {
+        if (_waCloudCache[e.slug]) { all = all.concat(_waCloudCache[e.slug]); continue; }
+        var ctext = await loadCloudChatText(e);
+        var cmsgs = waParse(ctext, e.group);
+        _waCloudCache[e.slug] = cmsgs;
+        all = all.concat(cmsgs);
       } else {
         if (_waRemoteCache[e.file]) { all = all.concat(_waRemoteCache[e.file]); continue; }
         var r = await fetch(getWaBase() + encodeURIComponent(e.file), { cache: 'no-store' });
@@ -13909,8 +14266,13 @@ async function waAsk(){
 function openWaSetup(){
   document.getElementById('waBaseInput').value = getWaBase();
   document.getElementById('waFolderStatus').textContent = '';
+  var box = document.getElementById('waCloudSyncBox');
+  if (box) box.checked = waCloudSyncOn();
   renderWaSources();
   document.getElementById('waSetupOverlay').classList.add('open');
+  // Pick up chats another device synced, without making Tony press a button to
+  // discover they exist. Quiet: a signed-out session must not shout about it here.
+  if (_fbDb) waRefreshCloud(true).catch(function(){});
 }
 function saveWaBase(){
   setWaBase(document.getElementById('waBaseInput').value);
@@ -13921,22 +14283,49 @@ function renderWaSources(){
   var el = document.getElementById('waSourceList'); if(!el) return;
   var idx = waIndex();
   if (!idx.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);">No chats loaded yet.</div>'; return; }
+  var LABEL = { cloud: '🔄 synced', remote: '☁️ folder', local: '📱 this device' };
+  var btn = 'flex-shrink:0;background:none;border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--muted);cursor:pointer;';
   el.innerHTML = idx.map(function(e){
+    var esc = escA(e.id).replace(/'/g, "\\'");
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
       + '<div style="flex:1;min-width:0;">'
       + '<div dir="auto" style="unicode-bidi:plaintext;font-size:13px;color:var(--ink);font-weight:600;">' + escH(e.group) + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);">' + (e.source === 'remote' ? '☁️ folder' : '📱 this device') + ' · '
+      + '<div style="font-size:11px;color:var(--muted);">' + (LABEL[e.source] || LABEL.local) + ' · '
       + (e.count||0).toLocaleString() + ' messages · ' + escH(e.first||'?') + ' → ' + escH(e.last||'?') + '</div>'
       + '</div>'
-      + '<button onclick="waRemove(\'' + escA(e.id).replace(/'/g, "\\'") + '\')" style="flex-shrink:0;background:none;border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--muted);cursor:pointer;">Remove</button>'
+      // Only offered where it does something: a chat already in the cloud has
+      // nowhere to be pushed to.
+      + (e.source !== 'cloud'
+          ? '<button onclick="waPushToCloud(\'' + esc + '\')" title="Copy this chat to the cloud so your other devices can read it" style="' + btn + '">☁️ Sync</button>'
+          : '')
+      + '<button onclick="waRemove(\'' + esc + '\')" style="' + btn + '">Remove</button>'
       + '</div>';
   }).join('');
 }
 async function waRemove(id){
+  var entry = waIndex().filter(function(e){ return e.id === id; })[0];
+  // Removing a cloud chat removes it for everyone, so it is asked about rather
+  // than done quietly — unlike the other two sources, which only affect this
+  // device and are trivially undone by loading the folder again.
+  if (entry && entry.source === 'cloud') {
+    var ok = await askConfirm({ icon:'🗑️', title:'Remove "' + entry.group + '" from the cloud?',
+      message:'This deletes it for every device, not just this one. A copy in the repo folder, if there is one, is untouched.',
+      okLabel:'Remove everywhere', danger:true });
+    if (!ok) return;
+    try { await deleteCloudChat(entry); }
+    catch(e) {
+      // Deletion is admin-only in the rules; a write-role member gets an honest
+      // refusal instead of a local removal that silently comes back on the next refresh.
+      toast('⚠️ Couldn\'t remove it from the cloud: ' + e.message);
+      return;
+    }
+    delete _waCloudCache[entry.slug];
+    try { await waDelete('cloud:' + entry.file); } catch(e) {}
+  }
   var idx = waIndex().filter(function(e){ return e.id !== id; });
   waSaveIndex(idx);
   if (id.indexOf('local:') === 0) { try { await waDelete(id); } catch(e) {} }
-  else { var f = id.slice(7); delete _waRemoteCache[f]; }
+  else if (id.indexOf('remote:') === 0) { var f = id.slice(7); delete _waRemoteCache[f]; }
   renderWaSources(); updateWaMenuLabel();
 }
 window.openWaAsk = openWaAsk; window.waAsk = waAsk; window.openWaSetup = openWaSetup;
