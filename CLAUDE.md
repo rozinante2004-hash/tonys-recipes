@@ -21,6 +21,10 @@ requirement, not a nice-to-have.
 - `whatsapp/` holds exported chat `.txt`/`.zip` files. The app LISTS the folder over
   the GitHub contents API (5f.7), so `index.json` is optional — it only supplies group
   labels now. See `whatsapp/UPLOAD-FROM-IPHONE.md` for the Share-sheet Shortcut.
+  **`whatsapp/upload-guide.html` is generated** from that markdown by
+  `tools/build-upload-guide.js` (`npm i marked@14` first) — it inlines the seven
+  `whatsapp/img/*.svg` mock-ups so the one file works offline and prints. Edit the
+  markdown and re-run the builder; never hand-edit the HTML.
 - `sw.js`, `manifest.json` — PWA. GitHub Pages deploys `main` via `.github/workflows/deploy.yml`.
 
 ## How to verify work — this is not optional

@@ -21,6 +21,10 @@ phone; that is the whole reason this folder exists.
 
 **From the iPhone, without a laptop:** see [UPLOAD-FROM-IPHONE.md](UPLOAD-FROM-IPHONE.md) —
 Export chat → Share → a Shortcut that PUTs the file straight into this folder.
+The same guide as one offline, printable file:
+[upload-guide.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload-guide.html).
+It is **generated** from the markdown by `tools/build-upload-guide.js` — edit the markdown
+and re-run the builder; never hand-edit the HTML.
 
 ## `index.json` — optional since v29.5
 

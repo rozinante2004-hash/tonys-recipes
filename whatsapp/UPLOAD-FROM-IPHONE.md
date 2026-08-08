@@ -10,6 +10,11 @@ afterwards can be, and that is what this builds.
 `index.json` no longer has to be edited. It is still read, and still does one job: giving a file
 a nicer group label than its file name.
 
+> **Prefer to read this away from GitHub?**
+> **[upload-guide.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload-guide.html)**
+> is this same guide as one self-contained file — pictures embedded, works offline, prints tidily.
+> Handy open on the iPad, or printed, while you build the Shortcut on the phone.
+>
 > **Don't fancy this?** There is a simpler route that needs no Shortcut at all:
 > **[upload.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html)** —
 > open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
