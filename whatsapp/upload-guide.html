@@ -120,12 +120,27 @@ route that is known to work.</p>
 </blockquote>
 <h3>A. Allow it to install</h3>
 <p>A shortcut that did not come from an iCloud link is <em>untrusted</em>, and iOS blocks those by default.</p>
+<p><strong>On iOS 26 the toggle is called &quot;Private Sharing&quot;, not &quot;Allow Untrusted Shortcuts&quot;.</strong> The old name
+is what every older article uses, and searching Settings for it finds nothing.</p>
 <ol>
-<li><strong>Settings</strong> → <strong>Shortcuts</strong> → turn on <strong>Allow Untrusted Shortcuts</strong> (some iOS versions call it
-<strong>Private Sharing</strong>).</li>
-<li>If the switch is greyed out, open Shortcuts and <strong>run any shortcut once</strong>, then come back. iOS
-deliberately will not let you enable it until you have used the app at least once.</li>
+<li>In <strong>Settings</strong>, pull down to reveal the search box and search <strong><code>Private Sharing</code></strong>. Searching
+is more reliable than a menu path — Settings has been reorganised more than once, and on iOS 26
+app settings live under <strong>Settings → Apps → Shortcuts</strong> rather than at the top level.</li>
+<li>Turn it on.</li>
 </ol>
+<blockquote>
+<p><strong>Not there at all?</strong> That is the normal state on a phone where the Shortcuts app has never run
+anything. <strong>The toggle is hidden until you have run at least one shortcut.</strong> Open Shortcuts, tap
+any shortcut in the Gallery to run it once — anything at all, it does not matter which — then go
+back to Settings and search again. This catches most people.</p>
+</blockquote>
+<blockquote>
+<p>If it is still missing after that, stop rather than hunting: a managed device (a work profile or
+Screen Time restrictions) can remove the option entirely, and no amount of menu-searching brings
+it back. Build the Shortcut by hand instead, or use
+<a href="https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html">upload.html</a> — neither
+route needs this setting.</p>
+</blockquote>
 <h3>B. Install it</h3>
 <ol start="3">
 <li>Open the link above in <strong>Safari on the phone</strong>. It downloads.</li>

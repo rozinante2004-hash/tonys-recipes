@@ -79,10 +79,24 @@ into one field, and you're finished. Part 3 onwards applies unchanged.
 
 A shortcut that did not come from an iCloud link is *untrusted*, and iOS blocks those by default.
 
-1. **Settings** → **Shortcuts** → turn on **Allow Untrusted Shortcuts** (some iOS versions call it
-   **Private Sharing**).
-2. If the switch is greyed out, open Shortcuts and **run any shortcut once**, then come back. iOS
-   deliberately will not let you enable it until you have used the app at least once.
+**On iOS 26 the toggle is called "Private Sharing", not "Allow Untrusted Shortcuts".** The old name
+is what every older article uses, and searching Settings for it finds nothing.
+
+1. In **Settings**, pull down to reveal the search box and search **`Private Sharing`**. Searching
+   is more reliable than a menu path — Settings has been reorganised more than once, and on iOS 26
+   app settings live under **Settings → Apps → Shortcuts** rather than at the top level.
+2. Turn it on.
+
+> **Not there at all?** That is the normal state on a phone where the Shortcuts app has never run
+> anything. **The toggle is hidden until you have run at least one shortcut.** Open Shortcuts, tap
+> any shortcut in the Gallery to run it once — anything at all, it does not matter which — then go
+> back to Settings and search again. This catches most people.
+
+> If it is still missing after that, stop rather than hunting: a managed device (a work profile or
+> Screen Time restrictions) can remove the option entirely, and no amount of menu-searching brings
+> it back. Build the Shortcut by hand instead, or use
+> [upload.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html) — neither
+> route needs this setting.
 
 ### B. Install it
 
