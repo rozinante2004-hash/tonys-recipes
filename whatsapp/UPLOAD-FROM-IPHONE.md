@@ -76,109 +76,238 @@ see the top of this document. It does the same job and needs no Shortcuts archae
 
 ### 2.2 The file name
 
-5. Search actions for `Text` → tap **Text**
-6. Tap the empty text box and type the file name you want in the repo, e.g.
-   `family-food.zip`
+**5.** Search actions for `Text` → tap **Text**. **6.** Tap inside its box and type the name you
+want the file to have in the repo, e.g. `Meat-prep.zip`
 
-   Keep it **plain ASCII** — letters, digits, dashes. A Hebrew file name needs percent-encoding
-   in the URL and is not worth the trouble. Hebrew belongs in the *group label*, see Part 4.
+> ✅ **Should read:** a yellow **Text** action containing `Meat-prep.zip`
 
-7. Search actions for `Set Variable` → tap **Set Variable**
-8. Tap **Variable Name** and type `FILENAME`
+Keep it **plain ASCII** — letters, digits, dashes, and an extension. Hebrew belongs in the group
+*label*, not the file name (Part 4).
 
-   (The Text action's output flows into it automatically. Naming variables is the difference
-   between a shortcut you can read next year and one you can't.)
+**7.** Search for `Set Variable` → tap it. **8.** Tap **Variable Name**, type `FILENAME`
+
+> ✅ **Should read:** `Set variable FILENAME to Text`
+>
+> The word **Text** at the end is a blue chip, not typed — Shortcuts fills it in because the Text
+> action is directly above. If it says `Set variable FILENAME to Shortcut Input`, tap that chip
+> and choose **Text** instead.
 
 ### 2.3 The token
 
-9. Add another **Text** action. Paste your token into it.
-10. Add another **Set Variable**, name it `TOKEN`
+**9.** Add another **Text** action → paste your token into it.
+**10.** Add another **Set Variable** → name it `TOKEN`
 
-> ⚠️ **The token is now plainly visible whenever this shortcut is open for editing.**
-> That is unavoidable — Shortcuts has nowhere private to keep it — but it means a screenshot of
-> the editor is a screenshot of your credentials. Do not send one to anyone, including me, and if
-> you already have, revoke the token at
-> <https://github.com/settings/personal-access-tokens> and paste a fresh one in.
+> ✅ **Should read:** `Set variable TOKEN to Text`
 >
-> If you need to show someone the shortcut, delete the text from this action first, screenshot,
-> then paste it back.
+> The capitalisation is only a label — `Token` works identically to `TOKEN`, as long as you insert
+> *that same chip* later. Matching the guide exactly just makes the later steps easier to check.
 
-### 2.4 Encode the file
+> ⚠️ **The token is now visible whenever this shortcut is open for editing** — so it is visible in
+> any screenshot of this screen. Do not send one to anyone, including me. If one escapes, revoke
+> at <https://github.com/settings/personal-access-tokens> and paste a fresh one in. To show
+> someone the shortcut, clear this Text action first, screenshot, then paste it back.
 
-11. Search actions for `Base64` → tap **Base64 Encode**
-12. Check its input says **Shortcut Input**. If it says something else, tap it and choose
-    **Shortcut Input**.
-13. Tap the word **Encode** (or the ⌄ on the action) to show its options and set
-    **Line Breaks: None**
+### 2.4 Turn the file into text
 
-    **This one matters.** The default inserts line breaks and GitHub rejects the upload with a
-    422. It is the single most likely thing to go wrong.
+GitHub's API will not take a raw file. It takes **Base64** — a way of writing any file as plain
+letters and digits. That is all this step does.
 
-14. Add a **Set Variable**, name it `CONTENT`
+**11.** Search for `Base64` → tap **Base64 Encode**
 
-### 2.5 Ask GitHub whether the file already exists
+> ✅ **Should read:** `Shortcut Input with base64` — **exactly one blue chip**, and it must say
+> **Shortcut Input**.
+>
+> ⚠️ **Check for a second chip.** Shortcuts helpfully drops the *previous* action's output into
+> this field, so it very often arrives reading `Shortcut Input  Token  with base64` — with a
+> stray **Token** chip alongside. That is wrong twice over: it encodes your token together with
+> the file, and then **uploads your token into the public repository** as part of the file's
+> contents.
+>
+> To fix: tap the field, put the cursor after the stray chip, and press **⌫ backspace** until only
+> **Shortcut Input** remains. Deleting the whole field and re-inserting **Shortcut Input** from the
+> variable bar works too.
+>
+> The chip you want is the file WhatsApp handed you. Nothing else belongs here.
 
-15. Search actions for `Get Contents of URL` → tap it
-16. In the URL box, type this, and where `[FILENAME]` appears insert the **variable**, not the
-    literal text:
+**12.** Tap the small **⌄** (or **Show More**) on that action and set **Line Breaks** to **None**
 
-    `https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/`
+> ✅ **Should read:** the action expands to show `Line Breaks: None`
+>
+> **This is the single most common failure.** The default chops the text into lines, and GitHub
+> answers **422** because a file's contents may not contain line breaks.
 
-    then tap the **variable bar just above the keyboard** and pick **FILENAME**.
+**13.** Add a **Set Variable** → name it `CONTENT`
 
-17. Tap **Show More** on that action:
-    - **Method:** GET
-    - **Headers** → **Add new field** twice:
-      - Key `Authorization`, Value: type `Bearer ` (with the space) then insert the **TOKEN**
-        variable
-      - Key `Accept`, Value `application/vnd.github+json`
+> ✅ **Should read:** `Set variable CONTENT to Base64 Encoded`
 
-18. Search actions for `Get Dictionary Value` → tap it
-    - **Get:** Value
-    - **Key:** `sha`
-    - **In:** the output of step 15 (it should already say *Contents of URL*)
-19. Add a **Set Variable**, name it `SHA`
+---
 
-    For a file that does not exist yet this request returns 404 and `SHA` comes out **empty**.
-    That is expected — it is exactly how the next step tells a new file from an existing one.
+### 2.5 Ask GitHub whether the file is already there
 
-### 2.6 Upload
+**First, why this step exists** — this is the part that is genuinely confusing, and it is worth
+one paragraph before you tap anything.
 
-20. Search actions for `If` → tap **If**
-21. Set it to: **If** `SHA` **has any value**
+GitHub treats *creating* a file and *replacing* a file as two different requests:
 
-    Tap the first blue field and choose the **SHA** variable; tap the condition and choose
-    **has any value**.
+- **Creating** — you just send the contents.
+- **Replacing** — you must also quote the **`sha`**, an ID GitHub gives the version currently
+  stored. It is GitHub asking *"you did look at what's there before overwriting it, didn't you?"*
 
-You now have an **If** / **Otherwise** / **End If** block. Put one upload action in each half.
+You do not know in advance which case you are in — the first time you send `Meat-prep.zip` it is a
+create, every time after that it is a replace. **So you ask.** You request the file's details:
 
-**Inside "If"** (the file already exists — replace it):
+- **File exists** → GitHub returns its details, including a `sha`.
+- **File does not exist** → GitHub returns **404 Not Found**, and there is no `sha`.
 
-22. Add **Get Contents of URL**, dragging it between **If** and **Otherwise**
-    - **URL:** same as step 16 (base URL + **FILENAME** variable)
-    - **Show More** → **Method: PUT**
-    - **Headers:** the same two as step 17 (`Authorization`, `Accept`)
-    - **Request Body: JSON**
-    - **Add new field** three times, all type **Text**:
-      - `message` → `Update chat export` (any text; it becomes the commit message)
-      - `content` → insert the **CONTENT** variable
-      - `sha` → insert the **SHA** variable
+That difference — *did I get a `sha` or not?* — is what section 2.6 branches on. Nothing here
+uploads anything; this step only asks a question.
 
-**Inside "Otherwise"** (brand new file):
+A 404 here is **not an error**. It is the expected answer for a new file.
 
-23. Add another **Get Contents of URL**, between **Otherwise** and **End If**
-    - Identical to step 22, **except there is no `sha` field** — only `message` and `content`.
+---
 
-    Sending an empty `sha` is an error, which is the entire reason for the If.
+**14.** Search for `Get Contents of URL` → tap it
+
+> ✅ **Should read:** `Get contents of` followed by an empty URL box
+
+**15.** Tap the URL box and type this **exactly**, ending with the slash:
+
+```
+https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/
+```
+
+**16.** With the cursor still at the end, look **just above the keyboard**. There is a bar of
+suggestions — your variables live there. Tap **FILENAME**.
+
+> ✅ **Should read:**
+> `Get contents of https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/FILENAME`
+>
+> **FILENAME must be a blue chip**, not black text. If it is black you typed the word instead of
+> inserting the variable — the shortcut will then ask GitHub for a file literally called
+> "FILENAME", get a 404, and you will spend an hour suspecting your token. Tap the word, delete
+> it, and pick it from the bar above the keyboard instead.
+>
+> If you cannot see the variable bar, tap the URL box once more — it appears only while that field
+> has the cursor.
+
+**17.** Tap **Show More** on this action to reveal Method, Headers and Request Body.
+
+**18.** Set **Method** to **GET**
+
+> ✅ **Should read:** `Method: GET`
+>
+> (It is usually GET already.)
+
+**19.** Under **Headers**, tap **Add new field**. Key: `Authorization`. For the value, type
+`Bearer ` — **including the space after "Bearer"** — then insert the **TOKEN** variable from the
+bar above the keyboard.
+
+> ✅ **Should read:** `Authorization` → `Bearer TOKEN`
+>
+> with **TOKEN** as a blue chip. The space matters: `BearerTOKEN` is rejected as a **401**, which
+> looks exactly like a bad token and sends you off regenerating one that was fine.
+
+**20.** **Add new field** again. Key: `Accept`. Value: `application/vnd.github+json`
+
+> ✅ **Should read:** `Accept` → `application/vnd.github+json`
+>
+> This one is plain text — no variable.
+
+**21.** Leave **Request Body** alone. A GET sends nothing.
+
+**22.** Search for `Get Dictionary Value` → tap it. Set **Key** to `sha`.
+
+> ✅ **Should read:** `Get sha from Contents of URL`
+>
+> The **Contents of URL** chip is the answer from step 14. If it says something else, tap it and
+> choose **Contents of URL**.
+
+**23.** Add a **Set Variable** → name it `SHA`
+
+> ✅ **Should read:** `Set variable SHA to Dictionary Value`
+
+**At this point the shortcut, top to bottom, should be:**
+
+```
+Receive Files from Share Sheet
+Text                         → Meat-prep.zip
+Set variable FILENAME to Text
+Text                         → github_pat_…
+Set variable TOKEN to Text
+Base64 Encode Shortcut Input   (Line Breaks: None)
+Set variable CONTENT to Base64 Encoded
+Get contents of https://api.github.com/…/whatsapp/FILENAME
+Set variable SHA to Dictionary Value
+```
+
+Nine actions. If yours matches, 2.6 is the last part.
+
+---
+
+### 2.6 Upload it
+
+**24.** Search for `If` → tap it. Three rows appear: **If**, **Otherwise**, **End If**.
+
+**25.** Tap the blue field after **If** and choose **SHA**. Tap the condition and choose
+**has any value**.
+
+> ✅ **Should read:** `If SHA has any value`
+>
+> In plain English: *"if GitHub gave me a sha, the file is already there."*
+
+Now one upload action in each half. They are **identical except for one field**.
+
+**26.** With the cursor between **If** and **Otherwise**, add **Get Contents of URL**. If it lands
+in the wrong place, press and hold it and drag it between those two rows.
+
+**27.** URL: the same as step 15 — type the address, then insert **FILENAME** from the bar.
+
+**28.** **Show More** → **Method: PUT**
+
+**29.** Headers: the same two as steps 19–20 (`Authorization` → `Bearer TOKEN`, and `Accept`).
+
+**30.** **Request Body: JSON**, then **Add new field** three times, each of type **Text**:
+
+| Key | Value |
+|---|---|
+| `message` | `Update chat export` (any text — it becomes the commit message) |
+| `content` | insert the **CONTENT** variable |
+| `sha` | insert the **SHA** variable |
+
+> ✅ **Should read**, inside the If branch:
+> `Get contents of https://…/whatsapp/FILENAME` with `Method: PUT`, two headers, and a JSON body
+> of three fields: `message`, `content`, `sha`
+
+**31.** Now the other half. Between **Otherwise** and **End If**, add another
+**Get Contents of URL** and set it up **exactly the same way** — *but with only two body fields:*
+`message` and `content`. **No `sha`.**
+
+> ✅ **Should read**, inside the Otherwise branch: the same action, JSON body of **two** fields
+>
+> Sending an empty `sha` is an error, which is the entire reason this is split in two. If you find
+> yourself wondering why you are building the same thing twice — that is why.
 
 ### 2.7 Tell yourself it worked
 
-24. After **End If**, add **Show Notification** → text `Uploaded to Recipes`
+**32.** After **End If**, add **Show Notification** with text `Uploaded to Recipes`
 
-    Worth having. Without it, a silent failure looks exactly like success.
+> ✅ **Should read:** `Show notification Uploaded to Recipes`
 
-25. Rename the shortcut (tap the name at the top) to something you'll recognise in the Share
-    sheet — **Send chat to Recipes**.
+Worth having: without it, a silent failure looks exactly like success.
+
+**33.** Tap the shortcut's name at the top → **Rename** → `Send chat to Recipes`
+
+### 2.8 Test it before you need it
+
+Tap **▶** (bottom right). With no file shared in, it should fail at the Base64 step — that is
+fine and expected. The real test is Part 3.
+
+Better first test: share **any small file** to it from the Files app. If you get *"Uploaded to
+Recipes"*, check it landed:
+
+<https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp>
+
+Then delete the test file from GitHub in a browser.
 
 ---
 
