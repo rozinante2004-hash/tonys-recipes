@@ -38,6 +38,11 @@ Do this on the phone, in Safari, so you can paste the token straight into the Sh
 
 Paste it somewhere you can get at in a moment — Notes will do, and you can delete it after.
 
+**Treat it like a password.** It goes into the shortcut in step 9, where it is visible to anyone
+who opens the shortcut for editing — so it is also visible in any screenshot of that screen. If
+one ever escapes, revoking and regenerating takes a minute:
+<https://github.com/settings/personal-access-tokens>.
+
 ---
 
 ## Part 2 — Build the Shortcut
@@ -88,6 +93,15 @@ see the top of this document. It does the same job and needs no Shortcuts archae
 
 9. Add another **Text** action. Paste your token into it.
 10. Add another **Set Variable**, name it `TOKEN`
+
+> ⚠️ **The token is now plainly visible whenever this shortcut is open for editing.**
+> That is unavoidable — Shortcuts has nowhere private to keep it — but it means a screenshot of
+> the editor is a screenshot of your credentials. Do not send one to anyone, including me, and if
+> you already have, revoke the token at
+> <https://github.com/settings/personal-access-tokens> and paste a fresh one in.
+>
+> If you need to show someone the shortcut, delete the text from this action first, screenshot,
+> then paste it back.
 
 ### 2.4 Encode the file
 
