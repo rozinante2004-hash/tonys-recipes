@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Upload a chat export — Tony's Recipes</title>
+<meta name="theme-color" content="#5C3D2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Chat Upload">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<style>
+  :root{--cream:#FAF7F2;--warm-brown:#5C3D2E;--terracotta:#C1440E;--gold:#D4A843;
+        --ink:#1C1A18;--muted:#8A8279;--border:#E8E0D5;--card:#fff;--green:#2E7D32;}
+  @media (prefers-color-scheme: dark){
+    :root{--cream:#171310;--ink:#F2EDE6;--muted:#A29A90;--border:#332A22;--card:#211A15;}
+  }
+  *{box-sizing:border-box;}
+  body{font-family:'DM Sans',system-ui,-apple-system,Arial,sans-serif;background:var(--cream);
+       color:var(--ink);margin:0;padding:20px 16px calc(40px + env(safe-area-inset-bottom));line-height:1.6;}
+  .wrap{max-width:620px;margin:0 auto;}
+  h1{font-family:Georgia,'Times New Roman',serif;color:var(--warm-brown);font-size:24px;margin:0 0 4px;}
+  :root[data-dark] h1{color:var(--gold);}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;
+        text-transform:uppercase;letter-spacing:0.6px;}
+  input[type=text],input[type=password]{width:100%;padding:13px 12px;font-size:16px;border-radius:9px;
+        border:1px solid var(--border);background:var(--cream);color:var(--ink);font-family:inherit;}
+  input[type=file]{width:100%;font-size:15px;padding:10px 0;color:var(--ink);}
+  button{width:100%;min-height:52px;padding:14px 18px;font-size:16px;font-weight:600;border:none;
+         border-radius:10px;background:var(--terracotta);color:#fff;font-family:inherit;cursor:pointer;margin-top:6px;}
+  button:disabled{opacity:0.45;}
+  button.ghost{background:var(--card);color:var(--ink);border:1px solid var(--border);}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:8px;}
+  .status{margin-top:14px;padding:13px 14px;border-radius:10px;font-size:14.5px;display:none;white-space:pre-wrap;}
+  .status.show{display:block;}
+  .ok{background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;}
+  .err{background:#FFEBEE;color:#B71C1C;border:1px solid #EF9A9A;}
+  .busy{background:#FFF8E8;color:#7A5C00;border:1px solid #E8D9A8;}
+  .warn{background:#FFF8E8;border:1px solid #E8D9A8;color:#7A5C00;font-size:13.5px;
+        border-radius:10px;padding:12px 14px;margin-bottom:16px;}
+  a{color:var(--terracotta);}
+  code{background:var(--cream);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Upload a chat export</h1>
+  <div class="sub">Puts a WhatsApp export straight into the app's <code>whatsapp/</code> folder — no laptop.</div>
+
+  <div class="warn">
+    <strong>This repository is public,</strong> so anything uploaded here is public too. That is
+    already true of the laptop route — but worth knowing before uploading a family group.
+  </div>
+
+  <div class="card">
+    <label for="tok">GitHub token</label>
+    <input id="tok" type="password" autocomplete="off" autocapitalize="off" autocorrect="off"
+           spellcheck="false" placeholder="github_pat_...">
+    <div class="hint">
+      Fine-grained token, this repository only, <strong>Contents: Read and write</strong>.
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create one</a>.
+      Stored on this device only, so you paste it once.
+    </div>
+    <button class="ghost" id="forget" type="button" style="margin-top:10px;">Forget the token on this device</button>
+  </div>
+
+  <div class="card">
+    <label for="file">The exported file</label>
+    <input id="file" type="file">
+    <div class="hint">WhatsApp gives you a <code>.zip</code> containing <code>_chat.txt</code>.
+      Upload it exactly as it is — the app unpacks it itself.</div>
+  </div>
+
+  <div class="card">
+    <label for="name">Save it as</label>
+    <input id="name" type="text" autocapitalize="off" autocorrect="off" spellcheck="false"
+           placeholder="family-food.zip">
+    <div class="hint">Keep it plain ASCII. Upload a later export under the <strong>same name</strong>
+      to replace it — re-exporting gives you the whole history again, not just the new part.</div>
+  </div>
+
+  <button id="go" type="button">Upload to the recipes folder</button>
+  <div id="status" class="status"></div>
+
+  <div class="hint" style="margin-top:22px;">
+    Then in the app: ⚙️ Settings → 💬 WhatsApp Groups → <strong>Load chats from this folder</strong>.<br>
+    To see what is already there:
+    <a href="https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp"
+       target="_blank" rel="noopener">list the folder</a>.
+  </div>
+</div>
+
+<script>
+(function () {
+  var OWNER = 'rozinante2004-hash', REPO = 'tonys-recipes', DIR = 'whatsapp';
+  var TOKEN_KEY = 'tonys_gh_upload_token';
+  var $ = function (id) { return document.getElementById(id); };
+
+  try { if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-dark',''); } catch (e) {}
+
+  function say(msg, kind) {
+    var el = $('status');
+    el.textContent = msg;
+    el.className = 'status show ' + (kind || 'busy');
+  }
+
+  // Keep the token on the device so it is pasted once, not every time. Same
+  // exposure as putting it in a Shortcut: anyone with the unlocked phone can
+  // reach it, which is why it is scoped to one repo with only Contents write.
+  try { $('tok').value = localStorage.getItem(TOKEN_KEY) || ''; } catch (e) {}
+  $('tok').addEventListener('change', function () {
+    try { localStorage.setItem(TOKEN_KEY, $('tok').value.trim()); } catch (e) {}
+  });
+  $('forget').addEventListener('click', function () {
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    $('tok').value = '';
+    say('Token removed from this device.', 'ok');
+  });
+
+  // A Hebrew or spaced file name needs percent-encoding in the URL path and is a
+  // pointless source of failure — the group LABEL is where a real name belongs
+  // (index.json). Suggest something safe rather than silently mangling it later.
+  function safeName(n) {
+    var base = String(n || '').replace(/^.*[\\/]/, '');
+    var hadNonAscii = /[^\x20-\x7E]/.test(base);
+    var ext = (base.match(/\.[A-Za-z0-9]{1,5}$/) || ['.zip'])[0];
+    var stem = base.slice(0, base.length - (base.match(/\.[A-Za-z0-9]{1,5}$/) ? ext.length : 0));
+    var cleaned = (stem.normalize ? stem.normalize('NFKD') : stem)
+                     .replace(/[^\x20-\x7E]/g, '')      // drop non-ASCII
+                     .replace(/[^\w.\-]+/g, '-')        // spaces & punctuation
+                     .replace(/-+/g, '-')
+                     .replace(/^[-.]+|[-.]+$/g, '');
+    // A Hebrew group name strips down to nothing useful — and EVERY Hebrew group
+    // would strip to the same stub, so a second upload would silently replace the
+    // first. Date-stamp anything whose name did not survive, so distinct groups
+    // stay distinct. Edit the field if you want something better; uploading under
+    // the same name on purpose is still how you replace an export.
+    if (hadNonAscii || !cleaned) {
+      var d = new Date();
+      var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+                + '-' + String(d.getDate()).padStart(2, '0');
+      cleaned = (cleaned || 'chat-export') + '-' + stamp;
+    }
+    return cleaned + ext;
+  }
+
+  $('file').addEventListener('change', function () {
+    var f = $('file').files && $('file').files[0];
+    if (f && !$('name').value.trim()) $('name').value = safeName(f.name);
+  });
+
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      // A data: URL's base64 payload has no line breaks, which is exactly what
+      // the GitHub API needs — line breaks are what make it answer 422.
+      fr.onload = function () {
+        var s = String(fr.result || '');
+        var comma = s.indexOf(',');
+        if (comma < 0) { reject(new Error('could not read the file')); return; }
+        resolve(s.slice(comma + 1));
+      };
+      fr.onerror = function () { reject(new Error('could not read the file')); };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  async function existingSha(path, token) {
+    // 404 here is not an error — it is how a new file announces itself.
+    var r = await fetch('https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/' + path, {
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' },
+      cache: 'no-store'
+    });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('checking for an existing file failed — HTTP ' + r.status);
+    var j = await r.json();
+    return j && j.sha ? j.sha : null;
+  }
+
+  $('go').addEventListener('click', async function () {
+    var token = $('tok').value.trim();
+    var file  = $('file').files && $('file').files[0];
+    var name  = safeName($('name').value.trim() || (file && file.name));
+
+    if (!token) { say('Paste your GitHub token first.', 'err'); return; }
+    if (!file)  { say('Choose the exported file first.', 'err'); return; }
+    $('name').value = name;
+
+    $('go').disabled = true;
+    try {
+      say('Reading the file…');
+      var content = await fileToBase64(file);
+      var path = DIR + '/' + encodeURIComponent(name);
+
+      say('Checking whether ' + name + ' is already there…');
+      var sha = await existingSha(path, token);
+
+      say((sha ? 'Replacing ' : 'Uploading ') + name + ' (' + Math.round(file.size / 1024) + ' KB)…');
+      var body = {
+        message: (sha ? 'Update' : 'Add') + ' chat export ' + name,
+        content: content
+      };
+      if (sha) body.sha = sha;     // required to replace; an error to send when creating
+
+      var r = await fetch('https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents/' + path, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!r.ok) {
+        // Say what the status actually means rather than printing a number.
+        var detail = '';
+        try { detail = (await r.json()).message || ''; } catch (e) {}
+        var why = r.status === 401 ? 'The token was rejected. It may have expired, or been pasted incomplete.'
+                : r.status === 403 ? 'Refused. The token most likely lacks Contents: Read and write on this repository.'
+                : r.status === 404 ? 'Not found. The token probably cannot see this repository — check it is scoped to tonys-recipes.'
+                : r.status === 409 ? 'Conflict — something else changed the file at the same moment. Try again.'
+                : r.status === 422 ? 'GitHub rejected the file contents. If this persists, tell Claude — this should not happen from this page.'
+                : 'HTTP ' + r.status + '.';
+        throw new Error(why + (detail ? '\n\n' + detail : ''));
+      }
+
+      try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+      say('✅ ' + (sha ? 'Replaced ' : 'Uploaded ') + name + '.\n\n'
+        + 'Now open the app: Settings → WhatsApp Groups → Load chats from this folder.', 'ok');
+    } catch (e) {
+      say('❌ ' + (e && e.message ? e.message : String(e)), 'err');
+    } finally {
+      $('go').disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

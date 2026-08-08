@@ -10,6 +10,11 @@ afterwards can be, and that is what this builds.
 `index.json` no longer has to be edited. It is still read, and still does one job: giving a file
 a nicer group label than its file name.
 
+> **Don't fancy this?** There is a simpler route that needs no Shortcut at all:
+> **[upload.html](https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/upload.html)** —
+> open it on the phone, add it to your Home Screen, paste the token once, pick the file, upload.
+> A few more taps per export than the Share sheet, but nothing to build and nothing to go wrong.
+>
 > **Written against the Shortcuts app as it looks in 2026.** Apple moved the shortcut's settings
 > out of an ⓘ button and onto the **⌄ chevron next to the shortcut's name**. If your screen
 > doesn't match a step, say so — the layout does move between iOS versions.
@@ -41,25 +46,27 @@ your screenshot: the name at the top, "Add actions from below", and a search box
 
 ### 2.1 Make it appear in the Share sheet
 
-There are two ways in. **The second is easier and is the one I'd use.**
+**The ⓘ button is in the BOTTOM toolbar**, not at the top. While editing a shortcut the bar along
+the bottom reads `↶  ↷  ⓘ  ⬆  ▶` — undo, redo, **info**, share, run. Tap the **ⓘ** in the middle.
 
-**Either** — tap the **⌄ chevron next to the shortcut's name** at the top of the screen. That
-opens the shortcut's details, which is where **Show in Share Sheet** now lives. Turn it on.
+Two things that will otherwise waste your time:
 
-**Or, simpler** — just add the action, which switches the setting on for you:
+- The **⌄ chevron beside the shortcut's name** is *not* it. That menu only has Rename, Choose
+  Icon, Duplicate, Move and Add to Home Screen.
+- **Searching the actions for "Receive" finds nothing**, because in this version it is not an
+  action you can add. It is purely a setting, and the "Receive … from Share Sheet" row appears at
+  the top of your shortcut *by itself* once the setting is on.
 
-1. In the **Search Actions** box, type `Receive`
-2. Tap **Receive [What] input from [Where]**
+So:
 
-It lands at the top of your shortcut reading something like
-*"Receive Text and images input from Share Sheet"*.
+1. Tap **ⓘ** in the bottom toolbar
+2. Turn on **Show in Share Sheet**
+3. Close the panel. A row now sits at the top of the shortcut reading something like
+   *"Receive Text and images input from Share Sheet"*
+4. Tap the blue **Text and images** in that row → **deselect everything**, select **Files** only
 
-Now narrow it to files:
-
-3. Tap the blue **Text and images** (the "what" part)
-4. **Deselect everything**, then select **Files** only. Tap outside to close.
-
-That one action is both step 1 and the Share-sheet setting. You do not need the chevron at all.
+If your Shortcuts app does not match even this, skip the whole thing and use the upload page —
+see the top of this document. It does the same job and needs no Shortcuts archaeology.
 
 ### 2.2 The file name
 
