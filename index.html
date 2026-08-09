@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.9 -->
+<!-- Tony's Recipes Collection v30.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1908,6 +1908,30 @@ const SELF_TESTS = [
       if(again.index.length!==res.index.length) throw new Error('a second refresh changed the list length');
       if(String(waRefreshCloud).indexOf('waMergeCloudIntoIndex')===-1)
         throw new Error('waRefreshCloud does not use the merge, so the list is unguarded');
+    } },
+
+  { id:'wa_sync_stamp', group:'WhatsApp', name:'A synced chat says WHEN it synced, to the minute (v30.0)',
+    test: async()=>{
+      if(typeof waWhen!=='function') throw new Error('waWhen not defined');
+      var at=new Date(2026,7,9,23,14).getTime();
+      var s=waWhen({ source:'cloud', updatedAt:at });
+      if(!s) throw new Error('a synced chat shows no timestamp at all');
+      // The date alone was the complaint: re-export, upload, and two syncs on the
+      // same day are indistinguishable without the time.
+      if(!/\d{1,2}[:.]\d{2}/.test(s)) throw new Error('the stamp has no time in it: '+s);
+      if(s.indexOf('2026')===-1) throw new Error('the stamp has no year in it: '+s);
+      // A cloud chat must use the SERVER's stamp, not when this browser happened
+      // to fetch it — otherwise every device shows a different "synced" time for
+      // the same upload.
+      var a=waWhen({ source:'cloud', updatedAt:at, addedAt:at+99999999 });
+      if(a!==s) throw new Error('the cloud stamp came from this device rather than the server');
+      // A folder chat has its addedAt rewritten on every load, so a stamp there
+      // would always read "just now" and mean nothing.
+      if(waWhen({ source:'remote', addedAt:at })!=='') throw new Error('a folder chat showed a meaningless stamp');
+      // Missing or damaged stamps must not print "Invalid Date" into the panel.
+      if(waWhen({ source:'cloud' })!=='') throw new Error('a missing stamp produced output');
+      if(waWhen({ source:'cloud', updatedAt:'nonsense' })!=='') throw new Error('a damaged stamp produced output');
+      if(String(renderWaSources).indexOf('waWhen')===-1) throw new Error('the list does not show the stamp');
     } },
 
   { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
@@ -4111,7 +4135,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.9';
+var APP_VERSION = 'v30.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6447,7 +6471,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7011,7 +7035,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7191,30 +7215,19 @@ body.banner-shown .header {
       The supported route is WhatsApp's own <strong>Export chat → Without media</strong>, which gives you a <code>.txt</code> file.
     </p>
 
-    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">☁️ Shared folder — works on every device</div>
+    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">🔄 Synced chats — start here</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
-      Put the <code>.txt</code> files in the repo's <code>whatsapp/</code> folder with an <code>index.json</code> listing them, and every device
-      — iPhone included — can read them. <strong>A file sitting on your laptop is not reachable from the phone</strong>, so this is the option to use for the iPhone.
-    </p>
-    <div style="display:flex;gap:8px;margin-bottom:6px;">
-      <input id="waBaseInput" class="help-input" placeholder="https://…/whatsapp/">
-      <button class="help-btn" onclick="saveWaBase()">Save</button>
-    </div>
-    <button onclick="waRefreshFolder()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:6px;">🔄 Load chats from this folder</button>
-    <div id="waFolderStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:14px;"></div>
-
-    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">🔄 Synced chats — the option that works everywhere</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
-      Chats stored alongside your recipes, in the same cloud and behind the same sign-in. <strong>Use this if a device
-      cannot reach GitHub</strong> — a work phone often blocks it — because nothing here touches the repo.
-      Import below and it appears on every signed-in device.
+      Chats stored alongside your recipes, in the same cloud and behind the same sign-in. This is the option
+      that works on <strong>every</strong> device, including a work phone that blocks GitHub, because nothing
+      here touches the repo. Import below and it appears everywhere you are signed in.
     </p>
     <button onclick="waRefreshCloud()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">🔄 Load synced chats</button>
 
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">📂 Import an export</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
-      Reads the file straight from this device. With the box below ticked it is also synced to your other
-      devices; untick it and the chat stays in this browser and nowhere else.
+      Reads the file straight from this device — <strong>on the iPhone: <em>Save to Files</em> first, then pick it
+      here</strong> (the full steps are at the bottom of this panel). With the box below ticked it is also synced to
+      your other devices; untick it and the chat stays in this browser and nowhere else.
     </p>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px;cursor:pointer;">
       <input type="checkbox" id="waCloudSyncBox" onchange="setWaCloudSync(this.checked)" style="width:16px;height:16px;cursor:pointer;">
@@ -7222,6 +7235,19 @@ body.banner-shown .header {
     </label>
     <input type="file" id="waFileIn" accept=".txt,.zip,text/plain,application/zip" multiple style="display:none" onchange="waImportFiles(this.files);this.value='';">
     <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt or .zip files</button>
+
+    <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">☁️ Shared folder — needs GitHub</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
+      The older route: <code>.txt</code> files committed to the repo's <code>whatsapp/</code> folder. Still read, and still
+      fine from a computer. <strong>It cannot work on a device that blocks GitHub</strong> — reading and uploading both go
+      through the same API — so prefer Synced above unless you have a reason not to.
+    </p>
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <input id="waBaseInput" class="help-input" placeholder="https://…/whatsapp/">
+      <button class="help-btn" onclick="saveWaBase()">Save</button>
+    </div>
+    <button onclick="waRefreshFolder()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:6px;">🔄 Load chats from this folder</button>
+    <div id="waFolderStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:14px;"></div>
 
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Loaded chats</div>
     <div id="waSourceList" style="margin-bottom:14px;"></div>
@@ -14389,10 +14415,33 @@ function saveWaBase(){
   document.getElementById('waBaseInput').value = getWaBase();
   toast('Folder URL saved');
 }
+// When a chat last arrived, to the minute. Date and time, because two syncs of
+// the same group on the same day are the normal case — you re-export, upload,
+// and want to know THIS copy is the new one.
+// A cloud entry carries the server's updatedAt, which is what every device sees;
+// a local one only knows when this browser imported it. The label says which.
+// Deliberately nothing for a folder chat: its addedAt is rewritten every time
+// the folder is loaded, so it would always read "just now" and mean nothing.
+function waWhen(e) {
+  if (e.source === 'remote') return '';
+  var at = e.source === 'cloud' ? e.updatedAt : e.addedAt;
+  if (!at) return '';
+  var d = new Date(at);
+  if (isNaN(d.getTime())) return '';
+  var day = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  var time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return ' ' + escH(day + ', ' + time);
+}
+window.waWhen = waWhen;
+
 function renderWaSources(){
   var el = document.getElementById('waSourceList'); if(!el) return;
   var idx = waIndex();
   if (!idx.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);">No chats loaded yet.</div>'; return; }
+  // "synced" on its own does not say whether the copy is from ten minutes ago or
+  // from March — which is the whole question when you have just re-exported a
+  // group and want to know the upload actually landed. The date alone was not
+  // enough for that: two syncs on the same day looked identical.
   var LABEL = { cloud: '🔄 synced', remote: '☁️ folder', local: '📱 this device' };
   var btn = 'flex-shrink:0;background:none;border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--muted);cursor:pointer;';
   el.innerHTML = idx.map(function(e){
@@ -14400,7 +14449,7 @@ function renderWaSources(){
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
       + '<div style="flex:1;min-width:0;">'
       + '<div dir="auto" style="unicode-bidi:plaintext;font-size:13px;color:var(--ink);font-weight:600;">' + escH(e.group) + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);">' + (LABEL[e.source] || LABEL.local) + ' · '
+      + '<div style="font-size:11px;color:var(--muted);">' + (LABEL[e.source] || LABEL.local) + waWhen(e) + ' · '
       + (e.count||0).toLocaleString() + ' messages · ' + escH(e.first||'?') + ' → ' + escH(e.last||'?') + '</div>'
       + '</div>'
       // Only offered where it does something: a chat already in the cloud has
