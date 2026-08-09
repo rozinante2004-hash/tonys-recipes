@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.6 -->
+<!-- Tony's Recipes Collection v29.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1770,6 +1770,34 @@ const SELF_TESTS = [
       // and no duplicates when both sources name the same file
       var merged4=waMergeFolderList(['a.zip'], ['a.zip']);
       if(merged4.length!==1) throw new Error('the same file was listed twice');
+      // v29.7 — the folder also holds the guides, their pictures and the
+      // Shortcut. Listing dragged all of them in as chats and reported four
+      // failures for files that were never exports. Reported by Tony.
+      if(typeof waFilterListing!=='function') throw new Error('waFilterListing not defined');
+      // Drive the real listing shape the GitHub API returns, not the helper on
+      // its own: an earlier version of this test checked only the predicate and
+      // passed while waListFolder still used the old name-based filter.
+      var listing=[
+        { type:'file', name:'Meat_Whatsapp.txt' },
+        { type:'file', name:'UPLOAD-FROM-IPHONE.md' },
+        { type:'file', name:'upload-guide.html' },
+        { type:'file', name:'upload.html' },
+        { type:'file', name:'Send-chat-to-Recipes.shortcut' },
+        { type:'file', name:'index.json' },
+        { type:'file', name:'README.md' },
+        { type:'dir',  name:'img' }
+      ];
+      var kept=waFilterListing(listing);
+      if(kept.length!==1||kept[0]!=='Meat_Whatsapp.txt')
+        throw new Error('the folder listing kept files that are not chats: '+JSON.stringify(kept));
+      if(String(waListFolder).indexOf('waFilterListing')===-1)
+        throw new Error('waListFolder does not use the filter, so the listing is unguarded');
+      // ...without rejecting real exports. WhatsApp's download can arrive with
+      // no extension at all, which is why this is a denylist and not .txt/.zip.
+      ['Meat_Whatsapp.txt','_chat.zip','WhatsApp Chat with Family.txt','download',
+       'שאלות בשר.txt'].forEach(function(n){
+        if(!waLooksLikeChatFile(n)) throw new Error(n+' was rejected but is a plausible export');
+      });
     } },
 
   { id:'wa_cloud_ids', group:'WhatsApp', name:'Cloud chat ids are stable, ASCII, and never collide (5f.8)',
@@ -4054,7 +4082,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.6';
+var APP_VERSION = 'v29.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6390,7 +6418,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6954,7 +6982,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13734,6 +13762,31 @@ function waRepoFromBase(base) {
 }
 window.waRepoFromBase = waRepoFromBase;
 
+// The folder holds the guides and the Shortcut alongside the chats, and listing
+// it dragged those in as "chats that contain no WhatsApp messages" — four red
+// failures for files that were never exports.
+//
+// A DENYLIST, not an allowlist of .txt/.zip: WhatsApp's own download sometimes
+// arrives with no extension at all, and README tells Tony that is fine because
+// the app sniffs the bytes. Requiring an extension would reject a real export to
+// exclude a README. So: anything that is not documentation or tooling is treated
+// as a possible chat, and the bytes decide.
+var WA_NOT_A_CHAT = /\.(md|markdown|html?|json|shortcut|svg|png|jpe?g|gif|webp|js|mjs|css|ya?ml|py|sh|xml)$/i;
+function waLooksLikeChatFile(name) {
+  return !!name && !WA_NOT_A_CHAT.test(name);
+}
+// Split out from waListFolder so the filtering can be tested without a network
+// round trip — the bug was in what the listing KEPT, not in the fetch, and a
+// test that only exercised waLooksLikeChatFile passed happily while the caller
+// still used the old name-based filter.
+function waFilterListing(entries) {
+  return (entries || [])
+    .filter(function(e) { return e && e.type === 'file' && waLooksLikeChatFile(e.name || ''); })
+    .map(function(e) { return e.name; });
+}
+window.waLooksLikeChatFile = waLooksLikeChatFile;
+window.waFilterListing = waFilterListing;
+
 // Unauthenticated directory listing. Works for a PUBLIC repo; a private one 404s
 // and we fall back to index.json, which is also what happens for any folder that
 // is not GitHub Pages at all. Never throws — a listing failure must not stop the
@@ -13747,9 +13800,7 @@ async function waListFolder(base) {
     if (!r.ok) return null;
     var j = await r.json();
     if (!Array.isArray(j)) return null;
-    return j.filter(function(e) {
-      return e && e.type === 'file' && !/^(index\.json|readme\.md)$/i.test(e.name || '');
-    }).map(function(e) { return e.name; });
+    return waFilterListing(j);
   } catch(e) { return null; }
 }
 window.waListFolder = waListFolder;

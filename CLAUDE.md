@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.6: 149 checks, 143 passing.** The 6 failures are `net_*` and
+**As of v29.7: 149 checks, 143 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -151,6 +151,16 @@ found only because a test was written first and disagreed with the code.
 - **`localStorage` is per-device.** Anything stored there (pantry, line marker, chat
   index, AI cache, theme) does not travel between Tony's phone and PC. Say so in the UI
   rather than letting it look broken.
+- **`whatsapp/` is scanned by the app, so anything put there must not look like a
+  chat.** The guides, their SVGs and the generated Shortcut went in beside the
+  exports and the folder listing dutifully offered all of them as chats, failing
+  four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
+  can arrive with no extension, and README promises that works, so an allowlist of
+  `.txt`/`.zip` would reject real exports to exclude a README.
+- **Testing a predicate is not testing the caller.** The first fix for the above
+  tested `waLooksLikeChatFile` directly; reverting `waListFolder` to the old filter
+  left every test green. The listing filter is now `waFilterListing`, driven with a
+  real GitHub-API-shaped array, plus an assertion that the caller uses it.
 - **Chunk by BYTES, never by characters.** Hebrew is two bytes per character in UTF-8
   and emoji are four, so a chunk budgeted in characters is double or quadruple what
   you asked for — and this collection is mostly Hebrew, so the 1 MiB document limit
