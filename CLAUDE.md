@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v29.7: 149 checks, 143 passing.** The 6 failures are `net_*` and
+**As of v29.8: 150 checks, 144 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -157,6 +157,12 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **A chat listed twice is fed to the AI twice, and the answer looks fine.**
+  `waLoadAllMessages` reads every index row, so a chat present as both `local` and
+  `cloud` puts all its messages into the context twice. Nothing errors and no count
+  looks wrong on screen — it just skews the answer. `waMergeCloudIntoIndex` keeps
+  one row per file with the cloud copy winning. Tony spotted this in a screenshot;
+  no error message would ever have surfaced it.
 - **Testing a predicate is not testing the caller.** The first fix for the above
   tested `waLooksLikeChatFile` directly; reverting `waListFolder` to the old filter
   left every test green. The listing filter is now `waFilterListing`, driven with a

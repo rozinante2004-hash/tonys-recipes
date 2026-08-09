@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.7 -->
+<!-- Tony's Recipes Collection v29.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1879,6 +1879,35 @@ const SELF_TESTS = [
         throw new Error('Sync Health does not report the chat footprint');
       if(syncHealthText().indexOf('whatsapp chats:')===-1)
         throw new Error('the copyable Sync Health text omits the chats line');
+    } },
+
+  { id:'wa_cloud_dedup', group:'WhatsApp', name:'A synced chat replaces its other copies, not joins them (v29.8)',
+    test: async()=>{
+      if(typeof waMergeCloudIntoIndex!=='function') throw new Error('waMergeCloudIntoIndex not defined');
+      // Found by Tony from a screenshot: after pressing Sync on a locally
+      // imported chat the list showed BOTH copies. waLoadAllMessages reads every
+      // row, so every message went into the AI context twice — and duplicated
+      // context does not look wrong in the answer, it just quietly skews it.
+      var existing=[
+        { id:'local:Meat.txt',  source:'local',  file:'Meat.txt', group:'Meat', count:5799 },
+        { id:'remote:Meat.txt', source:'remote', file:'Meat.txt', group:'Meat', count:5799 },
+        { id:'local:Other.txt', source:'local',  file:'Other.txt', group:'Other', count:12 }
+      ];
+      var cloud=[{ file:'Meat.txt', group:'Meat', slug:'meat-1', parts:1, size:10, count:5799, first:'1/1/2025', last:'2/2/2026', updatedAt:7 }];
+      var res=waMergeCloudIntoIndex(existing, cloud);
+      var meat=res.index.filter(function(e){ return e.file==='Meat.txt'; });
+      if(meat.length!==1) throw new Error('Meat.txt appears '+meat.length+' times — its messages would be counted that many times over');
+      if(meat[0].source!=='cloud') throw new Error('the copy every device can reach did not win, got '+meat[0].source);
+      // An unrelated chat must survive untouched.
+      if(res.index.filter(function(e){ return e.file==='Other.txt'; }).length!==1)
+        throw new Error('a chat with no cloud copy was dropped');
+      // Both superseded copies must be reported so the caller can free them.
+      if(res.dropped.length!==2) throw new Error('superseded copies were not reported for cleanup, got '+res.dropped.length);
+      // Running it twice must not accumulate — the panel refreshes on every open.
+      var again=waMergeCloudIntoIndex(res.index, cloud);
+      if(again.index.length!==res.index.length) throw new Error('a second refresh changed the list length');
+      if(String(waRefreshCloud).indexOf('waMergeCloudIntoIndex')===-1)
+        throw new Error('waRefreshCloud does not use the merge, so the list is unguarded');
     } },
 
   { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
@@ -4082,7 +4111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.7';
+var APP_VERSION = 'v29.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6418,7 +6447,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6982,7 +7011,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14052,9 +14081,35 @@ async function deleteCloudChat(entry, db) {
 window.saveChatDoc = saveChatDoc; window.readCloudChatIndex = readCloudChatIndex;
 window.loadCloudChatText = loadCloudChatText; window.deleteCloudChat = deleteCloudChat;
 
-// Merge cloud chats into the index. A chat present both in the repo folder and in
-// the cloud is ONE chat, not two — the cloud copy wins, because it is the one a
-// phone can actually reach and the one that was uploaded most recently.
+// Merge cloud chats into the index. A chat present in the cloud AND somewhere
+// else is ONE chat, not two — the cloud copy wins, because it is the one every
+// device can reach.
+//
+// v29.8: this originally superseded only the folder copy, so pressing ☁️ Sync on
+// a locally imported chat left both rows in the list. Nothing looked broken —
+// but waLoadAllMessages reads every row, so all 5,799 messages went into the AI
+// context twice. Duplicated context is invisible in the answer, which is exactly
+// what makes it worth a test.
+// Returns the new index plus the entries it dropped, so the caller can clean up
+// what they were holding.
+function waMergeCloudIntoIndex(existing, cloudList) {
+  var byFile = {};
+  (cloudList || []).forEach(function(c){ byFile[c.file] = true; });
+  var index = [], dropped = [];
+  (existing || []).forEach(function(e) {
+    if (e.source === 'cloud') return;          // rebuilt from cloudList below
+    if (byFile[e.file]) { dropped.push(e); return; }
+    index.push(e);
+  });
+  (cloudList || []).forEach(function(c) {
+    index.push({ id: 'cloud:' + c.file, group: c.group, source: 'cloud', file: c.file, slug: c.slug,
+                 parts: c.parts, size: c.size, count: c.count, first: c.first, last: c.last,
+                 updatedAt: c.updatedAt, addedAt: Date.now() });
+  });
+  return { index: index, dropped: dropped };
+}
+window.waMergeCloudIntoIndex = waMergeCloudIntoIndex;
+
 async function waRefreshCloud(quiet) {
   var st = quiet ? null : document.getElementById('waFolderStatus');
   if (!_fbDb) {
@@ -14067,18 +14122,15 @@ async function waRefreshCloud(quiet) {
     if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read cloud chats: ' + escH(e.message) + '</span>';
     return { added: 0, error: e.message };
   }
-  var byFile = {};
-  cloud.forEach(function(c){ byFile[c.file] = true; });
-  var idx = waIndex().filter(function(e){
-    if (e.source === 'cloud') return false;              // rebuilt below
-    return !(e.source === 'remote' && byFile[e.file]);   // superseded by the cloud copy
-  });
-  cloud.forEach(function(c){
-    idx.push({ id: 'cloud:' + c.file, group: c.group, source: 'cloud', file: c.file, slug: c.slug,
-               parts: c.parts, size: c.size, count: c.count, first: c.first, last: c.last,
-               updatedAt: c.updatedAt, addedAt: Date.now() });
-  });
-  waSaveIndex(idx);
+  var merged = waMergeCloudIntoIndex(waIndex(), cloud);
+  waSaveIndex(merged.index);
+  // The superseded copies are gone from the list; drop what they left behind so
+  // the browser is not holding a second copy of every export forever.
+  for (var i = 0; i < merged.dropped.length; i++) {
+    var gone = merged.dropped[i];
+    if (gone.source === 'local') { try { await waDelete(gone.id); } catch(e) {} }
+    else if (gone.file) delete _waRemoteCache[gone.file];
+  }
   renderWaSources(); updateWaMenuLabel();
   if (st) st.innerHTML = '<span style="color:' + (cloud.length ? '#2e7d32' : '#8A6D00') + ';">'
     + cloud.length + ' chat' + (cloud.length === 1 ? '' : 's') + ' in the cloud.</span>';
