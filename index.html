@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v29.8 -->
+<!-- Tony's Recipes Collection v29.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4111,7 +4111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v29.8';
+var APP_VERSION = 'v29.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6447,7 +6447,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7011,7 +7011,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v29.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7230,9 +7230,16 @@ body.banner-shown .header {
       <summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600;">How to export, and how to keep it up to date</summary>
       <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px;">
         <strong>Exporting (both platforms):</strong> open the group → group name → <em>Export chat</em> → <em>Without media</em>.<br><br>
+        <strong>From an iPhone, step by step</strong> — this is the whole route, and it needs no GitHub access at all:<br>
+        1. WhatsApp → open the group → tap the <strong>group name</strong> at the top → scroll down → <em>Export Chat</em> → <em>Without Media</em>.<br>
+        2. WhatsApp prepares the file (a few seconds on a big group), then the <strong>Share sheet</strong> opens.<br>
+        3. Scroll the lower list of actions and tap <strong>Save to Files</strong>. Pick somewhere you will find again — <em>On My iPhone → Downloads</em> is fine — then <strong>Save</strong>.<br>
+        4. Come back here: <strong>📂 Import exported .txt or .zip files</strong> above.<br>
+        5. The iPhone's file picker opens. The export is usually the top entry under <strong>Recents</strong>; otherwise tap <em>Browse</em> and go to where you saved it. Tap it.<br><br>
+        <strong>Worth knowing:</strong> WhatsApp hands you a <code>.zip</code> named <code>_chat.zip</code> or similar, not a <code>.txt</code> — that is correct, and this app opens it itself. Do not unzip it on the phone. And leave <em>Also sync imported chats</em> ticked, or the chat stays on the phone and never reaches your other devices.<br><br>
         <strong>Keeping it current — how far automation actually goes:</strong><br>
         • The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.<br>
-        • <strong>iPhone:</strong> the delivery afterwards can be automated. Build a Shortcut that accepts a file from the Share sheet and uploads it to the <code>whatsapp/</code> folder via the GitHub API — then exporting is: <em>Export chat → Share → your Shortcut</em>. Two taps, and every device sees the update.<br>
+        • <strong>iPhone:</strong> the delivery afterwards can be automated <em>if the device can reach GitHub</em> — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.<br>
         • <strong>Android/desktop:</strong> share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.<br>
         • Re-exporting produces the <em>whole</em> history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.
       </div>
