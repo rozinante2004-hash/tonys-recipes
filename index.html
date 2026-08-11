@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v30.0 -->
+<!-- Tony's Recipes Collection v30.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1908,6 +1908,73 @@ const SELF_TESTS = [
       if(again.index.length!==res.index.length) throw new Error('a second refresh changed the list length');
       if(String(waRefreshCloud).indexOf('waMergeCloudIntoIndex')===-1)
         throw new Error('waRefreshCloud does not use the merge, so the list is unguarded');
+    } },
+
+  { id:'wa_all_chats_searched', group:'WhatsApp', name:'Every chat is searched, and none bleeds into another (v30.1)',
+    test: async()=>{
+      ['waContributors','waCoverageHtml','waTag'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      // Two chats, concatenated the way waLoadAllMessages concatenates them.
+      var mk=function(chat,group,n,word){
+        var out=[];
+        for(var i=0;i<n;i++) out.push({ chat:chat, group:group, date:'1/1/2026', who:'A',
+          text:(i===n-1? word+' at 230 degrees on a preheated tray for twenty minutes' : 'filler message number '+i+' in '+group) });
+        return out;
+      };
+      // The hit is the LAST message of chat A, so a window that runs past the
+      // end reaches into chat B — the exact bug this pins.
+      var a=mk('cloud:A.txt','Meat',6,'brisket');
+      var b=mk('local:B.txt','Cakes',6,'brisket');
+      var all=a.concat(b);
+      var hits=waSearch(all,'brisket temperature',40);
+      if(hits.length<2) throw new Error('a term present in BOTH chats produced '+hits.length+' hits — only one chat was searched');
+      var groups={}; hits.forEach(function(h){ groups[all[h.i].group]=true; });
+      if(!groups['Meat']||!groups['Cakes']) throw new Error('hits came from only '+Object.keys(groups).join(',')+' — the other chat was not scanned');
+      // Context must not cross the boundary.
+      var ctx=waBuildContext(all,[{i:5,score:9}],14000);   // last message of chat A
+      if(/Cakes/.test(ctx.text)) throw new Error('context from chat A pulled in messages from chat B as if they were replies');
+      var ctx2=waBuildContext(all,[{i:6,score:9}],14000);  // first message of chat B
+      if(/Meat/.test(ctx2.text)) throw new Error('context from chat B reached back into chat A');
+      // Untagged messages (older callers) must still work rather than collapse.
+      var untagged=[{group:'X',date:'1/1/2026',who:'A',text:'brisket at 230 degrees for a while yet'}];
+      if(!waBuildContext(untagged,[{i:0,score:1}],14000).text) throw new Error('untagged messages produced no context at all');
+      // The coverage panel must name every chat searched, including one that
+      // contributed nothing — an omitted row reads as an oversight.
+      var html=waCoverageHtml({ messages:all, chats:[{id:'cloud:A.txt',group:'Meat',count:6},{id:'local:B.txt',group:'Cakes',count:6},{id:'local:C.txt',group:'Soup',count:3}] }, [{i:5,score:9}]);
+      ['Meat','Cakes','Soup'].forEach(function(g){
+        if(html.indexOf(g)===-1) throw new Error(g+' is missing from the coverage list, so the user cannot tell it was searched');
+      });
+      if(html.indexOf('nothing relevant')===-1) throw new Error('a chat with no hits is silently omitted rather than reported');
+      if(String(waAsk).indexOf('waCoverageHtml')===-1) throw new Error('the answer never shows which chats were searched');
+
+      // Everything above works on a hand-built array, which cannot catch a
+      // loader that stops after the first chat — and that is the actual question
+      // being asked here. Drive the real loader: two local chats, with waGet
+      // stubbed so no IndexedDB is needed.
+      var savedIndex=localStorage.getItem('tonys_wa_index'), savedGet=window.waGet;
+      try{
+        localStorage.setItem('tonys_wa_index', JSON.stringify([
+          { id:'local:A.txt', group:'Meat',  source:'local', file:'A.txt', count:2 },
+          { id:'local:B.txt', group:'Cakes', source:'local', file:'B.txt', count:2 }
+        ]));
+        window.waGet=function(id){
+          var who=id==='local:A.txt'?'Meat':'Cakes';
+          return Promise.resolve({ id:id, text:
+            '[01/01/2026, 10:00:00] A: brisket at 230 degrees in the '+who+' group\n'
+          + '[01/01/2026, 10:05:00] B: yes that worked well for me too in '+who+'\n' });
+        };
+        var loaded=await waLoadAllMessages();
+        if(loaded.chats.length!==2) throw new Error('waLoadAllMessages reported '+loaded.chats.length+' chats, not 2 — it stops early');
+        var gs={}; loaded.messages.forEach(function(m){ gs[m.group]=true; });
+        if(!gs['Meat']||!gs['Cakes']) throw new Error('messages came from only '+Object.keys(gs).join(',')+' — a chat was skipped');
+        if(loaded.messages.some(function(m){ return !m.chat; }))
+          throw new Error('a message carries no chat tag, so the context window cannot find its boundary');
+      } finally {
+        window.waGet=savedGet;
+        if(savedIndex===null) localStorage.removeItem('tonys_wa_index');
+        else localStorage.setItem('tonys_wa_index', savedIndex);
+      }
     } },
 
   { id:'wa_sync_stamp', group:'WhatsApp', name:'A synced chat says WHEN it synced, to the minute (v30.0)',
@@ -4135,7 +4202,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v30.0';
+var APP_VERSION = 'v30.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6471,7 +6538,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7035,7 +7102,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14203,33 +14270,60 @@ window.waRefreshCloud = waRefreshCloud; window.waPushToCloud = waPushToCloud;
 window.waCloudSyncOn = waCloudSyncOn; window.setWaCloudSync = setWaCloudSync;
 
 // ─── Loading messages for a query ────────────────────────────────────────────
+// EVERY chat in the index is loaded and every message is scored; there is no
+// "first chat wins" anywhere. What was missing is the boundary between them —
+// see waBuildContext.
+function waTag(msgs, id) {
+  for (var i = 0; i < msgs.length; i++) msgs[i].chat = id;
+  return msgs;
+}
 async function waLoadAllMessages(){
-  var idx = waIndex(), all = [], problems = [];
+  var idx = waIndex(), all = [], problems = [], loadedFrom = [];
   for (var i = 0; i < idx.length; i++) {
     var e = idx[i];
     try {
+      var got;
       if (e.source === 'local') {
         var rec = await waGet(e.id);
         if (!rec) { problems.push(e.group + ' (no longer in this browser\'s storage)'); continue; }
-        all = all.concat(waParse(rec.text, e.group));
+        got = waParse(rec.text, e.group);
       } else if (e.source === 'cloud') {
-        if (_waCloudCache[e.slug]) { all = all.concat(_waCloudCache[e.slug]); continue; }
-        var ctext = await loadCloudChatText(e);
-        var cmsgs = waParse(ctext, e.group);
-        _waCloudCache[e.slug] = cmsgs;
-        all = all.concat(cmsgs);
+        if (_waCloudCache[e.slug]) got = _waCloudCache[e.slug];
+        else {
+          got = waParse(await loadCloudChatText(e), e.group);
+          _waCloudCache[e.slug] = got;
+        }
       } else {
-        if (_waRemoteCache[e.file]) { all = all.concat(_waRemoteCache[e.file]); continue; }
-        var r = await fetch(getWaBase() + encodeURIComponent(e.file), { cache: 'no-store' });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        var msgs = waParse(await waTextFromBuffer(await r.arrayBuffer()), e.group);
-        _waRemoteCache[e.file] = msgs;
-        all = all.concat(msgs);
+        if (_waRemoteCache[e.file]) got = _waRemoteCache[e.file];
+        else {
+          var r = await fetch(getWaBase() + encodeURIComponent(e.file), { cache: 'no-store' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          got = waParse(await waTextFromBuffer(await r.arrayBuffer()), e.group);
+          _waRemoteCache[e.file] = got;
+        }
       }
+      all = all.concat(waTag(got, e.id));
+      loadedFrom.push({ id: e.id, group: e.group, source: e.source, count: got.length });
     } catch(err) { problems.push(e.group + ' (' + err.message + ')'); }
   }
-  return { messages: all, problems: problems };
+  return { messages: all, problems: problems, chats: loadedFrom };
 }
+
+// Which chats actually fed the answer. Without this "all your chats were
+// searched" is a claim the user has to take on trust — and the app's rule is
+// that it never asserts what it has not verified.
+function waContributors(messages, hits) {
+  var by = {}, order = [];
+  for (var h = 0; h < (hits || []).length; h++) {
+    var m = messages[hits[h].i];
+    if (!m) continue;
+    var k = m.chat || m.group || '?';
+    if (!by[k]) { by[k] = { group: m.group || '?', hits: 0 }; order.push(k); }
+    by[k].hits++;
+  }
+  return order.map(function(k){ return by[k]; }).sort(function(a,b){ return b.hits - a.hits; });
+}
+window.waContributors = waContributors; window.waTag = waTag;
 
 // ─── Retrieval ───────────────────────────────────────────────────────────────
 // Plain term scoring, no embeddings: substring matching handles Hebrew
@@ -14269,6 +14363,16 @@ function waBuildContext(messages, hits, charBudget){
   for (var h = 0; h < hits.length; h++) {
     var i = hits[h].i;
     var from = Math.max(0, i - 2), to = Math.min(messages.length - 1, i + 5);
+    // v30.1 — `messages` is every chat concatenated, so this window used to run
+    // straight off the end of one chat and into the start of the next. The
+    // opening messages of an unrelated group were then handed to the AI as
+    // "the replies" to a hit they have nothing to do with. Each message carries
+    // the chat it came from; the window stops at that boundary.
+    var chat = messages[i] && messages[i].chat;
+    if (chat !== undefined) {
+      while (from < i && messages[from] && messages[from].chat !== chat) from++;
+      while (to   > i && messages[to]   && messages[to].chat   !== chat) to--;
+    }
     var lines = [];
     for (var j = from; j <= to; j++) {
       if (seen[j]) continue;
@@ -14283,6 +14387,30 @@ function waBuildContext(messages, hits, charBudget){
   }
   return { text: blocks.join('\n---\n'), count: included };
 }
+
+// Every chat searched, and what each one turned up — including the ones that
+// turned up nothing, which is the half that answers "was it really searched?".
+// A chat with 0 hits is stated rather than omitted: an absent row reads as an
+// oversight, and "0 relevant" is a finding.
+function waCoverageHtml(loaded, hits){
+  var contrib = {}, list = waContributors(loaded.messages, hits);
+  list.forEach(function(c){ contrib[c.group] = c.hits; });
+  var rows = (loaded.chats || []).map(function(c){
+    var n = contrib[c.group] || 0;
+    return '<div style="display:flex;gap:8px;align-items:baseline;padding:2px 0;">'
+      + '<span dir="auto" style="unicode-bidi:plaintext;flex:1;min-width:0;">' + escH(c.group) + '</span>'
+      + '<span style="color:' + (n ? 'var(--terracotta)' : 'var(--muted)') + ';white-space:nowrap;">'
+      + (n ? n + ' relevant' : 'nothing relevant') + '</span>'
+      + '<span style="color:var(--muted);white-space:nowrap;">of ' + (c.count||0).toLocaleString() + '</span>'
+      + '</div>';
+  }).join('');
+  if (!rows) return '';
+  return '<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;color:var(--muted);">'
+    + 'Searched ' + loaded.chats.length + ' chat' + (loaded.chats.length===1?'':'s') + ' · '
+    + loaded.messages.length.toLocaleString() + ' messages</summary>'
+    + '<div style="font-size:12px;color:var(--ink);margin-top:8px;">' + rows + '</div></details>';
+}
+window.waCoverageHtml = waCoverageHtml;
 
 // ─── The modal ───────────────────────────────────────────────────────────────
 function waAskCountLabel(){
@@ -14363,7 +14491,9 @@ async function waAsk(){
     }
     var ctx = waBuildContext(loaded.messages, hits);
     var context = ctx.text;
-    load.textContent = hits.length + ' messages mention this, ' + ctx.count + ' read with their replies — collating…';
+    load.textContent = 'Searched ' + loaded.chats.length + ' chat' + (loaded.chats.length===1?'':'s') + ', '
+      + loaded.messages.length.toLocaleString() + ' messages — ' + hits.length + ' mention this, '
+      + ctx.count + ' read with their replies. Collating…';
     var prompt =
       'You are answering a question using excerpts from the user\'s own WhatsApp cooking groups.\n\n'
       + 'QUESTION:\n' + q + '\n\n'
@@ -14385,6 +14515,7 @@ async function waAsk(){
     ans.innerHTML = '<div dir="auto" style="unicode-bidi:plaintext;text-align:start;white-space:pre-wrap;line-height:1.7;">'
       + escH(out.trim()).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       + '</div>'
+      + waCoverageHtml(loaded, hits)
       + '<details style="margin-top:14px;"><summary style="cursor:pointer;font-size:12px;color:var(--muted);">'
       + 'Show the ' + ctx.count + ' messages this was based on</summary>'
       + '<div dir="auto" style="unicode-bidi:plaintext;text-align:start;font-size:12px;color:var(--muted);white-space:pre-wrap;margin-top:8px;max-height:280px;overflow-y:auto;">'
