@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v30.1: 152 checks, 146 passing.** The 6 failures are `net_*` and
+**As of v30.2: 153 checks, 147 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -157,6 +157,17 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **`_ph` / `_po` are the ONLY record that a photo exists somewhere else.**
+  localStorage holds photo-free recipes; the photo is in IndexedDB, and the flag
+  is what says so. `hydratePhotosFromIDB` used to clear the flag even when the
+  IndexedDB row was missing ("hydrated (or unavailable) — the flag has done its
+  job"), so when Chrome evicted IndexedDB on a low-storage Android phone, every
+  photo vanished on that device **permanently**: `attachCloudPhotos` then skipped
+  the recipe, and no reload, restart or re-sync could recover it. Clear the flag
+  only when the photo actually arrived, or when the cloud says there is genuinely
+  no photo document. A FAILED read is neither — treat it as "ask again", never as
+  absence, because absence also arms the delete branch in `syncCloudPhotos`
+  against every other device's copy. Reported by Tony from one phone out of three.
 - **`waLoadAllMessages` returns EVERY chat concatenated, so index arithmetic
   crosses chat boundaries.** `waBuildContext` expands each hit to `i-2 … i+5`,
   which ran off the end of one chat into the opening messages of the next and

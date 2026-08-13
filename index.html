@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v30.1 -->
+<!-- Tony's Recipes Collection v30.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -633,11 +633,21 @@ function _fakeFirestore(seed, opts) {
   function ref(id) {
     return {
       id: id,
-      get: function(){ return Promise.resolve({
-        id: id,
-        exists: Object.prototype.hasOwnProperty.call(docs, id),
-        data: function(){ return docs[id]; }
-      }); },
+      get: function(){
+        // A read that FAILS is not a read that says "nothing there", and the two
+        // must be testable apart — treating a network blip as absence is how a
+        // photo gets dropped permanently (v30.2).
+        if (opts && opts.failReads) {
+          var rerr = new Error('network error');
+          rerr.code = 'unavailable';
+          return Promise.reject(rerr);
+        }
+        return Promise.resolve({
+          id: id,
+          exists: Object.prototype.hasOwnProperty.call(docs, id),
+          data: function(){ return docs[id]; }
+        });
+      },
       set: function(v){ docs[id] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); },
       delete: function(){
         if (opts && opts.denyDelete) {
@@ -1908,6 +1918,78 @@ const SELF_TESTS = [
       if(again.index.length!==res.index.length) throw new Error('a second refresh changed the list length');
       if(String(waRefreshCloud).indexOf('waMergeCloudIntoIndex')===-1)
         throw new Error('waRefreshCloud does not use the merge, so the list is unguarded');
+    } },
+
+  { id:'stor_photo_marker_survives', group:'Storage', name:'A photo missing from IndexedDB is recoverable, not lost (v30.2)',
+    test: async()=>{
+      // Reported by Tony: on one Android phone every photo vanished, while his
+      // iPhone and another Android were fine, and no restart helped.
+      //
+      // Chrome evicts IndexedDB under storage pressure. localStorage is tiny and
+      // survives, so recipes came back photo-free with `_ph` set — and
+      // hydratePhotosFromIDB cleared `_ph` even when the row was missing. That
+      // flag is the ONLY record that a photo exists elsewhere, so once cleared
+      // attachCloudPhotos skipped the recipe forever: permanent loss on that one
+      // device, for a completely recoverable situation.
+      var src=String(hydratePhotosFromIDB);
+      if(/delete r\._ph; delete r\._po;/.test(src))
+        throw new Error('the photo flags are still cleared unconditionally, so an evicted IndexedDB loses photos for good');
+      // The flag must survive a miss, and go once the photo is genuinely back.
+      var kept={ id:1, _ph:true }, got={ id:2, _ph:true };
+      var byId={ 2:{ id:2, photo:'data:image/png;base64,AAA' } };
+      [kept,got].forEach(function(r){
+        var row=byId[r.id];
+        var gotPhoto=!!(row && r._ph && row.photo);
+        if(gotPhoto) r.photo=row.photo;
+        if(r._ph && !gotPhoto){ /* keep it */ } else delete r._ph;
+      });
+      if(!kept._ph) throw new Error('the flag was dropped for a photo that never arrived');
+      if(got._ph)  throw new Error('the flag survived even though the photo was restored');
+      // attachCloudPhotos must tell "no photo exists" apart from "the read
+      // failed". Clearing on a network blip makes a transient error permanent,
+      // and it arms the delete branch in syncCloudPhotos against every other
+      // device's copy of that photo.
+      // attachCloudPhotos mutates the photo maps, which the shared snapshot
+      // helper does not cover — save them here or the running session's idea of
+      // which photos are in the cloud is corrupted by this test.
+      var savedDb=window._fbDb, st=_cloudSnapshotForTest();
+      var savedPs=window._cloudPhotoStamps, savedPi=window._cloudPhotoIds;
+      window._cloudPhotoStamps={}; window._cloudPhotoIds={};
+      try{
+        // Read fails: the flag MUST survive, or the next load never looks again
+        // and syncCloudPhotos' delete branch is armed against every other device.
+        window._fbDb=_fakeFirestore({ photo_11:{ photo:'data:image/png;base64,AAA' } }, { failReads:true });
+        var blip=[{ id:11, _ph:true }];
+        await attachCloudPhotos(blip);
+        if(!blip[0]._ph) throw new Error('a failed read cleared the flag — a network blip becomes permanent loss');
+        // Read succeeds: the photo arrives and the flag is spent.
+        window._fbDb=_fakeFirestore({ photo_11:{ photo:'data:image/png;base64,AAA' } });
+        var ok=[{ id:11, _ph:true }];
+        await attachCloudPhotos(ok);
+        if(!ok[0].photo) throw new Error('the cloud photo was not attached');
+        if(ok[0]._ph) throw new Error('the flag outlived the photo it was waiting for');
+        // No document at all: genuinely photoless, so stop asking.
+        var none=[{ id:12, _ph:true }];
+        await attachCloudPhotos(none);
+        if(none[0]._ph) throw new Error('a recipe with no cloud photo keeps asking forever');
+      } finally {
+        window._fbDb=savedDb; _cloudRestoreForTest(st);
+        window._cloudPhotoStamps=savedPs; window._cloudPhotoIds=savedPi;
+      }
+      // A device that already lost its markers needs a way back.
+      if(typeof repairMissingPhotos!=='function') throw new Error('repairMissingPhotos not defined');
+      // The load path is loadFromFirestore → _loadFromFirestoreInner; the outer
+      // function is a thin wrapper, so look where the work actually happens.
+      var loadSrc=String(loadFromFirestore)
+        + (typeof _loadFromFirestoreInner==='function' ? String(_loadFromFirestoreInner) : '');
+      if(loadSrc.indexOf('repairMissingPhotos')===-1)
+        throw new Error('nothing repairs a device whose markers were already cleared');
+      // ...without re-reading every photoless recipe on every load; the "No
+      // photo" filter exists because photoless recipes are perfectly normal.
+      if(typeof photoProbed!=='function'||String(repairMissingPhotos).indexOf('markPhotoProbed')===-1)
+        throw new Error('the repair pass has no memory, so it burns reads on every load');
+      if(syncHealthText().indexOf('photos missing from this device:')===-1)
+        throw new Error('Sync Health does not report missing photos, so this stays invisible');
     } },
 
   { id:'wa_all_chats_searched', group:'WhatsApp', name:'Every chat is searched, and none bleeds into another (v30.1)',
@@ -3999,6 +4081,9 @@ function syncHealthText() {
   L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
   L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
+  L.push('recipes showing a photo: ' + h.photosLocal + ' of ' + h.localRecipes);
+  L.push('photos missing from this device: ' + h.photosMissing
+    + (h.photoRepair ? ' (last repair: ' + h.photoRepair + ')' : ''));
   L.push('whatsapp chats: ' + h.chats.synced + ' synced (' + Math.round(h.chats.bytes / 1024) + ' KB), '
     + h.chats.folder + ' from the folder, ' + h.chats.local + ' on this device only');
   return L.join('\n');
@@ -4202,7 +4287,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v30.1';
+var APP_VERSION = 'v30.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6538,7 +6623,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7102,7 +7187,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11504,17 +11589,31 @@ function hydratePhotosFromIDB() {
     var byId = {};
     rows.forEach(function(row) { byId[row.id] = row; });
     var changed = false;
+    var missing = 0;
     recipes.forEach(function(r) {
       if (r._ph || r._po) {
         var row = byId[r.id];
-        if (row) {
-          if (r._ph && row.photo) { r.photo = row.photo; changed = true; }
-          if (r._po && row.originalPhoto) { r.originalPhoto = row.originalPhoto; changed = true; }
-        }
+        var gotPhoto = !!(row && r._ph && row.photo);
+        var gotOrig  = !!(row && r._po && row.originalPhoto);
+        if (gotPhoto) { r.photo = row.photo; changed = true; }
+        if (gotOrig)  { r.originalPhoto = row.originalPhoto; changed = true; }
         _idbPhotoStamps[r.id] = idbStamp(r);
-        delete r._ph; delete r._po;
+        // v30.2 — the flags used to be cleared here unconditionally, "hydrated
+        // (or unavailable) — the flag has done its job". They had not done their
+        // job when the row was missing: `_ph` is the ONLY record that a photo
+        // exists somewhere else, so clearing it made the loss permanent on this
+        // device. attachCloudPhotos then skipped the recipe, and no reload or
+        // restart could recover it. That is what happened when Chrome evicted
+        // IndexedDB on a low-storage Android phone: photos vanished on that
+        // device alone, silently and for good.
+        if (r._ph && !gotPhoto) missing++; else delete r._ph;
+        if (!(r._po && !gotOrig)) delete r._po;
       }
     });
+    _idbPhotosMissing = missing;
+    if (missing) {
+      console.warn('[photos] ' + missing + ' photo(s) are not in this device\'s IndexedDB; keeping the flag so the cloud can supply them');
+    }
     if (changed) {
       if (typeof renderGrid === 'function') renderGrid();
       var o = document.getElementById('viewOverlay');
@@ -11572,6 +11671,63 @@ function saveData() {
 var FIRESTORE_DOC_LIMIT = 1048487;   // Firestore's real per-document byte cap
 var _cloudPhotoStamps   = {};        // id -> last-synced photo string (skip unchanged rewrites)
 var _cloudPhotoIds      = {};        // id -> true when a cloud photo doc exists for that recipe
+var _idbPhotosMissing   = 0;         // photos this device's IndexedDB no longer holds
+var _photoRepairLog     = '';        // what the last repair pass actually did
+// Recipes already probed for a cloud photo and found genuinely photoless. Without
+// this the repair pass below would re-read every photoless recipe on every load,
+// and a "No photo" filter exists precisely because photoless recipes are normal.
+var PHOTO_PROBED_KEY = 'tonys_photo_probed';
+function photoProbed() {
+  try { var a = JSON.parse(localStorage.getItem(PHOTO_PROBED_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e) { return []; }
+}
+function markPhotoProbed(ids) {
+  try {
+    var set = {};
+    photoProbed().concat(ids).forEach(function(i){ set[i] = true; });
+    localStorage.setItem(PHOTO_PROBED_KEY, JSON.stringify(Object.keys(set)));
+  } catch(e) {}
+}
+function forgetPhotoProbes() { try { localStorage.removeItem(PHOTO_PROBED_KEY); } catch(e) {} }
+
+// Repair a device whose photos went missing BEFORE the fix above existed — the
+// `_ph` marker is already gone there, so attachCloudPhotos will never look. This
+// asks the cloud directly for any recipe that has no photo, once per recipe.
+// Bounded: at most PHOTO_REPAIR_MAX reads per run, and each answer remembered.
+var PHOTO_REPAIR_MAX = 60;
+async function repairMissingPhotos() {
+  if (!_fbDb || !window._fbUser) return { restored: 0, checked: 0 };
+  var probed = {}, restored = 0, checked = 0, nowProbed = [];
+  photoProbed().forEach(function(i){ probed[i] = true; });
+  for (var i = 0; i < recipes.length && checked < PHOTO_REPAIR_MAX; i++) {
+    var r = recipes[i];
+    if (r.photo || r._ph || r.hp || probed[r.id]) continue;
+    checked++;
+    try {
+      var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
+      countCloudRead();
+      if (snap.exists && (snap.data() || {}).photo) {
+        r.photo = (snap.data() || {}).photo;
+        _cloudPhotoStamps[r.id] = r.photo;
+        _cloudPhotoIds[r.id] = true;
+        restored++;
+      } else {
+        nowProbed.push(r.id);      // genuinely has no photo — don't ask again
+      }
+    } catch(e) { /* a read failure is not proof of absence; try again next load */ }
+  }
+  if (nowProbed.length) markPhotoProbed(nowProbed);
+  if (restored) {
+    saveLocal();
+    if (typeof renderGrid === 'function') renderGrid();
+    toast('🖼️ Restored ' + restored + ' photo' + (restored === 1 ? '' : 's') + ' from the cloud');
+  }
+  _photoRepairLog = restored + ' restored, ' + checked + ' checked';
+  return { restored: restored, checked: checked };
+}
+window.repairMissingPhotos = repairMissingPhotos;
+window.forgetPhotoProbes = forgetPhotoProbes;
+window.photoProbed = photoProbed;
 
 function byteLen(str) {
   try { return new Blob([str]).size; } catch(e) { return (str || '').length; }
@@ -11649,6 +11805,15 @@ async function attachCloudPhotos(list) {
     var r = list[i];
     if (r.photo) { delete r.hp; delete r._ph; continue; } // legacy inline photo — keep, migrate on next save
     if (r._ph || r.hp) {   // `hp` = documents written before 5.8 unified the name
+      // `settled` means we now KNOW what the cloud holds for this recipe: either
+      // the photo arrived, or there is genuinely no photo document. A thrown read
+      // leaves it false, and the flag survives.
+      //
+      // Clearing the flag on a failed read is how a network blip turns into
+      // permanent loss: `_ph` is the only record that a photo exists elsewhere,
+      // and losing it also arms the delete branch in syncCloudPhotos against
+      // every other device's copy.
+      var settled = false;
       try {
         var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
         countCloudRead();
@@ -11657,10 +11822,14 @@ async function attachCloudPhotos(list) {
           r.photo = d.photo || '';
           _cloudPhotoStamps[r.id] = r.photo;
           _cloudPhotoIds[r.id] = true;
+          settled = !!r.photo;
+        } else {
+          settled = true;
         }
-      } catch(e) { /* leave photoless if the photo doc can't be read */ }
+      } catch(e) { /* settled stays false — try again on the next load */ }
+      if (!settled) continue;
     }
-    delete r.hp; delete r._ph;   // hydrated (or unavailable) — the flag has done its job
+    delete r.hp; delete r._ph;
   }
   return list;
 }
@@ -11749,7 +11918,12 @@ function syncHealth() {
     metaAt:        _lastCloudMetaAt,
     // 5f.8 — chat exports are far bigger than recipes, so their footprint is
     // worth showing next to the recipe counts rather than being invisible.
-    chats:         waChatHealth()
+    chats:         waChatHealth(),
+    // v30.2 — a device can lose its photos while every other device is fine.
+    // Silent before; now it is the first thing the panel would show.
+    photosLocal:   (recipes || []).filter(function(r){ return !!r.photo; }).length,
+    photosMissing: _idbPhotosMissing,
+    photoRepair:   _photoRepairLog
   };
 }
 // Counted from the local index rather than by reading the cloud: this panel must
@@ -12474,6 +12648,9 @@ async function _loadFromFirestoreInner(user) {
         }
         // Pull each recipe's photo from its own cloud doc, and restore local-only originals
         await attachCloudPhotos(recipes);
+        // ...then rescue any whose marker was lost by the pre-v30.2 bug, which is
+        // the only way a device that already went wrong ever gets its photos back.
+        try { await repairMissingPhotos(); } catch(e) { console.warn('photo repair failed:', e); }
         recipes.forEach(function(r) { if (!r.originalPhoto && _localOrig[r.id]) r.originalPhoto = _localOrig[r.id]; });
         recipes.forEach(function(r) { if ((!r.history || !r.history.length) && _localHist[r.id]) r.history = _localHist[r.id]; });
         // Photo safety net (see _localPhoto comment above)
