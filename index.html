@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v30.2 -->
+<!-- Tony's Recipes Collection v30.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2323,12 +2323,49 @@ const SELF_TESTS = [
   { id:'feat_photo_sources', group:'Features', name:'Photo search wires multiple sources',
     test: async()=>{
       if(typeof photoSearchMore!=='function') throw new Error('photoSearchMore not defined');
-      if(!Array.isArray(PHOTO_SOURCES)||PHOTO_SOURCES.length<3) throw new Error('expected 3 photo sources');
-      ['pixabay','pexels','unsplash'].forEach(function(s){
+      if(!Array.isArray(PHOTO_SOURCES)||PHOTO_SOURCES.length<4) throw new Error('expected at least 4 photo sources');
+      ['openverse','pixabay','pexels','unsplash'].forEach(function(s){
         if(PHOTO_SOURCES.indexOf(s)<0) throw new Error('missing photo source: '+s);
         if(!PHOTO_SOURCE_LABELS[s]) throw new Error('missing label for: '+s);
       });
       if(!document.getElementById('photoSearchMoreBtn')) throw new Error('#photoSearchMoreBtn (See more) missing from photo modal');
+      // The keyless source must be tried FIRST. Every other source shares one
+      // API key across the whole family, so they are the ones that 429; leading
+      // with Openverse means a rate limit is a slower search, not a dead end.
+      if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
+    } },
+
+  { id:'feat_photo_429', group:'Features', name:'A rate-limited source hands off instead of dead-ending (v30.3)',
+    test: async()=>{
+      // Tony hit "Pixabay: invalid JSON (429)" repeatedly. Two faults: the
+      // message blamed JSON parsing for what was a rate limit, and one failing
+      // source ended the whole search while two working ones sat unused.
+      if(typeof photoErrText!=='function') throw new Error('photoErrText not defined');
+      var t=photoErrText('Pixabay: invalid JSON (429)');
+      if(/invalid json/i.test(t)) throw new Error('a 429 is still reported as a JSON problem: '+t);
+      if(!/minute/i.test(t)) throw new Error('the message does not say it clears on its own: '+t);
+      if(!/key/i.test(photoErrText('Unsplash error 401: unauthorized'))) throw new Error('a rejected key is not explained');
+      if(photoErrText('something odd')!=='something odd') throw new Error('an unrecognised error should pass through unchanged');
+      // The search must move to the next source on an error, exactly as it does
+      // for a source with no API key configured.
+      var src=String(doPhotoSearch);
+      var errBranch=src.slice(src.indexOf('if (data.error)'), src.indexOf('if (data.error)')+400);
+      if(errBranch.indexOf('continue')===-1)
+        throw new Error('an erroring source still ends the search instead of trying the next one');
+      if(src.indexOf('failures')===-1) throw new Error('nothing collects why each source declined');
+      // Attribution must survive being applied, or CC-BY photos breach their licence.
+      if(typeof photoCreditHtml!=='function') throw new Error('photoCreditHtml not defined');
+      if(String(useSelectedSearchPhoto).indexOf('photoCredit')===-1)
+        throw new Error('credit is discarded when the photo is applied — a CC-BY photo would be uncredited');
+      var withCredit=photoCreditHtml({ photo:'data:x', photoCredit:{ name:'A Person', url:'https://example.com/p', license:'CC BY 4.0', source:'Openverse' } });
+      ['A Person','CC BY 4.0','Openverse'].forEach(function(bit){
+        if(withCredit.indexOf(bit)===-1) throw new Error('the credit line omits '+bit);
+      });
+      if(withCredit.indexOf('<script')!==-1) throw new Error('unescaped credit');
+      var evil=photoCreditHtml({ photo:'data:x', photoCredit:{ name:'<img src=x onerror=alert(1)>' } });
+      if(/<img src=x/.test(evil)) throw new Error('the credit name is injected as live HTML');
+      if(photoCreditHtml({ photo:'data:x' })!=='') throw new Error('a photo with no credit produced a stray line');
+      if(photoCreditHtml({ photoCredit:{ name:'X' } })!=='') throw new Error('credit shown for a recipe with no photo');
     } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
     test: async()=>{
@@ -4287,7 +4324,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v30.2';
+var APP_VERSION = 'v30.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6623,7 +6660,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7187,7 +7224,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8950,6 +8987,7 @@ function drawView(){
       <span class="emoji-over"${r.photo?' style="display:none"':''}>${escH(r.emoji)}</span>
       <button class="hero-photo-btn" onclick="event.stopPropagation();changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
     </div>
+    ${photoCreditHtml(r)}
     <div class="modal-content">
       <div class="modal-category">${escH(r.category)}</div>
       <div class="modal-title" dir="auto">${escH(r.name)}</div>
@@ -13321,8 +13359,14 @@ function loadIngsTable(ingredients) {
 var _photoSearchSelected = null;
 var _photoSearchResults  = [];
 // Photo search cycles through these free sources via the "See more" button.
-var PHOTO_SOURCES = ['pixabay', 'pexels', 'unsplash'];
-var PHOTO_SOURCE_LABELS = { pixabay: 'Pixabay', pexels: 'Pexels', unsplash: 'Unsplash' };
+// Openverse first: it needs no API key, so it is the one source that cannot be
+// taken out by a shared key hitting its rate limit — which is exactly what put
+// "Pixabay: invalid JSON (429)" in front of Tony. It federates Flickr, Wikimedia,
+// NASA and museum collections, so it is broad rather than a token extra.
+var PHOTO_SOURCES = ['openverse', 'pixabay', 'pexels', 'unsplash'];
+var PHOTO_SOURCE_LABELS = { openverse: 'Openverse', pixabay: 'Pixabay', pexels: 'Pexels', unsplash: 'Unsplash' };
+// Sources whose licences REQUIRE attribution, not merely appreciate it.
+var PHOTO_SOURCES_NEEDING_CREDIT = ['openverse'];
 var _photoSrcIdx = 0, _photoPage = 1, _photoQuery = '';
 
 function openPhotoSearch(recipeName) {
@@ -13370,7 +13414,11 @@ async function doPhotoSearch() {
   _photoSearchSelected = null;
   if (moreWrap) moreWrap.style.display = 'none';
 
-  var tried = 0;
+  // v30.3 — a source that ERRORS used to end the search, so a rate-limited
+  // Pixabay blocked photo search entirely while Pexels and Unsplash sat there
+  // working. A failing source is now treated exactly like an unconfigured one:
+  // move on, remember why, and only report if every source failed.
+  var tried = 0, failures = [];
   while (tried < PHOTO_SOURCES.length) {
     var source = PHOTO_SOURCES[_photoSrcIdx];
     var label  = PHOTO_SOURCE_LABELS[source] || source;
@@ -13389,8 +13437,11 @@ async function doPhotoSearch() {
         continue;
       }
       if (data.error) {
-        grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;font-size:13px;">' + escH(data.error) + '</div>';
-        updatePhotoMoreBtn(); return;
+        failures.push({ label: label, why: photoErrText(data.error) });
+        tried++;
+        _photoSrcIdx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
+        if (_photoSrcIdx === 0) _photoPage++;
+        continue;
       }
       if (!data.images || !data.images.length) {
         grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos from ' + label + '. Tap “See more” to try another source.</div>';
@@ -13401,14 +13452,47 @@ async function doPhotoSearch() {
       status.textContent = data.images.length + ' from ' + label + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select';
       updatePhotoMoreBtn(); return;
     } catch(err) {
-      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--terracotta);padding:12px;">Error: ' + escH(err.message) + '</div>';
-      updatePhotoMoreBtn(); return;
+      failures.push({ label: label, why: photoErrText(err.message) });
+      tried++;
+      _photoSrcIdx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
+      if (_photoSrcIdx === 0) _photoPage++;
     }
+  }
+  // Nothing worked. Say which sources were tried and why each declined, rather
+  // than showing whichever one happened to fail last.
+  if (failures.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:14px;color:var(--ink);font-size:13px;line-height:1.7;">'
+      + '<strong>No photos came back.</strong> All ' + failures.length + ' source'
+      + (failures.length === 1 ? '' : 's') + ' were tried:<br>'
+      + failures.map(function(f){ return '• <strong>' + escH(f.label) + '</strong> — ' + escH(f.why); }).join('<br>')
+      + (failures.some(function(f){ return /minute/.test(f.why); })
+          ? '<br><br>Rate limits reset on their own. Waiting a minute and searching again usually works.'
+          : '')
+      + '</div>';
+    status.textContent = '';
+    updatePhotoMoreBtn();
+    return;
   }
   // Every source came back notConfigured
   grid.innerHTML = '<div style="grid-column:1/-1;padding:14px;color:var(--muted);font-size:13px;line-height:1.6;">No photo sources are set up yet. Add a free API key (Pixabay, Pexels, or Unsplash) — see <strong>⚙️ → Deployments → Photo Sources</strong> for links and setup steps.</div>';
   status.textContent = '';
 }
+
+// Turn a provider's error into something that tells you what to do about it.
+// "Pixabay: invalid JSON (429)" is technically true and completely useless: the
+// body was not JSON *because* it was a rate-limit notice, and the fix is to wait,
+// not to report a parsing bug.
+function photoErrText(err) {
+  var s = String(err || '');
+  if (/\b429\b|too many requests|rate limit/i.test(s))
+    return 'too many searches in the last minute — it clears on its own, usually within a minute';
+  if (/\b401\b|\b403\b|unauthor|forbidden/i.test(s))  return 'the API key was rejected (check it in ⚙️ → Deployments → Photo Sources)';
+  if (/\b5\d\d\b/.test(s))                            return 'the service is having trouble right now';
+  if (/failed to fetch|networkerror|load failed/i.test(s)) return 'could not be reached from this device';
+  if (/invalid json/i.test(s))                        return 'sent something unreadable back — ' + s;
+  return s;
+}
+window.photoErrText = photoErrText;
 
 function renderPhotoSearchGrid(images) {
   var grid = document.getElementById('photoSearchGrid'); grid.innerHTML='';
@@ -13431,6 +13515,23 @@ function selectSearchPhoto(idx, el) {
   document.getElementById('photoSearchUseBtn').style.display='block';
 }
 
+// Attribution was shown in the picker and then thrown away when the photo was
+// applied. Pixabay, Pexels and Unsplash licences do not require credit, so that
+// was merely impolite — but Openverse serves Creative Commons work, where CC-BY
+// makes attribution a licence CONDITION. Adding that source without storing the
+// credit would have quietly put every recipe using one in breach.
+function photoCreditHtml(r) {
+  var c = r && r.photoCredit;
+  if (!c || !c.name || !r.photo) return '';
+  var who = c.url
+    ? '<a href="' + escA(c.url) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;">' + escH(c.name) + '</a>'
+    : escH(c.name);
+  return '<div style="font-size:11px;color:var(--muted);padding:4px 18px 0;text-align:end;">Photo: ' + who
+    + (c.license ? ' · ' + escH(c.license) : '')
+    + (c.source ? ' · ' + escH(c.source) : '') + '</div>';
+}
+window.photoCreditHtml = photoCreditHtml;
+
 async function useSelectedSearchPhoto() {
   if (_photoSearchSelected===null) { toast('Select a photo first'); return; }
   var img = _photoSearchResults[_photoSearchSelected]; if (!img) return;
@@ -13445,6 +13546,8 @@ async function useSelectedSearchPhoto() {
     var r=recipes.find(function(x){ return x.id===heroPhotoTargetId; });
     if (!r) throw new Error('Recipe not found');
     r.photo=photoUrl; r.updatedAt=Date.now(); pendingPhoto=photoUrl;
+    if (img.credit) r.photoCredit = { name: img.credit, url: img.creditUrl || '', license: img.license || '', source: img.sourceLabel || '' };
+    else delete r.photoCredit;
     saveData();
     var heroImg=document.getElementById('viewHeroImg'); if(heroImg) heroImg.src=photoUrl;
     renderGrid(); toast('\u2705 Photo updated!');

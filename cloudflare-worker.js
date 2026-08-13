@@ -1,4 +1,5 @@
-// Tony's Recipes — Cloudflare Worker v32
+// Tony's Recipes — Cloudflare Worker v33
+// v33: photo-search reports a 429 as a rate limit instead of "invalid JSON".
 // v32: instagram-fetch rebuilt on Meta's tokenless oEmbed (public again since
 //      15 Jun 2026). Mines the embed blockquote for a caption fragment and
 //      flags `partial` when what came back is too short to be a recipe.
@@ -397,6 +398,18 @@ export default {
       const source  = (body.source || 'pixabay').toLowerCase();
       const page    = Math.max(1, parseInt(body.page, 10) || 1);
       const perPage = 9;
+      // A provider that rate-limits answers with a plain-text notice, not JSON.
+      // Reporting that as "invalid JSON" is true and useless — it hides the one
+      // fact that matters, which is that waiting fixes it. v33.
+      const photoFail = (source, name, resp, raw) => {
+        if (resp.status === 429) {
+          const retry = parseInt(resp.headers.get('X-RateLimit-Reset') || resp.headers.get('Retry-After') || '0', 10);
+          return jsonResp({ source, rateLimited: true, retryAfter: retry || null,
+            error: name + ' is rate-limited (429) — too many searches in the last minute'
+                 + (retry ? '; try again in about ' + retry + 's' : '') });
+        }
+        return jsonResp({ source, error: name + ' error ' + resp.status + ': ' + String(raw || '').slice(0, 120) });
+      };
       try {
         // ── Pixabay ──
         if (source === 'pixabay') {
@@ -406,13 +419,14 @@ export default {
             + '&image_type=photo&per_page=' + perPage + '&page=' + page + '&safesearch=true&order=popular';
           const resp = await fetch(url);
           const raw = await resp.text();
-          let data; try { data = JSON.parse(raw); } catch(e) { return jsonResp({ source, error: 'Pixabay: invalid JSON (' + resp.status + ')' }); }
-          if (!resp.ok || data.error) return jsonResp({ source, error: 'Pixabay error ' + resp.status + ': ' + (data.error || raw.slice(0,120)) });
+          let data; try { data = JSON.parse(raw); } catch(e) { return photoFail(source, 'Pixabay', resp, raw); }
+          if (!resp.ok || data.error) return photoFail(source, 'Pixabay', resp, data.error || raw);
           const images = (data.hits || []).map(h => ({
             url: h.largeImageURL || h.webformatURL,
             thumb: h.webformatURL || h.previewURL,
             credit: h.user,
-            creditUrl: 'https://pixabay.com/users/' + h.user + '-' + h.user_id + '/'
+            creditUrl: 'https://pixabay.com/users/' + h.user + '-' + h.user_id + '/',
+            license: 'Pixabay licence', sourceLabel: 'Pixabay'
           }));
           return jsonResp({ source, page, images, total: data.totalHits });
         }
@@ -424,13 +438,14 @@ export default {
             + '&per_page=' + perPage + '&page=' + page;
           const resp = await fetch(url, { headers: { 'Authorization': key } });
           const raw = await resp.text();
-          let data; try { data = JSON.parse(raw); } catch(e) { return jsonResp({ source, error: 'Pexels: invalid JSON (' + resp.status + ')' }); }
-          if (!resp.ok) return jsonResp({ source, error: 'Pexels error ' + resp.status + ': ' + (data.error || raw.slice(0,120)) });
+          let data; try { data = JSON.parse(raw); } catch(e) { return photoFail(source, 'Pexels', resp, raw); }
+          if (!resp.ok) return photoFail(source, 'Pexels', resp, data.error || raw);
           const images = (data.photos || []).map(p => ({
             url: (p.src && (p.src.large || p.src.original)) || (p.src && p.src.medium),
             thumb: (p.src && (p.src.medium || p.src.small)) || (p.src && p.src.tiny),
             credit: p.photographer,
-            creditUrl: p.photographer_url
+            creditUrl: p.photographer_url,
+            license: 'Pexels licence', sourceLabel: 'Pexels'
           }));
           return jsonResp({ source, page, images, total: data.total_results });
         }
@@ -442,15 +457,39 @@ export default {
             + '&per_page=' + perPage + '&page=' + page + '&content_filter=high';
           const resp = await fetch(url, { headers: { 'Authorization': 'Client-ID ' + key, 'Accept-Version': 'v1' } });
           const raw = await resp.text();
-          let data; try { data = JSON.parse(raw); } catch(e) { return jsonResp({ source, error: 'Unsplash: invalid JSON (' + resp.status + ')' }); }
-          if (!resp.ok) return jsonResp({ source, error: 'Unsplash error ' + resp.status + ': ' + ((data.errors && data.errors.join(', ')) || raw.slice(0,120)) });
+          let data; try { data = JSON.parse(raw); } catch(e) { return photoFail(source, 'Unsplash', resp, raw); }
+          if (!resp.ok) return photoFail(source, 'Unsplash', resp, (data.errors && data.errors.join(', ')) || raw);
           const images = (data.results || []).map(p => ({
             url: (p.urls && (p.urls.regular || p.urls.full)) || (p.urls && p.urls.small),
             thumb: (p.urls && (p.urls.small || p.urls.thumb)) || (p.urls && p.urls.regular),
             credit: p.user && p.user.name,
-            creditUrl: p.user && p.user.links && p.user.links.html
+            creditUrl: p.user && p.user.links && p.user.links.html,
+            license: 'Unsplash licence', sourceLabel: 'Unsplash'
           }));
           return jsonResp({ source, page, images, total: data.total });
+        }
+        // ── Openverse — NO API KEY, so it cannot be knocked out by a shared
+        // key's rate limit, which is what made Pixabay 429 on Tony. It federates
+        // Flickr, Wikimedia, NASA and museum collections, all openly licensed.
+        // Licence and creator are passed through because CC-BY REQUIRES credit;
+        // the app stores them on the recipe.
+        if (source === 'openverse') {
+          const url = 'https://api.openverse.org/v1/images/?q=' + encodeURIComponent(query)
+            + '&page_size=' + perPage + '&page=' + page
+            + '&license_type=all-cc&mature=false';
+          const resp = await fetch(url, { headers: { 'User-Agent': 'TonysRecipes/1.0 (personal recipe app)' } });
+          const raw = await resp.text();
+          let data; try { data = JSON.parse(raw); } catch(e) { return photoFail(source, 'Openverse', resp, raw); }
+          if (!resp.ok) return photoFail(source, 'Openverse', resp, data.detail || raw);
+          const images = (data.results || []).map(i => ({
+            url: i.url,
+            thumb: i.thumbnail || i.url,
+            credit: i.creator || i.source || 'Unknown',
+            creditUrl: i.foreign_landing_url || i.url,
+            license: (i.license ? String(i.license).toUpperCase() : '') + (i.license_version ? ' ' + i.license_version : ''),
+            sourceLabel: 'Openverse'
+          })).filter(i => i.url);
+          return jsonResp({ source, page, images, total: data.result_count });
         }
         return jsonResp({ source, error: 'Unknown photo source: ' + source, images: [] });
       } catch(err) {

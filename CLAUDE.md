@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v30.2: 153 checks, 147 passing.** The 6 failures are `net_*` and
+**As of v30.3: 154 checks, 148 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -157,6 +157,15 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **One failing photo source must not end the search.** A 429 from Pixabay used
+  to dead-end photo search while Pexels and Unsplash sat there working — an error
+  is now handled exactly like an unconfigured source: move on, collect the reason,
+  report only if all four fail. **Openverse is first because it needs no API key**,
+  so it cannot be knocked out by the shared key's rate limit.
+- **Openverse is Creative Commons, so credit is a licence CONDITION, not a
+  courtesy.** Pixabay/Pexels/Unsplash do not require attribution, so the picker
+  showed credit and `useSelectedSearchPhoto` discarded it. Adding a CC source
+  without `r.photoCredit` would have put every recipe using one in breach.
 - **`_ph` / `_po` are the ONLY record that a photo exists somewhere else.**
   localStorage holds photo-free recipes; the photo is in IndexedDB, and the flag
   is what says so. `hydratePhotosFromIDB` used to clear the flag even when the
