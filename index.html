@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v30.3 -->
+<!-- Tony's Recipes Collection v30.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2335,6 +2335,62 @@ const SELF_TESTS = [
       if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
     } },
 
+  { id:'import_freehand_into_form', group:'Import/Export', name:'Free-hand text can fill an open recipe (v30.4)',
+    test: async()=>{
+      ['openFreehandForForm','applyParsedToForm','applyParsedToFormPreview'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      if(!document.getElementById('formFreehandBtn')) throw new Error('#formFreehandBtn missing from the edit form');
+      var parsed={ name:'Parsed Name', category:'Dinner', prep:'40 min', servings:'6',
+                   ingredients:[{a:'200g',n:'flour'},{a:'2',n:'eggs'}], steps:['Mix it','Bake it'] };
+      var testId=null;
+      try{
+        // Tony's case exactly: a recipe saved as a CLIP — name and photo already
+        // right, no ingredients, and "Enjoy!" standing in for a method.
+        testId=nextId++;
+        recipes.push(normalizeRecipe({ id:testId, name:'שניצל של סבתא', ingredients:[], steps:['Enjoy!'], isClip:true, photo:'' }));
+        openAddModal(testId);
+        openFreehandForForm();
+        var ov=document.getElementById('freehandOverlay');
+        if(!ov.classList.contains('open')) throw new Error('the paste box did not open');
+        // It must sit ABOVE the edit form, or it opens behind the thing it fills.
+        if(parseInt(ov.style.zIndex||'0',10)<=200) throw new Error('the paste box opens behind the edit form');
+        applyParsedToFormPreview(parsed,'freehandResult');
+        var html=document.getElementById('freehandResult').innerHTML;
+        if(html.indexOf('Fill in what')===-1||html.indexOf('Replace')===-1)
+          throw new Error('the preview does not offer both fill and replace');
+        applyParsedToForm(parsed,'fill');
+        // The curated Hebrew name must survive; the parser's guess must not win.
+        if(document.getElementById('f-name').value!=='שניצל של סבתא')
+          throw new Error('the existing recipe name was overwritten by the parsed one');
+        if(readIngsTable().filter(function(i){return i.n;}).length!==2)
+          throw new Error('ingredients were not filled into the form');
+        if(document.getElementById('f-steps').value.indexOf('Mix it')===-1)
+          throw new Error('"Enjoy!" was treated as a real method, so the clip case — the whole point — is unsolved');
+        if(document.getElementById('f-isclip').checked)
+          throw new Error('the recipe still claims to be a clip after gaining a method');
+        if(document.getElementById('freehandOverlay').classList.contains('open'))
+          throw new Error('the paste box stayed open over the form');
+        if(!document.getElementById('editOverlay').classList.contains('open'))
+          throw new Error('the edit form was closed — the fill must be reviewable before saving');
+        // Nothing may reach the stored recipe until Update Recipe is pressed.
+        var stored=recipes.find(function(x){ return x.id===testId; });
+        if(stored.steps.join(' ').indexOf('Mix it')!==-1)
+          throw new Error('the recipe was written straight to storage, bypassing review and the 5.4 conflict guard');
+        // "fill" must not clobber content that is already there; "replace" must.
+        document.getElementById('f-steps').value='My own method';
+        applyParsedToForm(parsed,'fill');
+        if(document.getElementById('f-steps').value!=='My own method')
+          throw new Error('fill overwrote a method that was already written');
+        applyParsedToForm(parsed,'replace');
+        if(document.getElementById('f-steps').value.indexOf('Mix it')===-1)
+          throw new Error('replace did not overwrite the method');
+      } finally {
+        closeM('freehandOverlay'); closeM('editOverlay');
+        if(testId) recipes=recipes.filter(function(r){ return r.id!==testId; });
+      }
+    } },
+
   { id:'feat_photo_429', group:'Features', name:'A rate-limited source hands off instead of dead-ending (v30.3)',
     test: async()=>{
       // Tony hit "Pixabay: invalid JSON (429)" repeatedly. Two faults: the
@@ -4324,7 +4380,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v30.3';
+var APP_VERSION = 'v30.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -6660,7 +6716,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6862,6 +6918,13 @@ body.banner-shown .header {
         <label class="form-label">Recipe name</label>
         <input class="form-input" id="f-name" dir="auto" placeholder="e.g. Grandma's Lasagna">
       </div>
+      <!-- For a recipe saved as a clip that you have since found the text for:
+           paste it here and let the parser fill the form in. It fills the FORM,
+           not the recipe — nothing is saved until Update Recipe. -->
+      <button type="button" id="formFreehandBtn" onclick="openFreehandForForm()"
+        style="width:100%;padding:9px;margin:-6px 0 14px;background:var(--bg);border:1.5px dashed var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;">
+        ✍️ Paste free-hand text to fill this in
+      </button>
       <div class="form-group">
         <label class="form-label">Photo (optional)</label>
         <div class="photo-zone" id="photoZone" onclick="document.getElementById('f-photo').click()">
@@ -7224,7 +7287,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11145,11 +11208,104 @@ function saveTranslation(parsed) {
 // ═══════════════════════════════════
 // FREE-HAND IMPORT
 // ═══════════════════════════════════
+// Where a parsed recipe should land: null = a NEW recipe (the Add menu), 'form'
+// = fill the edit form that is already open. Tony's case is a recipe saved as a
+// clip whose text he has since found — the recipe already exists, with its name,
+// photo and source, so parsing must fill it in rather than create a duplicate.
+var _freehandTarget = null;
 function openFreehandModal(prefillText) {
+  _freehandTarget = null;
   document.getElementById('freehandText').value = prefillText || '';
   document.getElementById('freehandResult').innerHTML = '';
+  document.getElementById('freehandOverlay').style.zIndex = '';
   document.getElementById('freehandOverlay').classList.add('open');
 }
+function openFreehandForForm() {
+  openFreehandModal();
+  _freehandTarget = 'form';
+  // Both are .modal-overlay at z-index 200, and the edit form is already open —
+  // without this the paste box opens BEHIND the form it is meant to fill.
+  document.getElementById('freehandOverlay').style.zIndex = '1200';
+  var res = document.getElementById('freehandResult');
+  res.innerHTML = '<div style="font-size:12px;color:var(--muted);line-height:1.6;">'
+    + 'This fills in the recipe you have open. Nothing is saved until you press '
+    + '<strong>Update Recipe</strong>, so you can review or undo it first.</div>';
+}
+window.openFreehandForForm = openFreehandForForm;
+
+// Write a parsed recipe into the OPEN edit form.
+//   'fill'    — only touch fields that are currently empty (the safe default)
+//   'replace' — overwrite ingredients, method, prep and servings
+// The name is never overwritten unless it is blank: it is the one field Tony
+// curated by hand, often in Hebrew, and the parser's guess is rarely better.
+function applyParsedToForm(parsed, mode) {
+  var byId = function(id){ return document.getElementById(id); };
+  var val  = function(id){ var e = byId(id); return e ? String(e.value || '').trim() : ''; };
+  var set  = function(id, v){ var e = byId(id); if (e && v) e.value = v; };
+  var norm = normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
+  var changed = [];
+
+  if (!val('f-name') && parsed.name) { set('f-name', parsed.name); changed.push('name'); }
+
+  var haveIngs = readIngsTable().filter(function(i){ return (i.a || i.n); }).length > 0;
+  if (norm.ingredients.length && (mode === 'replace' || !haveIngs)) {
+    loadIngsTable(norm.ingredients); changed.push(norm.ingredients.length + ' ingredients');
+  }
+  // "Enjoy!" is the placeholder a clip gets when it has no method, so it counts
+  // as empty here — otherwise the one case this feature exists for would refuse.
+  var stepsNow = val('f-steps');
+  var haveSteps = !!stepsNow && stepsNow !== 'Enjoy!';
+  if (norm.steps.length && (mode === 'replace' || !haveSteps)) {
+    set('f-steps', norm.steps.join('\n')); changed.push(norm.steps.length + ' steps');
+  }
+  ['prep', 'srv'].forEach(function(f, i) {
+    var v = i === 0 ? parsed.prep : parsed.servings;
+    var cur = val('f-' + f);
+    if (v && (mode === 'replace' || !cur || cur === '—')) { set('f-' + f, v); changed.push(i === 0 ? 'prep time' : 'servings'); }
+  });
+  if (parsed.category && byId('f-category')) {
+    var opts = Array.prototype.map.call(byId('f-category').options, function(o){ return o.value; });
+    if (opts.indexOf(parsed.category) !== -1 && (mode === 'replace' || !editingId)) {
+      byId('f-category').value = parsed.category; changed.push('category');
+    }
+  }
+  // A recipe that now has a method is no longer just a clip.
+  var clip = byId('f-isclip');
+  if (clip && clip.checked && norm.steps.length) { clip.checked = false; changed.push('unticked “clip”'); }
+
+  closeM('freehandOverlay');
+  _freehandTarget = null;
+  toast(changed.length
+    ? '✍️ Filled in ' + changed.join(', ') + ' — review, then Update Recipe'
+    : 'Nothing to fill in — those fields already have content. Use “Replace” to overwrite.');
+}
+window.applyParsedToForm = applyParsedToForm;
+
+// Preview + the two ways to apply it. Deliberately not one button: replacing a
+// method Tony typed himself is a different decision from filling a blank one.
+function applyParsedToFormPreview(parsed, resultDivId) {
+  var _n = normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
+  parsed.ingredients = _n.ingredients; parsed.steps = _n.steps;
+  var enc = JSON.stringify(parsed).replace(/"/g, '&quot;');
+  var ings = parsed.ingredients.map(function(i){
+    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
+  }).join('');
+  var steps = parsed.steps.map(function(s, i){
+    return '<div class="translate-step"><span class="translate-step-num">' + (i+1) + '</span><span>' + escH(s) + '</span></div>';
+  }).join('');
+  document.getElementById(resultDivId).innerHTML =
+    '<div class="translate-block" style="margin-top:12px;">'
+    + '<div class="translate-block-title">' + escH(parsed.name || 'Untitled') + '</div>'
+    + '<div class="translate-section-label">Ingredients</div>' + ings
+    + '<div class="translate-section-label" style="margin-top:14px;">Method</div>' + steps
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin:10px 0 6px;line-height:1.6;">'
+    + 'The recipe’s name and photo are kept either way.</div>'
+    + '<button class="save-translation-btn" onclick="applyParsedToForm(' + enc + ',&quot;fill&quot;)">&#10003; Fill in what’s missing</button>'
+    + '<button class="save-translation-btn" style="background:var(--bg);color:var(--heading);border:1.5px solid var(--border);margin-top:8px;" '
+    + 'onclick="applyParsedToForm(' + enc + ',&quot;replace&quot;)">&#8635; Replace ingredients &amp; method</button>';
+}
+window.applyParsedToFormPreview = applyParsedToFormPreview;
 
 async function runFreehandImport() {
   const text = document.getElementById('freehandText').value.trim();
@@ -11177,7 +11333,8 @@ ${text}`;
   try {
     const raw = await aiCall(prompt, 1500);
     const parsed = extractJSON(raw);
-    applyParsedRecipe(parsed, 'freehandResult', 'freehandOverlay');
+    if (_freehandTarget === 'form') applyParsedToFormPreview(parsed, 'freehandResult');
+    else applyParsedRecipe(parsed, 'freehandResult', 'freehandOverlay');
   } catch(err) {
     res.innerHTML = `<div class="explore-result" style="color:#B03030;">Could not parse recipe: ${err.message}<br>Try adding more recipe details to your text.</div>`;
   }
