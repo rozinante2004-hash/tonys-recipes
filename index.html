@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v30.5 -->
+<!-- Tony's Recipes Collection v31.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -393,10 +393,19 @@ function shareSelected() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
   var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
   var text = sel.map(function(r) { return r.name; }).join('\n');
+  // Both of these can be refused — share by cancelling, clipboard by permission
+  // or an insecure context — and both used to reject unhandled, so the user got
+  // silence and the console got an unhandled rejection. Never claim a copy that
+  // did not happen.
   if (navigator.share) {
-    navigator.share({ title: "Tony's Recipes", text: text });
+    navigator.share({ title: "Tony's Recipes", text: text })
+      .catch(function(){ /* cancelling a share is not an error */ });
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function() { toast('✅ Recipe names copied'); })
+      .catch(function() { showServiceError('Could not reach the clipboard. Here are the names to copy by hand:\n\n' + text); });
   } else {
-    navigator.clipboard.writeText(text).then(function() { toast('✅ Recipe names copied'); });
+    showServiceError('This browser offers no clipboard access. Here are the names to copy by hand:\n\n' + text);
   }
 }
 
@@ -510,8 +519,12 @@ function copyBookmarklet() {
   navigator.clipboard.writeText(el.textContent).then(function() {
     toast('✅ Bookmarklet code copied! Paste it as a bookmark URL.');
   }).catch(function() {
-    el.select(); document.execCommand('copy');
-    toast('✅ Copied!');
+    // execCommand reports whether it actually copied. Announcing success either
+    // way meant the user pasted nothing and had no idea why.
+    var ok = false;
+    try { el.select(); ok = document.execCommand('copy'); } catch(e) { ok = false; }
+    if (ok) toast('✅ Copied!');
+    else showServiceError('Could not copy automatically. Select the code above and copy it by hand.');
   });
 }
 
@@ -2333,6 +2346,126 @@ const SELF_TESTS = [
       // API key across the whole family, so they are the ones that 429; leading
       // with Openverse means a rate limit is a slower search, not a dead end.
       if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
+    } },
+
+  { id:'sec_email_html_escaped', group:'Cloud Sync', name:'Email HTML escapes every recipe field (audit v31.0)',
+    test: async()=>{
+      // rHtml builds HTML that is rendered in an iframe on THIS origin, so an
+      // escaping miss is script execution with the signed-in session attached.
+      // A recipe is not trusted input: it can come from an AI import, a restored
+      // backup, or another family member with write access.
+      if(typeof safeUrl!=='function') throw new Error('safeUrl not defined');
+      var evil=normalizeRecipe({ id:99901,
+        name:'" onerror="alert(1)" x="',
+        photo:'data:image/png;base64,AAA" onerror="alert(1)',
+        bg:'red;" onload="alert(1)',
+        emoji:'<img src=x onerror=alert(1)>',
+        diets:['<script>alert(1)<\/script>'],
+        category:'<b>Din</b>', difficulty:'<i>E</i>', prep:'<u>1</u>', servings:'<s>2</s>',
+        source:'javascript:alert(1)',
+        ingredients:[{a:'1',n:'<img src=x onerror=alert(1)>'}], steps:['<script>alert(1)<\/script>'] });
+      var html=rHtml(evil);
+      // Parsed inertly — never innerHTML — so a failure here cannot fire.
+      var doc=new DOMParser().parseFromString(html,'text/html');
+      if(doc.querySelector('script')) throw new Error('a <script> element survived into the email HTML');
+      ['onerror','onload','onclick'].forEach(function(a){
+        if(doc.querySelector('[' + a + ']')) throw new Error('an inline ' + a + ' handler was injected into the email HTML');
+      });
+      var links=doc.querySelectorAll('a[href]');
+      for(var i=0;i<links.length;i++){
+        if(/^javascript:/i.test(links[i].getAttribute('href')||''))
+          throw new Error('a javascript: URL reached an href — escaping does not help, the scheme is the payload');
+      }
+      // safeUrl itself, including the control-character bypass.
+      if(safeUrl('javascript:alert(1)')!=='') throw new Error('javascript: was allowed through');
+      if(safeUrl('java\tscript:alert(1)')!=='') throw new Error('a control character smuggled javascript: past the check');
+      if(safeUrl('JaVaScRiPt:alert(1)')!=='') throw new Error('case was enough to bypass safeUrl');
+      if(safeUrl('https://example.com/x')!=='https://example.com/x') throw new Error('a normal https URL was destroyed');
+      if(safeUrl('data:image/png;base64,AAA').indexOf('data:image/')!==0) throw new Error('recipe photo data URLs must survive');
+      if(safeUrl('data:text/html,<script>')!=='') throw new Error('a non-image data: URL was allowed');
+      // The preview iframe must be sandboxed — defence in depth for the above.
+      if(String(showEmailModal).indexOf("setAttribute('sandbox'")===-1)
+        throw new Error('the email preview iframe is not sandboxed, so any future escaping slip reaches this origin');
+    } },
+
+  { id:'safe_restore_confirms', group:'Backup', name:'Restore asks before replacing everything (audit v31.0)',
+    test: async()=>{
+      var src=String(backupRestoreFile);
+      if(src.indexOf('askConfirm')===-1)
+        throw new Error('restore replaces the whole collection, and every other device, without asking');
+      // The confirmation has to come BEFORE the data is touched, or it is theatre.
+      if(src.indexOf('askConfirm')>src.indexOf('recipes=migrateRecipes'))
+        throw new Error('the confirmation happens after the collection has already been replaced');
+      // exportedAt was read with .slice() and no guard: a backup without it threw
+      // AFTER the replace had happened and synced, then reported "Restore failed"
+      // for a restore that had in fact succeeded destructively.
+      if(typeof backupDateLabel!=='function') throw new Error('backupDateLabel not defined');
+      if(backupDateLabel(undefined)!=='') throw new Error('a missing exportedAt throws or prints rubbish');
+      if(backupDateLabel('not a date')!=='') throw new Error('a damaged exportedAt is not handled');
+      if(!backupDateLabel('2026-08-09T10:00:00Z')) throw new Error('a valid date produced no label');
+      // The call, not the comment explaining why it was removed.
+      if(src.indexOf('Math.max.apply(')!==-1) throw new Error('Math.max.apply returns -Infinity for an empty list and can overflow the argument limit on a big one');
+    } },
+
+  { id:'a11y_icon_buttons', group:'UI', name:'Icon-only buttons have an accessible name (audit v31.0)',
+    test: async()=>{
+      if(typeof labelIconButtons!=='function') throw new Error('labelIconButtons not defined');
+      var box=document.createElement('div');
+      box.innerHTML='<button>✕</button><button>🤍</button><button title="Send to Bring!"></button>'
+        + '<button aria-label="Already named">✕</button><button>Save Recipe</button>';
+      labelIconButtons(box);
+      var b=box.querySelectorAll('button');
+      if(b[0].getAttribute('aria-label')!=='Close') throw new Error('the close button has no accessible name');
+      if(!b[1].getAttribute('aria-label')) throw new Error('the favourite toggle has no accessible name');
+      if(b[2].getAttribute('aria-label')!=='Send to Bring!') throw new Error('an empty button did not fall back to its title');
+      if(b[3].getAttribute('aria-label')!=='Already named') throw new Error('an existing aria-label was overwritten');
+      if(b[4].getAttribute('aria-label')) throw new Error('a button with real text was given a redundant label');
+      // Dialogs built at runtime must be covered, not just the boot-time sweep.
+      if(String(trapFocus).indexOf('labelIconButtons')===-1)
+        throw new Error('dialogs opened later are never labelled');
+    } },
+
+  { id:'leak_mobile_panel_listener', group:'Performance', name:'The mobile filter panel does not stack listeners (audit v31.0)',
+    test: async()=>{
+      if(typeof clearMobilePanelCloser!=='function') throw new Error('clearMobilePanelCloser not defined');
+      var src=String(toggleMobilePanel);
+      // The old closer removed itself only on an OUTSIDE tap. Open the panel, tap
+      // a filter inside it, close it with the button, and it stayed bound to
+      // document for the rest of the session — one more on every open.
+      if(src.indexOf('clearMobilePanelCloser')===-1)
+        throw new Error('the outside-tap listener is never removed on the close path, so they accumulate');
+      if(/addEventListener\('click', function closePanels/.test(src))
+        throw new Error('the anonymous self-removing listener is back');
+      var added=0, removed=0;
+      var realAdd=document.addEventListener, realRemove=document.removeEventListener;
+      try{
+        document.addEventListener=function(t){ if(t==='click') added++; return realAdd.apply(document, arguments); };
+        document.removeEventListener=function(t){ if(t==='click') removed++; return realRemove.apply(document, arguments); };
+        var panel=document.createElement('div');
+        panel.id='__testPanel'; panel.className='mobile-dropdown-panel';
+        document.body.appendChild(panel);
+        for(var i=0;i<6;i++){ toggleMobilePanel('__testPanel','__testBtn'); }
+        await new Promise(function(r){ setTimeout(r,10); });
+        clearMobilePanelCloser();
+        panel.remove();
+      } finally { document.addEventListener=realAdd; document.removeEventListener=realRemove; }
+      if(added-removed>1) throw new Error('after 6 open/close cycles, '+(added-removed)+' click listeners are still bound');
+    } },
+
+  { id:'msg_access_not_granted', group:'Cloud Sync', name:'Access changes do not claim to have taken effect (audit v31.0)',
+    test: async()=>{
+      // The member list is not the permission: the rules embed these addresses
+      // literally and are published BY HAND. "✅ added!" and "🗑️ Removed" said a
+      // grant or a revocation had happened when neither had — and the removal
+      // direction is the dangerous one, since it reads as access revoked.
+      var add=String(addAccessMember), rem=String(removeAccessMember);
+      if(/added! Share the app URL/.test(add))
+        throw new Error('adding a member still claims access was granted before the rules are published');
+      if(!/Publish|publish/.test(add)) throw new Error('adding a member does not say the rules must be published');
+      if(/toast\('🗑️ Removed '/.test(rem))
+        throw new Error('removing a member still reads as a revocation that has not happened');
+      if(!/KEEP their access|keep their access/.test(rem))
+        throw new Error('removal does not warn that access continues until the rules are published');
     } },
 
   { id:'ui_version_badge_honest', group:'UI', name:'The version badge states what is RUNNING (v30.5)',
@@ -4202,6 +4335,8 @@ function syncHealthText() {
   L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
   L.push('recipes showing a photo: ' + h.photosLocal + ' of ' + h.localRecipes);
+  L.push('cloud photo deletions refused: ' + h.photoDeletesRefused
+    + (h.photoDeletesRefused ? ' (ids ' + photoDeletesRefused().join(', ') + ' — deletion is admin-only)' : ''));
   L.push('photos missing from this device: ' + h.photosMissing
     + (h.photoRepair ? ' (last repair: ' + h.photoRepair + ')' : ''));
   L.push('whatsapp chats: ' + h.chats.synced + ' synced (' + Math.round(h.chats.bytes / 1024) + ' KB), '
@@ -4302,7 +4437,10 @@ function addAccessMember() {
   saveAccessMembers(members);
   renderAccessMembers();
   document.getElementById('accessEmailInput').value = '';
-  toast('✅ ' + email + ' added! Share the app URL with them.');
+  // The list is not the permission. The rules embed these addresses literally
+  // and are published BY HAND in the Firebase console, so nothing has been
+  // granted yet — saying "added!" made it sound as though it had.
+  toast('📝 ' + email + ' is on the list — not granted yet. Publish the rules below to apply it.', 6000);
 }
 window.addAccessMember = addAccessMember;
 
@@ -4311,13 +4449,17 @@ function removeAccessMember(i) {
   var removed = members.splice(i, 1);
   saveAccessMembers(members);
   renderAccessMembers();
-  if(removed.length) toast('🗑️ Removed ' + removed[0].email);
+  // Same the other way round, and this direction matters more: until the rules
+  // are republished the person still has exactly the access they had. Telling
+  // Tony they were "removed" would be telling him a revocation happened when it
+  // has not.
+  if(removed.length) toast('📝 ' + removed[0].email + ' taken off the list. They KEEP their access until you publish the rules below.', 7000);
 }
 window.removeAccessMember = removeAccessMember;
 
 function changeAccessRole(i, role) {
   var members = getAccessMembers();
-  if(members[i]) { members[i].role = role; saveAccessMembers(members); updateAccessRules(); toast('✅ Access updated'); }
+  if(members[i]) { members[i].role = role; saveAccessMembers(members); updateAccessRules(); toast('📝 Role changed in the list — publish the rules below to apply it.', 6000); }
 }
 window.changeAccessRole = changeAccessRole;
 
@@ -4407,7 +4549,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v30.5';
+var APP_VERSION = 'v31.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -4564,11 +4706,15 @@ window.handleFileDrop = handleFileDrop;
 // ─── EMAIL MODAL ──────────────────────────────────────────────────────────────
 function rHtml(r) {
   // Build beautiful HTML email body
-  var photo = r.photo ? '<img src="' + r.photo + '" alt="' + r.name + '" style="width:100%;max-height:320px;object-fit:cover;border-radius:0;">' : '';
-  var emojiBlock = !r.photo ? '<div style="font-size:80px;text-align:center;padding:32px 0;background:' + (r.bg||'#FFF0E8') + ';">' + (r.emoji||'🍽️') + '</div>' : '';
+  // Everything below is interpolated into HTML that is rendered in an iframe on
+  // this origin, so an escaping miss here is script execution with access to the
+  // signed-in session. The recipe is NOT trusted input: it can come from an AI
+  // import, a restored backup, or another family member with write access.
+  var photo = r.photo ? '<img src="' + escA(safeUrl(r.photo)) + '" alt="' + escA(r.name) + '" style="width:100%;max-height:320px;object-fit:cover;border-radius:0;">' : '';
+  var emojiBlock = !r.photo ? '<div style="font-size:80px;text-align:center;padding:32px 0;background:' + escA(r.bg||'#FFF0E8') + ';">' + escH(r.emoji||'🍽️') + '</div>' : '';
 
   var dietTags = (r.diets && r.diets.length)
-    ? r.diets.map(function(d){ return '<span style="display:inline-block;padding:3px 10px;background:#E8F5E9;color:#2E7D32;border-radius:12px;font-size:12px;font-weight:600;margin:2px;">' + d + '</span>'; }).join(' ')
+    ? r.diets.map(function(d){ return '<span style="display:inline-block;padding:3px 10px;background:#E8F5E9;color:#2E7D32;border-radius:12px;font-size:12px;font-weight:600;margin:2px;">' + escH(d) + '</span>'; }).join(' ')
     : '';
 
   var ingredients = r.ingredients.map(function(i){
@@ -4590,13 +4736,18 @@ function rHtml(r) {
     '<div style="font-size:12px;font-weight:700;color:#8B6914;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Notes</div>' +
     '<div dir="auto" style="font-size:14px;color:#1C1A18;line-height:1.6;unicode-bidi:plaintext;">' + escH(r.notes) + '</div></div>' : '';
 
-  var sourceBlock = r.source ? '<div style="margin-top:8px;font-size:12px;color:#8A8279;">Source: <a href="' + r.source + '" style="color:#C1440E;">' + r.source + '</a></div>' : '';
+  var srcHref = safeUrl(r.source);
+  var sourceBlock = r.source
+    ? '<div style="margin-top:8px;font-size:12px;color:#8A8279;">Source: '
+      + (srcHref ? '<a href="' + escA(srcHref) + '" style="color:#C1440E;">' + escH(r.source) + '</a>' : escH(r.source))
+      + '</div>'
+    : '';
 
   var metaItems = [
-    r.category ? '🍽 ' + r.category : '',
-    r.difficulty ? '📊 ' + r.difficulty : '',
-    r.prep ? '⏱ ' + r.prep : '',
-    r.servings ? '👥 ' + r.servings + ' servings' : '',
+    r.category   ? '🍽 ' + escH(r.category) : '',
+    r.difficulty ? '📊 ' + escH(r.difficulty) : '',
+    r.prep       ? '⏱ ' + escH(r.prep) : '',
+    r.servings   ? '👥 ' + escH(r.servings) + ' servings' : '',
   ].filter(Boolean);
 
   var html = [
@@ -4693,6 +4844,11 @@ function showEmailModal(id) {
   previewWrap.style.cssText = 'flex:1;border:1px solid #E8E0D5;border-radius:8px;overflow:hidden;min-height:280px;';
   var iframe = document.createElement('iframe');
   iframe.style.cssText = 'width:100%;height:320px;border:none;';
+  // Defence in depth. This is a static preview — it needs no scripts, no forms
+  // and no navigation. An empty sandbox also denies it this origin, so even a
+  // future escaping slip in rHtml cannot reach localStorage or the Firebase
+  // session. Do not add allow-scripts or allow-same-origin here.
+  iframe.setAttribute('sandbox', '');
   iframe.srcdoc = htmlBody;
   previewWrap.appendChild(iframe);
 
@@ -6758,7 +6914,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6972,7 +7128,7 @@ body.banner-shown .header {
         <div class="photo-zone" id="photoZone" onclick="document.getElementById('f-photo').click()">
           <input type="file" id="f-photo" accept="image/*" onchange="onPhotoFile(event)">
           <span class="photo-zone-hint" id="photoHint">📷 Click to upload a photo</span>
-          <img id="photoPreview" class="photo-zone-preview">
+          <img id="photoPreview" class="photo-zone-preview" alt="">
           <button class="photo-remove" id="photoRemove" onclick="removePhoto(event)" title="Remove">✕</button>
         </div>
       </div>
@@ -7329,7 +7485,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v30.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7412,7 +7568,7 @@ body.banner-shown .header {
       <div class="modal-header-title">📷 Scanned Recipe</div>
     </div>
     <div class="modal-body">
-      <img id="cameraPreviewImg" style="width:100%;border-radius:8px;margin-bottom:12px;display:none;">
+      <img id="cameraPreviewImg" alt="" style="width:100%;border-radius:8px;margin-bottom:12px;display:none;">
       <div id="cameraResult"></div>
     </div>
   </div>
@@ -8518,9 +8674,31 @@ function focusablesIn(el) {
     return !!(n.offsetWidth || n.offsetHeight || n.getClientRects().length);
   });
 }
+// Every dialog closes with a "✕" button whose only content is that glyph, so a
+// screen reader announced "button" or read the symbol aloud — the app's most
+// repeated control had no name at all. Labelled here rather than at 30-odd call
+// sites, and re-run when a dialog opens so runtime-built ones are covered.
+// '✕' is unambiguous in this app: it is only ever close.
+var ICON_BUTTON_LABELS = { '✕': 'Close', '❤️': 'Remove from favourites', '🤍': 'Add to favourites' };
+function labelIconButtons(root) {
+  var scope = root || document;
+  if (!scope.querySelectorAll) return 0;
+  var btns = scope.querySelectorAll('button'), n = 0;
+  for (var i = 0; i < btns.length; i++) {
+    var b = btns[i];
+    if (b.getAttribute('aria-label')) continue;
+    var txt = (b.textContent || '').trim();
+    var label = ICON_BUTTON_LABELS[txt] || (!txt && b.title ? b.title : '');
+    if (label) { b.setAttribute('aria-label', label); n++; }
+  }
+  return n;
+}
+window.labelIconButtons = labelIconButtons;
+
 function trapFocus(overlayId) {
   var el = document.getElementById(overlayId);
   if (!el) return;
+  labelIconButtons(el);
   _focusReturn.push(document.activeElement);
   // Give the dialog a moment to finish rendering, then land on the first real
   // control rather than the close button, which is rarely what you want first.
@@ -10573,7 +10751,7 @@ function renderSuggestions(suggestions, containerId) {
       <div class="sug-card-body" dir="auto">
         <em>${escH(s.why||'')}</em><br><br>
         <strong>Key ingredients:</strong> ${(s.ingredients||[]).slice(0,5).map(i=>escH(i.n)).join(', ')}${(s.ingredients||[]).length>5?' &amp; more':''}
-        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${s.source.startsWith('http') ? s.source : '#'}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
+        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${escA(safeUrl(s.source) || '#')}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
       </div>
       <div class="sug-card-footer">
         <button class="sug-add-btn" id="sugadd-${containerId}-${i}" onclick="addSuggestion(${i},'${containerId}')">+ Add to My Recipes</button>
@@ -11135,6 +11313,22 @@ function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 // and never emits <br>, so a crafted value can't break out of the attribute.
 function escA(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 window.escA = escA;
+// A URL safe to put in href/src. Escaping alone does not help against
+// `javascript:` — the quotes are never broken, the scheme is the payload. Only
+// http/https/mailto/data-image survive; anything else becomes empty, so the link
+// is inert rather than hostile. Recipes arrive from AI imports, restored
+// backups and other family members, so `source` is not trusted input.
+function safeUrl(u){
+  var s = String(u == null ? '' : u).trim();
+  if (!s) return '';
+  // Strip control characters first: "java\tscript:x" is a real bypass.
+  s = s.replace(/[\x00-\x20\x7f]/g, '');
+  if (/^(https?:|mailto:)/i.test(s)) return s;
+  if (/^data:image\//i.test(s)) return s;          // recipe photos are data URLs
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return '';   // any other scheme, including javascript:
+  return s;                                        // relative or protocol-less
+}
+window.safeUrl = safeUrl;
 function rndEmoji(){return EMOJIS[Math.floor(Math.random()*EMOJIS.length)];}
 function rndBg(){return BGS[Math.floor(Math.random()*BGS.length)];}
 
@@ -11571,7 +11765,7 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   var origPhotoHtml = originalPhoto
     ? '<div style="margin-top:8px;">'
       + '<button class="action-btn" onclick="showOriginalPhotoPreview(this)">📸 Show Original</button>'
-      + '<div style="display:none;margin-top:6px;"><img src="' + originalPhoto + '" style="width:100%;border-radius:8px;border:1px solid var(--border);"></div>'
+      + '<div style="display:none;margin-top:6px;"><img alt="" src="' + escA(safeUrl(originalPhoto)) + '" style="width:100%;border-radius:8px;border:1px solid var(--border);"></div>'
       + '</div>'
     : '';
   document.getElementById(resultDivId).innerHTML =
@@ -12019,21 +12213,32 @@ async function syncCloudPhotos() {
       }
     } else if (_cloudPhotoIds[r.id] && !r._ph) {
       // photo was genuinely removed (not merely un-hydrated from local IDB) — delete its doc
-      try { await _fbDb.collection('shared').doc('photo_' + r.id).delete(); } catch(e) {}
-      delete _cloudPhotoIds[r.id];
-      delete _cloudPhotoStamps[r.id];
+      // Deletion is admin-only in the rules, so this fails for a write-role
+      // member. It used to fail in total silence AND drop the local record, so
+      // the app forgot a document it had failed to remove and nothing ever
+      // cleaned it up. Keep the record and report, as flushCloudDeletes does.
+      try {
+        await _fbDb.collection('shared').doc('photo_' + r.id).delete();
+        delete _cloudPhotoIds[r.id];
+        delete _cloudPhotoStamps[r.id];
+      } catch(e) { _photoDeleteRefused[r.id] = true; }
     }
   }
   // Drop photo docs for recipes that no longer exist
-  Object.keys(_cloudPhotoIds).forEach(function(id) {
-    if (!currentIds[id]) {
-      _fbDb.collection('shared').doc('photo_' + id).delete().catch(function() {});
-      delete _cloudPhotoIds[id];
-      delete _cloudPhotoStamps[id];
-    }
-  });
+  var goneIds = Object.keys(_cloudPhotoIds).filter(function(id){ return !currentIds[id]; });
+  for (var g = 0; g < goneIds.length; g++) {
+    try {
+      await _fbDb.collection('shared').doc('photo_' + goneIds[g]).delete();
+      delete _cloudPhotoIds[goneIds[g]];
+      delete _cloudPhotoStamps[goneIds[g]];
+    } catch(e) { _photoDeleteRefused[goneIds[g]] = true; }
+  }
   return errors;
 }
+// Photo documents this device tried and failed to delete — almost always the
+// admin-only delete rule. Surfaced in Sync Health rather than swallowed.
+var _photoDeleteRefused = {};
+window.photoDeletesRefused = function(){ return Object.keys(_photoDeleteRefused); };
 
 // Re-attach cloud photos to a freshly-loaded recipe list. Legacy inline photos (from the
 // old single-doc format) are kept as-is and left un-stamped so the next save migrates them.
@@ -12160,7 +12365,8 @@ function syncHealth() {
     // Silent before; now it is the first thing the panel would show.
     photosLocal:   (recipes || []).filter(function(r){ return !!r.photo; }).length,
     photosMissing: _idbPhotosMissing,
-    photoRepair:   _photoRepairLog
+    photoRepair:   _photoRepairLog,
+    photoDeletesRefused: Object.keys(_photoDeleteRefused).length
   };
 }
 // Counted from the local index rather than by reading the cloud: this panel must
@@ -15183,27 +15389,69 @@ async function backupRestore() {
   document.getElementById('backupRestoreInput').click();
 }
 
+// Restore is the most destructive action in the app: it replaces the whole
+// collection and pushes that over every other device. It used to do all of that
+// with NO confirmation \u2014 one wrong file in the picker and the live collection was
+// gone everywhere. It also read backup.exportedAt without checking it existed,
+// so a backup missing that field threw AFTER the data had already been replaced
+// and synced, and then reported "Restore failed" for a restore that had in fact
+// succeeded destructively. Parse and validate first, ask second, apply last.
 async function backupRestoreFile(event) {
   var file=event.target.files[0]; event.target.value=''; if(!file) return;
+  var backup, restored;
   try {
-    toast('Reading backup file...');
-    var text=await file.text(); var backup=JSON.parse(text);
-    if(!backup.version||!Array.isArray(backup.recipes)) throw new Error('Invalid backup file');
+    toast('Reading backup file\u2026');
+    backup=JSON.parse(await file.text());
+    if(!backup||!backup.version||!Array.isArray(backup.recipes)) throw new Error('this is not a Tony\'s Recipes backup (no version or recipe list in it)');
+    if(!backup.recipes.length) throw new Error('the backup contains no recipes');
     var photos=backup.photos||{};
-    var restored=backup.recipes.map(function(r){
+    restored=backup.recipes.map(function(r){
       var rec=JSON.parse(JSON.stringify(r));
-      if(rec.photo&&rec.photo.startsWith('__photo__')){ var k=rec.photo.replace('__photo__',''); rec.photo=photos[k]||''; }
-      if(rec.originalPhoto&&rec.originalPhoto.startsWith('__photo__')){ var k2=rec.originalPhoto.replace('__photo__',''); rec.originalPhoto=photos[k2]||''; }
+      if(rec.photo&&String(rec.photo).startsWith('__photo__')){ var k=rec.photo.replace('__photo__',''); rec.photo=photos[k]||''; }
+      if(rec.originalPhoto&&String(rec.originalPhoto).startsWith('__photo__')){ var k2=rec.originalPhoto.replace('__photo__',''); rec.originalPhoto=photos[k2]||''; }
       return rec;
     });
+  } catch(err){ toast('\u274c Could not read that backup: '+err.message); return; }
+
+  var when=backupDateLabel(backup.exportedAt);
+  var goesToCloud=!!(window._driveMode&&window._fbUser);
+  var ok=await askConfirm({
+    icon:'\u26a0\ufe0f', title:'Replace all '+recipes.length+' recipes?',
+    message:'The backup holds '+restored.length+' recipe'+(restored.length===1?'':'s')+(when?', saved '+when:'')+'.\n\n'
+      +'Everything currently in the app is replaced \u2014 this is not a merge, and there is no undo.'
+      +(goesToCloud?'\n\nIt will also be pushed to the cloud, so every other signed-in device is replaced too.':'\n\nYou are signed out, so only this device changes.'),
+    okLabel:'Replace everything', danger:true });
+  if(!ok) { toast('Restore cancelled \u2014 nothing changed'); return; }
+
+  try {
     recipes=migrateRecipes(restored);
-    nextId=backup.nextId||(Math.max.apply(null,recipes.map(function(r){ return r.id||0; }))+1);
+    // Math.max.apply on an empty list yields -Infinity, and on a very large one
+    // can overflow the argument limit. reduce is safe on both.
+    var maxId=recipes.reduce(function(m,r){ return Math.max(m, r.id||0); }, 0);
+    nextId=backup.nextId||(maxId+1);
     if(backup.settings&&backup.settings.viewMode) viewMode=backup.settings.viewMode;
     saveLocal(); renderFilters(); renderGrid();
-    if(window._driveMode&&window._fbUser){ toast('Syncing to cloud...'); await saveToFirestore(); }
-    toast('\u2705 Restored '+recipes.length+' recipes from backup ('+backup.exportedAt.slice(0,10)+')');
-  } catch(err){ toast('\u274c Restore failed: '+err.message); }
+  } catch(err){ toast('\u274c Restore failed while applying the backup: '+err.message); return; }
+
+  toast('\u2705 Restored '+recipes.length+' recipes'+(when?' from '+when:'')+' on this device');
+  // A cloud failure after a successful local restore is its own outcome, not a
+  // failed restore. Saying "restore failed" here would be wrong twice over.
+  if(goesToCloud){
+    try { toast('Syncing to your other devices\u2026'); await saveToFirestore(); toast('\u2705 Other devices updated'); }
+    catch(err){ showServiceError('The backup was restored on this device, but it could NOT be sent to the cloud:\n\n'
+      + (err && err.message ? err.message : String(err))
+      + '\n\nYour other devices still hold the old collection. Fix the connection and use \u2699\ufe0f \u2192 Sync now, or they will overwrite this device on their next sync.'); }
+  }
 }
+// A backup written before exportedAt existed, or with a damaged one, must not
+// throw \u2014 the label is decoration, not data.
+function backupDateLabel(v){
+  if(!v) return '';
+  var d=new Date(v);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined,{ day:'numeric', month:'short', year:'numeric' });
+}
+window.backupDateLabel=backupDateLabel;
 
 // Show backup buttons only on desktop
 (function(){
@@ -15521,30 +15769,39 @@ window.saveAsVideoBookmark = saveAsVideoBookmark;
 
 
 // ─── MOBILE FILTERS ───────────────────────────────────────────────────────────
+// The outside-tap closer used to be an anonymous listener that removed itself
+// only when a tap landed OUTSIDE the panel. Open the panel, tap a filter inside
+// it, then close it with the button, and that listener stayed bound to document
+// for the rest of the session — holding the panel element and running on every
+// click. The mobile filter bar is used constantly, so they piled up. One handler,
+// tracked, removed on every path that closes a panel.
+var _mobilePanelCloser = null;
+function clearMobilePanelCloser() {
+  if (_mobilePanelCloser) { document.removeEventListener('click', _mobilePanelCloser); _mobilePanelCloser = null; }
+}
 function toggleMobilePanel(panelId, btnId) {
   var panel = document.getElementById(panelId);
+  if (!panel) return;
   var isOpen = panel.classList.contains('open');
-  // Close all panels first
+  clearMobilePanelCloser();
   document.querySelectorAll('.mobile-dropdown-panel').forEach(function(p){ p.classList.remove('open'); });
   if (!isOpen) {
     panel.classList.add('open');
-    // Position panel below the filter bar
     var filterBar = document.getElementById('mobileFilterBar');
-    if (filterBar) {
-      var rect = filterBar.getBoundingClientRect();
-      panel.style.top = (rect.bottom + 6) + 'px';
-    }
-    // Close on outside tap
+    if (filterBar) panel.style.top = (filterBar.getBoundingClientRect().bottom + 6) + 'px';
     setTimeout(function(){
-      document.addEventListener('click', function closePanels(e) {
+      clearMobilePanelCloser();          // a second open in the same tick must not stack
+      _mobilePanelCloser = function(e) {
         if (!panel.contains(e.target) && e.target.id !== btnId) {
           panel.classList.remove('open');
-          document.removeEventListener('click', closePanels);
+          clearMobilePanelCloser();
         }
-      });
+      };
+      document.addEventListener('click', _mobilePanelCloser);
     }, 0);
   }
 }
+window.clearMobilePanelCloser = clearMobilePanelCloser;
 
 function mobileCatChange() {
   activeCategories.clear();
@@ -15641,6 +15898,7 @@ function updateFilterBarTop() {
   loadLastCloudMetaAt();       // 5.9 — how we know whether the cloud has moved since last time
   loadCloudBase();             // v29.2 — and what version of each recipe the cloud held
   initPullToRefresh();         // 5c.3
+  labelIconButtons();          // a11y: give the ✕ / heart buttons an accessible name
   setTimeout(checkBackupOverdue, 6000);   // 5d.1 — after the app has settled
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously

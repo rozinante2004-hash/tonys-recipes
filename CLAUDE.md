@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v30.5: 156 checks, 150 passing.** The 6 failures are `net_*` and
+**As of v31.0: 161 checks, 155 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -157,6 +157,25 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **`rHtml` output is rendered in an iframe on this origin.** The audit found
+  `r.name` going unescaped into `alt="..."`, plus `photo`, `bg`, `emoji`, diet
+  tags, `source` (into an `href`) and the meta row. A recipe is NOT trusted
+  input — it arrives from AI imports, restored backups and other family members.
+  Use `escH`/`escA`, and `safeUrl()` for anything that lands in href/src:
+  escaping cannot stop `javascript:`, because there the scheme is the payload.
+  The preview iframe carries `sandbox=""` as defence in depth — never add
+  `allow-scripts` or `allow-same-origin` to it.
+- **Restore is the most destructive action in the app** — it replaces the whole
+  collection AND pushes that to every other device. It must confirm BEFORE
+  touching anything, and a cloud failure afterwards is its own outcome, not a
+  failed restore. Reading `backup.exportedAt` unguarded used to throw after the
+  data was already replaced, then report "Restore failed" for a restore that had
+  succeeded destructively.
+- **The Family Access list is not the permission.** The rules embed addresses
+  literally and are published BY HAND, so adding or removing a member changes
+  nothing until Tony republishes. Never word those toasts as though a grant or a
+  revocation has happened — the removal direction especially, since it reads as
+  access revoked when it is not.
 - **The version badge must show what is RUNNING, not what the server has.**
   `checkAppVersion` used to overwrite the badge with `serverVersion`, so a device
   on v30.1 displayed "v30.4" and looked current while missing everything between.
