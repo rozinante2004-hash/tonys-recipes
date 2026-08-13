@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v29.6` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
+**Current version:** `v31.0` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
 the two version badges in the markup — four version strings in `index.html` in all, bumped together).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
@@ -37,10 +37,10 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~13,100 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~16,500 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v29.6"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v31.0"}` — polled to detect new deployments. Must never be cached. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
@@ -53,6 +53,9 @@ slide‑up modal animation.
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
 | `tests/run-self-tests.js` | The headless driver for `SELF_TESTS`. Opens `#selfTestOverlay` first — see the note in its header for why that is not optional. |
+| `tools/build-upload-guide.js` | Renders `whatsapp/UPLOAD-FROM-IPHONE.md` into `whatsapp/upload-guide.html`, inlining the mock-up SVGs so the one file works offline and prints. Needs `npm i marked@14`. **Never hand-edit the generated HTML.** |
+| `tools/build-guide-mockups.py` | Draws `whatsapp/img/*.svg` — diagrams of each Shortcuts action, so the guide can be compared against at a glance. |
+| `tools/build-shortcut.py` | Emits `whatsapp/Send-chat-to-Recipes.shortcut` (an Apple plist) so the 33-step Shortcut can be installed instead of built. The token in it is the placeholder `PASTE-YOUR-GITHUB-TOKEN-HERE`; the builder asserts no real token string reaches the file. Untested on a real device — Apple's format is undocumented. |
 
 ### 2.1 `.github/workflows/deploy.yml`
 Standard GitHub Pages deploy: triggers on push to `main` and `workflow_dispatch`;
@@ -106,6 +109,7 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 | **Anthropic Claude API** | All AI (import/extract, translate, suggest, explore, nutrition, help, diet auto‑tag) | Worker secret `ANTHROPIC_API_KEY` |
 | **Firebase** (Auth + Firestore) | Google sign‑in + shared cloud recipe doc | Public web config (safe to ship) |
 | **Cloudflare Worker** | Single POST endpoint proxying everything | The Worker itself |
+| **Openverse** | Food photo search — **first source, and needs NO key**, so it cannot be knocked out when the shared key hits its rate limit. Federates Flickr, Wikimedia, NASA and museum collections. | none |
 | **Pixabay / Pexels / Unsplash** | Food photo search / auto‑fetch (app cycles sources via "See more") | Worker secrets `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` (any subset; unset sources are skipped) |
 | **YouTube Data API** | Fetch video description for recipe extraction | Worker secret `YOUTUBE_API_KEY` |
 | **Bring!** | Push ingredients to a shopping list | Worker KV `BRING_KV` (key `accessToken`), else env `BRING_TOKEN`; plus env `BRING_API_KEY`, `BRING_LIST_UUID`, `BRING_USER_UUID` — **no Bring! values in source** |
@@ -140,6 +144,18 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 > bump the `// … Worker vNN` header — never assume the repo copy is current. Live‑only additions
 > to watch for: the **GET file‑download handler** + **`download-store`** action (KV one‑time
 > download links), and the **`instagram-fetch`** action.
+>
+> **Current repo version: v33.** v32 rebuilt `instagram-fetch` on Meta's tokenless oEmbed; v33
+> added the keyless **Openverse** photo source and made `photo-search` report a 429 as a rate
+> limit instead of "invalid JSON". A provider that rate-limits answers with a plain-text notice,
+> so `JSON.parse` throws and the naive catch blames JSON parsing — hiding the only fact that
+> matters, which is that waiting fixes it. `photoFail(source, name, resp, raw)` handles that
+> centrally and passes `retryAfter` back.
+>
+> **`photo-search` returns per-image `license` and `sourceLabel`.** Openverse serves Creative
+> Commons work where CC-BY makes attribution a licence *condition*, so the app stores
+> `r.photoCredit` and renders it — a picker that shows credit and then discards it on apply
+> puts every recipe using one in breach.
 
 A single ES‑module Worker (`export default { async fetch(request, env) }`). Handles CORS
 (allow `*`, methods `POST, OPTIONS`), rejects non‑POST with 405, parses a JSON body, and
@@ -194,6 +210,79 @@ forwards whatever the client sends.)
 
 ---
 
+## 4a. Security invariants (a rebuild WILL reintroduce these unless told)
+
+Every one of these was a real defect found in the v31.0 audit, in shipped code that looked fine.
+
+**A recipe is untrusted input.** It arrives from AI extraction, a restored backup file, a shared
+URL, or another family member with write access. Treat every field as hostile in every renderer.
+
+1. **Escape before interpolating, never after.** `escH()` for text (null-safe, `\n` → `<br>`),
+   `escA()` for attribute values (also escapes both quote characters, never emits `<br>`).
+   `hlMatch`, `aiFailPane`, `buildRecipePage`, `rHtml` and `buildPrintHtml` all have tests
+   pinning this. The audit found `rHtml` putting `r.name` straight into `alt="…"`, plus `photo`,
+   `bg`, `emoji`, diet tags and the meta row — a recipe named `" onerror="…` was script execution.
+2. **`safeUrl()` for anything reaching `href` or `src`.** Escaping does not stop `javascript:` —
+   the quotes are never broken, the scheme *is* the payload. Allow only `http:`, `https:`,
+   `mailto:` and `data:image/`; return `''` for any other scheme so the link is inert. Strip
+   control characters first, because `java\tscript:` is a real bypass.
+3. **The email preview iframe carries `sandbox=""`.** It is a static preview and needs no
+   scripts, forms or navigation. The empty sandbox also denies it this origin, so a future
+   escaping slip cannot reach localStorage or the Firebase session. **Never** add `allow-scripts`
+   or `allow-same-origin`.
+4. **Untrusted HTML *files* are parsed with `DOMParser`** (inert), never assigned to `innerHTML`.
+5. **No secrets in the client.** Every third-party key lives in Worker env/KV. The Firebase web
+   config is public by design and is the only credential that ships.
+
+---
+
+## 4b. Honesty invariants (the app's defining quality)
+
+Tony judges this app on whether it tells the truth. Each of these was a real bug where the UI
+asserted something that had not happened.
+
+- **Never claim an action succeeded without verifying it.** A clipboard write can be refused; a
+  `document.execCommand('copy')` returns a boolean; a share can be cancelled. Handle the rejection
+  and show the text to copy by hand rather than announcing success.
+- **The Family Access list is not the permission.** The rules embed member addresses literally and
+  are published **by hand** in the Firebase console, so adding or removing a member changes
+  nothing until they are republished. Word those messages as "on the list — not granted yet" and,
+  for removal, "they KEEP their access until you publish the rules". The removal direction is the
+  dangerous one: it reads as a revocation that has not occurred.
+- **The version badge must state what is RUNNING**, never what the server has. Showing
+  `serverVersion` made a device on an old build look current and turned three separate stale-cache
+  incidents into hunts for bugs that did not exist. Record `tonys_last_version` only once
+  `APP_VERSION === serverVersion`, or the update banner shows once and then goes quiet forever.
+- **"Update Now" must clear the caches before reloading**, guarded on `navigator.onLine`. With no
+  *waiting* service worker — the usual case, since `sw.js` rarely changes — a plain reload is
+  answered from the stale-while-revalidate cache and the button does nothing visible.
+- **A failure that is refused must be reported, not swallowed.** Deletion is admin-only, so a
+  write-role member's recipe and photo deletions fail; `flushCloudDeletes` and `syncCloudPhotos`
+  must keep the record and surface it in Sync Health rather than forgetting a document they failed
+  to remove.
+- **Distinguish "nothing there" from "the read failed."** Treating a failed cloud read as absence
+  is what made a transient network blip permanently lose a photo (§5a).
+- **A dead end with no way forward is a bug.** Every AI failure pane offers paste / open / bookmark.
+
+---
+
+## 4c. Destructive actions must confirm first
+
+- **Restore replaces the entire collection AND pushes it to every other device.** It must parse
+  and validate the file, *then* ask — stating the counts, that it is not a merge, that there is no
+  undo, and whether other devices are affected — and only then apply. It shipped for months with
+  no confirmation at all.
+- A cloud failure *after* a successful local restore is its own outcome, not a failed restore.
+- Never read a backup field unguarded during the apply. `backup.exportedAt.slice(0,10)` threw
+  after the collection had already been replaced and synced, then reported "Restore failed" for a
+  restore that had in fact succeeded destructively.
+- `Math.max.apply(null, ids)` returns `-Infinity` for an empty list and can overflow the argument
+  limit on a large one. Use `reduce`.
+- Deleting a synced WhatsApp chat removes it for everybody, so it asks; deleting recipes offers
+  undo.
+
+---
+
 ## 5. Data model
 
 **localStorage keys:**
@@ -223,7 +312,14 @@ forwards whatever the client sends.)
   `data-theme` on `<html>`; `auto` follows `prefers-color-scheme` and re-applies live on change
 - `tonys_wa_base` → base URL of the shared WhatsApp export folder (default the repo's
   `whatsapp/`); `tonys_wa_index` → small JSON index of loaded chats (`{id, group, source, file,
-  size, count, first, last}`) — the chat **text** never goes in localStorage or Firestore
+  slug, parts, size, count, first, last, updatedAt}`) — the chat **text** never goes in
+  localStorage; since 5f.8 it MAY go to Firestore, in its own documents (§11c)
+- `tonys_wa_cloud_sync` → `'1'`/`'0'` — whether an imported chat is also synced to the cloud
+- `tonys_photo_probed` → recipe ids already checked for a cloud photo and found genuinely
+  photoless, so `repairMissingPhotos` costs reads once per recipe rather than on every load
+- `tonys_last_version` → the version this device is actually RUNNING. Written only once
+  `APP_VERSION === serverVersion`; writing the server's value on sight made the update banner
+  appear exactly once and then go quiet forever on a stale device
 
 > **One flag per idea.** `isClip` is the only clip/video marker (2.3); `normalizeRecipe` folds a
 > legacy `isVideoBookmark` into it and deletes the old field. The edit form's ingredient table is
@@ -259,6 +355,9 @@ forwards whatever the client sends.)
   cookLog: [{ id, at, rating, note }],  // 3.5 — one entry per cook, capped at 50
   history: [{...}],           // 3.4 — last 3 revisions. Travels in recipe_<id> (5.4), never in the legacy doc
   isClip: Boolean,            // "clip"/bookmark (no full recipe). The ONLY clip flag (2.3)
+  photoCredit: null | { name, url, license, source },  // v30.3 — REQUIRED for Openverse
+                              // photos: CC-BY makes attribution a licence condition, not a
+                              // courtesy. Rendered under the hero by photoCreditHtml().
   updatedAt: Number           // ms timestamp — used for offline-merge conflict resolution
 }
 ```
@@ -395,6 +494,41 @@ wipes its cloud photo.
 
 ---
 
+## 5a. Photo storage, and the flag that makes it recoverable
+
+Photos are the app's largest data and its most fragile path. Three stores are involved:
+
+| Where | What | Why |
+|---|---|---|
+| `localStorage` | recipes **without** photos, each carrying `_ph` / `_po` | photo-free text is tiny and never hits quota |
+| IndexedDB (`tonys_recipes_db`, store `photos`) | `{id, photo, originalPhoto, thumb}` | the device's copy; `thumb` is a Blob, the rest data URLs |
+| Firestore `shared/photo_<id>` | `{photo, updatedAt}` | the copy every device can reach |
+
+**`_ph` / `_po` are the ONLY record that a photo exists somewhere else.** Clear one when the photo
+did not actually arrive and that photo is lost on that device *permanently* — `attachCloudPhotos`
+will skip the recipe forever, and no reload, restart or re-sync recovers it. This is not
+hypothetical: Chrome evicts IndexedDB under storage pressure (localStorage, being tiny, survives),
+and every photo vanished on one Android phone while two other devices were fine.
+
+Rules that follow from that:
+
+- Clear the flag **only** when the photo actually arrived, or when the cloud states there is
+  genuinely no photo document. A **failed read is neither** — keep the flag and try again.
+- Clearing on a failed read also arms the delete branch in `syncCloudPhotos`, which would remove
+  the photo for *every* device.
+- `repairMissingPhotos()` rescues a device whose flags were already cleared by an older build —
+  the only route back for one that has gone wrong. Bound it (60 reads per run) and remember which
+  recipes are genuinely photoless in `tonys_photo_probed`, because photoless recipes are normal
+  (there is a "No photo" filter for them) and re-probing every load would cost reads forever.
+- Blob URL hygiene: `photoSrc` keys its cache on a content signature and revokes the previous URL
+  when a photo changes; `prunePhotoUrlCache` releases URLs for deleted recipes;
+  `savePhotosToIDB` calls `releaseThumb` when a photo changes so the grid cannot show a stale
+  thumbnail.
+- **Full photos stay base64.** Export, backup, cloud sync, email and print all consume data URLs.
+  Only thumbnails are Blobs.
+
+---
+
 ## 6. Firebase auth & sync behaviour (subtle — match carefully)
 
 - Firebase **compat** SDK v10.12.0 loaded from `gstatic.com` (app + auth + firestore), plus
@@ -519,8 +653,10 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 ## 10. Import / Export / Backup
 
-- **Excel** (SheetJS `xlsx` 0.18.5 CDN): `exportAllExcel`/`expOneExcel`/`sheetRows`/
-  `styleExcelSheet`/`downloadExcelWb`. Import `.xlsx` via `importFromFile`.
+- **Excel EXPORT was removed in v28.5** along with the QR code — both were unused and cost a
+  CDN library each. Do **not** rebuild them. Excel *import* remains (`.xlsx` via SheetJS).
+- **`xlsx` and `mammoth` load ON DEMAND** via `loadScriptOnce()` (5.11), never from `<head>` —
+  there is a test pinning this. Only Firebase compat 10.12.0 and GSI are in `<head>`.
 - **Word** (`.docx`): **built by hand** as an OOXML zip — `makeDocxBlob` + a tiny `buildZip`
   (store‑only, CRC32) — no library for export. Import `.docx` via **mammoth** 1.6.0 CDN
   (`parseWordText`).
@@ -530,7 +666,9 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 - **Backup**: `backupSave` writes a single JSON `{version, exportedAt, nextId, recipes, photos,
   settings}` where inline data‑URL photos are **de‑duplicated** into a `photos` map and replaced
   by `__photo__N` refs. `backupRestore`/`backupRestoreFile` reverse it and re‑hydrate. Backup
-  buttons are desktop‑only.
+  buttons are desktop‑only. **Restore is the app's most destructive action — see §4c** for the
+  confirmation and validation it must carry. `backupIsOverdue()`/`checkBackupOverdue()` nudge
+  after 30 days (5d.1); the nudge never claims a backup happened.
 - **Local Save Helper**: on desktop, exports can POST base64 to `http://127.0.0.1:27182` so files
   land in `~/Documents/Projects/Recipes App/Backups` with correct Hebrew/Russian names
   (`downloadBlob` tries the helper first, falls back to a normal browser download + a rename hint
@@ -674,7 +812,8 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
 
 ## 12. Sharing, email, misc utilities
 
-- **Share app** (`openShareAppModal`): QR code (qrcodejs 1.0.0 CDN) + WhatsApp/copy link.
+- **Share app** (`openShareAppModal`): WhatsApp / copy link. **The QR code was removed in v28.5**
+  (with the qrcodejs CDN dependency) — do not rebuild it.
 - **Share recipe** (`toggleShare`/`rText`): native share, WhatsApp (`doWhatsApp`), email
   (`doEmail`/`showEmailModal`), copy (`doCopy`).
 - **Gmail API send** (`getGmailToken`/`sendViaGmailApi`): uses the Gmail send scope and a
@@ -682,7 +821,9 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
   formatted recipe emails; falls back to a copy‑paste hint.
 - **Measurement converter** (`openCalcModal`/`convertUnits`): Weight/Volume/Temp/Length with a
   live two‑way calculator.
-- **Print** (`printRecipe`): print‑friendly recipe window.
+- **Print** (`printRecipe`): print‑friendly recipe window (`buildPrintHtml`, escaped).
+- **Email preview** (`showEmailModal` → `rHtml`): the preview iframe is **sandboxed** and every
+  recipe field is escaped — see §4a. This is where the audit found the app's one real XSS.
 - **Family Access Control** (`openAccessControl`): manage member emails + roles
   (read/write/admin), stored locally and in Firestore, and **generate copy‑pasteable Firestore
   security rules** (`updateAccessRules`) that gate `shared/**` by `request.auth.token.email`.
@@ -714,9 +855,9 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **149 checks** in 13 groups —
-**Features (41), UI (24), Cloud Sync (21), CRUD (10), Import/Export (10), Storage (9),
-WhatsApp (9), CSS (6), Core, Modals and Network (5 each), Backup and Performance (2 each)** —
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **161 checks** in 13 groups —
+**Features (42), UI (26), Cloud Sync (23), WhatsApp (12), Import/Export (11), CRUD (10),
+Storage (10), CSS (6), Core, Modals and Network (5 each), Backup and Performance (3 each)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
@@ -726,6 +867,23 @@ live ✅/❌ status, and for failures shows a **detail card** with error, impact
 running session (e.g. re‑inject `:root` CSS vars, define a missing `sortMode`, call
 `renderGrid()`). Network tests ping the Worker health, AI round‑trip, `fetch-url`,
 `photo-search`, and `instagram-fetch` (treat IG 404 as pass, only 500 as fail).
+
+**Write a test for every behavioural change, then MUTATE THE CODE TO PROVE THE TEST FAILS.**
+This is the single most valuable practice in the project's history and it is not optional.
+Several tests here were written, passed, and were later shown to assert nothing:
+
+- `chunks.join('') === original` "proved" chunking preserved emoji — but JS strings are UTF-16,
+  so concatenation silently reunites a split surrogate pair. It passed with the guard removed.
+  The honest assertion is a UTF-8 round trip per chunk, which is what Firestore actually stores.
+- A folder-listing filter was tested through its predicate alone; reverting the *caller* to the
+  old behaviour left every test green.
+- A "all chats are searched" test built the message array by hand, so a loader crippled to stop
+  after the first chat still passed. It has to drive `waLoadAllMessages` itself.
+- An assertion that grepped for `Math.max.apply` matched the *comment* explaining its removal.
+
+When a mutation unexpectedly survives, check the mutation actually applied before concluding the
+test is weak — `perl` without `/g` hits the first match in the file, which twice was a different
+call site entirely.
 
 ---
 
@@ -784,8 +942,9 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
       errors with the friendly modal.
 - [ ] URL/Instagram/YouTube/free‑hand/camera/file imports all produce correct recipe JSON or a
       video bookmark; RTL Hebrew renders correctly throughout.
-- [ ] Excel + hand‑rolled Word export/import, JSON backup/restore (with de‑duped photos), and the
-      localhost save helper all work; non‑ASCII filenames handled.
+- [ ] Hand‑rolled Word export/import, JSON backup/restore (with de‑duped photos), and the
+      localhost save helper all work; non‑ASCII filenames handled. **There is no Excel export** —
+      it and the QR code were removed in v28.5 as unused; do not rebuild them.
 - [ ] Bring! send + all three token‑refresh paths function; expiry pill accurate.
 - [ ] Scale/units/nutrition/cook‑count/favourites/recent/sort/search/select‑mode/print/share all
       behave as described.
@@ -793,7 +952,22 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 - [ ] **No real secret is committed**; Worker holds `ANTHROPIC_API_KEY`, `PIXABAY_API_KEY`,
       `YOUTUBE_API_KEY`, and the Bring token/KV; Firebase web config may be embedded.
 - [ ] GitHub Actions deploys to Pages on push to `main`; `version.json` bump triggers the
-      in‑app update banner.
+      in‑app update banner, the badge shows the **running** version, and one tap of Update Now
+      actually lands the new build (it must clear the caches — see §4b).
+- [ ] **Security (§4a):** a recipe named `" onerror="alert(1)` renders inertly in the email
+      preview, the print view, the shared page and the grid; `safeUrl('javascript:alert(1)')`
+      is `''`; the preview iframe is sandboxed.
+- [ ] **Honesty (§4b):** no message claims a copy, a grant, a revocation or an update that has
+      not been verified; refused cloud deletions appear in Sync Health.
+- [ ] **Destructive actions (§4c):** restore confirms before replacing anything and survives a
+      backup with no `exportedAt`.
+- [ ] **Photos (§5a):** clearing IndexedDB with the app signed in loses no photo — they come back
+      from the cloud on the next load.
+- [ ] **Accessibility:** every ✕ has an accessible name; dialogs trap Tab and return focus;
+      the recipe card focus ring paints (`:focus:not(:focus-visible)` for the reset, ring rule
+      last); Hebrew recipes put ingredients on the right via `dir="rtl"` on the grid container.
+- [ ] **No listener or blob-URL leaks:** opening and closing the mobile filter panel repeatedly
+      leaves at most one document click listener bound.
 
 ---
 
@@ -808,9 +982,35 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 6. Import/Export/Backup + local save helper (`local-save-helper.py`, `setup-save-helper.sh`).
 7. Firebase auth + Firestore sync + offline merge + remote‑change banner.
 8. Bring! integration + `bring-relay.html`.
-9. Sharing/email/Gmail/QR/converter/print/access‑control/payments/deployments.
-10. PWA (`manifest.json`, `sw.js`, icons, install banners, version check) + Self‑Test suite.
-11. `.github/workflows/deploy.yml`; deploy; smoke‑test with the Self‑Test modal.
+9. Sharing/email/Gmail/converter/print/access‑control/deployments (no QR — removed v28.5).
+10. WhatsApp group knowledge (§11c), including the Firestore chat source.
+11. PWA (`manifest.json`, `sw.js`, icons, install banners, version check) + Self‑Test suite.
+12. `.github/workflows/deploy.yml` and `self-tests.yml`; deploy; smoke‑test with the Self‑Test
+    modal, then walk the acceptance checklist in §16 — including the security, honesty, photo
+    and accessibility rows, which are the ones a rebuild is most likely to miss.
 
 > Keep everything in one `index.html` with inline CSS/JS and CDN dependencies. Prefer clarity and
 > parity with this spec over modernization. When in doubt, match the observable behaviour above.
+
+---
+
+## 18. How this app is judged
+
+Two qualities matter more than features, and both were learned the hard way:
+
+**It must tell the truth.** Every message the UI shows is a claim, and a claim the code has not
+verified is a bug — not a cosmetic one. The version badge that displayed the server's version
+instead of the running one turned three separate stale-cache incidents into hunts for bugs that
+did not exist. "Removed member" that had removed nothing read as a revoked permission. §4b is not
+style guidance; it is the specification.
+
+**A failure must leave a way forward.** A dead end is treated as a bug here. An AI failure offers
+paste / open / bookmark; an unreadable cloud document repairs itself on the next save; a photo
+missing from IndexedDB comes back from the cloud; a rate-limited photo source hands off to the
+next instead of stopping. Where the app genuinely cannot proceed — a device whose administrator
+blocks GitHub — it says so plainly and points at the route that does work, rather than pretending
+or quietly doing nothing.
+
+The corollary for whoever rebuilds this: when a test passes, mutate the code and check it fails.
+Roughly a third of the real defects in this project's history were found that way, and several
+were hiding behind tests that had been green for months.
