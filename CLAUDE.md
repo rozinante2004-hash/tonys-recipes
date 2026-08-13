@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v30.4: 155 checks, 149 passing.** The 6 failures are `net_*` and
+**As of v30.5: 156 checks, 150 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -157,6 +157,20 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **The version badge must show what is RUNNING, not what the server has.**
+  `checkAppVersion` used to overwrite the badge with `serverVersion`, so a device
+  on v30.1 displayed "v30.4" and looked current while missing everything between.
+  Tony reported his version from that badge three times and it was wrong each
+  time, which turned "the feature is missing" into a hunt for a bug that was not
+  there. Same block: compare the banner against `APP_VERSION`, and only write
+  `VERSION_KEY` once the device is actually on that version — storing the
+  server's version when the banner appeared made it show once and never again.
+- **"Update Now" must clear the caches before reloading.** With no WAITING
+  service worker — the usual case, since `sw.js` rarely changes and `index.html`
+  always does — it fell through to a plain reload, which the stale-while-revalidate
+  handler answers from cache. The button did nothing visible and a second reload
+  was needed. Guard the cache purge on `navigator.onLine`, or an offline tap
+  empties the only copy there is.
 - **One failing photo source must not end the search.** A 429 from Pixabay used
   to dead-end photo search while Pexels and Unsplash sat there working — an error
   is now handled exactly like an unconfigured source: move on, collect the reason,
