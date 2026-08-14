@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.0 -->
+<!-- Tony's Recipes Collection v31.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +9,24 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Tony's Recipes">
 <meta name="theme-color" content="#5C3D2E">
+<!-- Content-Security-Policy (v31.1). The app builds a great deal of HTML from
+     recipe data it does not control — AI imports, restored backups, other family
+     members — so escaping is the first line and this is the second. It would
+     have contained the email-builder XSS the v31.0 audit found.
+
+     'unsafe-inline' is unavoidable for script-src while the whole app is one
+     inline <script> with inline handlers. It is not there for convenience:
+     removing it means a build step, which is the one thing this project will
+     not have. What the policy still buys even so:
+       object-src 'none'       no plugin embedding
+       base-uri 'none'         a <base> tag cannot repoint every relative URL
+       form-action 'none'      injected markup cannot POST anywhere
+       frame-ancestors 'none'  the app cannot be framed and clickjacked
+       connect-src pinned      exfiltration to an attacker's host is blocked
+       script-src pinned       no code from a host we did not choose
+     Keep in step with the <script src> tags and loadScriptOnce() hosts, or a
+     lazily loaded library silently stops working. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -709,6 +727,34 @@ function _cloudRestoreForTest(s) {
   } catch(e) {}
 }
 
+// ─── The Worker, in one place (v31.1) ───────────────────────────────────────
+// Every call used to inline the URL and send no credentials. The Worker forwards
+// to Anthropic on Tony's key and its URL is in this public file, so anyone who
+// read the page could spend his credits. Worker v34 now requires an allowed
+// Origin and this key, and rate-limits by IP.
+//
+// Be honest about what the key is worth: it SHIPS IN THIS FILE, so it is not a
+// secret and does not stop anyone who reads the source. It stops drive-by
+// scripted abuse. The rate limit is the control that actually bounds the damage.
+var WORKER_ENDPOINT = 'https://lively-bread-273a.rozinante2004.workers.dev';
+var WORKER_APP_KEY  = 'tonys-recipes-web-v1';
+function workerHeaders(extra) {
+  var h = { 'Content-Type': 'application/json', 'X-App-Key': WORKER_APP_KEY };
+  if (extra) Object.keys(extra).forEach(function(k){ h[k] = extra[k]; });
+  return h;
+}
+// Turn the Worker's own refusals into something actionable rather than a raw code.
+function workerErrorText(status, data) {
+  if (status === 403) return (data && data.error && /app key/i.test(data.error))
+    ? 'The app key was rejected. Set APP_SHARED_KEY on the Worker to match, or clear it there to disable the check.'
+    : 'The Worker refused this origin. Add this site to ALLOWED_ORIGINS on the Worker.';
+  if (status === 429) return 'Too many requests in the last minute. This is the Worker\'s own rate limit — wait a minute.';
+  if (status === 503) return (data && data.error) ? data.error : 'The Worker is missing configuration.';
+  return (data && data.error) ? data.error : ('Worker error ' + status);
+}
+window.WORKER_ENDPOINT = WORKER_ENDPOINT; window.workerHeaders = workerHeaders;
+window.workerErrorText = workerErrorText;
+
 const SELF_TESTS = [
   // ── UI ELEMENTS ────────────────────────────────────────────────────────────
   { id:'ui_header',      group:'UI',      name:'Header renders',
@@ -871,8 +917,8 @@ const SELF_TESTS = [
   { id:'net_worker',     group:'Network', name:'Cloudflare Worker reachable',
     test: async()=>{
       // Send a minimal AI request as a worker health check
-      const r=await fetch('https://lively-bread-273a.rozinante2004.workers.dev',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+      const r=await fetch(WORKER_ENDPOINT,{
+        method:'POST',headers: workerHeaders(),
         body:JSON.stringify({
           model: AI_MODEL,
           max_tokens:5,
@@ -892,8 +938,8 @@ const SELF_TESTS = [
   { id:'net_url_import', group:'Network', name:'URL import (test recipe URL)',
     test: async()=>{
       // Use a known accessible recipe URL provided for testing
-      const resp=await fetch('https://lively-bread-273a.rozinante2004.workers.dev',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+      const resp=await fetch(WORKER_ENDPOINT,{
+        method:'POST',headers: workerHeaders(),
         body:JSON.stringify({action:'fetch-url',url:'https://mazon-izun.com/recipes/fermented-cucumbers/'}),
         signal:AbortSignal.timeout(20000)});
       if(!resp.ok) throw new Error('fetch-url returned '+resp.status);
@@ -904,8 +950,8 @@ const SELF_TESTS = [
   },
   { id:'net_photo',      group:'Network', name:'Photo search (Pixabay)',
     test: async()=>{
-      const resp=await fetch('https://lively-bread-273a.rozinante2004.workers.dev',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+      const resp=await fetch(WORKER_ENDPOINT,{
+        method:'POST',headers: workerHeaders(),
         body:JSON.stringify({action:'photo-search',query:'pasta'}),
         signal:AbortSignal.timeout(10000)});
       if(!resp.ok) throw new Error('photo-search returned '+resp.status);
@@ -916,8 +962,8 @@ const SELF_TESTS = [
   { id:'net_instagram',  group:'Network', name:'Instagram fetch (test post)',
     test: async()=>{
       // Use a known stable public post
-      const resp=await fetch('https://lively-bread-273a.rozinante2004.workers.dev',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+      const resp=await fetch(WORKER_ENDPOINT,{
+        method:'POST',headers: workerHeaders(),
         body:JSON.stringify({action:'instagram-fetch',shortcode:'C5IHqgqoFMo'}),
         signal:AbortSignal.timeout(10000)});
       // Instagram's oEmbed API now requires auth — Worker returns 404 (not 500) when unavailable.
@@ -2346,6 +2392,174 @@ const SELF_TESTS = [
       // API key across the whole family, so they are the ones that 429; leading
       // with Openverse means a rate limit is a slower search, not a dead end.
       if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
+    } },
+
+  { id:'stor_photos_to_storage', group:'Storage', name:'Photos can live in Storage without breaking backups (5.2)',
+    test: async()=>{
+      ['storageReady','photoStoragePath','inlineRemotePhoto','dataUrlToBlobForUpload','inlinePhotosForBackup']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // Safe by default: with Storage unavailable in a sandbox the app must keep
+      // working exactly as before, on base64.
+      if(await storageReady()!==false) throw new Error('storageReady should be false where Storage is unavailable');
+      if(photoStoragePath(7).indexOf('shared/photos/')!==0) throw new Error('photos are not filed under the shared path');
+      var blob=dataUrlToBlobForUpload('data:image/png;base64,iVBORw0KGgo=');
+      if(!blob||blob.type!=='image/png') throw new Error('a data URL did not convert to an uploadable blob');
+      if(dataUrlToBlobForUpload('not a data url')!==null) throw new Error('a non-data URL should not convert');
+      // Both document shapes must be readable forever: a device that never gets
+      // Storage enabled keeps writing base64 into `photo`.
+      var attach=String(attachCloudPhotos);
+      if(attach.indexOf('d.photoUrl')===-1) throw new Error('attachCloudPhotos cannot read a Storage pointer');
+      if(attach.indexOf('d.photo ||')===-1) throw new Error('attachCloudPhotos stopped reading legacy base64 photos');
+      if(String(repairMissingPhotos).indexOf('photoUrl')===-1) throw new Error('the repair pass ignores Storage-backed photos');
+      // A Storage upload failure must fall back to base64, never lose the photo.
+      if(String(syncCloudPhotos).indexOf('falling back to base64')===-1)
+        throw new Error('a failed Storage upload does not fall back, so the photo would be lost');
+      // THE invariant: a backup stays self-contained. With photos as URLs, a
+      // backup of URLs would depend on a live bucket years later.
+      var bk=String(backupSave);
+      if(bk.indexOf('inlinePhotosForBackup')===-1)
+        throw new Error('backupSave does not re-inline remote photos, so backups would depend on a live bucket');
+      if(bk.indexOf('_backup_photo')===-1) throw new Error('the inlined bytes are never used in the exported recipe');
+      if(bk.indexOf('clearBackupInlines')===-1) throw new Error('the temporary inlined copies are never cleared');
+      // ...and a photo it could not download must be reported, not dropped quietly.
+      if(!/could not be\s*\n?\s*.\+ .downloaded|could not be /.test(bk) || bk.indexOf('failed.length')===-1)
+        throw new Error('photos missing from a backup are not reported, so the backup would be trusted wrongly');
+      // Deleting a photo must remove the object too, not just the pointer.
+      if(String(syncCloudPhotos).indexOf('deletePhotoFromStorageBucket')===-1)
+        throw new Error('deleting a photo leaves its Storage object orphaned forever');
+    } },
+
+  { id:'sec_worker_authenticated', group:'Network', name:'Every Worker call carries the app key (v31.1)',
+    test: async()=>{
+      // The Worker forwards to Anthropic on Tony's key and its URL ships in this
+      // public file. With CORS '*', no auth and no rate limit, anyone who read
+      // the page could spend his credits.
+      ['WORKER_ENDPOINT','workerHeaders','workerErrorText'].forEach(function(f){
+        if(typeof window[f]==='undefined') throw new Error(f+' not defined');
+      });
+      var h=workerHeaders();
+      if(!h['X-App-Key']) throw new Error('workerHeaders sends no app key');
+      if(h['Content-Type']!=='application/json') throw new Error('the JSON content type was lost');
+      if(workerHeaders({'X-Extra':'1'})['X-Extra']!=='1') throw new Error('extra headers are dropped');
+      // No call site may inline the URL and thereby skip the key.
+      var src=document.documentElement.innerHTML;
+      var inlined=(src.match(/fetch\('https:\/\/lively-bread/g)||[]).length;
+      if(inlined) throw new Error(inlined+' Worker call(s) still inline the URL, so they send no key');
+      // Its refusals must be explained, not shown as bare codes.
+      if(!/app key/i.test(workerErrorText(403,{error:'FORBIDDEN: missing or wrong app key.'})))
+        throw new Error('a 403 is not explained');
+      if(!/minute/i.test(workerErrorText(429,{}))) throw new Error('a 429 does not say to wait');
+    } },
+
+  { id:'sec_csp_present', group:'CSS', name:'A Content-Security-Policy is set and pinned (v31.1)',
+    test: async()=>{
+      var m=document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+      if(!m) throw new Error('no CSP meta tag');
+      var c=m.getAttribute('content')||'';
+      // The directives that still bite even with 'unsafe-inline' for scripts.
+      [["object-src 'none'",'plugin embedding'],["base-uri 'none'",'<base> hijacking'],
+       ["form-action 'none'",'injected forms posting out'],["frame-ancestors 'none'",'clickjacking']
+      ].forEach(function(pair){
+        if(c.indexOf(pair[0])===-1) throw new Error('CSP is missing '+pair[0]+' — '+pair[1]+' is not blocked');
+      });
+      if(c.indexOf('lively-bread')===-1) throw new Error('connect-src does not allow the Worker, so every AI call would fail');
+      // The email preview is a srcdoc iframe (about:srcdoc) and needs frame-src 'self'.
+      if(!/frame-src[^;]*'self'/.test(c)) throw new Error("frame-src lacks 'self' — the email preview iframe would be blocked");
+      // Lazily loaded libraries must still be reachable.
+      ['https://cdnjs.cloudflare.com','https://www.gstatic.com'].forEach(function(host){
+        if(c.indexOf(host)===-1) throw new Error('script-src omits '+host+', so a lazily loaded library would silently fail');
+      });
+    } },
+
+  { id:'feat_import_duplicates', group:'Import/Export', name:'Importing the same recipe twice is caught (5f.2)',
+    test: async()=>{
+      ['normUrl','normName','findDuplicate'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var list=[normalizeRecipe({id:1,name:"Grandma's Lasagna",source:'https://www.example.com/lasagna/?utm=1'}),
+                normalizeRecipe({id:2,name:'עוגת שוקולד'})];
+      // Same URL, cosmetically different — the near-certain signal.
+      var d=findDuplicate({name:'Totally Different',source:'http://example.com/lasagna'},list);
+      if(!d||d.why!=='source') throw new Error('the same source URL was not recognised');
+      // Same name, different punctuation and case.
+      if(!findDuplicate({name:'grandmas   lasagna!'},list)) throw new Error('a near-identical name was not recognised');
+      // Hebrew must work, including niqqud.
+      if(!findDuplicate({name:'עוגת שוקולד'},list)) throw new Error('a Hebrew duplicate was missed');
+      // ...and it must NOT collapse genuinely different recipes.
+      if(findDuplicate({name:'Beef Stew'},[normalizeRecipe({id:3,name:'Lamb Stew'})]))
+        throw new Error('two different recipes were treated as duplicates');
+      if(findDuplicate({name:'Soup'},[normalizeRecipe({id:4,name:'Stew'})]))
+        throw new Error('short unrelated names were conflated');
+      if(findDuplicate({name:'Anything',source:''},list)&&!findDuplicate({name:'Anything'},list))
+        throw new Error('an empty source matched something');
+      // The check must run BEFORE anything is written.
+      if(String(confirmImportParsed).indexOf('findDuplicate')===-1)
+        throw new Error('the import path never checks for duplicates');
+      if(String(confirmImportParsed).indexOf('recipes.unshift')!==-1)
+        throw new Error('confirmImportParsed still writes directly, so the check cannot block it');
+    } },
+
+  { id:'feat_ingredient_search', group:'Features', name:'Ingredient-level ALL search (5f.3)',
+    test: async()=>{
+      ['parseSearchQuery','recipeMatchesQuery'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var r=normalizeRecipe({ id:1, name:'Roast chicken', category:'Dinner',
+        ingredients:[{a:'1',n:'chicken'},{a:'2',n:'lemon'},{a:'3',n:'garlic clove'}],
+        steps:['Roast it with rosemary'] });
+      // Plain search is unchanged — OR-ish across every field.
+      if(!recipeMatchesQuery(r,'rosemary')) throw new Error('plain search stopped matching steps');
+      if(!recipeMatchesQuery(r,'roast')) throw new Error('plain search stopped matching the name');
+      // +term requires the term IN AN INGREDIENT, and ALL of them must be present.
+      if(!recipeMatchesQuery(r,'+chicken +lemon')) throw new Error('a recipe with both ingredients did not match');
+      if(recipeMatchesQuery(r,'+chicken +beef')) throw new Error('a missing ingredient still matched — this is AND, not OR');
+      if(recipeMatchesQuery(r,'+rosemary')) throw new Error('+term matched a STEP; it must match ingredients only');
+      // ing: form, for typing on a phone.
+      if(!recipeMatchesQuery(r,'ing: chicken, garlic')) throw new Error('the ing: form did not match');
+      if(recipeMatchesQuery(r,'ing: chicken, beef')) throw new Error('the ing: form is not requiring all terms');
+      // Mixed: +term plus free text, both must hold.
+      if(!recipeMatchesQuery(r,'+lemon roast')) throw new Error('mixing +term with free text failed');
+      if(recipeMatchesQuery(r,'+lemon pancake')) throw new Error('free text is not being applied alongside +term');
+      var p=parseSearchQuery('+a +b rest');
+      if(p.must.length!==2||p.text!=='rest') throw new Error('the query did not split into terms and free text');
+    } },
+
+  { id:'feat_one_item_away', group:'Features', name:'"One item away" filter (5f.5)',
+    test: async()=>{
+      ['missingFromPantry','oneAwayCount','toggleOneAwayFilter'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var saved=null; try{ saved=localStorage.getItem('tonys_pantry'); }catch(e){}
+      var keep=recipes, keepFlag=showOneAwayOnly;
+      try{
+        setPantry(['chicken','lemon','salt']);
+        var cookable=normalizeRecipe({id:90001,name:'Have it all',ingredients:[{a:'',n:'chicken'},{a:'',n:'salt'}],steps:['x']});
+        var oneAway =normalizeRecipe({id:90002,name:'One short',ingredients:[{a:'',n:'chicken'},{a:'',n:'saffron'}],steps:['x']});
+        var twoAway =normalizeRecipe({id:90003,name:'Two short',ingredients:[{a:'',n:'beef'},{a:'',n:'saffron'}],steps:['x']});
+        var clip    =normalizeRecipe({id:90004,name:'A clip',ingredients:[],steps:[],isClip:true});
+        // A clip CAN carry ingredients — isClip is auto-ticked only when there
+        // are none, but it can be ticked by hand on a recipe that has them. This
+        // one is exactly one item short, so without the isClip guard it would be
+        // offered as cookable when there is no method to cook from.
+        var clipWithIngs=normalizeRecipe({id:90005,name:'Clip with ingredients',
+          ingredients:[{a:'',n:'chicken'},{a:'',n:'saffron'}],steps:[],isClip:true});
+        recipes=[cookable,oneAway,twoAway,clip,clipWithIngs];
+        if(missingFromPantry(clipWithIngs).length!==0)
+          throw new Error('a clip with ingredients was measured against the pantry — it has no method, so it cannot be cooked');
+        if(missingFromPantry(oneAway).length!==1) throw new Error('a recipe one item short was not counted as one away');
+        if(missingFromPantry(cookable).length!==0) throw new Error('a fully cookable recipe looks like it is missing something');
+        // A clip has no ingredients, so it would read as "0 missing" and flood
+        // the filter with things that cannot be cooked at all.
+        if(missingFromPantry(clip).length!==0) throw new Error('clip handling changed');
+        if(oneAwayCount()!==1) throw new Error('oneAwayCount returned '+oneAwayCount()+', expected 1');
+        // With no pantry the chip cannot answer anything, so it must not appear.
+        setPantry([]);
+        if(oneAwayCount()!==0) throw new Error('the chip would show with an empty pantry, where it means nothing');
+      } finally {
+        recipes=keep; showOneAwayOnly=keepFlag;
+        try{ if(saved===null) localStorage.removeItem('tonys_pantry'); else localStorage.setItem('tonys_pantry',saved); }catch(e){}
+        renderFilters(); renderGrid();
+      }
     } },
 
   { id:'sec_email_html_escaped', group:'Cloud Sync', name:'Email HTML escapes every recipe field (audit v31.0)',
@@ -4209,8 +4423,8 @@ async function autoFetchMissingPhotos() {
         query = tResult.trim().replace(/['"]/g,'');
       }
       // Search Pixabay
-      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+      var resp = await fetch(WORKER_ENDPOINT, {
+        method:'POST', headers: workerHeaders(),
         body: JSON.stringify({action:'photo-search', query: query + ' food recipe'}),
         signal: AbortSignal.timeout(10000)
       });
@@ -4549,7 +4763,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.0';
+var APP_VERSION = 'v31.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -5061,7 +5275,7 @@ window.sendViaGmailApi = sendViaGmailApi;
 
 function checkHelperStatus(callback) {
   fetch('http://127.0.0.1:27182', {method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers: workerHeaders(),
     body:JSON.stringify({ping:true, filename:'ping', data:''}),
     signal: AbortSignal.timeout(1000)
   })
@@ -5149,7 +5363,7 @@ function showSaveHelperInfo() {
   stopBtn.onclick = function() {
     // Send stop signal to helper
     fetch('http://127.0.0.1:27182', {method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers: workerHeaders(),
       body: JSON.stringify({action:'stop'})
     }).catch(function(){});
     setTimeout(function(){ updateHelperStatus(); }, 800);
@@ -6914,7 +7128,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7485,7 +7699,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7938,6 +8152,58 @@ var showFavOnly      = false;
 var showClipsOnly    = false;
 var showRecentOnly   = false;
 var showNoPhotoOnly  = false; // 1.7 — surface recipes still missing a photo
+var showOneAwayOnly  = false; // 5f.5 — recipes you could cook bar ONE pantry item
+
+// ─── Search (5f.3) ──────────────────────────────────────────────────────────
+// The plain search is OR-ish across name/category/ingredients/steps, which gets
+// less useful as the collection grows: "chicken lemon" matches anything with
+// either word anywhere. Two additions, both opt-in so ordinary typing is
+// unchanged:
+//
+//   +chicken +lemon        every +term must appear IN AN INGREDIENT
+//   ing:chicken, lemon     same thing, comma-separated, easier on a phone
+//
+// Anything left over is matched the old way. Quoting is not supported on
+// purpose — it is a recipe box, not a query language.
+function parseSearchQuery(raw) {
+  var q = String(raw || '').toLowerCase().trim();
+  var must = [], rest = q;
+  var m = q.match(/^ing:\s*(.+)$/);
+  if (m) {
+    must = m[1].split(',').map(function(t){ return t.trim(); }).filter(Boolean);
+    rest = '';
+  } else {
+    rest = q.replace(/(^|\s)\+([^\s]+)/g, function(_, sp, term){ must.push(term); return sp; }).trim();
+  }
+  return { must: must, text: rest };
+}
+function recipeIngredientNames(r) {
+  return (Array.isArray(r.ingredients) ? r.ingredients : [])
+    .map(function(i){ return String((i && i.n) == null ? '' : i.n).toLowerCase(); });
+}
+function recipeMatchesQuery(r, raw) {
+  var parsed = parseSearchQuery(raw);
+  var lc = function(v){ return String(v == null ? '' : v).toLowerCase(); };
+  if (parsed.must.length) {
+    var names = recipeIngredientNames(r);
+    // ALL of them, each matched as a substring so Hebrew prefixes (ה/ו/ב/ל)
+    // still work without a stemmer — the same reasoning as waSearch.
+    var all = parsed.must.every(function(t){
+      return names.some(function(n){ return n.indexOf(t) !== -1; });
+    });
+    if (!all) return false;
+    if (!parsed.text) return true;
+  }
+  var q = parsed.text;
+  if (!q) return true;
+  // Defensive: a recipe with a missing field must never break the whole grid.
+  return lc(r.name).includes(q)
+    || lc(r.category).includes(q)
+    || recipeIngredientNames(r).some(function(n){ return n.includes(q); })
+    || (Array.isArray(r.steps) && r.steps.some(function(st){ return lc(st).includes(q); }));
+}
+window.parseSearchQuery = parseSearchQuery; window.recipeMatchesQuery = recipeMatchesQuery;
+
 var sortMode         = 'default'; // default|alpha|prep|difficulty|recent|popular
 var _bringSelected = new Set();
 var _bringPopup    = null;
@@ -7960,6 +8226,10 @@ function renderFilters() {
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + (function(){ var n = recipes.filter(function(r){ return !r.photo && !r.isClip; }).length;
         return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (' + n + ')</button>' : ''; })()
+    // 5f.5 — only offered when it can answer: no pantry, or nothing one item
+    // away, and the chip would be a dead end rather than a shortcut.
+    + (function(){ var n = oneAwayCount();
+        return n ? '<button class="filter-btn' + (showOneAwayOnly ? ' active' : '') + '" onclick="toggleOneAwayFilter()" title="Recipes you could cook if you bought one more thing">🛒 One item away (' + n + ')</button>' : ''; })()
     + '</div>';
 
   // Frame 2: Meal categories (with icons)
@@ -7992,6 +8262,7 @@ function resetFilters() {
   showClipsOnly  = false;
   showRecentOnly = false;
   showNoPhotoOnly = false;
+  showOneAwayOnly = false;
   document.querySelectorAll('.mobile-dropdown-panel input[type=checkbox]').forEach(function(cb){ cb.checked=false; });
   if(typeof updateMobileButtons==='function') updateMobileButtons();
   renderFilters();
@@ -8016,6 +8287,13 @@ function toggleNoPhotoFilter() {
   renderFilters();
   renderGrid();
 }
+function toggleOneAwayFilter() {
+  showOneAwayOnly = !showOneAwayOnly;
+  if (showOneAwayOnly) { showFavOnly = showClipsOnly = showNoPhotoOnly = showRecentOnly = false; }
+  renderFilters(); renderGrid();
+}
+window.toggleOneAwayFilter = toggleOneAwayFilter;
+
 window.toggleNoPhotoFilter = toggleNoPhotoFilter;
 
 function toggleRecentFilter() {
@@ -8426,6 +8704,27 @@ function missingFor(r, pantry) {
 }
 window.getPantry = getPantry; window.setPantry = setPantry;
 window.haveIngredient = haveIngredient; window.missingFor = missingFor;
+
+// ─── "One item away" (5f.5) ─────────────────────────────────────────────────
+// The pantry and the missing-ingredient ranking were already built; this just
+// surfaces the most actionable slice of them — the recipes a single shop item
+// unlocks. Deliberately reuses missingFor rather than reimplementing the
+// matching, which is loose in both directions so staples cover longer names and
+// Hebrew works without a stemmer.
+//
+// A clip has no ingredient list, so it would read as "0 missing" and flood the
+// filter with things you cannot cook. Excluded.
+function missingFromPantry(r) {
+  if (!r || r.isClip) return [];
+  var ings = Array.isArray(r.ingredients) ? r.ingredients : [];
+  if (!ings.length) return [];
+  return missingFor(r, getPantry());
+}
+function oneAwayCount() {
+  if (!getPantry().length) return 0;      // no pantry, no meaningful answer
+  return (recipes || []).filter(function(r){ return missingFromPantry(r).length === 1; }).length;
+}
+window.missingFromPantry = missingFromPantry; window.oneAwayCount = oneAwayCount;
 
 // ─── PANTRY UI (3.2) ──────────────────────────────────────────────────────────
 function openPantry() {
@@ -9006,19 +9305,17 @@ function renderGrid() {
         if (!dietMatch) return false;
       }
     }
+    // Frame 4: one-item-away (5f.5)
+    if (showOneAwayOnly && missingFromPantry(r).length !== 1) return false;
     // Search query
     if (!q) return true;
-    // Defensive: a recipe with a missing field must never break the whole grid.
-    const lc = v => String(v == null ? '' : v).toLowerCase();
-    return lc(r.name).includes(q)
-      || lc(r.category).includes(q)
-      || (Array.isArray(r.ingredients) && r.ingredients.some(i => lc(i && i.n).includes(q)))
-      || (Array.isArray(r.steps) && r.steps.some(s => lc(s).includes(q)));
+    return recipeMatchesQuery(r, q);
   });
   var labelParts = [];
   if (showFavOnly) labelParts.push('Favourites');
   if (showClipsOnly) labelParts.push('Clips');
   if (showNoPhotoOnly) labelParts.push('No photo');
+  if (showOneAwayOnly) labelParts.push('One item away');
   if (activeCategories.size) labelParts.push(Array.from(activeCategories).join(', '));
   if (activeDiets.size) labelParts.push(Array.from(activeDiets).join(', '));
   document.getElementById('sectionLabel').textContent = labelParts.length ? labelParts.join(' · ') : 'All Recipes';
@@ -9960,7 +10257,7 @@ function downloadBlob(blob, filename) {
     if(_localSaveAvailable !== false) {
       fetch('http://127.0.0.1:' + LOCAL_SAVE_PORT, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: workerHeaders(),
         body: JSON.stringify({
         filename: filename,
         data: b64,
@@ -10197,8 +10494,8 @@ async function importFromFile(event){
       }
       b64 = btoa(b64);
       toast('🤖 Extracting text from PDF…');
-      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+      var resp = await fetch(WORKER_ENDPOINT, {
+        method:'POST', headers: workerHeaders(),
         body: JSON.stringify({
           model: AI_MODEL, max_tokens:2000,
           messages:[{role:'user', content:[
@@ -10973,7 +11270,7 @@ async function aiCall(prompt, maxTokens=2000, tools=null) {
 async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
-  const WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
+  const WORKER_URL = WORKER_ENDPOINT;
 
   const MAX_RETRIES = 4;
   let delay = 2000;
@@ -10989,7 +11286,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
 
       const r = await fetch(WORKER_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: workerHeaders(),
         body: JSON.stringify(body)
       });
 
@@ -11623,8 +11920,8 @@ async function runUrlImport() {
       + '</div>';
     // Try Instagram oEmbed via Worker
     try {
-      var igResp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      var igResp = await fetch(WORKER_ENDPOINT, {
+        method: 'POST', headers: workerHeaders(),
         body: JSON.stringify({ action: 'instagram-fetch', shortcode: igId })
       });
       var igData = await igResp.json();
@@ -11667,9 +11964,9 @@ async function runUrlImport() {
   res.innerHTML = spinner('Fetching page via server…');
   let pageText = '';
   try {
-    const fetchResp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
+    const fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: workerHeaders(),
       body: JSON.stringify({ action: 'fetch-url', url: url })
     });
     if (fetchResp.ok) {
@@ -11788,7 +12085,93 @@ function showOriginalPhotoPreview(btn) {
 }
 window.showOriginalPhotoPreview = showOriginalPhotoPreview;
 
+// ─── Duplicate detection on import (5f.2) ───────────────────────────────────
+// Importing the same URL twice silently made two recipes, and with several
+// import routes now (URL, Instagram, YouTube, free-hand, camera, file, share
+// target) that is easy to do by accident. Two signals, in confidence order:
+// an identical source URL is near-certain; a near-identical name is a prompt,
+// not a verdict.
+function normUrl(u) {
+  var s = String(u || '').trim().toLowerCase();
+  if (!s) return '';
+  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+  return s;
+}
+// Fold case, strip punctuation and Hebrew niqqud, collapse spaces. Deliberately
+// NOT a fuzzy distance: "Chicken Soup" and "Chicken Soup 2" should both surface,
+// but "Beef Stew" and "Lamb Stew" must not be conflated.
+function normName(n) {
+  return String(n || '').toLowerCase()
+    .replace(/[\u0591-\u05C7]/g, '')          // Hebrew niqqud
+    // Apostrophes are DELETED, not turned into a space: "Grandma's Lasagna"
+    // must fold to the same key as "grandmas lasagna", and splitting it into
+    // "grandma s lasagna" meant the commonest real duplicate never matched.
+    .replace(/['\u2019\u02BC`\u00B4]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+function findDuplicate(candidate, list) {
+  var srcKey = normUrl(candidate && candidate.source);
+  var nameKey = normName(candidate && candidate.name);
+  var all = list || recipes || [];
+  for (var i = 0; i < all.length; i++) {
+    if (srcKey && normUrl(all[i].source) === srcKey) return { recipe: all[i], why: 'source' };
+  }
+  if (!nameKey) return null;
+  for (var j = 0; j < all.length; j++) {
+    var other = normName(all[j].name);
+    if (!other) continue;
+    if (other === nameKey) return { recipe: all[j], why: 'name' };
+    // One contained in the other catches "Chicken Soup" vs "Chicken Soup (mum's)".
+    if (nameKey.length > 6 && other.length > 6 && (other.indexOf(nameKey) === 0 || nameKey.indexOf(other) === 0))
+      return { recipe: all[j], why: 'name' };
+  }
+  return null;
+}
+window.normUrl = normUrl; window.normName = normName; window.findDuplicate = findDuplicate;
+
+// Returns 'add' | 'replace' | 'cancel'. Asked BEFORE anything is written.
+async function askDuplicateAction(dup, parsed) {
+  var why = dup.why === 'source'
+    ? 'You already have a recipe imported from that exact address:'
+    : 'You already have a recipe with practically the same name:';
+  var ok = await askConfirm({
+    icon: '⧉', title: 'Import this anyway?',
+    message: why + '\n\n  “' + dup.recipe.name + '”\n\n'
+      + 'Keep both, or update the existing one with what was just parsed? '
+      + 'Updating replaces its ingredients, method, prep and servings, and keeps its photo, '
+      + 'favourite and cooking history.',
+    okLabel: 'Update the existing one', cancelLabel: 'Keep both' });
+  return ok ? 'replace' : 'add';
+}
+
 function confirmImportParsed(parsed, overlayId) {
+  var dup = findDuplicate(parsed, recipes);
+  if (dup) { confirmImportChecked(parsed, overlayId, dup); return; }
+  importParsedNow(parsed, overlayId);
+}
+async function confirmImportChecked(parsed, overlayId, dup) {
+  var action = await askDuplicateAction(dup, parsed);
+  if (action === 'replace') {
+    var r = dup.recipe, n = normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
+    if (typeof pushHistory === 'function') { try { pushHistory(r); } catch(e) {} }
+    r.ingredients = n.ingredients.length ? n.ingredients : r.ingredients;
+    r.steps       = n.steps.length ? n.steps : r.steps;
+    if (parsed.prep) r.prep = parsed.prep;
+    if (parsed.servings) r.servings = parsed.servings;
+    if (parsed.source) r.source = parsed.source;
+    if (n.steps.length) r.isClip = false;
+    r.updatedAt = Date.now();
+    closeM(overlayId);
+    activeCat = 'All'; renderFilters(); renderGrid(); saveData();
+    toast('✅ Updated “' + r.name + '” — its photo and history were kept');
+    return;
+  }
+  importParsedNow(parsed, overlayId);
+}
+window.importParsedNow = null; // assigned below
+
+function importParsedNow(parsed, overlayId) {
   // normalizeRecipe coerces AI output into the expected shape (ingredients sometimes
   // come back as plain strings) and sets updatedAt — without it a freshly imported
   // recipe had updatedAt undefined and could lose to an older copy during cloud merge.
@@ -11809,6 +12192,9 @@ function confirmImportParsed(parsed, overlayId) {
   saveData();
   toast('Recipe imported!');
 }
+window.importParsedNow = importParsedNow;
+window.confirmImportParsed = confirmImportParsed;
+window.askDuplicateAction = askDuplicateAction;
 
 const STORAGE_KEY  = 'tonys_recipes_v1';
 const NEXTID_KEY  = 'tonys_nextId_v1';
@@ -12137,8 +12523,9 @@ async function repairMissingPhotos() {
     try {
       var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
       countCloudRead();
-      if (snap.exists && (snap.data() || {}).photo) {
-        r.photo = (snap.data() || {}).photo;
+      var pd = snap.exists ? (snap.data() || {}) : {};
+      if (pd.photo || pd.photoUrl) {
+        r.photo = pd.photo || pd.photoUrl;
         _cloudPhotoStamps[r.id] = r.photo;
         _cloudPhotoIds[r.id] = true;
         restored++;
@@ -12189,6 +12576,72 @@ function stripPhotosForCloud(list) {
 
 // Write each changed photo to its own doc; remove docs for cleared/deleted photos.
 // Returns an array of human-readable descriptions of photos too large to sync.
+// ─── Photos in Firebase Storage (5.2) ───────────────────────────────────────
+// Base64 in Firestore caps a photo at ~1 MiB (it inflates bytes by a third) and
+// every photo is re-read as document data. Storage holds the bytes and Firestore
+// keeps a pointer, so recipe documents stay small.
+//
+// SAFE BY DEFAULT: if Storage is not enabled on the project, or its SDK will not
+// load, `storageReady()` is false and everything behaves exactly as it did
+// before — base64 in `photo_<id>`. Nothing needs to be turned on for the app to
+// keep working, and nothing breaks if it is turned off again later.
+//
+// Invariant this must not break: **a backup is self-contained.** Once a photo is
+// a URL rather than a data URL, `backupSave` has to fetch the bytes back and
+// inline them, or a restore months later would depend on a live Storage bucket.
+var STORAGE_SDK = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js';
+var _storageReady = null;   // null = untried, false = unavailable, true = ready
+async function storageReady() {
+  if (_storageReady !== null) return _storageReady;
+  try {
+    if (!window.firebase || !firebase.apps || !firebase.apps.length) { _storageReady = false; return false; }
+    if (!firebase.storage) await loadScriptOnce(STORAGE_SDK, null);
+    if (!firebase.storage) { _storageReady = false; return false; }
+    firebase.storage();                       // throws if no bucket is configured
+    _storageReady = true;
+  } catch (e) {
+    dlog('[storage] unavailable, staying on base64:', e && e.message);
+    _storageReady = false;
+  }
+  return _storageReady;
+}
+function dataUrlToBlobForUpload(dataUrl) {
+  var m = /^data:([^;,]+)[^,]*,(.*)$/.exec(String(dataUrl || ''));
+  if (!m) return null;
+  try {
+    var bytes = Uint8Array.from(atob(m[2]), function(c){ return c.charCodeAt(0); });
+    return new Blob([bytes], { type: m[1] });
+  } catch (e) { return null; }
+}
+// Shared path, matching the shared collection: every family member reads the
+// same photos, so they are not filed per-user.
+function photoStoragePath(id) { return 'shared/photos/' + id + '.bin'; }
+async function uploadPhotoToStorageBucket(id, dataUrl) {
+  var blob = dataUrlToBlobForUpload(dataUrl);
+  if (!blob) throw new Error('the photo is not a readable data URL');
+  var ref = firebase.storage().ref(photoStoragePath(id));
+  await ref.put(blob, { cacheControl: 'public,max-age=31536000' });
+  return await ref.getDownloadURL();
+}
+async function deletePhotoFromStorageBucket(id) {
+  try { await firebase.storage().ref(photoStoragePath(id)).delete(); } catch (e) {}
+}
+// Turn an http(s) photo back into a data URL. Used by backup so the file stays
+// self-contained, and as the fallback if a bucket ever goes away.
+async function inlineRemotePhoto(url) {
+  var r = await fetch(url, { mode: 'cors' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  var blob = await r.blob();
+  return await new Promise(function(res, rej) {
+    var fr = new FileReader();
+    fr.onload = function(){ res(fr.result); };
+    fr.onerror = function(){ rej(new Error('could not read the downloaded photo')); };
+    fr.readAsDataURL(blob);
+  });
+}
+window.storageReady = storageReady; window.photoStoragePath = photoStoragePath;
+window.inlineRemotePhoto = inlineRemotePhoto; window.dataUrlToBlobForUpload = dataUrlToBlobForUpload;
+
 async function syncCloudPhotos() {
   var errors = [];
   var currentIds = {};
@@ -12197,14 +12650,33 @@ async function syncCloudPhotos() {
     currentIds[r.id] = true;
     if (r.photo) {
       if (_cloudPhotoStamps[r.id] === r.photo) continue; // unchanged — already synced
+      // A photo already stored as a URL needs no upload — only the pointer.
+      var isRemote = !/^data:/i.test(r.photo);
+      var useStorage = !isRemote && await storageReady();
+      if (useStorage) {
+        try {
+          var url = await uploadPhotoToStorageBucket(r.id, r.photo);
+          await _fbDb.collection('shared').doc('photo_' + r.id)
+            .set({ photoUrl: url, storage: true, updatedAt: r.updatedAt || Date.now() });
+          _cloudPhotoStamps[r.id] = r.photo;
+          _cloudPhotoIds[r.id] = true;
+          continue;
+        } catch(e) {
+          // Storage failed for this one photo. Fall through to base64 rather
+          // than losing it — a bucket problem must not cost a photo.
+          dlog('[storage] upload failed for ' + r.id + ', falling back to base64:', e && e.message);
+        }
+      }
       var pbytes = byteLen(r.photo);
       if (pbytes > FIRESTORE_DOC_LIMIT) {
-        errors.push((r.name || ('#' + r.id)) + ' — ' + Math.round(pbytes / 1024) + ' KB');
+        errors.push((r.name || ('#' + r.id)) + ' — ' + Math.round(pbytes / 1024) + ' KB'
+          + (await storageReady() ? '' : ' (enable Firebase Storage to lift this limit)'));
         continue;
       }
       try {
         await _fbDb.collection('shared').doc('photo_' + r.id)
-          .set({ photo: r.photo, updatedAt: r.updatedAt || Date.now() });
+          .set(isRemote ? { photoUrl: r.photo, storage: true, updatedAt: r.updatedAt || Date.now() }
+                        : { photo: r.photo, updatedAt: r.updatedAt || Date.now() });
         _cloudPhotoStamps[r.id] = r.photo;
         _cloudPhotoIds[r.id] = true;
       } catch(e) {
@@ -12219,6 +12691,7 @@ async function syncCloudPhotos() {
       // cleaned it up. Keep the record and report, as flushCloudDeletes does.
       try {
         await _fbDb.collection('shared').doc('photo_' + r.id).delete();
+        if (await storageReady()) await deletePhotoFromStorageBucket(r.id);
         delete _cloudPhotoIds[r.id];
         delete _cloudPhotoStamps[r.id];
       } catch(e) { _photoDeleteRefused[r.id] = true; }
@@ -12261,7 +12734,10 @@ async function attachCloudPhotos(list) {
         countCloudRead();
         if (snap.exists) {
           var d = snap.data() || {};
-          r.photo = d.photo || '';
+          // Two shapes: legacy base64 in `photo`, or a Storage pointer in
+          // `photoUrl`. Both must be understood forever — a device that never
+          // gets Storage enabled keeps writing the first kind.
+          r.photo = d.photo || d.photoUrl || '';
           _cloudPhotoStamps[r.id] = r.photo;
           _cloudPhotoIds[r.id] = true;
           settled = !!r.photo;
@@ -13561,8 +14037,8 @@ async function processCameraImage(event) {
       var base64 = compressed.split(',')[1];
       var sizeKB = Math.round(base64.length * 0.75 / 1024);
       res.innerHTML = spinner('Step 1: Reading text (2500px, ' + sizeKB + 'KB)...');
-      const step1 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const step1 = await fetch(WORKER_ENDPOINT, {
+        method: 'POST', headers: workerHeaders(),
         body: JSON.stringify({ model: AI_MODEL, max_tokens: 1500,
           messages: [{ role: 'user', content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
@@ -13577,8 +14053,8 @@ async function processCameraImage(event) {
         + '<strong style="font-size:12px;color:var(--muted);">What Claude read:</strong>'
         + '<div style="font-size:13px;margin-top:6px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">' + escH(transcription) + '</div></div>'
         + spinner('Step 2: Extracting recipe...');
-      const step2 = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const step2 = await fetch(WORKER_ENDPOINT, {
+        method: 'POST', headers: workerHeaders(),
         body: JSON.stringify({ model: AI_MODEL, max_tokens: 2000,
           messages: [{ role: 'user', content: 'Extract recipe from this text. Keep original language. Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. If no recipe return {"error":"no recipe"}. Text:\n\n' + transcription }]
         })
@@ -13848,8 +14324,8 @@ async function doPhotoSearch() {
     var label  = PHOTO_SOURCE_LABELS[source] || source;
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching ' + label + '…</div>';
     try {
-      var resp = await fetch('https://lively-bread-273a.rozinante2004.workers.dev', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      var resp = await fetch(WORKER_ENDPOINT, {
+        method: 'POST', headers: workerHeaders(),
         body: JSON.stringify({ action: 'photo-search', query: _photoQuery, source: source, page: _photoPage })
       });
       var data = await resp.json();
@@ -14165,7 +14641,7 @@ function showHelpDetail(topic, context) {
 
 // ─── BRING! TOKEN & REFRESH ───────────────────────────────────────────────────
 var BRING_TOKEN_STORAGE_KEY='bring_token_expiry';
-var BRING_WORKER_URL='https://lively-bread-273a.rozinante2004.workers.dev';
+var BRING_WORKER_URL=WORKER_ENDPOINT;
 var BRING_TOKEN_SECRET='tonys-recipes-2024';
 // (_bringPopup / _bringTokenCheckInterval are declared with the other state vars above.)
 
@@ -14190,7 +14666,7 @@ async function checkBringTokenStatus(probe){
   renderBringTokenStatus();
   try {
     var resp = await fetch(BRING_WORKER_URL,{
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers: workerHeaders(),
       body: JSON.stringify({action:'bring-token-status', probe: !!probe})
     });
     var data = await resp.json();
@@ -14220,7 +14696,7 @@ async function updateBringToken(token) {
     var parts=token.split('.'); if(parts.length!==3) throw new Error('Invalid token');
     var payload=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
     setBringTokenExpiry(payload.exp);
-    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'bring-settoken',token:token,secret:BRING_TOKEN_SECRET})});
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-settoken',token:token,secret:BRING_TOKEN_SECRET})});
     var data=await resp.json();
     if(data.success){ toast('Bring! token updated! Valid for 7 days.'); renderBringTokenStatus(); return true; }
   } catch(e){ console.warn('Bring token update failed:',e); }
@@ -14247,7 +14723,7 @@ function openBringAutoRefresh() {
 }
 
 function showBringBookmarklet() {
-  var code='javascript:(function(){var t=localStorage.getItem("accessToken");if(!t){alert("Not logged into Bring!");return;}fetch("'+BRING_WORKER_URL+'",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"bring-settoken",token:t,secret:"'+BRING_TOKEN_SECRET+'"})}).then(function(r){return r.json();}).then(function(d){alert(d.success?"Bring! token updated!":"Failed: "+d.message);}).catch(function(e){alert("Error: "+e.message);});})();';
+  var code='javascript:(function(){var t=localStorage.getItem("accessToken");if(!t){alert("Not logged into Bring!");return;}fetch("'+BRING_WORKER_URL+'",{method:"POST",headers: workerHeaders(),body:JSON.stringify({action:"bring-settoken",token:t,secret:"'+BRING_TOKEN_SECRET+'"})}).then(function(r){return r.json();}).then(function(d){alert(d.success?"Bring! token updated!":"Failed: "+d.message);}).catch(function(e){alert("Error: "+e.message);});})();';
   document.getElementById('bringBookmarkletCode').textContent=code;
   document.getElementById('bringBookmarkletOverlay').classList.add('open');
 }
@@ -14328,7 +14804,7 @@ function openBringForTokenRefresh() {
     _bringTokenPollAttempts++;
     if(_bringTokenPollAttempts>40){ clearInterval(_bringTokenPollInterval); document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:#c62828;">Timed out. Try again.</span>'; return; }
     try {
-      var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'bring-lists'})});
+      var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-lists'})});
       var data=await resp.json();
       if(data.ok||(data.lists&&data.lists.length>0)){
         clearInterval(_bringTokenPollInterval);
@@ -14349,7 +14825,7 @@ function showBringTokenExpired(items) {
 
 async function sendItemsToBring(items) {
   try {
-    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'bring-add',items:items})});
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-add',items:items})});
     var data=await resp.json();
     if(data.tokenExpired){ showBringTokenExpired(items); return; }
     if(data.success){
@@ -15360,11 +15836,48 @@ window.getLastBackupAt = getLastBackupAt;
 window.backupIsOverdue = backupIsOverdue;
 window.backupAgeDays   = backupAgeDays;
 
-function backupSave() {
+// A backup must stay SELF-CONTAINED. Once photos live in Firebase Storage,
+// `r.photo` is an https URL, and a backup holding URLs would silently depend on
+// a live bucket — restore it in two years, or after the project is deleted, and
+// every photo is gone. So fetch the bytes back and inline them at backup time.
+// Failures are reported, never silently dropped: a backup that quietly lost
+// photos would be worse than no backup, because it would be trusted.
+async function inlinePhotosForBackup() {
+  var failed = [];
+  var list = recipes.map(function(r){ return r; });
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    for (var f = 0; f < 2; f++) {
+      var field = f === 0 ? 'photo' : 'originalPhoto';
+      var v = r[field];
+      if (!v || /^data:/i.test(v)) continue;
+      try { r['_backup_' + field] = await inlineRemotePhoto(v); }
+      catch (e) { failed.push((r.name || ('#' + r.id)) + ' — ' + (e && e.message ? e.message : 'could not be downloaded')); }
+    }
+  }
+  return failed;
+}
+function clearBackupInlines() {
+  recipes.forEach(function(r){ delete r._backup_photo; delete r._backup_originalPhoto; });
+}
+
+async function backupSave() {
+  var failed = [];
+  try {
+    // Only worth a round trip if something is actually remote.
+    if (recipes.some(function(r){ return (r.photo && !/^data:/i.test(r.photo)) || (r.originalPhoto && !/^data:/i.test(r.originalPhoto)); })) {
+      toast('Fetching photos so the backup is self-contained…');
+      failed = await inlinePhotosForBackup();
+    }
+  } catch (e) { failed.push('photo download failed: ' + e.message); }
   try {
     var photoMap={}; var photoIndex=0;
     var exportRecipes=recipes.map(function(r){
       var rec=JSON.parse(JSON.stringify(r));
+      // Prefer the inlined bytes over the URL, and never ship the temp field.
+      if(rec._backup_photo){ rec.photo=rec._backup_photo; }
+      if(rec._backup_originalPhoto){ rec.originalPhoto=rec._backup_originalPhoto; }
+      delete rec._backup_photo; delete rec._backup_originalPhoto;
       if(rec.photo&&rec.photo.startsWith('data:')){ if(photoMap[rec.photo]!==undefined){rec.photo='__photo__'+photoMap[rec.photo];}else{var k=photoIndex++;photoMap[rec.photo]=k;rec.photo='__photo__'+k;} }
       if(rec.originalPhoto&&rec.originalPhoto.startsWith('data:')){ if(photoMap[rec.originalPhoto]!==undefined){rec.originalPhoto='__photo__'+photoMap[rec.originalPhoto];}else{var k2=photoIndex++;photoMap[rec.originalPhoto]=k2;rec.originalPhoto='__photo__'+k2;} }
       return rec;
@@ -15379,8 +15892,15 @@ function backupSave() {
     a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     toast('\u2705 Backup saved! '+recipes.length+' recipes, '+(Object.keys(photos).length)+' photos');
+    // Say so plainly. A backup missing photos it could not download is still
+    // worth having, but only if you know which ones are missing.
+    if(failed.length) showServiceError('The backup was saved, but ' + failed.length + ' photo(s) could not be '
+      + 'downloaded and are NOT in the file:\n\n' + failed.join('\n')
+      + '\n\nThose recipes will restore without their photos. The cloud copies are untouched.');
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
+  finally { clearBackupInlines(); }
 }
+window.inlinePhotosForBackup = inlinePhotosForBackup;
 
 async function backupRestore() {
   if(!await askConfirm({ icon:'📂', title:'Restore from backup?',

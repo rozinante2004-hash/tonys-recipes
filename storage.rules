@@ -1,0 +1,47 @@
+rules_version = '2';
+// ─────────────────────────────────────────────────────────────────────────────
+// Tony's Recipes — Firebase STORAGE security rules (5.2)
+//
+// Only needed if you enable Firebase Storage for recipe photos. Until you do,
+// the app keeps photos as base64 in Firestore exactly as before — `storageReady()`
+// returns false and nothing here matters.
+//
+// Apply: Firebase console → Storage → Rules → paste → Publish.
+// By hand on purpose, same as firestore.rules: a bad rules push locks every
+// device out at once, and that is not something to automate.
+//
+// ⚠️ These rules are written to mirror firestore.rules deliberately:
+//    read   — any signed-in account (the collection is shared with the family)
+//    write  — any signed-in account (create + update)
+//    delete — signed-in as well, because a photo whose recipe is gone must be
+//             removable by whoever removed the recipe. Firestore is stricter
+//             (admin-only delete) because a deleted RECIPE is data loss; an
+//             orphaned photo blob is only waste.
+//
+// If you want photo deletion restricted to the same admins as Firestore,
+// replace the delete condition with an explicit email list, the way
+// firestore.rules does. The app reports a refused deletion rather than
+// pretending — see `_photoDeleteRefused` and the Sync Health panel.
+// ─────────────────────────────────────────────────────────────────────────────
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Recipe photos, shared across the family, one object per recipe.
+    match /shared/photos/{photoId} {
+      allow read:   if request.auth != null;
+      allow write:  if request.auth != null
+                    // 12 MB ceiling: far above any photo the app produces
+                    // (it compresses before upload), far below anything that
+                    // could run up a bill by accident.
+                    && request.resource.size < 12 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Nothing else. An unmatched path is denied by default, but saying so
+    // explicitly keeps the intent obvious to whoever reads this next.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

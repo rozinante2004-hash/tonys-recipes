@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v33
+// Tony's Recipes — Cloudflare Worker v34
+// v34: access control — origin allowlist, X-App-Key, KV rate limiting, and the
+//      hard-coded bring-settoken fallback secret removed. Adds an open `health`
+//      action so the app can tell "down" from "refusing me".
 // v33: photo-search reports a 429 as a rate limit instead of "invalid JSON".
 // v32: instagram-fetch rebuilt on Meta's tokenless oEmbed (public again since
 //      15 Jun 2026). Mines the embed blockquote for a caption fragment and
@@ -44,10 +47,77 @@ function bringConfigError(missing) {
   }, 503);
 }
 
-function jsonResp(data, status = 200) {
+// ─── Access control (v34) ───────────────────────────────────────────────────
+// This Worker forwards to the Anthropic API on Tony's key, and its URL ships in
+// index.html, which is a public repo. With `Access-Control-Allow-Origin: *`, no
+// auth and no rate limit, anyone who found the URL could spend his credits.
+//
+// Three controls, because no single one is sufficient:
+//   1. ORIGIN ALLOWLIST — stops any other website's JS from using it. Does not
+//      stop curl, which simply omits Origin.
+//   2. SHARED APP KEY — stops trivial scripted abuse. Honest limitation: the key
+//      ships in the client, so anyone reading the page source can copy it. It
+//      raises the bar; it is not a secret.
+//   3. RATE LIMIT — the one that actually bounds the damage, and the only one
+//      that works against someone who has read the source.
+const DEFAULT_ORIGINS = [
+  'https://rozinante2004-hash.github.io',
+  'http://localhost:8137',
+  'http://127.0.0.1:8137',
+];
+function allowedOrigins(env) {
+  const extra = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+  return DEFAULT_ORIGINS.concat(extra);
+}
+function originAllowed(request, env) {
+  const origin = request.headers.get('Origin') || '';
+  if (!origin) return null;                      // no Origin (curl, server-side) — see appKeyOk
+  return allowedOrigins(env).includes(origin) ? origin : false;
+}
+function corsFor(request, env) {
+  const o = originAllowed(request, env);
+  return {
+    'Content-Type': 'application/json',
+    // Never echo an origin we did not allow, and never fall back to '*'.
+    'Access-Control-Allow-Origin': (typeof o === 'string' && o) ? o : 'null',
+    'Vary': 'Origin',
+  };
+}
+function appKeyOk(request, env) {
+  const expected = env.APP_SHARED_KEY || '';
+  if (!expected) return true;                    // not configured — fail open, and say so in health
+  return request.headers.get('X-App-Key') === expected;
+}
+
+// KV-backed sliding window, keyed on the caller's IP. KV is eventually
+// consistent, so this is approximate — which is fine: the job is to bound a
+// runaway, not to meter precisely. Fails OPEN if no KV is bound, because
+// breaking the family's app to punish a hypothetical abuser is the wrong trade.
+async function rateLimited(request, env, action) {
+  const kv = env.BRING_KV;
+  if (!kv) return null;
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  // The AI path (no action) is the expensive one; browsing photos is cheap.
+  const costly = !action || action === 'ai' || action === 'instagram-fetch';
+  const limit = parseInt(env.RATE_LIMIT || '', 10) || (costly ? 40 : 150);
+  const windowSec = 60;
+  const bucket = Math.floor(Date.now() / 1000 / windowSec);
+  const key = 'rl:' + ip + ':' + bucket + (costly ? ':ai' : ':x');
+  let used = 0;
+  try { used = parseInt(await kv.get(key) || '0', 10) || 0; } catch (e) { return null; }
+  if (used >= limit) {
+    return jsonResp({ error: 'RATE_LIMIT: too many requests in the last minute (' + used + '/' + limit
+      + '). Wait a minute and try again.', rateLimited: true, retryAfter: windowSec }, 429);
+  }
+  try { await kv.put(key, String(used + 1), { expirationTtl: windowSec * 2 }); } catch (e) {}
+  return null;
+}
+
+function jsonResp(data, status = 200, cors) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    headers: Object.assign({ 'Content-Type': 'application/json',
+                             'Access-Control-Allow-Origin': 'null', 'Vary': 'Origin' }, cors || {})
   });
 }
 
@@ -92,16 +162,18 @@ function decodeJwtExp(token) {
 
 export default {
   async fetch(request, env) {
-    const corsHeaders = {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    };
+    const corsHeaders = corsFor(request, env);
+    const origin = originAllowed(request, env);
 
     if (request.method === 'OPTIONS') {
+      // A disallowed origin gets no CORS grant, so the browser refuses the real
+      // request before it is ever sent.
+      if (origin === false) return new Response(null, { status: 403 });
       return new Response(null, { headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': (typeof origin === 'string' && origin) ? origin : 'null',
+        'Vary': 'Origin',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, X-App-Key',
         'Access-Control-Max-Age': '86400',
       }});
     }
@@ -131,14 +203,63 @@ export default {
           return new Response('Error: ' + e.message, { status: 500 });
         }
       }
-      return new Response('OK', { status: 200, headers: {'Access-Control-Allow-Origin': '*'} });
+      return new Response('OK', { status: 200, headers: {
+        'Access-Control-Allow-Origin': (typeof origin === 'string' && origin) ? origin : 'null',
+        'Vary': 'Origin',
+      }});
     }
 
-    if (request.method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405);
+    if (request.method !== 'POST') return jsonResp({ error: 'Method not allowed' }, 405, corsHeaders);
+
+    // A browser request from somewhere that is not our app is refused outright.
+    if (origin === false) {
+      return jsonResp({ error: 'FORBIDDEN: this Worker only serves Tony\'s Recipes.' }, 403, corsHeaders);
+    }
 
     let body;
     try { body = JSON.parse(await request.text()); }
-    catch(e) { return jsonResp({ error: 'Invalid JSON' }, 400); }
+    catch(e) { return jsonResp({ error: 'Invalid JSON' }, 400, corsHeaders); }
+
+    // health is deliberately open: the app pings it to tell "Worker down" apart
+    // from "Worker refusing me", and it reveals nothing and costs nothing.
+    if (body.action !== 'health') {
+      // bring-settoken comes from a bookmarklet running on web.getbring.com, so
+      // it cannot satisfy the origin or app-key checks. Its own secret is what
+      // authenticates it — see below, where the insecure default was removed.
+      if (body.action !== 'bring-settoken') {
+        if (!appKeyOk(request, env)) {
+          return jsonResp({ error: 'FORBIDDEN: missing or wrong app key.' }, 403, corsHeaders);
+        }
+      }
+      const limited = await rateLimited(request, env, body.action);
+      if (limited) return limited;
+    }
+
+    // ── health ───────────────────────────────────────────────────────────────
+    // Open on purpose, and it returns no secrets — only whether each control is
+    // switched on. Without it, "the Worker is down" and "the Worker is refusing
+    // me" look identical from the app, which is the kind of dead end this
+    // project treats as a bug.
+    if (body.action === 'health') {
+      return jsonResp({
+        ok: true,
+        version: 'v34',
+        originAllowed: origin !== false,
+        appKeyRequired: !!env.APP_SHARED_KEY,
+        appKeyAccepted: appKeyOk(request, env),
+        rateLimiting: !!env.BRING_KV,
+        configured: {
+          anthropic: !!env.ANTHROPIC_API_KEY,
+          openverse: true,
+          pixabay: !!env.PIXABAY_API_KEY,
+          pexels: !!env.PEXELS_API_KEY,
+          unsplash: !!env.UNSPLASH_ACCESS_KEY,
+          youtube: !!env.YOUTUBE_API_KEY,
+          bringToken: !!(env.BRING_KV || env.BRING_TOKEN),
+          bringSetToken: !!env.BRING_SETTOKEN_SECRET
+        }
+      }, 200, corsHeaders);
+    }
 
     // ── instagram-fetch ──────────────────────────────────────────────────────
     if (body.action === 'instagram-fetch') {
@@ -375,7 +496,13 @@ export default {
       const { token, secret } = body;
       // Override with a BRING_SETTOKEN_SECRET env var if you want a different one
       // (the default matches the bookmarklet the app generates today).
-      if (secret !== (env.BRING_SETTOKEN_SECRET || 'tonys-recipes-2024')) return jsonResp({ error: 'Unauthorized' }, 403);
+      // The old fallback secret was committed in a PUBLIC repo, so if the env
+      // var was unset anyone could overwrite the shared Bring! token. No default:
+      // unset now means the endpoint is closed, which is the safe direction.
+      if (!env.BRING_SETTOKEN_SECRET) {
+        return jsonResp({ error: 'BRING_SETTOKEN_SECRET is not set on the Worker, so this endpoint is closed. Set it in Cloudflare → Settings → Variables & Secrets.' }, 503, corsHeaders);
+      }
+      if (secret !== env.BRING_SETTOKEN_SECRET) return jsonResp({ error: 'Unauthorized' }, 403, corsHeaders);
       if (!token || token.split('.').length !== 3) return jsonResp({ error: 'Invalid token' }, 400);
       if (env.BRING_KV) {
         try {

@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.0: 161 checks, 155 passing.** The 6 failures are `net_*` and
+**As of v31.1: 167 checks, 161 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -96,7 +96,7 @@ found only because a test was written first and disagreed with the code.
 | **Ticks are session-only.** | Explicitly requested. In memory only, wiped when the recipe closes. Never persist them. |
 | **Bring! status comes from the Worker.** | The token lives in KV and is shared; the per-device `bring_token_expiry` is a cache. It may say "unknown" but must **never** assert "expired". |
 | **Metric leaves tsp/tbsp/cup alone.** | Only lb/oz/fl oz are converted. They are standard kitchen measures in metric kitchens too. |
-| **Full photos stay base64.** | Export, backup, cloud sync, email and print all consume data URLs. Only thumbnails are Blobs. |
+| **Full photos stay base64 LOCALLY.** | Export, email and print consume data URLs; only thumbnails are Blobs. Since v31.1 the CLOUD copy may be a Firebase Storage URL (`photo_<id>.photoUrl`) instead of base64 — but a **backup must stay self-contained**, so `backupSave` fetches remote photos back and inlines them. Both document shapes must be readable forever. |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 
@@ -157,6 +157,19 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **The Worker is not free to call.** It forwards to Anthropic on Tony's key and
+  its URL ships in a public file. v34 requires an allowed Origin **and** an
+  `X-App-Key`, and rate-limits per IP in KV. The key ships in `index.html`, so it
+  is not a secret — it stops drive-by abuse; the **rate limit** is what bounds the
+  damage. Every call must go through `workerHeaders()`; a call site that inlines
+  the URL sends no key and gets a 403. `bring-settoken` is exempt from origin and
+  key checks because it runs from a bookmarklet on web.getbring.com — its own
+  secret authenticates it, and that secret now has **no default** (the old
+  fallback was committed in a public repo).
+- **The CSP must stay in step with the script hosts.** `script-src` lists the CDN
+  hosts `loadScriptOnce()` uses; adding a lazily loaded library without adding its
+  host makes it fail silently. `frame-src` needs `'self'` for the email preview's
+  `srcdoc` iframe. `'unsafe-inline'` cannot be removed without a build step.
 - **`rHtml` output is rendered in an iframe on this origin.** The audit found
   `r.name` going unescaped into `alt="..."`, plus `photo`, `bg`, `emoji`, diet
   tags, `source` (into an `href`) and the meta row. A recipe is NOT trusted
