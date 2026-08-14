@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.3: 168 checks, 162 passing.** The 6 failures are `net_*` and
+**As of v31.4: 169 checks, 163 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -166,6 +166,12 @@ found only because a test was written first and disagreed with the code.
   key checks because it runs from a bookmarklet on web.getbring.com — its own
   secret authenticates it, and that secret now has **no default** (the old
   fallback was committed in a public repo).
+- **The CSP must stay in step with the CONNECT hosts too.** v31.1 pinned
+  `connect-src` without the three CORS proxies that URL import falls back to, so
+  our own policy killed the fallback — and the failure message blamed the recipe
+  site, sending Tony to debug something that was working. A test now extracts the
+  proxy hosts from `runUrlImport` itself and fails if any is missing from the CSP,
+  so adding a fourth proxy cannot repeat it.
 - **The CSP must stay in step with the script hosts.** `script-src` lists the CDN
   hosts `loadScriptOnce()` uses; adding a lazily loaded library without adding its
   host makes it fail silently. `frame-src` needs `'self'` for the email preview's

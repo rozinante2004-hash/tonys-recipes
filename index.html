@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.3 -->
+<!-- Tony's Recipes Collection v31.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,8 +25,14 @@
        connect-src pinned      exfiltration to an attacker's host is blocked
        script-src pinned       no code from a host we did not choose
      Keep in step with the <script src> tags and loadScriptOnce() hosts, or a
-     lazily loaded library silently stops working. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+     lazily loaded library silently stops working.
+
+     connect-src also lists three CORS-proxy hosts. They are the FALLBACK for
+     URL import when the Worker cannot fetch a page. Omitting them (v31.1)
+     killed URL import for any site the Worker could not reach, and the error
+     blamed the recipe site. Do not drop them without also removing step 2 of
+     runUrlImport. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -2496,6 +2502,44 @@ const SELF_TESTS = [
       if(!/minute/i.test(workerErrorText(429,{}))) throw new Error('a 429 does not say to wait');
     } },
 
+  { id:'sec_csp_allows_import_fallbacks', group:'Network', name:'The CSP does not break URL import (v31.4)',
+    test: async()=>{
+      // v31.1 shipped a CSP whose connect-src omitted the CORS proxies that URL
+      // import falls back to. Every fallback was blocked by our own policy, and
+      // the failure message blamed the recipe site — Tony went looking at a site
+      // that was working perfectly. Reported by him.
+      var c=(document.querySelector('meta[http-equiv="Content-Security-Policy"]')||{getAttribute:function(){return '';}}).getAttribute('content')||'';
+      var src=String(runUrlImport);
+      // Pull the proxy hosts out of the code itself, so adding a fourth proxy
+      // without adding it to the CSP fails here rather than in Tony's hands.
+      var hosts=(src.match(/https:\/\/[a-z0-9.-]+(?=\/[^`'"]*\$\{|\/)/gi)||[])
+        .filter(function(h){ return h.indexOf('workers.dev')===-1; })
+        .filter(function(h,i,a){ return a.indexOf(h)===i; });
+      hosts.forEach(function(h){
+        if(c.indexOf(h)===-1) throw new Error(h+' is used by URL import but is not in connect-src, so our own CSP blocks it');
+      });
+      if(c.indexOf('api.allorigins.win')===-1) throw new Error('the CORS proxy fallbacks are not allowed by the CSP');
+      // ...and the failure message must not blame the site for our own faults.
+      if(/The site blocks automated access\. Please/.test(src))
+        throw new Error('the failure message still asserts the SITE blocked us, whatever actually happened');
+      if(src.indexOf('attempts')===-1)
+        throw new Error('nothing records why each attempt failed, so the message cannot be truthful');
+      // Assert on the OUTPUT: a grep for this wording passes while the branch
+      // that selects it is disabled, which is how the first version of this
+      // test survived exactly that mutation.
+      if(typeof importFailureHtml!=='function') throw new Error('importFailureHtml not defined');
+      var ours=importFailureHtml('https://example.com/r',['server: The Worker refused this origin. Add this site to ALLOWED_ORIGINS on the Worker.']);
+      if(ours.indexOf('at our end')===-1)
+        throw new Error('a Worker refusal is still presented as the recipe site blocking us');
+      var theirs=importFailureHtml('https://example.com/r',['the server fetched the page but found no readable text in it']);
+      if(theirs.indexOf('at our end')!==-1)
+        throw new Error('a genuine site problem is blamed on us');
+      if(theirs.indexOf('no readable text')===-1) throw new Error('the reasons are not shown to the user');
+      // A hostile URL must not break out of the href.
+      var evil=importFailureHtml('javascript:alert(1)',[]);
+      if(evil.indexOf('href="javascript:')!==-1) throw new Error('a javascript: URL reached the href');
+    } },
+
   { id:'sec_csp_present', group:'CSS', name:'A Content-Security-Policy is set and pinned (v31.1)',
     test: async()=>{
       var m=document.querySelector('meta[http-equiv="Content-Security-Policy"]');
@@ -4827,7 +4871,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.3';
+var APP_VERSION = 'v31.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7192,7 +7236,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7763,7 +7807,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11973,6 +12017,36 @@ function extractInstagramId(url) {
   return m ? m[1] : null;
 }
 
+// Split out so it can be tested by what it PRODUCES. Only claim the SITE blocked
+// us if an attempt actually said so — our Worker refusing the call, a proxy
+// blocked by our own CSP or a network failure are all our end, and saying
+// otherwise sends the user to debug a site that is working perfectly. That is
+// exactly what v31.1 did to Tony.
+function importFailureCausedByUs(attempts) {
+  return (attempts || []).some(function(a){ return /^server: (The Worker|The app key|Too many)/.test(a); });
+}
+function importFailureHtml(url, attempts) {
+  var ourEnd = importFailureCausedByUs(attempts);
+  var headline = ourEnd ? 'Could not fetch this page — the problem is at our end.'
+                        : 'Could not fetch this page.';
+  var why = ourEnd
+    ? 'The recipe site is probably fine. What actually happened:'
+    : 'Nothing readable came back. This is usually a site that blocks automated access, but here is what each attempt reported:';
+  return '<div class="explore-result" style="color:#B03030;">'
+    + '<strong>&#10060; ' + escH(headline) + '</strong><br><br>'
+    + escH(why) + '<br>'
+    + '<ul style="margin:8px 0 0;padding-inline-start:20px;font-size:12px;">'
+    + ((attempts && attempts.length) ? attempts.map(function(a){ return '<li>' + escH(a) + '</li>'; }).join('')
+                                     : '<li>no attempt reported a reason</li>')
+    + '</ul><br>'
+    + 'Meanwhile, this always works:<br>'
+    + '1. Open <a href="' + escA(safeUrl(url)) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta)">' + escH(url) + '</a><br>'
+    + '2. Select all &amp; copy the text (Ctrl+A, Ctrl+C)<br>'
+    + '3. Use <strong>Import &rarr; &#9997;&#65039; Paste free-hand text</strong>'
+    + '</div>';
+}
+window.importFailureHtml = importFailureHtml; window.importFailureCausedByUs = importFailureCausedByUs;
+
 async function runUrlImport() {
   const url = document.getElementById('urlImportInput').value.trim();
   if (!url) { toast('Please enter a URL'); return; }
@@ -12041,6 +12115,11 @@ async function runUrlImport() {
   // ── Step 1: Fetch the page via Worker (server-side, no CORS issues) ────────
   res.innerHTML = spinner('Fetching page via server…');
   let pageText = '';
+  // Why each attempt failed, so the message at the end can be true. Blaming the
+  // recipe site for our own Worker refusing us, or for our own CSP blocking the
+  // fallback, is exactly the kind of confident-and-wrong error this app treats
+  // as a bug — and it sent Tony hunting a site that was working fine.
+  var attempts = [];
   try {
     const fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
@@ -12050,9 +12129,13 @@ async function runUrlImport() {
     if (fetchResp.ok) {
       const fetchData = await fetchResp.json();
       pageText = fetchData.text || '';
+      if (!pageText) attempts.push('the server fetched the page but found no readable text in it');
+    } else {
+      var wd = null; try { wd = await fetchResp.json(); } catch(e2) {}
+      attempts.push('server: ' + workerErrorText(fetchResp.status, wd));
     }
   } catch(e) {
-    console.warn('Worker fetch failed:', e.message);
+    attempts.push('server: could not be reached (' + (e && e.message ? e.message : 'network error') + ')');
   }
 
   // ── Step 2: Fall back to browser CORS proxies if Worker fetch failed ───────
@@ -12081,19 +12164,18 @@ async function runUrlImport() {
         tmp.querySelectorAll('script,style,nav,footer,header,aside,iframe,noscript').forEach(el => el.remove());
         pageText = (tmp.innerText || tmp.textContent || '').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim().slice(0,8000);
         if (pageText.length > 100) break;
-      } catch(e) { /* try next */ }
+      } catch(e) {
+        // A CSP violation surfaces here as a TypeError with no useful text, so
+        // name the possibility rather than swallowing it.
+        attempts.push('proxy ' + (new URL(makeProxy('http://x')).host) + ': '
+          + (e && e.name === 'TypeError' ? 'blocked or unreachable' : (e && e.message ? e.message : 'failed')));
+      }
     }
   }
 
   // ── Step 3: Extract recipe from page text via Claude ──────────────────────
   if (!pageText || pageText.length < 100) {
-    res.innerHTML = `<div class="explore-result" style="color:#B03030;">
-      <strong>&#10060; Could not fetch this page.</strong><br><br>
-      The site blocks automated access. Please:<br><br>
-      1. Open <a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta)">${escH(url)}</a><br>
-      2. Select all &amp; copy the text (Ctrl+A, Ctrl+C)<br>
-      3. Use <strong>Import &rarr; &#9997;&#65039; Paste free-hand text</strong>
-    </div>`;
+    res.innerHTML = importFailureHtml(url, attempts);
     return;
   }
 
