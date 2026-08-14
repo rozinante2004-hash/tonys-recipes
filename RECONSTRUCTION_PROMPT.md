@@ -180,7 +180,9 @@ the **Anthropic Messages API** (this is the AI path).
    `/bringlists/{uuid}` as form‑encoded `purchase`/`specification`. On any `401` return
    `{success:false, tokenExpired:true}` (status 401). Else `{success, results, listUuid}`.
 3. **`bring-lists`** — GET `/bringlists/{BRING_USER_UUID}`; return `{status, ok, lists:[{name,uuid}]}`.
-4. **`bring-settoken`** `{token, secret}` — require `secret === 'tonys-recipes-2024'`, validate
+4. **`bring-settoken`** `{token, secret}` — require `secret === env.BRING_SETTOKEN_SECRET` with
+   **NO fallback default** (the old hard-coded one was committed in a public repo, so it was no
+   secret at all; unset must mean the endpoint is CLOSED). Validate
    the JWT has 3 segments, store in `BRING_KV` under `accessToken`.
 5. **`photo-search`** `{query, source?, page?}` — multi‑source (`source` = `pixabay` |
    `pexels` | `unsplash`, default `pixabay`; 9 per page). Pixabay
@@ -699,7 +701,10 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
     there. The relay cannot read Bring!'s localStorage (different origin), so it presents the
     bookmarklet and a copyable one-line console snippet instead of polling pointlessly.
   - **Bookmarklet** (`showBringBookmarklet`): a `javascript:` snippet the user runs on
-    `web.getbring.com` that POSTs `bring-settoken` (shared secret `tonys-recipes-2024`). The same
+    `web.getbring.com` that POSTs `bring-settoken`. The shared secret is stored per-device in
+    `tonys_bring_settoken_secret` and entered by hand — **never shipped in `index.html`**, which is
+    public. The bookmarklet runs off-origin, so it must inline literal headers rather than calling
+    any app helper. The same
     modal offers a **paste-the-token** field (`submitManualBringToken`) for when no bookmarks bar
     is available at all.
   - **Expired modal** (`showBringTokenExpired`/`openBringForTokenRefresh`) polls `bring-lists`

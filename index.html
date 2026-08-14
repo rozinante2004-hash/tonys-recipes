@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.2 -->
+<!-- Tony's Recipes Collection v31.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2429,6 +2429,51 @@ const SELF_TESTS = [
         throw new Error('deleting a photo leaves its Storage object orphaned forever');
     } },
 
+  { id:'sec_bring_secret_not_shipped', group:'Network', name:'The Bring! set-token secret is not in the repo (v31.3)',
+    test: async()=>{
+      // The secret guarding the shared Bring! token used to be a hard-coded
+      // constant in this file, and this file is a public repo — so it was
+      // readable by anyone. Removing the Worker's fallback was only half the
+      // fix: a value shipped here is public whatever it is.
+      // (The old name and value are deliberately NOT written out here: this test
+      // greps the page, and a comment quoting them would match itself.)
+      var src=document.documentElement.innerHTML;
+      if(/BRING_TOKEN_SECRET\s*=\s*['"][^'"]+['"]/.test(src))
+        throw new Error('a Bring! secret is hard-coded in the page again — it would be public in the repo');
+      // Assembled at runtime so this needle does not match itself.
+      var oldSecret=['tonys','recipes','2024'].join('-');
+      if(src.indexOf(oldSecret)!==-1)
+        throw new Error('the old public secret is still in the source');
+      ['getBringTokenSecret','setBringTokenSecret','saveBringSecret'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var saved=getBringTokenSecret();
+      try{
+        setBringTokenSecret('  test-secret-123  ');
+        if(getBringTokenSecret()!=='test-secret-123') throw new Error('the secret did not round-trip through storage (or was not trimmed)');
+        setBringTokenSecret('');
+        if(getBringTokenSecret()!=='') throw new Error('clearing the secret did not work');
+      } finally { setBringTokenSecret(saved); }
+      // The bookmarklet runs on web.getbring.com, where the app's helpers do not
+      // exist. A v31.1 refactor put workerHeaders() into that string and broke it.
+      // Assert on the bookmarklet's OUTPUT, not on the function's source: three
+      // grep-style assertions in a row matched their own comments.
+      if(typeof buildBringBookmarklet!=='function') throw new Error('buildBringBookmarklet not defined');
+      var bm=buildBringBookmarklet('sekrit-42');
+      if(bm.indexOf('workerHeaders')!==-1)
+        throw new Error('the emitted bookmarklet calls an app helper, which does not exist on web.getbring.com');
+      if(bm.indexOf('"Content-Type":"application/json"')===-1) throw new Error('the bookmarklet sends no content type');
+      if(bm.indexOf('"sekrit-42"')===-1) throw new Error('the secret was not embedded in the bookmarklet');
+      if(bm.indexOf('bring-settoken')===-1) throw new Error('the bookmarklet does not call the set-token action');
+      // A secret containing a quote must not break out of the emitted JS.
+      var evil=buildBringBookmarklet('a"b\\c');
+      if(evil.indexOf('secret:"a"b')!==-1) throw new Error('a quote in the secret breaks the generated bookmarklet');
+      // ...and an unset secret must warn rather than emit a silently broken one.
+      if(String(showBringBookmarklet).indexOf('showServiceError')===-1)
+        throw new Error('an unset secret produces a broken bookmarklet with no warning');
+      if(!document.getElementById('bringSecretInput')) throw new Error('there is nowhere to enter the secret');
+    } },
+
   { id:'sec_worker_authenticated', group:'Network', name:'Every Worker call carries the app key (v31.1)',
     test: async()=>{
       // The Worker forwards to Anthropic on Tony's key and its URL ships in this
@@ -4782,7 +4827,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.2';
+var APP_VERSION = 'v31.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7147,7 +7192,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7718,7 +7763,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8077,6 +8122,20 @@ body.banner-shown .header {
   <div style="background:var(--card-bg);border-radius:16px;width:90%;max-width:480px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
     <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:18px;color:var(--heading);margin-bottom:12px;">🔖 Bring! Token Bookmarklet</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">This bookmarklet refreshes your Bring! connection in one click. <strong>Set it up once, use it whenever needed.</strong></p>
+    <div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;background:var(--bg);">
+      <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">Step 0: the shared secret</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.6;">
+        Must match <code>BRING_SETTOKEN_SECRET</code> on the Cloudflare Worker. It is stored on
+        <strong>this device only</strong> and never committed — the old value was hard-coded in the
+        public repo, which made it no secret at all.
+      </p>
+      <div style="display:flex;gap:8px;">
+        <input id="bringSecretInput" type="password" autocomplete="off" placeholder="paste the secret"
+          style="flex:1;min-width:0;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;">
+        <button onclick="saveBringSecret()" style="flex-shrink:0;padding:8px 14px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
+      </div>
+      <div id="bringSecretStatus" style="font-size:12px;color:var(--muted);min-height:16px;margin-top:6px;"></div>
+    </div>
     <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Step 1: Copy the bookmarklet code</div>
     <div style="position:relative;margin-bottom:12px;">
       <textarea id="bringBookmarkletCode" readonly style="width:100%;height:60px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;background:#f5f0ea;box-sizing:border-box;"></textarea>
@@ -14659,7 +14718,26 @@ function showHelpDetail(topic, context) {
 // ─── BRING! TOKEN & REFRESH ───────────────────────────────────────────────────
 var BRING_TOKEN_STORAGE_KEY='bring_token_expiry';
 var BRING_WORKER_URL=WORKER_ENDPOINT;
-var BRING_TOKEN_SECRET='tonys-recipes-2024';
+// The Bring! set-token secret is NOT in this file any more. It used to be a
+// hard-coded constant here — and index.html is a public repo, so the secret
+// protecting the shared Bring! token was readable by anyone. Removing the
+// Worker's fallback (v34) was only half the fix: a value shipped here is public
+// whatever it is. (The old value is not quoted anywhere in this file on purpose;
+// a self-test greps the page for it.)
+//
+// It now lives per-device in localStorage, entered once in ⚙️ Settings, and is
+// baked into the bookmarklet at the moment Tony generates it. Nothing to commit.
+var BRING_SECRET_KEY = 'tonys_bring_settoken_secret';
+function getBringTokenSecret() {
+  try { return localStorage.getItem(BRING_SECRET_KEY) || ''; } catch(e) { return ''; }
+}
+function setBringTokenSecret(v) {
+  try {
+    v = String(v || '').trim();
+    if (v) localStorage.setItem(BRING_SECRET_KEY, v); else localStorage.removeItem(BRING_SECRET_KEY);
+  } catch(e) {}
+}
+window.getBringTokenSecret = getBringTokenSecret; window.setBringTokenSecret = setBringTokenSecret;
 // (_bringPopup / _bringTokenCheckInterval are declared with the other state vars above.)
 
 function getBringTokenExpiry(){ try{ var s=localStorage.getItem(BRING_TOKEN_STORAGE_KEY); var n=parseInt(s,10); return isNaN(n)?null:n; }catch(e){return null;} }
@@ -14713,7 +14791,9 @@ async function updateBringToken(token) {
     var parts=token.split('.'); if(parts.length!==3) throw new Error('Invalid token');
     var payload=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
     setBringTokenExpiry(payload.exp);
-    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-settoken',token:token,secret:BRING_TOKEN_SECRET})});
+    var _secret=getBringTokenSecret();
+    if(!_secret){ showServiceError('The Bring! set-token secret is not set on this device.\n\nOpen ⚙️ Settings → Bring! and paste the same value you put in BRING_SETTOKEN_SECRET on the Worker.'); return; }
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-settoken',token:token,secret:_secret})});
     var data=await resp.json();
     if(data.success){ toast('Bring! token updated! Valid for 7 days.'); renderBringTokenStatus(); return true; }
   } catch(e){ console.warn('Bring token update failed:',e); }
@@ -14739,11 +14819,44 @@ function openBringAutoRefresh() {
   window._bringRelayTimeout=timeout;
 }
 
+function saveBringSecret() {
+  var el = document.getElementById('bringSecretInput');
+  var st = document.getElementById('bringSecretStatus');
+  var v = (el && el.value || '').trim();
+  setBringTokenSecret(v);
+  if (st) st.innerHTML = v
+    ? '<span style="color:#2e7d32;">Saved on this device. Re-copy the bookmarklet below — it embeds this value.</span>'
+    : '<span style="color:#8A6D00;">Cleared. The token refresh will not work until a secret is set.</span>';
+  if (el) el.value = '';
+  if (v) showBringBookmarklet();
+}
+window.saveBringSecret = saveBringSecret;
+
+// Split out so it can be tested by its OUTPUT rather than by grepping the
+// function source — three assertions in a row have matched their own
+// explanatory comments, which is a false negative waiting to happen.
+function buildBringBookmarklet(secret) {
+  // Literal headers on purpose: this string executes on web.getbring.com, where
+  // none of the app's helpers exist. A v31.1 refactor put a call to one of them
+  // in here and broke the bookmarklet. The set-token action is exempt from the
+  // app-key check in Worker v34 precisely because it runs off-origin; its own
+  // secret is what authenticates it.
+  return 'javascript:(function(){var t=localStorage.getItem("accessToken");'
+    + 'if(!t){alert("Not logged into Bring!");return;}'
+    + 'fetch("' + BRING_WORKER_URL + '",{method:"POST",headers:{"Content-Type":"application/json"},'
+    + 'body:JSON.stringify({action:"bring-settoken",token:t,secret:' + JSON.stringify(String(secret || '')) + '})})'
+    + '.then(function(r){return r.json();}).then(function(d){alert(d.success?"Bring! token updated!":"Failed: "+d.message);})'
+    + '.catch(function(e){alert("Error: "+e.message);});})();';
+}
+window.buildBringBookmarklet = buildBringBookmarklet;
+
 function showBringBookmarklet() {
-  var code='javascript:(function(){var t=localStorage.getItem("accessToken");if(!t){alert("Not logged into Bring!");return;}fetch("'+BRING_WORKER_URL+'",{method:"POST",headers: workerHeaders(),body:JSON.stringify({action:"bring-settoken",token:t,secret:"'+BRING_TOKEN_SECRET+'"})}).then(function(r){return r.json();}).then(function(d){alert(d.success?"Bring! token updated!":"Failed: "+d.message);}).catch(function(e){alert("Error: "+e.message);});})();';
-  document.getElementById('bringBookmarkletCode').textContent=code;
+  var _secret = getBringTokenSecret();
+  if (!_secret) { showServiceError('Set the Bring! secret first: \u2699\ufe0f Settings \u2192 Bring!. It must match BRING_SETTOKEN_SECRET on the Worker.'); return; }
+  document.getElementById('bringBookmarkletCode').textContent = buildBringBookmarklet(_secret);
   document.getElementById('bringBookmarkletOverlay').classList.add('open');
 }
+
 
 // Paste-the-token fallback — works anywhere, no bookmarks bar required.
 async function submitManualBringToken(){

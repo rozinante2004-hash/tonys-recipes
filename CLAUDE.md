@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.2: 167 checks, 161 passing.** The 6 failures are `net_*` and
+**As of v31.3: 168 checks, 162 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -235,6 +235,21 @@ found only because a test was written first and disagreed with the code.
   looks wrong on screen — it just skews the answer. `waMergeCloudIntoIndex` keeps
   one row per file with the cloud copy winning. Tony spotted this in a screenshot;
   no error message would ever have surfaced it.
+- **A source-grep assertion can match its own comment.** `String(fn).indexOf('x')`
+  sees comments too, so a test explaining "must not call x()" fails on itself —
+  this has now happened three times (`Math.max.apply`, the old Bring! secret, and
+  `workerHeaders` in the bookmarklet). Prefer testing a function's OUTPUT; where a
+  grep is genuinely the only option, assemble the needle at runtime
+  (`['a','b'].join('-')`) so it cannot appear literally in the file.
+- **Nothing secret may live in `index.html`.** It is a public repo. The Bring!
+  set-token secret was a hard-coded constant there, which made the Worker's check
+  decorative; it now lives per-device in `tonys_bring_settoken_secret`. The Worker
+  app key is the deliberate exception — it ships, and the code says outright that
+  it is a speed bump rather than a secret.
+- **The Bring! bookmarklet runs on web.getbring.com**, so it must inline literal
+  headers. A v31.1 refactor rewrote every `{'Content-Type':'application/json'}`
+  to `workerHeaders()` including the one inside that generated string, which is
+  undefined there. `buildBringBookmarklet()` exists so this is testable by output.
 - **`window.foo = null` DESTROYS a hoisted `function foo(){}`.** At top level the
   identifier and the window property are the same binding, so a
   "assigned below" placeholder nulls the real function, and the later
