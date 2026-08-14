@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.1 -->
+<!-- Tony's Recipes Collection v31.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2497,6 +2497,25 @@ const SELF_TESTS = [
         throw new Error('the import path never checks for duplicates');
       if(String(confirmImportParsed).indexOf('recipes.unshift')!==-1)
         throw new Error('confirmImportParsed still writes directly, so the check cannot block it');
+
+      // ACTUALLY RUN AN IMPORT. The assertions above are all about the source
+      // text, and they all passed while `importParsedNow` was null at runtime —
+      // a stray `window.importParsedNow = null` placeholder had overwritten the
+      // hoisted function, so every real import threw. Reported by Tony. Source
+      // inspection cannot see a broken binding; only calling it can.
+      var keepRecipes=recipes, keepNext=nextId;
+      try{
+        recipes=[]; 
+        importParsedNow({ name:'Import Smoke Test', category:'Dinner', difficulty:'Easy',
+          prep:'10 min', servings:'2', ingredients:[{a:'1',n:'thing'}], steps:['Do it'] }, 'urlImportOverlay');
+        if(recipes.length!==1) throw new Error('importParsedNow did not add the recipe');
+        if(recipes[0].name!=='Import Smoke Test') throw new Error('the imported recipe is wrong');
+        if(!recipes[0].updatedAt) throw new Error('the import set no updatedAt, so it could lose a cloud merge');
+        // And the duplicate-aware entry point must reach the same place.
+        recipes=[];
+        confirmImportParsed({ name:'Second Import', ingredients:[{a:'1',n:'x'}], steps:['y'] }, 'urlImportOverlay');
+        if(recipes.length!==1) throw new Error('confirmImportParsed did not import a non-duplicate');
+      } finally { recipes=keepRecipes; nextId=keepNext; renderFilters(); renderGrid(); }
     } },
 
   { id:'feat_ingredient_search', group:'Features', name:'Ingredient-level ALL search (5f.3)',
@@ -4763,7 +4782,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.1';
+var APP_VERSION = 'v31.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7128,7 +7147,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7699,7 +7718,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12169,8 +12188,6 @@ async function confirmImportChecked(parsed, overlayId, dup) {
   }
   importParsedNow(parsed, overlayId);
 }
-window.importParsedNow = null; // assigned below
-
 function importParsedNow(parsed, overlayId) {
   // normalizeRecipe coerces AI output into the expected shape (ingredients sometimes
   // come back as plain strings) and sets updatedAt — without it a freshly imported

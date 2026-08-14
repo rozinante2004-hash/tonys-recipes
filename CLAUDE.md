@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.1: 167 checks, 161 passing.** The 6 failures are `net_*` and
+**As of v31.2: 167 checks, 161 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -235,6 +235,13 @@ found only because a test was written first and disagreed with the code.
   looks wrong on screen — it just skews the answer. `waMergeCloudIntoIndex` keeps
   one row per file with the cloud copy winning. Tony spotted this in a screenshot;
   no error message would ever have surfaced it.
+- **`window.foo = null` DESTROYS a hoisted `function foo(){}`.** At top level the
+  identifier and the window property are the same binding, so a
+  "assigned below" placeholder nulls the real function, and the later
+  `window.foo = foo` then assigns null to null. Shipped in v31.1 and broke every
+  URL import. **Source-inspection tests cannot see this** — `String(fn)` still
+  reads perfectly while the binding is null. Any test for a new entry point must
+  CALL it, not just grep it.
 - **Testing a predicate is not testing the caller.** The first fix for the above
   tested `waLooksLikeChatFile` directly; reverting `waListFolder` to the old filter
   left every test green. The listing filter is now `waFilterListing`, driven with a
