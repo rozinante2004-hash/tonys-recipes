@@ -153,8 +153,9 @@ found only because a test was written first and disagreed with the code.
 - **Escape before highlighting/interpolating, never after.** `hlMatch`, `aiFailPane`
   and `buildRecipePage` all have tests pinning this.
 - **Firestore documents have a 1 MiB limit** (`FIRESTORE_DOC_LIMIT`). Since 5.4 each
-  recipe has its own document, so the limit is per recipe rather than per collection —
-  but the legacy `shared/recipes` document is still *read*, and it is still capped.
+  recipe has its own document, so the limit is per recipe rather than per collection.
+  It is still reachable by one recipe: that is why `slimRecipeForCloud` blanks the photo
+  and `syncCloudPhotos` writes photos to their own documents.
 - **Dropdown menus:** `closeDrop` must disarm the outside-click listener, or the next
   click on the trigger reopens and instantly recloses the menu.
 - **Test isolation:** close modals in `finally`, not in `try`. A failed assertion that
@@ -358,13 +359,15 @@ found only because a test was written first and disagreed with the code.
 
 ## Outstanding
 
-- **5.4 — per-recipe Firestore documents. Steps 1 and 2 of 3 shipped (v28.0, v28.1).**
-  The legacy `shared/recipes` document is no longer written, only read once per load by
-  `reconcileLegacyStragglers` to catch a device still on v27.9. Remaining: delete that
-  document by hand once no device can be on v27.9, and remove the reconciliation pass
-  and the `recipes` listener with it. The two-browser concurrency checks in
-  `PLAN-5.4-per-recipe-docs.md` §7 have **not** been run; they need two real signed-in
-  sessions.
+- **5.4 — per-recipe Firestore documents. Complete as of v32.2.** All four steps are
+  done: v28.0 dual-wrote both layouts, v28.1 stopped writing the legacy
+  `shared/recipes` document but kept reading it each load, the document was deleted by
+  hand in the Firestore console on 15 Aug 2026, and v32.2 removed the reading code —
+  `reconcileLegacyStragglers`, `migrateToPerRecipeDocs`, `stripPhotosForCloud`,
+  `slimRecipeForCloud`'s `keepHistory` flag, `meta.legacyAt`, the `recipes` listener and
+  the unconditional-read branch. **Do not reintroduce a second cloud shape.** The two-
+  browser concurrency checks in `PLAN-5.4-per-recipe-docs.md` §7 have **not** been run;
+  they need two real signed-in sessions.
 - **Deletion is genuinely admin-only, published 1 Aug 2026.** v28.1 split `write` into
   `create, update` — `write` in Firestore means create + update + delete and allow rules
   are OR'd, so the `allow delete` line below it had been restricting nothing. Consequences

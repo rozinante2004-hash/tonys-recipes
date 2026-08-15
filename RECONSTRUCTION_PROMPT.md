@@ -399,7 +399,6 @@ load/restore/remote‑update.
 | `shared/recipe_<id>` | `{ r: <JSON of one photo‑free recipe>, updatedAt, id }`. Carries `history`. |
 | `shared/meta` | `{ nextId, ids: [...], schema: 2, updatedAt }` |
 | `shared/photo_<id>` | `{ photo: <base64>, updatedAt }` — unchanged, photos were already split |
-| `shared/recipes` | The **legacy** single document, `{ recipes: <JSON string>, nextId, updatedAt }`, photo‑ *and* history‑free. Written through v28.0 only; **v28.1 stopped writing it** and merely reads it once per load (`reconcileLegacyStragglers`) to catch a device still on v27.9. Deleted by hand later still. |
 | `shared/access` | `{ members, updatedAt }` |
 
 Legacy `users/{uid}/…` rules kept for safety.
@@ -409,13 +408,17 @@ editing inside the same window meant the second save replaced the first person's
 silently. It also capped the collection at ~610 recipes and re‑uploaded everything to record
 one favourite.
 
-**Reading:** `shared/meta` first. Per‑recipe documents are authoritative **only when
-`meta.schema >= 2`** — a migration interrupted half way leaves some `recipe_*` documents
-written and `schema` still below 2, and trusting their mere existence would silently drop
-everything not yet written. Otherwise read `shared/recipes` and migrate. The documents are
-fetched with a `documentId()` range query over `['recipe_', 'recipe` ')` — note the upper
-bound is `'_' + 1`, which excludes the legacy `recipes` document; falling back to fetching
-`meta.ids` one at a time if the range query is unavailable.
+**Reading:** `shared/meta` first, then the per‑recipe documents — **unconditionally**. Build
+this the simple way: there is one layout and `schema` is a label on it, not a branch. (A
+migration from a pre‑v28 single document existed through v32.1 and made the read conditional
+on `meta.schema >= 2`; that document has since been deleted and the branch with it. Reading
+unconditionally is also the safer failure mode — a `meta` with a missing or stale `schema`
+loads the collection instead of reporting an empty cloud.)
+
+The documents are fetched with a `documentId()` range query over `['recipe_', 'recipe` ')` —
+the upper bound is `'_' + 1`, which excludes every other document sharing the collection
+(`meta`, `access`, `photo_*`, `chat*`) — falling back to fetching `meta.ids` one at a time if
+the range query is unavailable.
 
 **Writing:** only recipes whose serialised form changed (`cloudDirtyIds`). Each write is a
 transaction that compares the cloud document's `updatedAt` against the base we last read
@@ -428,15 +431,19 @@ honest refusal. `nextId` is merged upward, never lowered, or two devices mint th
 against memory — a partial read would otherwise look exactly like a mass deletion. Undo takes
 the id back off the queue. Deleting removes `recipe_<id>` *and* `photo_<id>`.
 
-**Stragglers (v28.1):** since the app no longer writes `shared/recipes`, any *change* to it
-means a device is still on v27.9. `reconcileLegacyStragglers` adopts an existing recipe only
-when the legacy copy is strictly newer, and an unknown one only when it was touched after
-`meta.legacyAt` — so a recipe deleted since that mark is never resurrected.
+**Change notification:** one `onSnapshot` listener, on `shared/meta`, which every save
+touches. The snapshot does **not** carry the recipes — with per‑recipe documents the only
+honest way to apply an update is to re‑read, so `applyRemoteUpdate()` calls
+`loadFromFirestore()`. Keep the subscribe/unsubscribe list shape even with a single listener:
+it is what guarantees nothing is left dangling across a re‑sign‑in.
 
-**Change notification:** two `onSnapshot` listeners during the transition — `shared/meta`
-(touched by every v28 save) and `shared/recipes` (all a v27.9 device ever writes). Watching
-one would miss half the family. The snapshot no longer carries the recipes, so
-`applyRemoteUpdate()` re‑reads via `loadFromFirestore()`.
+**A note on retiring a storage layout**, because this app got it right and it is worth
+copying. Moving off the old single document took **four** releases, never fewer: v28.0 wrote
+both layouts; v28.1 stopped writing the old one but still *read* it each load, so a device on
+the previous version could not lose edits; the document was then deleted by hand in the
+console once every device had moved; and only *then* did v32.2 delete the reading code. Do
+not collapse those steps. The cost of the slow version is one wasted read per load; the cost
+of the fast version is somebody's recipes.
 
 **Photo display (`photoSrc`)**: stored photos are base64 data URLs (needed for backup/export/
 sync), but rendering them inline makes every grid render build multi‑MB markup. `photoSrc(r)`
@@ -445,10 +452,13 @@ converts each photo to a **cached `blob:` URL** for display only (revoked when t
 original data URL — a `blob:` URL is dead outside the page.
 
 **Cloud photo storage (critical — Firestore's 1 MiB/doc limit):** photos are base64 and must
-NOT live inline in the `shared/recipes` doc or it overflows 1 MiB after a dozen or so photos and
-every write fails. Instead, `saveToFirestore` writes a **slim** recipes doc via
-`stripPhotosForCloud` (each recipe's `photo` blanked, a `_ph:1` flag set when a photo exists, and
-`originalPhoto` omitted entirely), then `syncCloudPhotos` writes each recipe's display photo to
+NOT live inline in a recipe's document, or a single photo blows the 1 MiB limit and that recipe
+can never be saved again. Instead `saveToFirestore` writes each recipe through
+`slimRecipeForCloud` — the **one and only** cloud shape: `photo` blanked, `_ph:1` set when a
+photo exists elsewhere, `originalPhoto` omitted entirely, `history` kept. Give this function a
+single parameter. It briefly had a `keepHistory` flag so the old single document could get a
+history‑free copy, and a second shape that silently drops a field is exactly the kind of thing
+that is called by accident. Then `syncCloudPhotos` writes each recipe's display photo to
 its **own** doc `shared/photo_<id>` = `{ photo:<base64>, updatedAt }` (only when changed; deletes
 docs for removed/deleted photos). These per‑photo docs sit in the `shared` collection so the
 existing `match /shared/{document=**}` rule already permits them — no rules change needed.
@@ -864,7 +874,7 @@ A first‑class feature — recreate it. `SELF_TESTS` is an array of **161 check
 **Features (42), UI (26), Cloud Sync (23), WhatsApp (12), Import/Export (11), CRUD (10),
 Storage (10), CSS (6), Core, Modals and Network (5 each), Backup and Performance (3 each)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
-photo‑split (`stripPhotosForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
+photo‑split (`slimRecipeForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
 (`openSelfTest`/`runSelfTests`) lets the user pick tests by group, runs them sequentially with
 live ✅/❌ status, and for failures shows a **detail card** with error, impact, a suggested fix

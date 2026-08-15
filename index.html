@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.1 -->
+<!-- Tony's Recipes Collection v32.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1037,9 +1037,13 @@ const SELF_TESTS = [
     test: async()=>{
       if(!window._fbUser) throw new Error('Not signed in to Firebase — sign in first');
       if(!window._fbDb)   throw new Error('Firestore not initialised');
-      // Try a lightweight read
-      const snap=await window._fbDb.collection('shared').doc('recipes').get();
+      // A lightweight read of `shared/meta` — a live document this app writes on
+      // every save. Until v32.2 this read `shared/recipes`, which is now deleted;
+      // a read of a MISSING document still resolves, so that form of the check
+      // would have passed against an entirely empty collection.
+      const snap=await window._fbDb.collection('shared').doc('meta').get();
       if(!snap) throw new Error('Firestore read returned nothing');
+      if(!snap.exists) throw new Error('shared/meta is missing — either the collection has never been written, or the rules refuse this account');
     }
   },
 
@@ -1296,14 +1300,19 @@ const SELF_TESTS = [
     } },
 
   // ── CLOUD SYNC (Firestore photo split) ───────────────────────────────────────
-  { id:'cloud_strip', group:'Cloud Sync', name:'Photos stripped from recipes doc',
+  { id:'cloud_strip', group:'Cloud Sync', name:'Photos stripped from the per-recipe doc',
     test: async()=>{
-      if(typeof stripPhotosForCloud!=='function') throw new Error('stripPhotosForCloud not defined');
-      var slim=stripPhotosForCloud([{id:1,name:'x',photo:'data:image/jpeg;base64,AAAA',originalPhoto:'data:big',updatedAt:1}]);
-      if(slim[0].photo!=='') throw new Error('photo not blanked in the cloud recipes doc');
-      if(slim[0].originalPhoto!==undefined) throw new Error('originalPhoto must never be sent to the cloud');
-      if(slim[0]._ph!==1) throw new Error('_ph (photo-lives-elsewhere) flag not set for cloud hydration');
-      if('hp' in slim[0]) throw new Error('the old `hp` name is still being written — 5.8 unified it to _ph');
+      if(typeof slimRecipeForCloud!=='function') throw new Error('slimRecipeForCloud not defined');
+      var slim=slimRecipeForCloud({id:1,name:'x',photo:'data:image/jpeg;base64,AAAA',originalPhoto:'data:big',updatedAt:1});
+      if(slim.photo!=='') throw new Error('photo not blanked in the per-recipe document');
+      if(slim.originalPhoto!==undefined) throw new Error('originalPhoto must never be sent to the cloud');
+      if(slim._ph!==1) throw new Error('_ph (photo-lives-elsewhere) flag not set for cloud hydration');
+      if('hp' in slim) throw new Error('the old `hp` name is still being written — 5.8 unified it to _ph');
+      // v32.2 — slimRecipeForCloud takes ONE argument. It used to take a
+      // `keepHistory` flag, false for the legacy single document; passing a
+      // second argument must no longer be able to strip history.
+      if(slimRecipeForCloud.length!==1) throw new Error('slimRecipeForCloud takes '+slimRecipeForCloud.length+' arguments — the legacy history-stripping flag is back');
+      if(typeof window.stripPhotosForCloud==='function') throw new Error('stripPhotosForCloud is back — that was the legacy `shared/recipes` shape and it is deleted');
     } },
   { id:'cloud_bytelen', group:'Cloud Sync', name:'byteLen measures UTF-8 size',
     test: async()=>{
@@ -1684,18 +1693,20 @@ const SELF_TESTS = [
       if(!link) throw new Error('the note no longer links to the Firebase rules editor');
     } },
 
-  { id:'cloud_doc_range', group:'Cloud Sync', name:'recipe_* range excludes the legacy `recipes` doc',
+  { id:'cloud_doc_range', group:'Cloud Sync', name:'The recipe_* range reads recipes and nothing else',
     test: async()=>{
       if(typeof RECIPE_DOC_LO!=='string'||typeof RECIPE_DOC_HI!=='string') throw new Error('the recipe_* document-id bounds are not defined');
       var inRange=function(id){ return id>=RECIPE_DOC_LO && id<RECIPE_DOC_HI; };
       ['recipe_1','recipe_12','recipe_999999'].forEach(function(id){
         if(!inRange(id)) throw new Error(id+' should be inside the recipe_* range but is not');
       });
-      // The one that matters: the legacy single document is called `recipes`, and
-      // reading it as though it were a recipe would parse the whole collection as one.
-      if(inRange('recipes')) throw new Error('the legacy `recipes` document falls inside the recipe_* range — a load would parse it as a single recipe');
-      ['photo_1','meta','access'].forEach(function(id){
-        if(inRange(id)) throw new Error(id+' must not be read as a recipe document');
+      // Every other document that shares the `shared` collection. Any of these
+      // falling inside the range would be parsed as a recipe — silently, and with
+      // whatever nonsense that produces. `recipes` is the deleted legacy document
+      // and stays on this list: the bound was chosen to exclude it, so a change
+      // that let it back in is a change to the bound itself.
+      ['recipes','photo_1','meta','access','chat_x','chatpart_x_1'].forEach(function(id){
+        if(inRange(id)) throw new Error(id+' falls inside the recipe_* range and would be parsed as a recipe');
       });
     } },
 
@@ -1727,50 +1738,6 @@ const SELF_TESTS = [
       } finally { _cloudRestoreForTest(s); }
     } },
 
-  { id:'cloud_migrate_idempotent', group:'Cloud Sync', name:'Migration is idempotent and interruptible',
-    test: async()=>{
-      var s=_cloudSnapshotForTest();
-      try{
-        var list=[{id:1,name:'A',updatedAt:10,ingredients:[],steps:[]},{id:2,name:'B',updatedAt:20,ingredients:[],steps:[]}];
-        var db=_fakeFirestore({ recipes:{ recipes:JSON.stringify(list), nextId:3 } });
-        // Compare everything except meta.updatedAt, which is a wall-clock stamp
-        // and legitimately differs between two runs — comparing it made this
-        // test fail whenever the two migrations straddled a millisecond.
-        var shot=function(){
-          var c=JSON.parse(JSON.stringify(db._docs));
-          if(c.meta) delete c.meta.updatedAt;
-          return JSON.stringify(c);
-        };
-        await migrateToPerRecipeDocs(list,3,db);
-        var first=shot();
-        await migrateToPerRecipeDocs(list,3,db);   // run it again — a re-run must be a no-op
-        if(shot()!==first) throw new Error('running the migration twice changed the result, so an interrupted migration cannot safely be retried');
-        if(db._docs.meta.schema!==2) throw new Error('meta.schema was not stamped to 2');
-        if(!db._docs.recipe_1||!db._docs.recipe_2) throw new Error('a per-recipe document is missing after migration');
-        if(!db._docs.recipes) throw new Error('the legacy document must NOT be deleted by the migration — it is the fallback for devices still on v27.9');
-      } finally { _cloudRestoreForTest(s); }
-    } },
-
-  { id:'cloud_migrate_legacy', group:'Cloud Sync', name:'A legacy-only account migrates, keeping every recipe',
-    test: async()=>{
-      var s=_cloudSnapshotForTest();
-      try{
-        var list=[];
-        for(var i=1;i<=25;i++) list.push({id:i,name:'R'+i,updatedAt:i,ingredients:[],steps:[]});
-        var db=_fakeFirestore({ recipes:{ recipes:JSON.stringify(list), nextId:26 } });
-        var res=await migrateToPerRecipeDocs(list,26,db);
-        if(res.written!==25) throw new Error('migrated '+res.written+' of 25 recipes');
-        var docs=Object.keys(db._docs).filter(function(k){ return k.indexOf('recipe_')===0; });
-        if(docs.length!==25) throw new Error('expected 25 per-recipe documents, found '+docs.length);
-        if(db._docs.meta.ids.length!==25) throw new Error('meta.ids does not list every recipe, so the fallback read path would lose some');
-        // Round-trip: the documents must parse back to the same recipes.
-        var back=parseCloudRecipeDocs(docs.map(function(k){ return { id:k, data:db._docs[k] }; }));
-        if(back.length!==25) throw new Error('re-reading the migrated documents produced '+back.length+' recipes');
-        if(back.map(function(r){return r.id;}).sort(function(a,b){return a-b;}).join()!==list.map(function(r){return r.id;}).join())
-          throw new Error('the migrated documents do not round-trip to the same recipe ids');
-      } finally { _cloudRestoreForTest(s); }
-    } },
-
   { id:'cloud_delete_docs', group:'Cloud Sync', name:'Deleting a recipe removes its doc AND its photo doc',
     test: async()=>{
       var s=_cloudSnapshotForTest();
@@ -1785,14 +1752,14 @@ const SELF_TESTS = [
       } finally { _cloudRestoreForTest(s); }
     } },
 
-  { id:'cloud_history_split', group:'Cloud Sync', name:'History travels per-recipe but not in the legacy doc',
+  { id:'cloud_history_split', group:'Cloud Sync', name:'History always travels to the cloud',
     test: async()=>{
       var r={id:1,name:'x',history:[{name:'old'}],photo:'',updatedAt:1};
-      // 3.4 — per-recipe documents have no shared ceiling, so history can travel.
-      if(!slimRecipeForCloud(r,true).history) throw new Error('history is missing from the per-recipe document — 5.4 was the whole reason it could start syncing');
-      // ...but the legacy single document still has one, and history tripled it.
-      if(slimRecipeForCloud(r,false).history) throw new Error('history leaked into the legacy-shaped copy — that document is size-capped and history triples each recipe');
-      if(stripPhotosForCloud([r])[0].history) throw new Error('stripPhotosForCloud writes the legacy document and must stay history-free');
+      // 3.4 — per-recipe documents have no shared ceiling, so history travels.
+      if(!slimRecipeForCloud(r).history) throw new Error('history is missing from the per-recipe document — 5.4 was the whole reason it could start syncing');
+      // v32.2 — the second shape is gone, so a stray extra argument must be
+      // inert rather than quietly reverting to the history-free legacy copy.
+      if(!slimRecipeForCloud(r,false).history) throw new Error('a second argument still strips history — the legacy shape has come back');
     } },
 
   { id:'cloud_read_cache', group:'Cloud Sync', name:'An unchanged cloud is not re-read (5.9)',
@@ -2284,33 +2251,6 @@ const SELF_TESTS = [
       } finally { _cloudRestoreForTest(st); }
     } },
 
-  { id:'cloud_straggler', group:'Cloud Sync', name:'A v27.9 straggler is picked up, a deletion is not resurrected',
-    test: async()=>{
-      var s=_cloudSnapshotForTest();
-      try{
-        var mark='2026-01-01T00:00:00.000Z', markMs=Date.parse(mark);
-        var mine=[{id:1,name:'mine-1',updatedAt:1000},{id:2,name:'mine-2',updatedAt:900}];
-        var legacy=[
-          {id:1,name:'older-device-edited-this',updatedAt:2000},   // newer than ours -> adopt
-          {id:2,name:'stale',updatedAt:500},                        // older than ours -> ignore
-          {id:3,name:'added-on-old-device',updatedAt:markMs+1000},  // new since the mark -> adopt
-          {id:4,name:'we-deleted-this',updatedAt:markMs-1000}       // predates the mark -> must NOT come back
-        ];
-        var db=_fakeFirestore({ recipes:{ recipes:JSON.stringify(legacy), updatedAt:'2026-02-01T00:00:00.000Z' } });
-        var res=await reconcileLegacyStragglers(mine,{legacyAt:mark},db);
-        if(!res.changed) throw new Error('a changed legacy document was not noticed, so a straggler\'s edits would be invisible');
-        var ids=res.adopted.map(function(r){return r.id;}).sort();
-        if(ids.join()!=='1,3') throw new Error('expected to adopt recipes 1 and 3, adopted '+JSON.stringify(ids));
-        // The one that matters most: absence from the new layout means we deleted it.
-        if(ids.indexOf(4)>-1) throw new Error('a recipe deleted after the high-water mark was resurrected from the legacy document');
-        if(res.legacyAt!=='2026-02-01T00:00:00.000Z') throw new Error('the high-water mark did not advance, so this would re-run on every load');
-        // Untouched since we last looked -> nothing to do, and no needless writes.
-        var quiet=_fakeFirestore({ recipes:{ recipes:JSON.stringify(legacy), updatedAt:mark } });
-        var res2=await reconcileLegacyStragglers(mine,{legacyAt:mark},quiet);
-        if(res2.changed||res2.adopted.length) throw new Error('an unchanged legacy document was treated as a straggler edit');
-      } finally { _cloudRestoreForTest(s); }
-    } },
-
   { id:'cloud_delete_denied', group:'Cloud Sync', name:'An admin-only delete refusal is reported, not swallowed',
     test: async()=>{
       var s=_cloudSnapshotForTest();
@@ -2331,7 +2271,7 @@ const SELF_TESTS = [
     test: async()=>{
       var a={id:1,name:'A',photo:'',updatedAt:1}, b={id:2,name:'B',photo:'',updatedAt:1};
       // v29.2 — stamps are digests now, so persisting them doesn't double storage.
-      var stamps={}; stamps[1]=hashStr(JSON.stringify(slimRecipeForCloud(a,true))); stamps[2]=hashStr(JSON.stringify(slimRecipeForCloud(b,true)));
+      var stamps={}; stamps[1]=hashStr(JSON.stringify(slimRecipeForCloud(a))); stamps[2]=hashStr(JSON.stringify(slimRecipeForCloud(b)));
       if(cloudDirtyIds([a,b],stamps).length!==0) throw new Error('unchanged recipes were queued for writing — favouriting one recipe would re-upload the collection again');
       b.fav=true;
       var dirty=cloudDirtyIds([a,b],stamps);
@@ -3762,13 +3702,16 @@ const SELF_TESTS = [
         for(var i=2;i<=5;i++){ pushHistory(r); r.name='V'+i; }
         if(r.history.length!==3) throw new Error('history was not capped at 3, got '+r.history.length);
         if(r.history[0].name!=='V4') throw new Error('history is not newest-first, got '+r.history[0].name);
-        // Snapshots must not carry photos or nested history — the collection shares one 1 MiB doc.
+        // A snapshot must stay flat: photos are huge and nested history would
+        // recurse, and each recipe document still has its own 1 MiB ceiling.
         var snap=historySnapshot(r);
-        if('photo' in snap||'history' in snap||'originalPhoto' in snap) throw new Error('a snapshot carries photo/history data and would bloat the cloud document');
-        // History must never reach the shared Firestore document: it more than
-        // triples a recipe's size and would gut the collection's capacity.
-        var slim=stripPhotosForCloud([r])[0];
-        if('history' in slim) throw new Error('history is being synced to the shared document — that cuts capacity from ~610 recipes to ~170');
+        if('photo' in snap||'history' in snap||'originalPhoto' in snap) throw new Error('a snapshot carries photo/history data and would bloat the recipe document');
+        // v32.2 — history DOES reach the cloud, in the per-recipe document. The
+        // old assertion here was the opposite, and correct only while the legacy
+        // single document existed.
+        var slim=slimRecipeForCloud(r);
+        if(!('history' in slim)) throw new Error('history is not being synced — a device restoring from the cloud would lose every previous version');
+        if('photo' in slim && slim.photo!=='') throw new Error('the per-recipe document still carries photo data');
         // Editing through the real save path records the previous version.
         openAddModal(testId); await wait(60);
         document.getElementById('f-name').value='Edited name';
@@ -4436,7 +4379,7 @@ var SELF_TEST_FIXES = {
   stor_idb_roundtrip:{ fix:'IndexedDB read/write failed. Storage may be full or blocked. Check DevTools → Application → IndexedDB → tonys_recipes_db, and free device storage.', autofix: null },
   stor_local_photofree:{ fix:'stripPhotosLocal is not removing photo data before writing to localStorage — photos would overflow the ~5 MB quota. Verify the local IndexedDB photo-storage code is intact.', autofix: null },
   stor_hydrate_fn:   { fix:'hydratePhotosFromIDB / savePhotosToIDB missing. The IndexedDB photo layer is incomplete — photos will not persist or reload correctly.', autofix: null },
-  cloud_strip:       { fix:'stripPhotosForCloud must blank photo, drop originalPhoto, and set _ph:1 (5.8 — one name for local and cloud; reads still accept the legacy `hp`). If broken, the shared/recipes doc will bloat past Firestore’s 1 MiB limit and all cloud saves will fail.', autofix: null },
+  cloud_strip:       { fix:'slimRecipeForCloud must blank photo, drop originalPhoto, and set _ph:1 (5.8 — one name for local and cloud; reads still accept the legacy `hp`). If broken, each shared/recipe_<id> doc carries its full base64 photo and will blow past Firestore’s 1 MiB limit, so that recipe can never be saved.', autofix: null },
   cloud_bytelen:     { fix:'byteLen (Blob-based UTF-8 size) is wrong. Document/photo size checks depend on it — the 1 MiB guardrails may misfire.', autofix: null },
   cloud_sizeerr:     { fix:'isSizeError misclassifies Firestore errors. Size errors must NOT be auto-retried (they never succeed) and offline errors must be. Check the error-classification code.', autofix: null },
   cloud_fns:         { fix:'A cloud-sync function is missing. Check for a syntax error or truncation in the CLOUD PHOTO STORAGE / Firestore section.', autofix: null },
@@ -4846,8 +4789,13 @@ function renderSyncHealth() {
                    (h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes) ? 'warn' : '',
                    h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes
                      ? 'a mismatch is normal right after an edit, and should settle on the next sync' : '');
-  out += healthRow('Cloud storage layout', h.schema >= 2 ? 'per-recipe documents (v2)' : (h.signedIn ? 'legacy single document' : 'unknown'),
-                   h.schema >= 2 ? 'good' : (h.signedIn ? 'warn' : ''));
+  // v32.2 — the legacy single document is deleted and there is no migration path
+  // left, so a schema below 2 is no longer "an older layout you will be upgraded
+  // from". It means `shared/meta` is missing or malformed, which is worth saying
+  // plainly rather than dressing up as a transitional state.
+  out += healthRow('Cloud storage layout', h.schema >= 2 ? 'per-recipe documents (v2)' : (h.signedIn ? 'unrecognised — shared/meta is missing or damaged' : 'unknown'),
+                   h.schema >= 2 ? 'good' : (h.signedIn ? 'bad' : ''),
+                   h.signedIn && h.schema < 2 ? 'recipes still load from their own documents; it is the meta document that needs attention' : '');
 
   out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Cost & safety</div>';
   var pct = Math.round((h.readsToday / h.readsBudget) * 100);
@@ -5097,7 +5045,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.1';
+var APP_VERSION = 'v32.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7462,7 +7410,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8033,7 +7981,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13040,21 +12988,19 @@ function isSizeError(err) {
          m.indexOf('maximum') > -1 || m.indexOf('exceeds') > -1 || m.indexOf('1048') > -1;
 }
 
-// A recipe copy with photo data removed, for the slim recipes doc.
-// 5.8 — local storage and the cloud used to spell the same idea two ways
-// (`_ph` vs `hp`), which made every photo bug twice as hard to read. There is
-// now one name, `_ph` ("photo lives elsewhere"). Documents written by older
-// versions still carry `hp`, so reads accept both; writes only ever emit `_ph`.
-// The LEGACY single document's shape. No longer written as of v28.1 — kept
-// because the straggler reconciliation still PARSES that document, and because
-// it stays history-free: three revisions more
-// than triple a recipe's serialised size (measured 1.7 KB → 6.2 KB), which would
-// cut that one document's capacity from ~610 recipes to ~170. Per-recipe
-// documents have no such ceiling, so `slimRecipeForCloud(r, true)` — the shape
-// written to `shared/recipe_<id>` — does carry history.
-function stripPhotosForCloud(list) {
-  return list.map(function(r) { return slimRecipeForCloud(r, false); });
-}
+// A recipe copy with photo data removed — the shape written to
+// `shared/recipe_<id>`. 5.8 — local storage and the cloud used to spell the same
+// idea two ways (`_ph` vs `hp`), which made every photo bug twice as hard to
+// read. There is now one name, `_ph` ("photo lives elsewhere"). Documents written
+// by older versions still carry `hp`, so reads accept both; writes only ever
+// emit `_ph`.
+//
+// v32.2 — there used to be a second shape here, `stripPhotosForCloud`, producing
+// the history-free copy the legacy single `shared/recipes` document needed: three
+// revisions more than tripled a recipe's serialised size (measured 1.7 KB →
+// 6.2 KB), which would have cut that one document's capacity from ~610 recipes to
+// ~170. Per-recipe documents have no such ceiling and the legacy document is
+// deleted, so there is now exactly ONE cloud shape and history always travels.
 
 // Write each changed photo to its own doc; remove docs for cleared/deleted photos.
 // Returns an array of human-readable descriptions of photos too large to sync.
@@ -13266,19 +13212,22 @@ async function attachCloudPhotos(list) {
 //   shared/meta         { nextId, ids: [...], schema: 2, updatedAt }
 //   shared/photo_<id>   unchanged — photos were already split out
 //
-// TRANSITION — v28.0 dual-wrote the legacy `shared/recipes` document so a phone
-// left on v27.9 kept working. v28.1 STOPPED writing it: that removes the last
-// blind whole-collection overwrite in the app. It is still READ once per load by
-// reconcileLegacyStragglers, so a device genuinely still on v27.9 does not lose
-// its edits. The document itself is deleted by hand later, never in the same
-// release that stopped writing it.
+// TRANSITION, now complete. v28.0 dual-wrote the legacy `shared/recipes`
+// document so a phone left on v27.9 kept working; v28.1 stopped writing it,
+// removing the last blind whole-collection overwrite in the app, and read it
+// once per load so a straggler's edits were not lost. v32.2 removed that read
+// and everything supporting it, after the document was deleted by hand in the
+// Firestore console — deliberately three steps, in three separate releases,
+// never all at once.
 var CLOUD_SCHEMA = 2;
 
-// Document-id range covering exactly `recipe_*`. The legacy document is called
-// `recipes`, and it MUST fall outside this range or a read would parse it as a
-// recipe: '_' is 0x5F and the character after it is '`' (0x60), so 'recipes'
-// (0x73 at that position) sorts above the upper bound and is excluded. There is
-// a self test pinning this, because getting it wrong is silent and ugly.
+// Document-id range covering exactly `recipe_*`. The bound is not obvious and is
+// worth stating: '_' is 0x5F and the character after it is '`' (0x60), so
+// `recipe_1` is inside and anything continuing with a letter — `recipes`
+// (0x73), the now-deleted legacy document — sorts above the upper bound and is
+// excluded. `meta`, `access`, `photo_*` and `chat*` fall outside on their own.
+// A self test pins all of this, because getting it wrong is silent and ugly:
+// the read simply parses the wrong document as a recipe.
 var RECIPE_DOC_LO = 'recipe_';
 var RECIPE_DOC_HI = 'recipe' + String.fromCharCode(96);
 
@@ -13462,18 +13411,22 @@ window.unqueueCloudDelete = unqueueCloudDelete;
 
 function recipeDocId(id) { return 'recipe_' + id; }
 
-// One recipe, photo-free, ready for its own document.
-// 3.4 — `history` DOES travel now. It was excluded only because three revisions
-// took a recipe from 1.7 KB to 6.2 KB and would have cut the single shared
-// document's capacity from ~610 recipes to ~170. Per-document that cost is
-// irrelevant. The legacy document still gets a history-free copy, because for a
-// v27.9 device that ceiling is still very much real.
-function slimRecipeForCloud(r, keepHistory) {
+// One recipe, photo-free, ready for its own document. This is the ONLY shape
+// written to the cloud (v32.2).
+// 3.4 — `history` DOES travel. It was excluded only because three revisions took
+// a recipe from 1.7 KB to 6.2 KB and would have cut the single shared document's
+// capacity from ~610 recipes to ~170. Per-document that cost is irrelevant: the
+// 1 MiB limit now applies to one recipe rather than all of them.
+//
+// Takes ONE argument on purpose. It used to take `keepHistory`, passed false for
+// the legacy `shared/recipes` copy — a second shape that silently dropped
+// history. Both that document and that flag are gone; a self test pins the arity
+// so neither can quietly return.
+function slimRecipeForCloud(r) {
   var c = {};
   for (var k in r) {
     if (!r.hasOwnProperty(k)) continue;
     if (k === 'photo' || k === 'originalPhoto' || k === 'hp' || k === '_ph' || k === '_po') continue;
-    if (k === 'history' && !keepHistory) continue;
     c[k] = r[k];
   }
   c.photo = '';
@@ -13487,7 +13440,7 @@ function cloudDirtyIds(list, stamps) {
   var out = [];
   for (var i = 0; i < list.length; i++) {
     var r = list[i];
-    if (stamps[r.id] !== hashStr(JSON.stringify(slimRecipeForCloud(r, true)))) out.push(r.id);
+    if (stamps[r.id] !== hashStr(JSON.stringify(slimRecipeForCloud(r)))) out.push(r.id);
   }
   return out;
 }
@@ -13613,7 +13566,7 @@ async function saveRecipeDoc(r, db) {
   // very next dirty check disagreed and the recipe was rewritten on every single
   // save — which is what made this fire on every favourite.
   var stampedAt = r.updatedAt || Date.now();
-  var payload   = slimRecipeForCloud(r, true);
+  var payload   = slimRecipeForCloud(r);
   payload.updatedAt = stampedAt;
   var json  = JSON.stringify(payload);
   var bytes = byteLen(json);
@@ -13643,7 +13596,7 @@ async function saveRecipeDoc(r, db) {
 // new recipe yet must not drop it from the list on its next save.
 // Returns the updatedAt stamp it wrote, so the caller can record it as the
 // high-water mark and its own save doesn't force a full re-read next time.
-async function writeCloudMeta(list, nextIdVal, db, legacyAt) {
+async function writeCloudMeta(list, nextIdVal, db) {
   db = db || _fbDb;
   var stamp = Date.now();
   var ref = db.collection('shared').doc('meta');
@@ -13660,54 +13613,15 @@ async function writeCloudMeta(list, nextIdVal, db, legacyAt) {
       nextId: mergeNextId(nextIdVal, cur.nextId),
       ids: Object.keys(ids).map(function(i){ return parseInt(i, 10); }).filter(function(i){ return !isNaN(i); }),
       schema: CLOUD_SCHEMA,
-      // High-water mark for the legacy document (v28.1). Only moves when we have
-      // actually looked at it, so it never silently skips a straggler's edit.
-      legacyAt: (legacyAt === undefined ? (cur.legacyAt === undefined ? null : cur.legacyAt) : legacyAt),
+      // v32.2 — `legacyAt` used to live here as the high-water mark for the
+      // legacy `shared/recipes` document. That document has been deleted, so the
+      // field is no longer written. This is a full set(), not a merge, so the
+      // stale field disappears from the cloud on the first save after upgrading.
       updatedAt: stamp
     });
   });
   return stamp;
 }
-
-// v28.1 — `shared/recipes` is no longer written by this app, so if it CHANGES,
-// some device is still on v27.9 and writing to it. Without this pass that
-// person's edits would be invisible to every updated device and then quietly
-// overwritten. Narrow on purpose: adopt an existing recipe only when the legacy
-// copy is strictly newer, and an unknown recipe only when it was touched after
-// our high-water mark. A recipe deleted since then is older than the mark, so
-// this can never resurrect a deletion. Delete this pass along with the legacy
-// document, by hand, once no device can possibly be on v27.9.
-async function reconcileLegacyStragglers(list, meta, db) {
-  db = db || _fbDb;
-  var mark = (meta && meta.legacyAt) || null;
-  var out = { adopted: [], legacyAt: mark, changed: false };
-  var snap;
-  try { snap = await db.collection('shared').doc('recipes').get(); if (typeof countCloudRead==='function') countCloudRead(); }
-  catch(e) { return out; }                       // unreadable — not a reason to fail the load
-  if (!snap.exists) return out;
-  var data = snap.data() || {};
-  if (!data.updatedAt || data.updatedAt === mark) return out;   // untouched since we last looked
-  var legacy;
-  try { legacy = JSON.parse(data.recipes || '[]'); } catch(e) { return out; }
-  if (!Array.isArray(legacy)) return out;
-
-  var markMs = mark ? (Date.parse(mark) || 0) : 0;
-  var byId = {};
-  list.forEach(function(r){ byId[r.id] = r; });
-  legacy.forEach(function(L) {
-    if (!L || typeof L !== 'object' || L.id === undefined) return;
-    var mine = byId[L.id];
-    if (mine) {
-      if ((L.updatedAt || 0) > (mine.updatedAt || 0)) out.adopted.push(L);
-    } else if ((L.updatedAt || 0) > markMs) {
-      out.adopted.push(L);   // created on an old device since we last reconciled
-    }
-  });
-  out.legacyAt = data.updatedAt;
-  out.changed  = true;
-  return out;
-}
-window.reconcileLegacyStragglers = reconcileLegacyStragglers;
 
 // Remove the documents for recipes the user actually deleted.
 // Deletion is admin-only in firestore.rules, so a write-role member genuinely
@@ -13802,32 +13716,6 @@ function parseCloudRecipeDocs(docs) {
 }
 window.cloudUnreadableIds = function(){ return Object.keys(_cloudUnreadable); };
 window.parseCloudRecipeDocs = parseCloudRecipeDocs;
-
-// One-way migration from the legacy single document. Idempotent and safe to
-// interrupt: `schema` is stamped LAST and only once every document has landed, so
-// a migration killed half way leaves schema < 2, the read path keeps using the
-// legacy document, and re-running simply rewrites the same documents.
-async function migrateToPerRecipeDocs(list, nextIdVal, db, legacyAt) {
-  db = db || _fbDb;
-  var written = 0, skipped = [];
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i];
-    var json = JSON.stringify(slimRecipeForCloud(r, true));
-    if (byteLen(json) > FIRESTORE_DOC_LIMIT) { skipped.push(r.name || ('#' + r.id)); continue; }
-    var at = r.updatedAt || 0;
-    await db.collection('shared').doc(recipeDocId(r.id)).set({ r: json, updatedAt: at, id: r.id });
-    _cloudRecipeBase[r.id]  = at;
-    _cloudRecipeStamp[r.id] = hashStr(json);
-    _cloudRecipeIds[r.id]   = true;
-    written++;
-  }
-  // The legacy document's stamp at migration time becomes the high-water mark,
-  // so its existing contents are not mistaken for a straggler's later edits.
-  await writeCloudMeta(list, nextIdVal, db, legacyAt === undefined ? null : legacyAt);
-  _cloudSchema = CLOUD_SCHEMA;
-  return { written: written, skipped: skipped };
-}
-window.migrateToPerRecipeDocs = migrateToPerRecipeDocs;
 
 // 5d.2 — since deletion became admin-only, a write-role member removing a photo
 // cannot delete its cloud document and syncCloudPhotos swallows the refusal.
@@ -13938,14 +13826,7 @@ async function saveToFirestore() {
     setLastCloudMetaAt(await writeCloudMeta(recipes, nextId));
     saveCloudBase();   // v29.2 — so the next session still knows its base
 
-    // 3) v28.1 — the legacy `shared/recipes` document is no longer written.
-    //    That removes the last blind whole-collection overwrite in the app: up
-    //    to v28.0 every save still rewrote all of it, which was both the cost
-    //    and the remaining clobbering risk. It is still READ once per load, to
-    //    catch a device left on v27.9 (see reconcileLegacyStragglers), and it is
-    //    deleted by hand later — never in the same release that stopped writing.
-
-    // 4) Each changed photo into its own doc
+    // 3) Each changed photo into its own doc
     var photoErrors = await syncCloudPhotos();
 
     setTimeout(function() { window._justSaved = false; }, 5000);
@@ -14049,8 +13930,10 @@ async function _loadFromFirestoreInner(user) {
   // originalPhoto is local-only (never synced) — remember it so a cloud load doesn't drop it
   var _localOrig = {};
   recipes.forEach(function(r) { if (r.originalPhoto) _localOrig[r.id] = r.originalPhoto; });
-  // History is local-only (see stripPhotosForCloud), so a cloud load would
-  // otherwise wipe it — the incoming records simply don't have the field.
+  // History DOES travel per-recipe (v32.2 — it is the only cloud shape now), but
+  // a document written before 5.4, or one whose recipe was too large to write, has
+  // no `history` field at all. Remembering it locally means a cloud load can only
+  // ever ADD history, never silently wipe it.
   var _localHist = {};
   recipes.forEach(function(r) { if (r.history && r.history.length) _localHist[r.id] = r.history; });
   // Safety net: remember local photos too, keyed with their updatedAt. If the incoming
@@ -14072,15 +13955,13 @@ async function _loadFromFirestoreInner(user) {
     _cloudSchema = meta.schema || 0;
 
     var hasData = false;
-    var fsRecipes = null, cloudNextId = 0, needMigration = false;
-
-    var straggler = null, legacyAtAtMigration;
+    var fsRecipes = null, cloudNextId = 0;
 
     // 5.9 — nothing has changed in the cloud since this device last loaded, so
-    // skip reading every recipe and every photo. The legacy document is still
-    // checked (one read) because a device on v27.9 never touches `meta`, and
-    // missing its edits is exactly what v28.1 exists to prevent. Two reads
-    // instead of ~350; one, once the legacy document is finally deleted.
+    // skip reading every recipe and every photo. v32.2 — this used to cost a
+    // second read as well, checking the legacy `shared/recipes` document in case
+    // a device on v27.9 (which never touches `meta`) had edited it. That document
+    // is gone, so an unchanged collection now costs exactly ONE read.
     var offlineQueued = _offlineQueue || localStorage.getItem('tonys_offline_queue') === '1';
     var haveAllBases = recipes.length > 0 && recipes.every(function(r) {
       return _cloudRecipeBase[r.id] !== undefined;
@@ -14088,43 +13969,25 @@ async function _loadFromFirestoreInner(user) {
     var skipFanout = false;
     if (_cloudSchema >= CLOUD_SCHEMA &&
         canSkipCloudFanout(meta, recipes.length, _lastCloudMetaAt, offlineQueued, haveAllBases)) {
-      var quiet = await reconcileLegacyStragglers(recipes, meta);
-      countCloudRead();
-      if (!quiet.changed) {
-        dlog('[5.9] cloud unchanged (meta.updatedAt ' + meta.updatedAt + ') — skipped the per-recipe fan-out');
-        _lastSyncOkAt = Date.now();   // a confirmed no-change IS a successful sync
-        nextId = mergeNextId(nextId, meta.nextId || 0);
-        skipFanout = true;   // fall through: the change listeners below must still be installed
-      } else {
-        dlog('[5.9] legacy document moved — a device is still on v27.9; doing a full read');
-      }
+      dlog('[5.9] cloud unchanged (meta.updatedAt ' + meta.updatedAt + ') — skipped the per-recipe fan-out');
+      _lastSyncOkAt = Date.now();   // a confirmed no-change IS a successful sync
+      nextId = mergeNextId(nextId, meta.nextId || 0);
+      skipFanout = true;   // fall through: the change listeners below must still be installed
     }
 
     if (skipFanout) {
       // nothing to fetch — fsRecipes stays null and the load block below is a no-op
-    } else if (_cloudSchema >= CLOUD_SCHEMA) {
+    } else {
+      // v32.2 — no longer conditional on `_cloudSchema >= CLOUD_SCHEMA`. The only
+      // other branch read the legacy document and migrated from it; with that
+      // document deleted, per-recipe documents are the sole layout. Reading them
+      // unconditionally is also the safer failure mode: a `meta` document with a
+      // missing or stale `schema` field now loads the collection rather than
+      // reporting an empty cloud.
       var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
       countCloudRead(docs.length);
       fsRecipes = parseCloudRecipeDocs(docs);
       cloudNextId = meta.nextId || 0;
-      // v28.1 — catch a device still on v27.9 writing to the legacy document
-      straggler = await reconcileLegacyStragglers(fsRecipes, meta);
-      if (straggler.adopted.length) {
-        straggler.adopted.forEach(function(L) {
-          var i = fsRecipes.findIndex(function(r){ return r.id === L.id; });
-          if (i >= 0) fsRecipes[i] = L; else fsRecipes.push(L);
-        });
-      }
-    } else {
-      var snap = await _fbDb.collection('shared').doc('recipes').get();
-      countCloudRead();
-      if (snap.exists) {
-        var data = snap.data();
-        try { fsRecipes = JSON.parse(data.recipes || '[]'); } catch(e) { fsRecipes = null; }
-        cloudNextId = data.nextId || 0;
-        legacyAtAtMigration = data.updatedAt || null;
-        needMigration = Array.isArray(fsRecipes) && fsRecipes.length > 0;
-      }
     }
 
     {
@@ -14173,26 +14036,6 @@ async function _loadFromFirestoreInner(user) {
         if (typeof meta.updatedAt === 'number') setLastCloudMetaAt(meta.updatedAt);
         _lastSyncOkAt = Date.now();
 
-        // 5.4 — a legacy-only account migrates on its first load after sign-in.
-        // Done before any push-back below so those writes go to the new layout.
-        if (needMigration) {
-          try {
-            var mig = await migrateToPerRecipeDocs(recipes, nextId, _fbDb, legacyAtAtMigration);
-            dlog('[5.4] migrated', mig.written, 'recipes to per-recipe documents');
-            if (mig.skipped.length) {
-              toast('⚠️ ' + mig.skipped.length + ' recipe(s) too large to migrate — still in the old shared document');
-            } else {
-              toast('☁️ Cloud storage upgraded — each recipe now has its own document');
-            }
-            needMigration = false;
-          } catch(e) {
-            // Leave schema below 2 and keep using the legacy document; the next
-            // load simply tries again. An interrupted migration is not a failure
-            // state, it is just an unfinished one.
-            console.warn('[5.4] migration did not finish, will retry on next load:', e && e.message);
-          }
-        }
-
         if (hasOfflineChanges) {
           toast('✅ Offline changes merged with cloud data');
           _offlineQueue = false;
@@ -14204,28 +14047,20 @@ async function _loadFromFirestoreInner(user) {
           await saveToFirestore(); // push the recovered photos up so other devices get them too
         }
 
-        // v28.1 — a straggler on v27.9 wrote to the legacy document. Pull its
-        // edits into the per-recipe documents, then move the high-water mark so
-        // the same change isn't re-examined on every load. Say plainly which
-        // device needs attention: silently absorbing it forever would hide that
-        // someone is running a version that can still lose edits.
-        if (straggler && straggler.changed) {
-          if (straggler.adopted.length) {
-            toast('📥 Picked up ' + straggler.adopted.length + ' change(s) from a device still on v27.9 — update it when you can');
-            await saveToFirestore();
-          }
-          try { await writeCloudMeta(recipes, nextId, _fbDb, straggler.legacyAt); } catch(e) {}
-        }
       }
     }
 
     // Step 2: Set up listeners for FUTURE remote changes only.
-    // 5.4 — TWO listeners during the transition. A v28 device touches
-    // `shared/meta` on every save; a device still on v27.9 only ever writes
-    // `shared/recipes`. Watching one of them would miss half the family.
+    // v32.2 — ONE listener. During the 5.4 transition there were two: a v28
+    // device touches `shared/meta` on every save, but a device still on v27.9
+    // only ever wrote `shared/recipes`, so watching either alone would have
+    // missed half the family. `shared/recipes` is now deleted and nothing writes
+    // it, so `meta` alone sees every save. The list-and-unsubscribe shape is kept
+    // rather than collapsed: it is what guarantees no listener is left dangling
+    // across a re-sign-in, and that is worth more than one saved line.
     if (_firestoreUnsubscribe) _firestoreUnsubscribe();
     var subs = [];
-    ['meta', 'recipes'].forEach(function(docName) {
+    ['meta'].forEach(function(docName) {
       // Each listener skips its own first snapshot, which always fires
       // immediately with current data and is not a remote change.
       var isFirstSnapshot = true;
