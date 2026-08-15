@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.9: 171 checks, 165 passing.** The 6 failures are `net_*` and
+**As of v32.0: 171 checks, 165 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -303,6 +303,10 @@ found only because a test was written first and disagreed with the code.
   looks wrong on screen — it just skews the answer. `waMergeCloudIntoIndex` keeps
   one row per file with the cloud copy winning. Tony spotted this in a screenshot;
   no error message would ever have surfaced it.
+- **A source grep cannot see that a guard was disabled.** `if (false && await
+  askConfirm(...))` leaves the name in the source and a grep passes while the
+  confirmation never blocks. Stub the dependency and assert the OUTCOME — that
+  declining writes nothing. Fifth grep-shaped false pass in this project.
 - **A source-grep assertion can match its own comment.** `String(fn).indexOf('x')`
   sees comments too, so a test explaining "must not call x()" fails on itself —
   this has now happened three times (`Math.max.apply`, the old Bring! secret, and

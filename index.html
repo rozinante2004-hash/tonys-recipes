@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.9 -->
+<!-- Tony's Recipes Collection v32.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2466,6 +2466,57 @@ const SELF_TESTS = [
       // Deleting a photo must remove the object too, not just the pointer.
       if(String(syncCloudPhotos).indexOf('deletePhotoFromStorageBucket')===-1)
         throw new Error('deleting a photo leaves its Storage object orphaned forever');
+      // Enabling Storage only changes where NEW uploads go, so without a
+      // migration the collection would sit in two shapes forever — the exact
+      // mixed-methodology trap Tony objected to over recipe ids.
+      ['migratePhotosToStorage','storageMigrationPending','refreshStorageMigrateBox'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var keep=recipes, keepIds=window._cloudPhotoIds;
+      try{
+        window._cloudPhotoIds={ 1:true, 2:true };
+        recipes=[ normalizeRecipe({id:1,name:'still base64',photo:'data:image/png;base64,AAA'}),
+                  normalizeRecipe({id:2,name:'already moved',photo:'https://firebasestorage.googleapis.com/x'}),
+                  normalizeRecipe({id:3,name:'not in cloud',photo:'data:image/png;base64,BBB'}) ];
+        var pend=storageMigrationPending();
+        if(pend.length!==1) throw new Error('expected exactly the base64 cloud photo to need moving, got '+pend.length);
+        if(pend[0].id!==1) throw new Error('the wrong photo was queued for migration');
+      } finally { recipes=keep; window._cloudPhotoIds=keepIds; }
+      // It must be a deliberate action, and it must confirm — it rewrites every
+      // photo document in the shared collection.
+      var mig=String(migratePhotosToStorage);
+      // Behavioural, not a grep: `false && askConfirm(...)` leaves the name in
+      // the source while never blocking, and a grep passes. Declining must
+      // actually write nothing.
+      var sDb=window._fbDb, sUser=window._fbUser, sAsk=window.askConfirm,
+          sReady=window.storageReady, sUp=window.uploadPhotoToStorageBucket, sRec=recipes, sIds=window._cloudPhotoIds;
+      try{
+        var db=_fakeFirestore({}); window._fbDb=db; window._fbUser={ email:'t@x.y' };
+        window.storageReady=function(){ return Promise.resolve(true); };
+        var uploads=0;
+        window.uploadPhotoToStorageBucket=function(){ uploads++; return Promise.resolve('https://storage/x'); };
+        window._cloudPhotoIds={ 1:true };
+        recipes=[ normalizeRecipe({id:1,name:'p',photo:'data:image/png;base64,AAA'}) ];
+        window.askConfirm=function(){ return Promise.resolve(false); };   // user says no
+        await migratePhotosToStorage();
+        if(uploads!==0) throw new Error('declining the confirmation still uploaded '+uploads+' photo(s)');
+        if(Object.keys(db._docs).length!==0) throw new Error('declining still rewrote Firestore documents');
+        window.askConfirm=function(){ return Promise.resolve(true); };    // user says yes
+        await migratePhotosToStorage();
+        if(uploads!==1) throw new Error('accepting did not upload the pending photo');
+        if(!db._docs['photo_1']||!db._docs['photo_1'].photoUrl)
+          throw new Error('the Firestore document was not replaced with a Storage pointer');
+        if(db._docs['photo_1'].photo) throw new Error('the base64 copy was left in the document');
+      } finally {
+        window._fbDb=sDb; window._fbUser=sUser; window.askConfirm=sAsk;
+        window.storageReady=sReady; window.uploadPhotoToStorageBucket=sUp;
+        recipes=sRec; window._cloudPhotoIds=sIds;
+      }
+      if(mig.indexOf('storageReady')===-1) throw new Error('migration does not check Storage is actually available');
+      // A failure must leave that photo untouched and be reported, not swallowed.
+      if(mig.indexOf('failed.push')===-1||mig.indexOf('showServiceError')===-1)
+        throw new Error('photos that fail to move are not reported');
+      if(!document.getElementById('storageMigrateBox')) throw new Error('there is no way to run the migration');
     } },
 
   { id:'sec_bring_secret_not_shipped', group:'Network', name:'The Bring! set-token secret is not in the repo (v31.3)',
@@ -4845,6 +4896,7 @@ window.copySyncHealth = copySyncHealth;
 
 function openSyncHealth() {
   renderSyncHealth();
+  refreshStorageMigrateBox().catch(function(){});
   document.getElementById('syncHealthOverlay').classList.add('open');
 }
 window.openSyncHealth   = openSyncHealth;
@@ -5036,7 +5088,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.9';
+var APP_VERSION = 'v32.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7401,7 +7453,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7972,7 +8024,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12851,6 +12903,85 @@ function forgetPhotoProbes() { try { localStorage.removeItem(PHOTO_PROBED_KEY); 
 // asks the cloud directly for any recipe that has no photo, once per recipe.
 // Bounded: at most PHOTO_REPAIR_MAX reads per run, and each answer remembered.
 var PHOTO_REPAIR_MAX = 60;
+// ─── Moving photos already in Firestore over to Storage (5.2) ───────────────
+// Enabling Storage only changes where NEW uploads go: syncCloudPhotos skips a
+// photo whose content has not changed, so everything already in Firestore as
+// base64 would stay there indefinitely. That is precisely the mixed-methodology
+// state Tony objected to over recipe ids, and he is right — two storage shapes
+// for the same kind of data is a trap for whoever looks next.
+//
+// This is deliberately a BUTTON, not something that happens on load: it rewrites
+// every photo document in the shared collection, and a bulk cloud write should
+// be a decision, taken once, with a backup in hand.
+function storageMigrationPending() {
+  // Only what is genuinely still base64 in the cloud. _cloudPhotoStamps holds
+  // what we last wrote; a photo already stored as a URL has an http(s) stamp.
+  return (recipes || []).filter(function(r) {
+    return r.photo && /^data:/i.test(r.photo) && _cloudPhotoIds[r.id];
+  });
+}
+async function migratePhotosToStorage() {
+  var btn = document.getElementById('storageMigrateBtn');
+  var st  = document.getElementById('storageMigrateStatus');
+  var say = function(html){ if (st) st.innerHTML = html; };
+  if (!_fbDb || !window._fbUser) { say('<span style="color:#c62828;">Sign in first.</span>'); return; }
+  if (!await storageReady()) {
+    say('<span style="color:#c62828;">Firebase Storage is not enabled on the project yet.</span>'); return;
+  }
+  var pending = storageMigrationPending();
+  if (!pending.length) { say('<span style="color:#2e7d32;">Nothing to move — every photo is already in Storage.</span>'); return; }
+  if (!await askConfirm({ icon:'🗄️', title:'Move ' + pending.length + ' photo' + (pending.length===1?'':'s') + ' to Storage?',
+      message:'Each photo is uploaded to Firebase Storage and its Firestore document is replaced with a pointer.\n\n'
+        + 'The photos on this device are untouched, and a photo that fails to move simply stays where it is. '
+        + 'Other devices pick up the change on their next sync.\n\nTake a backup first if you have not.',
+      okLabel:'Move them' })) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Moving…'; }
+  var moved = 0, failed = [];
+  for (var i = 0; i < pending.length; i++) {
+    var r = pending[i];
+    say('Moving ' + (i + 1) + ' of ' + pending.length + '…');
+    try {
+      var url = await uploadPhotoToStorageBucket(r.id, r.photo);
+      await _fbDb.collection('shared').doc('photo_' + r.id)
+        .set({ photoUrl: url, storage: true, updatedAt: r.updatedAt || Date.now() });
+      // The local copy stays base64 on purpose: export, email and print all
+      // consume data URLs, and re-fetching every photo to prove a point would
+      // cost bandwidth for nothing.
+      _cloudPhotoStamps[r.id] = r.photo;
+      moved++;
+    } catch(e) {
+      failed.push((r.name || ('#' + r.id)) + ' — ' + (e && e.message ? e.message : 'upload failed'));
+    }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Move existing photos to Storage'; }
+  say('<span style="color:' + (failed.length ? '#8A6D00' : '#2e7d32') + ';">Moved ' + moved + ' of ' + pending.length + '.</span>');
+  if (failed.length) {
+    showServiceError('Moved ' + moved + ' photo(s). ' + failed.length + ' could not be moved and are UNCHANGED '
+      + 'in Firestore — nothing was lost, and you can run this again:\n\n' + failed.join('\n'));
+  }
+  renderSyncHealth();
+}
+window.migratePhotosToStorage = migratePhotosToStorage;
+window.storageMigrationPending = storageMigrationPending;
+
+// Show the control only when it can do something.
+async function refreshStorageMigrateBox() {
+  var box = document.getElementById('storageMigrateBox');
+  if (!box) return;
+  var ready = await storageReady();
+  box.style.display = ready ? 'block' : 'none';
+  if (!ready) return;
+  var n = storageMigrationPending().length;
+  var info = document.getElementById('storageMigrateInfo');
+  if (info) info.textContent = n
+    ? n + ' photo' + (n===1?' is':'s are') + ' still stored as base64 inside Firestore. Moving them keeps recipe documents small and lifts the 1 MB per-photo limit.'
+    : 'Every photo is in Storage. New ones go there automatically.';
+  var btn = document.getElementById('storageMigrateBtn');
+  if (btn) btn.style.display = n ? 'block' : 'none';
+}
+window.refreshStorageMigrateBox = refreshStorageMigrateBox;
+
 async function repairMissingPhotos() {
   if (!_fbDb || !window._fbUser) return { restored: 0, checked: 0 };
   var probed = {}, restored = 0, checked = 0, nowProbed = [];
@@ -17044,6 +17175,14 @@ function updateFilterBarTop() {
       <div style="display:flex;gap:8px;margin-top:14px;">
         <button onclick="renderSyncHealth()" style="flex:1;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">↻ Refresh</button>
         <button onclick="copySyncHealth()" style="flex:1;padding:11px 18px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy</button>
+      </div>
+      <!-- Only shown once Firebase Storage is actually reachable, so it cannot
+           be pressed into a dead end. -->
+      <div id="storageMigrateBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">🗄️ Photos in Firebase Storage</div>
+        <div id="storageMigrateInfo" style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px;"></div>
+        <button id="storageMigrateBtn" onclick="migratePhotosToStorage()" style="width:100%;padding:11px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;">Move existing photos to Storage</button>
+        <div id="storageMigrateStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:6px;"></div>
       </div>
     </div>
   </div>
