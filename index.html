@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.0 -->
+<!-- Tony's Recipes Collection v32.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2513,6 +2513,15 @@ const SELF_TESTS = [
         recipes=sRec; window._cloudPhotoIds=sIds;
       }
       if(mig.indexOf('storageReady')===-1) throw new Error('migration does not check Storage is actually available');
+      // storageReady() only proves the SDK constructs; on a project where
+      // Storage was never enabled (it needs a paid plan) firebase.storage()
+      // still succeeds. The first real failure is the only proof, and it must
+      // stop the retries — otherwise every photo save attempts a doomed upload.
+      if(typeof markStorageUnavailable!=='function') throw new Error('markStorageUnavailable not defined');
+      if(String(syncCloudPhotos).indexOf('markStorageUnavailable')===-1)
+        throw new Error('a failed Storage upload keeps retrying on every photo, on every save');
+      if(mig.indexOf('markStorageUnavailable')===-1)
+        throw new Error('the migration grinds through every photo collecting the same error');
       // A failure must leave that photo untouched and be reported, not swallowed.
       if(mig.indexOf('failed.push')===-1||mig.indexOf('showServiceError')===-1)
         throw new Error('photos that fail to move are not reported');
@@ -5088,7 +5097,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.0';
+var APP_VERSION = 'v32.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7453,7 +7462,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8024,7 +8033,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12952,6 +12961,9 @@ async function migratePhotosToStorage() {
       moved++;
     } catch(e) {
       failed.push((r.name || ('#' + r.id)) + ' — ' + (e && e.message ? e.message : 'upload failed'));
+      // If the very first one fails, Storage is not really there. Stop rather
+      // than grinding through every photo to collect the same error N times.
+      if (!moved) { markStorageUnavailable(e && e.message); break; }
     }
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Move existing photos to Storage'; }
@@ -13067,7 +13079,12 @@ async function storageReady() {
     if (!window.firebase || !firebase.apps || !firebase.apps.length) { _storageReady = false; return false; }
     if (!firebase.storage) await loadScriptOnce(STORAGE_SDK, null);
     if (!firebase.storage) { _storageReady = false; return false; }
-    firebase.storage();                       // throws if no bucket is configured
+    // NOTE: this only proves the SDK constructs. It does NOT prove the project
+    // has a Storage bucket provisioned — `storageBucket` is in the config, so
+    // this succeeds even on a project where Storage was never enabled (it now
+    // needs a paid plan). Real proof only arrives when an upload is attempted,
+    // which is why markStorageUnavailable() exists.
+    firebase.storage();
     _storageReady = true;
   } catch (e) {
     dlog('[storage] unavailable, staying on base64:', e && e.message);
@@ -13075,6 +13092,18 @@ async function storageReady() {
   }
   return _storageReady;
 }
+// The first failed upload is the real answer. Without this, a project without
+// Storage retried a doomed upload for EVERY photo on EVERY save — a wasted round
+// trip each time — and the migration button appeared and could only fail.
+function markStorageUnavailable(reason) {
+  if (_storageReady === false) return;
+  _storageReady = false;
+  dlog('[storage] disabled for this session:', reason);
+  var box = document.getElementById('storageMigrateBox');
+  if (box) box.style.display = 'none';
+}
+window.markStorageUnavailable = markStorageUnavailable;
+
 function dataUrlToBlobForUpload(dataUrl) {
   var m = /^data:([^;,]+)[^,]*,(.*)$/.exec(String(dataUrl || ''));
   if (!m) return null;
@@ -13133,8 +13162,11 @@ async function syncCloudPhotos() {
           continue;
         } catch(e) {
           // Storage failed for this one photo. Fall through to base64 rather
-          // than losing it — a bucket problem must not cost a photo.
+          // than losing it — a bucket problem must not cost a photo. And stop
+          // trying for the rest of the session: on a project without Storage
+          // this would otherwise fail once per photo, per save, forever.
           dlog('[storage] upload failed for ' + r.id + ', falling back to base64:', e && e.message);
+          markStorageUnavailable(e && e.message);
         }
       }
       var pbytes = byteLen(r.photo);

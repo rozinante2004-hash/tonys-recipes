@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v32.0: 171 checks, 165 passing.** The 6 failures are `net_*` and
+**As of v32.1: 171 checks, 165 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -168,6 +168,13 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **Firebase Storage needs a PAID (Blaze) plan and this project is on Spark, so
+  it is OFF and photos stay base64 in Firestore.** All the Storage code is dormant
+  and safe: `storageReady()` gates it, uploads fall back to base64, and both
+  document shapes stay readable. Note the trap — `firebase.storage()` SUCCEEDS on
+  a project without a bucket, because `storageBucket` is in the config, so
+  readiness cannot be proven up front. `markStorageUnavailable()` latches on the
+  first real upload failure; without it every photo save retried a doomed upload.
 - **`img-src` governs RENDERING; fetching an image's bytes is `connect-src`.**
   Photo search results displayed fine while "Use this Photo" failed silently,
   because applying a photo downloads it with `fetch()` from whatever host the
