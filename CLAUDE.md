@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.4: 169 checks, 163 passing.** The 6 failures are `net_*` and
+**As of v31.5: 170 checks, 164 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -166,6 +166,16 @@ found only because a test was written first and disagreed with the code.
   key checks because it runs from a bookmarklet on web.getbring.com — its own
   secret authenticates it, and that secret now has **no default** (the old
   fallback was committed in a public repo).
+- **Firebase Auth needs its own authDomain in the CSP.** The compat SDK creates a
+  hidden iframe on `<project>.firebaseapp.com` and talks to it; omitting the host
+  from `frame-src`/`connect-src` stalls sign-in with no visible error, so the app
+  never runs any of the paths that reveal the Sign in control.
+- **`#signInHeaderBtn` is `display:none` in the markup** and is only revealed by
+  `useOfflineMode()`, `signOut()` or an auth callback. If auth never resolves,
+  none of them run and the header shows the words "Sign in to sync across
+  devices" with nothing to press — the app instructing something it gives no
+  means of doing. `ensureSignInReachable()` is the safety net, deliberately
+  independent of WHY auth failed.
 - **The CSP must stay in step with the CONNECT hosts too.** v31.1 pinned
   `connect-src` without the three CORS proxies that URL import falls back to, so
   our own policy killed the fallback — and the failure message blamed the recipe

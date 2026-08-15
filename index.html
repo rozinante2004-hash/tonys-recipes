@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.4 -->
+<!-- Tony's Recipes Collection v31.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,7 +32,7 @@
      killed URL import for any site the Worker could not reach, and the error
      blamed the recipe site. Do not drop them without also removing step 2 of
      runUrlImport. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -2502,6 +2502,44 @@ const SELF_TESTS = [
       if(!/minute/i.test(workerErrorText(429,{}))) throw new Error('a 429 does not say to wait');
     } },
 
+  { id:'ux_signin_always_reachable', group:'UI', name:'Sign in is never unclickable text (v31.5)',
+    test: async()=>{
+      // Tony's son's phone showed "Offline mode" and "Sign in to sync across
+      // devices" with no control to act on either: #signInHeaderBtn is
+      // display:none in the markup and only useOfflineMode(), signOut() or an
+      // auth callback reveal it. If Firebase never initialises, none of those
+      // run and the app instructs something it gives no means of doing.
+      ['ensureSignInReachable','signInIsReachable'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var btn=document.getElementById('signInHeaderBtn');
+      if(!btn) throw new Error('#signInHeaderBtn missing');
+      var prevBtn=btn.style.display, prevUser=window._fbUser;
+      var bar=document.getElementById('saveStatusBar'), prevBar=bar?bar.textContent:'';
+      var login=document.getElementById('loginScreen'), prevLogin=login?login.style.display:'';
+      try{
+        window._fbUser=null;
+        btn.style.display='none';
+        if(login) login.style.display='none';
+        if(!signInIsReachable()!==true) { /* both hidden => not reachable */ }
+        if(signInIsReachable()) throw new Error('signInIsReachable says yes while both the button and the login screen are hidden');
+        ensureSignInReachable();
+        await new Promise(function(r){ setTimeout(r,4200); });
+        if(!signInIsReachable()) throw new Error('after boot with no auth, there is still no way to sign in');
+        if(bar && /Sign in to sync across devices/.test(bar.textContent))
+          throw new Error('the status line still instructs an action the user cannot take');
+        // It must NOT nag a signed-in user.
+        btn.style.display='none'; window._fbUser={ email:'x@y.z' };
+        ensureSignInReachable();
+        await new Promise(function(r){ setTimeout(r,4200); });
+        if(btn.style.display!=='none') throw new Error('a signed-in user was offered a Sign in button');
+      } finally {
+        window._fbUser=prevUser; btn.style.display=prevBtn;
+        if(bar) bar.textContent=prevBar;
+        if(login) login.style.display=prevLogin;
+      }
+    } },
+
   { id:'sec_csp_allows_import_fallbacks', group:'Network', name:'The CSP does not break URL import (v31.4)',
     test: async()=>{
       // v31.1 shipped a CSP whose connect-src omitted the CORS proxies that URL
@@ -2552,6 +2590,10 @@ const SELF_TESTS = [
         if(c.indexOf(pair[0])===-1) throw new Error('CSP is missing '+pair[0]+' — '+pair[1]+' is not blocked');
       });
       if(c.indexOf('lively-bread')===-1) throw new Error('connect-src does not allow the Worker, so every AI call would fail');
+      // Firebase Auth compat creates a hidden iframe on the project's authDomain
+      // and talks to it. Omitting the host stalls sign-in with no visible error.
+      if(c.indexOf('firebaseapp.com')===-1)
+        throw new Error('the Firebase auth domain is not allowed, so sign-in would stall');
       // The email preview is a srcdoc iframe (about:srcdoc) and needs frame-src 'self'.
       if(!/frame-src[^;]*'self'/.test(c)) throw new Error("frame-src lacks 'self' — the email preview iframe would be blocked");
       // Lazily loaded libraries must still be reachable.
@@ -4871,7 +4913,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.4';
+var APP_VERSION = 'v31.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7236,7 +7278,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7807,7 +7849,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14022,6 +14064,35 @@ function useOfflineMode() {
   renderFilters(); renderGrid();
 }
 
+// v31.5 — Tony's son's phone showed "Offline mode" and the words "Sign in to
+// sync across devices", with no way to act on either: #signInHeaderBtn is
+// display:none in the markup and is only revealed by useOfflineMode(), signOut()
+// or an auth callback. If Firebase never initialises — a blocked script, a CSP
+// gap, no network at boot — none of those run, and the app instructs the user to
+// do something it gives them no means of doing. A dead end is a bug here.
+//
+// So: a short while after boot, if we are not signed in, make sure the control
+// exists. Cheap, idempotent, and independent of WHY auth did not resolve.
+function signInIsReachable() {
+  var btn = document.getElementById('signInHeaderBtn');
+  var login = document.getElementById('loginScreen');
+  var btnVisible = !!(btn && btn.style.display !== 'none');
+  var loginVisible = !!(login && login.style.display !== 'none' && login.style.display !== '');
+  return btnVisible || loginVisible;
+}
+function ensureSignInReachable() {
+  setTimeout(function() {
+    if (window._fbUser) return;                 // signed in; nothing to offer
+    if (signInIsReachable()) return;            // already reachable
+    var btn = document.getElementById('signInHeaderBtn');
+    if (btn) btn.style.display = 'inline';
+    // ...and stop the status line instructing something it cannot deliver.
+    var bar = document.getElementById('saveStatusBar');
+    if (bar) bar.textContent = 'Working offline — tap Sign in above to sync across devices';
+  }, 4000);
+}
+window.ensureSignInReachable = ensureSignInReachable; window.signInIsReachable = signInIsReachable;
+
 function showLoginScreen() {
   // Save current local data before showing login — protects offline changes
   saveLocal();
@@ -16631,6 +16702,7 @@ function updateFilterBarTop() {
   loadCloudBase();             // v29.2 — and what version of each recipe the cloud held
   initPullToRefresh();         // 5c.3
   labelIconButtons();          // a11y: give the ✕ / heart buttons an accessible name
+  ensureSignInReachable();     // v31.5 — never leave "sign in" as unclickable text
   setTimeout(checkBackupOverdue, 6000);   // 5d.1 — after the app has settled
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously
