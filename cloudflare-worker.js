@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v34
+// Tony's Recipes — Cloudflare Worker v35
+// v35: the app key is read from the request BODY (header still accepted). A
+//      custom header forces a CORS preflight that only v34+ allows, so an app
+//      sending it could not reach an older Worker at all — that took every
+//      server feature down in v31.1 until this Worker was deployed.
 // v34: access control — origin allowlist, X-App-Key, KV rate limiting, and the
 //      hard-coded bring-settoken fallback secret removed. Adds an open `health`
 //      action so the app can tell "down" from "refusing me".
@@ -83,10 +87,17 @@ function corsFor(request, env) {
     'Vary': 'Origin',
   };
 }
-function appKeyOk(request, env) {
+// The key arrives in the BODY, with the header still accepted for compatibility.
+// A custom request header forces a CORS preflight, and v34's OPTIONS reply is the
+// only one that allows X-App-Key — so an app sending the header could not talk to
+// an older Worker AT ALL. That ordering dependency took the whole app down once
+// (v31.1) and must not be able to again: a body field needs no preflight change,
+// so old app + new Worker and new app + old Worker both work.
+function appKeyOk(request, env, body) {
   const expected = env.APP_SHARED_KEY || '';
-  if (!expected) return true;                    // not configured — fail open, and say so in health
-  return request.headers.get('X-App-Key') === expected;
+  if (!expected) return true;                    // not configured — fail open, reported by health
+  const supplied = (body && body.appKey) || request.headers.get('X-App-Key') || '';
+  return supplied === expected;
 }
 
 // KV-backed sliding window, keyed on the caller's IP. KV is eventually
@@ -227,7 +238,7 @@ export default {
       // it cannot satisfy the origin or app-key checks. Its own secret is what
       // authenticates it — see below, where the insecure default was removed.
       if (body.action !== 'bring-settoken') {
-        if (!appKeyOk(request, env)) {
+        if (!appKeyOk(request, env, body)) {
           return jsonResp({ error: 'FORBIDDEN: missing or wrong app key.' }, 403, corsHeaders);
         }
       }
@@ -246,7 +257,7 @@ export default {
         version: 'v34',
         originAllowed: origin !== false,
         appKeyRequired: !!env.APP_SHARED_KEY,
-        appKeyAccepted: appKeyOk(request, env),
+        appKeyAccepted: appKeyOk(request, env, body),
         rateLimiting: !!env.BRING_KV,
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,

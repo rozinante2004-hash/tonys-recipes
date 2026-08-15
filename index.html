@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.7 -->
+<!-- Tony's Recipes Collection v31.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -744,11 +744,29 @@ function _cloudRestoreForTest(s) {
 // scripted abuse. The rate limit is the control that actually bounds the damage.
 var WORKER_ENDPOINT = 'https://lively-bread-273a.rozinante2004.workers.dev';
 var WORKER_APP_KEY  = 'tonys-recipes-web-v1';
+// The key travels in the BODY, not a header. A custom request header forces a
+// CORS preflight, and the deployed Worker answers OPTIONS with
+// `Access-Control-Allow-Headers: Content-Type` — so adding `X-App-Key` in v31.1
+// made the browser block EVERY Worker call until the new Worker was deployed.
+// Photo search, AI import, URL fetch, translate and nutrition were all dead, and
+// the app could only report "could not be reached from this device".
+//
+// A body field needs no preflight change, so this works against the currently
+// deployed Worker AND the hardened one, in either order. Deployment ordering
+// must never be able to take the app down again.
 function workerHeaders(extra) {
-  var h = { 'Content-Type': 'application/json', 'X-App-Key': WORKER_APP_KEY };
+  var h = { 'Content-Type': 'application/json' };
   if (extra) Object.keys(extra).forEach(function(k){ h[k] = extra[k]; });
   return h;
 }
+// Wrap a payload with the app key. Every Worker call goes through this.
+function workerBody(payload) {
+  var o = {};
+  Object.keys(payload || {}).forEach(function(k){ o[k] = payload[k]; });
+  o.appKey = WORKER_APP_KEY;
+  return JSON.stringify(o);
+}
+window.workerBody = workerBody;
 // Turn the Worker's own refusals into something actionable rather than a raw code.
 function workerErrorText(status, data) {
   if (status === 403) return (data && data.error && /app key/i.test(data.error))
@@ -925,7 +943,7 @@ const SELF_TESTS = [
       // Send a minimal AI request as a worker health check
       const r=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body:JSON.stringify({
+        body: workerBody({
           model: AI_MODEL,
           max_tokens:5,
           messages:[{role:'user',content:'Reply OK'}]
@@ -946,7 +964,7 @@ const SELF_TESTS = [
       // Use a known accessible recipe URL provided for testing
       const resp=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body:JSON.stringify({action:'fetch-url',url:'https://mazon-izun.com/recipes/fermented-cucumbers/'}),
+        body: workerBody({action:'fetch-url',url:'https://mazon-izun.com/recipes/fermented-cucumbers/'}),
         signal:AbortSignal.timeout(20000)});
       if(!resp.ok) throw new Error('fetch-url returned '+resp.status);
       const data=await resp.json();
@@ -958,7 +976,7 @@ const SELF_TESTS = [
     test: async()=>{
       const resp=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body:JSON.stringify({action:'photo-search',query:'pasta'}),
+        body: workerBody({action:'photo-search',query:'pasta'}),
         signal:AbortSignal.timeout(10000)});
       if(!resp.ok) throw new Error('photo-search returned '+resp.status);
       const data=await resp.json();
@@ -970,7 +988,7 @@ const SELF_TESTS = [
       // Use a known stable public post
       const resp=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body:JSON.stringify({action:'instagram-fetch',shortcode:'C5IHqgqoFMo'}),
+        body: workerBody({action:'instagram-fetch',shortcode:'C5IHqgqoFMo'}),
         signal:AbortSignal.timeout(10000)});
       // Instagram's oEmbed API now requires auth — Worker returns 404 (not 500) when unavailable.
       // Accept 200 or 404; only fail on 500 (true Worker crash).
@@ -2489,9 +2507,23 @@ const SELF_TESTS = [
         if(typeof window[f]==='undefined') throw new Error(f+' not defined');
       });
       var h=workerHeaders();
-      if(!h['X-App-Key']) throw new Error('workerHeaders sends no app key');
       if(h['Content-Type']!=='application/json') throw new Error('the JSON content type was lost');
       if(workerHeaders({'X-Extra':'1'})['X-Extra']!=='1') throw new Error('extra headers are dropped');
+      // v31.8 — the key must travel in the BODY, never as a custom header. A
+      // custom header forces a CORS preflight, and only the newest Worker allows
+      // it in Access-Control-Allow-Headers — so sending it made the browser
+      // block EVERY Worker call until that Worker was deployed. The whole app's
+      // server features were dead for two releases because of this.
+      if(h['X-App-Key'])
+        throw new Error('the app key is back in a request header, which forces a preflight an older Worker will reject');
+      if(typeof workerBody!=='function') throw new Error('workerBody not defined');
+      var body=JSON.parse(workerBody({ action:'photo-search', query:'x' }));
+      if(!body.appKey) throw new Error('workerBody sends no app key');
+      if(body.action!=='photo-search'||body.query!=='x') throw new Error('workerBody dropped the payload');
+      // Every Worker call must go through it, or that call is unauthenticated.
+      var page=document.documentElement.innerHTML;
+      var stray=(page.match(/fetch\(\s*(?:WORKER_ENDPOINT|BRING_WORKER_URL|WORKER_URL)\b[\s\S]{0,800}?body:\s*JSON\.stringify\(/g)||[]).length;
+      if(stray) throw new Error(stray+' Worker call(s) build their body directly and so send no app key');
       // No call site may inline the URL and thereby skip the key.
       var src=document.documentElement.innerHTML;
       var inlined=(src.match(/fetch\('https:\/\/lively-bread/g)||[]).length;
@@ -4643,7 +4675,7 @@ async function autoFetchMissingPhotos() {
       // Search Pixabay
       var resp = await fetch(WORKER_ENDPOINT, {
         method:'POST', headers: workerHeaders(),
-        body: JSON.stringify({action:'photo-search', query: query + ' food recipe'}),
+        body: workerBody({action:'photo-search', query: query + ' food recipe'}),
         signal: AbortSignal.timeout(10000)
       });
       var data = await resp.json();
@@ -4981,7 +5013,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.7';
+var APP_VERSION = 'v31.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7346,7 +7378,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7917,7 +7949,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10728,7 +10760,7 @@ async function importFromFile(event){
       toast('🤖 Extracting text from PDF…');
       var resp = await fetch(WORKER_ENDPOINT, {
         method:'POST', headers: workerHeaders(),
-        body: JSON.stringify({
+        body: workerBody({
           model: AI_MODEL, max_tokens:2000,
           messages:[{role:'user', content:[
             {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
@@ -11519,7 +11551,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
       const r = await fetch(WORKER_URL, {
         method: 'POST',
         headers: workerHeaders(),
-        body: JSON.stringify(body)
+        body: workerBody(body)
       });
 
       if (r.status === 429 || r.status === 529) {
@@ -12184,7 +12216,7 @@ async function runUrlImport() {
     try {
       var igResp = await fetch(WORKER_ENDPOINT, {
         method: 'POST', headers: workerHeaders(),
-        body: JSON.stringify({ action: 'instagram-fetch', shortcode: igId })
+        body: workerBody({ action: 'instagram-fetch', shortcode: igId })
       });
       var igData = await igResp.json();
       // `partial` means the Worker got the post but not the words. Ten characters
@@ -12234,7 +12266,7 @@ async function runUrlImport() {
     const fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
       headers: workerHeaders(),
-      body: JSON.stringify({ action: 'fetch-url', url: url })
+      body: workerBody({ action: 'fetch-url', url: url })
     });
     if (fetchResp.ok) {
       const fetchData = await fetchResp.json();
@@ -14433,7 +14465,7 @@ async function processCameraImage(event) {
       res.innerHTML = spinner('Step 1: Reading text (2500px, ' + sizeKB + 'KB)...');
       const step1 = await fetch(WORKER_ENDPOINT, {
         method: 'POST', headers: workerHeaders(),
-        body: JSON.stringify({ model: AI_MODEL, max_tokens: 1500,
+        body: workerBody({ model: AI_MODEL, max_tokens: 1500,
           messages: [{ role: 'user', content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
             { type: 'text', text: 'Transcribe ALL text visible in this image word for word in the original language. Watch for similar Hebrew letters. Do NOT translate. If unclear write [?].' }
@@ -14449,7 +14481,7 @@ async function processCameraImage(event) {
         + spinner('Step 2: Extracting recipe...');
       const step2 = await fetch(WORKER_ENDPOINT, {
         method: 'POST', headers: workerHeaders(),
-        body: JSON.stringify({ model: AI_MODEL, max_tokens: 2000,
+        body: workerBody({ model: AI_MODEL, max_tokens: 2000,
           messages: [{ role: 'user', content: 'Extract recipe from this text. Keep original language. Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. If no recipe return {"error":"no recipe"}. Text:\n\n' + transcription }]
         })
       });
@@ -14720,7 +14752,7 @@ async function doPhotoSearch() {
     try {
       var resp = await fetch(WORKER_ENDPOINT, {
         method: 'POST', headers: workerHeaders(),
-        body: JSON.stringify({ action: 'photo-search', query: _photoQuery, source: source, page: _photoPage })
+        body: workerBody({ action: 'photo-search', query: _photoQuery, source: source, page: _photoPage })
       });
       var data = await resp.json();
       if (data.notConfigured) {
@@ -15080,7 +15112,7 @@ async function checkBringTokenStatus(probe){
   try {
     var resp = await fetch(BRING_WORKER_URL,{
       method:'POST', headers: workerHeaders(),
-      body: JSON.stringify({action:'bring-token-status', probe: !!probe})
+      body: workerBody({action:'bring-token-status', probe: !!probe})
     });
     var data = await resp.json();
     if(data && typeof data.configured !== 'undefined'){
@@ -15111,7 +15143,7 @@ async function updateBringToken(token) {
     setBringTokenExpiry(payload.exp);
     var _secret=getBringTokenSecret();
     if(!_secret){ showServiceError('The Bring! set-token secret is not set on this device.\n\nOpen ⚙️ Settings → Bring! and paste the same value you put in BRING_SETTOKEN_SECRET on the Worker.'); return; }
-    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-settoken',token:token,secret:_secret})});
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body: workerBody({action:'bring-settoken',token:token,secret:_secret})});
     var data=await resp.json();
     if(data.success){ toast('Bring! token updated! Valid for 7 days.'); renderBringTokenStatus(); return true; }
   } catch(e){ console.warn('Bring token update failed:',e); }
@@ -15252,7 +15284,7 @@ function openBringForTokenRefresh() {
     _bringTokenPollAttempts++;
     if(_bringTokenPollAttempts>40){ clearInterval(_bringTokenPollInterval); document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:#c62828;">Timed out. Try again.</span>'; return; }
     try {
-      var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-lists'})});
+      var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body: workerBody({action:'bring-lists'})});
       var data=await resp.json();
       if(data.ok||(data.lists&&data.lists.length>0)){
         clearInterval(_bringTokenPollInterval);
@@ -15273,7 +15305,7 @@ function showBringTokenExpired(items) {
 
 async function sendItemsToBring(items) {
   try {
-    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body:JSON.stringify({action:'bring-add',items:items})});
+    var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body: workerBody({action:'bring-add',items:items})});
     var data=await resp.json();
     if(data.tokenExpired){ showBringTokenExpired(items); return; }
     if(data.success){

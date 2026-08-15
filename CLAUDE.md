@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.7: 171 checks, 165 passing.** The 6 failures are `net_*` and
+**As of v31.8: 171 checks, 165 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -157,6 +157,15 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **NEVER send a custom request header to the Worker.** `Content-Type:
+  application/json` already forces a CORS preflight, and the Worker's OPTIONS
+  reply lists exactly which headers are allowed. Adding `X-App-Key` in v31.1 meant
+  every call was blocked by the browser until the matching Worker was deployed —
+  photo search, AI import, URL fetch, translate and nutrition were ALL dead for
+  two releases, reporting only "could not be reached from this device". The key
+  travels in the request BODY (`workerBody()`), which needs no preflight change,
+  so app and Worker can be deployed in either order. This is a deployment-ordering
+  hazard, not a style preference.
 - **The Worker is not free to call.** It forwards to Anthropic on Tony's key and
   its URL ships in a public file. v34 requires an allowed Origin **and** an
   `X-App-Key`, and rate-limits per IP in KV. The key ships in `index.html`, so it
