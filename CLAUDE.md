@@ -42,6 +42,17 @@ requirement, not a nice-to-have.
 
 ## How to verify work — this is not optional
 
+**Two suites, and BOTH must run.** The self-test suite only ever loads
+`index.html`; it cannot see the Worker at all. A CORS regression in the Worker
+took every server-side feature down for three releases while the suite stayed
+green (v34–v35). The Worker is a plain ES module with no Cloudflare imports, so
+it can be imported and driven with ordinary `Request` objects:
+
+```bash
+node tests/worker-cors.mjs        # no network, no wrangler
+```
+
+
 The app has a built-in Self Test suite (`SELF_TESTS` in `index.html`, surfaced at
 ⚙️ Settings → 🧪 Self Test). Drive it headlessly:
 
@@ -157,6 +168,12 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **CORS is applied CENTRALLY, in the `fetch` wrapper (v36).** Handlers must not
+  each remember to set it. v34 changed `jsonResp`'s default from `'*'` to
+  `'null'` and updated only 8 of 51 call sites; the other 43 returned
+  `Allow-Origin: null`, the browser rejected them, and the app reported "could not
+  be reached from this device" for every feature. A rule 51 call sites must
+  remember is a rule that will be broken.
 - **NEVER send a custom request header to the Worker.** `Content-Type:
   application/json` already forces a CORS preflight, and the Worker's OPTIONS
   reply lists exactly which headers are allowed. Adding `X-App-Key` in v31.1 meant

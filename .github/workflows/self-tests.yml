@@ -91,3 +91,9 @@ jobs:
             }
             console.log('version strings agree: ' + declared);
           "
+
+      # The Worker had no tests until v36, and a CORS regression in it took every
+      # server-side feature down for three releases without the suite noticing —
+      # that suite only ever loaded index.html. This drives the Worker directly.
+      - name: Worker checks (CORS, origin, app key)
+        run: node tests/worker-cors.mjs

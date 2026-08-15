@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v35
+// Tony's Recipes — Cloudflare Worker v36
+// v36: CORS applied centrally in the fetch wrapper. v34 left 43 of 51 jsonResp
+//      calls returning Allow-Origin: null, which the browser rejects — every
+//      feature reported "could not be reached from this device".
 // v35: the app key is read from the request BODY (header still accepted). A
 //      custom header forces a CORS preflight that only v34+ allows, so an app
 //      sending it could not reach an older Worker at all — that took every
@@ -127,8 +130,9 @@ async function rateLimited(request, env, action) {
 function jsonResp(data, status = 200, cors) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: Object.assign({ 'Content-Type': 'application/json',
-                             'Access-Control-Allow-Origin': 'null', 'Vary': 'Origin' }, cors || {})
+    // CORS is set centrally by the fetch wrapper; anything passed here is only
+    // an override and is normally omitted.
+    headers: Object.assign({ 'Content-Type': 'application/json' }, cors || {})
   });
 }
 
@@ -171,8 +175,15 @@ function decodeJwtExp(token) {
   } catch (e) { return null; }
 }
 
-export default {
-  async fetch(request, env) {
+// v36 — CORS is applied CENTRALLY, in one place, on the way out.
+//
+// v34 changed jsonResp's default from '*' to 'null' and threaded the real
+// headers through only the handful of call sites it touched. The other 43
+// returned `Access-Control-Allow-Origin: null`, so the browser rejected those
+// responses and the app saw a thrown fetch — "could not be reached from this
+// device" on every feature. A rule that 51 call sites have to remember is a rule
+// that will be broken; the wrapper below makes forgetting impossible.
+async function handleRequest(request, env) {
     const corsHeaders = corsFor(request, env);
     const origin = originAllowed(request, env);
 
@@ -667,5 +678,21 @@ export default {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     } catch(err) { return jsonResp({ error: err.message }, 500); }
+}
+
+export default {
+  async fetch(request, env) {
+    const cors = corsFor(request, env);
+    let resp;
+    try {
+      resp = await handleRequest(request, env);
+    } catch (err) {
+      resp = jsonResp({ error: 'Worker error: ' + (err && err.message ? err.message : String(err)) }, 500);
+    }
+    // Stamp CORS on EVERY response, whatever produced it — including the binary
+    // download path and anything that throws. Handlers no longer decide this.
+    const h = new Headers(resp.headers);
+    Object.keys(cors).forEach(function(k){ h.set(k, cors[k]); });
+    return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h });
   }
 };
