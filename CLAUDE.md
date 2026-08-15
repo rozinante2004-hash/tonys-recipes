@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.6: 171 checks, 165 passing.** The 6 failures are `net_*` and
+**As of v31.7: 171 checks, 165 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -172,9 +172,14 @@ found only because a test was written first and disagreed with the code.
   keyed by id — stayed behind and attached to the survivor. Tony lost a recipe and
   got his photo on his son's. `uid` (assigned at CREATION, `newUid()`) is the real
   identity; `mergeRecipeLists` keeps both sides and renumbers the local one.
-  **Never backfill `uid` onto existing recipes** — each device would invent a
-  different one and every legacy recipe would duplicate on the next merge. No uid
-  on either side deliberately means "fall back to id".
+  **EVERY recipe has a uid (v31.7), including old ones** — one identity rule, not
+  two. The backfill is safe only because it is DETERMINISTIC: `legacy-<id>`, which
+  every device computes identically with no coordination and no network. A random
+  per-device backfill is the trap — the same old recipe would get a different uid
+  on each device and every legacy recipe would duplicate on the next merge. A new
+  recipe's random uid can never equal `legacy-<n>`, so a fresh recipe landing on
+  an old number is still caught. `normalizeRecipe` must not mint a uid for a
+  fragment with no id (it is called on `{ingredients, steps}` shapes too).
 - **Firebase Auth needs its own authDomain in the CSP.** The compat SDK creates a
   hidden iframe on `<project>.firebaseapp.com` and talks to it; omitting the host
   from `frame-src`/`connect-src` stalls sign-in with no visible error, so the app

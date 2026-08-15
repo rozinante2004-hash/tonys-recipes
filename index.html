@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.6 -->
+<!-- Tony's Recipes Collection v31.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2534,13 +2534,27 @@ const SELF_TESTS = [
       if(o2.list.length!==1) throw new Error('a real conflict was duplicated instead of resolved');
       if(o2.list[0].name!=='new') throw new Error('the newer edit did not win a genuine conflict');
       if(o2.renamed.length) throw new Error('a genuine conflict was reported as a collision');
-      // LEGACY recipes have no uid on either side; id alone must still mean
-      // "same recipe", or every pre-v31.6 recipe would be duplicated on merge.
+      // LEGACY recipes are backfilled with a DETERMINISTIC uid (v31.7), so every
+      // device computes the same one with no coordination. Two devices holding
+      // the same old recipe must therefore agree, not duplicate it.
       var c3=[normalizeRecipe({id:5,name:'legacy',updatedAt:100})];
       var l3=[normalizeRecipe({id:5,name:'legacy edited',updatedAt:200})];
+      if(!c3[0].uid||!l3[0].uid) throw new Error('a legacy recipe was left without a uid — two identity rules instead of one');
+      if(c3[0].uid!==l3[0].uid)
+        throw new Error('two devices derived DIFFERENT uids for the same legacy recipe — every old recipe would duplicate');
+      if(c3[0].uid!=='legacy-5') throw new Error('the legacy uid is not derived from the id: '+c3[0].uid);
       var o3=mergeRecipeLists(c3,l3,6);
-      if(o3.list.length!==1) throw new Error('legacy recipes without a uid were duplicated');
+      if(o3.list.length!==1) throw new Error('the same legacy recipe was duplicated across devices');
       if(o3.renamed.length) throw new Error('legacy recipes were treated as a collision');
+      if(o3.list[0].name!=='legacy edited') throw new Error('the newer edit of a legacy recipe did not win');
+      // A NEW recipe must never be confused with a legacy one holding its number.
+      var fresh=normalizeRecipe({id:5,uid:newUid(),name:'brand new',updatedAt:300});
+      if(fresh.uid==='legacy-5') throw new Error('a new recipe was given the legacy uid for its number');
+      var o5=mergeRecipeLists([c3[0]],[fresh],6);
+      if(o5.list.length!==2) throw new Error('a new recipe reusing an old number silently replaced it');
+      // ...and normalizeRecipe must not invent a uid for a fragment with no id.
+      var frag=normalizeRecipe({ingredients:[],steps:[]});
+      if(frag.uid) throw new Error('a recipe fragment with no id was given a uid');
       // A recipe only the local device has must simply come along.
       var o4=mergeRecipeLists([normalizeRecipe({id:1,uid:'a'})],[normalizeRecipe({id:9,uid:'b'})],10);
       if(o4.list.length!==2) throw new Error('an offline-only addition was dropped');
@@ -4967,7 +4981,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.6';
+var APP_VERSION = 'v31.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7332,7 +7346,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7903,7 +7917,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12584,6 +12598,22 @@ function saveLocal() {
 // sometimes return as plain strings instead of {a,n} objects.
 function normalizeRecipe(r) {
   if (!r || typeof r !== 'object') r = {};
+  // v31.7 — every recipe carries a uid, so there is ONE identity rule rather
+  // than two. A recipe that predates uid gets a DETERMINISTIC one derived from
+  // its id.
+  //
+  // Deterministic is what makes backfilling safe. A random uid minted per device
+  // would differ for the same old recipe on each of them, and mergeRecipeLists
+  // would read that as a collision and duplicate every legacy recipe. Every
+  // device computes 'legacy-42' for recipe 42 with no coordination and no
+  // network, so they agree by construction — which is exactly the assumption
+  // legacy recipes were already living under: for them, id IS the identity.
+  //
+  // A new recipe gets a random uid, which can never equal 'legacy-<n>'. So if a
+  // fresh recipe is ever allocated a number an old one already holds, the two
+  // still disagree and the collision is caught.
+  if (!r.uid && (typeof r.id === 'number' || typeof r.id === 'string') && r.id !== '')
+    r.uid = 'legacy-' + r.id;
   if (typeof r.name !== 'string')  r.name = String(r.name == null ? 'Untitled recipe' : r.name);
   if (typeof r.emoji !== 'string' || !r.emoji) r.emoji = '🍽️';
   if (typeof r.category !== 'string' || !r.category) r.category = 'Dinner';
@@ -13292,8 +13322,11 @@ window.newUid = newUid;
 function sameRecipeIdentity(a, b) {
   if (!a || !b) return false;
   if (a.id !== b.id) return false;
-  if (a.uid && b.uid) return a.uid === b.uid;   // both known: uid decides
-  return true;                                   // legacy: id is all we have
+  // Since v31.7 normalizeRecipe guarantees a uid on every recipe, legacy ones
+  // included, so uid decides. The fallback below only covers an object that
+  // never went through normalizeRecipe at all; it is not a second methodology.
+  if (a.uid && b.uid) return a.uid === b.uid;
+  return true;
 }
 // Merge two lists, keeping BOTH sides of an id collision. Returns the merged
 // list plus what it had to renumber, so the caller can say so out loud.
