@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.8 -->
+<!-- Tony's Recipes Collection v31.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,8 +31,23 @@
      URL import when the Worker cannot fetch a page. Omitting them (v31.1)
      killed URL import for any site the Worker could not reach, and the error
      blamed the recipe site. Do not drop them without also removing step 2 of
-     runUrlImport. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+     runUrlImport.
+
+     connect-src includes a bare `https:` and that is DELIBERATE. Applying a
+     chosen photo downloads its bytes with fetch(), and the host is whatever the
+     photo source returned — Openverse federates Flickr, Wikimedia, NASA and
+     museum collections, so the set is genuinely unbounded and cannot be listed.
+     `img-src https:` only lets a picture RENDER; fetching its bytes is
+     connect-src, which is why the search results appeared but "Use this Photo"
+     failed. The named hosts above are kept because they document intent.
+
+     What this costs, stated plainly: an injected script could send data to any
+     https host. What still holds: script-src (so getting a script injected is
+     the hard part), object-src, base-uri, form-action and frame-ancestors. The
+     alternative is proxying every image download through the Worker, which is a
+     fair trade to revisit — it would also fix image hosts that send no CORS
+     headers — but it needs a Worker deploy, and this needs to work now. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https: https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -2657,6 +2672,14 @@ const SELF_TESTS = [
         if(c.indexOf(h)===-1) throw new Error(h+' is used by URL import but is not in connect-src, so our own CSP blocks it');
       });
       if(c.indexOf('api.allorigins.win')===-1) throw new Error('the CORS proxy fallbacks are not allowed by the CSP');
+      // v31.9 — applying a chosen photo fetches its BYTES from whatever host the
+      // source returned. img-src only governs rendering, which is why search
+      // results appeared while "Use this Photo" silently failed. Openverse
+      // federates Flickr, Wikimedia and museums, so the hosts cannot be listed.
+      if(!/connect-src[^;]*\bhttps:(\s|;)/.test(c))
+        throw new Error('connect-src does not permit fetching a photo from an arbitrary host, so "Use this Photo" is blocked by our own CSP');
+      if(String(useSelectedSearchPhoto).indexOf('showServiceError')===-1)
+        throw new Error('a failed photo apply only toasts, so it looks like nothing happened');
       // ...and the failure message must not blame the site for our own faults.
       if(/The site blocks automated access\. Please/.test(src))
         throw new Error('the failure message still asserts the SITE blocked us, whatever actually happened');
@@ -5013,7 +5036,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.8';
+var APP_VERSION = 'v31.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7378,7 +7401,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7949,7 +7972,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14877,7 +14900,19 @@ async function useSelectedSearchPhoto() {
     saveData();
     var heroImg=document.getElementById('viewHeroImg'); if(heroImg) heroImg.src=photoUrl;
     renderGrid(); toast('\u2705 Photo updated!');
-  } catch(err) { photoUploadInProgress=false; toast('Photo failed: '+err.message); }
+  } catch(err) {
+    photoUploadInProgress=false;
+    // A three-second toast is not enough for a failure that leaves the old photo
+    // in place: Tony saw "nothing happened", not an error. Say what failed, and
+    // give the route that always works.
+    var why = /failed to fetch|networkerror|load failed/i.test(err.message || '')
+      ? 'The photo could not be downloaded from ' + (function(){ try { return new URL(img.url).host; } catch(e) { return 'its source'; } })()
+        + '. That host may not allow downloads from other sites.'
+      : err.message;
+    showServiceError('The photo was not changed.\n\n' + why
+      + '\n\nThe recipe still has its previous photo. You can also set a photo from a file: '
+      + 'open the recipe, tap the picture, and choose Upload.');
+  }
 }
 
 // ─── HELP ASSISTANT ───────────────────────────────────────────────────────────

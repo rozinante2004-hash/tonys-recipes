@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.8: 171 checks, 165 passing.** The 6 failures are `net_*` and
+**As of v31.9: 171 checks, 165 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -168,6 +168,18 @@ found only because a test was written first and disagreed with the code.
   four times over. `WA_NOT_A_CHAT` is a DENYLIST on purpose — WhatsApp's download
   can arrive with no extension, and README promises that works, so an allowlist of
   `.txt`/`.zip` would reject real exports to exclude a README.
+- **`img-src` governs RENDERING; fetching an image's bytes is `connect-src`.**
+  Photo search results displayed fine while "Use this Photo" failed silently,
+  because applying a photo downloads it with `fetch()` from whatever host the
+  source returned. Openverse federates Flickr, Wikimedia and museums, so those
+  hosts cannot be enumerated — `connect-src` carries a bare `https:` on purpose.
+  Revisit only by proxying image downloads through the Worker (which would also
+  fix hosts that send no CORS headers), never by removing it.
+- **This CSP has now caused four separate outages** (CORS proxies, the Firebase
+  auth domain, photo downloads, and nearly the Worker itself). Every one came from
+  pinning a directive against a mental model instead of against what the code
+  actually fetches. Before touching it, grep for `fetch(`, `<script src`,
+  `loadScriptOnce`, and every SDK's runtime hosts.
 - **CORS is applied CENTRALLY, in the `fetch` wrapper (v36).** Handlers must not
   each remember to set it. v34 changed `jsonResp`'s default from `'*'` to
   `'null'` and updated only 8 of 51 call sites; the other 43 returned
