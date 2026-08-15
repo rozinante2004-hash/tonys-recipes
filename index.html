@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v31.5 -->
+<!-- Tony's Recipes Collection v31.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -319,7 +319,7 @@ function duplicateRecipe(id) {
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r) return;
   var copy = normalizeRecipe(JSON.parse(JSON.stringify(r)));
-  copy.id = nextId++;
+  copy.id = nextId++; copy.uid = newUid();
   copy.name = r.name + ' (copy)';
   copy.fav = false;
   copy.cookCount = 0;
@@ -2500,6 +2500,60 @@ const SELF_TESTS = [
       if(!/app key/i.test(workerErrorText(403,{error:'FORBIDDEN: missing or wrong app key.'})))
         throw new Error('a 403 is not explained');
       if(!/minute/i.test(workerErrorText(429,{}))) throw new Error('a 429 does not say to wait');
+    } },
+
+  { id:'sync_id_collision_keeps_both', group:'Cloud Sync', name:'Two devices adding offline do not overwrite each other (v31.6)',
+    test: async()=>{
+      // Reported by Tony: he added a recipe on the PC and Peleg added one on his
+      // phone, both offline. Both got the same id. On reconnect the merge treated
+      // them as two VERSIONS of one recipe, the newer won, and the photo — which
+      // lives in its own document keyed by id — stayed behind and attached itself
+      // to the survivor. He ended up with his photo on his son's recipe and his
+      // own recipe gone.
+      ['newUid','sameRecipeIdentity','mergeRecipeLists','reportIdCollisions'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      if(newUid()===newUid()) throw new Error('newUid is not unique');
+      // Same id, different uid => two different recipes.
+      var cloud=[normalizeRecipe({id:42,uid:'uid-cloud',name:'באו באן',updatedAt:100})];
+      var local=[normalizeRecipe({id:42,uid:'uid-local',name:'מוסקה',updatedAt:50})];
+      var out=mergeRecipeLists(cloud,local,43);
+      if(out.list.length!==2) throw new Error('a collision lost a recipe: '+out.list.length+' survived, expected 2');
+      var names=out.list.map(function(r){ return r.name; });
+      if(names.indexOf('באו באן')===-1||names.indexOf('מוסקה')===-1)
+        throw new Error('both recipes must survive, got: '+names.join(', '));
+      if(out.list[0].id===out.list[1].id) throw new Error('both kept the same id, so they will collide again');
+      if(!out.renamed.length) throw new Error('the renumbering was not reported, so it would happen silently');
+      // The OLDER local one must not win on updatedAt — this is not a conflict.
+      if(out.list.filter(function(r){ return r.name==='מוסקה'; })[0].id===42)
+        throw new Error('the local copy kept the contested number; the cloud copy is the one other devices know');
+      // Same id AND same uid => a genuine conflict; newer wins, one survives.
+      var c2=[normalizeRecipe({id:7,uid:'same',name:'old',updatedAt:100})];
+      var l2=[normalizeRecipe({id:7,uid:'same',name:'new',updatedAt:200})];
+      var o2=mergeRecipeLists(c2,l2,8);
+      if(o2.list.length!==1) throw new Error('a real conflict was duplicated instead of resolved');
+      if(o2.list[0].name!=='new') throw new Error('the newer edit did not win a genuine conflict');
+      if(o2.renamed.length) throw new Error('a genuine conflict was reported as a collision');
+      // LEGACY recipes have no uid on either side; id alone must still mean
+      // "same recipe", or every pre-v31.6 recipe would be duplicated on merge.
+      var c3=[normalizeRecipe({id:5,name:'legacy',updatedAt:100})];
+      var l3=[normalizeRecipe({id:5,name:'legacy edited',updatedAt:200})];
+      var o3=mergeRecipeLists(c3,l3,6);
+      if(o3.list.length!==1) throw new Error('legacy recipes without a uid were duplicated');
+      if(o3.renamed.length) throw new Error('legacy recipes were treated as a collision');
+      // A recipe only the local device has must simply come along.
+      var o4=mergeRecipeLists([normalizeRecipe({id:1,uid:'a'})],[normalizeRecipe({id:9,uid:'b'})],10);
+      if(o4.list.length!==2) throw new Error('an offline-only addition was dropped');
+      // nextId must move past everything, or the very next add collides again.
+      // The renumbered recipe took 43, so the next free number is 44.
+      var moved=out.list.filter(function(r){ return r.name==='מוסקה'; })[0];
+      if(out.nextId<=moved.id) throw new Error('nextId ('+out.nextId+') is not past the renumbered recipe ('+moved.id+') — the next add collides again');
+      // And new recipes must actually be born with a uid.
+      var src=document.documentElement.innerHTML;
+      if(src.indexOf('id: nextId++, uid: newUid()')===-1)
+        throw new Error('new recipes are created without a uid, so collisions stay undetectable');
+      if(String(_loadFromFirestoreInner).indexOf('mergeRecipeLists')===-1)
+        throw new Error('the load path still uses the old id-only merge');
     } },
 
   { id:'ux_signin_always_reachable', group:'UI', name:'Sign in is never unclickable text (v31.5)',
@@ -4913,7 +4967,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v31.5';
+var APP_VERSION = 'v31.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches /version.json (never cached) to detect if a newer version is deployed.
@@ -7278,7 +7332,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7849,7 +7903,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v31.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10711,7 +10765,7 @@ async function importFromFile(event){
     parsed.forEach(function(rec){
       if(!rec.name) return;
       recipes.unshift({
-        id: nextId++, bg: rndBg(), fav: false,
+        id: nextId++, uid: newUid(), bg: rndBg(), fav: false,
         name:        rec.name        || '',
         emoji:       rec.emoji       || '🍽️',
         category:    rec.category    || 'Dinner',
@@ -10871,7 +10925,7 @@ function parseWordText(text){
           else if(!/^(method|ingredients)$/i.test(l))steps.push(l);
         }
       }
-      recipes.unshift({id:nextId++,name:nameRaw,emoji:rndEmoji(),photo:'',
+      recipes.unshift({id: nextId++, uid: newUid(),name:nameRaw,emoji:rndEmoji(),photo:'',
         category:CATS.includes(cat)?cat:'Dinner',
         difficulty:['Easy','Medium','Hard'].includes(diff)?diff:'Medium',
         prep,servings:srv,bg:rndBg(),fav:false,
@@ -11058,7 +11112,7 @@ async function saveRecipe(){
     }
     toast('\u2705 Recipe updated!');
   } else {
-    recipes.unshift({id:nextId++,bg:rndBg(),...data});
+    recipes.unshift({id: nextId++, uid: newUid(),bg:rndBg(),...data});
     toast('\u2705 Recipe saved!');
   }
   _editFormSnapshot = null; // saved — nothing left to warn about
@@ -11227,7 +11281,7 @@ function addSuggestion(idx, containerId) {
   const s = (res._suggestions || [])[idx];
   if (!s) return;
   recipes.unshift(normalizeRecipe({
-    id: nextId++,
+    id: nextId++, uid: newUid(),
     name: s.name || 'Imported Recipe',
     emoji: rndEmoji(),
     photo: '',
@@ -11888,7 +11942,7 @@ ${stepsText}`;
 
 function saveTranslation(parsed) {
   recipes.unshift({
-    id: nextId++, name: parsed.name, emoji: rndEmoji(), photo: '',
+    id: nextId++, uid: newUid(), name: parsed.name, emoji: rndEmoji(), photo: '',
     category: CATS.includes(parsed.category) ? parsed.category : 'Dinner',
     difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
     prep: parsed.prep || '—', servings: parsed.servings || '—',
@@ -12376,7 +12430,7 @@ function importParsedNow(parsed, overlayId) {
   // come back as plain strings) and sets updatedAt — without it a freshly imported
   // recipe had updatedAt undefined and could lose to an older copy during cloud merge.
   recipes.unshift(normalizeRecipe({
-    id: nextId++, name: parsed.name || 'Imported Recipe', emoji: rndEmoji(), photo: '',
+    id: nextId++, uid: newUid(), name: parsed.name || 'Imported Recipe', emoji: rndEmoji(), photo: '',
     category: CATS.includes(parsed.category) ? parsed.category : 'Dinner',
     difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
     prep: parsed.prep || '-', servings: parsed.servings || '-',
@@ -13207,6 +13261,85 @@ function cloudWriteAllowed(cloudUpdatedAt, base, localUpdatedAt) {
   return false;
 }
 
+// ─── Recipe identity (v31.6) ────────────────────────────────────────────────
+// `id` is allocated from a per-device counter, so two devices adding a recipe
+// while OFFLINE both get the same number. The merge matched on id alone and
+// treated that as two versions of one recipe: newer won, the other was
+// destroyed, and the photo — living in its own document — stayed behind and
+// attached itself to the survivor. Tony lost a recipe this way and ended up with
+// his photo on his son's recipe.
+//
+// `uid` is a stable identity assigned when a recipe is CREATED. Same id +
+// different uid = a collision, not a conflict, and both recipes are kept.
+//
+// Deliberately NOT backfilled onto existing recipes: a recipe that predates uid
+// would be given a different random one on each device, and two copies of the
+// same old recipe would then look like a collision and be duplicated. No uid on
+// either side means "fall back to the old id match", which is right for them.
+function newUid() {
+  try {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    if (window.crypto && crypto.getRandomValues) {
+      var a = new Uint8Array(16); crypto.getRandomValues(a);
+      return Array.prototype.map.call(a, function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+    }
+  } catch(e) {}
+  return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+window.newUid = newUid;
+
+// Two recipes are the SAME recipe only if nothing contradicts it.
+function sameRecipeIdentity(a, b) {
+  if (!a || !b) return false;
+  if (a.id !== b.id) return false;
+  if (a.uid && b.uid) return a.uid === b.uid;   // both known: uid decides
+  return true;                                   // legacy: id is all we have
+}
+// Merge two lists, keeping BOTH sides of an id collision. Returns the merged
+// list plus what it had to renumber, so the caller can say so out loud.
+function mergeRecipeLists(cloudList, localList, startId) {
+  var merged = (cloudList || []).slice();
+  var renamed = [];
+  var used = {};
+  merged.forEach(function(r){ used[r.id] = true; });
+  var nextFree = Math.max(parseInt(startId, 10) || 0,
+    merged.reduce(function(m, r){ return Math.max(m, r.id || 0); }, 0) + 1);
+  (localList || []).forEach(function(localR) {
+    var idx = merged.findIndex(function(c){ return c.id === localR.id; });
+    if (idx < 0) { merged.unshift(localR); used[localR.id] = true; return; }
+    if (sameRecipeIdentity(merged[idx], localR)) {
+      if ((localR.updatedAt || 0) > (merged[idx].updatedAt || 0)) merged[idx] = localR;
+      return;
+    }
+    // Same number, different recipe: keep both. The LOCAL one is renumbered,
+    // because the cloud copy is the one other devices already know about.
+    while (used[nextFree]) nextFree++;
+    var oldId = localR.id;
+    localR.id = nextFree; used[nextFree] = true; nextFree++;
+    localR.updatedAt = Date.now();
+    delete localR._ph; delete localR._po;   // its photo is in memory, not under the old id
+    merged.unshift(localR);
+    renamed.push({ from: oldId, to: localR.id, name: localR.name || ('#' + localR.id),
+                   kept: merged.filter(function(c){ return c.id === oldId; })[0] });
+  });
+  return { list: merged, renamed: renamed, nextId: nextFree };
+}
+window.sameRecipeIdentity = sameRecipeIdentity; window.mergeRecipeLists = mergeRecipeLists;
+
+var _idCollisions = [];
+function reportIdCollisions(list) {
+  if (!list || !list.length) return;
+  var lines = list.map(function(c){
+    return '• "' + (c.name || ('#' + c.to)) + '" was renumbered ' + c.from + ' \u2192 ' + c.to
+      + (c.kept ? ' (number ' + c.from + ' is "' + (c.kept.name || '') + '", added on another device)' : '');
+  }).join('\n');
+  showServiceError('Two devices added different recipes while offline and both were given the same number. '
+    + 'Nothing was lost — the numbers were changed so both survive:\n\n' + lines
+    + '\n\nIf a recipe is showing the wrong photo, open it and set the photo again: photos are stored '
+    + 'against the number, so the one that moved may still be holding the other recipe\'s picture.');
+}
+window.reportIdCollisions = reportIdCollisions;
+
 function mergeNextId(local, cloud) {
   return Math.max(parseInt(local, 10) || 0, parseInt(cloud, 10) || 0);
 }
@@ -13749,19 +13882,18 @@ async function _loadFromFirestoreInner(user) {
         // Check both memory flag AND localStorage (in case timing caused memory flag to be missed)
         var hasOfflineChanges = _offlineQueue || localStorage.getItem('tonys_offline_queue') === '1';
         if (hasOfflineChanges && recipes.length > 0) {
-          // Offline changes exist — merge: keep newer version of each recipe
-          var merged = fsRecipes.slice();
-          recipes.forEach(function(localR) {
-            var fsIdx = merged.findIndex(function(fsR){ return fsR.id === localR.id; });
-            if (fsIdx >= 0) {
-              if ((localR.updatedAt || 0) > (merged[fsIdx].updatedAt || 0)) {
-                merged[fsIdx] = localR; // local is newer
-              }
-            } else {
-              merged.unshift(localR); // added offline
-            }
-          });
-          recipes = merged;
+          // Offline changes exist. Same id can mean two DIFFERENT recipes added
+          // independently while offline — mergeRecipeLists keeps both rather than
+          // letting the newer silently destroy the older (v31.6).
+          var mergeOut = mergeRecipeLists(fsRecipes, recipes, nextId);
+          recipes = mergeOut.list;
+          nextId  = mergeNextId(nextId, mergeOut.nextId);
+          if (mergeOut.renamed.length) {
+            _idCollisions = mergeOut.renamed;
+            // Never silent: the numbers moved, and the user needs to know which
+            // recipe is which before they go looking for something "missing".
+            setTimeout(function(){ reportIdCollisions(mergeOut.renamed); }, 1200);
+          }
         } else {
           recipes = fsRecipes; // normal load
         }
@@ -16541,7 +16673,7 @@ function saveAsVideoBookmark(btn) {
   var name = (document.getElementById('bookmarkNameInput') || {value:''}).value.trim();
   if (!name) name = 'Video clip';
   var r = {
-    id: nextId++,
+    id: nextId++, uid: newUid(),
     name: name,
     emoji: emoji || '🎥',
     photo: '',

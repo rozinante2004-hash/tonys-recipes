@@ -54,7 +54,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v31.5: 170 checks, 164 passing.** The 6 failures are `net_*` and
+**As of v31.6: 171 checks, 165 passing.** The 6 failures are `net_*` and
 `stor_firebase` only — they need real network and a signed-in Firebase session,
 and cannot pass in a sandbox. Any *other* failure is a real regression.
 
@@ -166,6 +166,15 @@ found only because a test was written first and disagreed with the code.
   key checks because it runs from a bookmarklet on web.getbring.com — its own
   secret authenticates it, and that secret now has **no default** (the old
   fallback was committed in a public repo).
+- **`id` is a PER-DEVICE counter, so two offline devices allocate the same one.**
+  The merge matched on `id` alone and treated a collision as two versions of one
+  recipe: newer won, the other was destroyed, and the photo — its own document
+  keyed by id — stayed behind and attached to the survivor. Tony lost a recipe and
+  got his photo on his son's. `uid` (assigned at CREATION, `newUid()`) is the real
+  identity; `mergeRecipeLists` keeps both sides and renumbers the local one.
+  **Never backfill `uid` onto existing recipes** — each device would invent a
+  different one and every legacy recipe would duplicate on the next merge. No uid
+  on either side deliberately means "fall back to id".
 - **Firebase Auth needs its own authDomain in the CSP.** The compat SDK creates a
   hidden iframe on `<project>.firebaseapp.com` and talks to it; omitting the host
   from `frame-src`/`connect-src` stalls sign-in with no visible error, so the app
