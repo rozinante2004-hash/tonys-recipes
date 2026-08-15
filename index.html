@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.2 -->
+<!-- Tony's Recipes Collection v32.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1013,6 +1013,36 @@ const SELF_TESTS = [
   },
 
   // ── STORAGE ────────────────────────────────────────────────────────────────
+  { id:'ver_order',      group:'Storage', name:'The update banner only fires for a NEWER version',
+    test: async()=>{
+      if(typeof versionIsNewer!=='function') throw new Error('versionIsNewer not defined');
+      // v32.3 — v32.3 shipped with version.json left at v32.1, so a device that
+      // had the new build was told "you are running v32.3, v32.1 is ready" and
+      // was told again on every check, because Update Now reloads the same build.
+      // An ordered comparison is the only thing that can tell those apart.
+      if(versionIsNewer('v32.1','v32.3')) throw new Error('an OLDER server version was reported as an available update — this is the v32.3 nag loop');
+      if(!versionIsNewer('v32.3','v32.1')) throw new Error('a genuinely newer server version was not offered as an update');
+      if(versionIsNewer('v32.3','v32.3')) throw new Error('the same version was offered as an update — the banner would never stop');
+      // Numeric, not lexicographic: '9' > '10' as strings.
+      if(!versionIsNewer('v32.10','v32.9')) throw new Error('v32.10 was judged older than v32.9 — the comparison is comparing strings, not numbers');
+      if(!versionIsNewer('v33.0','v32.99')) throw new Error('a major bump was missed');
+      // A version we cannot read is not grounds for claiming an update.
+      if(versionIsNewer('garbage','v32.3')||versionIsNewer('v32.3','garbage')) throw new Error('an unparseable version produced an update prompt');
+      if(parseVersion('v1.2.3').join()!=='1,2,3') throw new Error('a three-part version does not parse');
+      if(parseVersion('v1.2').join()!=='1,2,0') throw new Error('a two-part version must imply a .0 patch');
+    } },
+
+  { id:'ver_manifest',   group:'Storage', name:'version.json matches the build it ships with',
+    test: async()=>{
+      // The banner reads version.json; if a release bumps index.html and forgets
+      // that file, every device is told the wrong thing. CI checks this too, but
+      // CI only runs AFTER the push — this catches it in the browser as well.
+      var r=await fetch(new URL('version.json?t='+Date.now(), location.href), {cache:'no-store'});
+      if(!r.ok) throw new Error('version.json could not be read ('+r.status+') — the update banner has nothing to compare against');
+      var declared=(await r.json()).version;
+      if(declared!==APP_VERSION) throw new Error('version.json says '+declared+' but this build is '+APP_VERSION+' — devices would be told to "update" to a version older than the one they are running');
+    } },
+
   { id:'stor_local',     group:'Storage', name:'localStorage read/write',
     test: async()=>{
       const key='selftest_ping_'+Date.now();
@@ -1038,7 +1068,7 @@ const SELF_TESTS = [
       if(!window._fbUser) throw new Error('Not signed in to Firebase — sign in first');
       if(!window._fbDb)   throw new Error('Firestore not initialised');
       // A lightweight read of `shared/meta` — a live document this app writes on
-      // every save. Until v32.2 this read `shared/recipes`, which is now deleted;
+      // every save. Until v32.3 this read `shared/recipes`, which is now deleted;
       // a read of a MISSING document still resolves, so that form of the check
       // would have passed against an entirely empty collection.
       const snap=await window._fbDb.collection('shared').doc('meta').get();
@@ -1308,7 +1338,7 @@ const SELF_TESTS = [
       if(slim.originalPhoto!==undefined) throw new Error('originalPhoto must never be sent to the cloud');
       if(slim._ph!==1) throw new Error('_ph (photo-lives-elsewhere) flag not set for cloud hydration');
       if('hp' in slim) throw new Error('the old `hp` name is still being written — 5.8 unified it to _ph');
-      // v32.2 — slimRecipeForCloud takes ONE argument. It used to take a
+      // v32.3 — slimRecipeForCloud takes ONE argument. It used to take a
       // `keepHistory` flag, false for the legacy single document; passing a
       // second argument must no longer be able to strip history.
       if(slimRecipeForCloud.length!==1) throw new Error('slimRecipeForCloud takes '+slimRecipeForCloud.length+' arguments — the legacy history-stripping flag is back');
@@ -1757,7 +1787,7 @@ const SELF_TESTS = [
       var r={id:1,name:'x',history:[{name:'old'}],photo:'',updatedAt:1};
       // 3.4 — per-recipe documents have no shared ceiling, so history travels.
       if(!slimRecipeForCloud(r).history) throw new Error('history is missing from the per-recipe document — 5.4 was the whole reason it could start syncing');
-      // v32.2 — the second shape is gone, so a stray extra argument must be
+      // v32.3 — the second shape is gone, so a stray extra argument must be
       // inert rather than quietly reverting to the history-free legacy copy.
       if(!slimRecipeForCloud(r,false).history) throw new Error('a second argument still strips history — the legacy shape has come back');
     } },
@@ -3706,7 +3736,7 @@ const SELF_TESTS = [
         // recurse, and each recipe document still has its own 1 MiB ceiling.
         var snap=historySnapshot(r);
         if('photo' in snap||'history' in snap||'originalPhoto' in snap) throw new Error('a snapshot carries photo/history data and would bloat the recipe document');
-        // v32.2 — history DOES reach the cloud, in the per-recipe document. The
+        // v32.3 — history DOES reach the cloud, in the per-recipe document. The
         // old assertion here was the opposite, and correct only while the legacy
         // single document existed.
         var slim=slimRecipeForCloud(r);
@@ -4789,7 +4819,7 @@ function renderSyncHealth() {
                    (h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes) ? 'warn' : '',
                    h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes
                      ? 'a mismatch is normal right after an edit, and should settle on the next sync' : '');
-  // v32.2 — the legacy single document is deleted and there is no migration path
+  // v32.3 — the legacy single document is deleted and there is no migration path
   // left, so a schema below 2 is no longer "an older layout you will be upgraded
   // from". It means `shared/meta` is missing or malformed, which is worth saying
   // plainly rather than dressing up as a transitional state.
@@ -5045,11 +5075,37 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.2';
+var APP_VERSION = 'v32.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
-// Fetches /version.json (never cached) to detect if a newer version is deployed.
+// Fetches version.json (never cached) to detect if a newer version is deployed.
 // This works even when the SW serves a cached index.html.
+//
+// v32.3 — this compared the two strings with `!==` and treated ANY difference as
+// "an update is waiting". When v32.3 shipped with version.json left at v32.1, a
+// device that had already fetched the new index.html was told it was running
+// v32.3 and that v32.1 was ready — backwards — and told again on every check,
+// because tapping Update Now reloads the SAME build and the mismatch survives.
+// An inequality cannot tell "the server is ahead" from "the server is behind";
+// only an ORDERED comparison can, so that is what this does now. A server that
+// is BEHIND means a deploy is mid-flight or a version bump was missed: that is
+// worth recording in the badge tooltip, and worth NOT nagging about.
+function parseVersion(v) {
+  var m = String(v == null ? '' : v).trim().match(/^v?(\d+)\.(\d+)(?:\.(\d+))?$/);
+  if (!m) return null;
+  return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3] || '0', 10)];
+}
+// Is `a` strictly newer than `b`? Unparseable on either side returns false: a
+// version we cannot read is not grounds for claiming an update is ready.
+function versionIsNewer(a, b) {
+  var pa = parseVersion(a), pb = parseVersion(b);
+  if (!pa || !pb) return false;
+  for (var i = 0; i < 3; i++) { if (pa[i] !== pb[i]) return pa[i] > pb[i]; }
+  return false;
+}
+window.parseVersion = parseVersion;
+window.versionIsNewer = versionIsNewer;
+
 function checkAppVersion() {
   // Keep header badge in sync with this build's version
   var badge = document.getElementById('appVersionBadge');
@@ -5060,7 +5116,9 @@ function checkAppVersion() {
   try { lastSeen = localStorage.getItem(VERSION_KEY) || ''; } catch(e) {}
 
   // Fetch the canonical version from server — bypasses SW cache
-  fetch('/tonys-recipes/version.json?t=' + Date.now(), {cache: 'no-store'})
+  // Relative on purpose: hardcoding /tonys-recipes/ breaks the moment the app is
+  // served from anywhere else, and it resolves to exactly the same URL on Pages.
+  fetch('version.json?t=' + Date.now(), {cache: 'no-store'})
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var serverVersion = data.version || APP_VERSION;
@@ -5072,9 +5130,16 @@ function checkAppVersion() {
       // states what is RUNNING, and says separately that something newer exists.
       if (badge) {
         badge.textContent = APP_VERSION;
-        if (serverVersion !== APP_VERSION) {
+        badge.title = 'You are running ' + APP_VERSION + '.';
+        if (versionIsNewer(serverVersion, APP_VERSION)) {
           badge.textContent = APP_VERSION + ' → ' + serverVersion + ' ready';
           badge.title = 'You are running ' + APP_VERSION + '; ' + serverVersion + ' is on the server.';
+        } else if (serverVersion !== APP_VERSION) {
+          // The server is BEHIND us, or one of the strings is unreadable. Neither
+          // is an update, and neither is worth a banner — but say so here rather
+          // than leave the difference invisible.
+          badge.title = 'You are running ' + APP_VERSION + '; the server still reports ' + serverVersion
+                      + ' — a deploy is probably still in flight.';
         }
       }
 
@@ -5082,7 +5147,7 @@ function checkAppVersion() {
       // string. `lastSeen` was stored the moment the banner appeared, so the
       // banner showed exactly once and then went quiet while the device stayed
       // on the old build for good.
-      if (serverVersion !== APP_VERSION) {
+      if (versionIsNewer(serverVersion, APP_VERSION)) {
         var banner = document.getElementById('swUpdateBanner');
         var msg    = document.getElementById('swUpdateMsg');
         if (msg) msg.innerHTML = '📲 You are running <strong style="color:white;">' + escH(APP_VERSION)
@@ -7410,7 +7475,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7981,7 +8046,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12995,7 +13060,7 @@ function isSizeError(err) {
 // by older versions still carry `hp`, so reads accept both; writes only ever
 // emit `_ph`.
 //
-// v32.2 — there used to be a second shape here, `stripPhotosForCloud`, producing
+// v32.3 — there used to be a second shape here, `stripPhotosForCloud`, producing
 // the history-free copy the legacy single `shared/recipes` document needed: three
 // revisions more than tripled a recipe's serialised size (measured 1.7 KB →
 // 6.2 KB), which would have cut that one document's capacity from ~610 recipes to
@@ -13215,7 +13280,7 @@ async function attachCloudPhotos(list) {
 // TRANSITION, now complete. v28.0 dual-wrote the legacy `shared/recipes`
 // document so a phone left on v27.9 kept working; v28.1 stopped writing it,
 // removing the last blind whole-collection overwrite in the app, and read it
-// once per load so a straggler's edits were not lost. v32.2 removed that read
+// once per load so a straggler's edits were not lost. v32.3 removed that read
 // and everything supporting it, after the document was deleted by hand in the
 // Firestore console — deliberately three steps, in three separate releases,
 // never all at once.
@@ -13412,7 +13477,7 @@ window.unqueueCloudDelete = unqueueCloudDelete;
 function recipeDocId(id) { return 'recipe_' + id; }
 
 // One recipe, photo-free, ready for its own document. This is the ONLY shape
-// written to the cloud (v32.2).
+// written to the cloud (v32.3).
 // 3.4 — `history` DOES travel. It was excluded only because three revisions took
 // a recipe from 1.7 KB to 6.2 KB and would have cut the single shared document's
 // capacity from ~610 recipes to ~170. Per-document that cost is irrelevant: the
@@ -13613,7 +13678,7 @@ async function writeCloudMeta(list, nextIdVal, db) {
       nextId: mergeNextId(nextIdVal, cur.nextId),
       ids: Object.keys(ids).map(function(i){ return parseInt(i, 10); }).filter(function(i){ return !isNaN(i); }),
       schema: CLOUD_SCHEMA,
-      // v32.2 — `legacyAt` used to live here as the high-water mark for the
+      // v32.3 — `legacyAt` used to live here as the high-water mark for the
       // legacy `shared/recipes` document. That document has been deleted, so the
       // field is no longer written. This is a full set(), not a merge, so the
       // stale field disappears from the cloud on the first save after upgrading.
@@ -13930,7 +13995,7 @@ async function _loadFromFirestoreInner(user) {
   // originalPhoto is local-only (never synced) — remember it so a cloud load doesn't drop it
   var _localOrig = {};
   recipes.forEach(function(r) { if (r.originalPhoto) _localOrig[r.id] = r.originalPhoto; });
-  // History DOES travel per-recipe (v32.2 — it is the only cloud shape now), but
+  // History DOES travel per-recipe (v32.3 — it is the only cloud shape now), but
   // a document written before 5.4, or one whose recipe was too large to write, has
   // no `history` field at all. Remembering it locally means a cloud load can only
   // ever ADD history, never silently wipe it.
@@ -13958,7 +14023,7 @@ async function _loadFromFirestoreInner(user) {
     var fsRecipes = null, cloudNextId = 0;
 
     // 5.9 — nothing has changed in the cloud since this device last loaded, so
-    // skip reading every recipe and every photo. v32.2 — this used to cost a
+    // skip reading every recipe and every photo. v32.3 — this used to cost a
     // second read as well, checking the legacy `shared/recipes` document in case
     // a device on v27.9 (which never touches `meta`) had edited it. That document
     // is gone, so an unchanged collection now costs exactly ONE read.
@@ -13978,7 +14043,7 @@ async function _loadFromFirestoreInner(user) {
     if (skipFanout) {
       // nothing to fetch — fsRecipes stays null and the load block below is a no-op
     } else {
-      // v32.2 — no longer conditional on `_cloudSchema >= CLOUD_SCHEMA`. The only
+      // v32.3 — no longer conditional on `_cloudSchema >= CLOUD_SCHEMA`. The only
       // other branch read the legacy document and migrated from it; with that
       // document deleted, per-recipe documents are the sole layout. Reading them
       // unconditionally is also the safer failure mode: a `meta` document with a
@@ -14051,7 +14116,7 @@ async function _loadFromFirestoreInner(user) {
     }
 
     // Step 2: Set up listeners for FUTURE remote changes only.
-    // v32.2 — ONE listener. During the 5.4 transition there were two: a v28
+    // v32.3 — ONE listener. During the 5.4 transition there were two: a v28
     // device touches `shared/meta` on every save, but a device still on v27.9
     // only ever wrote `shared/recipes`, so watching either alone would have
     // missed half the family. `shared/recipes` is now deleted and nothing writes
