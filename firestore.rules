@@ -22,9 +22,10 @@ service cloud.firestore {
     //   recipe_<id>  one photo-free document per recipe          (5.4, v28.0+)
     //   meta         { nextId, ids, schema } for the above       (5.4, v28.0+)
     //   photo_<id>   one document per recipe photo
-    //   recipes      the legacy single document — no longer written from v28.1,
-    //                still READ once per load to catch a device left on v27.9
+    //   chat_<slug>, chatpart_<slug>_<n>   synced WhatsApp exports    (5f.8)
     //   access       the member list itself
+    // The legacy single `recipes` document was deleted by hand on 15 Aug 2026
+    // and its reading code removed in app v32.2. Nothing refers to it any more.
     // The {document=**} wildcard already covers all of these, so 5.4 needed no
     // rules change. Verified rather than assumed, per PLAN-5.4 §5.
     match /shared/{document=**} {

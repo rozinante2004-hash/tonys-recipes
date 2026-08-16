@@ -32,6 +32,7 @@
 // commit publicly. The token that used to be hard-coded here is still in git
 // history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
 
+const WORKER_VERSION = 'v36';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -265,7 +266,10 @@ async function handleRequest(request, env) {
     if (body.action === 'health') {
       return jsonResp({
         ok: true,
-        version: 'v34',
+        // Keep in step with the header at the top of this file. It said v34 on a
+        // v36 Worker, which made `health` — the one endpoint whose entire job is
+        // to report the truth about this Worker — quietly wrong about it.
+        version: WORKER_VERSION,
         originAllowed: origin !== false,
         appKeyRequired: !!env.APP_SHARED_KEY,
         appKeyAccepted: appKeyOk(request, env, body),

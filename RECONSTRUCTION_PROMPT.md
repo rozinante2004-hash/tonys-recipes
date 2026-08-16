@@ -6,7 +6,7 @@
 > specified."* It is written to be self‑contained: every file, data shape, external service,
 > secret placeholder, and UX behaviour is described so the app can be recreated to parity.
 >
-> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~13,100
+> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~17,600
 > lines) plus a handful of supporting files. No build step, no framework, no bundler, no npm.
 > Plain ES5‑flavoured vanilla JavaScript (mostly `var`/`function`, some template literals and
 > `async/await`), inline `<style>`, and CDN `<script>` tags. Keep it that way.
@@ -24,8 +24,13 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v31.0` (see `version.json`, the HTML comment on line 1, `APP_VERSION`, and
-the two version badges in the markup — four version strings in `index.html` in all, bumped together).
+**Current version:** `v32.3` — app. **Worker: v36**, deployed separately and versioned separately
+(§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
+1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
+disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
+v32.2 shipped with `version.json` left a release behind, and the update banner then told every
+device it was running v32.2 and that v32.1 was ready — repeatedly, since Update Now reloads the
+same build and the mismatch survives (§4b).
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
 **DM Sans** for body. Cream/brown/terracotta/gold palette. Rounded cards, soft shadows,
@@ -40,10 +45,12 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~16,500 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v31.0"}` — polled to detect new deployments. Must never be cached. |
+| `version.json` | `{"version": "v32.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
-| `firestore.rules` | **Canonical** Firestore security rules (5.5). The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published by hand in the Firebase console. |
+| `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
+| `storage.rules` | Firebase **Storage** rules (§4d). Dormant: Storage needs a paid Firebase plan, so photos stay base64 in Firestore and this file is unpublished. Keep it in the repo anyway — the code path exists and the rules must be ready before it is ever switched on. |
+| `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). |
 | `whatsapp/` | Shared folder of exported WhatsApp chat `.txt`/`.zip` files. The app **lists the folder** over the GitHub contents API (5f.7), so `index.json` is optional and only supplies group labels. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
 | `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. |
@@ -145,29 +152,78 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 > to watch for: the **GET file‑download handler** + **`download-store`** action (KV one‑time
 > download links), and the **`instagram-fetch`** action.
 >
-> **Current repo version: v33.** v32 rebuilt `instagram-fetch` on Meta's tokenless oEmbed; v33
+> **Current repo version: v36.** v32 rebuilt `instagram-fetch` on Meta's tokenless oEmbed; v33
 > added the keyless **Openverse** photo source and made `photo-search` report a 429 as a rate
 > limit instead of "invalid JSON". A provider that rate-limits answers with a plain-text notice,
 > so `JSON.parse` throws and the naive catch blames JSON parsing — hiding the only fact that
 > matters, which is that waiting fixes it. `photoFail(source, name, resp, raw)` handles that
-> centrally and passes `retryAfter` back.
+> centrally and passes `retryAfter` back. **v34–v36 are the access-control releases and the two
+> outages they caused — see §4a1, which is the part a rebuild is most likely to get wrong.**
 >
 > **`photo-search` returns per-image `license` and `sourceLabel`.** Openverse serves Creative
 > Commons work where CC-BY makes attribution a licence *condition*, so the app stores
 > `r.photoCredit` and renders it — a picker that shows credit and then discards it on apply
 > puts every recipe using one in breach.
 
-A single ES‑module Worker (`export default { async fetch(request, env) }`). Handles CORS
-(allow `*`, methods `POST, OPTIONS`), rejects non‑POST with 405, parses a JSON body, and
-dispatches on `body.action`. If **no** `action` is present, the body is forwarded verbatim to
-the **Anthropic Messages API** (this is the AI path).
+A single ES‑module Worker (`export default { async fetch(request, env) }`). Rejects non‑POST
+with 405, parses a JSON body, and dispatches on `body.action`. If **no** `action` is present,
+the body is forwarded verbatim to the **Anthropic Messages API** (this is the AI path).
+
+**CORS is applied centrally, in the `fetch` wrapper — never per handler.** This is not a style
+preference; see §4a1. The shape to copy:
+
+```js
+async function handleRequest(request, env) { /* every action; returns a Response */ }
+
+export default {
+  async fetch(request, env) {
+    const cors = corsFor(request, env);
+    let resp;
+    try { resp = await handleRequest(request, env); }
+    catch (err) { resp = jsonResp({ error: 'Worker error: ' + (err && err.message) }, 500); }
+    const h = new Headers(resp.headers);
+    Object.keys(cors).forEach(k => h.set(k, cors[k]));
+    return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h });
+  }
+};
+```
 
 **Constants / env used:**
 - Bring: `BRING_LIST_UUID`, `BRING_USER_UUID`, `BRING_API_V2 = 'https://api.getbring.com/rest/v2'`,
   `BRING_HEADERS` (`X-BRING-CLIENT: WebApp`, `X-BRING-CLIENT-SOURCE: webApp`,
   `X-BRING-COUNTRY: IL`, `X-BRING-API-KEY: <secret>`, `Origin`/`Referer: web.getbring.com`).
 - `getToken(env)` reads `env.BRING_KV.get('accessToken')`, else `env.BRING_TOKEN` (no hard-coded fallback). `bringHeaders(env)` builds the Bring! headers from env; missing config returns a clear `BRING_CONFIG` 503 rather than a confusing 401.
-- Env secrets: `ANTHROPIC_API_KEY`, `PIXABAY_API_KEY`, `YOUTUBE_API_KEY`, KV binding `BRING_KV`.
+- Env secrets: `ANTHROPIC_API_KEY`, `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY`,
+  `YOUTUBE_API_KEY`, `BRING_SETTOKEN_SECRET`, `APP_SHARED_KEY`, optional `ALLOWED_ORIGINS` and
+  `RATE_LIMIT`, KV binding `BRING_KV`.
+
+### Access control (v34) — three controls, because no one of them is sufficient
+
+The Worker forwards to the Anthropic API on Tony's key, and its URL ships in `index.html`, which
+is a **public** repo. With `Access-Control-Allow-Origin: *`, no auth and no rate limit, anyone who
+found the URL could spend his credits.
+
+1. **Origin allowlist.** `DEFAULT_ORIGINS` = the Pages origin plus `localhost:8137`/`127.0.0.1:8137`
+   for the test runner, extended by a comma-separated `ALLOWED_ORIGINS`. `corsFor()` echoes the
+   request's origin only when it is on the list and otherwise emits the literal `'null'` — **never**
+   `'*'`, and never an origin it did not allow. Always set `Vary: Origin`. A request with **no**
+   `Origin` header (curl, server-side) is not refused here; that is what control 2 is for.
+2. **Shared app key.** `appKeyOk(request, env, body)` compares `body.appKey` — falling back to an
+   `X-App-Key` header — against `env.APP_SHARED_KEY`. Unset means **fail open**, and `health`
+   reports that honestly. State the limitation plainly in the code: *the key ships in the client,
+   so anyone reading the page source can copy it.* It raises the bar; it is not a secret. Do not
+   describe it as one.
+3. **Rate limit.** `rateLimited()` — a KV-backed sliding window keyed on `CF-Connecting-IP`,
+   60-second buckets, 40/min for the costly paths (the AI path and `instagram-fetch`) and 150/min
+   for the cheap ones. **Fails open when no KV is bound**: breaking the family's app to punish a
+   hypothetical abuser is the wrong trade. KV is eventually consistent so the count is approximate,
+   which is fine — the job is to bound a runaway, not to meter precisely. This is the only one of
+   the three that works against someone who has read the source, and therefore the one that
+   actually matters.
+
+Also in v34: the hard-coded `bring-settoken` fallback secret was removed. An **unset**
+`BRING_SETTOKEN_SECRET` must **close** the endpoint (503), never fall back to a default — the old
+default was committed to a public repo, so it was never a secret.
 
 **Actions:**
 1. **`fetch-url`** `{url}` — if URL is YouTube (`extractYouTubeId` matches `watch?v=`,
@@ -195,7 +251,13 @@ the **Anthropic Messages API** (this is the AI path).
 6. **(default, no action)** — forward the whole body to
    `https://api.anthropic.com/v1/messages` with headers `x-api-key: env.ANTHROPIC_API_KEY`,
    `anthropic-version: 2023-06-01`; return the JSON response with `Access-Control-Allow-Origin: *`.
-7. **`instagram-fetch`** `{shortcode}` — Meta made oEmbed **tokenless again on 15 Jun 2026**, so
+7. **`health`** — deliberately **open**: it works without the app key, because its whole job is to
+   let the app distinguish *"the Worker is down"* from *"the Worker is refusing me"*. Returns
+   `{ok, version, originAllowed, appKeyRequired, appKeyAccepted, rateLimiting, configured:{…}}`,
+   where `configured` is a per-service boolean map derived from which env vars are set. Keep the
+   reported `version` in step with the file header — it drifted to `v34` on a v36 Worker, which is
+   exactly the kind of small lie §4b exists to forbid.
+8. **`instagram-fetch`** `{shortcode}` — Meta made oEmbed **tokenless again on 15 Jun 2026**, so
    this calls `graph.facebook.com/v23.0/instagram_oembed` with no token. oEmbed returns the embed
    HTML, author and thumbnail — **not reliably the caption**, which is where the recipe is; a
    caption fragment is mined out of the `<blockquote>` when present. Returns
@@ -209,6 +271,48 @@ to the Worker, retries up to 4× with exponential backoff on `429/529`, maps `40
 the concatenated `content[].text`. (Some self‑tests reference model id `claude-sonnet-4-6`; the
 production `aiCall` uses `claude-sonnet-4-5-20250929`. Keep the Worker model‑agnostic — it
 forwards whatever the client sends.)
+
+---
+
+## 4a1. The two Worker outages — read before touching the Worker
+
+Adding access control to a working Worker took the whole app down **twice**, for a combined four
+releases. Neither bug was in the security logic; both were in how it reached the browser. A
+rebuild that adds auth to a CORS endpoint will hit both unless it is told.
+
+**Outage 1 — the custom header that could not be sent (v31.1 → v31.8).** The app was changed to
+send the app key as an `X-App-Key` request header. A custom header makes the request
+*non-simple*, so the browser sends a `OPTIONS` **preflight** first, and only a Worker whose
+preflight reply lists `X-App-Key` in `Access-Control-Allow-Headers` will accept it. The deployed
+Worker was older than that. Every Worker-backed feature — photo search, AI import, URL fetch,
+translate, nutrition — was dead for two releases, and the app could only report that the Worker
+"could not be reached from this device."
+
+> **The rule this bought:** *put the key in the request BODY, not in a header.* A body field
+> changes nothing about preflight, so **old app + new Worker** and **new app + old Worker** both
+> work. Two independently-deployed components must never require a synchronised release. Accept
+> the header too, for compatibility — but never require it.
+
+**Outage 2 — the default that was applied 8 times out of 51 (v34 → v36).** v34 changed
+`jsonResp`'s default CORS header from `'*'` to `'null'`, then threaded the real headers through
+**8** of its **51** call sites. The other 43 returned `Access-Control-Allow-Origin: null`, the
+browser rejected every one of those responses, and the app reported the same
+"could not be reached" message. Tony found it. The self-test suite could not, because it only
+ever tested `index.html`.
+
+> **The rules this bought:** (a) **apply CORS centrally in the `fetch` wrapper**, so no individual
+> `return` can forget it — see the wrapper in §4. (b) **The Worker gets its own tests.** It is a
+> plain ES module with no Cloudflare-specific imports, so it can be imported and driven with
+> ordinary `Request` objects: no wrangler, no network. `tests/worker-cors.mjs` asserts that *every*
+> response from *every* path — including errors, refusals, the 403, the malformed-body 400 and the
+> preflight — carries CORS for an allowed origin, and never echoes one that is not allowed. It runs
+> with a deliberately **empty** `env`, because the "not configured" early returns were exactly the
+> call sites v34 left bare.
+
+**A third trap, from the same period:** the repo copy of `cloudflare-worker.js` can lag the live
+deployment, since the Worker is edited in the Cloudflare dashboard. Once, the repo held v22 while
+production ran v29. Always start from the deployed code, apply the change to that, and bump the
+header.
 
 ---
 
@@ -234,7 +338,30 @@ URL, or another family member with write access. Treat every field as hostile in
    or `allow-same-origin`.
 4. **Untrusted HTML *files* are parsed with `DOMParser`** (inert), never assigned to `innerHTML`.
 5. **No secrets in the client.** Every third-party key lives in Worker env/KV. The Firebase web
-   config is public by design and is the only credential that ships.
+   config is public by design and is the only credential that ships. The Worker's `APP_SHARED_KEY`
+   is the deliberate exception and must be documented as a speed bump, not a secret (§4a1). The
+   Bring! set-token secret is per-device `localStorage`, never `index.html`.
+6. **A `Content-Security-Policy` meta tag (v31.1)** — escaping is the first line, this is the
+   second, and it would have contained the email-builder XSS the v31.0 audit found. Four traps,
+   each of which caused a real outage:
+   - **`script-src 'unsafe-inline'` is unavoidable** while the whole app is one inline `<script>`
+     with inline handlers. Removing it means a build step, which this project will not have. What
+     the policy still buys: `object-src 'none'`, `base-uri 'none'` (a `<base>` tag cannot repoint
+     every relative URL), `form-action 'none'` (injected markup cannot POST anywhere),
+     `frame-ancestors 'none'` (no clickjacking), and pinned `connect-src`/`script-src`.
+   - **Keep `script-src` in step with the `<script src>` tags *and* every `loadScriptOnce()` host**,
+     or a lazily loaded library silently stops working — long after the change that broke it.
+   - **`connect-src` must list the Worker, the three CORS-proxy fallback hosts, and
+     `*.firebaseapp.com` / `*.googleapis.com`.** Omitting the proxies killed URL import and blamed
+     the recipe site; omitting `*.firebaseapp.com` killed Google sign-in. `frame-src` needs
+     `accounts.google.com`, `content.googleapis.com` and `*.firebaseapp.com`/`*.web.app` for the
+     sign-in popup.
+   - **`connect-src` includes a bare `https:` and that is deliberate.** Applying a chosen photo
+     downloads its bytes with `fetch()`, and the host is whatever the photo source returned —
+     Openverse federates Flickr, Wikimedia, NASA and museum collections, so the set is genuinely
+     unbounded. **`img-src` governs rendering; `connect-src` governs `fetch()`** — confusing the
+     two is what broke "Use this Photo" in v31.9. Tightening this back means proxying image
+     downloads through the Worker first.
 
 ---
 
@@ -255,6 +382,15 @@ asserted something that had not happened.
   `serverVersion` made a device on an old build look current and turned three separate stale-cache
   incidents into hunts for bugs that did not exist. Record `tonys_last_version` only once
   `APP_VERSION === serverVersion`, or the update banner shows once and then goes quiet forever.
+- **Compare versions by ORDER, never by `!==`** (v32.3). An inequality cannot distinguish *"the
+  server is ahead"* from *"the server is behind"*, so when `version.json` was left a release
+  behind, the banner read **"You are running v32.2. v32.1 is ready"** — and said it again on every
+  check, because Update Now reloads the same build and the mismatch survives the reload. The
+  banner must fire only when the server version is **strictly newer**. Parse and compare
+  **numerically**: as strings `'v32.9' > 'v32.10'`, so a lexicographic compare breaks on its own at
+  the next `.10` release. An unparseable version on either side returns `false` — a version we
+  cannot read is not grounds for claiming an update exists. When the server is *behind*, say so in
+  the badge tooltip (a deploy in flight, or a missed bump) rather than either nagging or hiding it.
 - **"Update Now" must clear the caches before reloading**, guarded on `navigator.onLine`. With no
   *waiting* service worker — the usual case, since `sw.js` rarely changes — a plain reload is
   answered from the stale-while-revalidate cache and the button does nothing visible.
@@ -282,6 +418,104 @@ asserted something that had not happened.
   limit on a large one. Use `reduce`.
 - Deleting a synced WhatsApp chat removes it for everybody, so it asks; deleting recipes offers
   undo.
+
+---
+
+## 4d. The security rules (Firestore + Storage)
+
+Both files live in the repo and are published **by hand** in the Firebase console. That is
+deliberate and must stay that way: **a bad rules push locks every device out at once**, and that
+is not something to automate behind a green CI run.
+
+`firestore.rules` is the **canonical** copy. The app fetches it at runtime
+(⚙️ Settings → 👥 Family Access → Show rules) and substitutes three placeholders — `READ`, `WRITE`,
+`ADMIN`, each written in double braces in the file — with the current member list before showing
+you what to paste. **Edit the structure here, not in `index.html`.** The placeholders are named
+without braces in the file's own comments on purpose: substitution is a blind text replace, so a
+literal token inside a comment would be swapped too. The owner is always in all three lists, so
+you cannot lock yourself out.
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Shared recipe collection — family access. Holds:
+    //   recipe_<id>  one photo-free document per recipe          (5.4, v28.0+)
+    //   meta         { nextId, ids, schema } for the above       (5.4, v28.0+)
+    //   photo_<id>   one document per recipe photo
+    //   chat_<slug>, chatpart_<slug>_<n>   synced WhatsApp exports (5f.8)
+    //   access       the member list itself
+    // The {document=**} wildcard already covers all of these, so 5.4 needed no
+    // rules change. Verified rather than assumed, per PLAN-5.4 §5.
+    match /shared/{document=**} {
+      allow read: if request.auth != null &&
+        request.auth.token.email in [{{READ}}];
+
+      allow create, update: if request.auth != null &&
+        request.auth.token.email in [{{WRITE}}];
+
+      allow delete: if request.auth != null &&
+        request.auth.token.email in [{{ADMIN}}];
+    }
+
+    // Legacy per-user documents (owner only). Kept for data written before the
+    // collection became shared; nothing writes here any more.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+**The one thing to get right, and the reason this file is worth a chapter:** the write rule says
+`allow create, update`, **not** `allow write`. In Firestore, `write` expands to *create + update +
+delete*, and allow rules are **OR'd** — so granting `write` here would hand every write-role member
+deletion as well, and make the `allow delete` line below it purely decorative. It was decorative
+for months. Spelling out `create, update` is what makes the delete rule mean anything.
+
+The consequence is real and the app must not hide it: a write-role member deleting a recipe
+removes it from their own device but **cannot** remove the cloud documents, so it reappears on
+their next sync. `flushCloudDeletes` reports the refusal into Sync Health rather than letting it
+look like a bug (§4b).
+
+### `storage.rules` — written, not published
+
+Firebase Storage requires a **paid plan** (Blaze), which needs a billing account and offers only
+budget *alerts*, not a hard spending cap. For a family recipe collection that is a poor trade, so
+Storage stays off and photos remain base64 in Firestore. Keep the rules file anyway — the code
+path exists and the rules must be ready before it is ever switched on.
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /shared/photos/{photoId} {
+      allow read:   if request.auth != null;
+      allow write:  if request.auth != null
+                    && request.resource.size < 12 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+Deliberately **less** strict than Firestore on delete: a deleted *recipe* is data loss, so it is
+admin-only; an orphaned photo blob is only waste, and whoever removed the recipe must be able to
+remove it. The 12 MB ceiling sits far above anything the app produces (it compresses first) and
+far below anything that could run up a bill by accident.
+
+> **The trap this file taught:** `storageReady()` originally called `firebase.storage()` and
+> treated a successful construction as proof Storage worked. But `storageBucket` is present in the
+> Firebase config, so the SDK constructs happily on a project with **no bucket provisioned** —
+> every photo save then attempted a doomed upload before falling back, and the migration button
+> appeared and could only fail. **A client library constructing is not evidence a service exists.**
+> Latch availability off on the first genuine failure (`markStorageUnavailable`), never on a
+> constructor.
 
 ---
 
@@ -870,9 +1104,9 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **161 checks** in 13 groups —
-**Features (42), UI (26), Cloud Sync (23), WhatsApp (12), Import/Export (11), CRUD (10),
-Storage (10), CSS (6), Core, Modals and Network (5 each), Backup and Performance (3 each)** —
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **170 checks** in 13 groups —
+**Features (44), UI (27), Cloud Sync (21), Storage (13), Import/Export (12), WhatsApp (12),
+CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup and Performance (3 each)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`slimRecipeForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
@@ -882,6 +1116,18 @@ live ✅/❌ status, and for failures shows a **detail card** with error, impact
 running session (e.g. re‑inject `:root` CSS vars, define a missing `sortMode`, call
 `renderGrid()`). Network tests ping the Worker health, AI round‑trip, `fetch-url`,
 `photo-search`, and `instagram-fetch` (treat IG 404 as pass, only 500 as fail).
+
+### There are TWO suites, and passing one proves nothing about the other
+
+`tests/run-self-tests.js` drives `SELF_TESTS` in a headless browser and only ever loads
+`index.html`. `tests/worker-cors.mjs` imports `cloudflare-worker.js` and drives it with plain
+`Request` objects. **Run both before every push.** The v34 CORS regression was green on the
+self-test suite for two releases while every server-side feature was dead, because the suite had
+no visibility into the Worker at all.
+
+CI also runs a third, cheaper check: `version.json` must agree with all four version strings in
+`index.html`. Run it locally too — **CI only fails after the push**, which is exactly how v32.2
+reached Tony's phone with a backwards update banner.
 
 **Write a test for every behavioural change, then MUTATE THE CODE TO PROVE THE TEST FAILS.**
 This is the single most valuable practice in the project's history and it is not optional.
@@ -895,6 +1141,13 @@ Several tests here were written, passed, and were later shown to assert nothing:
 - A "all chats are searched" test built the message array by hand, so a loader crippled to stop
   after the first chat still passed. It has to drive `waLoadAllMessages` itself.
 - An assertion that grepped for `Math.max.apply` matched the *comment* explaining its removal.
+  Four more failed the same way: a retired secret matching its own comment, a `workerHeaders`
+  check satisfied by a comment, an error string present but unreachable, and a confirmation
+  guarded by `false && askConfirm(...)`. **Never assert on source text when you can assert on
+  behaviour** — every one of these was converted to a behavioural check.
+- `stor_firebase` used a document that had since been deleted as its "lightweight read". A read of
+  a *missing* document still resolves, so the check would have reported a healthy connection
+  against an entirely empty Firestore. Assert `snap.exists`, not merely that the read returned.
 
 When a mutation unexpectedly survives, check the mutation actually applied before concluding the
 test is weak — `perl` without `/g` hits the first match in the file, which twice was a different
@@ -965,10 +1218,25 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
       behave as described.
 - [ ] Self‑Test modal runs, reports pass/fail, and runtime fixes apply.
 - [ ] **No real secret is committed**; Worker holds `ANTHROPIC_API_KEY`, `PIXABAY_API_KEY`,
-      `YOUTUBE_API_KEY`, and the Bring token/KV; Firebase web config may be embedded.
+      `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY`, `YOUTUBE_API_KEY`, `BRING_SETTOKEN_SECRET` and the
+      Bring token/KV; Firebase web config may be embedded. `APP_SHARED_KEY` ships in the client
+      and is documented as a speed bump, not a secret.
+- [ ] **Worker access control (§4a1):** a request from an unlisted origin is not echoed back an
+      `Access-Control-Allow-Origin`; a wrong app key gets a 403 **that still carries CORS**; an
+      unset `BRING_SETTOKEN_SECRET` returns 503 rather than falling back to a default; `health`
+      answers without a key and reports what is configured. `node tests/worker-cors.mjs` passes.
+- [ ] **The app key travels in the request BODY**, so old-app/new-Worker and new-app/old-Worker
+      both work without a synchronised deploy.
+- [ ] **Rules (§4d):** `firestore.rules` says `allow create, update` — never `allow write` — so
+      the admin-only delete rule genuinely restricts; a write-role member's refused deletion shows
+      up in Sync Health instead of looking like a bug.
+- [ ] **CSP (§4a.6):** sign-in, URL import via the CORS-proxy fallback, every lazily loaded
+      library, and "Use this Photo" against an arbitrary image host all work with the policy on.
 - [ ] GitHub Actions deploys to Pages on push to `main`; `version.json` bump triggers the
       in‑app update banner, the badge shows the **running** version, and one tap of Update Now
       actually lands the new build (it must clear the caches — see §4b).
+- [ ] **The update banner fires only for a strictly NEWER server version** and never loops: with
+      `version.json` deliberately set one release *behind* the build, no banner appears at all.
 - [ ] **Security (§4a):** a recipe named `" onerror="alert(1)` renders inertly in the email
       preview, the print view, the shared page and the grid; `safeUrl('javascript:alert(1)')`
       is `''`; the preview iframe is sandboxed.
@@ -993,15 +1261,18 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 2. DATA section (constants, seed recipes, state vars) + `localStorage` load/save/migrate.
 3. `renderFilters` + `renderGrid` + search/sort/filter/select‑mode.
 4. View modal + Add/Edit modal + ingredient table + scaling/units/nutrition/cook‑count.
-5. `cloudflare-worker.js` + `aiCall` + `extractJSON`, then every AI feature.
+5. `cloudflare-worker.js` + `aiCall` + `extractJSON`, then every AI feature. Write
+   `tests/worker-cors.mjs` **at the same time as the Worker**, not after — §4a1 is what a
+   Worker without tests costs.
 6. Import/Export/Backup + local save helper (`local-save-helper.py`, `setup-save-helper.sh`).
 7. Firebase auth + Firestore sync + offline merge + remote‑change banner.
 8. Bring! integration + `bring-relay.html`.
 9. Sharing/email/Gmail/converter/print/access‑control/deployments (no QR — removed v28.5).
 10. WhatsApp group knowledge (§11c), including the Firestore chat source.
 11. PWA (`manifest.json`, `sw.js`, icons, install banners, version check) + Self‑Test suite.
-12. `.github/workflows/deploy.yml` and `self-tests.yml`; deploy; smoke‑test with the Self‑Test
-    modal, then walk the acceptance checklist in §16 — including the security, honesty, photo
+12. `.github/workflows/deploy.yml` and `self-tests.yml` (both suites plus the version-agreement
+    check); publish `firestore.rules` by hand; deploy; smoke‑test with the Self‑Test modal, then
+    walk the acceptance checklist in §16 — including the security, honesty, Worker, rules, photo
     and accessibility rows, which are the ones a rebuild is most likely to miss.
 
 > Keep everything in one `index.html` with inline CSS/JS and CDN dependencies. Prefer clarity and
