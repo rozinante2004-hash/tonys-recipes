@@ -1,3 +1,17 @@
 node_modules/
 package.json
 package-lock.json
+
+# ── WhatsApp chat exports — NEVER commit these ───────────────────────────────
+# A real group export (whatsapp/Meat_Whatsapp.txt — a ZIP despite the .txt name)
+# sat in this PUBLIC repo from 2026-08-01 to 2026-08-16: 693 KB of one group's
+# messages, hundreds of senders, phone numbers. None of those people consented
+# to publication. It was purged from history with git-filter-repo on 2026-08-16.
+#
+# The app never needed it committed: it LISTS the folder over the GitHub contents
+# API at runtime (5f.7), and where GitHub is unreachable chats travel through
+# Firestore instead (5f.8). A committed export is pure exposure, no benefit.
+#
+# index.json stays tracked on purpose — it holds only group LABELS, no messages.
+whatsapp/*.txt
+whatsapp/*.zip
