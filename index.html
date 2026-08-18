@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.3 -->
+<!-- Tony's Recipes Collection v32.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1016,13 +1016,16 @@ const SELF_TESTS = [
   { id:'ver_order',      group:'Storage', name:'The update banner only fires for a NEWER version',
     test: async()=>{
       if(typeof versionIsNewer!=='function') throw new Error('versionIsNewer not defined');
-      // v32.3 — v32.3 shipped with version.json left at v32.1, so a device that
-      // had the new build was told "you are running v32.3, v32.1 is ready" and
+      // v32.3 — v32.2 shipped with version.json left at v32.1, so a device that
+      // had the new build was told "you are running v32.2, v32.1 is ready" and
       // was told again on every check, because Update Now reloads the same build.
       // An ordered comparison is the only thing that can tell those apart.
-      if(versionIsNewer('v32.1','v32.3')) throw new Error('an OLDER server version was reported as an available update — this is the v32.3 nag loop');
-      if(!versionIsNewer('v32.3','v32.1')) throw new Error('a genuinely newer server version was not offered as an update');
-      if(versionIsNewer('v32.3','v32.3')) throw new Error('the same version was offered as an update — the banner would never stop');
+      // (These version numbers are the historical record. A release bump must
+      // never blanket-replace them — doing exactly that is how this comment came
+      // to claim v32.3 was the release that shipped broken.)
+      if(versionIsNewer('v32.1','v32.2')) throw new Error('an OLDER server version was reported as an available update — this is the v32.2 nag loop');
+      if(!versionIsNewer('v32.2','v32.1')) throw new Error('a genuinely newer server version was not offered as an update');
+      if(versionIsNewer('v32.2','v32.2')) throw new Error('the same version was offered as an update — the banner would never stop');
       // Numeric, not lexicographic: '9' > '10' as strings.
       if(!versionIsNewer('v32.10','v32.9')) throw new Error('v32.10 was judged older than v32.9 — the comparison is comparing strings, not numbers');
       if(!versionIsNewer('v33.0','v32.99')) throw new Error('a major bump was missed');
@@ -2541,6 +2544,38 @@ const SELF_TESTS = [
       if(String(showBringBookmarklet).indexOf('showServiceError')===-1)
         throw new Error('an unset secret produces a broken bookmarklet with no warning');
       if(!document.getElementById('bringSecretInput')) throw new Error('there is nowhere to enter the secret');
+
+      // v32.4 — assert on BEHAVIOUR, not on source text. Every earlier assertion
+      // here was a string match, and all of them passed while the bookmarklet
+      // reported "Failed: undefined" for three of the Worker's four failure
+      // replies. The message logic is now a real function, so it can be called.
+      if(typeof bringFailureMessage!=='function') throw new Error('bringFailureMessage not defined');
+      var cases=[
+        // The Worker reports every genuine failure as {error}. These three used
+        // to surface as "Failed: undefined" — the reason was thrown away.
+        { st:503, body:'{"error":"BRING_SETTOKEN_SECRET is not set on the Worker"}', want:'BRING_SETTOKEN_SECRET' },
+        { st:403, body:'{"error":"Unauthorized"}',   want:'Unauthorized' },
+        { st:400, body:'{"error":"Invalid token"}',  want:'Invalid token' },
+        // Only this one ever sent {message}, which is why it alone read correctly.
+        { st:200, body:'{"success":false,"message":"KV not available"}', want:'KV not available' },
+        // A non-JSON body (proxy error page) must be shown, not swallowed.
+        { st:502, body:'<html>bad gateway</html>',   want:'bad gateway' },
+        // Nothing at all still has to say something.
+        { st:500, body:'',                            want:'no reason given' }
+      ];
+      cases.forEach(function(c){
+        var m=bringFailureMessage(c.st, c.body);
+        if(m===null) throw new Error('a '+c.st+' reply was treated as SUCCESS');
+        if(m.indexOf(c.want)===-1) throw new Error('a '+c.st+' reply reads "'+m+'" — it must carry "'+c.want+'"');
+        if(/undefined/.test(m)) throw new Error('a '+c.st+' reply produced "'+m+'" — this is the Failed: undefined bug');
+        if(m.indexOf(String(c.st))===-1) throw new Error('a '+c.st+' reply does not name its status: "'+m+'"');
+      });
+      // Success must still read as success.
+      if(bringFailureMessage(200,'{"success":true,"message":"Token updated in KV"}')!==null)
+        throw new Error('a successful save was reported as a failure');
+      // ...and the bookmarklet must carry THIS function, not a copy that can drift.
+      if(bm.indexOf(bringFailureMessage.toString())===-1)
+        throw new Error('the bookmarklet no longer inlines bringFailureMessage — the two can now drift apart');
     } },
 
   { id:'sec_worker_authenticated', group:'Network', name:'Every Worker call carries the app key (v31.1)',
@@ -5075,7 +5110,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.3';
+var APP_VERSION = 'v32.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7475,7 +7510,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8046,7 +8081,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15289,11 +15324,34 @@ function buildBringBookmarklet(secret) {
   // in here and broke the bookmarklet. The set-token action is exempt from the
   // app-key check in Worker v34 precisely because it runs off-origin; its own
   // secret is what authenticates it.
+  // How a bring-settoken reply is turned into words. A REAL function, not a
+  // string, so the self test can call it with each reply the Worker can send —
+  // and `buildBringBookmarklet` inlines this very source, so the two cannot
+  // drift apart. (It cannot be eval'd in a test: the app's CSP has no
+  // 'unsafe-eval', and weakening the policy to suit a test is the wrong trade.)
+  // Returns null on success, the message to show otherwise.
+  function bringFailureMessage(status, rawText) {
+    var d; try { d = JSON.parse(rawText); } catch (e) { d = {}; }
+    if (d.success) return null;
+    return 'Failed (' + status + '): ' +
+      (d.error || d.message || String(rawText || '').slice(0, 200) || 'no reason given');
+  }
+  window.bringFailureMessage = bringFailureMessage;
+
+  // v32.4 — read `error` as well as `message`, and show the HTTP status. The
+  // Worker reports every genuine failure as {error}: 503 when
+  // BRING_SETTOKEN_SECRET is unset, 403 on a wrong secret, 400 on a malformed
+  // token. Only the KV-missing case sends {message}. Reading `message` alone
+  // turned all three into "Failed: undefined" — the Worker was saying exactly
+  // what was wrong and the bookmarklet threw it away. Parse from text() so a
+  // non-JSON body (a proxy error page, say) is shown rather than swallowed.
   return 'javascript:(function(){var t=localStorage.getItem("accessToken");'
     + 'if(!t){alert("Not logged into Bring!");return;}'
     + 'fetch("' + BRING_WORKER_URL + '",{method:"POST",headers:{"Content-Type":"application/json"},'
     + 'body:JSON.stringify({action:"bring-settoken",token:t,secret:' + JSON.stringify(String(secret || '')) + '})})'
-    + '.then(function(r){return r.json();}).then(function(d){alert(d.success?"Bring! token updated!":"Failed: "+d.message);})'
+    + '.then(function(r){return r.text().then(function(x){'
+    + bringFailureMessage.toString()
+    + 'var m=bringFailureMessage(r.status,x);alert(m===null?"Bring! token updated!":m);});})'
     + '.catch(function(e){alert("Error: "+e.message);});})();';
 }
 window.buildBringBookmarklet = buildBringBookmarklet;
