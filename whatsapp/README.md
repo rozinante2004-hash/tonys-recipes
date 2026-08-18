@@ -17,7 +17,23 @@ phone; that is the whole reason this folder exists.
    that is fine too — just rename it to something meaningful.)
    Give it a sensible name — the file name becomes the group's label unless `index.json`
    says otherwise.
-3. Commit and push. The app picks it up the next time you press *Load chats from this folder*.
+3. **Do NOT commit it.** `.gitignore` blocks `whatsapp/*.txt` and `whatsapp/*.zip`, and that is
+   deliberate — see the warning below. Load it through 📂 **Import** in the app instead; the chat
+   then syncs to Firestore (5f.8) and reaches every device, including the phone.
+
+> ## ⚠️ Never commit a chat export
+>
+> This repository is **public**. From 2026-08-01 to 2026-08-16 it contained a real export of the
+> group *שאלות ותשובות בנושא הכנת בשר* — 693 KB, hundreds of senders, phone numbers in the text.
+> Nobody in that group agreed to be published. It was purged from every commit with
+> `git-filter-repo` and the ignore rule added so it cannot happen again.
+>
+> Nothing needed it committed even then: chats reach other devices through **Firestore** (5f.8),
+> which is the route that works on a phone whose administrator blocks `github.com` — the reason
+> 5f.8 exists at all. A committed export is exposure with no benefit.
+>
+> The folder-listing route below still works for anything you legitimately want public. It is not
+> the route to use for other people's conversations.
 
 **From the iPhone, without a laptop:** see [UPLOAD-FROM-IPHONE.md](UPLOAD-FROM-IPHONE.md) —
 Export chat → Share → a Shortcut that PUTs the file straight into this folder.
@@ -29,11 +45,17 @@ The same guide as one offline, printable file:
 It is **generated** from the markdown by `tools/build-upload-guide.js` — edit the markdown
 and re-run the builder; never hand-edit the HTML.
 
-## `index.json` — optional since v29.5
+## `index.json` — optional since v29.5, and empty since 2026-08-16
 
 The app now **lists this folder** over the GitHub API, so a file that is simply dropped in here
 is picked up on its own. `index.json` is still read, and still does one useful job: giving a file
 a nicer group label than its file name. Without it the label comes from the file name.
+
+It is currently `[]`. Its one entry mapped `Meat_Whatsapp.txt` to
+*שאלות ותשובות בנושא הכנת בשר*, and that file has been purged (see the warning above), so the
+entry pointed at nothing. The label is recorded here rather than in the file so it is not lost:
+if that group is ever re-imported through a route that keeps it out of the repo, this is the name
+it had.
 
 (The listing needs the repository to be public, which it is. For a private repo the listing is
 refused and `index.json` becomes required again — the app falls back to it automatically.)

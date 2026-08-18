@@ -71,6 +71,50 @@ check('a 403 refusal still carries CORS', wrong);
 const openHealth = await worker.fetch(post({ action: 'health' }), keyed);
 expect('health stays open without a key', openHealth.status === 200, `got ${openHealth.status}`);
 
+console.log('\nThe Bring! bookmarklet\'s origin:');
+// The bookmarklet runs ON web.getbring.com. v34 added the origin allowlist
+// without it, so the browser blocked the reply and the only symptom the user
+// could see was "Failed to fetch" — indistinguishable from the Worker being down.
+const bringOrigin = 'https://web.getbring.com';
+check('web.getbring.com is allowed', await worker.fetch(
+  post({ action: 'bring-status' }, bringOrigin), env), bringOrigin);
+const bringPreflight = await worker.fetch(new Request('https://worker.test', {
+  method: 'OPTIONS', headers: { Origin: bringOrigin } }), env);
+expect('its preflight is accepted', bringPreflight.status === 200, `got ${bringPreflight.status}`);
+
+console.log('\nAI path — what actually reaches Anthropic:');
+// v35 moved the app key into the request BODY to avoid a CORS preflight. That
+// was right. What went unchecked: this path forwards the body VERBATIM, so the
+// key went to Anthropic too, which rejects unknown top-level fields —
+// 400 invalid_request_error: appKey: Extra inputs are not permitted. Every AI
+// feature was dead. Testing CORS alone could never have seen it; the assertion
+// has to be about the body we send onward.
+{
+  const realFetch = globalThis.fetch;
+  let sentUrl = null, sentBody = null;
+  globalThis.fetch = async (url, init) => {
+    sentUrl = String(url);
+    sentBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const aiResp = await worker.fetch(post({
+      model: 'claude-sonnet-4-5', max_tokens: 100,
+      messages: [{ role: 'user', content: 'hi' }],
+      appKey: 'secret-k',
+    }), { ANTHROPIC_API_KEY: 'sk-test' });
+
+    expect('it reaches the Messages API', sentUrl === 'https://api.anthropic.com/v1/messages', `got ${sentUrl}`);
+    expect('appKey is STRIPPED before forwarding', sentBody && sentBody.appKey === undefined,
+      'appKey was forwarded — Anthropic answers 400 "Extra inputs are not permitted" and every AI feature dies');
+    expect('the real payload survives', sentBody && sentBody.model === 'claude-sonnet-4-5'
+      && Array.isArray(sentBody.messages) && sentBody.messages[0].content === 'hi',
+      'stripping removed more than it should: ' + JSON.stringify(sentBody));
+    check('the AI response still carries CORS', aiResp);
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,

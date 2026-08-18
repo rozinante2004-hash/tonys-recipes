@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v36
+// Tony's Recipes — Cloudflare Worker v37
+// v37: two regressions from the hardening releases, both found by Tony, neither
+//      caught by tests. (a) The Anthropic proxy forwarded the body verbatim
+//      INCLUDING the `appKey` v35 put there, and Anthropic rejects unknown
+//      top-level fields — every AI feature returned 400 "Extra inputs are not
+//      permitted". (b) web.getbring.com was missing from the v34 origin
+//      allowlist, so the Bring! bookmarklet got "Failed to fetch".
 // v36: CORS applied centrally in the fetch wrapper. v34 left 43 of 51 jsonResp
 //      calls returning Allow-Origin: null, which the browser rejects — every
 //      feature reported "could not be reached from this device".
@@ -32,7 +38,7 @@
 // commit publicly. The token that used to be hard-coded here is still in git
 // history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
 
-const WORKER_VERSION = 'v36';
+const WORKER_VERSION = 'v37';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -70,6 +76,12 @@ function bringConfigError(missing) {
 //      that works against someone who has read the source.
 const DEFAULT_ORIGINS = [
   'https://rozinante2004-hash.github.io',
+  // The Bring! bookmarklet runs ON web.getbring.com and POSTs `bring-settoken`
+  // here from that page, so this origin is as load-bearing as the app's own.
+  // v34 added the allowlist without it: the browser saw Allow-Origin: null and
+  // the bookmarklet could only report "Failed to fetch", which reads like the
+  // Worker is down rather than refusing the caller.
+  'https://web.getbring.com',
   'http://localhost:8137',
   'http://127.0.0.1:8137',
 ];
@@ -671,15 +683,31 @@ async function handleRequest(request, env) {
     try {
       const apiKey = env.ANTHROPIC_API_KEY;
       if (!apiKey) return jsonResp({ error: 'No API key' }, 500);
+      // v37 — the body is forwarded VERBATIM, so every field the app added for the
+      // Worker's own benefit must come off first. Anthropic rejects unknown
+      // top-level fields outright: v35 moved the app key into the body and this
+      // path kept forwarding it, so the API answered
+      //   400 invalid_request_error: appKey: Extra inputs are not permitted
+      // and EVERY AI feature broke — ask-my-WhatsApp-groups, AI import, translate,
+      // nutrition, suggest, explore, diet auto-tag. The CORS reasoning behind v35
+      // was right; what went unchecked was what this path then did with the field.
+      // Anything added to workerBody() in index.html must be added here too.
+      const forwarded = {};
+      Object.keys(body).forEach(function(k) {
+        if (k === 'appKey' || k === 'action') return;   // Worker-only, never Anthropic's
+        forwarded[k] = body[k];
+      });
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(forwarded),
       });
       const data = await r.json();
+      // CORS is applied centrally by the fetch wrapper (v36); it overwrites
+      // whatever is set here, so this carries only Content-Type.
       return new Response(JSON.stringify(data), {
         status: r.status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        headers: { 'Content-Type': 'application/json' }
       });
     } catch(err) { return jsonResp({ error: err.message }, 500); }
 }
