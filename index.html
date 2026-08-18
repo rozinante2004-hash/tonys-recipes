@@ -2531,6 +2531,12 @@ const SELF_TESTS = [
       // Assert on the bookmarklet's OUTPUT, not on the function's source: three
       // grep-style assertions in a row matched their own comments.
       if(typeof buildBringBookmarklet!=='function') throw new Error('buildBringBookmarklet not defined');
+      // BEFORE calling the builder: bringFailureMessage must already exist. It was
+      // briefly nested inside buildBringBookmarklet, so updateBringToken could not
+      // reach it — and this test passed regardless, because it called the builder
+      // first. Order the check so it cannot be satisfied by a side effect.
+      if(typeof window.bringFailureMessage!=='function')
+        throw new Error('bringFailureMessage is not defined at module scope — updateBringToken cannot see it');
       var bm=buildBringBookmarklet('sekrit-42');
       if(bm.indexOf('workerHeaders')!==-1)
         throw new Error('the emitted bookmarklet calls an app helper, which does not exist on web.getbring.com');
@@ -15269,6 +15275,29 @@ async function checkBringTokenStatus(probe){
 }
 window.checkBringTokenStatus = checkBringTokenStatus;
 
+// How a bring-settoken reply is turned into words. Shared by BOTH routes that
+// set the token — the in-app paste box and the bookmarklet — so the two can
+// never disagree about what a reply means. Returns null on success, otherwise
+// the message to show.
+//
+// Module scope on purpose. v32.4 first defined this INSIDE buildBringBookmarklet,
+// where updateBringToken could not see it; the self test passed anyway, because
+// it happened to call buildBringBookmarklet first and that call is what assigned
+// window.bringFailureMessage. A test that depends on call ordering for a symbol
+// to exist is testing the ordering, not the symbol.
+//
+// It cannot be eval'd in a test: the app's CSP has no 'unsafe-eval', and
+// weakening the policy to suit a test is the wrong trade. buildBringBookmarklet
+// inlines this source via .toString(), and a test pins that, so the copy running
+// on web.getbring.com is provably this code.
+function bringFailureMessage(status, rawText) {
+  var d; try { d = JSON.parse(rawText); } catch (e) { d = {}; }
+  if (d.success) return null;
+  return 'Failed (' + status + '): ' +
+    (d.error || d.message || String(rawText || '').slice(0, 200) || 'no reason given');
+}
+window.bringFailureMessage = bringFailureMessage;
+
 async function updateBringToken(token) {
   try {
     var parts=token.split('.'); if(parts.length!==3) throw new Error('Invalid token');
@@ -15277,10 +15306,20 @@ async function updateBringToken(token) {
     var _secret=getBringTokenSecret();
     if(!_secret){ showServiceError('The Bring! set-token secret is not set on this device.\n\nOpen ⚙️ Settings → Bring! and paste the same value you put in BRING_SETTOKEN_SECRET on the Worker.'); return; }
     var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body: workerBody({action:'bring-settoken',token:token,secret:_secret})});
-    var data=await resp.json();
-    if(data.success){ toast('Bring! token updated! Valid for 7 days.'); renderBringTokenStatus(); return true; }
-  } catch(e){ console.warn('Bring token update failed:',e); }
-  return false;
+    // v32.4 — same bug the bookmarklet had: this read `success` and threw the
+    // rest away, so a refusal surfaced as a guess ("check the Worker is deployed
+    // and the secret matches") instead of the Worker's own words. It reports
+    // BRING_SETTOKEN_SECRET unset as 503, a wrong secret as 403 and a malformed
+    // token as 400, each with a reason. Share the bookmarklet's formatter so the
+    // two routes can never disagree about what a reply means.
+    var raw=await resp.text();
+    var data; try{ data=JSON.parse(raw); }catch(e){ data={}; }
+    if(data.success){ toast('Bring! token updated! Valid for 7 days.'); renderBringTokenStatus(); return {ok:true}; }
+    return {ok:false, reason: bringFailureMessage(resp.status, raw)};
+  } catch(e){
+    console.warn('Bring token update failed:',e);
+    return {ok:false, reason:'Could not reach the Worker: '+(e&&e.message||'unknown error')};
+  }
 }
 
 window.addEventListener('message',function(event){
@@ -15288,7 +15327,10 @@ window.addEventListener('message',function(event){
   if(!allowed.includes(event.origin)) return; if(!event.data||!event.data.bringToken) return;
   clearTimeout(window._bringRelayTimeout); clearInterval(_bringTokenCheckInterval);
   if(_bringPopup&&!_bringPopup.closed) _bringPopup.close();
-  updateBringToken(event.data.bringToken).then(function(ok){ if(ok) toast('\u2705 Bring! connection refreshed!'); });
+  updateBringToken(event.data.bringToken).then(function(r){
+    if(r&&r.ok) toast('\u2705 Bring! connection refreshed!');
+    else showServiceError('Bring! did not accept the token.\n\n'+((r&&r.reason)||'No reason given.'));
+  });
 });
 
 function openBringAutoRefresh() {
@@ -15324,20 +15366,6 @@ function buildBringBookmarklet(secret) {
   // in here and broke the bookmarklet. The set-token action is exempt from the
   // app-key check in Worker v34 precisely because it runs off-origin; its own
   // secret is what authenticates it.
-  // How a bring-settoken reply is turned into words. A REAL function, not a
-  // string, so the self test can call it with each reply the Worker can send —
-  // and `buildBringBookmarklet` inlines this very source, so the two cannot
-  // drift apart. (It cannot be eval'd in a test: the app's CSP has no
-  // 'unsafe-eval', and weakening the policy to suit a test is the wrong trade.)
-  // Returns null on success, the message to show otherwise.
-  function bringFailureMessage(status, rawText) {
-    var d; try { d = JSON.parse(rawText); } catch (e) { d = {}; }
-    if (d.success) return null;
-    return 'Failed (' + status + '): ' +
-      (d.error || d.message || String(rawText || '').slice(0, 200) || 'no reason given');
-  }
-  window.bringFailureMessage = bringFailureMessage;
-
   // v32.4 — read `error` as well as `message`, and show the HTTP status. The
   // Worker reports every genuine failure as {error}: 503 when
   // BRING_SETTOKEN_SECRET is unset, 403 on a wrong secret, 400 on a malformed
@@ -15372,7 +15400,8 @@ async function submitManualBringToken(){
   if(!tok){ st.innerHTML='<span style="color:#c62828;">Paste the token first.</span>'; return; }
   if(tok.split('.').length!==3){ st.innerHTML='<span style="color:#c62828;">That doesn\'t look like a Bring! token (expected three dot-separated parts).</span>'; return; }
   st.innerHTML='Saving…';
-  var ok=await updateBringToken(tok);
+  var res=await updateBringToken(tok);
+  var ok=res&&res.ok;
   if(ok){
     ta.value='';
     st.innerHTML='<span style="color:#2e7d32;">✅ Saved. Checking with the server…</span>';
@@ -15381,7 +15410,8 @@ async function submitManualBringToken(){
     else if(s&&s.unknown) st.innerHTML='<span style="color:#8A6D00;">Saved, but the server status check failed: '+escH(s.reason)+'</span>';
     else st.innerHTML='<span style="color:#c62828;">Saved, but Bring! still rejects it. Is it the current token?</span>';
   } else {
-    st.innerHTML='<span style="color:#c62828;">The Worker refused the token. Check that the Worker is deployed and the secret matches.</span>';
+    // Say what the Worker said, not what it might have been.
+    st.innerHTML='<span style="color:#c62828;">'+escH((res&&res.reason)||'The Worker refused the token, without saying why.')+'</span>';
   }
 }
 window.submitManualBringToken=submitManualBringToken;
