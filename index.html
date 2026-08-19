@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.4 -->
+<!-- Tony's Recipes Collection v32.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1516,6 +1516,13 @@ const SELF_TESTS = [
         try{ if(prev===null) localStorage.removeItem(CLOUD_READS_KEY); else localStorage.setItem(CLOUD_READS_KEY,prev); }catch(e){}
       }
       if(!document.querySelector('#settingsDrop button[onclick*="openSyncHealth"]')) throw new Error('Sync Health is not reachable from Settings');
+      // v32.5 — the ONLY input for the Bring! shared secret lives inside the
+      // bookmarklet modal, and nothing in Settings opened it. Worse, the modal
+      // refused to open until a secret was set, and the refusal pointed at
+      // "Settings -> Bring!", which did not exist: a closed loop with no way in.
+      // Tony went looking in Settings, reasonably, and found nothing.
+      if(!document.querySelector('#settingsDrop button[onclick*="showBringBookmarklet"]'))
+        throw new Error('Bring! is not reachable from Settings — the shared secret can only be entered there');
     } },
 
   { id:'safety_backup_age', group:'Backup', name:'Backup age is tracked and nagged about (5d.1)',
@@ -2546,10 +2553,38 @@ const SELF_TESTS = [
       // A secret containing a quote must not break out of the emitted JS.
       var evil=buildBringBookmarklet('a"b\\c');
       if(evil.indexOf('secret:"a"b')!==-1) throw new Error('a quote in the secret breaks the generated bookmarklet');
-      // ...and an unset secret must warn rather than emit a silently broken one.
-      if(String(showBringBookmarklet).indexOf('showServiceError')===-1)
-        throw new Error('an unset secret produces a broken bookmarklet with no warning');
+      // (An earlier assertion here required showBringBookmarklet to call
+      // showServiceError. That pinned the IMPLEMENTATION of the warning, not the
+      // behaviour — and the implementation it pinned was the dead end itself: a
+      // refusal to open the only window where the secret can be typed. The
+      // behaviour it meant to protect, "an unset secret must warn rather than
+      // emit a broken bookmarklet", is asserted directly below.)
       if(!document.getElementById('bringSecretInput')) throw new Error('there is nowhere to enter the secret');
+
+      // v32.5 — the modal must OPEN with no secret set. That is the only place the
+      // secret can be entered, so refusing to open it left a user with no way in
+      // at all, and the refusal named a Settings entry that did not exist. Assert
+      // on the actual overlay state, not on the source of the guard.
+      var _sv=getBringTokenSecret(), ov=document.getElementById('bringBookmarkletOverlay');
+      try{
+        setBringTokenSecret('');
+        ov.classList.remove('open');
+        showBringBookmarklet();
+        if(!ov.classList.contains('open'))
+          throw new Error('the bookmarklet modal refuses to open without a secret — the secret can then never be entered');
+        var codeBox=document.getElementById('bringBookmarkletCode');
+        if(/javascript:/.test(codeBox.textContent))
+          throw new Error('a bookmarklet was emitted with an empty secret — it would always be refused');
+        if(!/secret/i.test(codeBox.textContent))
+          throw new Error('the code box does not explain why there is nothing to copy');
+        // With a secret it must emit the real thing, and show it back for checking.
+        setBringTokenSecret('sekrit-42');
+        showBringBookmarklet();
+        if(codeBox.textContent.indexOf('javascript:')!==0)
+          throw new Error('no bookmarklet was emitted even though a secret is set');
+        if(document.getElementById('bringSecretInput').value!=='sekrit-42')
+          throw new Error('the stored secret is not shown back, so it cannot be checked against the Worker');
+      } finally { setBringTokenSecret(_sv); ov.classList.remove('open'); }
 
       // v32.4 — assert on BEHAVIOUR, not on source text. Every earlier assertion
       // here was a string match, and all of them passed while the bookmarklet
@@ -5116,7 +5151,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.4';
+var APP_VERSION = 'v32.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6002,6 +6037,24 @@ window.addEventListener('error', function(e) {
 :root[data-theme="dark"] .toast-icon-wrap,
 :root[data-theme="dark"] .filter-btn.fav-btn { background: #3A241A; color: var(--terracotta); border-color: #55372A; }
 :root[data-theme="dark"] .diet-check-item:hover { background: #2E251E; }
+
+/* v32.5 — the nutrition panel was unreadable in dark mode. Its background is a
+   hard-coded cream (#f5f0ea) with no override, while every piece of text inside
+   it is themed: --heading for the numbers, --ink for the labels, --muted for the
+   units. In dark mode those all resolve to LIGHT colours, so the panel rendered
+   light-on-light — Tony's screenshot shows "Calories / Carbs / Fat / Protein"
+   almost invisible and the figures barely legible.
+   Fixing the background alone is not enough: --muted (#A79E93) on this dark tile
+   is only about 3:1, under the 4.5:1 WCAG AA minimum for the small 10–11px text
+   the units and labels use. So the panel gets its own foreground colours too.
+   Any panel that hard-codes a background must also hard-code, or override, every
+   colour used on top of it — inheriting half a palette is what breaks here. */
+:root[data-theme="dark"] .nutrition-panel { background: #241D18; border-color: #3A2F26; }
+:root[data-theme="dark"] .nutrition-title,
+:root[data-theme="dark"] .nutrition-unit  { color: #B9AFA3; }
+:root[data-theme="dark"] .nutrition-label { color: #EFE7DC; }
+:root[data-theme="dark"] .nutrition-value { color: #F5C77E; }
+:root[data-theme="dark"] .nutrition-loading { color: #B9AFA3; }
 :root[data-theme="dark"] .filter-btn:hover { background: #33291F; color: var(--ink); border-color: #55372A; }
 
 /* 4.2 — "why did this match?" line under a card's title */
@@ -6864,8 +6917,11 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
   font-weight: 700;
   color: var(--heading);
 }
-.nutrition-unit { font-size: 10px; color: var(--muted); }
-.nutrition-label { font-size: 11px; color: var(--ink); font-weight: 500; }
+/* v32.5 — 10px/11px is below what is comfortable on a phone, and these are the
+   two lines Tony could not read. Bumped, with the label given more weight so it
+   reads as the heading it is. */
+.nutrition-unit { font-size: 11px; color: var(--muted); }
+.nutrition-label { font-size: 12px; color: var(--ink); font-weight: 600; }
 .nutrition-loading { font-size: 12px; color: var(--muted); text-align: center; padding: 8px 0; }
 .nutrition-btn {
   font-size: 11px; padding: 4px 10px; border-radius: 6px;
@@ -7516,7 +7572,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7534,6 +7590,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showSaveHelperInfo()">💾 Save Helper</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
@@ -8087,7 +8144,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15352,7 +15409,8 @@ function saveBringSecret() {
   if (st) st.innerHTML = v
     ? '<span style="color:#2e7d32;">Saved on this device. Re-copy the bookmarklet below — it embeds this value.</span>'
     : '<span style="color:#8A6D00;">Cleared. The token refresh will not work until a secret is set.</span>';
-  if (el) el.value = '';
+  // v32.5 — do NOT blank the field. Re-rendering the modal below repopulates it,
+  // and a box that empties itself on save reads as "it did not take".
   if (v) showBringBookmarklet();
 }
 window.saveBringSecret = saveBringSecret;
@@ -15384,10 +15442,29 @@ function buildBringBookmarklet(secret) {
 }
 window.buildBringBookmarklet = buildBringBookmarklet;
 
+// v32.5 — this used to REFUSE to open when no secret was set, and send the user
+// to "Settings -> Bring!", a menu entry that does not exist. The only input for
+// the secret lives inside this very modal, so a user without one had nowhere to
+// enter it and no way to find out: a closed loop, and the exact "dead end with no
+// way forward" §4b calls a bug. It now always opens; the code box explains what
+// is missing instead of pretending there is a menu that would fix it.
 function showBringBookmarklet() {
   var _secret = getBringTokenSecret();
-  if (!_secret) { showServiceError('Set the Bring! secret first: \u2699\ufe0f Settings \u2192 Bring!. It must match BRING_SETTOKEN_SECRET on the Worker.'); return; }
-  document.getElementById('bringBookmarkletCode').textContent = buildBringBookmarklet(_secret);
+  var box = document.getElementById('bringBookmarkletCode');
+  var inp = document.getElementById('bringSecretInput');
+  // Show what is stored, so it can be checked against the Worker rather than
+  // retyped blind. It is already on this device; masking it from its owner buys
+  // nothing.
+  if (inp) inp.value = _secret || '';
+  if (box) {
+    box.textContent = _secret
+      ? buildBringBookmarklet(_secret)
+      : 'Enter the shared secret above and press Save — the bookmarklet is built from it, '
+        + 'so there is nothing to copy until then. It must match BRING_SETTOKEN_SECRET on the '
+        + 'Cloudflare Worker (Settings \u2192 Variables & Secrets).';
+  }
+  var st = document.getElementById('bringSecretStatus');
+  if (st && !_secret) st.innerHTML = '<span style="color:#8A6D00;">No secret set on this device yet.</span>';
   document.getElementById('bringBookmarkletOverlay').classList.add('open');
 }
 
