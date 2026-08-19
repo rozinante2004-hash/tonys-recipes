@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.5 -->
+<!-- Tony's Recipes Collection v32.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2413,13 +2413,82 @@ const SELF_TESTS = [
       if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
     } },
 
+  { id:'ui_selftest_report', group:'UI', name:'The self-test report carries enough to diagnose without asking',
+    test: async()=>{
+      // Tony asked for a Copy button whose output means no second round of
+      // questions. The only way to know it does is to seed a failure and read
+      // what comes out — a button that exists but reports nothing useful is
+      // worse than none, because it looks like the information was provided.
+      ['selfTestReportText','copySelfTestReport','renderSelfTestSummary','recentErrors']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('selfTestCopyBtn')) throw new Error('there is no Copy button in the Self Test panel');
+      if(!document.getElementById('selfTestSummary')) throw new Error('there is nowhere to render the run summary');
+
+      var saved=_selfTestResults, savedNotRun=_selfTestNotRun, savedAt=_selfTestStartedAt;
+      try{
+        _selfTestResults={
+          fake_ok:  {pass:true,  ms:3, group:'Fake', name:'a passing one'},
+          cloud_strip:{pass:false, ms:7, group:'Cloud Sync', name:'Photos stripped from the per-recipe doc',
+                       error:'SEEDED-FAILURE-MARKER', stack:'Error: SEEDED-FAILURE-MARKER\n    at frameOne (index.html:1)'}
+        };
+        _selfTestNotRun=['net_ai']; _selfTestStartedAt=new Date();
+        var rep=selfTestReportText();
+
+        // The failure itself, in full.
+        [['SEEDED-FAILURE-MARKER','the error message'],
+         ['frameOne','the stack'],
+         ['cloud_strip','the failing test id'],
+         ['Cloud Sync','the failing test group'],
+         [APP_VERSION,'the app version'],
+         ['net_ai','which tests were NOT run'],
+         [navigator.userAgent.slice(0,16),'the user agent'],
+         ['SYNC HEALTH','the sync health block'],
+         ['RECENT JS ERRORS','the captured error buffer'],
+         [WORKER_ENDPOINT,'the Worker endpoint']
+        ].forEach(function(pair){
+          if(rep.indexOf(pair[0])===-1) throw new Error('the report omits '+pair[1]+' — I would have to ask for it');
+        });
+        // The standing fix note for a known test must ride along.
+        if(rep.indexOf(SELF_TEST_FIXES.cloud_strip.fix.slice(0,25))===-1)
+          throw new Error('the report drops SELF_TEST_FIXES guidance for the failing test');
+        // A passing test must not be listed as a failure.
+        if(/FAILURES \(2\)/.test(rep)) throw new Error('a passing test was counted as a failure');
+        if(rep.indexOf('1 passed, 1 failed')===-1) throw new Error('the counts are wrong: '+rep.split('\n')[4]);
+
+        // ...and with nothing failing it must say so plainly, not go silent.
+        _selfTestResults={ fake_ok:{pass:true,ms:1,group:'Fake',name:'ok'} };
+        if(selfTestReportText().indexOf('FAILURES: none')===-1)
+          throw new Error('a clean run does not state that there were no failures');
+      } finally { _selfTestResults=saved; _selfTestNotRun=savedNotRun; _selfTestStartedAt=savedAt; }
+    } },
+
   { id:'stor_photos_to_storage', group:'Storage', name:'Photos can live in Storage without breaking backups (5.2)',
     test: async()=>{
       ['storageReady','photoStoragePath','inlineRemotePhoto','dataUrlToBlobForUpload','inlinePhotosForBackup']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
-      // Safe by default: with Storage unavailable in a sandbox the app must keep
-      // working exactly as before, on base64.
-      if(await storageReady()!==false) throw new Error('storageReady should be false where Storage is unavailable');
+      // v32.6 — this used to assert storageReady()===false outright. That is only
+      // true where Firebase was never initialised, which is the CI sandbox; on a
+      // signed-in device the SDK constructs fine (storageBucket is in the config
+      // even with no bucket provisioned) and it correctly returns true. So the
+      // check passed in CI and failed on Tony's phone, reporting a fault where
+      // there was none. A test that asserts an ENVIRONMENT rather than a
+      // behaviour will do that every time.
+      //
+      // The behaviour worth pinning holds everywhere: it answers with a boolean
+      // and never throws, and markStorageUnavailable() can latch it off and make
+      // it stay off — which is what stops a project without Storage from retrying
+      // a doomed upload for every photo on every save.
+      var _sr0 = await storageReady();
+      if(typeof _sr0!=='boolean') throw new Error('storageReady() answered '+JSON.stringify(_sr0)+' instead of a boolean');
+      var _srSaved = window._storageReady;
+      try{
+        window._storageReady = null;               // forget any cached answer
+        markStorageUnavailable('self test');
+        if(await storageReady()!==false)
+          throw new Error('markStorageUnavailable() did not latch Storage off — a project without a bucket would retry a doomed upload for every photo, on every save');
+        markStorageUnavailable('self test again'); // idempotent, must not flip back
+        if(await storageReady()!==false) throw new Error('the latch did not hold');
+      } finally { window._storageReady = _srSaved; }
       if(photoStoragePath(7).indexOf('shared/photos/')!==0) throw new Error('photos are not filed under the shared path');
       var blob=dataUrlToBlobForUpload('data:image/png;base64,iVBORw0KGgo=');
       if(!blob||blob.type!=='image/png') throw new Error('a data URL did not convert to an uploadable blob');
@@ -4295,6 +4364,12 @@ var _selfTestRunning = false;
 // ── OPEN MODAL ───────────────────────────────────────────────────────────────
 function openSelfTest() {
   _selfTestResults = {};
+  // Clear last run's summary — a stale "all passed" above a fresh, unrun list
+  // is exactly the kind of thing that gets believed.
+  var _sum=document.getElementById('selfTestSummary');
+  if(_sum){ _sum.style.display='none'; _sum.innerHTML=''; }
+  var _cp=document.getElementById('selfTestCopyBtn'); if(_cp) _cp.style.display='none';
+  _selfTestNotRun = []; _selfTestStartedAt = null;
   renderSelfTestList();
   document.getElementById('selfTestProgress').textContent = '';
   document.getElementById('selfTestRunBtn').textContent = '▶ Execute Selected';
@@ -4373,6 +4448,10 @@ async function runSelfTests() {
   const selected = Array.from(document.querySelectorAll('.st-checkbox:checked')).map(cb=>cb.getAttribute('data-id'));
   const toRun = SELF_TESTS.filter(t=>selected.includes(t.id));
   let passed=0, failed=0;
+  // Recorded so the report can say what was NOT run. A summary that counts only
+  // what ran reads as a full pass when half the suite was deselected.
+  _selfTestNotRun = SELF_TESTS.filter(t=>!selected.includes(t.id)).map(t=>t.id);
+  _selfTestStartedAt = new Date();
 
   for(let i=0; i<toRun.length; i++) {
     const t = toRun[i];
@@ -4387,14 +4466,16 @@ async function runSelfTests() {
     // Scroll into view
     if(row) row.scrollIntoView({block:'nearest',behavior:'smooth'});
 
+    var _t0 = Date.now();
     try {
       await t.test();
-      _selfTestResults[t.id] = {pass:true};
+      _selfTestResults[t.id] = {pass:true, ms:Date.now()-_t0, group:t.group, name:t.name};
       if(statusEl) statusEl.textContent = '✅';
       if(row) row.style.background = '#f0fdf0';
       passed++;
     } catch(err) {
-      _selfTestResults[t.id] = {pass:false, error:err.message, stack:err.stack};
+      _selfTestResults[t.id] = {pass:false, error:err.message, stack:err.stack,
+                                ms:Date.now()-_t0, group:t.group, name:t.name};
       if(statusEl) statusEl.textContent = '❌';
       if(detailBtn) detailBtn.style.display = 'inline-block';
       if(row) row.style.background = '#fff5f5';
@@ -4409,7 +4490,136 @@ async function runSelfTests() {
   btn.textContent = '▶ Run Again';
   document.getElementById('selfTestProgress').textContent =
     `✅ ${passed} passed  ❌ ${failed} failed  (${toRun.length} total)`;
+  renderSelfTestSummary(passed, failed, toRun.length);
 }
+
+var _selfTestNotRun = [];
+var _selfTestStartedAt = null;
+
+// The summary panel that appears once a run finishes, with the Copy button.
+function renderSelfTestSummary(passed, failed, total) {
+  var box = document.getElementById('selfTestSummary');
+  if (!box) return;
+  var secs = _selfTestStartedAt ? ((Date.now() - _selfTestStartedAt.getTime())/1000).toFixed(1) : '?';
+  var failing = Object.keys(_selfTestResults).filter(function(id){ return !_selfTestResults[id].pass; });
+  var head = failed
+    ? '<span style="color:var(--terracotta);font-weight:700;">' + failed + ' failed</span>, ' + passed + ' passed'
+    : '<span style="color:var(--green);font-weight:700;">All ' + passed + ' passed</span>';
+  var lines = '<div style="font-size:13px;margin-bottom:6px;">' + head
+    + ' <span style="color:var(--muted);">— ' + total + ' run in ' + secs + 's'
+    + (_selfTestNotRun.length ? ', ' + _selfTestNotRun.length + ' not run' : '') + '</span></div>';
+  if (failing.length) {
+    lines += '<div style="font-size:12px;color:var(--muted);line-height:1.7;">';
+    failing.slice(0, 6).forEach(function(id){
+      var r = _selfTestResults[id];
+      lines += '<div>❌ <strong>' + escH(r.name || id) + '</strong> — ' + escH(r.error || '') + '</div>';
+    });
+    if (failing.length > 6) lines += '<div>…and ' + (failing.length - 6) + ' more.</div>';
+    lines += '</div>';
+  }
+  box.innerHTML = lines;
+  box.style.display = 'block';
+  var btn = document.getElementById('selfTestCopyBtn');
+  if (btn) {
+    btn.style.display = 'inline-block';
+    btn.textContent = failed ? '\u{1F4CB} Copy report (' + failed + ' failing)' : '\u{1F4CB} Copy report';
+  }
+}
+window.renderSelfTestSummary = renderSelfTestSummary;
+
+// Everything needed to diagnose a failure WITHOUT a second round of questions.
+// Written as plain text so it pastes into a chat legibly. The rule for what goes
+// in: if its absence would make me ask a follow-up, it belongs here.
+function selfTestReportText() {
+  var L = [];
+  var failing = [], passing = [];
+  Object.keys(_selfTestResults).forEach(function(id){
+    (_selfTestResults[id].pass ? passing : failing).push(id);
+  });
+
+  L.push('SELF TEST REPORT — Tony\u2019s Recipes');
+  L.push('='.repeat(52));
+  L.push('app version:   ' + APP_VERSION);
+  L.push('run at:        ' + (_selfTestStartedAt ? _selfTestStartedAt.toISOString() : new Date().toISOString()));
+  L.push('result:        ' + passing.length + ' passed, ' + failing.length + ' failed, '
+         + _selfTestNotRun.length + ' not run (' + SELF_TESTS.length + ' in suite)');
+  L.push('');
+
+  // ── Environment. Half of what I ask for after a bug report is here. ────────
+  L.push('ENVIRONMENT');
+  L.push('  user agent:  ' + navigator.userAgent);
+  L.push('  platform:    ' + (navigator.platform || 'unknown')
+         + '  | languages: ' + ((navigator.languages||[]).join(',') || navigator.language || '?'));
+  L.push('  viewport:    ' + window.innerWidth + 'x' + window.innerHeight
+         + '  | screen: ' + (screen.width||'?') + 'x' + (screen.height||'?')
+         + '  | dpr: ' + (window.devicePixelRatio || 1));
+  L.push('  theme:       ' + (typeof effectiveTheme==='function' ? effectiveTheme() : 'unknown')
+         + ' (setting: ' + (typeof getTheme==='function' ? getTheme() : '?') + ')');
+  L.push('  online:      ' + (navigator.onLine ? 'yes' : 'no'));
+  L.push('  standalone:  ' + (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'yes (installed PWA)' : 'no (browser tab)'));
+  L.push('  worker:      ' + WORKER_ENDPOINT);
+  L.push('  storage:     _storageReady=' + String(window._storageReady));
+  L.push('');
+
+  // ── The failures, in full. Message AND stack AND the standing fix note. ───
+  if (failing.length) {
+    L.push('FAILURES (' + failing.length + ')');
+    failing.forEach(function(id, i){
+      var r = _selfTestResults[id];
+      L.push('');
+      L.push('  ' + (i+1) + '. [' + (r.group||'?') + '] ' + id);
+      L.push('     name:   ' + (r.name || '(unnamed)'));
+      L.push('     error:  ' + (r.error || '(no message)'));
+      if (SELF_TEST_FIXES[id] && SELF_TEST_FIXES[id].fix)
+        L.push('     note:   ' + SELF_TEST_FIXES[id].fix);
+      if (r.stack) {
+        // First few frames only — the rest is runner scaffolding.
+        String(r.stack).split('\n').slice(0, 6).forEach(function(line){
+          if (line.trim()) L.push('     stack:  ' + line.trim());
+        });
+      }
+    });
+    L.push('');
+  } else {
+    L.push('FAILURES: none');
+    L.push('');
+  }
+
+  if (_selfTestNotRun.length) {
+    L.push('NOT RUN (' + _selfTestNotRun.length + '): ' + _selfTestNotRun.join(', '));
+    L.push('');
+  }
+
+  // ── Recent JS errors. Often the real cause of a test failure. ─────────────
+  var errs = (typeof recentErrors === 'function') ? recentErrors() : [];
+  L.push('RECENT JS ERRORS (' + errs.length + ')');
+  if (!errs.length) L.push('  none captured this session');
+  errs.forEach(function(e){ L.push('  ' + e.at + '  [' + e.kind + '] ' + e.message + (e.where ? '  @ ' + e.where : '')); });
+  L.push('');
+
+  // ── Sync health, verbatim. Already exists; no reason to duplicate it. ─────
+  L.push('SYNC HEALTH');
+  try {
+    syncHealthText().split('\n').forEach(function(line){ L.push('  ' + line); });
+  } catch (e) {
+    L.push('  (could not be collected: ' + (e && e.message) + ')');
+  }
+
+  return L.join('\n');
+}
+window.selfTestReportText = selfTestReportText;
+
+// Same honest-clipboard handling as copySyncHealth: a refused write must never
+// be reported as a success — show the text so it can be selected by hand.
+function copySelfTestReport() {
+  var text = selfTestReportText();
+  navigator.clipboard.writeText(text)
+    .then(function(){ toast('\u{1F4CB} Self test report copied \u2014 paste it straight into the chat'); })
+    .catch(function(){
+      showServiceError('Could not reach the clipboard. Here is the report to copy by hand:\n\n' + text);
+    });
+}
+window.copySelfTestReport = copySelfTestReport;
 
 // ── DETAIL MODAL ─────────────────────────────────────────────────────────────
 var SELF_TEST_FIXES = {
@@ -5151,7 +5361,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.5';
+var APP_VERSION = 'v32.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5926,10 +6136,31 @@ window.showSaveHelperInfo = showSaveHelperInfo;
 window.copyAutoStart = copyAutoStart;
 window.updateHelperStatus = updateHelperStatus;
 
+// v32.6 — keep the last few errors, don't just shout them. A toast is gone in
+// five seconds, and by the time anyone asks "what did it say?" the answer is
+// gone with it. The self-test report includes this buffer, which is often the
+// difference between a diagnosis and another round of questions.
+var _recentErrors = [];
+function recordError(kind, message, where) {
+  _recentErrors.push({ at: new Date().toISOString(), kind: kind,
+                       message: String(message || '(no message)'), where: where || '' });
+  if (_recentErrors.length > 20) _recentErrors.shift();   // ring buffer, newest kept
+}
+window.recentErrors = function(){ return _recentErrors.slice(); };
+
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
   console.error('[Global error]', e.message, e.filename, e.lineno);
+  recordError('error', e.message, (e.filename || '') + (e.lineno ? ':' + e.lineno : ''));
   if (typeof toast === 'function') toast('⚠️ Error: ' + e.message);
+});
+// A rejected promise never reaches the handler above, and most of this app's
+// failure paths are async — so without this the report would miss exactly the
+// errors most likely to matter.
+window.addEventListener('unhandledrejection', function(e) {
+  var m = (e && e.reason && (e.reason.message || e.reason)) || 'unknown';
+  console.error('[Unhandled rejection]', m);
+  recordError('unhandled-rejection', m, '');
 });
 
 </script>
@@ -7572,7 +7803,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8144,7 +8375,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17215,9 +17446,12 @@ function updateFilterBarTop() {
       </div>
       <!-- Test list -->
       <div id="selfTestList" style="max-height:55vh;overflow-y:auto;padding:8px 0;"></div>
+      <!-- Summary, shown once a run finishes -->
+      <div id="selfTestSummary" style="display:none;padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);"></div>
       <!-- Footer -->
-      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
-        <button id="selfTestRunBtn" onclick="runSelfTests()" style="flex:1;padding:11px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">▶ Execute Selected</button>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="selfTestRunBtn" onclick="runSelfTests()" style="flex:1;min-width:150px;padding:11px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">▶ Execute Selected</button>
+        <button id="selfTestCopyBtn" onclick="copySelfTestReport()" style="display:none;padding:11px 14px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;cursor:pointer;" title="Copies versions, environment, every failure with its stack, recent JS errors and sync health — everything needed to diagnose without another round of questions.">📋 Copy report</button>
         <button onclick="closeM('selfTestOverlay')" style="padding:11px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>
       </div>
     </div>
