@@ -356,6 +356,23 @@ found only because a test was written first and disagreed with the code.
   (`chat_` … `` chat` ``) cannot see the parts. Name a part `chat_<slug>_p1` and every
   chat is read in full just to draw a list of group names. `'_'` (0x5F) sorting before
   `` '`' `` (0x60) is what makes that boundary work; there is a test.
+- **`''.indexOf('')` is `0`, so a `charset.indexOf(lastChar) > -1` trim loop never
+  ends on an empty string.** `waTrimUrlPunctuation` used `for (;;)` and asked "is the
+  last character punctuation?" — on `''` the answer is yes, forever. It ran over every
+  recipe's `source`, and a hand-typed recipe has none, so v32.7's harvest panel froze
+  the tab solid for anyone with such a recipe: no error, no console output, just Chrome
+  offering to kill the page. Use `while (s)`, and test the inputs that trim away to
+  nothing (`''`, `undefined`, `'...'`), not only the happy path.
+- **A hanging test is not a failing test, and the difference matters when hunting.**
+  That freeze made the runner produce *no output at all* rather than a red line, and it
+  killed the mutation harness mid-run, leaving the mutation applied on disk. When a
+  suite goes silent: work out whether the page is blocked (an in-page `setTimeout` that
+  never fires proves it) or has crashed (Playwright reports the target closed), then
+  bisect by running the suspect function's statements one at a time. Restore mutations
+  in a `finally`, and treat a timeout as CAUGHT rather than as a broken run.
+- **Do not edit a file while a mutation script is cycling it.** The harness rewrites
+  the original after each run, so an edit made in between is silently reverted. Wait
+  for it to finish; if an edit vanished, that is why.
 
 ## Outstanding
 

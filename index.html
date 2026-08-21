@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.7 -->
+<!-- Tony's Recipes Collection v32.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1978,9 +1978,28 @@ const SELF_TESTS = [
       // The reason this feature exists: a device that cannot reach GitHub must
       // still be able to read a chat. So the loader has to handle 'cloud'
       // WITHOUT falling through to the folder fetch.
-      var src=String(waLoadAllMessages);
-      if(src.indexOf("'cloud'")===-1) throw new Error('waLoadAllMessages does not handle the cloud source');
-      if(src.indexOf('loadCloudChatText')===-1) throw new Error('the cloud branch does not read the cloud text');
+      //
+      // Checked by RUNNING it, not by reading its source. This used to grep
+      // String(waLoadAllMessages) for "'cloud'", which broke the moment the
+      // per-chat load was split out to let chats load in parallel (v32.8) —
+      // the behaviour was untouched and the test failed anyway. Stub the cloud
+      // reader, forbid the network, and see which one it actually calls.
+      if(typeof waLoadOneChat!=='function') throw new Error('waLoadOneChat not defined');
+      var realCloud=window.loadCloudChatText, realFetch=window.fetch;
+      var cloudCalls=0, fetchCalls=0, slug='selftest-cloud-'+Date.now();
+      window.loadCloudChatText=function(){ cloudCalls++; return Promise.resolve('1/2/2026, 10:00 - Dana: shakshuka'); };
+      window.fetch=function(){ fetchCalls++; return Promise.reject(new Error('the cloud source fell through to the network')); };
+      var got;
+      try{
+        got=await waLoadOneChat({source:'cloud', slug:slug, group:'G', id:'cloud:'+slug});
+      } finally {
+        window.loadCloudChatText=realCloud; window.fetch=realFetch;
+        if(typeof _waCloudCache==='object') delete _waCloudCache[slug];
+      }
+      if(cloudCalls!==1) throw new Error('a cloud chat did not go through loadCloudChatText (called '+cloudCalls+'×)');
+      if(fetchCalls!==0) throw new Error('a cloud chat fell through to the folder fetch — the offline-GitHub case is broken');
+      if(!got||!got.length||got[0].text.indexOf('shakshuka')===-1)
+        throw new Error('the cloud text was not parsed into messages');
       // Import must offer to sync, or the phone stays a dead end.
       if(String(waImportFiles).indexOf('saveChatDoc')===-1)
         throw new Error('importing a chat never syncs it, so the phone case is unsolved');
@@ -2429,6 +2448,26 @@ const SELF_TESTS = [
       // stray closer must go.
       if(waTrimUrlPunctuation('https://a.com/x)')!=='https://a.com/x') throw new Error('an unbalanced closing bracket was kept');
 
+      // Inputs that trim away to NOTHING. ''.slice(-1) is '' and ''.indexOf('')
+      // is 0, so a `> -1` test says "this is punctuation, trim it" about a string
+      // with nothing left in it — the v32.7 loop span forever on that. It froze
+      // the whole panel, because the check below runs over every recipe and a
+      // hand-typed recipe has no source at all. Each of these must simply RETURN.
+      // (If this test ever hangs rather than fails, that is the bug back again.)
+      if(waTrimUrlPunctuation('')!=='') throw new Error('an empty string did not come back empty');
+      if(waTrimUrlPunctuation(undefined)!=='') throw new Error('undefined did not come back empty');
+      if(waTrimUrlPunctuation(null)!=='') throw new Error('null did not come back empty');
+      if(waTrimUrlPunctuation('...')!=='') throw new Error('an all-punctuation string did not trim to empty');
+      if(waTrimUrlPunctuation(')))')!=='') throw new Error('an all-bracket string did not trim to empty');
+      if(waNormalizeUrl('')!=='') throw new Error('normalising an empty source did not return empty');
+      if(waNormalizeUrl(undefined)!=='') throw new Error('normalising a missing source did not return empty');
+      // The exact shape that froze it: a collection where a recipe has no source.
+      var mixed=[{name:'typed by hand'},{name:'no source',source:''},{name:'null source',source:null},
+                 {name:'real',source:'https://site.com/recipe/1'}];
+      var probe=[{key:waNormalizeUrl('https://site.com/recipe/1'),url:'https://site.com/recipe/1'}];
+      waLinksAlreadyImported(probe,mixed);
+      if(!probe[0].imported) throw new Error('a source-less recipe in the collection broke the already-imported match');
+
       // The same recipe in five disguises is ONE row.
       var k=waNormalizeUrl('https://www.Site.com/recipe/1/?utm_source=wa&b=2#method');
       if(k!==waNormalizeUrl('http://site.com/recipe/1?b=2')) throw new Error('www/scheme/tracking/fragment differences were not normalised away: '+k);
@@ -2548,8 +2587,29 @@ const SELF_TESTS = [
       if(!document.getElementById('waLinksItem')) throw new Error('the More menu has no "Recipes hiding in my chats" entry');
       if(!document.getElementById('waLinksOverlay')) throw new Error('#waLinksOverlay missing');
       if(!document.getElementById('waLinksBody')) throw new Error('#waLinksBody missing');
-      ['openWaLinks','renderWaHarvest','waImportTextRecipe','waHarvestText','copyWaHarvest']
+      ['openWaLinks','renderWaHarvest','waImportTextRecipe','waHarvestText','copyWaHarvest',
+       'closeWaLinks','waHarvestForget','waToggleSel','waImportSelected']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // A long scan the user cannot stop is the complaint that prompted all of
+      // this, so the controls have to actually appear while one is running.
+      var keptScan={status:_waScan.status,done:_waScan.done,total:_waScan.total,startedAt:_waScan.startedAt};
+      try{
+        _waScan.status='running'; _waScan.done=10; _waScan.total=100; _waScan.startedAt=Date.now();
+        var running=waProgressHtml();
+        if(running.indexOf('waScanToggle')===-1) throw new Error('a running scan offers no Pause');
+        if(running.indexOf('waScanStop')===-1)   throw new Error('a running scan offers no Stop');
+        if(running.indexOf('wa-spin')===-1)      throw new Error('a running scan shows no sign of life, so it looks hung');
+        if(running.indexOf('10')===-1||running.indexOf('100')===-1)
+          throw new Error('a running scan does not say how far along it is');
+        _waScan.status='paused';
+        if(waProgressHtml().indexOf('Continue')===-1) throw new Error('a paused scan offers no way to resume');
+        // Closing while paused must release the loop, or it waits for ever.
+        if(String(closeWaLinks).indexOf('waScanResume')===-1)
+          throw new Error('closing the panel while paused would strand the scan on a promise nobody resolves');
+      } finally {
+        _waScan.status=keptScan.status; _waScan.done=keptScan.done;
+        _waScan.total=keptScan.total; _waScan.startedAt=keptScan.startedAt;
+      }
       // ONE parser and ONE URL importer. A second copy of either would drift.
       if(String(waImportTextRecipe).indexOf('openFreehandModal')===-1)
         throw new Error('in-text recipes do not go through the free-hand parser — there would be two parsers to keep in step');
@@ -2565,6 +2625,172 @@ const SELF_TESTS = [
         if(t.indexOf('מיונז')===-1) throw new Error('the copied list omits the in-text recipes');
         if(t.indexOf('Dana')===-1) throw new Error('the copied list omits who shared what');
       } finally { _waHarvest=saved; }
+    } },
+
+  { id:'wa_scan_load_parallel', group:'WhatsApp', name:'Chats load concurrently, in order, and report progress (5f.9)',
+    test: async()=>{
+      if(typeof waLoadOneChat!=='function') throw new Error('waLoadOneChat not defined');
+      var realOne=window.waLoadOneChat, realIdx=window.waIndex;
+      var inFlight=0, peak=0, order=[];
+      try{
+        window.waIndex=function(){ return [
+          {id:'a',group:'A',source:'remote',file:'a.txt'},{id:'b',group:'B',source:'remote',file:'b.txt'},
+          {id:'c',group:'C',source:'remote',file:'c.txt'},{id:'d',group:'D',source:'remote',file:'d.txt'}]; };
+        window.waLoadOneChat=function(e){
+          inFlight++; peak=Math.max(peak,inFlight);
+          return new Promise(function(res){ setTimeout(function(){
+            inFlight--; order.push(e.id);
+            res([{date:'1/2/2026',time:'10:00',who:'W',text:'from '+e.id,group:e.group}]);
+          }, e.id==='a' ? 60 : 10); });   // 'a' is the SLOW one, on purpose
+        };
+        var progress=[];
+        var got=await waLoadAllMessages({ onProgress: function(p){ progress.push(p.done); } });
+
+        // Sequential loading would never have more than one request open at a time.
+        // This is the whole point of loading in parallel, and dropping the pool back
+        // to one lane must fail here rather than pass quietly.
+        if(peak<2) throw new Error('chats were loaded one after another — never more than '+peak+' in flight');
+        // The slow chat finishes LAST, so if results were pushed as they landed its
+        // messages would move. Order must follow the index, not the network, because
+        // the delta watermark counts positions within a chat.
+        if(order[order.length-1]!=='a') throw new Error('the fixture did not exercise out-of-order completion');
+        var from=got.messages.map(function(m){ return m.text; });
+        if(from.join(',')!=='from a,from b,from c,from d')
+          throw new Error('a slow chat was reordered by which request finished first: '+from.join(','));
+        if(got.chats.length!==4) throw new Error('not every chat was reported as loaded');
+        if(!progress.length) throw new Error('loading reported no progress, so the panel cannot show "chat 2 of 5"');
+        if(progress[progress.length-1]!==4) throw new Error('progress never reached the total');
+
+        // One chat failing must not take the others down with it.
+        window.waLoadOneChat=function(e){
+          if(e.id==='b') return Promise.reject(new Error('boom'));
+          return Promise.resolve([{date:'1/2/2026',time:'10:00',who:'W',text:'from '+e.id,group:e.group}]);
+        };
+        var partial=await waLoadAllMessages({});
+        if(partial.chats.length!==3) throw new Error('one failed chat lost the others: '+partial.chats.length);
+        if(!(partial.problems.join(' ').indexOf('boom')>-1))
+          throw new Error('the failure was swallowed instead of reported');
+      } finally { window.waLoadOneChat=realOne; window.waIndex=realIdx; }
+    } },
+
+  { id:'wa_scan_progress', group:'WhatsApp', name:'Progress and ETA are honest, and pausing does not distort them (5f.9)',
+    test: async()=>{
+      ['waEtaText','waElapsedMs','waFmtDuration'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(waFmtDuration(45000)!=='45s') throw new Error('seconds are not formatted: '+waFmtDuration(45000));
+      if(waFmtDuration(125000)!=='2m 5s') throw new Error('minutes are not formatted: '+waFmtDuration(125000));
+      if(waFmtDuration(3900000)!=='1h 5m') throw new Error('hours are not formatted: '+waFmtDuration(3900000));
+
+      // 1,000 of 5,000 in 10s ⇒ 4,000 left at 100/s ⇒ about 40s.
+      var eta=waEtaText(1000,5000,10000);
+      if(eta.indexOf('40s')===-1) throw new Error('the ETA is not derived from the observed rate: '+eta);
+      // Too early to know. Guessing from the first handful of messages is how a
+      // progress bar earns its reputation, so it must say so instead.
+      if(waEtaText(5,5000,50)!=='estimating…') throw new Error('an ETA was invented from almost no evidence: '+waEtaText(5,5000,50));
+      if(waEtaText(0,5000,9999)!=='') throw new Error('an ETA was shown before anything was scanned');
+      if(waEtaText(5000,5000,9999)!=='') throw new Error('an ETA was still shown after the scan finished');
+
+      // Paused time must not count as work time, or the estimate inflates for
+      // every second the user spends reading the list.
+      var t0=1000000;
+      var scan={ status:'paused', startedAt:t0, pausedAt:t0+5000, pausedMs:0 };
+      if(waElapsedMs(scan,t0+25000)!==5000)
+        throw new Error('time spent paused was counted as scanning time: '+waElapsedMs(scan,t0+25000));
+      var resumed={ status:'running', startedAt:t0, pausedAt:0, pausedMs:20000 };
+      if(waElapsedMs(resumed,t0+30000)!==10000)
+        throw new Error('a completed pause was not deducted: '+waElapsedMs(resumed,t0+30000));
+    } },
+
+  { id:'wa_scan_delta', group:'WhatsApp', name:'A refresh reads only what is new, and knows when it cannot (5f.9)',
+    test: async()=>{
+      ['waDeltaStart','waChatSig','waMarkOf'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var msgs=[];
+      for(var i=0;i<5;i++) msgs.push({date:'0'+(i+1)+'/02/2026',time:'10:0'+i,who:'Dana',text:'message '+i});
+
+      var mark=waMarkOf(msgs);
+      if(mark.count!==5) throw new Error('the watermark did not record how much was read');
+      if(!mark.lastDate) throw new Error('the watermark kept no date to show the user how current the list is');
+
+      // Nothing new: start at the end, do no work at all.
+      if(waDeltaStart(msgs,mark).start!==5) throw new Error('an unchanged chat would be read again from the top');
+      // Three more arrive: read exactly those three.
+      var grown=msgs.concat([{date:'06/02/2026',time:'11:00',who:'A',text:'x'},
+                             {date:'07/02/2026',time:'11:00',who:'B',text:'y'},
+                             {date:'08/02/2026',time:'11:00',who:'C',text:'z'}]);
+      if(waDeltaStart(grown,mark).start!==5) throw new Error('a grown chat did not resume from the watermark');
+      // Never read before.
+      if(waDeltaStart(grown,null).start!==0) throw new Error('a chat never read before was not read in full');
+
+      // The dangerous cases. A re-export with a different start, or a shortened
+      // chat, means position numbers no longer refer to the same messages — so
+      // trusting the count would silently SKIP messages. Both must rescan.
+      var replaced=[{date:'01/01/2020',time:'09:00',who:'Zed',text:'different first message'}].concat(msgs);
+      if(waDeltaStart(replaced,mark).start!==0)
+        throw new Error('a replaced export kept the old watermark — messages would be skipped for good');
+      if(waDeltaStart(msgs.slice(0,3),mark).start!==0)
+        throw new Error('a shortened export kept the old watermark');
+      // The fingerprint must actually depend on the first message.
+      if(waChatSig(msgs)===waChatSig(replaced)) throw new Error('the fingerprint does not distinguish two different exports');
+    } },
+
+  { id:'wa_scan_engine', group:'WhatsApp', name:'The scan yields, can be stopped, and finds the same things either way (5f.9)',
+    test: async()=>{
+      ['waHarvestAcc','waRunHarvest','waScanPause','waScanResume','waScanStop','waScanToggle']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('waLinksBody')) throw new Error('#waLinksBody missing');
+
+      var mayo='מיונז ביתי\nמצרכים:\n1 ביצה\n1 כוס שמן\n1 כפית חרדל\n2 כפות מיץ לימון\nקורט מלח\nאופן ההכנה:\n'
+        + 'טורפים את הביצה עם החרדל, מוסיפים את השמן בהדרגה תוך כדי טריפה, מוסיפים לימון ומערבבים.\nמקררים כשעה לפני ההגשה.';
+
+      // Fed one at a time, the accumulator must reach the same answer as one
+      // batch pass — otherwise a paused scan and an uninterrupted one disagree.
+      var msgs=[{who:'A',date:'1/2/2026',text:'לינק https://site.com/r?utm_source=wa'},
+                {who:'B',date:'2/2/2026',text:mayo},
+                {who:'C',date:'3/2/2026',text:'תודה!'},
+                {who:'D',date:'4/2/2026',text:'https://www.site.com/r/'},
+                {who:'E',date:'5/2/2026',text:mayo}];
+      var acc=waHarvestAcc();
+      msgs.forEach(function(m){ acc.add(m); });
+      var batchLinks=waExtractLinks(msgs), batchTexts=waFindTextRecipes(msgs);
+      if(acc.links().length!==batchLinks.length)
+        throw new Error('incremental and batch disagree on links: '+acc.links().length+' vs '+batchLinks.length);
+      if(acc.textList().length!==batchTexts.length)
+        throw new Error('incremental and batch disagree on in-text recipes: '+acc.textList().length+' vs '+batchTexts.length);
+      if(acc.links()[0].count!==2) throw new Error('the same link fed one at a time was not counted twice');
+      if(acc.textList()[0].dupes!==2) throw new Error('a forwarded recipe fed one at a time was not folded in');
+
+      // The real point of the rebuild: the scan must hand the thread back. A
+      // synchronous pass is what made the browser offer to kill the page, and a
+      // timer that never fires until the scan ends proves it is still doing it.
+      var realLoad=window.waLoadAllMessages, realSave=window.waHarvestSave, realIdb=window._idbAvailable;
+      var bulk=[]; for(var i=0;i<4000;i++) bulk.push({chat:'c1',group:'G',who:'X',date:'1/2/2026',text:'just chatter number '+i});
+      bulk[3999]={chat:'c1',group:'G',who:'Y',date:'9/9/2026',text:mayo};
+      window.waLoadAllMessages=function(){ return Promise.resolve({messages:bulk,problems:[],chats:[{id:'c1',group:'G',count:bulk.length}]}); };
+      window.waHarvestSave=function(){ return Promise.resolve(true); };
+      window._idbAvailable=false;
+      var painted=false, savedH=_waHarvest, savedS=_waScan;
+      try{
+        setTimeout(function(){ painted=true; },0);
+        await waRunHarvest(true);
+        if(!painted) throw new Error('no timer ran during the whole scan — it never released the main thread, so the tab was frozen exactly as before');
+        if(_waScan.status!=='done') throw new Error('the scan did not finish cleanly: '+_waScan.status);
+        if(_waScan.done!==bulk.length) throw new Error('the scan skipped messages: '+_waScan.done+' of '+bulk.length);
+        if(!_waHarvest.texts.length) throw new Error('the recipe buried at the end of a long chat was never found');
+
+        // Stop must halt early AND keep what was found by then.
+        window.waLoadAllMessages=function(){ return Promise.resolve({messages:bulk,problems:[],chats:[]}); };
+        var run=waRunHarvest(true);
+        await new Promise(function(r){ setTimeout(r,0); });
+        waScanStop();
+        await run;
+        if(_waScan.status!=='stopped') throw new Error('stop did not stop the scan: '+_waScan.status);
+        if(_waScan.done>=bulk.length) throw new Error('stop was ignored — the scan ran to the end anyway');
+      } finally {
+        window.waLoadAllMessages=realLoad; window.waHarvestSave=realSave; window._idbAvailable=realIdb;
+        _waHarvest=savedH; _waScan=savedS;
+        var b=document.getElementById('waLinksBody'); if(b) b.innerHTML='';
+      }
     } },
 
   { id:'ui_selftest_report', group:'UI', name:'The self-test report carries enough to diagnose without asking',
@@ -5515,7 +5741,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.7';
+var APP_VERSION = 'v32.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6562,6 +6788,53 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 #waSetupOverlay.open {
   opacity: 1 !important;
   pointer-events: auto !important;
+}
+
+/* ── The harvest panel (5f.9, rebuilt in v32.8) ──────────────────────────────
+   A long scan needs to LOOK like it is working. Without motion and a count the
+   page is indistinguishable from a hung tab — which is exactly what the browser
+   concluded, offering to kill it. Dark mode is defined alongside every colour
+   here: a panel that hardcodes light values is the nutrition-panel bug again. */
+.wa-progress { padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--card-bg); position: sticky; top: 0; z-index: 2; }
+.wa-bar { height: 4px; border-radius: 3px; background: var(--border); overflow: hidden; margin-bottom: 8px; }
+.wa-bar > i { display: block; height: 100%; background: var(--terracotta); border-radius: 3px; transition: width 0.3s ease; }
+.wa-bar.is-paused > i { background: var(--muted); }
+.wa-progress-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.wa-progress-line { font-size: 12px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.wa-spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--terracotta); border-radius: 50%; display: inline-block; animation: waSpin 0.7s linear infinite; flex: none; }
+@keyframes waSpin { to { transform: rotate(360deg); } }
+.wa-ctls { display: flex; gap: 6px; }
+.wa-ctl { padding: 5px 11px; border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; }
+.wa-ctl:hover { border-color: var(--terracotta); color: var(--terracotta); }
+.wa-ctl.primary { background: var(--terracotta); color: #fff; border-color: var(--terracotta); margin-top: 6px; }
+.wa-ctl.primary:hover { opacity: 0.9; color: #fff; }
+.wa-fresh { padding: 8px 14px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wa-fresh-btns { display: flex; gap: 6px; }
+.wa-tabs { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.wa-tab { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 13px; font-weight: 600; background: var(--card-bg); color: var(--ink); }
+.wa-tab.on { background: var(--terracotta); color: #fff; border-color: var(--terracotta); }
+.wa-selbar { padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--ink); background: #FFF0E8; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wa-selbar span { display: flex; gap: 6px; }
+.wa-selbar .wa-ctl.primary { margin-top: 0; }
+.wa-filters { padding: 8px 14px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; gap: 14px; flex-wrap: wrap; }
+.wa-filters label { cursor: pointer; }
+.wa-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+.wa-row { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-start; }
+.wa-row.picked { background: #FFF0E8; }
+.wa-pick { flex: none; padding-top: 2px; cursor: pointer; }
+.wa-rowmain { flex: 1; min-width: 0; }
+.wa-url { font-size: 13px; word-break: break-all; }
+.wa-url a { color: var(--terracotta); }
+.wa-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.wa-ctx { font-size: 12px; color: var(--ink); margin-top: 4px; unicode-bidi: plaintext; text-align: start; opacity: 0.85; }
+.wa-text { font-size: 13px; color: var(--ink); margin-top: 4px; unicode-bidi: plaintext; text-align: start; white-space: pre-wrap; }
+:root[data-theme="dark"] .wa-selbar,
+:root[data-theme="dark"] .wa-row.picked { background: #2E241C; }
+/* The spinner is the only thing on screen saying "still alive", so it does not
+   vanish under reduced motion — it stops rotating and stays visible. */
+@media (prefers-reduced-motion: reduce) {
+  .wa-spin { animation: none; border-top-color: var(--terracotta); opacity: 0.7; }
+  .wa-bar > i { transition: none; }
 }
 .drop-item { padding: 10px 14px; font-size: 13px; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 8px; transition: background 0.1s; border: none; background: none; width: 100%; font-family: 'DM Sans', 'Heebo', sans-serif; text-align: left; }
 .drop-item:hover { background: #FFF0E8; color: var(--terracotta); }
@@ -7958,7 +8231,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8531,7 +8804,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8680,17 +8953,18 @@ body.banner-shown .header {
 
 <!-- WHATSAPP: ASK MY GROUPS (3.9) -->
 <!-- WHATSAPP: HARVEST LINKS & IN-TEXT RECIPES (5f.9) -->
-<div id="waLinksOverlay" onclick="bgClose(event,'waLinksOverlay')" class="modal-overlay" style="z-index:900;">
+<div id="waLinksOverlay" onclick="if(event.target===this)closeWaLinks()" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:96%;max-width:640px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;display:flex;flex-direction:column;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px;">
       <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">🧺 Recipes hiding in my chats</div>
-      <button class="modal-close" onclick="closeM('waLinksOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+      <button class="modal-close" onclick="closeWaLinks()" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
     <div id="waLinksCount" style="font-size:11px;color:var(--muted);padding:0 16px 8px;"></div>
     <div id="waLinksBody" style="overflow-y:auto;flex:1;min-height:120px;"></div>
     <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
       <button onclick="copyWaHarvest()" style="flex:1;padding:10px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy the list</button>
-      <button onclick="closeM('waLinksOverlay')" style="padding:10px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Done</button>
+      <button onclick="waHarvestForget()" style="padding:10px 12px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;" title="Forget the saved list and read the chats from scratch next time">🗑</button>
+      <button onclick="closeWaLinks()" style="padding:10px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Done</button>
     </div>
   </div>
 </div>
@@ -16137,7 +16411,13 @@ function waParse(text, group){
 var WA_URL_RE = /https?:\/\/[^\s<>"']+/gi;
 function waTrimUrlPunctuation(u) {
   var s = String(u || '');
-  for (;;) {
+  // `while (s)`, not `for (;;)`. On an empty string s.slice(-1) is '' and
+  // ''.indexOf('') is 0 — which passes the `> -1` test — so the old loop trimmed
+  // an already-empty string forever. waLinksAlreadyImported calls this for every
+  // recipe's source, and a recipe added by hand has no source, so ANY collection
+  // containing one froze the harvest panel solid: the tab locked, no error, and
+  // Chrome offered to kill the page. Shipped in v32.7; found in v32.8.
+  while (s) {
     var last = s.slice(-1);
     if ('.,;:!?…־»'.indexOf(last) > -1) { s = s.slice(0, -1); continue; }
     if (last === ')' && (s.split('(').length - 1) < (s.split(')').length - 1)) { s = s.slice(0, -1); continue; }
@@ -16181,12 +16461,23 @@ function waUrlDomain(u) {
 var WA_LINK_NOISE = /^(chat\.whatsapp\.com|wa\.me|api\.whatsapp\.com|t\.me|maps\.app\.goo\.gl|goo\.gl\/maps|meet\.google\.com|zoom\.us)$/i;
 function waLinkIsNoise(u) { return WA_LINK_NOISE.test(waUrlDomain(u)); }
 
-// Extract every link, with the context that makes it decidable: who shared it,
-// when, and what they said around it. Newest occurrence wins for display — a
-// re-share usually carries the better description.
-function waExtractLinks(messages) {
-  var byKey = {};
-  (messages || []).forEach(function(m) {
+// ─── The accumulator ────────────────────────────────────────────────────────
+// The scan used to be one synchronous pass over every message. On a real group —
+// 11,000 messages, plenty of them long — that locked the tab hard enough that the
+// browser offered to kill the page, and nothing appeared until the very end.
+//
+// So nothing below ever sees "all the messages". It is fed ONE message at a time
+// and can be stopped between any two of them, which is what makes the scan
+// chunkable, pausable, resumable and able to show its results as they arrive.
+// waExtractLinks/waFindTextRecipes stay as they were, as thin wrappers, so a
+// caller that genuinely has everything in hand keeps working unchanged.
+function waHarvestAcc(prev) {
+  var byKey    = (prev && prev.byKey)    || {};
+  var textSeen = (prev && prev.textSeen) || {};
+  var texts    = (prev && prev.texts)    || [];
+  var seq      = (prev && prev.seq)      || 0;
+
+  function addLinks(m) {
     var found = String(m && m.text || '').match(WA_URL_RE);
     if (!found) return;
     found.forEach(function(hit) {
@@ -16207,9 +16498,47 @@ function waExtractLinks(messages) {
       }
       if (url.length > e.url.length) e.url = url;   // prefer the fullest form seen
     });
-  });
-  return Object.keys(byKey).map(function(k){ return byKey[k]; })
-    .sort(function(a, b){ return b.count - a.count || (a.domain < b.domain ? -1 : 1); });
+  }
+
+  function addText(m, floor) {
+    var s = waScoreRecipeText(m && m.text);
+    if (s.score < floor) return null;
+    var k = String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, 160).toLowerCase();
+    if (textSeen[k]) { textSeen[k].dupes = (textSeen[k].dupes || 1) + 1; return null; }
+    var c = { idx: seq, score: s.score, signals: s.signals, lines: s.lines,
+              who: (m.who || '').trim(), date: m.date || '', group: m.group || '',
+              text: String(m.text || '') };
+    textSeen[k] = c; texts.push(c);
+    return c;
+  }
+
+  return {
+    byKey: byKey, textSeen: textSeen, texts: texts,
+    get seq(){ return seq; },
+    // Returns the newly-found in-text recipe, or null. The caller uses that to
+    // know whether the visible list actually changed.
+    add: function(m, floor) {
+      seq++;
+      addLinks(m);
+      return addText(m, (typeof floor === 'number') ? floor : 45);
+    },
+    links: function() {
+      return Object.keys(byKey).map(function(k){ return byKey[k]; })
+        .sort(function(a, b){ return b.count - a.count || (a.domain < b.domain ? -1 : 1); });
+    },
+    textList: function() {
+      return texts.slice().sort(function(a, b){ return b.score - a.score; });
+    }
+  };
+}
+
+// Extract every link, with the context that makes it decidable: who shared it,
+// when, and what they said around it. Newest occurrence wins for display — a
+// re-share usually carries the better description.
+function waExtractLinks(messages) {
+  var acc = waHarvestAcc();
+  (messages || []).forEach(function(m){ acc.add(m); });
+  return acc.links();
 }
 
 // Which links are already in the collection. Compared on the SAME normalised form
@@ -16311,24 +16640,14 @@ function waScoreRecipeText(text) {
 }
 
 // Candidate in-text recipes, best first. `min` is the score floor.
+// Same text posted twice (forwards, re-shares) collapses to one entry — the
+// accumulator does that on the way in, so a paused scan and a complete one
+// cannot disagree about what counts as a duplicate.
 function waFindTextRecipes(messages, min) {
   var floor = (typeof min === 'number') ? min : 45;
-  var out = [];
-  (messages || []).forEach(function(m, i) {
-    var s = waScoreRecipeText(m && m.text);
-    if (s.score < floor) return;
-    out.push({ idx: i, score: s.score, signals: s.signals, lines: s.lines,
-               who: (m.who || '').trim(), date: m.date || '', group: m.group || '',
-               text: String(m.text || '') });
-  });
-  // Same text posted twice (forwards, re-shares) collapses to one entry.
-  var seen = {}, dedup = [];
-  out.sort(function(a, b){ return b.score - a.score; }).forEach(function(c){
-    var k = c.text.replace(/\s+/g, ' ').trim().slice(0, 160).toLowerCase();
-    if (seen[k]) { seen[k].dupes = (seen[k].dupes || 1) + 1; return; }
-    seen[k] = c; dedup.push(c);
-  });
-  return dedup;
+  var acc = waHarvestAcc();
+  (messages || []).forEach(function(m){ acc.add(m, floor); });
+  return acc.textList();
 }
 window.waScoreRecipeText = waScoreRecipeText;
 window.waFindTextRecipes = waFindTextRecipes;
@@ -16818,34 +17137,69 @@ function waTag(msgs, id) {
   for (var i = 0; i < msgs.length; i++) msgs[i].chat = id;
   return msgs;
 }
-async function waLoadAllMessages(){
-  var idx = waIndex(), all = [], problems = [], loadedFrom = [];
-  for (var i = 0; i < idx.length; i++) {
-    var e = idx[i];
-    try {
-      var got;
-      if (e.source === 'local') {
-        var rec = await waGet(e.id);
-        if (!rec) { problems.push(e.group + ' (no longer in this browser\'s storage)'); continue; }
-        got = waParse(rec.text, e.group);
-      } else if (e.source === 'cloud') {
-        if (_waCloudCache[e.slug]) got = _waCloudCache[e.slug];
-        else {
-          got = waParse(await loadCloudChatText(e), e.group);
-          _waCloudCache[e.slug] = got;
-        }
-      } else {
-        if (_waRemoteCache[e.file]) got = _waRemoteCache[e.file];
-        else {
-          var r = await fetch(getWaBase() + encodeURIComponent(e.file), { cache: 'no-store' });
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          got = waParse(await waTextFromBuffer(await r.arrayBuffer()), e.group);
-          _waRemoteCache[e.file] = got;
-        }
-      }
-      all = all.concat(waTag(got, e.id));
-      loadedFrom.push({ id: e.id, group: e.group, source: e.source, count: got.length });
-    } catch(err) { problems.push(e.group + ' (' + err.message + ')'); }
+// Load one chat. Split out of waLoadAllMessages so several can be in flight at
+// once — see below.
+async function waLoadOneChat(e) {
+  if (e.source === 'local') {
+    var rec = await waGet(e.id);
+    if (!rec) throw new Error('no longer in this browser\'s storage');
+    return waParse(rec.text, e.group);
+  }
+  if (e.source === 'cloud') {
+    if (_waCloudCache[e.slug]) return _waCloudCache[e.slug];
+    var got = waParse(await loadCloudChatText(e), e.group);
+    _waCloudCache[e.slug] = got;
+    return got;
+  }
+  if (_waRemoteCache[e.file]) return _waRemoteCache[e.file];
+  var r = await fetch(getWaBase() + encodeURIComponent(e.file), { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  var msgs = waParse(await waTextFromBuffer(await r.arrayBuffer()), e.group);
+  _waRemoteCache[e.file] = msgs;
+  return msgs;
+}
+
+// Chats load CONCURRENTLY. This used to be a plain sequential await-in-a-loop,
+// so five chats meant five round trips end to end and the wait was the sum of
+// them; the work is network-bound, so it was idle almost the whole time. A small
+// pool rather than Promise.all over everything: an unbounded fan-out at a phone
+// on a weak connection makes every request slower and can trip rate limits.
+//
+// Order is preserved deliberately. Results are placed back at their own index
+// rather than pushed as they land, because the delta refresh identifies "already
+// scanned" by POSITION within a chat, and a message list whose order depends on
+// which network request happened to win would corrupt that watermark.
+var WA_LOAD_CONCURRENCY = 4;
+async function waLoadAllMessages(opts){
+  var o = opts || {};
+  var idx = waIndex();
+  var slots = new Array(idx.length);
+  var next = 0, finished = 0;
+  var lanes = Math.max(1, Math.min(WA_LOAD_CONCURRENCY, idx.length));
+
+  async function lane(){
+    for (;;) {
+      var i = next++;
+      if (i >= idx.length) return;
+      if (o.shouldStop && o.shouldStop()) return;
+      var e = idx[i];
+      try { slots[i] = { e: e, msgs: await waLoadOneChat(e) }; }
+      catch (err) { slots[i] = { e: e, err: err }; }
+      finished++;
+      if (o.onProgress) o.onProgress({ done: finished, total: idx.length, label: e.group });
+    }
+  }
+  var pool = [];
+  for (var w = 0; w < lanes; w++) pool.push(lane());
+  await Promise.all(pool);
+
+  var all = [], problems = [], loadedFrom = [];
+  for (var j = 0; j < slots.length; j++) {
+    var s = slots[j];
+    if (!s) continue;                                  // not reached: stopped early
+    if (s.err) { problems.push(s.e.group + ' (' + s.err.message + ')'); continue; }
+    all = all.concat(waTag(s.msgs, s.e.id));
+    loadedFrom.push({ id: s.e.id, group: s.e.group, source: s.e.source, count: s.msgs.length });
   }
   return { messages: all, problems: problems, chats: loadedFrom };
 }
@@ -16961,40 +17315,409 @@ function waAskCountLabel(){
     : '';
 }
 // ─── 5f.9 UI — the harvest panel ────────────────────────────────────────────
-var _waHarvest = { links: [], texts: [], loaded: false, hideImported: true, hideNoise: true };
+// v32.8 rebuilt this. The first version loaded every chat sequentially, scanned
+// every message in one synchronous pass, and rendered once at the very end. On a
+// real group that meant minutes of a frozen tab, Chrome offering to kill the
+// page, no progress, no way to stop, and the whole thing repeated from scratch
+// the next time the panel was opened.
+//
+// The scan is now: chunked (so the tab breathes and paints), pausable and
+// stoppable, rendered as it goes, and saved when it finishes so reopening is
+// instant and a refresh only reads what arrived since.
 
-async function openWaLinks(){
-  document.getElementById('waLinksOverlay').classList.add('open');
-  var body = document.getElementById('waLinksBody');
-  body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">🔎 Reading every chat…</div>';
+var WA_HARVEST_KEY   = 'harvest:v1';   // record id inside the existing wachats store
+var WA_SCAN_CHUNK    = 250;            // messages between yields to the browser
+var WA_RENDER_MS     = 400;            // never repaint the list faster than this
+
+var _waHarvest = { links: [], texts: [], loaded: false, hideImported: true, hideNoise: true,
+                   tab: 'links', selected: {} };
+
+// The scan's own state. Kept apart from the results so a re-render never has to
+// reason about whether a scan is in flight.
+var _waScan = {
+  status: 'idle',       // idle | loading | running | paused | stopped | done | error
+  done: 0, total: 0,
+  chatsDone: 0, chatsTotal: 0, chatLabel: '',
+  startedAt: 0, pausedAt: 0, pausedMs: 0,
+  acc: null, marks: {}, error: '',
+  found: 0,             // in-text recipes found so far, for the live counter
+  _resume: null         // resolve fn while paused
+};
+
+// ─── Progress arithmetic ────────────────────────────────────────────────────
+// Pure so it can be tested without a scan. Elapsed time EXCLUDES time spent
+// paused, or pausing for a minute would tell the user the remaining work had
+// somehow grown by a minute.
+function waElapsedMs(scan, now) {
+  var s = scan || _waScan;
+  var t = (typeof now === 'number' ? now : Date.now());
+  if (!s.startedAt) return 0;
+  var paused = s.pausedMs + (s.status === 'paused' && s.pausedAt ? (t - s.pausedAt) : 0);
+  return Math.max(0, t - s.startedAt - paused);
+}
+function waFmtDuration(ms) {
+  var s = Math.round(Math.max(0, ms) / 1000);
+  if (s < 60) return s + 's';
+  var m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ' + (s % 60) + 's';
+  return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+}
+// Returns '' when there is not yet enough evidence to estimate. A confident
+// wrong number is worse than no number: an ETA from the first few messages is
+// noise, and it is what makes progress bars untrustworthy.
+function waEtaText(done, total, elapsedMs) {
+  if (!total || done <= 0 || done >= total) return '';
+  if (done < 200 || elapsedMs < 1200) return 'estimating…';
+  var rate = done / elapsedMs;                       // messages per ms
+  if (!(rate > 0)) return '';
+  return 'about ' + waFmtDuration((total - done) / rate) + ' left';
+}
+
+// ─── Watermarks, for reading only what is new ───────────────────────────────
+// Tony suggested keying the delta on WhatsApp's timestamps. Those are ambiguous
+// in exactly the wrong way: "03/04/2026" is 3 April or 4 March depending on the
+// phone's locale, exports carry no timezone, and two messages in the same minute
+// are indistinguishable — so a timestamp comparison would silently re-scan or
+// silently skip. Position within the chat is exact, because a WhatsApp export is
+// append-only: message N is always message N.
+//
+// The guard is a fingerprint of the FIRST message. If that still matches and the
+// chat has only grown, everything before the stored count is known and we start
+// at it. If it does not match, the export was replaced (a fresh export, a
+// different date range, a cleared chat) and that chat is read in full again. The
+// last timestamp is kept too, but only to SHOW the user how current the list is.
+function waChatSig(msgs) {
+  var m = (msgs || [])[0];
+  if (!m) return '';
+  return [m.date || '', m.time || '', (m.who || '').slice(0, 24),
+          String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, 40)].join('|');
+}
+function waDeltaStart(msgs, mark) {
+  var list = msgs || [];
+  if (!mark || !mark.count) return { start: 0, reason: 'never read before' };
+  if (mark.sig !== waChatSig(list))  return { start: 0, reason: 'the export was replaced' };
+  if (list.length < mark.count)      return { start: 0, reason: 'the export got shorter' };
+  return { start: mark.count, reason: list.length === mark.count ? 'nothing new' : 'new messages only' };
+}
+function waMarkOf(msgs) {
+  var list = msgs || [], last = list[list.length - 1] || {};
+  return { count: list.length, sig: waChatSig(list),
+           lastDate: last.date || '', lastTime: last.time || '' };
+}
+
+// ─── Persistence ────────────────────────────────────────────────────────────
+// Saved into the wachats store that already exists. Nothing enumerates that
+// store, so a record under its own id cannot be mistaken for a chat.
+async function waHarvestSave() {
+  if (!_idbAvailable) return false;
   try {
-    var loaded = await waLoadAllMessages();
-    var msgs = loaded.messages || [];
-    _waHarvest.links = waLinksAlreadyImported(waExtractLinks(msgs), recipes);
-    _waHarvest.texts = waFindTextRecipes(msgs);
+    await waPut({ id: WA_HARVEST_KEY, savedAt: new Date().toISOString(),
+                  links: _waHarvest.links, texts: _waHarvest.texts,
+                  marks: _waScan.marks, selected: _waHarvest.selected });
+    return true;
+  } catch (e) { recordError('harvest-save', e && e.message, 'waHarvestSave'); return false; }
+}
+async function waHarvestLoad() {
+  if (!_idbAvailable) return null;
+  try { return await waGet(WA_HARVEST_KEY); }
+  catch (e) { recordError('harvest-load', e && e.message, 'waHarvestLoad'); return null; }
+}
+async function waHarvestForget() {
+  try { await waDelete(WA_HARVEST_KEY); } catch (e) {}
+  _waHarvest.links = []; _waHarvest.texts = []; _waHarvest.selected = {};
+  _waScan.marks = {}; _waScan.status = 'idle'; _waScan.done = 0; _waScan.total = 0;
+  renderWaHarvest();
+  toast('Saved list cleared');
+}
+window.waHarvestForget = waHarvestForget;
+
+// ─── The scan ───────────────────────────────────────────────────────────────
+function waScanPause(){
+  if (_waScan.status !== 'running') return;
+  _waScan.status = 'paused'; _waScan.pausedAt = Date.now();
+  renderWaHarvest();
+}
+function waScanResume(){
+  if (_waScan.status !== 'paused') return;
+  _waScan.pausedMs += Date.now() - _waScan.pausedAt; _waScan.pausedAt = 0;
+  _waScan.status = 'running';
+  var r = _waScan._resume; _waScan._resume = null;
+  if (r) r();
+  renderWaHarvest();
+}
+function waScanToggle(){ (_waScan.status === 'paused') ? waScanResume() : waScanPause(); }
+// Stop keeps what has been found. Throwing the partial list away would punish
+// the user for stopping a scan that had already surfaced what they wanted.
+function waScanStop(){
+  if (_waScan.status !== 'running' && _waScan.status !== 'paused' && _waScan.status !== 'loading') return;
+  var wasPaused = _waScan.status === 'paused';
+  _waScan.status = 'stopped';
+  if (wasPaused) { var r = _waScan._resume; _waScan._resume = null; if (r) r(); }
+  renderWaHarvest();
+}
+window.waScanPause = waScanPause; window.waScanResume = waScanResume;
+window.waScanToggle = waScanToggle; window.waScanStop = waScanStop;
+
+function waScanShouldStop(){ return _waScan.status === 'stopped'; }
+// Hand the thread back so the browser can paint and so clicks land. This is the
+// difference between a scan and a frozen tab.
+function waYield(){ return new Promise(function(res){ setTimeout(res, 0); }); }
+async function waScanGate(){
+  if (_waScan.status === 'paused') {
+    await new Promise(function(res){ _waScan._resume = res; });
+  }
+  return !waScanShouldStop();
+}
+
+// full = ignore the watermarks and read every message again.
+async function waRunHarvest(full){
+  if (_waScan.status === 'running' || _waScan.status === 'loading' || _waScan.status === 'paused') return;
+
+  _waScan.status = 'loading';
+  _waScan.done = 0; _waScan.total = 0; _waScan.found = 0; _waScan.error = '';
+  _waScan.startedAt = Date.now(); _waScan.pausedMs = 0; _waScan.pausedAt = 0;
+  _waScan.chatsDone = 0; _waScan.chatsTotal = (waIndex() || []).length; _waScan.chatLabel = '';
+  if (full) { _waScan.marks = {}; _waHarvest.links = []; _waHarvest.texts = []; }
+  // Carry the existing findings forward so a delta refresh ADDS to the list
+  // rather than replacing it with only what is new.
+  _waScan.acc = waHarvestAcc(full ? null : {
+    byKey: waIndexBy(_waHarvest.links, 'key'),
+    texts: _waHarvest.texts.slice(),
+    textSeen: waIndexTexts(_waHarvest.texts)
+  });
+  renderWaHarvest();
+
+  try {
+    var loaded = await waLoadAllMessages({
+      shouldStop: waScanShouldStop,
+      onProgress: function(p){
+        _waScan.chatsDone = p.done; _waScan.chatsTotal = p.total; _waScan.chatLabel = p.label || '';
+        renderWaHarvest();
+      }
+    });
+    if (waScanShouldStop()) { _waScan.status = 'stopped'; renderWaHarvest(); return; }
+
+    // Work out, per chat, where to start. Everything before that was scanned in
+    // an earlier run and is already in the list.
+    var byChat = {}, order = [];
+    (loaded.messages || []).forEach(function(m){
+      var k = m.chat || m.group || '?';
+      if (!byChat[k]) { byChat[k] = []; order.push(k); }
+      byChat[k].push(m);
+    });
+    var plan = [], total = 0, skipped = 0;
+    order.forEach(function(k){
+      var msgs = byChat[k];
+      var d = full ? { start: 0, reason: 'full rescan' } : waDeltaStart(msgs, _waScan.marks[k]);
+      plan.push({ chat: k, msgs: msgs, start: d.start });
+      total += msgs.length - d.start;
+      skipped += d.start;
+    });
+    _waScan.total = total; _waScan.skipped = skipped;
+    _waScan.status = 'running';
+    _waScan.startedAt = Date.now(); _waScan.pausedMs = 0;   // time the SCAN, not the load
+
+    var lastPaint = 0;
+    for (var p = 0; p < plan.length; p++) {
+      var item = plan[p];
+      for (var i = item.start; i < item.msgs.length; i++) {
+        if (_waScan.acc.add(item.msgs[i])) _waScan.found++;
+        _waScan.done++;
+        if (_waScan.done % WA_SCAN_CHUNK === 0) {
+          if (!(await waScanGate())) { break; }
+          await waYield();
+          var now = Date.now();
+          if (now - lastPaint > WA_RENDER_MS) {
+            lastPaint = now;
+            waHarvestSyncResults();
+            renderWaHarvest();
+          }
+        }
+      }
+      if (waScanShouldStop()) break;
+      // Mark the chat only once it has been read all the way to the end.
+      _waScan.marks[item.chat] = waMarkOf(item.msgs);
+    }
+
+    waHarvestSyncResults();
+    if (waScanShouldStop()) { _waScan.status = 'stopped'; }
+    else { _waScan.status = 'done'; }
     _waHarvest.loaded = true;
-    document.getElementById('waLinksCount').textContent =
-      msgs.length.toLocaleString() + ' messages across ' + (loaded.chats || []).length + ' chat'
-      + (((loaded.chats||[]).length) === 1 ? '' : 's');
+    _waScan.problems = loaded.problems || [];
+    _waScan.chats = loaded.chats || [];
+    // A stopped scan is saved too: the chats it finished are genuinely done, and
+    // their watermarks are what make the next run cheap.
+    await waHarvestSave();
     renderWaHarvest();
   } catch (e) {
-    // Say which step failed. "Could not load" with no cause is another dead end.
-    body.innerHTML = '<div style="padding:18px;font-size:13px;color:var(--terracotta);">'
-      + 'Could not read the chats: ' + escH(e && e.message || 'unknown error')
-      + '<div style="color:var(--muted);margin-top:8px;font-size:12px;">Open ⚙️ Settings → 💬 WhatsApp Groups and check the chats are loaded.</div></div>';
+    _waScan.status = 'error';
+    _waScan.error = (e && e.message) || 'unknown error';
+    recordError('harvest-scan', _waScan.error, 'waRunHarvest');
+    renderWaHarvest();
   }
+}
+window.waRunHarvest = waRunHarvest;
+
+function waIndexBy(list, key){
+  var o = {}; (list || []).forEach(function(x){ if (x && x[key]) o[x[key]] = x; }); return o;
+}
+function waIndexTexts(list){
+  var o = {};
+  (list || []).forEach(function(c){
+    o[String(c.text || '').replace(/\s+/g, ' ').trim().slice(0, 160).toLowerCase()] = c;
+  });
+  return o;
+}
+// Pull the accumulator's current view into what the renderer reads.
+function waHarvestSyncResults(){
+  if (!_waScan.acc) return;
+  _waHarvest.links = waLinksAlreadyImported(_waScan.acc.links(), recipes);
+  _waHarvest.texts = _waScan.acc.textList();
+}
+window.waHarvestSyncResults = waHarvestSyncResults;
+window.waEtaText = waEtaText; window.waElapsedMs = waElapsedMs;
+window.waFmtDuration = waFmtDuration;
+window.waDeltaStart = waDeltaStart; window.waChatSig = waChatSig; window.waMarkOf = waMarkOf;
+window.waHarvestAcc = waHarvestAcc;
+
+// ─── Opening the panel ──────────────────────────────────────────────────────
+// Opening must never start a long scan on its own. It shows whatever was saved
+// last time — instantly — and lets the user decide to refresh.
+async function openWaLinks(){
+  document.getElementById('waLinksOverlay').classList.add('open');
+  if (!_waHarvest.loaded) {
+    var saved = await waHarvestLoad();
+    if (saved) {
+      _waHarvest.links = waLinksAlreadyImported(saved.links || [], recipes);
+      _waHarvest.texts = saved.texts || [];
+      _waHarvest.selected = saved.selected || {};
+      _waScan.marks = saved.marks || {};
+      _waScan.savedAt = saved.savedAt || '';
+      _waHarvest.loaded = true;
+    }
+  }
+  renderWaHarvest();
+  // Nothing saved yet: this is the first run, so start rather than showing an
+  // empty panel with a button the user has to find.
+  if (!_waHarvest.links.length && !_waHarvest.texts.length && _waScan.status === 'idle') waRunHarvest(true);
 }
 window.openWaLinks = openWaLinks;
 
-function waHarvestTab(which){
-  _waHarvest.tab = which;
-  renderWaHarvest();
-}
+function waHarvestTab(which){ _waHarvest.tab = which; renderWaHarvest(); }
 window.waHarvestTab = waHarvestTab;
 
+// Closing the panel must not strand a paused scan. A pause parks the loop on a
+// promise that only the Continue button resolves, so closing while paused would
+// leave it waiting forever, holding every message in memory and never saving
+// what it had already found. Closing resumes it instead: it finishes in the
+// background and saves, which is what makes the next open instant.
+function closeWaLinks(){
+  if (_waScan.status === 'paused') waScanResume();
+  closeM('waLinksOverlay');
+}
+window.closeWaLinks = closeWaLinks;
+
+// ─── Selection ──────────────────────────────────────────────────────────────
+// Keyed by content, not by row position, so a selection survives the list being
+// re-sorted underneath it while the scan is still running.
+function waSelKey(kind, item){
+  return kind === 'link' ? 'l:' + item.key
+                         : 't:' + String(item.text || '').replace(/\s+/g,' ').trim().slice(0,160).toLowerCase();
+}
+function waToggleSel(kind, i){
+  var item = (kind === 'link' ? _waHarvest.links : _waHarvest.texts)[i];
+  if (!item) return;
+  var k = waSelKey(kind, item);
+  if (_waHarvest.selected[k]) delete _waHarvest.selected[k];
+  else _waHarvest.selected[k] = { kind: kind, url: item.url || '', text: item.text || '' };
+  renderWaHarvest();
+  if (_waScan.status === 'done' || _waScan.status === 'stopped') waHarvestSave();
+}
+function waSelCount(){ return Object.keys(_waHarvest.selected).length; }
+function waClearSel(){ _waHarvest.selected = {}; renderWaHarvest(); }
+// Import them one at a time through the importers that already exist. Firing a
+// dozen modals at once would be unusable, so this opens the first and the rest
+// stay selected and waiting.
+function waImportSelected(){
+  var keys = Object.keys(_waHarvest.selected);
+  if (!keys.length) { toast('Nothing selected'); return; }
+  var k = keys[0], sel = _waHarvest.selected[k];
+  delete _waHarvest.selected[k];
+  waHarvestSave();
+  closeM('waLinksOverlay');
+  if (sel.kind === 'link') openUrlImportModal(sel.url);
+  else openFreehandModal(sel.text);
+  if (keys.length > 1) toast(keys.length - 1 + ' more selected — reopen the panel for the next');
+}
+window.waToggleSel = waToggleSel; window.waSelCount = waSelCount;
+window.waClearSel = waClearSel; window.waImportSelected = waImportSelected;
+window.waSelKey = waSelKey;
+
+// ─── The progress strip ─────────────────────────────────────────────────────
+function waProgressHtml(){
+  var s = _waScan;
+  if (s.status === 'idle') return '';
+  var bar = '', line = '', controls = '';
+  var spin = '<span class="wa-spin" aria-hidden="true"></span>';
+
+  if (s.status === 'loading') {
+    line = spin + 'Reading chat ' + s.chatsDone + ' of ' + s.chatsTotal
+         + (s.chatLabel ? ' — ' + escH(s.chatLabel) : '') + '…';
+    var pctL = s.chatsTotal ? Math.round(s.chatsDone / s.chatsTotal * 100) : 0;
+    bar = '<div class="wa-bar"><i style="width:' + pctL + '%"></i></div>';
+  } else if (s.status === 'running' || s.status === 'paused') {
+    var pct = s.total ? Math.round(s.done / s.total * 100) : 0;
+    var eta = s.status === 'paused' ? 'paused' : waEtaText(s.done, s.total, waElapsedMs(s));
+    line = (s.status === 'paused' ? '⏸ ' : spin)
+         + s.done.toLocaleString() + ' of ' + s.total.toLocaleString() + ' messages'
+         + ' · ' + pct + '%'
+         + (eta ? ' · ' + eta : '')
+         + ' · ' + s.found + ' found';
+    bar = '<div class="wa-bar' + (s.status === 'paused' ? ' is-paused' : '') + '"><i style="width:' + pct + '%"></i></div>';
+  } else if (s.status === 'stopped') {
+    line = '⏹ Stopped after ' + s.done.toLocaleString() + ' of ' + s.total.toLocaleString()
+         + ' messages. What was found is kept.';
+  } else if (s.status === 'done') {
+    line = '✅ Read ' + s.done.toLocaleString() + ' message' + (s.done === 1 ? '' : 's')
+         + ' in ' + waFmtDuration(waElapsedMs(s))
+         + (s.skipped ? ' · ' + s.skipped.toLocaleString() + ' already read before' : '');
+  } else if (s.status === 'error') {
+    line = '⚠️ ' + escH(s.error);
+  }
+
+  if (s.status === 'running' || s.status === 'paused') {
+    controls = '<button onclick="waScanToggle()" class="wa-ctl">'
+             + (s.status === 'paused' ? '▶︎ Continue' : '⏸ Pause') + '</button>'
+             + '<button onclick="waScanStop()" class="wa-ctl">⏹ Stop</button>';
+  } else if (s.status === 'loading') {
+    controls = '<button onclick="waScanStop()" class="wa-ctl">⏹ Stop</button>';
+  }
+  return '<div class="wa-progress">' + bar
+       + '<div class="wa-progress-row"><div class="wa-progress-line">' + line + '</div>'
+       + '<div class="wa-ctls">' + controls + '</div></div></div>';
+}
+
+function waFreshnessHtml(){
+  if (_waScan.status === 'running' || _waScan.status === 'loading' || _waScan.status === 'paused') return '';
+  var when = _waScan.savedAt ? new Date(_waScan.savedAt) : null;
+  var marks = _waScan.marks || {};
+  var upTo = Object.keys(marks).map(function(k){ return marks[k].lastDate; }).filter(Boolean);
+  return '<div class="wa-fresh">'
+    + (when ? 'Saved ' + when.toLocaleDateString() + ' ' + when.toLocaleTimeString().slice(0,5) : 'Not saved yet')
+    + (upTo.length ? ' · chats read up to ' + escH(upTo.sort().slice(-1)[0]) : '')
+    + '<span class="wa-fresh-btns">'
+    + '<button onclick="waRunHarvest(false)" class="wa-ctl">🔄 Read what is new</button>'
+    + '<button onclick="waRunHarvest(true)" class="wa-ctl">↻ Read everything again</button>'
+    + '</span></div>';
+}
+
+// ─── The list ───────────────────────────────────────────────────────────────
 function renderWaHarvest(){
   var body = document.getElementById('waLinksBody');
+  if (!body) return;
   var tab  = _waHarvest.tab || 'links';
+  var scanning = (_waScan.status === 'running' || _waScan.status === 'loading' || _waScan.status === 'paused');
+
   var links = _waHarvest.links.filter(function(l){
     if (_waHarvest.hideNoise && l.noise) return false;
     if (_waHarvest.hideImported && l.imported) return false;
@@ -17002,60 +17725,70 @@ function renderWaHarvest(){
   });
   var hiddenImported = _waHarvest.links.filter(function(l){ return l.imported; }).length;
   var hiddenNoise    = _waHarvest.links.filter(function(l){ return l.noise; }).length;
+  var sel = waSelCount();
 
-  var h = '<div style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border);">'
-    + '<button onclick="waHarvestTab(\'links\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;'
-    + (tab==='links' ? 'background:var(--terracotta);color:#fff;' : 'background:var(--card-bg);color:var(--ink);') + '">🔗 Links (' + links.length + ')</button>'
-    + '<button onclick="waHarvestTab(\'texts\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;'
-    + (tab==='texts' ? 'background:var(--terracotta);color:#fff;' : 'background:var(--card-bg);color:var(--ink);') + '">📝 Written in the chat (' + _waHarvest.texts.length + ')</button>'
+  var h = waProgressHtml() + waFreshnessHtml();
+
+  h += '<div class="wa-tabs">'
+    + '<button onclick="waHarvestTab(\'links\')" class="wa-tab' + (tab==='links'?' on':'') + '">🔗 Links (' + links.length + ')</button>'
+    + '<button onclick="waHarvestTab(\'texts\')" class="wa-tab' + (tab==='texts'?' on':'') + '">📝 Written in the chat (' + _waHarvest.texts.length + ')</button>'
     + '</div>';
 
+  if (sel) {
+    h += '<div class="wa-selbar">' + sel + ' selected'
+      + '<span><button onclick="waImportSelected()" class="wa-ctl primary">Import the first</button>'
+      + '<button onclick="waClearSel()" class="wa-ctl">Clear</button></span></div>';
+  }
+
   if (tab === 'links') {
-    h += '<div style="padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">'
-      + '<label style="cursor:pointer;"><input type="checkbox" ' + (_waHarvest.hideImported ? 'checked' : '')
+    h += '<div class="wa-filters">'
+      + '<label><input type="checkbox" ' + (_waHarvest.hideImported ? 'checked' : '')
       + ' onchange="_waHarvest.hideImported=this.checked;renderWaHarvest()"> hide the ' + hiddenImported + ' already imported</label>'
-      + ' &nbsp; <label style="cursor:pointer;"><input type="checkbox" ' + (_waHarvest.hideNoise ? 'checked' : '')
+      + '<label><input type="checkbox" ' + (_waHarvest.hideNoise ? 'checked' : '')
       + ' onchange="_waHarvest.hideNoise=this.checked;renderWaHarvest()"> hide ' + hiddenNoise + ' group invites/maps</label>'
       + '</div>';
     if (!links.length) {
-      h += '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No links left after filtering.</div>';
+      h += '<div class="wa-empty">' + (scanning ? 'Nothing yet — still reading…' : 'No links left after filtering.') + '</div>';
     }
-    links.forEach(function(l){
+    links.forEach(function(l, i){
       var ctx = l.shares[0] || {};
-      h += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);">'
-        + '<div style="font-size:13px;word-break:break-all;">'
+      var on = !!_waHarvest.selected[waSelKey('link', l)];
+      h += '<div class="wa-row' + (on ? ' picked' : '') + '">'
+        + '<label class="wa-pick"><input type="checkbox" ' + (on ? 'checked' : '')
+        + ' onchange="waToggleSel(\'link\',' + i + ')"></label>'
+        + '<div class="wa-rowmain">'
+        + '<div class="wa-url">'
         + (l.imported ? '<span title="already in your collection" style="color:var(--green);">✔ </span>' : '')
-        + '<a href="' + escA(safeUrl(l.url)) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">' + escH(l.url) + '</a></div>'
-        + '<div style="font-size:11px;color:var(--muted);margin-top:3px;">'
+        + '<a href="' + escA(safeUrl(l.url)) + '" target="_blank" rel="noopener noreferrer">' + escH(l.url) + '</a></div>'
+        + '<div class="wa-meta">'
         + escH(l.domain) + (l.count > 1 ? ' · shared ' + l.count + '×' : '')
         + (ctx.who ? ' · ' + escH(ctx.who) : '') + (ctx.date ? ' · ' + escH(ctx.date) : '')
         + (l.imported ? ' · <span style="color:var(--green);">already saved as ' + escH(l.importedAs || 'a recipe') + '</span>' : '')
         + '</div>'
-        + (ctx.text ? '<div dir="auto" style="font-size:12px;color:var(--ink);margin-top:4px;unicode-bidi:plaintext;text-align:start;opacity:0.85;">' + escH(ctx.text) + '</div>' : '')
-        // escA already turns the quotes JSON.stringify produces into &quot;, which the
-        // HTML parser hands back to JS as a real string literal inside the attribute.
-        + (l.imported ? '' : '<button onclick="openUrlImportModal(' + escA(JSON.stringify(l.url)) + ')" '
-            + 'style="margin-top:6px;padding:5px 12px;border:none;border-radius:6px;background:var(--terracotta);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Import this</button>')
-        + '</div>';
+        + (ctx.text ? '<div dir="auto" class="wa-ctx">' + escH(ctx.text) + '</div>' : '')
+        + (l.imported ? '' : '<button onclick="openUrlImportModal(' + escA(JSON.stringify(l.url)) + ')" class="wa-ctl primary">Import this</button>')
+        + '</div></div>';
     });
   } else {
-    h += '<div style="padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">'
-      + 'Messages that look like a full recipe — quantities and method, not just a mention. '
-      + 'Best guesses first; skim and open the ones you want.</div>';
+    h += '<div class="wa-filters"><span>Messages that look like a full recipe — quantities and method, not just a mention. Best guesses first.</span></div>';
     if (!_waHarvest.texts.length) {
-      h += '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">Nothing in the chats reads as a written-out recipe.</div>';
+      h += '<div class="wa-empty">' + (scanning ? 'Nothing yet — still reading…' : 'Nothing in the chats reads as a written-out recipe.') + '</div>';
     }
     _waHarvest.texts.forEach(function(c, i){
       var preview = c.text.replace(/\s+/g, ' ').trim().slice(0, 220);
-      h += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);">'
-        + '<div style="font-size:11px;color:var(--muted);">'
+      var on = !!_waHarvest.selected[waSelKey('text', c)];
+      h += '<div class="wa-row' + (on ? ' picked' : '') + '">'
+        + '<label class="wa-pick"><input type="checkbox" ' + (on ? 'checked' : '')
+        + ' onchange="waToggleSel(\'text\',' + i + ')"></label>'
+        + '<div class="wa-rowmain">'
+        + '<div class="wa-meta">'
         + (c.who ? escH(c.who) : 'unknown') + (c.date ? ' · ' + escH(c.date) : '')
         + (c.group ? ' · ' + escH(c.group) : '')
         + (c.dupes ? ' · posted ' + c.dupes + '×' : '')
-        + ' · <span title="' + escA(c.signals.join(', ')) + '">' + escH(c.signals.join(', ')) + '</span></div>'
-        + '<div dir="auto" style="font-size:13px;color:var(--ink);margin-top:4px;unicode-bidi:plaintext;text-align:start;white-space:pre-wrap;">' + escH(preview) + (c.text.length > 220 ? '…' : '') + '</div>'
-        + '<button onclick="waImportTextRecipe(' + i + ')" style="margin-top:6px;padding:5px 12px;border:none;border-radius:6px;background:var(--terracotta);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Parse this into a recipe</button>'
-        + '</div>';
+        + ' · ' + escH(c.signals.join(', ')) + '</div>'
+        + '<div dir="auto" class="wa-text">' + escH(preview) + (c.text.length > 220 ? '…' : '') + '</div>'
+        + '<button onclick="waImportTextRecipe(' + i + ')" class="wa-ctl primary">Parse this into a recipe</button>'
+        + '</div></div>';
     });
   }
   body.innerHTML = h;
@@ -17077,6 +17810,7 @@ window.waImportTextRecipe = waImportTextRecipe;
 function waHarvestText(){
   var L = [];
   L.push('Recipes hiding in my chats — ' + new Date().toISOString().slice(0,10));
+  if (_waScan.status === 'stopped') L.push('(scan was stopped early — this is a partial list)');
   L.push('');
   L.push('LINKS (' + _waHarvest.links.length + ')');
   _waHarvest.links.forEach(function(l){
