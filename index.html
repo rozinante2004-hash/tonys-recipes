@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.6 -->
+<!-- Tony's Recipes Collection v32.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2411,6 +2411,160 @@ const SELF_TESTS = [
       // API key across the whole family, so they are the ones that 429; leading
       // with Openverse means a rate limit is a slower search, not a dead end.
       if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
+    } },
+
+  { id:'wa_harvest_links', group:'WhatsApp', name:'Links are found, de-duplicated and matched to what I already have (5f.9)',
+    test: async()=>{
+      ['waExtractLinks','waNormalizeUrl','waLinksAlreadyImported','waTrimUrlPunctuation','waLinkIsNoise']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // Trailing punctuation: people write "try this: https://x.com/a." and the
+      // full stop is not part of the link.
+      if(waTrimUrlPunctuation('https://a.com/x.')!=='https://a.com/x') throw new Error('a trailing full stop was kept in the URL');
+      if(waTrimUrlPunctuation('https://a.com/x,')!=='https://a.com/x') throw new Error('a trailing comma was kept');
+      // ...but a balanced bracket is part of the address (Wikipedia does this).
+      if(waTrimUrlPunctuation('https://a.com/x_(y)')!=='https://a.com/x_(y)') throw new Error('a balanced closing bracket was stripped from the URL');
+      // The extractor starts at "http", so a bracketed link arrives here as
+      // "https://a.com/x)" — the opening bracket was never captured, and the
+      // stray closer must go.
+      if(waTrimUrlPunctuation('https://a.com/x)')!=='https://a.com/x') throw new Error('an unbalanced closing bracket was kept');
+
+      // The same recipe in five disguises is ONE row.
+      var k=waNormalizeUrl('https://www.Site.com/recipe/1/?utm_source=wa&b=2#method');
+      if(k!==waNormalizeUrl('http://site.com/recipe/1?b=2')) throw new Error('www/scheme/tracking/fragment differences were not normalised away: '+k);
+      if(k!==waNormalizeUrl('https://site.com/recipe/1?b=2&utm_medium=x')) throw new Error('a second tracking parameter defeated de-duplication');
+      // ...but a genuine query difference is a DIFFERENT recipe. Sites put the id
+      // there (?p=123), so collapsing the query would merge unrelated recipes.
+      if(waNormalizeUrl('https://site.com/r?p=1')===waNormalizeUrl('https://site.com/r?p=2'))
+        throw new Error('two different recipes collapsed into one — the query string was dropped wholesale');
+      // ...and the order the parameters happen to be written in is not identity.
+      // The same link comes back re-shared with them shuffled, and two rows for
+      // one recipe is precisely what this panel exists to prevent.
+      if(waNormalizeUrl('https://site.com/r?a=1&b=2')!==waNormalizeUrl('https://site.com/r?b=2&a=1'))
+        throw new Error('the same link with its query parameters in a different order became two separate rows');
+
+      var msgs=[
+        {who:'Dana', date:'01/02/2026', text:'מתכון מעולה https://site.com/recipe/1?utm_source=wa שווה לנסות'},
+        {who:'Yossi',date:'02/02/2026', text:'שיתפתי כבר: https://www.site.com/recipe/1/'},
+        {who:'Dana', date:'03/02/2026', text:'https://other.com/x.'},
+        {who:'Rami', date:'04/02/2026', text:'הצטרפו https://chat.whatsapp.com/ABC'},
+        {who:'Rami', date:'05/02/2026', text:'no links here at all'}
+      ];
+      var links=waExtractLinks(msgs);
+      var first=links.filter(function(l){ return l.domain==='site.com'; })[0];
+      if(!first) throw new Error('the site.com link was not found');
+      if(first.count!==2) throw new Error('the same link shared twice was counted '+first.count+' times, not 2');
+      if(links.filter(function(l){return l.domain==='other.com';})[0].url.slice(-1)==='.')
+        throw new Error('the trailing full stop survived into the extracted link');
+      var invite=links.filter(function(l){ return l.domain==='chat.whatsapp.com'; })[0];
+      if(!invite||!invite.noise) throw new Error('a group invite link was not flagged as noise');
+      // Context is what makes a link decidable — who, when, and what they said.
+      if(!first.shares.length||!first.shares[0].who) throw new Error('no context was kept for a link');
+      if(first.shares[0].text.indexOf('http')>-1) throw new Error('the URL was left inside its own context snippet');
+
+      // "Already have it" must use the SAME normalisation as de-duplication, or
+      // the two can disagree and a link shows as new when it is not.
+      waLinksAlreadyImported(links,[{name:'כבר יש',source:'http://WWW.site.com/recipe/1?utm_campaign=x'}]);
+      if(!first.imported) throw new Error('a link already saved as a recipe was not recognised — normalisation disagrees between the two');
+      if(first.importedAs!=='כבר יש') throw new Error('the existing recipe name is not shown');
+      if(links.filter(function(l){return l.domain==='other.com';})[0].imported)
+        throw new Error('an unimported link was marked as already saved');
+    } },
+
+  { id:'wa_harvest_text', group:'WhatsApp', name:'Recipes typed into the chat are found, chatter is not (5f.9)',
+    test: async()=>{
+      ['waScoreRecipeText','waFindTextRecipes'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // The Hebrew word boundary, pinned on its own. \b is ASCII-only, so an
+      // alternation ending in \b matches nothing after a Hebrew letter — every
+      // Hebrew unit and verb scored zero and the whole feature was dead in the
+      // only language these chats are written in. Two assertions: the unit must
+      // match standing alone, and must NOT match inside a longer Hebrew word.
+      if(waScoreRecipeText.toString().indexOf('WA_QTY_RE')===-1) throw new Error('the scorer no longer consults the quantity pattern');
+      var heb=(('2 כוסות קמח 1 כפית מלח '.repeat(12))+'מערבבים ומוסיפים ואופים');
+      if(waScoreRecipeText(heb).signals.join(' ').indexOf('quantities')===-1)
+        throw new Error('Hebrew units matched nothing — a word boundary that only works in ASCII would do exactly this');
+      // ...and the guard must not be so loose that a unit matches INSIDE a longer
+      // Hebrew word ("מל" sitting in "מלחמות"). Verbs are present on purpose: with
+      // no quantities this is chatter, so anything above zero means "מל" matched.
+      var noRunOn=waScoreRecipeText('מערבבים את כל הדעות ומוסיפים עוד '
+        + '3 מלחמות גדולות ו-2 מלחמות נוספות '.repeat(3)
+        + 'וכך נמשך הסיפור הארוך הזה עוד שנים רבות מאוד עד עצם היום הזה ממש');
+      if(noRunOn.score!==0) throw new Error('"מל" matched inside "מלחמות" ('+noRunOn.signals.join(', ')+') — the unit ran on into a longer word');
+
+      // The mayonnaise case: a real recipe typed straight into the group, in
+      // Hebrew, with no link. This is the whole point of the feature.
+      var mayo='מיונז ביתי\nמצרכים:\n1 ביצה\n1 כוס שמן\n1 כפית חרדל\n2 כפות מיץ לימון\nקורט מלח\nאופן ההכנה:\n'
+        + 'טורפים את הביצה עם החרדל, מוסיפים את השמן בהדרגה תוך כדי טריפה, מוסיפים לימון ומערבבים.\n'
+        + 'מקררים כשעה לפני ההגשה.';
+      var m=waScoreRecipeText(mayo);
+      if(m.score<45) throw new Error('a full Hebrew recipe scored only '+m.score+' — it would never be surfaced');
+
+      // Things that must NOT be mistaken for a recipe.
+      if(waScoreRecipeText('קניתי 2 קילו קמח ו-3 קילו סוכר בסופר, היה זול').score!==0)
+        throw new Error('a shopping remark was scored as a recipe');
+      if(waScoreRecipeText('תודה רבה!! נשמע מעולה').score!==0) throw new Error('a one-line thank-you was scored as a recipe');
+      if(waScoreRecipeText('מערבבים ומחממים').score!==0) throw new Error('a fragment with verbs but no quantities scored above zero');
+      // The discriminator, both ways round. These two are LONG and well-formed —
+      // plenty of lines, plenty of signal — so only "what to use AND what to do"
+      // keeps them out. A shopping list is the exact thing this feature must not
+      // dredge up, and a method with nothing to measure is somebody reminiscing.
+      var shopping='רשימת קניות לשבת\n2 קילו קמח\n3 כוסות סוכר\n1 ליטר חלב\n500 גרם חמאה\n'
+        + '1 כפית מלח\n4 יחידות ביצים\n2 כפות שמן\nמי שיכול שיביא, תודה רבה לכולם מראש';
+      var sc=waScoreRecipeText(shopping);
+      if(sc.score!==0) throw new Error('a shopping list scored '+sc.score+' ('+sc.signals.join(', ')+') — quantities alone are not a recipe');
+      var methodOnly='מערבבים היטב את הכל ואז מוסיפים לאט לאט, מחממים על אש קטנה, מבשלים עד שמסמיך, '
+        + 'מסננים ומקררים לפני ההגשה, ואז מגישים לשולחן עם קצת עשבי תיבול טריים מהגינה שליד הבית';
+      var mo=waScoreRecipeText(methodOnly);
+      if(mo.score!==0) throw new Error('a method with nothing to measure scored '+mo.score+' ('+mo.signals.join(', ')+')');
+      // Long chatter with a single stray number must stay at zero.
+      var chatter='היינו אתמול במסעדה חדשה בתל אביב והאוכל היה ממש טעים, הזמנו 2 מנות ראשונות ואחר כך '
+        + 'מנה עיקרית, וישבנו שם בערך שעתיים. ממליץ בחום לכל מי שמחפש מקום נחמד לארוחת ערב עם המשפחה.';
+      if(waScoreRecipeText(chatter).score!==0) throw new Error('restaurant chatter was scored as a recipe: '+waScoreRecipeText(chatter).score);
+
+      // English must work too — the app is bilingual.
+      var en='Quick pancakes\nIngredients:\n2 cups flour\n1 tbsp sugar\n1 tsp salt\n2 eggs\n'
+        + 'Method:\nMix the dry, add the eggs, stir until smooth, heat the pan and fry 2 minutes a side.';
+      if(waScoreRecipeText(en).score<45) throw new Error('an English recipe scored only '+waScoreRecipeText(en).score);
+
+      // End to end, including de-duplication of a forwarded copy.
+      var found=waFindTextRecipes([
+        {who:'Dana',date:'01/02/2026',text:mayo},
+        {who:'Yossi',date:'02/02/2026',text:mayo},          // forwarded — same recipe
+        {who:'Rami',date:'03/02/2026',text:'תודה!'},
+        {who:'Dana',date:'04/02/2026',text:en}
+      ]);
+      if(found.length!==2) throw new Error('expected 2 distinct recipes, got '+found.length);
+      if(!found[0].signals.length) throw new Error('no signals were recorded, so the list cannot explain itself');
+      if(found.filter(function(c){ return c.dupes; }).length!==1) throw new Error('the forwarded copy was not folded into the original');
+      // A URL inside the text must not inflate the score on its own.
+      if(waScoreRecipeText('https://site.com/a-very-long-recipe-url-with-many-words-in-it-indeed-yes').score!==0)
+        throw new Error('a bare URL was scored as a written recipe');
+    } },
+
+  { id:'wa_harvest_ui', group:'WhatsApp', name:'The harvest panel is reachable and feeds the existing importers (5f.9)',
+    test: async()=>{
+      if(!document.getElementById('waLinksItem')) throw new Error('the More menu has no "Recipes hiding in my chats" entry');
+      if(!document.getElementById('waLinksOverlay')) throw new Error('#waLinksOverlay missing');
+      if(!document.getElementById('waLinksBody')) throw new Error('#waLinksBody missing');
+      ['openWaLinks','renderWaHarvest','waImportTextRecipe','waHarvestText','copyWaHarvest']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // ONE parser and ONE URL importer. A second copy of either would drift.
+      if(String(waImportTextRecipe).indexOf('openFreehandModal')===-1)
+        throw new Error('in-text recipes do not go through the free-hand parser — there would be two parsers to keep in step');
+      if(String(renderWaHarvest).indexOf('openUrlImportModal')===-1)
+        throw new Error('links do not go through the existing URL importer');
+      // The copy output must carry both halves, or it is not the list.
+      var saved=_waHarvest;
+      try{
+        _waHarvest={ links:[{url:'https://a.com/x',domain:'a.com',count:2,imported:false,shares:[{who:'Dana',date:'01/02',text:'ctx'}]}],
+                     texts:[{who:'Yossi',date:'02/02',signals:['3 quantities'],text:'מיונז ביתי עם ביצה ושמן'}], loaded:true };
+        var t=waHarvestText();
+        if(t.indexOf('https://a.com/x')===-1) throw new Error('the copied list omits the links');
+        if(t.indexOf('מיונז')===-1) throw new Error('the copied list omits the in-text recipes');
+        if(t.indexOf('Dana')===-1) throw new Error('the copied list omits who shared what');
+      } finally { _waHarvest=saved; }
     } },
 
   { id:'ui_selftest_report', group:'UI', name:'The self-test report carries enough to diagnose without asking',
@@ -5361,7 +5515,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.6';
+var APP_VERSION = 'v32.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6403,6 +6557,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 #cookLogOverlay.open,
 #pantryOverlay.open,
 #wcimOverlay.open,
+#waLinksOverlay.open,
 #waAskOverlay.open,
 #waSetupOverlay.open {
   opacity: 1 !important;
@@ -7803,7 +7958,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7849,6 +8004,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
           <button class="drop-item" id="waAskItem" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
+          <button class="drop-item" id="waLinksItem" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make?</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -8375,7 +8531,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8523,6 +8679,22 @@ body.banner-shown .header {
 </div>
 
 <!-- WHATSAPP: ASK MY GROUPS (3.9) -->
+<!-- WHATSAPP: HARVEST LINKS & IN-TEXT RECIPES (5f.9) -->
+<div id="waLinksOverlay" onclick="bgClose(event,'waLinksOverlay')" class="modal-overlay" style="z-index:900;">
+  <div style="background:var(--card-bg);border-radius:16px;width:96%;max-width:640px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px;">
+      <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">🧺 Recipes hiding in my chats</div>
+      <button class="modal-close" onclick="closeM('waLinksOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
+    </div>
+    <div id="waLinksCount" style="font-size:11px;color:var(--muted);padding:0 16px 8px;"></div>
+    <div id="waLinksBody" style="overflow-y:auto;flex:1;min-height:120px;"></div>
+    <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
+      <button onclick="copyWaHarvest()" style="flex:1;padding:10px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy the list</button>
+      <button onclick="closeM('waLinksOverlay')" style="padding:10px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Done</button>
+    </div>
+  </div>
+</div>
+
 <div id="waAskOverlay" onclick="bgClose(event,'waAskOverlay')" class="modal-overlay" style="z-index:900;">
   <div style="background:var(--card-bg);border-radius:16px;width:94%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -15953,6 +16125,221 @@ function waParse(text, group){
   });
 }
 
+// ═══ 5f.9 — RECIPE LINKS IN MY CHATS ═════════════════════════════════════════
+// A group with thousands of messages can hold hundreds of shared links. Asking a
+// question answers one thing; this answers "what is in here that I could keep?".
+// Everything below the UI is pure so it can be tested on fixtures rather than on
+// whatever happens to be in Tony's Firestore today.
+
+// Trailing punctuation is the hard part: people write "try this: https://x.com/a."
+// and the full stop is not part of the link. Closing brackets are only trimmed
+// when unbalanced, because some real URLs (Wikipedia especially) end in one.
+var WA_URL_RE = /https?:\/\/[^\s<>"']+/gi;
+function waTrimUrlPunctuation(u) {
+  var s = String(u || '');
+  for (;;) {
+    var last = s.slice(-1);
+    if ('.,;:!?…־»'.indexOf(last) > -1) { s = s.slice(0, -1); continue; }
+    if (last === ')' && (s.split('(').length - 1) < (s.split(')').length - 1)) { s = s.slice(0, -1); continue; }
+    if (last === ']' && (s.split('[').length - 1) < (s.split(']').length - 1)) { s = s.slice(0, -1); continue; }
+    break;
+  }
+  return s;
+}
+
+// One canonical form, so the same recipe shared five times is one row. Deliberately
+// conservative: only things that are provably not part of the identity are dropped.
+// A query string is NOT dropped wholesale — plenty of sites put the recipe id there
+// (?p=123, ?recipe=x), and collapsing those would merge different recipes into one.
+var WA_TRACKING_PARAMS = /^(utm_[a-z_]+|fbclid|gclid|igshid|mc_[a-z]+|ref|ref_src|si|feature|_branch_match_id)$/i;
+function waNormalizeUrl(u) {
+  var raw = waTrimUrlPunctuation(u);
+  if (!raw) return '';
+  var parsed;
+  try { parsed = new URL(raw); } catch (e) { return raw.toLowerCase(); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+  var host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  var kept = [];
+  try {
+    parsed.searchParams.forEach(function(v, k){ if (!WA_TRACKING_PARAMS.test(k)) kept.push([k, v]); });
+  } catch (e) {}
+  kept.sort(function(a, b){ return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });   // order must not matter
+  var path = parsed.pathname.replace(/\/+$/, '');
+  var qs = kept.length ? '?' + kept.map(function(p){ return p[0] + '=' + p[1]; }).join('&') : '';
+  // The fragment is dropped: #ingredients and #method are the same page.
+  return host + path + qs;
+}
+function waUrlDomain(u) {
+  try { return new URL(waTrimUrlPunctuation(u)).hostname.toLowerCase().replace(/^www\./, ''); }
+  catch (e) { return ''; }
+}
+
+// Links that are definitely not a recipe. Kept SHORT on purpose: guessing which
+// domains are "recipe sites" would hide the ones Tony actually wants, and he uses
+// YouTube and Instagram as recipe sources constantly. These are only the ones that
+// cannot be a recipe by construction.
+var WA_LINK_NOISE = /^(chat\.whatsapp\.com|wa\.me|api\.whatsapp\.com|t\.me|maps\.app\.goo\.gl|goo\.gl\/maps|meet\.google\.com|zoom\.us)$/i;
+function waLinkIsNoise(u) { return WA_LINK_NOISE.test(waUrlDomain(u)); }
+
+// Extract every link, with the context that makes it decidable: who shared it,
+// when, and what they said around it. Newest occurrence wins for display — a
+// re-share usually carries the better description.
+function waExtractLinks(messages) {
+  var byKey = {};
+  (messages || []).forEach(function(m) {
+    var found = String(m && m.text || '').match(WA_URL_RE);
+    if (!found) return;
+    found.forEach(function(hit) {
+      var url = waTrimUrlPunctuation(hit);
+      var key = waNormalizeUrl(url);
+      if (!key) return;
+      if (!byKey[key]) {
+        byKey[key] = { key: key, url: url, domain: waUrlDomain(url), count: 0,
+                       noise: waLinkIsNoise(url), shares: [] };
+      }
+      var e = byKey[key];
+      e.count++;
+      // Cap the stored context. A link shared 40 times must not carry 40 copies
+      // of its surrounding message into memory or into the rendered list.
+      if (e.shares.length < 5) {
+        e.shares.push({ who: (m.who || '').trim(), date: m.date || '', group: m.group || '',
+                        text: String(m.text || '').replace(WA_URL_RE, '').replace(/\s+/g, ' ').trim().slice(0, 200) });
+      }
+      if (url.length > e.url.length) e.url = url;   // prefer the fullest form seen
+    });
+  });
+  return Object.keys(byKey).map(function(k){ return byKey[k]; })
+    .sort(function(a, b){ return b.count - a.count || (a.domain < b.domain ? -1 : 1); });
+}
+
+// Which links are already in the collection. Compared on the SAME normalised form
+// as extraction, so "already have it" cannot disagree with de-duplication.
+function waLinksAlreadyImported(links, recipeList) {
+  var have = {};
+  (recipeList || []).forEach(function(r){
+    var k = waNormalizeUrl(r && r.source);
+    if (k) have[k] = r;
+  });
+  (links || []).forEach(function(l){
+    var hit = have[l.key];
+    l.imported = !!hit;
+    l.importedAs = hit ? (hit.name || '') : '';
+  });
+  return links;
+}
+// ─── In-text recipes ────────────────────────────────────────────────────────
+// Plenty of what is worth keeping was never a link: somebody just typed the
+// mayonnaise recipe into the group. These are easy to lose precisely because
+// there is nothing to click.
+//
+// SCORED, not matched. A single keyword catches "I bought 2 kg of flour today";
+// a recipe shows SEVERAL signals at once — quantities with units, a list shape,
+// cooking verbs, an oven temperature or a time. Both languages, because these
+// chats are Hebrew and an English-only heuristic would find almost nothing.
+//
+// Deliberately biased toward recall over precision: this produces a list a human
+// reviews, so a false positive costs one glance while a miss loses the recipe.
+
+// The end-of-word test. \b is NOT usable here: it is defined against \w, which is
+// ASCII-only, so a Hebrew letter counts as a non-word character and "כפית\b" never
+// fires — every Hebrew unit and verb below would silently score zero, in chats that
+// are almost entirely Hebrew. This lookahead says the same thing for both scripts:
+// the word must not run on into another letter (so "מל" does not match inside "מלח",
+// and "g" does not match inside "gram").
+var WA_WORD_END = '(?![\\w\\u0590-\\u05FF])';
+
+// A number next to a unit. Hebrew units appear with and without quotes (מ"ל / מל).
+var WA_QTY_RE = new RegExp(
+  '(\\d+([.,/]\\d+)?|½|¼|¾)\\s*'
+  + '(גרם|גר\'|ג\'|ק"ג|קג|כפית|כפיות|כף|כפות|כוס|כוסות|מ"ל|מל|ליטר|יח\'|יחידות|חבילה|שקית|קורט'
+  + '|grams|gram|gr|kg|ml|litre|liter|l|cups|cup|tbsp|tsp|tablespoon|teaspoon|oz|lb|pinch|cloves|clove|g)'
+  + WA_WORD_END,
+  'gi');
+// Things you DO to food. Hebrew present-tense plural is how recipes are written.
+var WA_VERB_RE = new RegExp(
+  '(מערבבים|מוסיפים|מחממים|אופים|מטגנים|מבשלים|קוצצים|חותכים|טורפים|לשים|מקררים|מסננים|ממליחים'
+  + '|מכניסים לתנור|יוצקים|מועכים|מקציפים|מרתיחים|משרים|מתבלים'
+  + '|mix|stir|add|heat|bake|fry|chop|whisk|knead|simmer|boil|marinate|season|preheat|blend|fold)'
+  + WA_WORD_END,
+  'gi');
+// An oven temperature or a duration.
+var WA_TEMPTIME_RE = new RegExp(
+  '(\\d{2,3}\\s*(°|מעלות|degrees|c|f)' + WA_WORD_END + ')'
+  + '|(\\d+\\s*(דקות|דקה|שעות|שעה|לילה|minutes|mins|min|hours|hour)' + WA_WORD_END + ')',
+  'gi');
+// Section headings people actually type.
+var WA_SECTION_RE = /(מצרכים|רכיבים|חומרים|אופן ההכנה|הוראות הכנה|הכנה|ingredients|instructions|directions|method|preparation)\s*[:\-–]?/gi;
+
+function waCountMatches(re, text) {
+  re.lastIndex = 0;
+  var n = 0, m;
+  while ((m = re.exec(text)) !== null) { n++; if (m.index === re.lastIndex) re.lastIndex++; if (n > 40) break; }
+  return n;
+}
+
+// Returns {score, signals, lines} — score 0 when it cannot be a recipe at all.
+function waScoreRecipeText(text) {
+  var t = String(text || '');
+  var stripped = t.replace(WA_URL_RE, ' ').trim();
+  var signals = [];
+  // Too short to be a recipe, whatever else it contains. A real one needs an
+  // ingredient list and a method; 140 characters cannot hold both.
+  if (stripped.length < 140) return { score: 0, signals: [], lines: 0 };
+
+  var qty  = waCountMatches(WA_QTY_RE, stripped);
+  var verb = waCountMatches(WA_VERB_RE, stripped);
+  var tt   = waCountMatches(WA_TEMPTIME_RE, stripped);
+  var sect = waCountMatches(WA_SECTION_RE, stripped);
+  var lines = stripped.split('\n').filter(function(l){ return l.trim(); }).length;
+
+  var score = 0;
+  // Quantities are the strongest single signal, but cap their contribution so a
+  // shopping list ("2 kg flour, 3 kg sugar, 1 kg rice...") cannot win on its own.
+  if (qty >= 2) { score += Math.min(qty, 6) * 6; signals.push(qty + ' quantities'); }
+  if (verb >= 2) { score += Math.min(verb, 6) * 7; signals.push(verb + ' cooking steps'); }
+  if (tt   >= 1) { score += Math.min(tt, 3) * 6;   signals.push(tt + ' time/temperature'); }
+  if (sect >= 1) { score += 18; signals.push('a section heading'); }
+  if (lines >= 4) { score += Math.min(lines, 12) * 2; signals.push(lines + ' lines'); }
+  if (stripped.length > 400) score += 8;
+
+  // The discriminator: a recipe tells you what to use AND what to do. Either one
+  // alone is a shopping list or chatter, so require both before scoring at all.
+  if (!(qty >= 2 && verb >= 2) && !(sect >= 1 && (qty >= 2 || verb >= 2))) {
+    return { score: 0, signals: signals, lines: lines };
+  }
+  return { score: score, signals: signals, lines: lines };
+}
+
+// Candidate in-text recipes, best first. `min` is the score floor.
+function waFindTextRecipes(messages, min) {
+  var floor = (typeof min === 'number') ? min : 45;
+  var out = [];
+  (messages || []).forEach(function(m, i) {
+    var s = waScoreRecipeText(m && m.text);
+    if (s.score < floor) return;
+    out.push({ idx: i, score: s.score, signals: s.signals, lines: s.lines,
+               who: (m.who || '').trim(), date: m.date || '', group: m.group || '',
+               text: String(m.text || '') });
+  });
+  // Same text posted twice (forwards, re-shares) collapses to one entry.
+  var seen = {}, dedup = [];
+  out.sort(function(a, b){ return b.score - a.score; }).forEach(function(c){
+    var k = c.text.replace(/\s+/g, ' ').trim().slice(0, 160).toLowerCase();
+    if (seen[k]) { seen[k].dupes = (seen[k].dupes || 1) + 1; return; }
+    seen[k] = c; dedup.push(c);
+  });
+  return dedup;
+}
+window.waScoreRecipeText = waScoreRecipeText;
+window.waFindTextRecipes = waFindTextRecipes;
+
+window.waTrimUrlPunctuation = waTrimUrlPunctuation;
+window.waNormalizeUrl = waNormalizeUrl;
+window.waUrlDomain = waUrlDomain;
+window.waLinkIsNoise = waLinkIsNoise;
+window.waExtractLinks = waExtractLinks;
+window.waLinksAlreadyImported = waLinksAlreadyImported;
+
 // ─── IndexedDB storage for locally imported chats ────────────────────────────
 function waStore(mode){
   return idbOpen().then(function(db){ return db.transaction(IDB_WA_STORE, mode).objectStore(IDB_WA_STORE); });
@@ -16573,6 +16960,157 @@ function waAskCountLabel(){
     ? idx.length + ' chat' + (idx.length===1?'':'s') + ' · ' + idx.reduce(function(s,e){return s+(e.count||0);},0).toLocaleString() + ' messages'
     : '';
 }
+// ─── 5f.9 UI — the harvest panel ────────────────────────────────────────────
+var _waHarvest = { links: [], texts: [], loaded: false, hideImported: true, hideNoise: true };
+
+async function openWaLinks(){
+  document.getElementById('waLinksOverlay').classList.add('open');
+  var body = document.getElementById('waLinksBody');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">🔎 Reading every chat…</div>';
+  try {
+    var loaded = await waLoadAllMessages();
+    var msgs = loaded.messages || [];
+    _waHarvest.links = waLinksAlreadyImported(waExtractLinks(msgs), recipes);
+    _waHarvest.texts = waFindTextRecipes(msgs);
+    _waHarvest.loaded = true;
+    document.getElementById('waLinksCount').textContent =
+      msgs.length.toLocaleString() + ' messages across ' + (loaded.chats || []).length + ' chat'
+      + (((loaded.chats||[]).length) === 1 ? '' : 's');
+    renderWaHarvest();
+  } catch (e) {
+    // Say which step failed. "Could not load" with no cause is another dead end.
+    body.innerHTML = '<div style="padding:18px;font-size:13px;color:var(--terracotta);">'
+      + 'Could not read the chats: ' + escH(e && e.message || 'unknown error')
+      + '<div style="color:var(--muted);margin-top:8px;font-size:12px;">Open ⚙️ Settings → 💬 WhatsApp Groups and check the chats are loaded.</div></div>';
+  }
+}
+window.openWaLinks = openWaLinks;
+
+function waHarvestTab(which){
+  _waHarvest.tab = which;
+  renderWaHarvest();
+}
+window.waHarvestTab = waHarvestTab;
+
+function renderWaHarvest(){
+  var body = document.getElementById('waLinksBody');
+  var tab  = _waHarvest.tab || 'links';
+  var links = _waHarvest.links.filter(function(l){
+    if (_waHarvest.hideNoise && l.noise) return false;
+    if (_waHarvest.hideImported && l.imported) return false;
+    return true;
+  });
+  var hiddenImported = _waHarvest.links.filter(function(l){ return l.imported; }).length;
+  var hiddenNoise    = _waHarvest.links.filter(function(l){ return l.noise; }).length;
+
+  var h = '<div style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border);">'
+    + '<button onclick="waHarvestTab(\'links\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;'
+    + (tab==='links' ? 'background:var(--terracotta);color:#fff;' : 'background:var(--card-bg);color:var(--ink);') + '">🔗 Links (' + links.length + ')</button>'
+    + '<button onclick="waHarvestTab(\'texts\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;'
+    + (tab==='texts' ? 'background:var(--terracotta);color:#fff;' : 'background:var(--card-bg);color:var(--ink);') + '">📝 Written in the chat (' + _waHarvest.texts.length + ')</button>'
+    + '</div>';
+
+  if (tab === 'links') {
+    h += '<div style="padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">'
+      + '<label style="cursor:pointer;"><input type="checkbox" ' + (_waHarvest.hideImported ? 'checked' : '')
+      + ' onchange="_waHarvest.hideImported=this.checked;renderWaHarvest()"> hide the ' + hiddenImported + ' already imported</label>'
+      + ' &nbsp; <label style="cursor:pointer;"><input type="checkbox" ' + (_waHarvest.hideNoise ? 'checked' : '')
+      + ' onchange="_waHarvest.hideNoise=this.checked;renderWaHarvest()"> hide ' + hiddenNoise + ' group invites/maps</label>'
+      + '</div>';
+    if (!links.length) {
+      h += '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No links left after filtering.</div>';
+    }
+    links.forEach(function(l){
+      var ctx = l.shares[0] || {};
+      h += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);">'
+        + '<div style="font-size:13px;word-break:break-all;">'
+        + (l.imported ? '<span title="already in your collection" style="color:var(--green);">✔ </span>' : '')
+        + '<a href="' + escA(safeUrl(l.url)) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">' + escH(l.url) + '</a></div>'
+        + '<div style="font-size:11px;color:var(--muted);margin-top:3px;">'
+        + escH(l.domain) + (l.count > 1 ? ' · shared ' + l.count + '×' : '')
+        + (ctx.who ? ' · ' + escH(ctx.who) : '') + (ctx.date ? ' · ' + escH(ctx.date) : '')
+        + (l.imported ? ' · <span style="color:var(--green);">already saved as ' + escH(l.importedAs || 'a recipe') + '</span>' : '')
+        + '</div>'
+        + (ctx.text ? '<div dir="auto" style="font-size:12px;color:var(--ink);margin-top:4px;unicode-bidi:plaintext;text-align:start;opacity:0.85;">' + escH(ctx.text) + '</div>' : '')
+        // escA already turns the quotes JSON.stringify produces into &quot;, which the
+        // HTML parser hands back to JS as a real string literal inside the attribute.
+        + (l.imported ? '' : '<button onclick="openUrlImportModal(' + escA(JSON.stringify(l.url)) + ')" '
+            + 'style="margin-top:6px;padding:5px 12px;border:none;border-radius:6px;background:var(--terracotta);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Import this</button>')
+        + '</div>';
+    });
+  } else {
+    h += '<div style="padding:8px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">'
+      + 'Messages that look like a full recipe — quantities and method, not just a mention. '
+      + 'Best guesses first; skim and open the ones you want.</div>';
+    if (!_waHarvest.texts.length) {
+      h += '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">Nothing in the chats reads as a written-out recipe.</div>';
+    }
+    _waHarvest.texts.forEach(function(c, i){
+      var preview = c.text.replace(/\s+/g, ' ').trim().slice(0, 220);
+      h += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);">'
+        + '<div style="font-size:11px;color:var(--muted);">'
+        + (c.who ? escH(c.who) : 'unknown') + (c.date ? ' · ' + escH(c.date) : '')
+        + (c.group ? ' · ' + escH(c.group) : '')
+        + (c.dupes ? ' · posted ' + c.dupes + '×' : '')
+        + ' · <span title="' + escA(c.signals.join(', ')) + '">' + escH(c.signals.join(', ')) + '</span></div>'
+        + '<div dir="auto" style="font-size:13px;color:var(--ink);margin-top:4px;unicode-bidi:plaintext;text-align:start;white-space:pre-wrap;">' + escH(preview) + (c.text.length > 220 ? '…' : '') + '</div>'
+        + '<button onclick="waImportTextRecipe(' + i + ')" style="margin-top:6px;padding:5px 12px;border:none;border-radius:6px;background:var(--terracotta);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Parse this into a recipe</button>'
+        + '</div>';
+    });
+  }
+  body.innerHTML = h;
+}
+window.renderWaHarvest = renderWaHarvest;
+
+// Hand the full message text to the existing free-hand parser — the same path as
+// "✍️ Paste free-hand text", so there is one parser, not two.
+function waImportTextRecipe(i){
+  var c = _waHarvest.texts[i];
+  if (!c) return;
+  closeM('waLinksOverlay');
+  openFreehandModal(c.text);
+}
+window.waImportTextRecipe = waImportTextRecipe;
+
+// Plain text, so it pastes into a note or a message. Same honest-clipboard rule
+// as everywhere else: never claim a copy that did not happen.
+function waHarvestText(){
+  var L = [];
+  L.push('Recipes hiding in my chats — ' + new Date().toISOString().slice(0,10));
+  L.push('');
+  L.push('LINKS (' + _waHarvest.links.length + ')');
+  _waHarvest.links.forEach(function(l){
+    var c = l.shares[0] || {};
+    L.push((l.imported ? '[have] ' : '[    ] ') + l.url
+      + (l.count > 1 ? '  (' + l.count + '×)' : '')
+      + (c.who ? '  — ' + c.who : '') + (c.date ? ', ' + c.date : '')
+      + (c.text ? '\n        ' + c.text.slice(0,120) : ''));
+  });
+  L.push('');
+  L.push('WRITTEN IN THE CHAT (' + _waHarvest.texts.length + ')');
+  _waHarvest.texts.forEach(function(c, i){
+    L.push((i+1) + '. ' + (c.who || 'unknown') + (c.date ? ', ' + c.date : '')
+      + '  [' + c.signals.join(', ') + ']');
+    L.push('   ' + c.text.replace(/\s+/g,' ').trim().slice(0,300));
+  });
+  return L.join('\n');
+}
+function copyWaHarvest(){
+  var text = waHarvestText();
+  // navigator.clipboard is undefined outside a secure context, so calling straight
+  // through would throw synchronously and the .catch below would never run — the
+  // button would look dead. Check first, and always leave the text recoverable.
+  if (!(navigator.clipboard && navigator.clipboard.writeText)) {
+    showServiceError('This browser offers no clipboard access. Here is the list to copy by hand:\n\n' + text);
+    return;
+  }
+  navigator.clipboard.writeText(text)
+    .then(function(){ toast('\u{1F4CB} List copied'); })
+    .catch(function(){ showServiceError('Could not reach the clipboard. Here it is to copy by hand:\n\n' + text); });
+}
+window.waHarvestText = waHarvestText;
+window.copyWaHarvest = copyWaHarvest;
+
 function openWaAsk(){
   document.getElementById('waAskAnswer').style.display = 'none';
   document.getElementById('waAskAnswer').innerHTML = '';
