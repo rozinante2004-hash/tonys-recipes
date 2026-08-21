@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.1 -->
+<!-- Tony's Recipes Collection v33.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2667,6 +2667,93 @@ const SELF_TESTS = [
         if(t.indexOf('מיונז')===-1) throw new Error('the copied list omits the in-text recipes');
         if(t.indexOf('Dana')===-1) throw new Error('the copied list omits who shared what');
       } finally { _waHarvest=saved; }
+    } },
+
+  { id:'photo_hebrew_terms', group:'Features', name:'A Hebrew recipe name becomes a searchable English dish (5g.1)',
+    test: async()=>{
+      ['photoQueryFromName','photoTermIsUsable','photoAttemptPlan','photoSearchTerms']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // An image library has no picture of whose recipe it is or how quick it is.
+      // "עוגת השוקולד של סבתא רבקה" is not a subject; "עוגת השוקולד" is.
+      var c=photoQueryFromName('עוגת השוקולד של סבתא רבקה');
+      if(/סבתא|רבקה|\bשל\b/.test(c)) throw new Error('the family attribution survived into the search term: '+c);
+      if(c.indexOf('עוגת')===-1) throw new Error('the dish itself was stripped out: '+c);
+      var e=photoQueryFromName("Grandma's BEST homemade chicken soup recipe 🍲");
+      if(/grandma|best|homemade|recipe/i.test(e)) throw new Error('English noise words survived: '+e);
+      if(!/chicken soup/i.test(e)) throw new Error('the dish was lost: '+e);
+      if(/[\u{1F300}-\u{1FAFF}]/u.test(e)) throw new Error('an emoji survived into the query: '+e);
+
+      // What comes back from the AI must be CHECKED. A refusal, a preamble or a
+      // truncated reply used to go straight into the query.
+      if(!photoTermIsUsable('chicken soup')) throw new Error('a good term was rejected');
+      if(photoTermIsUsable('עוגת שוקולד'))
+        throw new Error('an untranslated Hebrew term was accepted — the libraries do not read Hebrew, which is the whole point');
+      if(photoTermIsUsable("I'm sorry, I cannot help with that"))
+        throw new Error('a refusal was accepted as a search term');
+      if(photoTermIsUsable('Here is the English name: chicken soup'))
+        throw new Error('a preamble was accepted as a search term');
+      if(photoTermIsUsable('')) throw new Error('an empty term was accepted');
+      if(photoTermIsUsable('a very long string of words that is clearly a sentence and not a dish name'))
+        throw new Error('a sentence was accepted as a search term');
+
+      // The ladder must try EVERY source, keyless one first. Searching only the
+      // default source meant an unset PIXABAY_API_KEY read as "no pictures exist"
+      // for the entire collection.
+      var plan=photoAttemptPlan('chicken soup','Dinner');
+      if(!plan.length) throw new Error('no attempts are planned at all');
+      if(plan[0].source!==PHOTO_SOURCES[0])
+        throw new Error('the first attempt is not the keyless source, so an unconfigured key kills every search');
+      var srcs={}; plan.forEach(function(p){ srcs[p.source]=1; });
+      PHOTO_SOURCES.forEach(function(sname){
+        if(!srcs[sname]) throw new Error('source '+sname+' is never tried, so its pictures are unreachable');
+      });
+      if(!plan.some(function(p){ return p.q!=='chicken soup'; }))
+        throw new Error('there is no broader fallback when the exact dish finds nothing');
+      // ...and it must NOT bolt "food recipe" onto an already-specific dish: stock
+      // libraries match on tags, and the extra words find nothing.
+      if(plan[0].q!=='chicken soup') throw new Error('the first attempt is not the plain dish term: '+plan[0].q);
+
+      // One AI call for the whole batch, and an English name needs none at all.
+      var realAi=window.aiCall, calls=0;
+      try{
+        window.aiCall=function(){ calls++; return Promise.resolve('["chicken soup","beef stew"]'); };
+        var out=await photoSearchTerms(['מרק עוף של אמא','נזיד בקר']);
+        if(calls!==1) throw new Error('expected ONE batched call for two names, got '+calls);
+        if(out[0]!=='chicken soup'||out[1]!=='beef stew') throw new Error('the batched answers were not applied in order');
+        calls=0;
+        await photoSearchTerms(['Chicken soup','Beef stew']);
+        if(calls!==0) throw new Error('English names still cost an AI call');
+        // A failed or refused translation must fall back to the cleaned name,
+        // never leave the query in Hebrew.
+        calls=0;
+        window.aiCall=function(){ return Promise.reject(new Error('boom')); };
+        var fb=await photoSearchTerms(['מרק עוף של אמא']);
+        if(!fb[0]) throw new Error('a failed translation produced no term at all');
+        if(/של|אמא/.test(fb[0])) throw new Error('the fallback kept the noise words: '+fb[0]);
+
+        // The validation has to be applied AT THE CALL SITE, not merely exist.
+        // Checked by feeding photoSearchTerms junk, because asserting on
+        // photoTermIsUsable alone left photoSearchTerms free to stop calling it —
+        // which is exactly what a mutation showed, for the fourth time in this
+        // file. Every one of these must be REJECTED and fall back to the cleaned
+        // Hebrew-free-ish name rather than being pasted into a photo query.
+        var junk=[
+          ['["I\'m sorry, I cannot translate that"]','a refusal'],
+          ['["Here is the English name: chicken soup"]','a preamble'],
+          ['["מרק עוף"]','an untranslated Hebrew answer'],
+          ['["a very long sentence that is plainly not a dish name at all here"]','a sentence'],
+          ['[""]','an empty answer'],
+          ['[null]','a null answer']
+        ];
+        for(var ji=0;ji<junk.length;ji++){
+          (function(payload){ window.aiCall=function(){ return Promise.resolve(payload); }; })(junk[ji][0]);
+          var got=(await photoSearchTerms(['מרק עוף של אמא']))[0];
+          if(!got) throw new Error(junk[ji][1]+' left no term at all');
+          if(got.indexOf('sorry')>-1||got.indexOf('Here is')>-1||got.length>40)
+            throw new Error(junk[ji][1]+' was accepted as a search term: "'+got+'"');
+        }
+      } finally { window.aiCall=realAi; }
     } },
 
   { id:'wa_link_classify', group:'WhatsApp', name:'Shops, sign-ups and invites are hidden; recipes are not (5f.11)',
@@ -5799,51 +5886,186 @@ window.setCookLogRating = setCookLogRating; window.commitCooked = commitCooked;
 window.deleteCookLogEntry = deleteCookLogEntry; window.cookLogId = cookLogId; window.avgRating = avgRating; window.stars = stars;
 
 // ─── AUTO-FETCH MISSING PHOTOS ───────────────────────────────────────────────
+// v33.2. This did already translate Hebrew names, and still came back empty
+// nearly every time. Translation was only one of five reasons:
+//
+//   1. It searched ONE source — whichever the Worker defaults to (pixabay) —
+//      and never the keyless Openverse or the others the picker cycles through.
+//      With PIXABAY_API_KEY unset the Worker answers {notConfigured:true} and the
+//      loop reads that as "no pictures" for every recipe in the collection.
+//   2. It appended " food recipe" to an already-specific dish name. Stock photo
+//      sites match on tags, so "jerusalem mixed grill food recipe" finds nothing
+//      that "mixed grill" finds easily.
+//   3. It never checked what the AI sent back. A refusal, a preamble or a
+//      truncated reply (maxTokens was 30) went straight into the query.
+//   4. A failed translation left the query in Hebrew — guaranteed zero results.
+//   5. One AI call per recipe, against a rate-limited Worker, and a silent
+//      `continue` on failure. Twenty recipes meant twenty calls and a final
+//      "Fetched 0/20" that said nothing about why.
+//
+// Tony's suggestion — translate first, and search for the DISH rather than the
+// title — is right, and needs all five fixed to actually pay off.
+
+// Strip what a stock photo library cannot possibly have a picture of: whose
+// recipe it is, how quick it is, and the word "recipe" itself. "עוגת השוקולד של
+// סבתא רבקה" is not a searchable subject; "chocolate cake" is. Pure, so it is
+// testable without the network, and it runs BEFORE the AI so an English name
+// never needs a call at all.
+// \b is ASCII-only, so "\bשל" matches NOTHING — the trap this project has now
+// sprung twice (the in-text recipe scorer, then this). The boundaries are spelled
+// out instead: a non-word, non-Hebrew character (or the start) in front, and no
+// letter of either alphabet behind. Written first and tested with a Hebrew
+// fixture, because an English-only test of a bilingual matcher proves nothing.
+var PHOTO_NAME_NOISE = new RegExp(
+  '(^|[^\\w\\u0590-\\u05FF])(?:' + [
+    // "X של סבתא רבקה" — the possessive tail runs to the end of the name, and no
+    // list of personal names could ever be complete.
+    'של\\s+.*$',
+    'סבתא\\S*','סבא\\S*','אמא\\S*','אבא\\S*','דודה\\S*',
+    'מתכון','הכי טוב[הת]?','ביתי[תה]?','מהיר[הת]?','מושלם[תה]?',
+    'grandma\\S*','grandpa\\S*','mom\\S*','mum\\S*','dad\\S*','aunties?','aunts?',
+    'my','best','easy','quick','perfect','homemade','recipe','ultimate','famous'
+  ].join('|') + ')(?![\\w\\u0590-\\u05FF])', 'gi');
+function photoQueryFromName(name) {
+  var t = String(name == null ? '' : name);
+  t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ');  // emoji
+  t = t.replace(/\([^)]*\)/g, ' ');                                 // (parenthetical asides)
+  t = t.replace(/["'`״׳“”‘’]/g, ' ');
+  t = t.replace(PHOTO_NAME_NOISE, ' ');
+  t = t.replace(/\s*[-–—:,]\s*/g, ' ');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+// Is this usable as a search term? An AI that refuses, explains itself, or gets
+// truncated must not have its answer pasted into a query.
+function photoTermIsUsable(term) {
+  var t = String(term == null ? '' : term).trim();
+  if (t.length < 2 || t.length > 40) return false;
+  if (/[֐-׿]/.test(t)) return false;          // still Hebrew: not translated
+  if (t.split(/\s+/).length > 5) return false;          // a sentence, not a subject
+  if (/[.!?;:]|\bsorry\b|\bcannot\b|\bcan't\b|\bi am\b|\bhere\b/i.test(t)) return false;
+  return true;
+}
+window.photoQueryFromName = photoQueryFromName; window.photoTermIsUsable = photoTermIsUsable;
+
+// ONE AI call for every Hebrew name, not one per recipe. Twenty recipes used to
+// mean twenty calls at a rate-limited Worker; this is a single request, and it
+// degrades to the cleaned original where the answer is unusable.
+async function photoSearchTerms(names) {
+  var out = {}, need = [];
+  (names || []).forEach(function(n, i){
+    var cleaned = photoQueryFromName(n);
+    out[i] = cleaned;
+    // Only Hebrew needs the round trip. An English name is already searchable.
+    if (/[֐-׿]/.test(cleaned)) need.push({ i: i, text: cleaned });
+  });
+  if (!need.length) return out;
+  var prompt = 'For each numbered dish below, give the SHORT English search term an image '
+    + 'library would tag the photograph with — the dish itself, 1 to 3 words, no names of '
+    + 'people, no adjectives like best or homemade, no punctuation.\n'
+    + 'Reply with ONLY a JSON array of strings, in the same order, same length.\n\n'
+    + need.map(function(n, k){ return (k + 1) + '. ' + n.text; }).join('\n');
+  try {
+    var raw = await aiCall(prompt, Math.min(1000, 60 + need.length * 14));
+    var arr = extractJSON(raw);
+    if (Array.isArray(arr)) {
+      need.forEach(function(n, k){
+        if (photoTermIsUsable(arr[k])) out[n.i] = String(arr[k]).trim();
+      });
+    }
+  } catch (e) {
+    recordError('photo-terms', e && e.message, 'photoSearchTerms');
+  }
+  return out;
+}
+window.photoSearchTerms = photoSearchTerms;
+
+// One search, one source. Returns [] rather than throwing so a dead source never
+// takes the whole run down.
+async function photoSearchOnce(query, source) {
+  try {
+    var resp = await fetch(WORKER_ENDPOINT, {
+      method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'photo-search', query: query, source: source }),
+      signal: AbortSignal.timeout(10000)
+    });
+    var data = await resp.json();
+    return (data && data.images) || [];
+  } catch (e) { return []; }
+}
+// The ladder: the dish term across the keyless source first, then the keyed ones,
+// then one broader attempt. Ordering matters — Openverse needs no API key, so it
+// is the one that still works when nothing is configured.
+function photoAttemptPlan(term, category) {
+  var broad = String(term || '').split(/\s+/).slice(-1)[0] || '';
+  var plan = [];
+  PHOTO_SOURCES.forEach(function(src){ if (term) plan.push({ q: term, source: src }); });
+  if (broad && broad.toLowerCase() !== String(term).toLowerCase()) plan.push({ q: broad, source: PHOTO_SOURCES[0] });
+  if (category) plan.push({ q: category + ' food', source: PHOTO_SOURCES[0] });
+  return plan;
+}
+window.photoAttemptPlan = photoAttemptPlan; window.photoSearchOnce = photoSearchOnce;
+
 async function autoFetchMissingPhotos() {
   var noPhoto = recipes.filter(function(r){ return !r.photo && !r.isClip; });
   if (!noPhoto.length) { toast('✅ All recipes already have photos!'); return; }
   if (!await askConfirm({ icon:'📸', title:'Fetch photos for ' + noPhoto.length + ' recipe' + (noPhoto.length!==1?'s':'') + '?',
-      message:'Each recipe name is searched and the best match used. You can change any photo afterwards.', okLabel:'Fetch photos' })) return;
+      message:'Hebrew names are translated to an English dish name first — the photo libraries have no Hebrew. Each is searched across every source, and you can change any photo afterwards.', okLabel:'Fetch photos' })) return;
 
-  var fetched = 0;
+  toast('🈯 Working out what to search for…');
+  var terms = await photoSearchTerms(noPhoto.map(function(r){ return r.name; }));
+
+  var fetched = 0, noResults = [], failed = [];
   for (var i = 0; i < noPhoto.length; i++) {
     var r = noPhoto[i];
-    toast('🔍 Fetching photo ' + (i+1) + '/' + noPhoto.length + ': ' + r.name.slice(0,20));
+    var term = terms[i] || photoQueryFromName(r.name) || r.name;
+    toast('🔍 ' + (i+1) + '/' + noPhoto.length + ': ' + term.slice(0, 24));
+    var images = [], plan = photoAttemptPlan(term, r.category);
+    for (var a = 0; a < plan.length && !images.length; a++) {
+      images = await photoSearchOnce(plan[a].q, plan[a].source);
+      if (!images.length) await new Promise(function(res){ setTimeout(res, 200); });
+    }
+    if (!images.length) { noResults.push(r.name + ' → "' + term + '"'); continue; }
     try {
-      // Build a clean English search query using AI if name is Hebrew
-      var query = r.name;
-      var isHeb = /[\u0590-\u05FF]/.test(r.name);
-      if (isHeb) {
-        var tResult = await aiCall('Translate this recipe name to English for image search, reply with ONLY the English name: ' + r.name, 30);
-        query = tResult.trim().replace(/['"]/g,'');
-      }
-      // Search Pixabay
-      var resp = await fetch(WORKER_ENDPOINT, {
-        method:'POST', headers: workerHeaders(),
-        body: workerBody({action:'photo-search', query: query + ' food recipe'}),
-        signal: AbortSignal.timeout(10000)
-      });
-      var data = await resp.json();
-      if (!data.images || !data.images.length) continue;
-
-      // Download and compress first result
-      var imgResp = await fetch(data.images[0].url);
+      var imgResp = await fetch(images[0].url);
       var blob = await imgResp.blob();
-      var file = new File([blob], 'auto-photo.jpg', {type: blob.type||'image/jpeg'});
+      var file = new File([blob], 'auto-photo.jpg', { type: blob.type || 'image/jpeg' });
       var photoUrl = await uploadPhotoToStorage(file, r.id);
       if (photoUrl) {
         r.photo = photoUrl;
+        // Openverse is Creative Commons: attribution is a licence CONDITION, not
+        // a courtesy, so the credit travels with the photo (v30.3).
+        if (images[0].license || images[0].sourceLabel) {
+          r.photoCredit = { name: images[0].author || '', url: images[0].sourceUrl || images[0].url,
+                            license: images[0].license || '', source: images[0].sourceLabel || '' };
+        }
         r.updatedAt = Date.now();
         fetched++;
-      }
-    } catch(err) {
-      console.warn('Auto-photo failed for', r.name, err);
+      } else { failed.push(r.name + ' (could not be stored)'); }
+    } catch (err) {
+      failed.push(r.name + ' (' + ((err && err.message) || 'download failed') + ')');
+      recordError('auto-photo', err && err.message, r.name);
     }
-    await new Promise(function(res){ setTimeout(res, 500); });
+    await new Promise(function(res){ setTimeout(res, 400); });
   }
   saveData();
   renderGrid();
-  toast('✅ Fetched ' + fetched + '/' + noPhoto.length + ' photos!');
+
+  // Say what happened. "Fetched 0/20" with no reason is the message this used to
+  // end on, and it is impossible to act on.
+  if (fetched === noPhoto.length) { toast('✅ Fetched all ' + fetched + ' photos!'); return; }
+  var lines = ['Fetched ' + fetched + ' of ' + noPhoto.length + '.'];
+  if (noResults.length) {
+    lines.push('', 'No picture found for ' + noResults.length + ' — the search term is shown, '
+      + 'so you can try your own in ✏️ Edit → 🔍 Find a photo:');
+    lines.push(noResults.slice(0, 12).map(function(x){ return '  • ' + x; }).join('\n'));
+    if (noResults.length > 12) lines.push('  …and ' + (noResults.length - 12) + ' more.');
+  }
+  if (failed.length) {
+    lines.push('', failed.length + ' found a picture but could not save it:');
+    lines.push(failed.slice(0, 6).map(function(x){ return '  • ' + x; }).join('\n'));
+  }
+  showServiceError(lines.join('\n'));
 }
 window.autoFetchMissingPhotos = autoFetchMissingPhotos;
 
@@ -6164,7 +6386,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.1';
+var APP_VERSION = 'v33.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8679,7 +8901,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9252,7 +9474,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

@@ -356,6 +356,13 @@ found only because a test was written first and disagreed with the code.
   (`chat_` … `` chat` ``) cannot see the parts. Name a part `chat_<slug>_p1` and every
   chat is read in full just to draw a list of group names. `'_'` (0x5F) sorting before
   `` '`' `` (0x60) is what makes that boundary work; there is a test.
+- **`\b` is ASCII-only, and this app is half Hebrew — sprung TWICE.** Once in the
+  in-text recipe scorer (every Hebrew unit and verb scored zero), then again in the
+  photo-name cleaner, in code written *after* the first was documented here. Any
+  regex meant to match Hebrew must spell its boundaries out —
+  `(^|[^\w\u0590-\u05FF])` in front, `(?![\w\u0590-\u05FF])` behind — and must be
+  exercised with a Hebrew fixture. An English-only test of a bilingual matcher
+  proves nothing at all.
 - **`''.indexOf('')` is `0`, so a `charset.indexOf(lastChar) > -1` trim loop never
   ends on an empty string.** `waTrimUrlPunctuation` used `for (;;)` and asked "is the
   last character punctuation?" — on `''` the answer is yes, forever. It ran over every
@@ -382,6 +389,11 @@ found only because a test was written first and disagreed with the code.
   scoring fixture with no verbs is zero whether or not the unit regex fires. When
   a mutation survives, first ask what else in the fixture was already forcing the
   expected answer.
+- **A mutation harness must verify a GREEN BASELINE before it mutates, and treat
+  a missing summary line as an error.** A batch of ten reported clean when the
+  static server had died: every run failed to load the page, printed nothing, and
+  the harness read "no failures" as "no failures". Same shape as the CI that sat
+  red for 19 releases — a check that reports success when it did not actually run.
 - **A mutation that breaks the BUILD is not a caught mutation.** Renaming a
   function whose name is exported on the next line throws at load, fails a dozen
   unrelated tests, and tells you nothing about whether the behaviour is covered.
