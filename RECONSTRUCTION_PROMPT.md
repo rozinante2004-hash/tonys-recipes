@@ -6,7 +6,7 @@
 > specified."* It is written to be self‑contained: every file, data shape, external service,
 > secret placeholder, and UX behaviour is described so the app can be recreated to parity.
 >
-> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~17,600
+> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~19,300
 > lines) plus a handful of supporting files. No build step, no framework, no bundler, no npm.
 > Plain ES5‑flavoured vanilla JavaScript (mostly `var`/`function`, some template literals and
 > `async/await`), inline `<style>`, and CDN `<script>` tags. Keep it that way.
@@ -24,13 +24,23 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v32.3` — app. **Worker: v36**, deployed separately and versioned separately
+**Current version:** `v32.9` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
 v32.2 shipped with `version.json` left a release behind, and the update banner then told every
 device it was running v32.2 and that v32.1 was ready — repeatedly, since Update Now reloads the
 same build and the mismatch survives (§4b).
+
+> **Bump those five by editing those five lines — never with a find-and-replace over the file.**
+> A blanket replace rewrote the *history comments* that record what each release fixed: twice,
+> at v32.3 and again at v32.4, the second time touching 28 lines and corrupting the note
+> describing the v32.2 incident itself. A comment naming a version is evidence about the past
+> and must not be dragged forward. Afterwards, the only remaining mentions of the old version
+> should be prose about history.
+
+**The repository is PRIVATE.** It was public for its entire life until 16 Aug 2026, so anything
+ever committed must be assumed permanently disclosed regardless of later rewriting — see §2a.
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
 **DM Sans** for body. Cream/brown/terracotta/gold palette. Rounded cards, soft shadows,
@@ -42,21 +52,22 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~16,500 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v32.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v32.9"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
 | `storage.rules` | Firebase **Storage** rules (§4d). Dormant: Storage needs a paid Firebase plan, so photos stay base64 in Firestore and this file is unpublished. Keep it in the repo anyway — the code path exists and the rules must be ready before it is ever switched on. |
-| `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). |
-| `whatsapp/` | Shared folder of exported WhatsApp chat `.txt`/`.zip` files. The app **lists the folder** over the GitHub contents API (5f.7), so `index.json` is optional and only supplies group labels. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
+| `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
+| `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
 | `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
 | `logo.svg` | Brand mark (brown disc, gold ring, fork + terracotta/gold flame). |
 | `icons/icon-192.png`, `icons/icon-512.png` | PWA icons. `icon-512.png` also duplicated at repo root. |
+| `.gitignore` | Blocks `whatsapp/*.txt` and `whatsapp/*.zip`. Not tidiness — see §2a. |
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
 | `tests/run-self-tests.js` | The headless driver for `SELF_TESTS`. Opens `#selfTestOverlay` first — see the note in its header for why that is not optional. |
@@ -109,6 +120,31 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 
 ---
 
+## 2a. Never commit a WhatsApp chat export
+
+A real group export — `whatsapp/Meat_Whatsapp.txt`, 693 KB, a ZIP despite the `.txt` name — sat
+in this repository while it was **public**, from 1 to 16 Aug 2026. Hundreds of senders, their
+phone numbers, and two weeks of their conversation. None of those people had any idea, and none
+of them could have consented. It was purged with `git filter-repo` and force-pushed on 16 Aug
+2026, after making the repository private and taking a backup; the repo had zero forks, stars
+and watchers, which is the only reason the exposure was bounded.
+
+**The app never needed it committed.** The folder is *listed* at runtime over the GitHub contents
+API (5f.7), and where GitHub is unreachable chats travel through Firestore instead (5f.8). A
+committed export is pure exposure with no benefit whatsoever.
+
+Rules for a rebuild:
+
+1. `.gitignore` blocks `whatsapp/*.txt` and `whatsapp/*.zip`. Keep it, and keep the comment
+   explaining why, or someone will "tidy it up".
+2. `whatsapp/index.json` stays tracked, because it holds only group **labels** — no messages.
+3. Chat content belongs in IndexedDB (local), Firestore (cloud), or a folder served at runtime.
+   Never in git.
+4. Rewriting history does not undo publication. Anything that was public must be treated as
+   permanently disclosed and **rotated**, not merely deleted — as the Bring! secret was (§3).
+
+---
+
 ## 3. External services & secrets (all proxied through the Worker)
 
 | Service | Role | Where the secret lives |
@@ -152,13 +188,19 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
 > to watch for: the **GET file‑download handler** + **`download-store`** action (KV one‑time
 > download links), and the **`instagram-fetch`** action.
 >
-> **Current repo version: v36.** v32 rebuilt `instagram-fetch` on Meta's tokenless oEmbed; v33
+> **Current repo version: v37.** v32 rebuilt `instagram-fetch` on Meta's tokenless oEmbed; v33
 > added the keyless **Openverse** photo source and made `photo-search` report a 429 as a rate
 > limit instead of "invalid JSON". A provider that rate-limits answers with a plain-text notice,
 > so `JSON.parse` throws and the naive catch blames JSON parsing — hiding the only fact that
 > matters, which is that waiting fixes it. `photoFail(source, name, resp, raw)` handles that
-> centrally and passes `retryAfter` back. **v34–v36 are the access-control releases and the two
+> centrally and passes `retryAfter` back. **v34–v37 are the access-control releases and the three
 > outages they caused — see §4a1, which is the part a rebuild is most likely to get wrong.**
+>
+> **v37 specifically:** the Anthropic path builds an explicit `forwarded` object, copying every
+> body key **except** `appKey` and `action`, because Anthropic rejects unknown top-level fields
+> and the verbatim forward broke every AI feature. And `DEFAULT_ORIGINS` includes
+> **`https://web.getbring.com`**, because the Bring! bookmarklet calls the Worker from Bring!'s
+> own page. Neither is optional; both were outages.
 >
 > **`photo-search` returns per-image `license` and `sourceLabel`.** Openverse serves Creative
 > Commons work where CC-BY makes attribution a licence *condition*, so the app stores
@@ -274,11 +316,12 @@ forwards whatever the client sends.)
 
 ---
 
-## 4a1. The two Worker outages — read before touching the Worker
+## 4a1. The three Worker outages — read before touching the Worker
 
-Adding access control to a working Worker took the whole app down **twice**, for a combined four
-releases. Neither bug was in the security logic; both were in how it reached the browser. A
-rebuild that adds auth to a CORS endpoint will hit both unless it is told.
+Adding access control to a working Worker took the whole app down **three times**, across five
+releases. Not one of the bugs was in the security logic itself; every one was in what the
+hardening did to the request or the response on its way past. A rebuild that adds auth to a CORS
+proxy will hit all three unless it is told.
 
 **Outage 1 — the custom header that could not be sent (v31.1 → v31.8).** The app was changed to
 send the app key as an `X-App-Key` request header. A custom header makes the request
@@ -309,7 +352,29 @@ ever tested `index.html`.
 > with a deliberately **empty** `env`, because the "not configured" early returns were exactly the
 > call sites v34 left bare.
 
-**A third trap, from the same period:** the repo copy of `cloudflare-worker.js` can lag the live
+**Outage 3 — the auth field that was forwarded to the upstream API (v35 → v37).** Outage 1's fix
+moved the app key into the request **body**, which was right. But the Anthropic path then
+forwarded that body to `api.anthropic.com` **verbatim**, `appKey` and all — and Anthropic
+rejects unknown top-level fields. Every AI feature (import, translate, nutrition, Ask my
+WhatsApp groups) returned `400 … appKey: Extra inputs are not permitted`. Tony found it.
+
+The Worker's own tests could not have caught it: they asserted CORS headers, and this response
+*had* perfect CORS. It was a 400 with a correct `Access-Control-Allow-Origin`.
+
+> **The rules this bought:** (a) **a proxy must strip its own fields before forwarding.** Build
+> an explicit forwarded object — copy every key except the Worker's own (`appKey`, `action`) —
+> rather than passing the parsed body through. (b) **Test the proxy's payload, not just its
+> envelope.** `tests/worker-cors.mjs` now stubs `globalThis.fetch`, calls the AI path, and
+> asserts on what the Worker *sent upstream*: `appKey` absent, everything else intact. A test
+> suite scoped to one property (CORS) will keep passing through every bug in the other
+> properties, and its green tick reads as if the whole component were covered.
+
+**Also v37 — `web.getbring.com` was missing from the v34 origin allowlist**, so the Bring!
+bookmarklet, which runs *on Bring!'s own page*, got "Failed to fetch". When an allowlist is
+introduced, enumerate every origin that legitimately calls the Worker, including pages that are
+not yours but run your code.
+
+**A fourth trap, from the same period:** the repo copy of `cloudflare-worker.js` can lag the live
 deployment, since the Worker is edited in the Cloudflare dashboard. Once, the repo held v22 while
 production ran v29. Always start from the deployed code, apply the change to that, and bump the
 header.
@@ -516,6 +581,52 @@ far below anything that could run up a bill by accident.
 > appeared and could only fail. **A client library constructing is not evidence a service exists.**
 > Latch availability off on the first genuine failure (`markStorageUnavailable`), never on a
 > constructor.
+
+---
+
+## 4e. Two traps that pass every happy-path test
+
+Both of these shipped. Both were invisible to a full green suite. A rebuild will reproduce them
+exactly unless it is told, because in each case the *obvious* code is the broken code.
+
+**1. `\b` does not work in Hebrew, and this app is half Hebrew.** JavaScript's word boundary is
+defined against `\w`, which is ASCII-only — a Hebrew letter is a *non*-word character, so
+`/כפית\b/` never matches. The in-text recipe scorer (§11c) ended every alternation with `\b`, so
+**no Hebrew unit or verb ever matched** and the feature scored 0 on every Hebrew recipe. The
+English test passed perfectly the whole time, which is why it shipped.
+
+Use an explicit lookahead instead, and share it:
+
+```js
+var WA_WORD_END = '(?![\\w\\u0590-\\u05FF])';   // "not followed by another letter", both scripts
+```
+
+It does the job `\b` does for ASCII (`g` must not match inside `gram`) *and* the job `\b` cannot
+do at all (`מל` must not match inside `מלחמות`). **Any regex written against user text must be
+exercised with a Hebrew fixture**, not only an English one — an English-only test of a bilingual
+matcher proves nothing about the half the users actually write in.
+
+**2. `''.indexOf('')` is `0`, so a "trim the last character" loop never terminates on an empty
+string.** `waTrimUrlPunctuation` asked *"is the last character punctuation?"* with
+`'.,;:!?…'.indexOf(last) > -1`. On `''`, `slice(-1)` is `''` and `indexOf('')` is `0` — the
+answer is yes, for ever. It ran over every recipe's `source`, and a hand-typed recipe has none,
+so the harvest panel **froze the tab solid** for anyone with such a recipe: no error, no console
+output, just the browser offering to kill the page.
+
+```js
+while (s) { … }        // NOT for (;;) — an empty string must exit the loop, not satisfy it
+```
+
+Test the inputs that trim away to **nothing** (`''`, `undefined`, `null`, `'...'`, `')))'`), not
+only well-formed URLs. The general rule: any loop that shortens a string until a predicate fails
+must be checked against the empty string, because most character-class predicates accept it.
+
+> **Debugging note, because this one is different in kind.** A hang is not a failure. The suite
+> produced *no output at all* rather than a red line, and it killed the mutation harness mid-run,
+> leaving the mutation applied on disk. When a suite goes silent: determine whether the page is
+> **blocked** (an in-page `setTimeout` that never fires proves it) or has **crashed** (Playwright
+> reports the target closed), then bisect by running the suspect function's statements one at a
+> time. Always restore mutations in a `finally`, and count a timeout as *caught*.
 
 ---
 
@@ -954,6 +1065,21 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   - **Expired modal** (`showBringTokenExpired`/`openBringForTokenRefresh`) polls `bring-lists`
     until the token works again, then re-checks the real expiry and retries the queued items.
 
+- **The per-device secret must have a way in.** The bookmarklet modal refused to open without a
+  secret and pointed the user at "⚙️ Settings → Bring!" — **which did not exist**. The only input
+  for the secret lived inside the modal that the missing secret prevented from opening: a closed
+  loop with no way in, shipped, and asserted twice in a review without anyone opening the menu.
+  When an error message names a route, **open that route and confirm it exists.**
+- **Report the reason the server actually gave.** The bookmarklet read `d.message`; the Worker
+  sends `d.error` on 503/403/400 — so every failure displayed `Failed: undefined`, which says
+  nothing and cannot be acted on. `bringFailureMessage(status, rawText)` is a real module-scope
+  function that tries `error`, then `message`, then the raw body, and it is **inlined into the
+  bookmarklet via `.toString()`** so the off-origin copy and the in-app copy cannot drift; a test
+  pins that. `updateBringToken` had the identical defect independently — when a response-shape
+  bug is found, grep for every other reader of that same response.
+- **The old set-token secret `tonys-recipes-2024` is DEAD and must never be reused.** It was
+  hard-coded in a public repo and is in git history permanently (§2a).
+
 ---
 
 ## 11a. Keeping your place, and step timers
@@ -1051,6 +1177,87 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
   to collate *every* relevant answer, lead with a single `**Best answer:**`, list other viable
   options with who suggested them and their trade-offs, name disagreements explicitly, attribute
   claims, and use only the excerpts. Sources shown behind a `<details>`.
+- **Harvesting** (More → 🧺 Recipes hiding in my chats, `openWaLinks`) — **5f.9, v32.7–v32.8.**
+  A chat export keeps every shared link as plain text, and years of them are invisible. Two lists:
+
+  - **Links.** `waExtractLinks` de-duplicates on `waNormalizeUrl`: host without `www`, path
+    without a trailing slash, query **kept but sorted** with tracking parameters removed
+    (`utm_*`, `fbclid`, `gclid`, `igshid`, `ref`, `si`, …), fragment dropped. The query is *not*
+    dropped wholesale — sites put the recipe id there (`?p=123`) and collapsing it would merge
+    unrelated recipes. Each row keeps who shared it, when, and the surrounding words, because a
+    bare URL is not decidable. `waLinkIsNoise` flags only what cannot be a recipe by
+    construction (group invites, `wa.me`, maps, Zoom) — guessing which domains are "recipe
+    sites" would hide YouTube and Instagram, which is where most of them come from.
+    **`waLinksAlreadyImported` must compare on the same `waNormalizeUrl`** as de-duplication, or
+    "already have it" and "these two are the same" can disagree.
+  - **In-text recipes.** `waScoreRecipeText` — *scored*, never keyword-matched. A recipe shows
+    several signals at once (quantities with units, cooking verbs, a section heading, an oven
+    temperature, a list shape) and must say both **what to use and what to do**: without that
+    discriminator a shopping list scores as a recipe. Biased toward recall, because a human
+    reviews the list — a false positive costs a glance, a miss loses the recipe.
+
+  Both feed the importers that already exist — `openUrlImportModal(url)` and
+  `openFreehandModal(text)`. **One URL importer and one parser**, never parallel copies.
+
+  **Both must close the harvest panel before opening an importer** (`waImportOne`).
+  `#waLinksOverlay` carries an inline `z-index: 900` and `.modal-overlay` is `200`, so an
+  importer opened while the panel is still up renders *behind* it — the button appears to do
+  absolutely nothing. That shipped: "Import this" was dead for a release while "Parse this into
+  a recipe" worked, purely because the second one happened to close the panel on its way past.
+
+- **Selecting, dismissing and numbering — 5f.10.**
+  - **Import queue.** Tick rows, then "Import selected (N)". Both importers are modal and need
+    the user to review what was parsed, so a batch cannot be silent — but it can *advance
+    itself*. Every import route ends at `importParsedNow`, and every modal closes through
+    `closeM`, so the queue hooks **those two points** rather than the importers: a save advances
+    to the next, closing without saving stops the queue and hands back the panel with the
+    remainder still ticked. Selection with no batch action is decoration; "opens the first,
+    reopen the panel for the next" is barely better.
+  - **Two dismiss buttons, and the distinction is the point.** 🚫 *Not a recipe* means the
+    scorer was **wrong** — it stores the score and the signals that produced it. 🙈 *Not
+    interested* means the scorer was **right** and Tony does not want it — it deliberately
+    stores **no** signals. Dismissals are keyed by **content** (the same key as selection), so a
+    later rescan that re-finds the same message must not resurrect it; keying by row position
+    would. They persist with the saved list, and `waUndismissAll` is always offered, because a
+    permanent action taken by one tap needs a visible way back.
+  - **What "not a recipe" is honestly for.** Nothing in this app trains anything, and a rebuild
+    must not imply otherwise. The false-positive pile is surfaced in the **copied report**
+    (`waHarvestText`) with each item's score, signals and a preview, plus the rate among
+    everything surfaced — so a *person* can read it and change `WA_QTY_RE`, the weights or the
+    floor in a later release. That human-in-the-loop route is the whole justification for it
+    being a separate button; claiming anything more would be a promise the code cannot keep.
+  - **Row numbers are assigned when the list is BUILT, not on every repaint** (`waRenumber` /
+    `waRowNo`). Dismissing #3 leaves `1, 2, 4, 5` — the gap is deliberate, so nothing moves
+    under the reader's finger and it is visible that something went. Numbers close up the next
+    time the list is displayed afresh: reopening, switching tab, a finished scan, or restoring
+    hidden rows. During a **live scan** they do keep pace, because the list is genuinely growing
+    and re-sorting, and frozen numbers would not match the order on screen. A headline count
+    sits above the tabs.
+
+  The scan is **chunked**: `waHarvestAcc` is fed one message at a time and `waRunHarvest` yields
+  every `WA_SCAN_CHUNK` (250) messages, so the tab paints and the controls respond. Pause parks
+  the loop on a promise, Stop keeps everything found so far, and **closing the panel while
+  paused resumes it** rather than stranding the loop forever. Results render as they arrive
+  (throttled to `WA_RENDER_MS`, 400 ms), selection is keyed by content so it survives re-sorting,
+  and the finished list is saved to IndexedDB (`harvest:v1` in the existing `wachats` store —
+  nothing enumerates that store, so it cannot be mistaken for a chat).
+
+  **Delta refresh uses position + a fingerprint, NOT timestamps.** Tony asked for timestamps;
+  they are ambiguous in exactly the wrong way — `03/04/2026` is 3 April or 4 March depending on
+  the exporting phone's locale, there is no timezone, and two messages in the same minute are
+  indistinguishable — so comparing them would silently skip or silently re-scan. A WhatsApp
+  export is append-only, so message *N* is always message *N*: `waMarkOf` stores the count plus
+  `waChatSig` (a fingerprint of the **first** message), and `waDeltaStart` resumes at the stored
+  count only when that fingerprint still matches and the chat has only grown. A re-export that
+  starts elsewhere, or a shortened one, forces a full re-read of that chat. The last timestamp is
+  stored too, but only to *show* how current the list is.
+
+  **Chats load concurrently** (`WA_LOAD_CONCURRENCY = 4` lanes over `waLoadOneChat`) — it was a
+  sequential `await` in a loop, so the wait was the sum of every round trip while the CPU idled.
+  Results are placed back **at their own index**, never pushed as they land: the delta watermark
+  counts positions within a chat, so ordering by which request finished first would corrupt it.
+  One chat failing must not lose the others; it goes into `problems` and the rest still load.
+
 - **Automation limits, stated honestly:** the export step cannot be automated on any platform.
   The upload afterwards can — on iPhone, a Shortcut accepting a file from the Share sheet and
   PUTting it to `/repos/<owner>/<repo>/contents/whatsapp/<file>`. **That whole route dies on a
@@ -1104,8 +1311,8 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **170 checks** in 13 groups —
-**Features (44), UI (27), Cloud Sync (21), Storage (13), Import/Export (12), WhatsApp (12),
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **181 checks** in 13 groups —
+**Features (44), UI (28), WhatsApp (22), Cloud Sync (21), Storage (13), Import/Export (12),
 CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup and Performance (3 each)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`slimRecipeForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
@@ -1129,6 +1336,44 @@ CI also runs a third, cheaper check: `version.json` must agree with all four ver
 `index.html`. Run it locally too — **CI only fails after the push**, which is exactly how v32.2
 reached Tony's phone with a backwards update banner.
 
+### A run ends with a summary and a **Copy** button
+
+The report is one plain-text block carrying everything needed to diagnose a failure without
+asking a follow-up question: counts by group, every failure with its id, group, name and error,
+the app and Worker versions, user agent, viewport, theme, online flag, recipe/photo counts,
+storage backend, sign-in state, and the last errors from `recentErrors()` — a 20-entry ring
+buffer (`recordError`, plus an `unhandledrejection` hook) that exists because a toast is gone in
+three seconds and takes the only account of the failure with it. Tony pastes that block straight
+into a chat; the design goal is that no reproduction step is ever needed.
+
+### CI was red for 19 releases and nobody noticed
+
+The syntax-check step (step 5 of 9) matched the literal `<script>` written *inside* the CSP
+explanation comment near the top of `index.html` — "the whole app is one inline `<script>` with
+inline handlers" — captured the prose after it up to the next `</script>`, and reported a syntax
+error in English text. Nothing was ever wrong with the app.
+
+The damage was downstream: a failing step **skips** the ones after it, so the self-tests, the
+version guard and the Worker checks all reported "skipped" from v31.1 to v32.7. The workflow ran,
+went red for a phantom, and verified nothing — through the CSP work, the Storage migration, two
+Worker outages and the WhatsApp purge. It stayed invisible because every one of those checks was
+being run by hand anyway, so they always passed and the red cross never changed anything visible.
+
+> **Rules:** blank HTML comments before scanning for scripts (blank, don't delete — line numbers
+> stay honest); make a **zero** match a failure, since a matcher that matches nothing must never
+> report a pass; and **look at CI after pushing**. A red tick nobody reads is worse than no CI,
+> because it looks like coverage. Also verify the steps *ran* — a workflow whose later steps all
+> say "skipped" is not a passing build, and the deploy workflow is always green because it only
+> uploads.
+
+### A test must not depend on the environment it happens to run in
+
+`stor_photos_to_storage` asserted `storageReady() === false`. That is only true where Firebase is
+absent — i.e. in CI — so it passed in CI for ever and failed on Tony's real, signed-in browser.
+Restoring the wrong assertion still passes headlessly, which is the proof that CI could never
+have caught it. Assert the *invariant* (a photo's bytes never reach the backup) rather than the
+ambient state of the machine.
+
 **Write a test for every behavioural change, then MUTATE THE CODE TO PROVE THE TEST FAILS.**
 This is the single most valuable practice in the project's history and it is not optional.
 Several tests here were written, passed, and were later shown to assert nothing:
@@ -1149,9 +1394,26 @@ Several tests here were written, passed, and were later shown to assert nothing:
   a *missing* document still resolves, so the check would have reported a healthy connection
   against an entirely empty Firestore. Assert `snap.exists`, not merely that the read returned.
 
+- A Hebrew fixture for the recipe scorer had no cooking verbs, so the discriminator zeroed it
+  whether or not the thing under test worked. **A negative test proves nothing unless the
+  property under test is the only reason the result is negative.**
+- The harvest tests never covered a long shopping list, so deleting the "what to use AND what to
+  do" discriminator entirely broke nothing.
+- A de-duplication fixture had only one surviving query parameter, so the sort that makes
+  parameter order irrelevant could be deleted freely.
+- `wa_cloud_wiring` grepped `String(waLoadAllMessages)` for `'cloud'`. Splitting the per-chat
+  load out to allow parallel loading broke the test while the behaviour was untouched — the same
+  source-text anti-pattern as above, one release later. It now stubs the cloud reader, forbids
+  the network, and checks which one is actually called.
+
 When a mutation unexpectedly survives, check the mutation actually applied before concluding the
 test is weak — `perl` without `/g` hits the first match in the file, which twice was a different
-call site entirely.
+call site entirely. And **restore the file in a `finally`**: a mutation that makes the suite
+*hang* rather than fail will kill the harness on timeout and leave the mutation on disk.
+
+Two practical notes for a mutation run: never edit the file while the harness is cycling it (it
+rewrites the original after each run, so the edit silently vanishes), and treat a **timeout as
+CAUGHT** — for an infinite-loop bug, "the suite produced no result at all" *is* the detection.
 
 ---
 
@@ -1213,7 +1475,23 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 - [ ] Hand‑rolled Word export/import, JSON backup/restore (with de‑duped photos), and the
       localhost save helper all work; non‑ASCII filenames handled. **There is no Excel export** —
       it and the QR code were removed in v28.5 as unused; do not rebuild them.
-- [ ] Bring! send + all three token‑refresh paths function; expiry pill accurate.
+- [ ] Bring! send + all three token‑refresh paths function; expiry pill accurate. The per-device
+      secret can be entered from a route that **exists**, and a failure shows the server's reason
+      rather than `undefined` (§11).
+- [ ] **🧺 Recipes hiding in my chats (§11c)** finds links *and* typed-out recipes in **Hebrew**,
+      shows a live count with an ETA while it works, can be paused and stopped, keeps what a
+      stopped scan found, saves the list, and refreshes only the delta. Open it against a
+      collection containing a **hand-typed recipe with no `source`** — that combination froze the
+      whole tab in v32.7 (§4e).
+- [ ] **Every button in that panel actually does something visible.** Tap "Import this" with the
+      panel open and confirm the importer appears *in front*; tick several rows and confirm
+      "Import selected" walks the whole queue; dismiss a row and confirm it is gone after a
+      rescan and after a reload, and that the rows above it keep their numbers until the list is
+      displayed again.
+- [ ] **Dark mode is checked for every new panel.** Any block that hardcodes a light background
+      while its text uses theme variables becomes unreadable the moment the theme flips — that
+      shipped for the nutrition panel (`.nutrition-panel` hardcoded `#f5f0ea`), and the values
+      were reported unreadable on a real phone. Define the dark overrides in the same commit.
 - [ ] Scale/units/nutrition/cook‑count/favourites/recent/sort/search/select‑mode/print/share all
       behave as described.
 - [ ] Self‑Test modal runs, reports pass/fail, and runtime fixes apply.
@@ -1297,6 +1575,15 @@ next instead of stopping. Where the app genuinely cannot proceed — a device wh
 blocks GitHub — it says so plainly and points at the route that does work, rather than pretending
 or quietly doing nothing.
 
+**And it must be looked at.** Nearly every defect in this file's history was found by Tony using
+the app, not by the suite: the frozen tab, the backwards update banner, the `Failed: undefined`,
+the Settings entry that did not exist, the unreadable nutrition panel, the AI 400s, the Bring!
+"Failed to fetch", the button that opened a modal behind another modal. In each case the tests
+were green and the code read correctly. A suite is a ratchet against regression; it is not
+evidence that a feature works. **Open the thing and use it** — on a phone, in dark mode, in
+Hebrew, with a collection that has a hand-typed recipe in it.
+
 The corollary for whoever rebuilds this: when a test passes, mutate the code and check it fails.
 Roughly a third of the real defects in this project's history were found that way, and several
-were hiding behind tests that had been green for months.
+were hiding behind tests that had been green for months. When a mutation survives, the usual
+cause is not a weak assertion but a **missing** one — the property was never stated at all.

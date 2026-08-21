@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.8 -->
+<!-- Tony's Recipes Collection v32.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2610,11 +2610,38 @@ const SELF_TESTS = [
         _waScan.status=keptScan.status; _waScan.done=keptScan.done;
         _waScan.total=keptScan.total; _waScan.startedAt=keptScan.startedAt;
       }
-      // ONE parser and ONE URL importer. A second copy of either would drift.
-      if(String(waImportTextRecipe).indexOf('openFreehandModal')===-1)
-        throw new Error('in-text recipes do not go through the free-hand parser — there would be two parsers to keep in step');
-      if(String(renderWaHarvest).indexOf('openUrlImportModal')===-1)
-        throw new Error('links do not go through the existing URL importer');
+      // ONE parser and ONE URL importer, checked by CALLING them rather than by
+      // grepping their source — the previous version pinned the text of
+      // waImportTextRecipe and broke the moment both buttons were routed through
+      // a shared helper, with the behaviour unchanged.
+      //
+      // It also pins the bug Tony hit: #waLinksOverlay is z-index 900 and
+      // .modal-overlay is 200, so an importer opened while the panel is still up
+      // renders BEHIND it and the button looks completely dead. Importing must
+      // close the panel first.
+      var realUrlM=window.openUrlImportModal, realFreeM=window.openFreehandModal;
+      var gotUrl=null, gotText=null, openWhenCalled=null;
+      var ov=document.getElementById('waLinksOverlay');
+      try{
+        window.openUrlImportModal=function(u){ gotUrl=u; openWhenCalled=ov.classList.contains('open'); };
+        window.openFreehandModal=function(t){ gotText=t; openWhenCalled=ov.classList.contains('open'); };
+        _waHarvest={ links:[{key:'a.com/x',url:'https://a.com/x',domain:'a.com',count:1,shares:[]}],
+                     texts:[{text:'מיונז ביתי עם ביצה',score:70,signals:['x'],who:'Y'}],
+                     loaded:true, hideImported:true, hideNoise:true, tab:'links',
+                     selected:{}, dismissed:{}, numbering:{} };
+        ov.classList.add('open');
+        waImportLink(0);
+        if(gotUrl!=='https://a.com/x') throw new Error('"Import this" did not reach the URL importer');
+        if(openWhenCalled) throw new Error('the importer was opened while the harvest panel was still up — at z-index 900 it hides the importer completely, which is exactly the button appearing to do nothing');
+        ov.classList.add('open');
+        waImportTextRecipe(0);
+        if(!gotText||gotText.indexOf('מיונז')===-1)
+          throw new Error('in-text recipes do not reach the free-hand parser — there would be two parsers to keep in step');
+        if(openWhenCalled) throw new Error('the free-hand parser was opened behind the harvest panel');
+      } finally {
+        window.openUrlImportModal=realUrlM; window.openFreehandModal=realFreeM;
+        ov.classList.remove('open');
+      }
       // The copy output must carry both halves, or it is not the list.
       var saved=_waHarvest;
       try{
@@ -2671,6 +2698,187 @@ const SELF_TESTS = [
         if(!(partial.problems.join(' ').indexOf('boom')>-1))
           throw new Error('the failure was swallowed instead of reported');
       } finally { window.waLoadOneChat=realOne; window.waIndex=realIdx; }
+    } },
+
+  { id:'wa_dismiss', group:'WhatsApp', name:'Dismissing hides an item for good, and says why (5f.10)',
+    test: async()=>{
+      ['waDismiss','waIsDismissed','waDismissedCount','waUndismissAll','waSelKey']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var savedH=_waHarvest, savedSave=window.waHarvestSave;
+      try{
+        window.waHarvestSave=function(){ return Promise.resolve(true); };
+        _waHarvest={ links:[{key:'a.com/x',url:'https://a.com/x',domain:'a.com',count:1,shares:[{who:'Dana',date:'01/02',text:'ctx'}]}],
+                     texts:[{text:'מיונז ביתי עם ביצה ושמן וחרדל',score:77,signals:['3 quantities','4 cooking steps'],who:'Yossi',date:'02/02'},
+                            {text:'משהו ארוך שהוא בכלל לא מתכון',score:52,signals:['2 quantities','2 cooking steps'],who:'Rami',date:'03/02'}],
+                     loaded:true, hideImported:true, hideNoise:true, tab:'texts', selected:{}, dismissed:{} };
+
+        // Selecting and then dismissing must not leave it queued for import.
+        waToggleSel('text',1);
+        if(!waSelCount()) throw new Error('fixture: selection did not take');
+        waDismiss('text',1,'notrecipe');
+        if(waSelCount()!==0) throw new Error('a dismissed row was still queued for import');
+        if(waDismissedCount()!==1) throw new Error('the dismissal was not recorded');
+        if(!waIsDismissed('text',_waHarvest.texts[1])) throw new Error('the dismissed item is not recognised as dismissed');
+        if(waIsDismissed('text',_waHarvest.texts[0])) throw new Error('dismissing one item hid another');
+
+        // "Forever" means keyed by CONTENT. A later scan rebuilds the array from
+        // scratch — new object, possibly a different position — and must not
+        // resurrect it. This is the assertion that makes the promise true.
+        var afterRescan={ text:'משהו ארוך שהוא בכלל לא מתכון', score:52, signals:['2 quantities'], who:'Rami' };
+        if(!waIsDismissed('text',afterRescan))
+          throw new Error('the same message found again by a later scan came back — the dismissal is keyed by position, not content');
+
+        // The two reasons are different KINDS of fact, and only one is evidence.
+        var rec=_waHarvest.dismissed[waSelKey('text',afterRescan)];
+        if(rec.reason!=='notrecipe') throw new Error('the reason was not stored');
+        if(!rec.signals||!rec.signals.length)
+          throw new Error('"not a recipe" kept no signals — then it is not diagnostic and the second button earns nothing');
+        if(!rec.score) throw new Error('"not a recipe" kept no score');
+        waDismiss('link',0,'notinterested');
+        var link=_waHarvest.dismissed[waSelKey('link',_waHarvest.links[0])];
+        if(!link) throw new Error('a link could not be dismissed');
+        if(link.signals) throw new Error('"not interested" stored signals — it says nothing about the algorithm and must not pretend to');
+
+        // The copied report is the ONLY route by which a false positive reaches a
+        // human who can fix the scorer, so it must carry the evidence.
+        var t=waHarvestText();
+        if(t.indexOf('NOT A RECIPE')===-1) throw new Error('the report does not mention the false positives at all');
+        if(t.indexOf('quantities')===-1)
+          throw new Error('the report omits the signals, so nobody can tell why the scorer was fooled');
+        if(t.indexOf('False-positive rate')===-1) throw new Error('the report does not say how often the scorer was wrong');
+
+        // Mutation testing caught this missing: everything above proved the
+        // dismissal was RECORDED, nothing proved the row actually goes away —
+        // which is the entire user-visible promise. Assert on what is rendered.
+        _waHarvest.tab='texts';
+        var body=document.getElementById('waLinksBody');
+        renderWaHarvest();
+        if(body.innerHTML.indexOf('בכלל לא מתכון')>-1)
+          throw new Error('a dismissed recipe is still drawn in the list');
+        if(body.innerHTML.indexOf('מיונז')===-1)
+          throw new Error('dismissing one row removed an unrelated one from the list');
+        _waHarvest.tab='links';
+        renderWaHarvest();
+        if(body.innerHTML.indexOf('a.com/x')>-1) throw new Error('a dismissed link is still drawn in the list');
+        body.innerHTML='';
+
+        // ...and it must survive the app being closed, or "forever" is a lie.
+        // This exercises the REAL save/load through IndexedDB, because stubbing
+        // waHarvestSave (as the rest of this test does) cannot see the payload.
+        window.waHarvestSave=savedSave;
+        if(_idbAvailable){
+          var before=waDismissedCount();
+          await waHarvestSave();
+          var back=await waHarvestLoad();
+          if(!back) throw new Error('the harvest did not save at all');
+          if(!back.dismissed || Object.keys(back.dismissed).length!==before)
+            throw new Error('dismissals were not persisted — they would all come back on the next open');
+          await waDelete(WA_HARVEST_KEY);
+        }
+        window.waHarvestSave=function(){ return Promise.resolve(true); };
+
+        // A permanent action needs a visible way back.
+        waUndismissAll();
+        if(waDismissedCount()!==0) throw new Error('dismissals could not be undone — one mis-tap would lose a recipe silently');
+      } finally { _waHarvest=savedH; window.waHarvestSave=savedSave; }
+    } },
+
+  { id:'wa_import_queue', group:'WhatsApp', name:'Selected rows import as a queue that advances itself (5f.10)',
+    test: async()=>{
+      ['waImportSelected','waQueueNext','waQueueAdvance','waImportOne','waImportLink']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var savedH=_waHarvest, savedSave=window.waHarvestSave;
+      var realUrlM=window.openUrlImportModal, realFreeM=window.openFreehandModal, realOpen=window.openWaLinks;
+      var opened=[];
+      try{
+        window.waHarvestSave=function(){ return Promise.resolve(true); };
+        window.openWaLinks=function(){};                       // don't reopen during the test
+        window.openUrlImportModal=function(u){ opened.push('url:'+u); };
+        window.openFreehandModal=function(t){ opened.push('text:'+String(t).slice(0,6)); };
+        _waHarvest={ links:[{key:'a.com/1',url:'https://a.com/1',domain:'a.com',count:1,shares:[]},
+                            {key:'a.com/2',url:'https://a.com/2',domain:'a.com',count:1,shares:[]}],
+                     texts:[{text:'מיונז ביתי עם ביצה ושמן',score:70,signals:['x'],who:'Y'}],
+                     loaded:true, hideImported:true, hideNoise:true, tab:'links',
+                     selected:{}, dismissed:{}, numbering:{} };
+        waToggleSel('link',0); waToggleSel('link',1); waToggleSel('text',0);
+        if(waSelCount()!==3) throw new Error('fixture: expected 3 selected, got '+waSelCount());
+
+        waImportSelected();
+        if(opened.length!==1) throw new Error('the queue did not open the first importer');
+        if(_waQueue.total!==3) throw new Error('the queue lost track of how many were selected');
+
+        // A saved import advances to the next WITHOUT the user reopening anything.
+        _waQueue.imported=true; closeM('urlImportOverlay');
+        await new Promise(function(r){ setTimeout(r,500); });
+        if(opened.length!==2) throw new Error('the queue did not advance after a successful import — selection is decoration again');
+        if(_waQueue.done!==1) throw new Error('the queue did not count the import');
+
+        // Cancelling stops the queue and leaves the rest still selected, rather
+        // than marching through them.
+        _waQueue.imported=false; closeM('urlImportOverlay');
+        await new Promise(function(r){ setTimeout(r,500); });
+        if(opened.length!==2) throw new Error('cancelling one import carried on to the next anyway');
+        if(_waQueue.active) throw new Error('the queue kept running after a cancel');
+        if(waSelCount()!==1) throw new Error('the un-imported remainder was not left selected: '+waSelCount());
+      } finally {
+        _waHarvest=savedH; window.waHarvestSave=savedSave; window.openWaLinks=realOpen;
+        window.openUrlImportModal=realUrlM; window.openFreehandModal=realFreeM;
+        _waQueue.active=false; _waQueue.items=[]; _waQueue.total=0; _waQueue.done=0; _waQueue.imported=false;
+      }
+    } },
+
+  { id:'wa_numbering', group:'WhatsApp', name:'Rows are numbered, and dismissing does not reshuffle them (5f.10)',
+    test: async()=>{
+      ['waRenumber','waRowNo'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var savedH=_waHarvest, savedSave=window.waHarvestSave;
+      try{
+        window.waHarvestSave=function(){ return Promise.resolve(true); };
+        var mk=function(n){ return {text:'recipe number '+n+' with enough text to be distinct',score:90-n,signals:['x'],who:'W'}; };
+        _waHarvest={ links:[], texts:[mk(1),mk(2),mk(3),mk(4)], loaded:true,
+                     hideImported:true, hideNoise:true, tab:'texts',
+                     selected:{}, dismissed:{}, numbering:{} };
+        waRenumber();
+        if(waRowNo('text',_waHarvest.texts[0],0)!==1) throw new Error('the first row is not numbered 1');
+        if(waRowNo('text',_waHarvest.texts[3],0)!==4) throw new Error('the fourth row is not numbered 4');
+
+        // Dismissing #2 must NOT renumber: 1, 3, 4 keep their numbers, so nothing
+        // moves under the reader's finger. The gap is deliberate.
+        waDismiss('text',1,'notinterested');
+        if(waRowNo('text',_waHarvest.texts[2],0)!==3)
+          throw new Error('row 3 was renumbered the moment something above it was dismissed — the list shuffled under the reader');
+        if(waRowNo('text',_waHarvest.texts[3],0)!==4) throw new Error('row 4 was renumbered on dismissal');
+
+        // ...but displaying the list afresh closes the gap. Go through the REAL
+        // route the user takes — switching tab — not waRenumber() directly:
+        // testing the helper alone leaves every call site free to stop calling it.
+        waHarvestTab('links'); waHarvestTab('texts');
+        if(waRowNo('text',_waHarvest.texts[2],0)!==2)
+          throw new Error('the numbers did not close up when the list was displayed again');
+        if(waRowNo('text',_waHarvest.texts[3],0)!==3) throw new Error('renumbering did not run to the end');
+
+        // Reopening the panel is the OTHER way a fresh list gets displayed, and
+        // it is the one Tony actually uses. Test that call site too — a helper
+        // that only one caller invokes is a helper the others can quietly drop.
+        waDismiss('text',0,'notinterested');       // now 2 remain, numbered 2 and 3
+        _waHarvest.numbering={};
+        var ovN=document.getElementById('waLinksOverlay');
+        try{
+          await openWaLinks();
+          if(waRowNo('text',_waHarvest.texts[2],0)!==1)
+            throw new Error('reopening the panel did not renumber the list');
+        } finally { ovN.classList.remove('open'); }
+
+        // The headline count reports what is actually in the list now.
+        var body=document.getElementById('waLinksBody');
+        renderWaHarvest();
+        var html=body.innerHTML;
+        if(html.indexOf('class="wa-count"')===-1)
+          throw new Error('no headline count is shown at the top');   // exact class: "wa-count-x" must not satisfy this
+        if(!/<b>2<\/b>\s*recipes/.test(html))
+          throw new Error('the headline count does not reflect the 2 remaining recipes');
+        body.innerHTML='';
+      } finally { _waHarvest=savedH; window.waHarvestSave=savedSave; }
     } },
 
   { id:'wa_scan_progress', group:'WhatsApp', name:'Progress and ETA are honest, and pausing does not distort them (5f.9)',
@@ -5741,7 +5949,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.8';
+var APP_VERSION = 'v32.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6806,7 +7014,10 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .wa-ctls { display: flex; gap: 6px; }
 .wa-ctl { padding: 5px 11px; border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; }
 .wa-ctl:hover { border-color: var(--terracotta); color: var(--terracotta); }
-.wa-ctl.primary { background: var(--terracotta); color: #fff; border-color: var(--terracotta); margin-top: 6px; }
+.wa-ctl.primary { background: var(--terracotta); color: #fff; border-color: var(--terracotta); }
+/* Row actions wrap on a phone rather than overflowing: Import, Not a recipe and
+   Not interested do not fit on one line at 360px. */
+.wa-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .wa-ctl.primary:hover { opacity: 0.9; color: #fff; }
 .wa-fresh { padding: 8px 14px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .wa-fresh-btns { display: flex; gap: 6px; }
@@ -8231,7 +8442,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8804,7 +9015,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12593,6 +12804,14 @@ function closeM(id){
   releaseFocus();   // 5c.1b — hand focus back to whatever opened this
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
   if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
+  // The harvest import queue advances here, because this is the one funnel every
+  // importer closes through — whether it saved a recipe or the user gave up.
+  if ((id === 'urlImportOverlay' || id === 'freehandOverlay')
+      && typeof _waQueue === 'object' && _waQueue.active) {
+    var saved = _waQueue.imported;
+    _waQueue.imported = false;
+    waQueueAdvance(saved);
+  }
 }
 
 // ─── STYLED CONFIRM / PROMPT (2.1) ────────────────────────────────────────────
@@ -13359,6 +13578,7 @@ function importParsedNow(parsed, overlayId) {
     steps: parsed.steps || [],
     updatedAt: Date.now()
   }));
+  if (typeof _waQueue === 'object') _waQueue.imported = true;   // for the harvest queue
   closeM(overlayId);
   activeCat = 'All'; renderFilters(); renderGrid();
   saveData();
@@ -17330,7 +17550,7 @@ var WA_SCAN_CHUNK    = 250;            // messages between yields to the browser
 var WA_RENDER_MS     = 400;            // never repaint the list faster than this
 
 var _waHarvest = { links: [], texts: [], loaded: false, hideImported: true, hideNoise: true,
-                   tab: 'links', selected: {} };
+                   tab: 'links', selected: {}, dismissed: {}, numbering: {} };
 
 // The scan's own state. Kept apart from the results so a re-render never has to
 // reason about whether a scan is in flight.
@@ -17413,7 +17633,8 @@ async function waHarvestSave() {
   try {
     await waPut({ id: WA_HARVEST_KEY, savedAt: new Date().toISOString(),
                   links: _waHarvest.links, texts: _waHarvest.texts,
-                  marks: _waScan.marks, selected: _waHarvest.selected });
+                  marks: _waScan.marks, selected: _waHarvest.selected,
+                  dismissed: _waHarvest.dismissed });
     return true;
   } catch (e) { recordError('harvest-save', e && e.message, 'waHarvestSave'); return false; }
 }
@@ -17424,7 +17645,7 @@ async function waHarvestLoad() {
 }
 async function waHarvestForget() {
   try { await waDelete(WA_HARVEST_KEY); } catch (e) {}
-  _waHarvest.links = []; _waHarvest.texts = []; _waHarvest.selected = {};
+  _waHarvest.links = []; _waHarvest.texts = []; _waHarvest.selected = {}; _waHarvest.dismissed = {};
   _waScan.marks = {}; _waScan.status = 'idle'; _waScan.done = 0; _waScan.total = 0;
   renderWaHarvest();
   toast('Saved list cleared');
@@ -17530,6 +17751,7 @@ async function waRunHarvest(full){
           if (now - lastPaint > WA_RENDER_MS) {
             lastPaint = now;
             waHarvestSyncResults();
+            waRenumber();               // the list is still being built; keep numbers with it
             renderWaHarvest();
           }
         }
@@ -17548,6 +17770,7 @@ async function waRunHarvest(full){
     // A stopped scan is saved too: the chats it finished are genuinely done, and
     // their watermarks are what make the next run cheap.
     await waHarvestSave();
+    waRenumber();                       // the finished list is a fresh list
     renderWaHarvest();
   } catch (e) {
     _waScan.status = 'error';
@@ -17591,11 +17814,13 @@ async function openWaLinks(){
       _waHarvest.links = waLinksAlreadyImported(saved.links || [], recipes);
       _waHarvest.texts = saved.texts || [];
       _waHarvest.selected = saved.selected || {};
+      _waHarvest.dismissed = saved.dismissed || {};
       _waScan.marks = saved.marks || {};
       _waScan.savedAt = saved.savedAt || '';
       _waHarvest.loaded = true;
     }
   }
+  waRenumber();
   renderWaHarvest();
   // Nothing saved yet: this is the first run, so start rather than showing an
   // empty panel with a button the user has to find.
@@ -17603,7 +17828,7 @@ async function openWaLinks(){
 }
 window.openWaLinks = openWaLinks;
 
-function waHarvestTab(which){ _waHarvest.tab = which; renderWaHarvest(); }
+function waHarvestTab(which){ _waHarvest.tab = which; waRenumber(); renderWaHarvest(); }
 window.waHarvestTab = waHarvestTab;
 
 // Closing the panel must not strand a paused scan. A pause parks the loop on a
@@ -17635,23 +17860,176 @@ function waToggleSel(kind, i){
 }
 function waSelCount(){ return Object.keys(_waHarvest.selected).length; }
 function waClearSel(){ _waHarvest.selected = {}; renderWaHarvest(); }
-// Import them one at a time through the importers that already exist. Firing a
-// dozen modals at once would be unusable, so this opens the first and the rest
-// stay selected and waiting.
-function waImportSelected(){
-  var keys = Object.keys(_waHarvest.selected);
-  if (!keys.length) { toast('Nothing selected'); return; }
-  var k = keys[0], sel = _waHarvest.selected[k];
-  delete _waHarvest.selected[k];
-  waHarvestSave();
+// Importing one row. The panel MUST be closed first: #waLinksOverlay carries an
+// inline z-index of 900 and .modal-overlay is 200, so opening the importer
+// underneath it looked exactly like the button doing nothing. That was the bug
+// for "Import this" — the in-text button worked only because it happened to
+// close the panel on its way.
+function waImportOne(sel){
   closeM('waLinksOverlay');
   if (sel.kind === 'link') openUrlImportModal(sel.url);
   else openFreehandModal(sel.text);
-  if (keys.length > 1) toast(keys.length - 1 + ' more selected — reopen the panel for the next');
 }
+function waImportLink(i){
+  var l = _waHarvest.links[i];
+  if (!l) return;
+  waImportOne({ kind: 'link', url: l.url });
+}
+window.waImportLink = waImportLink; window.waImportOne = waImportOne;
+
+// ─── The import queue ───────────────────────────────────────────────────────
+// Selecting rows with no way to act on all of them is just decoration, and
+// "opens the first, reopen the panel for the next" is barely better. Both
+// importers are modal and need the user to review what was parsed, so a batch
+// cannot be silent — but it can be a QUEUE that advances itself.
+//
+// Every import route ends at importParsedNow(), and every modal closes through
+// closeM(), so the queue hooks those two points rather than the importers.
+// Saving advances; closing without saving stops the queue and hands back the
+// panel with the remainder still selected, so nothing is lost either way.
+var _waQueue = { items: [], total: 0, done: 0, active: false, imported: false };
+
+function waImportSelected(){
+  var keys = Object.keys(_waHarvest.selected);
+  if (!keys.length) { toast('Nothing selected'); return; }
+  _waQueue.items = keys.map(function(k){ return _waHarvest.selected[k]; });
+  _waQueue.total = keys.length;
+  _waQueue.done = 0;
+  _waQueue.active = true;
+  waQueueNext();
+}
+function waQueueNext(){
+  _waQueue.imported = false;
+  var sel = _waQueue.items.shift();
+  if (!sel) { waQueueFinish(); return; }
+  // Drop it from the selection as it goes in, so a stopped queue leaves exactly
+  // the ones still to do ticked.
+  Object.keys(_waHarvest.selected).forEach(function(k){
+    var v = _waHarvest.selected[k];
+    if (v === sel) delete _waHarvest.selected[k];
+  });
+  waImportOne(sel);
+}
+function waQueueFinish(){
+  var n = _waQueue.done, total = _waQueue.total;
+  _waQueue.active = false; _waQueue.items = []; _waQueue.total = 0; _waQueue.done = 0;
+  waHarvestSave();
+  if (n) toast('✅ Imported ' + n + ' of ' + total);
+}
+// Called from closeM once an import modal has closed. `saved` says whether a
+// recipe actually came out of it.
+function waQueueAdvance(saved){
+  if (!_waQueue.active) return;
+  if (saved) _waQueue.done++;
+  if (!saved) {
+    // Cancelled. Stop rather than marching through the rest — the user closed
+    // this one deliberately, and the remainder stay ticked in the panel.
+    var left = _waQueue.items.length;
+    waQueueFinish();
+    if (left) toast('Stopped — ' + left + ' still selected');
+    setTimeout(function(){ openWaLinks(); }, 150);
+    return;
+  }
+  if (!_waQueue.items.length) { waQueueFinish(); setTimeout(function(){ openWaLinks(); }, 150); return; }
+  toast('Imported ' + _waQueue.done + ' of ' + _waQueue.total + ' — next…');
+  setTimeout(waQueueNext, 350);
+}
+window.waImportSelected = waImportSelected; window.waQueueNext = waQueueNext;
+window.waQueueAdvance = waQueueAdvance;
 window.waToggleSel = waToggleSel; window.waSelCount = waSelCount;
 window.waClearSel = waClearSel; window.waImportSelected = waImportSelected;
 window.waSelKey = waSelKey;
+
+// ─── Dismissing ─────────────────────────────────────────────────────────────
+// "Forever" is the whole point, so a dismissal is keyed by CONTENT — the same key
+// as selection — and stored with the saved list. A full rescan re-finds the same
+// message and must not resurrect it, which ruling by row position would do.
+//
+// Two reasons, because they are different KINDS of fact and only one of them is
+// diagnostic:
+//
+//   'notrecipe'     the scorer was WRONG. Worth keeping the score and the signals
+//                   that produced it: those are what a person needs in order to
+//                   fix the heuristic.
+//   'notinterested' the scorer was RIGHT and Tony does not want it. Says nothing
+//                   about the algorithm, so no signals are kept.
+//
+// To be honest about what this does: nothing here trains anything. Storing a
+// dismissal does not make the app, or any model, cleverer on its own. The
+// 'notrecipe' pile is evidence a HUMAN reads — it is surfaced in the copied
+// report (waHarvestText) precisely so it can be handed to someone who can then
+// change WA_QTY_RE, the weights, or the floor in a later release. Anything more
+// than that would be a claim this code cannot honour.
+function waDismiss(kind, i, reason){
+  var item = (kind === 'link' ? _waHarvest.links : _waHarvest.texts)[i];
+  if (!item) return;
+  var k = waSelKey(kind, item);
+  var rec = { kind: kind, reason: reason, at: new Date().toISOString(),
+              who: item.who || (item.shares && item.shares[0] && item.shares[0].who) || '',
+              date: item.date || (item.shares && item.shares[0] && item.shares[0].date) || '' };
+  if (reason === 'notrecipe') {
+    // Only the false-positive pile carries the evidence, and only enough of it to
+    // be diagnosable — never the whole message.
+    rec.score = item.score || 0;
+    rec.signals = (item.signals || []).slice();
+    rec.preview = String(item.url || item.text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  } else {
+    rec.preview = String(item.url || item.text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+  waDismissals()[k] = rec;
+  delete _waHarvest.selected[k];          // a dismissed row must not stay queued for import
+  waHarvestSave();
+  renderWaHarvest();
+  toast(reason === 'notrecipe' ? '🚫 Marked "not a recipe"' : '🙈 Hidden');
+}
+// A harvest saved before v32.9 has no `dismissed` key, and neither does a caller
+// that builds _waHarvest by hand. Read through this rather than indexing it
+// so an older saved list opens instead of throwing on Object.keys(undefined).
+function waDismissals(){ return (_waHarvest && _waHarvest.dismissed) || (_waHarvest.dismissed = {}); }
+function waIsDismissed(kind, item){ return !!waDismissals()[waSelKey(kind, item)]; }
+function waDismissedCount(){ return Object.keys(waDismissals()).length; }
+function waUndismissAll(){
+  var n = waDismissedCount();
+  if (!n) { toast('Nothing has been dismissed'); return; }
+  _waHarvest.dismissed = {};
+  waHarvestSave();
+  waRenumber();                 // restoring IS displaying the list afresh
+  renderWaHarvest();
+  toast('Restored ' + n + ' hidden item' + (n === 1 ? '' : 's'));
+}
+// ─── Row numbers ────────────────────────────────────────────────────────────
+// Numbers are assigned when the list is BUILT, and deliberately not recomputed
+// when a row is dismissed. Dismissing #3 leaves 1, 2, 4, 5 — the gap is the
+// point: nothing under the reader's finger moves, and it is visible that
+// something was removed. The numbers close up the next time the list is
+// displayed afresh (reopening the panel, switching tab, a finished scan, or
+// restoring hidden rows), which is when the reader expects a new list anyway.
+//
+// During a live scan the list genuinely grows and re-sorts as scores arrive, so
+// numbering keeps pace there: frozen numbers would not match the order on
+// screen, which is worse than renumbering.
+function waRenumber(){
+  var n = {};
+  _waHarvest.links.filter(function(l){
+    if (waIsDismissed('link', l)) return false;
+    if (_waHarvest.hideNoise && l.noise) return false;
+    if (_waHarvest.hideImported && l.imported) return false;
+    return true;
+  }).forEach(function(l, i){ n[waSelKey('link', l)] = i + 1; });
+  _waHarvest.texts.filter(function(c){ return !waIsDismissed('text', c); })
+    .forEach(function(c, i){ n[waSelKey('text', c)] = i + 1; });
+  _waHarvest.numbering = n;
+}
+// The number to print. A row that appeared since the last renumber (a live scan,
+// or a filter just switched on) still needs one, so fall back to its position.
+function waRowNo(kind, item, fallback){
+  var v = (_waHarvest.numbering || {})[waSelKey(kind, item)];
+  return v || fallback;
+}
+window.waRenumber = waRenumber; window.waRowNo = waRowNo;
+
+window.waDismiss = waDismiss; window.waIsDismissed = waIsDismissed;
+window.waDismissedCount = waDismissedCount; window.waUndismissAll = waUndismissAll;
 
 // ─── The progress strip ─────────────────────────────────────────────────────
 function waProgressHtml(){
@@ -17719,25 +18097,43 @@ function renderWaHarvest(){
   var scanning = (_waScan.status === 'running' || _waScan.status === 'loading' || _waScan.status === 'paused');
 
   var links = _waHarvest.links.filter(function(l){
+    if (waIsDismissed('link', l)) return false;          // dismissed means gone, for good
     if (_waHarvest.hideNoise && l.noise) return false;
     if (_waHarvest.hideImported && l.imported) return false;
     return true;
   });
+  var texts = _waHarvest.texts.filter(function(c){ return !waIsDismissed('text', c); });
   var hiddenImported = _waHarvest.links.filter(function(l){ return l.imported; }).length;
   var hiddenNoise    = _waHarvest.links.filter(function(l){ return l.noise; }).length;
   var sel = waSelCount();
 
   var h = waProgressHtml() + waFreshnessHtml();
 
+  // The headline answer, before any of the controls: how much is actually here.
+  // "Found" counts what is in the list now — dismissed rows are not findings any
+  // more — and it says so plainly rather than making the reader add up two tabs.
+  h += '<div class="wa-count">'
+    + '<b>' + texts.length + '</b> recipe' + (texts.length === 1 ? '' : 's') + ' written in the chat'
+    + ' &nbsp;·&nbsp; <b>' + links.length + '</b> link' + (links.length === 1 ? '' : 's')
+    + (scanning ? ' <span class="wa-count-sub">— still reading</span>' : '')
+    + '</div>';
+
   h += '<div class="wa-tabs">'
     + '<button onclick="waHarvestTab(\'links\')" class="wa-tab' + (tab==='links'?' on':'') + '">🔗 Links (' + links.length + ')</button>'
-    + '<button onclick="waHarvestTab(\'texts\')" class="wa-tab' + (tab==='texts'?' on':'') + '">📝 Written in the chat (' + _waHarvest.texts.length + ')</button>'
+    + '<button onclick="waHarvestTab(\'texts\')" class="wa-tab' + (tab==='texts'?' on':'') + '">📝 Written in the chat (' + texts.length + ')</button>'
     + '</div>';
 
   if (sel) {
     h += '<div class="wa-selbar">' + sel + ' selected'
-      + '<span><button onclick="waImportSelected()" class="wa-ctl primary">Import the first</button>'
+      + '<span><button onclick="waImportSelected()" class="wa-ctl primary">Import selected (' + sel + ')</button>'
       + '<button onclick="waClearSel()" class="wa-ctl">Clear</button></span></div>';
+  }
+  // Dismissals are permanent by design, so the way back has to be visible —
+  // otherwise one mis-tap silently loses a recipe with no sign it ever existed.
+  var dis = waDismissedCount();
+  if (dis) {
+    h += '<div class="wa-fresh">' + dis + ' hidden by you'
+      + '<span class="wa-fresh-btns"><button onclick="waUndismissAll()" class="wa-ctl">Show them again</button></span></div>';
   }
 
   if (tab === 'links') {
@@ -17750,10 +18146,12 @@ function renderWaHarvest(){
     if (!links.length) {
       h += '<div class="wa-empty">' + (scanning ? 'Nothing yet — still reading…' : 'No links left after filtering.') + '</div>';
     }
-    links.forEach(function(l, i){
+    links.forEach(function(l, n){
+      var i = _waHarvest.links.indexOf(l);
       var ctx = l.shares[0] || {};
       var on = !!_waHarvest.selected[waSelKey('link', l)];
       h += '<div class="wa-row' + (on ? ' picked' : '') + '">'
+        + '<span class="wa-no">' + waRowNo('link', l, n + 1) + '.</span>'
         + '<label class="wa-pick"><input type="checkbox" ' + (on ? 'checked' : '')
         + ' onchange="waToggleSel(\'link\',' + i + ')"></label>'
         + '<div class="wa-rowmain">'
@@ -17766,18 +18164,25 @@ function renderWaHarvest(){
         + (l.imported ? ' · <span style="color:var(--green);">already saved as ' + escH(l.importedAs || 'a recipe') + '</span>' : '')
         + '</div>'
         + (ctx.text ? '<div dir="auto" class="wa-ctx">' + escH(ctx.text) + '</div>' : '')
-        + (l.imported ? '' : '<button onclick="openUrlImportModal(' + escA(JSON.stringify(l.url)) + ')" class="wa-ctl primary">Import this</button>')
-        + '</div></div>';
+        + '<div class="wa-acts">'
+        + (l.imported ? '' : '<button onclick="waImportLink(' + i + ')" class="wa-ctl primary">Import this</button>')
+        + '<button onclick="waDismiss(\'link\',' + i + ',\'notrecipe\')" class="wa-ctl" title="This is not a recipe — the detection was wrong">🚫 Not a recipe</button>'
+        + '<button onclick="waDismiss(\'link\',' + i + ',\'notinterested\')" class="wa-ctl" title="A recipe, but hide it and never show it again">🙈 Not interested</button>'
+        + '</div></div></div>';
     });
   } else {
     h += '<div class="wa-filters"><span>Messages that look like a full recipe — quantities and method, not just a mention. Best guesses first.</span></div>';
-    if (!_waHarvest.texts.length) {
+    if (!texts.length) {
       h += '<div class="wa-empty">' + (scanning ? 'Nothing yet — still reading…' : 'Nothing in the chats reads as a written-out recipe.') + '</div>';
     }
-    _waHarvest.texts.forEach(function(c, i){
+    texts.forEach(function(c, n){
+      // Index into the UNFILTERED array: the handlers below look items up there,
+      // and dismissing by a filtered position would hit the wrong row.
+      var i = _waHarvest.texts.indexOf(c);
       var preview = c.text.replace(/\s+/g, ' ').trim().slice(0, 220);
       var on = !!_waHarvest.selected[waSelKey('text', c)];
       h += '<div class="wa-row' + (on ? ' picked' : '') + '">'
+        + '<span class="wa-no">' + waRowNo('text', c, n + 1) + '.</span>'
         + '<label class="wa-pick"><input type="checkbox" ' + (on ? 'checked' : '')
         + ' onchange="waToggleSel(\'text\',' + i + ')"></label>'
         + '<div class="wa-rowmain">'
@@ -17787,8 +18192,11 @@ function renderWaHarvest(){
         + (c.dupes ? ' · posted ' + c.dupes + '×' : '')
         + ' · ' + escH(c.signals.join(', ')) + '</div>'
         + '<div dir="auto" class="wa-text">' + escH(preview) + (c.text.length > 220 ? '…' : '') + '</div>'
+        + '<div class="wa-acts">'
         + '<button onclick="waImportTextRecipe(' + i + ')" class="wa-ctl primary">Parse this into a recipe</button>'
-        + '</div></div>';
+        + '<button onclick="waDismiss(\'text\',' + i + ',\'notrecipe\')" class="wa-ctl" title="This is not a recipe — the detection was wrong">🚫 Not a recipe</button>'
+        + '<button onclick="waDismiss(\'text\',' + i + ',\'notinterested\')" class="wa-ctl" title="A recipe, but hide it and never show it again">🙈 Not interested</button>'
+        + '</div></div></div>';
     });
   }
   body.innerHTML = h;
@@ -17800,8 +18208,7 @@ window.renderWaHarvest = renderWaHarvest;
 function waImportTextRecipe(i){
   var c = _waHarvest.texts[i];
   if (!c) return;
-  closeM('waLinksOverlay');
-  openFreehandModal(c.text);
+  waImportOne({ kind: 'text', text: c.text });
 }
 window.waImportTextRecipe = waImportTextRecipe;
 
@@ -17827,6 +18234,29 @@ function waHarvestText(){
       + '  [' + c.signals.join(', ') + ']');
     L.push('   ' + c.text.replace(/\s+/g,' ').trim().slice(0,300));
   });
+
+  // The false positives, with the evidence that produced them. This block is the
+  // entire reason "not a recipe" is a separate button from "not interested": it
+  // is what someone needs in order to improve the scorer by hand. Nothing here
+  // learns on its own — this is a report for a person to read.
+  var keys = Object.keys(waDismissals());
+  var wrong = keys.filter(function(k){ return waDismissals()[k].reason === 'notrecipe'; });
+  var bored = keys.length - wrong.length;
+  L.push('');
+  L.push('DISMISSED: ' + wrong.length + ' marked NOT A RECIPE, ' + bored + ' not interested');
+  if (wrong.length) {
+    var surfaced = _waHarvest.texts.length + _waHarvest.links.length + keys.length;
+    L.push('False-positive rate among everything surfaced: ' + wrong.length + '/' + surfaced);
+    L.push('These scored high enough to be shown but are not recipes. The signals are');
+    L.push('what the scorer believed; they are the handle for fixing it:');
+    wrong.forEach(function(k, i){
+      var d = waDismissals()[k];
+      L.push('  ' + (i+1) + '. score ' + (d.score || 0)
+        + ' [' + ((d.signals || []).join(', ') || 'no signals recorded') + ']'
+        + (d.who ? '  — ' + d.who : ''));
+      L.push('     ' + (d.preview || ''));
+    });
+  }
   return L.join('\n');
 }
 function copyWaHarvest(){
