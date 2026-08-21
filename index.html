@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.0 -->
+<!-- Tony's Recipes Collection v33.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2619,28 +2619,43 @@ const SELF_TESTS = [
       // .modal-overlay is 200, so an importer opened while the panel is still up
       // renders BEHIND it and the button looks completely dead. Importing must
       // close the panel first.
-      var realUrlM=window.openUrlImportModal, realFreeM=window.openFreehandModal;
-      var gotUrl=null, gotText=null, openWhenCalled=null;
+      var gotUrl=null, gotText=null;
       var ov=document.getElementById('waLinksOverlay');
+      var savedHarv=_waHarvest;
       try{
-        window.openUrlImportModal=function(u){ gotUrl=u; openWhenCalled=ov.classList.contains('open'); };
-        window.openFreehandModal=function(t){ gotText=t; openWhenCalled=ov.classList.contains('open'); };
         _waHarvest={ links:[{key:'a.com/x',url:'https://a.com/x',domain:'a.com',count:1,shares:[]}],
                      texts:[{text:'מיונז ביתי עם ביצה',score:70,signals:['x'],who:'Y'}],
                      loaded:true, hideImported:true, hideNoise:true, tab:'links',
-                     selected:{}, dismissed:{}, numbering:{} };
+                     selected:{}, dismissed:{}, numbering:{}, seen:{} };
         ov.classList.add('open');
         waImportLink(0);
+        gotUrl=document.getElementById('urlImportInput').value;
         if(gotUrl!=='https://a.com/x') throw new Error('"Import this" did not reach the URL importer');
-        if(openWhenCalled) throw new Error('the importer was opened while the harvest panel was still up — at z-index 900 it hides the importer completely, which is exactly the button appearing to do nothing');
+        // The panel STAYS open — closing it lost your place in a 969-row list on
+        // every single import — so the importer has to be raised above it. At
+        // equal z-index the importer renders behind #waLinksOverlay's 900 and the
+        // button looks completely dead, which is exactly what Tony reported.
+        if(!ov.classList.contains('open'))
+          throw new Error('importing closed the harvest panel — the list must stay open until the user closes it');
+        var zi=parseInt(document.getElementById('urlImportOverlay').style.zIndex||'0',10);
+        if(zi<=900) throw new Error('the URL importer opens behind the harvest panel (z-index '+zi+' vs 900)');
+        closeM('urlImportOverlay');
+        if(document.getElementById('urlImportOverlay').style.zIndex!=='')
+          throw new Error('the raised z-index was not cleared, so the next plain open inherits it');
+
         ov.classList.add('open');
         waImportTextRecipe(0);
+        gotText=document.getElementById('freehandText').value;
         if(!gotText||gotText.indexOf('מיונז')===-1)
           throw new Error('in-text recipes do not reach the free-hand parser — there would be two parsers to keep in step');
-        if(openWhenCalled) throw new Error('the free-hand parser was opened behind the harvest panel');
+        if(!ov.classList.contains('open')) throw new Error('parsing an in-text recipe closed the harvest panel');
+        if(parseInt(document.getElementById('freehandOverlay').style.zIndex||'0',10)<=900)
+          throw new Error('the free-hand parser opens behind the harvest panel');
+        closeM('freehandOverlay');
       } finally {
-        window.openUrlImportModal=realUrlM; window.openFreehandModal=realFreeM;
+        _waHarvest=savedHarv;
         ov.classList.remove('open');
+        closeM('urlImportOverlay'); closeM('freehandOverlay');
       }
       // The copy output must carry both halves, or it is not the list.
       var saved=_waHarvest;
@@ -2954,6 +2969,17 @@ const SELF_TESTS = [
         if(!_waQueue.active) throw new Error('the queue stopped after one item was skipped');
         if(_waQueue.skipped!==1) throw new Error('the skip was not counted');
 
+        // ...and the still-open panel must REDRAW to show it. The panel no longer
+        // closes during an import, so nothing else would ever repaint it and the
+        // row would keep saying "Import this" for a recipe already imported.
+        _waHarvest.hideImported=false; _waHarvest.tab='links';
+        var bodyQ=document.getElementById('waLinksBody');
+        bodyQ.innerHTML='<!--stale-->';
+        waHarvestRefreshImported();
+        if(bodyQ.innerHTML.indexOf('stale')>-1)
+          throw new Error('the panel was never redrawn after an import, so it still shows the old state');
+        bodyQ.innerHTML='';
+
         // A completed import must mark the row 'Imported' — checked through the
         // QUEUE, not by calling waMarkImported directly. Testing the helper alone
         // left every call site free to stop calling it, which is exactly what
@@ -3028,6 +3054,35 @@ const SELF_TESTS = [
           if(waRowNo('text',_waHarvest.texts[2],0)!==1)
             throw new Error('reopening the panel did not renumber the list');
         } finally { ovN.classList.remove('open'); }
+
+        // Refreshing after an import must NOT renumber either — same rule as
+        // dismissing. An import removes a row from view (it becomes "already
+        // saved"), and closing the gap at that moment shuffles every row below it
+        // under the reader's finger, mid-list, without them asking.
+        var savedLinks=_waHarvest.links, savedTab=_waHarvest.tab, savedHide=_waHarvest.hideImported;
+        try{
+          _waHarvest.links=[{key:'x.com/1',url:'https://x.com/1',domain:'x.com',count:1,shares:[]},
+                            {key:'x.com/2',url:'https://x.com/2',domain:'x.com',count:1,shares:[]},
+                            {key:'x.com/3',url:'https://x.com/3',domain:'x.com',count:1,shares:[]}];
+          _waHarvest.tab='links'; _waHarvest.hideImported=true;
+          waRenumber();
+          if(waRowNo('link',_waHarvest.links[2],0)!==3) throw new Error('fixture: third link is not numbered 3');
+          _waHarvest.links[1].imported=true;            // as an import would
+          waHarvestRefreshImported();
+          if(waRowNo('link',_waHarvest.links[2],0)!==3)
+            throw new Error('importing a row renumbered the ones below it — the list shuffled mid-read');
+        } finally {
+          _waHarvest.links=savedLinks; _waHarvest.tab=savedTab; _waHarvest.hideImported=savedHide;
+          document.getElementById('waLinksBody').innerHTML='';
+        }
+
+        // NOTE: there is deliberately no assertion here that a repaint keeps the
+        // scroll position. One was written, and mutation testing showed it passed
+        // with the code removed — Chromium preserves scrollTop across a single
+        // innerHTML assignment on its own, so nothing this suite can run will
+        // ever fail. A test that cannot fail is worse than none: it reads as
+        // coverage. The line stays in renderWaHarvest for WebKit, unverified,
+        // and says so.
 
         // The headline count reports what is actually in the list now.
         var body=document.getElementById('waLinksBody');
@@ -6109,7 +6164,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.0';
+var APP_VERSION = 'v33.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8624,7 +8679,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9197,7 +9252,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12996,7 +13051,11 @@ function closeM(id){
     } else if (saved && typeof _waLastImportAttempt !== 'undefined' && _waLastImportAttempt) {
       waMarkImported(_waLastImportAttempt);      // a single import, not a batch
       _waLastImportAttempt = null;
+      if (typeof waHarvestRefreshImported === 'function') waHarvestRefreshImported();
     }
+    // Drop the raised z-index, or a later un-stacked open inherits it.
+    var ovz = document.getElementById(id);
+    if (ovz) ovz.style.zIndex = '';
   }
 }
 
@@ -13426,6 +13485,9 @@ ${text}`;
 function openUrlImportModal(prefillUrl) {
   document.getElementById('urlImportInput').value = prefillUrl || '';
   document.getElementById('urlImportResult').innerHTML = '';
+  // Cleared on every open, like openFreehandModal does: a raised z-index left
+  // over from a stacked open would otherwise stick for good.
+  document.getElementById('urlImportOverlay').style.zIndex = '';
   document.getElementById('urlImportOverlay').classList.add('open');
 }
 
@@ -18165,17 +18227,28 @@ function waToggleSel(kind, i){
 }
 function waSelCount(){ return Object.keys(_waHarvest.selected).length; }
 function waClearSel(){ _waHarvest.selected = {}; renderWaHarvest(); }
-// Importing one row. The panel MUST be closed first: #waLinksOverlay carries an
-// inline z-index of 900 and .modal-overlay is 200, so opening the importer
-// underneath it looked exactly like the button doing nothing. That was the bug
-// for "Import this" — the in-text button worked only because it happened to
-// close the panel on its way.
+// Importing one row. #waLinksOverlay carries an inline z-index of 900 and
+// .modal-overlay is 200, so an importer opened while the panel is up renders
+// BEHIND it — that was "Import this does nothing".
+//
+// v33.1 fixes it the right way round. The first fix closed the panel, which
+// worked but threw away your place in a 969-row list on every single import, and
+// meant reopening the panel after each one. Now the panel STAYS and the importer
+// is raised above it — the same pattern openFreehandForForm already uses to sit
+// above the edit form.
+var WA_IMPORT_Z = '1200';        // above #waLinksOverlay's 900
+function waRaiseOverImportPanel(id){
+  var panel = document.getElementById('waLinksOverlay');
+  var ov = document.getElementById(id);
+  if (!ov) return;
+  ov.style.zIndex = (panel && panel.classList.contains('open')) ? WA_IMPORT_Z : '';
+}
 function waImportOne(sel){
   _waLastImportAttempt = sel;      // marked 'imported' if a recipe actually lands
-  closeM('waLinksOverlay');
-  if (sel.kind === 'link') openUrlImportModal(sel.url);
-  else openFreehandModal(sel.text);
+  if (sel.kind === 'link') { openUrlImportModal(sel.url); waRaiseOverImportPanel('urlImportOverlay'); }
+  else { openFreehandModal(sel.text); waRaiseOverImportPanel('freehandOverlay'); }
 }
+window.waRaiseOverImportPanel = waRaiseOverImportPanel;
 function waImportLink(i){
   var l = _waHarvest.links[i];
   if (!l) return;
@@ -18249,8 +18322,18 @@ function waQueueAbort(){
   var left = _waQueue.items.length;
   waQueueFinish();
   toast(left ? 'Stopped — ' + left + ' still selected' : 'Stopped');
-  setTimeout(function(){ openWaLinks(); }, 150);
+  waHarvestRefreshImported();
 }
+// After an import the collection has changed, so "already saved as …" and the
+// Imported badge have to be recomputed. Deliberately NOT waRenumber(): the list
+// is not being displayed afresh, and renumbering here would shuffle rows under
+// the reader exactly as dismissing used to.
+function waHarvestRefreshImported(){
+  if (!_waHarvest.links.length && !_waHarvest.texts.length) return;
+  waLinksAlreadyImported(_waHarvest.links, recipes);
+  renderWaHarvest();
+}
+window.waHarvestRefreshImported = waHarvestRefreshImported;
 window.waQueueAbort = waQueueAbort; window.waQueueChip = waQueueChip;
 // Called from closeM once an import modal has closed. `saved` says whether a
 // recipe actually came out of it.
@@ -18263,7 +18346,7 @@ function waQueueAdvance(saved){
   waQueueChip();
   if (!_waQueue.items.length) {
     waQueueFinish();
-    setTimeout(function(){ openWaLinks(); }, 150);
+    waHarvestRefreshImported();
     return;
   }
   // Closing one importer SKIPS that item and moves on. It used to abort the whole
@@ -18466,6 +18549,13 @@ function waFreshnessHtml(){
 function renderWaHarvest(){
   var body = document.getElementById('waLinksBody');
   if (!body) return;
+  // Belt and braces, and honestly labelled as such: MEASURED in Chromium, a single
+  // `innerHTML =` assignment PRESERVES scrollTop by itself, so this line changes
+  // nothing there and no test can make it fail. It is kept because the panel is
+  // used mostly on an iPhone, WebKit is not covered by this suite, and one cheap
+  // assignment is a fair price for not dumping the reader at row 1 of 969 if it
+  // behaves differently. Do not claim it is tested — it is not.
+  var keepScroll = body.scrollTop;
   var tab  = _waHarvest.tab || 'links';
   var scanning = (_waScan.status === 'running' || _waScan.status === 'loading' || _waScan.status === 'paused');
 
@@ -18582,6 +18672,7 @@ function renderWaHarvest(){
     });
   }
   body.innerHTML = h;
+  if (keepScroll) body.scrollTop = keepScroll;
 }
 window.renderWaHarvest = renderWaHarvest;
 
