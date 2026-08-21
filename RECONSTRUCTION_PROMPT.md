@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v32.9` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v33.0` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v32.9"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v33.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1206,7 +1206,16 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
   a recipe" worked, purely because the second one happened to close the panel on its way past.
 
 - **Selecting, dismissing and numbering — 5f.10.**
-  - **Import queue.** Tick rows, then "Import selected (N)". Both importers are modal and need
+  - **Import queue.** Tick rows, then "Import selected (N)". **Closing one importer
+    SKIPS that item and moves on — it must not abort the batch.** It did, and a
+    single "Could not fetch this page", closed by the user exactly as anyone would,
+    silently ended the run after one import: the whole feature read as "Import
+    selected only imports one". Two other paths had the same effect and are just as
+    easy to miss — `confirmImportChecked`'s duplicate-**replace** branch saves a
+    recipe and closes the overlay without telling the queue it succeeded, so a
+    replace looked identical to a cancel. Since cancelling no longer stops
+    anything, a fixed chip shows "Importing 3 of 7 — Stop" while a batch runs: a
+    batch you cannot see and cannot stop is worse than no batch. Both importers are modal and need
     the user to review what was parsed, so a batch cannot be silent — but it can *advance
     itself*. Every import route ends at `importParsedNow`, and every modal closes through
     `closeM`, so the queue hooks **those two points** rather than the importers: a save advances
@@ -1226,6 +1235,30 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
     everything surfaced — so a *person* can read it and change `WA_QTY_RE`, the weights or the
     floor in a later release. That human-in-the-loop route is the whole justification for it
     being a separate button; claiming anything more would be a promise the code cannot keep.
+  - **Link noise is a NEGATIVE classifier** (`waClassifyLink`, v33.0). The first
+    version flagged only invites and maps, on the principle that guessing which
+    domains are "recipe sites" would hide the YouTube and Instagram links Tony
+    actually uses. That principle is right, but a real chat produced **969 links**
+    whose top was entirely workshop sign-ups, AliExpress gadgets, bank notices and
+    Waze pins — he dismissed 62 by hand before asking for this. Being unopinionated
+    made the feature unusable, which is its own kind of wrong.
+    So it never decides what IS a recipe, only what provably is not, by category:
+    booking platforms, shops (marketplaces + the specific shops the chat links to),
+    invites, maps, banking/government/insurance, technical reference, the app's own
+    URLs, profile *roots* as opposed to posts, and promotional message text
+    (`הרשמה`, `סדנה`, `מקומות אחרונים`, `מבצע`, `₪`, "I just found this on
+    AliExpress"). Two safeguards make it safe: **nothing is deleted** — noise is a
+    flag the UI hides behind a labelled checkbox — and **any recipe signal in the
+    URL or the surrounding message rescues a link from every rule**, because a
+    false negative loses a recipe while a false positive costs one tick.
+    Beware generic path rules: `/item/` looked like a shop path and was hiding
+    every `food.walla.co.il/item/…` recipe. The shops that use `/item/` are named
+    by domain anyway. Test against real rows, not invented ones.
+  - **"Viewed" and "Imported"** (`waSeenState`). 969 links take several sittings, so
+    an eye per row marks how far you got — grey, then green. `imported` outranks
+    `viewed`, and is set **only by the importer**, never by the eye: the app must
+    not claim an import that never happened, and tapping the eye must not downgrade
+    a real one.
   - **Row numbers are assigned when the list is BUILT, not on every repaint** (`waRenumber` /
     `waRowNo`). Dismissing #3 leaves `1, 2, 4, 5` — the gap is deliberate, so nothing moves
     under the reader's finger and it is visible that something went. Numbers close up the next
@@ -1311,7 +1344,7 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **181 checks** in 13 groups —
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **184 checks** in 13 groups —
 **Features (44), UI (28), WhatsApp (22), Cloud Sync (21), Storage (13), Import/Export (12),
 CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup and Performance (3 each)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
@@ -1483,6 +1516,10 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
       stopped scan found, saves the list, and refreshes only the delta. Open it against a
       collection containing a **hand-typed recipe with no `source`** — that combination froze the
       whole tab in v32.7 (§4e).
+- [ ] **A failed URL import offers free-hand THERE**, with the URL carried across
+      so the recipe still records its source (§10). Telling the user to close the
+      modal and find another menu, when they usually have the page open already, is
+      a dead end with extra steps.
 - [ ] **Every button in that panel actually does something visible.** Tap "Import this" with the
       panel open and confirm the importer appears *in front*; tick several rows and confirm
       "Import selected" walks the whole queue; dismiss a row and confirm it is gone after a

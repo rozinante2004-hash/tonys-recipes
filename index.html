@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v32.9 -->
+<!-- Tony's Recipes Collection v33.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2654,6 +2654,137 @@ const SELF_TESTS = [
       } finally { _waHarvest=saved; }
     } },
 
+  { id:'wa_link_classify', group:'WhatsApp', name:'Shops, sign-ups and invites are hidden; recipes are not (5f.11)',
+    test: async()=>{
+      if(typeof waClassifyLink!=='function') throw new Error('waClassifyLink not defined');
+      // Every one of these is a real row from Tony's own 969-link harvest. The
+      // first version flagged only invites and maps, so the top of his list was
+      // workshop sign-ups, AliExpress gadgets and bank notices — 62 dismissed by
+      // hand before he asked for this.
+      var NOISE=[
+        ['https://did.li/zO4rl','נשארו מקומות אחרונים לסדנאות גריל, והרשמה בקישור הזה'],
+        ['https://tidycal.com/drormamalia/grillworkshop',''],
+        ['https://popup.fm/dror-mamalia?event_id=deTVLPQR5IRrZyCMxXXC','לא לשכוח להירשם לשידור החי'],
+        ['https://meatbalcony.co.il/product/%d7%a1%d7%93%d7%a0%d7%aa/','הזדמנות אחרונה להירשם'],
+        ['https://a.aliexpress.com/_c417uxSl','I just found this on AliExpress: ₪6.41 | Meat Shredder Claws'],
+        ['https://a.co/d/gQFAUIS','מיטר פלוס ב-70 דולר'],
+        ['https://inkbird.com/products/wifi-bluetooth-meat-thermometer-int-14-bw',''],
+        ['https://ksp.co.il/item/16697-338588',''],
+        ['https://chat.whatsapp.com/LKOj6yh6dRN6Yq80w1559m?mode=gi_t',''],
+        ['https://t.me/haregakaniti','בחצי מחיר'],
+        ['https://maps.app.goo.gl/5naJpB4ttxMSPg2G8','הוד השרון'],
+        ['https://waze.com/ul/hsvc43hq9s','drive here using Waze'],
+        ['https://rozinante2004-hash.github.io/tonys-recipes',''],
+        ['https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/',''],
+        ['https://buyme.co.il/W2i8qm57ko988j','זכית בשובר BUYME בשווי 75 ₪'],
+        ['https://go.gov.il/Hodaot','ממתינה לך הודעה ברשות המסים'],
+        ['https://askubuntu.com/questions/38566/hard-drive',''],
+        ['https://chatgpt.com/share/6929c061-c664-8010-8882-b6860b369330',''],
+        ['https://www.instagram.com/the.knife.dr?igsh=NXlqbXF2OXV6Z3hw',''],
+        ['https://youtube.com/@crazebiltongandsausages','שלום חברים, שמי רז'],
+        ['https://share.temu.com/uOtE5fgjckA',''],
+        ['https://x.com/rainmaker1973/status/1631317449768329217',''],
+        ['https://docs.google.com/forms/d/e/1FAIpQLSd9/viewform','למילוי הסקר'],
+        ['https://amzn.to/4vkuaj6','ב-42 ש"ח בלבד כולל משלוח חינם'],
+        // These two are caught by the MESSAGE alone — bit.ly and an unknown shop
+        // are not on any domain list, and could be anything. Without them the
+        // promo rule was dead code that no test could see.
+        ['http://bit.ly/4j62UQP','התפנה מקום אחד בסדנת גריל גז הערב 19:00 תל מונד, לפרטים והרשמה'],
+        ['https://someshop.example/x/1','קופון בשווי 800 ₪ לרכישת גריל גז 3 מבערים, מבצע לזמן מוגבל']
+      ];
+      var KEEP=[
+        ['https://twoguysandacooler.com/biltong/','מתכון מעולה שתמיד מצליח לי'],
+        ['https://www.hashulchan.co.il/%D7%9E%D7%AA%D7%9B%D7%95%D7%A0%D7%99%D7%9D/x/',''],
+        ['https://food.walla.co.il/item/3533603?utm_source=whatsup','כתבה מוואלה! - כרוב ממולא עם בשר טחון'],
+        ['https://www.ketofocus.com/recipes/keto-carnivore-braised-short-ribs/',''],
+        ['https://mazon-izun.com/recipes/home-made-salami/',''],
+        ['https://www.goodlifetv.co.il/food/carbonara/',''],
+        ['https://youtu.be/rJDYHr6D_wY','הנה עוד וריאציה עם אוסובוקו בסו ויד'],
+        ['https://www.instagram.com/reel/DPyJb51CPHV/','לחמניית עוף'],
+        ['https://youtube.com/shorts/DssxlU_qCMU?si=iRa',''],
+        ['https://www.facebook.com/reel/642531595088907','מיונז ביצים קשות'],
+        ['https://share.google/4wf6jGt1ps21tcjFX','Source: גולאש הונגרי קלאסי | השולחן']
+      ];
+      var wrong=[];
+      NOISE.forEach(function(c){ if(!waClassifyLink(c[0],c[1]).noise) wrong.push('kept noise: '+c[0].slice(0,60)); });
+      KEEP.forEach(function(c){ if(waClassifyLink(c[0],c[1]).noise) wrong.push('hid a recipe: '+c[0].slice(0,60)); });
+      if(wrong.length) throw new Error(wrong.length+' misclassified — '+wrong.slice(0,3).join(' | '));
+
+      // The rescue rule is what makes the whole thing safe: a shop domain with
+      // recipe words around it is kept, because a false negative loses a recipe
+      // while a false positive costs one checkbox tick.
+      if(waClassifyLink('https://ksp.co.il/item/12345','מתכון מעולה, ככה מכינים').noise)
+        throw new Error('a recipe shared from a shop domain was hidden anyway — the rescue rule is not working');
+      // ...and /item/ must NOT be a blanket noise path, or Walla's recipes vanish.
+      if(waClassifyLink('https://food.walla.co.il/item/3515904','').noise)
+        throw new Error('a generic /item/ rule is hiding a recipe site');
+      // Nothing is deleted — noise is a flag the UI hides behind a checkbox.
+      if(String(renderWaHarvest).indexOf('hideNoise')===-1)
+        throw new Error('noise is not behind a filter, so classifying it would DESTROY links rather than tidy them');
+    } },
+
+  { id:'wa_seen', group:'WhatsApp', name:'Viewed and Imported are marked, and Imported is never claimed falsely (5f.11)',
+    test: async()=>{
+      ['waSeenState','waToggleViewed','waMarkImported'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var savedH=_waHarvest, savedSave=window.waHarvestSave;
+      try{
+        window.waHarvestSave=function(){ return Promise.resolve(true); };
+        _waHarvest={ links:[{key:'a.com/1',url:'https://a.com/1',domain:'a.com',count:1,shares:[]},
+                            {key:'a.com/2',url:'https://a.com/2',domain:'a.com',count:1,shares:[],imported:true,importedAs:'X'}],
+                     texts:[{text:'מיונז ביתי עם ביצה ושמן',score:70,signals:['x'],who:'Y'}],
+                     loaded:true, hideImported:false, hideNoise:true, tab:'links',
+                     selected:{}, dismissed:{}, numbering:{}, seen:{} };
+        if(waSeenState('link',_waHarvest.links[0])!=='') throw new Error('a fresh row is not blank');
+        waToggleViewed('link',0);
+        if(waSeenState('link',_waHarvest.links[0])!=='viewed') throw new Error('the eye did not mark it viewed');
+        waToggleViewed('link',0);
+        if(waSeenState('link',_waHarvest.links[0])!=='') throw new Error('the eye does not toggle back off');
+
+        // A link already in the collection reads as Imported without any tapping.
+        if(waSeenState('link',_waHarvest.links[1])!=='imported')
+          throw new Error('a link already in the collection is not shown as imported');
+
+        // "Imported" is set by the IMPORTER, never by the eye, so the app cannot
+        // claim an import that never happened — the honesty rule.
+        waMarkImported({kind:'text',text:'מיונז ביתי עם ביצה ושמן'});
+        if(waSeenState('text',_waHarvest.texts[0])!=='imported')
+          throw new Error('a completed import did not mark the row');
+        waToggleViewed('text',0);
+        if(waSeenState('text',_waHarvest.texts[0])!=='imported')
+          throw new Error('the eye downgraded a real import to "viewed"');
+
+        // It must survive a rescan: keyed by content, like every other mark.
+        if(waSeenState('text',{text:'מיונז ביתי עם ביצה ושמן'})!=='imported')
+          throw new Error('the mark is keyed by position, so a rescan would lose it');
+        renderWaHarvest();
+        var html=document.getElementById('waLinksBody').innerHTML;
+        if(html.indexOf('wa-eye')===-1) throw new Error('no eye control is rendered');
+        document.getElementById('waLinksBody').innerHTML='';
+      } finally { _waHarvest=savedH; window.waHarvestSave=savedSave; }
+    } },
+
+  { id:'wa_freehand_fallback', group:'Import/Export', name:'A failed URL import offers free-hand there and then, keeping the URL (5f.11)',
+    test: async()=>{
+      if(typeof waFreehandFromFailedUrl!=='function') throw new Error('waFreehandFromFailedUrl not defined');
+      var html=importFailureHtml('https://site.com/recipe/1',['server: The Worker refused']);
+      if(html.indexOf('waFreehandFromFailedUrl')===-1)
+        throw new Error('the failure offers no way to paste the text without starting over');
+      if(html.indexOf('site.com/recipe/1')===-1) throw new Error('the failure no longer shows the URL to open');
+      // The URL has to survive into free-hand, or the imported recipe loses its
+      // source — and "already imported" in the harvest panel matches on source.
+      var realOpen=window.openFreehandModal, got=null;
+      try{
+        window.openFreehandModal=function(t,u){ got={text:t,url:u}; };
+        waFreehandFromFailedUrl('https://site.com/recipe/1');
+        if(!got) throw new Error('it did not open the free-hand parser');
+        if(got.url!=='https://site.com/recipe/1')
+          throw new Error('the URL was not carried across, so the recipe would have no source: '+got.url);
+      } finally { window.openFreehandModal=realOpen; closeM('urlImportOverlay'); }
+      if(String(runFreehandImport).indexOf('_freehandSourceUrl')===-1)
+        throw new Error('free-hand never applies the carried URL as the recipe source');
+    } },
+
   { id:'wa_scan_load_parallel', group:'WhatsApp', name:'Chats load concurrently, in order, and report progress (5f.9)',
     test: async()=>{
       if(typeof waLoadOneChat!=='function') throw new Error('waLoadOneChat not defined');
@@ -2795,11 +2926,11 @@ const SELF_TESTS = [
         window.openWaLinks=function(){};                       // don't reopen during the test
         window.openUrlImportModal=function(u){ opened.push('url:'+u); };
         window.openFreehandModal=function(t){ opened.push('text:'+String(t).slice(0,6)); };
-        _waHarvest={ links:[{key:'a.com/1',url:'https://a.com/1',domain:'a.com',count:1,shares:[]},
-                            {key:'a.com/2',url:'https://a.com/2',domain:'a.com',count:1,shares:[]}],
+        _waHarvest={ links:[{key:waNormalizeUrl('https://a.com/1'),url:'https://a.com/1',domain:'a.com',count:1,shares:[]},
+                            {key:waNormalizeUrl('https://a.com/2'),url:'https://a.com/2',domain:'a.com',count:1,shares:[]}],
                      texts:[{text:'מיונז ביתי עם ביצה ושמן',score:70,signals:['x'],who:'Y'}],
                      loaded:true, hideImported:true, hideNoise:true, tab:'links',
-                     selected:{}, dismissed:{}, numbering:{} };
+                     selected:{}, dismissed:{}, numbering:{}, seen:{} };
         waToggleSel('link',0); waToggleSel('link',1); waToggleSel('text',0);
         if(waSelCount()!==3) throw new Error('fixture: expected 3 selected, got '+waSelCount());
 
@@ -2813,17 +2944,46 @@ const SELF_TESTS = [
         if(opened.length!==2) throw new Error('the queue did not advance after a successful import — selection is decoration again');
         if(_waQueue.done!==1) throw new Error('the queue did not count the import');
 
-        // Cancelling stops the queue and leaves the rest still selected, rather
-        // than marching through them.
+        // Closing one importer SKIPS it and moves on. It used to abort the whole
+        // batch, so a single "Could not fetch this page" — closed by the user,
+        // as anyone would — silently ended the run after one import. That is
+        // exactly what "Import selected only imports one" turned out to be.
         _waQueue.imported=false; closeM('urlImportOverlay');
-        await new Promise(function(r){ setTimeout(r,500); });
-        if(opened.length!==2) throw new Error('cancelling one import carried on to the next anyway');
-        if(_waQueue.active) throw new Error('the queue kept running after a cancel');
-        if(waSelCount()!==1) throw new Error('the un-imported remainder was not left selected: '+waSelCount());
+        await new Promise(function(r){ setTimeout(r,600); });
+        if(opened.length!==3) throw new Error('a skipped import ended the whole batch instead of moving to the next');
+        if(!_waQueue.active) throw new Error('the queue stopped after one item was skipped');
+        if(_waQueue.skipped!==1) throw new Error('the skip was not counted');
+
+        // A completed import must mark the row 'Imported' — checked through the
+        // QUEUE, not by calling waMarkImported directly. Testing the helper alone
+        // left every call site free to stop calling it, which is exactly what
+        // happened here (and twice before in this file).
+        if(waSeenState('link',_waHarvest.links[0])!=='imported')
+          throw new Error('a row imported by the batch was never marked as imported');
+
+        // Replacing a DUPLICATE is a successful import, not a cancel. This path
+        // closes the overlay from confirmImportChecked, which used to forget to
+        // say so — another way the batch ended after one.
+        if(String(confirmImportChecked).indexOf('_waQueue.imported = true')===-1)
+          throw new Error('replacing a duplicate does not tell the queue it succeeded, so a replace ends the batch');
+
+        // Stopping must still be possible, and must be a deliberate act.
+        if(typeof waQueueAbort!=='function') throw new Error('there is no way to stop a running batch');
+        var left=_waQueue.items.length;
+        waQueueAbort();
+        if(_waQueue.active) throw new Error('Stop did not stop the batch');
+        if(waSelCount()!==left) throw new Error('the un-imported remainder was not left selected: '+waSelCount()+' vs '+left);
       } finally {
+        // waQueueAbort reopens the panel on a timer, so wait for that to land
+        // before restoring — otherwise it opens AFTER this block and the suite's
+        // hygiene check fails on a stranded dialog.
+        await new Promise(function(r){ setTimeout(r,300); });
         _waHarvest=savedH; window.waHarvestSave=savedSave; window.openWaLinks=realOpen;
         window.openUrlImportModal=realUrlM; window.openFreehandModal=realFreeM;
-        _waQueue.active=false; _waQueue.items=[]; _waQueue.total=0; _waQueue.done=0; _waQueue.imported=false;
+        _waQueue.active=false; _waQueue.items=[]; _waQueue.total=0;
+        _waQueue.done=0; _waQueue.skipped=0; _waQueue.imported=false; _waQueue.current=null;
+        var ovQ=document.getElementById('waLinksOverlay'); if(ovQ) ovQ.classList.remove('open');
+        var chip=document.getElementById('waQueueChip'); if(chip) chip.remove();
       }
     } },
 
@@ -5949,7 +6109,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v32.9';
+var APP_VERSION = 'v33.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7017,7 +7177,29 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .wa-ctl.primary { background: var(--terracotta); color: #fff; border-color: var(--terracotta); }
 /* Row actions wrap on a phone rather than overflowing: Import, Not a recipe and
    Not interested do not fit on one line at 360px. */
-.wa-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.wa-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+/* The eye: grey until you mark it, then green with a soft glow so a long list
+   shows at a glance how far you got. "Imported" outranks it and is set only by a
+   real import. */
+.wa-eye { padding: 5px 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--muted);
+          border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+          font-family: 'DM Sans', 'Heebo', sans-serif; transition: color 0.15s, border-color 0.15s, box-shadow 0.15s; }
+.wa-eye:hover { color: var(--ink); border-color: var(--muted); }
+.wa-eye.is-viewed { color: var(--green); border-color: var(--green); box-shadow: 0 0 6px rgba(46,125,50,0.45); }
+.wa-eye.is-imported { color: #fff; background: var(--green); border-color: var(--green);
+                      box-shadow: 0 0 8px rgba(46,125,50,0.55); cursor: default; }
+.wa-row.seen .wa-url a, .wa-row.seen .wa-text { opacity: 0.72; }
+/* The batch importer's own chip: while a queue runs it is the only thing on
+   screen that says so, and the only way to stop it. */
+.wa-queue-chip { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 2000;
+                 display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 999px;
+                 background: var(--warm-brown); color: #fff; font-size: 13px; font-weight: 600;
+                 font-family: 'DM Sans', 'Heebo', sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,0.28); }
+.wa-queue-chip button { border: 1px solid rgba(255,255,255,0.5); background: transparent; color: #fff;
+                        border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 600;
+                        cursor: pointer; font-family: inherit; }
+.wa-queue-chip button:hover { background: rgba(255,255,255,0.15); }
+@media (prefers-reduced-motion: reduce) { .wa-eye { transition: none; } }
 .wa-ctl.primary:hover { opacity: 0.9; color: #fff; }
 .wa-fresh { padding: 8px 14px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .wa-fresh-btns { display: flex; gap: 6px; }
@@ -8442,7 +8624,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9015,7 +9197,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v32.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12806,11 +12988,15 @@ function closeM(id){
   if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
   // The harvest import queue advances here, because this is the one funnel every
   // importer closes through — whether it saved a recipe or the user gave up.
-  if ((id === 'urlImportOverlay' || id === 'freehandOverlay')
-      && typeof _waQueue === 'object' && _waQueue.active) {
-    var saved = _waQueue.imported;
-    _waQueue.imported = false;
-    waQueueAdvance(saved);
+  if (id === 'urlImportOverlay' || id === 'freehandOverlay') {
+    var saved = (typeof _waQueue === 'object') && _waQueue.imported;
+    if (typeof _waQueue === 'object') _waQueue.imported = false;
+    if (typeof _waQueue === 'object' && _waQueue.active) {
+      waQueueAdvance(saved);
+    } else if (saved && typeof _waLastImportAttempt !== 'undefined' && _waLastImportAttempt) {
+      waMarkImported(_waLastImportAttempt);      // a single import, not a batch
+      _waLastImportAttempt = null;
+    }
   }
 }
 
@@ -13101,8 +13287,9 @@ function saveTranslation(parsed) {
 // clip whose text he has since found — the recipe already exists, with its name,
 // photo and source, so parsing must fill it in rather than create a duplicate.
 var _freehandTarget = null;
-function openFreehandModal(prefillText) {
+function openFreehandModal(prefillText, sourceUrl) {
   _freehandTarget = null;
+  _freehandSourceUrl = sourceUrl || '';
   document.getElementById('freehandText').value = prefillText || '';
   document.getElementById('freehandResult').innerHTML = '';
   document.getElementById('freehandOverlay').style.zIndex = '';
@@ -13195,6 +13382,7 @@ function applyParsedToFormPreview(parsed, resultDivId) {
 }
 window.applyParsedToFormPreview = applyParsedToFormPreview;
 
+var _freehandSourceUrl = '';     // set when free-hand is reached from a failed URL import
 async function runFreehandImport() {
   const text = document.getElementById('freehandText').value.trim();
   if (!text) { toast('Please paste a recipe first'); return; }
@@ -13221,6 +13409,10 @@ ${text}`;
   try {
     const raw = await aiCall(prompt, 1500);
     const parsed = extractJSON(raw);
+    // Carry the original page through. Pasting the text of a page you had open
+    // should still produce a recipe that remembers where it came from — and the
+    // harvest panel matches "already imported" on exactly that field.
+    if (_freehandSourceUrl && !parsed.source) parsed.source = _freehandSourceUrl;
     if (_freehandTarget === 'form') applyParsedToFormPreview(parsed, 'freehandResult');
     else applyParsedRecipe(parsed, 'freehandResult', 'freehandOverlay');
   } catch(err) {
@@ -13275,10 +13467,28 @@ function importFailureHtml(url, attempts) {
     + 'Meanwhile, this always works:<br>'
     + '1. Open <a href="' + escA(safeUrl(url)) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta)">' + escH(url) + '</a><br>'
     + '2. Select all &amp; copy the text (Ctrl+A, Ctrl+C)<br>'
-    + '3. Use <strong>Import &rarr; &#9997;&#65039; Paste free-hand text</strong>'
+    + '3. Paste it straight into the box below &mdash; no need to start over.'
+    // The instructions used to end at "Import → Paste free-hand text", which
+    // means closing this modal and finding that menu, having usually already got
+    // the page open. The button does it here, and carries the URL across so the
+    // recipe still records where it came from.
+    + '<div style="margin-top:12px;">'
+    + '<button onclick="waFreehandFromFailedUrl(' + escA(JSON.stringify(url)) + ')" '
+    + 'style="padding:9px 14px;border:none;border-radius:8px;background:var(--terracotta);color:#fff;'
+    + 'font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">'
+    + '\u270D\uFE0F Paste the text instead</button></div>'
     + '</div>';
 }
 window.importFailureHtml = importFailureHtml; window.importFailureCausedByUs = importFailureCausedByUs;
+// Hand the failed URL to the free-hand parser. The URL is kept so the recipe
+// still gets a source, and so the harvest panel can tell it is now imported.
+function waFreehandFromFailedUrl(url){
+  closeM('urlImportOverlay');
+  openFreehandModal('', url);
+  var el = document.getElementById('freehandText');
+  if (el) setTimeout(function(){ el.focus(); }, 120);
+}
+window.waFreehandFromFailedUrl = waFreehandFromFailedUrl;
 
 async function runUrlImport() {
   const url = document.getElementById('urlImportInput').value.trim();
@@ -13555,6 +13765,9 @@ async function confirmImportChecked(parsed, overlayId, dup) {
     if (parsed.source) r.source = parsed.source;
     if (n.steps.length) r.isClip = false;
     r.updatedAt = Date.now();
+    // Replacing a duplicate IS a successful import as far as the harvest queue is
+    // concerned. Without this a replace read as a cancel and stopped the batch.
+    if (typeof _waQueue === 'object') _waQueue.imported = true;
     closeM(overlayId);
     activeCat = 'All'; renderFilters(); renderGrid(); saveData();
     toast('✅ Updated “' + r.name + '” — its photo and history were kept');
@@ -16678,8 +16891,91 @@ function waUrlDomain(u) {
 // domains are "recipe sites" would hide the ones Tony actually wants, and he uses
 // YouTube and Instagram as recipe sources constantly. These are only the ones that
 // cannot be a recipe by construction.
-var WA_LINK_NOISE = /^(chat\.whatsapp\.com|wa\.me|api\.whatsapp\.com|t\.me|maps\.app\.goo\.gl|goo\.gl\/maps|meet\.google\.com|zoom\.us)$/i;
-function waLinkIsNoise(u) { return WA_LINK_NOISE.test(waUrlDomain(u)); }
+// ─── Which links cannot be a recipe ─────────────────────────────────────────
+// v33.0. The first version flagged only group invites and maps, on the principle
+// that guessing which domains are "recipe sites" would hide the YouTube and
+// Instagram links Tony actually uses. That principle stands — but a real chat
+// produced 969 links, and the top of the list was entirely workshop sign-ups,
+// AliExpress gadgets, bank notices and Waze pins. Being unopinionated made the
+// feature unusable, which is its own kind of wrong.
+//
+// So this stays a NEGATIVE classifier: it never tries to decide what IS a
+// recipe, only what provably is not, by category. Nothing is deleted — noise is
+// hidden behind a checkbox that says how much it is hiding, and a recipe signal
+// in the URL or the surrounding message always rescues a link from every rule
+// below.
+var WA_NOISE_DOMAINS = new RegExp('^(' + [
+  // Invitations, messaging, meetings — a link to a conversation, not content.
+  'chat\\.whatsapp\\.com','wa\\.me','api\\.whatsapp\\.com','t\\.me','telegram\\.me',
+  'meet\\.google\\.com','zoom\\.us',
+  // Places.
+  'maps\\.app\\.goo\\.gl','maps\\.google\\.com','goo\\.gl','waze\\.com','images\\.app\\.goo\\.gl',
+  // Booking and event sign-up platforms.
+  'tidycal\\.com','popup\\.fm','my\\.schooler\\.biz','.*\\.ravpage\\.co\\.il','calendly\\.com',
+  'did\\.li','forms\\.gle',
+  // Our own app, and the plumbing under it.
+  'rozinante2004-hash\\.github\\.io','api\\.github\\.com','github\\.com',
+  'firestore\\.googleapis\\.com','.*\\.firebaseapp\\.com','.*\\.netlify\\.app','.*\\.vercel\\.app',
+  // Banking, insurance, government, health, parking, post.
+  '.*isracard.*','buyme\\.co\\.il','clalbit\\.co\\.il','.*menoramivt\\.co\\.il','migdal\\.co\\.il',
+  'ps\\.btl\\.gov\\.il','.*\\.gov\\.il','go\\.gov\\.il','my\\.gov\\.il','ecom\\.gov\\.il',
+  'l5k\\.me','postil\\.co\\.il','.*sbparking.*','mar-ltd\\.com','geffenmedical\\.co\\.il',
+  'goodbyepain\\.co\\.il','sleeplessness\\.org\\.il','metabolix\\.co\\.il','.*shekelgroup.*',
+  'amat\\.service-now\\.com','urldefense\\.com','tor4you\\.co\\.il','4u\\.isracard\\.co\\.il',
+  // Shopping. Marketplaces first, then the shops this chat actually links to.
+  '.*aliexpress\\.com','a\\.co','amzn\\.to','.*amazon\\..*','.*temu\\.com','.*ebay\\..*',
+  'ksp\\.co\\.il','zap\\.co\\.il','ivory\\.co\\.il','ace\\.co\\.il','.*iherb\\..*','wisebuy\\.co\\.il',
+  'naamanp\\.co\\.il','homequeen\\.co\\.il','shefbakelim\\.co\\.il','techmax\\.co\\.il',
+  'se-keys\\.com','teva-stock\\.com','bella-natura\\.net','alon-computers\\.co\\.il',
+  'aluf1\\.co\\.il','technoshlomo\\.co\\.il','reshit-building\\.co\\.il','sakuraknives\\.co\\.il',
+  'japanese-knives\\.co\\.il','brazilianflame\\.com','.*ikea\\.com','.*lenovo\\.com',
+  'fruugo\\.co\\.il','.*inkbird\\.com','carmeldirect\\.com','.*carnivores\\.co\\.il',
+  'agrooz\\.co\\.il','dlz\\.co\\.il','aideals\\.co\\.il','nfarm\\.co\\.il','coopercheese\\.com',
+  'ciranova\\.co\\.il','dilimshavim\\.co\\.il','.*electrogas\\.co\\.il','lightinthebox\\.com',
+  'dederoom\\.com','omega3galil\\.com','.*\\.myshopify\\.com','shop\\..*','store\\..*',
+  // Technical reference — real, useful, not food.
+  'askubuntu\\.com','.*stackexchange\\.com','stackoverflow\\.com','techcommunity\\.microsoft\\.com',
+  'omgubuntu\\.co\\.uk','windowsreport\\.com','lifehacker\\.com','opensource\\.com',
+  'igeeksblog\\.com','intercom\\.help','kmtools\\.com','enjeck\\.com','gzhls\\.at',
+  // Link aggregators and short social posts that are almost never a recipe.
+  'flip\\.it','x\\.com','twitter\\.com','t\\.co','.*linkedin\\.com','chat\\.openai\\.com',
+  'chatgpt\\.com','quora\\.com','he\\.quora\\.com'
+].join('|') + ')$', 'i');
+
+// A path that names a product or a basket. Catches the shops not listed above.
+// NOT /item/ or /items/: Walla files its recipes under /item/, and the shops that
+// use it (ksp, zap, ivory, aluf1, technoshlomo, alon-computers) are named above
+// by domain anyway. A generic path rule that swallows a recipe site is worse than
+// no rule — it was hiding food.walla.co.il/item/… until this was narrowed.
+var WA_NOISE_PATH = /(\/product\/|\/products\/|\/shop\/|\/cart|\/catalog|\/goods|\/dp\/|\/gp\/product|\/forms\/|ratestoreform|compare\.aspx|models\.aspx)/i;
+// A profile or channel ROOT, as opposed to a post: nothing to import from it.
+var WA_PROFILE_ONLY = /^https?:\/\/(www\.)?(instagram\.com\/[^\/?#]+\/?(\?|$)|youtube\.com\/@|facebook\.com\/(groups\/[^\/?#]+\/?$|[^\/?#]+\/?$))/i;
+// What a sales or sign-up message sounds like, in both languages.
+var WA_PROMO_TEXT = new RegExp([
+  'הרשמה','נרשמים','להירשם','סדנה','סדנאות','מקומות אחרונים','נשארו מקומות','לפרטים',
+  'שידור חי','מבצע','דיל','הנחה','קופון','לרכישה','במלאי','משלוח חינם','מחיר מיוחד',
+  'I just found this on','AliExpress','חצי מחיר','₪\\s*\\d','\\d+\\s*₪'
+].join('|'), 'i');
+// ...and what a recipe sounds like. Any of these rescues a link from every rule
+// above, because a false negative loses a recipe and a false positive costs a
+// checkbox tick.
+var WA_RECIPE_TEXT = /(מתכון|מצרכים|אופן ההכנה|הוראות הכנה|כפית|כפות|recipe|ingredients)/i;
+var WA_RECIPE_PATH = /(\/recipe|\/recipes|\/food\/|%D7%9E%D7%AA%D7%9B%D7%95%D7%A0|%d7%9e%d7%aa%d7%9b%d7%95%d7%a0|מתכון)/i;
+
+// Returns {noise, why}. `text` is the message the link was shared in.
+function waClassifyLink(u, text) {
+  var url = String(u || ''), t = String(text || '');
+  var dom = waUrlDomain(url);
+  var rescued = WA_RECIPE_PATH.test(url) || WA_RECIPE_TEXT.test(t);
+  if (rescued) return { noise: false, why: 'looks like a recipe' };
+  if (WA_NOISE_DOMAINS.test(dom)) return { noise: true, why: 'not a recipe site' };
+  if (WA_NOISE_PATH.test(url))    return { noise: true, why: 'a product page' };
+  if (WA_PROFILE_ONLY.test(url))  return { noise: true, why: 'a profile, not a post' };
+  if (WA_PROMO_TEXT.test(t))      return { noise: true, why: 'a sale or a sign-up' };
+  return { noise: false, why: '' };
+}
+function waLinkIsNoise(u, text) { return waClassifyLink(u, text).noise; }
+window.waClassifyLink = waClassifyLink;
 
 // ─── The accumulator ────────────────────────────────────────────────────────
 // The scan used to be one synchronous pass over every message. On a real group —
@@ -16705,8 +17001,9 @@ function waHarvestAcc(prev) {
       var key = waNormalizeUrl(url);
       if (!key) return;
       if (!byKey[key]) {
+        var cls = waClassifyLink(url, m && m.text);
         byKey[key] = { key: key, url: url, domain: waUrlDomain(url), count: 0,
-                       noise: waLinkIsNoise(url), shares: [] };
+                       noise: cls.noise, why: cls.why, shares: [] };
       }
       var e = byKey[key];
       e.count++;
@@ -16717,6 +17014,12 @@ function waHarvestAcc(prev) {
                         text: String(m.text || '').replace(WA_URL_RE, '').replace(/\s+/g, ' ').trim().slice(0, 200) });
       }
       if (url.length > e.url.length) e.url = url;   // prefer the fullest form seen
+      // A link shared twice can be flagged from one message and rescued by
+      // another ("here's the recipe" on the second share). Recipe evidence wins.
+      if (e.noise) {
+        var re = waClassifyLink(url, m && m.text);
+        if (!re.noise) { e.noise = false; e.why = re.why; }
+      }
     });
   }
 
@@ -17550,7 +17853,7 @@ var WA_SCAN_CHUNK    = 250;            // messages between yields to the browser
 var WA_RENDER_MS     = 400;            // never repaint the list faster than this
 
 var _waHarvest = { links: [], texts: [], loaded: false, hideImported: true, hideNoise: true,
-                   tab: 'links', selected: {}, dismissed: {}, numbering: {} };
+                   tab: 'links', selected: {}, dismissed: {}, numbering: {}, seen: {} };
 
 // The scan's own state. Kept apart from the results so a re-render never has to
 // reason about whether a scan is in flight.
@@ -17634,7 +17937,7 @@ async function waHarvestSave() {
     await waPut({ id: WA_HARVEST_KEY, savedAt: new Date().toISOString(),
                   links: _waHarvest.links, texts: _waHarvest.texts,
                   marks: _waScan.marks, selected: _waHarvest.selected,
-                  dismissed: _waHarvest.dismissed });
+                  dismissed: _waHarvest.dismissed, seen: _waHarvest.seen });
     return true;
   } catch (e) { recordError('harvest-save', e && e.message, 'waHarvestSave'); return false; }
 }
@@ -17645,7 +17948,8 @@ async function waHarvestLoad() {
 }
 async function waHarvestForget() {
   try { await waDelete(WA_HARVEST_KEY); } catch (e) {}
-  _waHarvest.links = []; _waHarvest.texts = []; _waHarvest.selected = {}; _waHarvest.dismissed = {};
+  _waHarvest.links = []; _waHarvest.texts = []; _waHarvest.selected = {};
+  _waHarvest.dismissed = {}; _waHarvest.seen = {};
   _waScan.marks = {}; _waScan.status = 'idle'; _waScan.done = 0; _waScan.total = 0;
   renderWaHarvest();
   toast('Saved list cleared');
@@ -17815,6 +18119,7 @@ async function openWaLinks(){
       _waHarvest.texts = saved.texts || [];
       _waHarvest.selected = saved.selected || {};
       _waHarvest.dismissed = saved.dismissed || {};
+      _waHarvest.seen = saved.seen || {};
       _waScan.marks = saved.marks || {};
       _waScan.savedAt = saved.savedAt || '';
       _waHarvest.loaded = true;
@@ -17866,6 +18171,7 @@ function waClearSel(){ _waHarvest.selected = {}; renderWaHarvest(); }
 // for "Import this" — the in-text button worked only because it happened to
 // close the panel on its way.
 function waImportOne(sel){
+  _waLastImportAttempt = sel;      // marked 'imported' if a recipe actually lands
   closeM('waLinksOverlay');
   if (sel.kind === 'link') openUrlImportModal(sel.url);
   else openFreehandModal(sel.text);
@@ -17887,7 +18193,8 @@ window.waImportLink = waImportLink; window.waImportOne = waImportOne;
 // closeM(), so the queue hooks those two points rather than the importers.
 // Saving advances; closing without saving stops the queue and hands back the
 // panel with the remainder still selected, so nothing is lost either way.
-var _waQueue = { items: [], total: 0, done: 0, active: false, imported: false };
+var _waQueue = { items: [], total: 0, done: 0, skipped: 0, active: false, imported: false, current: null };
+var _waLastImportAttempt = null;
 
 function waImportSelected(){
   var keys = Object.keys(_waHarvest.selected);
@@ -17895,7 +18202,9 @@ function waImportSelected(){
   _waQueue.items = keys.map(function(k){ return _waHarvest.selected[k]; });
   _waQueue.total = keys.length;
   _waQueue.done = 0;
+  _waQueue.skipped = 0;
   _waQueue.active = true;
+  waQueueChip();
   waQueueNext();
 }
 function waQueueNext(){
@@ -17908,30 +18217,61 @@ function waQueueNext(){
     var v = _waHarvest.selected[k];
     if (v === sel) delete _waHarvest.selected[k];
   });
+  _waQueue.current = sel;
   waImportOne(sel);
 }
 function waQueueFinish(){
-  var n = _waQueue.done, total = _waQueue.total;
-  _waQueue.active = false; _waQueue.items = []; _waQueue.total = 0; _waQueue.done = 0;
+  var n = _waQueue.done, skipped = _waQueue.skipped, total = _waQueue.total;
+  _waQueue.active = false; _waQueue.items = []; _waQueue.total = 0;
+  _waQueue.done = 0; _waQueue.skipped = 0;
+  waQueueChip();
   waHarvestSave();
-  if (n) toast('✅ Imported ' + n + ' of ' + total);
+  if (n || skipped) toast('✅ Imported ' + n + ' of ' + total
+    + (skipped ? ' · ' + skipped + ' skipped' : ''));
 }
+// A batch that hides itself is a batch you cannot get out of. While one is
+// running a chip sits above everything with the count and a way to stop.
+function waQueueChip(){
+  var el = document.getElementById('waQueueChip');
+  if (!_waQueue.active) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'waQueueChip';
+    el.className = 'wa-queue-chip';
+    document.body.appendChild(el);
+  }
+  var at = _waQueue.done + _waQueue.skipped;
+  el.innerHTML = '<span>Importing ' + (at + 1) + ' of ' + _waQueue.total + '</span>'
+    + '<button onclick="waQueueAbort()">Stop</button>';
+}
+function waQueueAbort(){
+  if (!_waQueue.active) return;
+  var left = _waQueue.items.length;
+  waQueueFinish();
+  toast(left ? 'Stopped — ' + left + ' still selected' : 'Stopped');
+  setTimeout(function(){ openWaLinks(); }, 150);
+}
+window.waQueueAbort = waQueueAbort; window.waQueueChip = waQueueChip;
 // Called from closeM once an import modal has closed. `saved` says whether a
 // recipe actually came out of it.
 function waQueueAdvance(saved){
   if (!_waQueue.active) return;
   if (saved) _waQueue.done++;
-  if (!saved) {
-    // Cancelled. Stop rather than marching through the rest — the user closed
-    // this one deliberately, and the remainder stay ticked in the panel.
-    var left = _waQueue.items.length;
+  if (saved) waMarkImported(_waQueue.current);
+  _waQueue.current = null;
+  if (!saved) _waQueue.skipped++;
+  waQueueChip();
+  if (!_waQueue.items.length) {
     waQueueFinish();
-    if (left) toast('Stopped — ' + left + ' still selected');
     setTimeout(function(){ openWaLinks(); }, 150);
     return;
   }
-  if (!_waQueue.items.length) { waQueueFinish(); setTimeout(function(){ openWaLinks(); }, 150); return; }
-  toast('Imported ' + _waQueue.done + ' of ' + _waQueue.total + ' — next…');
+  // Closing one importer SKIPS that item and moves on. It used to abort the whole
+  // batch, which meant a single "Could not fetch this page" — closed by the user,
+  // exactly as you would — silently ended the run after one import. Stopping is
+  // still possible, but it has to be asked for: see the Stop chip.
+  toast((saved ? 'Imported ' : 'Skipped ') + (_waQueue.done + _waQueue.skipped)
+        + ' of ' + _waQueue.total + ' — next…');
   setTimeout(waQueueNext, 350);
 }
 window.waImportSelected = waImportSelected; window.waQueueNext = waQueueNext;
@@ -18027,6 +18367,39 @@ function waRowNo(kind, item, fallback){
   return v || fallback;
 }
 window.waRenumber = waRenumber; window.waRowNo = waRowNo;
+
+// ─── Viewed / Imported ──────────────────────────────────────────────────────
+// 969 links take several sittings. Without a mark for "I have looked at this"
+// the only way to keep your place is to remember it. Keyed by content like every
+// other mark here, so a rescan does not wipe it.
+//   'viewed'   — you tapped the eye. Grey → green.
+//   'imported' — a recipe actually came out of it. Outranks 'viewed', and is set
+//                by the importer, never by the eye, so it cannot be claimed for
+//                something that was never imported.
+function waSeen(){ return (_waHarvest && _waHarvest.seen) || (_waHarvest.seen = {}); }
+function waSeenState(kind, item){
+  if (kind === 'link' && item && item.imported) return 'imported';   // already in the collection
+  return waSeen()[waSelKey(kind, item)] || '';
+}
+function waToggleViewed(kind, i){
+  var item = (kind === 'link' ? _waHarvest.links : _waHarvest.texts)[i];
+  if (!item) return;
+  var k = waSelKey(kind, item);
+  if (waSeen()[k] === 'imported') return;        // never downgrade a real import
+  if (waSeen()[k] === 'viewed') delete waSeen()[k];
+  else waSeen()[k] = 'viewed';
+  waHarvestSave();
+  renderWaHarvest();
+}
+function waMarkImported(sel){
+  if (!sel) return;
+  var k = sel.kind === 'link' ? 'l:' + waNormalizeUrl(sel.url)
+        : 't:' + String(sel.text || '').replace(/\s+/g,' ').trim().slice(0,160).toLowerCase();
+  waSeen()[k] = 'imported';
+  waHarvestSave();
+}
+window.waSeenState = waSeenState; window.waToggleViewed = waToggleViewed;
+window.waMarkImported = waMarkImported; window.waSeen = waSeen;
 
 window.waDismiss = waDismiss; window.waIsDismissed = waIsDismissed;
 window.waDismissedCount = waDismissedCount; window.waUndismissAll = waUndismissAll;
@@ -18141,7 +18514,8 @@ function renderWaHarvest(){
       + '<label><input type="checkbox" ' + (_waHarvest.hideImported ? 'checked' : '')
       + ' onchange="_waHarvest.hideImported=this.checked;renderWaHarvest()"> hide the ' + hiddenImported + ' already imported</label>'
       + '<label><input type="checkbox" ' + (_waHarvest.hideNoise ? 'checked' : '')
-      + ' onchange="_waHarvest.hideNoise=this.checked;renderWaHarvest()"> hide ' + hiddenNoise + ' group invites/maps</label>'
+      + ' onchange="_waHarvest.hideNoise=this.checked;waRenumber();renderWaHarvest()"> hide ' + hiddenNoise
+      + ' shops, sign-ups, invites &amp; maps</label>'
       + '</div>';
     if (!links.length) {
       h += '<div class="wa-empty">' + (scanning ? 'Nothing yet — still reading…' : 'No links left after filtering.') + '</div>';
@@ -18150,7 +18524,8 @@ function renderWaHarvest(){
       var i = _waHarvest.links.indexOf(l);
       var ctx = l.shares[0] || {};
       var on = !!_waHarvest.selected[waSelKey('link', l)];
-      h += '<div class="wa-row' + (on ? ' picked' : '') + '">'
+      var st = waSeenState('link', l);
+      h += '<div class="wa-row' + (on ? ' picked' : '') + (st ? ' seen' : '') + '">'
         + '<span class="wa-no">' + waRowNo('link', l, n + 1) + '.</span>'
         + '<label class="wa-pick"><input type="checkbox" ' + (on ? 'checked' : '')
         + ' onchange="waToggleSel(\'link\',' + i + ')"></label>'
@@ -18165,6 +18540,9 @@ function renderWaHarvest(){
         + '</div>'
         + (ctx.text ? '<div dir="auto" class="wa-ctx">' + escH(ctx.text) + '</div>' : '')
         + '<div class="wa-acts">'
+        + '<button class="wa-eye ' + (st === 'imported' ? 'is-imported' : (st === 'viewed' ? 'is-viewed' : ''))
+        + '" onclick="waToggleViewed(\'link\',' + i + ')" title="' + (st === 'imported' ? 'Imported' : (st === 'viewed' ? 'You marked this viewed' : 'Mark as viewed')) + '">'
+        + (st === 'imported' ? '\u2714\uFE0E Imported' : (st === 'viewed' ? '\u25C9 Viewed' : '\u25CE Viewed')) + '</button>'
         + (l.imported ? '' : '<button onclick="waImportLink(' + i + ')" class="wa-ctl primary">Import this</button>')
         + '<button onclick="waDismiss(\'link\',' + i + ',\'notrecipe\')" class="wa-ctl" title="This is not a recipe — the detection was wrong">🚫 Not a recipe</button>'
         + '<button onclick="waDismiss(\'link\',' + i + ',\'notinterested\')" class="wa-ctl" title="A recipe, but hide it and never show it again">🙈 Not interested</button>'
@@ -18181,7 +18559,8 @@ function renderWaHarvest(){
       var i = _waHarvest.texts.indexOf(c);
       var preview = c.text.replace(/\s+/g, ' ').trim().slice(0, 220);
       var on = !!_waHarvest.selected[waSelKey('text', c)];
-      h += '<div class="wa-row' + (on ? ' picked' : '') + '">'
+      var st = waSeenState('text', c);
+      h += '<div class="wa-row' + (on ? ' picked' : '') + (st ? ' seen' : '') + '">'
         + '<span class="wa-no">' + waRowNo('text', c, n + 1) + '.</span>'
         + '<label class="wa-pick"><input type="checkbox" ' + (on ? 'checked' : '')
         + ' onchange="waToggleSel(\'text\',' + i + ')"></label>'
@@ -18193,6 +18572,9 @@ function renderWaHarvest(){
         + ' · ' + escH(c.signals.join(', ')) + '</div>'
         + '<div dir="auto" class="wa-text">' + escH(preview) + (c.text.length > 220 ? '…' : '') + '</div>'
         + '<div class="wa-acts">'
+        + '<button class="wa-eye ' + (st === 'imported' ? 'is-imported' : (st === 'viewed' ? 'is-viewed' : ''))
+        + '" onclick="waToggleViewed(\'text\',' + i + ')" title="' + (st === 'imported' ? 'Imported' : (st === 'viewed' ? 'You marked this viewed' : 'Mark as viewed')) + '">'
+        + (st === 'imported' ? '\u2714\uFE0E Imported' : (st === 'viewed' ? '\u25C9 Viewed' : '\u25CE Viewed')) + '</button>'
         + '<button onclick="waImportTextRecipe(' + i + ')" class="wa-ctl primary">Parse this into a recipe</button>'
         + '<button onclick="waDismiss(\'text\',' + i + ',\'notrecipe\')" class="wa-ctl" title="This is not a recipe — the detection was wrong">🚫 Not a recipe</button>'
         + '<button onclick="waDismiss(\'text\',' + i + ',\'notinterested\')" class="wa-ctl" title="A recipe, but hide it and never show it again">🙈 Not interested</button>'

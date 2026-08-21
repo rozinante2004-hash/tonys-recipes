@@ -370,6 +370,22 @@ found only because a test was written first and disagreed with the code.
   never fires proves it) or has crashed (Playwright reports the target closed), then
   bisect by running the suspect function's statements one at a time. Restore mutations
   in a `finally`, and treat a timeout as CAUGHT rather than as a broken run.
+- **Test the ROUTE, not the helper.** Three separate times in one session a
+  mutation survived because the test called a helper directly (`waRenumber()`,
+  `waMarkImported()`) instead of going through the thing that calls it (switching
+  tab, finishing a queued import). Deleting the call site then broke nothing. If a
+  helper has one job and several callers, at least one test must reach it the way
+  the user does — otherwise every call site is free to quietly stop calling it.
+- **A negative test proves nothing unless the property under test is the only
+  reason the result is negative.** A "this is noise" fixture that ALSO matches a
+  domain rule cannot tell you whether the message-text rule works; a Hebrew
+  scoring fixture with no verbs is zero whether or not the unit regex fires. When
+  a mutation survives, first ask what else in the fixture was already forcing the
+  expected answer.
+- **A mutation that breaks the BUILD is not a caught mutation.** Renaming a
+  function whose name is exported on the next line throws at load, fails a dozen
+  unrelated tests, and tells you nothing about whether the behaviour is covered.
+  Gut the body instead (`if (true) return;`) and keep the signature.
 - **Do not edit a file while a mutation script is cycling it.** The harness rewrites
   the original after each run, so an edit made in between is silently reverted. Wait
   for it to finish; if an edit vanished, that is why.
