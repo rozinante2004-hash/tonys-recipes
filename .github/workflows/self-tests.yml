@@ -42,11 +42,23 @@ jobs:
 
       # A single-file app fails silently and completely on a syntax error, so
       # check the inline scripts parse before spending time on a browser.
+      #
+      # HTML comments are blanked out first. The CSP note near the top of
+      # index.html contains the words "one inline <script> with inline handlers",
+      # and this regex matched THAT, captured the prose after it up to the next
+      # </script>, and reported a syntax error in it. Because this is step 5 of 9,
+      # the failure SKIPPED the self-tests, the version guard and the Worker
+      # checks: from v31.1 to v32.7 the workflow was red and verifying nothing,
+      # while every one of those checks passed when run by hand. A green tick
+      # nobody looks at is a missing test; a red cross nobody looks at is worse.
+      # Blanking rather than deleting keeps line numbers honest, and a zero count
+      # is now a failure too — a matcher that finds nothing must not report pass.
       - name: Syntax-check the inline scripts
         run: |
           node -e "
             const fs = require('fs');
-            const html = fs.readFileSync('index.html', 'utf8');
+            const raw = fs.readFileSync('index.html', 'utf8');
+            const html = raw.replace(/<!--[\s\S]*?-->/g, c => c.replace(/[^\n]/g, ' '));
             const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
             let m, bad = 0, i = 0;
             while ((m = re.exec(html))) {
@@ -54,6 +66,7 @@ jobs:
               try { new Function(m[1]); }
               catch (e) { bad++; console.error('inline script #' + i + ': ' + e.message); }
             }
+            if (!i) { console.error('no inline scripts found at all — the matcher is broken'); process.exit(1); }
             console.log(bad ? 'FAILED' : 'all ' + i + ' inline scripts parse');
             process.exit(bad ? 1 : 0);
           "
