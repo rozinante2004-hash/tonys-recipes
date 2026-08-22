@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.6 -->
+<!-- Tony's Recipes Collection v33.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2716,6 +2716,54 @@ const SELF_TESTS = [
         if(t.indexOf('מיונז')===-1) throw new Error('the copied list omits the in-text recipes');
         if(t.indexOf('Dana')===-1) throw new Error('the copied list omits who shared what');
       } finally { _waHarvest=saved; }
+    } },
+
+  { id:'photo_search_translates', group:'Features', name:'The manual photo search sends English, not Hebrew (5g.4)',
+    test: async()=>{
+      if(typeof photoQueryForSearch!=='function') throw new Error('photoQueryForSearch not defined');
+      var input=document.getElementById('photoSearchInput');
+      if(!input) throw new Error('no photo search input to drive');
+      var realAi=window.aiCall, realFetch=window.fetch, realVal=input.value;
+      // Driven through searchPhotos() — the route every entry point uses (the
+      // Search button, the Enter key, and the auto-search when the panel opens
+      // from a recipe). Calling photoQueryForSearch directly would leave all
+      // three free to go on sending Hebrew.
+      try{
+        var asked=[], sent=[];
+        window.aiCall=function(p){ asked.push(p); return Promise.resolve('["beef brisket"]'); };
+        window.fetch=function(url, opt){
+          try{ sent.push(JSON.parse(opt.body).query); }catch(e){ sent.push(null); }
+          return Promise.resolve({ json:function(){ return Promise.resolve({ images:[
+            { url:'https://x/1.jpg', thumb:'https://x/1t.jpg', credit:'A', creditUrl:'https://x/a' }
+          ] }); } });
+        };
+        input.value='חזה בקר בתנור';
+        await searchPhotos();
+        if(!sent.length) throw new Error('no search was issued at all');
+        if(/[֐-׿]/.test(sent[0]))
+          throw new Error('Hebrew went to the photo source as “'+sent[0]+'” — none of them read it, so this finds nothing');
+        if(sent[0]!=='beef brisket') throw new Error('the translated term was not the one searched: '+sent[0]);
+        if(input.value!=='beef brisket')
+          throw new Error('the box still shows what was typed, not what was searched — the UI would be stating something untrue');
+
+        // An English name must NOT cost an AI round trip.
+        asked=[]; sent=[];
+        input.value='chicken soup';
+        await searchPhotos();
+        if(asked.length) throw new Error('an English name was sent for translation anyway — a wasted AI call per search');
+        if(sent[0]!=='chicken soup') throw new Error('an English name was altered before searching: '+sent[0]);
+
+        // A translation that fails must still search, and must SAY it failed
+        // rather than showing a result count that implies an English search.
+        asked=[]; sent=[];
+        window.aiCall=function(){ return Promise.reject(new Error('AI down')); };
+        input.value='מרק עוף';
+        await searchPhotos();
+        if(!sent.length) throw new Error('a failed translation stopped the search entirely');
+        var st=(document.getElementById('photoSearchStatus')||{}).textContent||'';
+        if(st.indexOf('⚠')===-1)
+          throw new Error('a failed translation was not reported — the user would think English was searched');
+      } finally { window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
     } },
 
   { id:'photo_never_overwrites', group:'Features', name:'Auto-fetch never touches a recipe that already has a photo (5g.2)',
@@ -6347,6 +6395,34 @@ async function photoSearchTerms(names) {
 }
 window.photoSearchTerms = photoSearchTerms;
 
+// The photo libraries are English-only — a Hebrew query matches nothing at all.
+// That was the whole reason the bulk auto-fetch returned zero results, and the
+// manual "Add photo" search sent the raw name for exactly as long. Both paths
+// translate through the same function now; there is no second opinion to drift.
+//
+// Returns { query, original, translated }. `translated` false means the round
+// trip produced nothing usable — the caller then says so rather than showing a
+// result count that implies an English search happened. The query box is updated
+// to whatever was ACTUALLY sent: leaving Hebrew on screen while querying English
+// would be the UI stating something untrue about its own search.
+async function photoQueryForSearch(text) {
+  var raw = String(text || '').trim();
+  var out = { query: raw, original: raw, translated: false };
+  if (!raw || !/[֐-׿]/.test(raw)) return out;
+  try {
+    var terms = await photoSearchTerms([raw]);
+    var t = (terms && terms[0] != null) ? String(terms[0]).trim() : '';
+    if (t) {
+      out.query = t;                                   // at minimum the cleaned name
+      out.translated = !/[֐-׿]/.test(t);     // ...English only if it really is
+    }
+  } catch (e) {
+    recordError('photo-terms', e && e.message, 'photoQueryForSearch');
+  }
+  return out;
+}
+window.photoQueryForSearch = photoQueryForSearch;
+
 // The attribution record for a chosen photo, in ONE place. The Worker returns
 // `credit` and `creditUrl` from every source; the auto-fetch guessed `author` and
 // `sourceUrl`, which do not exist, so it wrote a credit naming nobody. For
@@ -6930,7 +7006,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.6';
+var APP_VERSION = 'v33.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9445,7 +9521,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10021,7 +10097,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16859,11 +16935,11 @@ var PHOTO_SOURCES = ['openverse', 'pixabay', 'pexels', 'unsplash'];
 var PHOTO_SOURCE_LABELS = { openverse: 'Openverse', pixabay: 'Pixabay', pexels: 'Pexels', unsplash: 'Unsplash' };
 // Sources whose licences REQUIRE attribution, not merely appreciate it.
 var PHOTO_SOURCES_NEEDING_CREDIT = ['openverse'];
-var _photoSrcIdx = 0, _photoPage = 1, _photoQuery = '';
+var _photoSrcIdx = 0, _photoPage = 1, _photoQuery = '', _photoOriginal = '';
 
 function openPhotoSearch(recipeName) {
   _photoSearchSelected = null; _photoSearchResults = [];
-  _photoSrcIdx = 0; _photoPage = 1; _photoQuery = '';
+  _photoSrcIdx = 0; _photoPage = 1; _photoQuery = ''; _photoOriginal = '';
   document.getElementById('photoSearchGrid').innerHTML = '';
   document.getElementById('photoSearchUseBtn').style.display = 'none';
   var moreWrap = document.getElementById('photoSearchMoreWrap'); if (moreWrap) moreWrap.style.display = 'none';
@@ -16873,12 +16949,36 @@ function openPhotoSearch(recipeName) {
   if (recipeName) setTimeout(searchPhotos, 300);
 }
 
-// New search — start from the first source, first page
-function searchPhotos() {
-  var query = document.getElementById('photoSearchInput').value.trim();
+// New search — start from the first source, first page. Hebrew is translated
+// first, whether it arrived from the recipe name or was typed into the box: the
+// sources are English-only either way, and searching Hebrew is searching for
+// nothing.
+async function searchPhotos() {
+  var input  = document.getElementById('photoSearchInput');
+  var status = document.getElementById('photoSearchStatus');
+  var query  = (input ? input.value : '').trim();
   if (!query) { toast('Enter a search term'); return; }
-  _photoQuery = query; _photoSrcIdx = 0; _photoPage = 1;
-  doPhotoSearch();
+
+  var isHeb = /[֐-׿]/.test(query);
+  if (isHeb && status) status.textContent = '🌐 Finding the English term…';
+  var r = await photoQueryForSearch(query);
+
+  _photoQuery = r.query; _photoSrcIdx = 0; _photoPage = 1;
+  // Held as state, not written to the status line here: doPhotoSearch overwrites
+  // that line when results land, so a note written now would vanish exactly when
+  // the user has results to make sense of.
+  _photoOriginal = isHeb
+    ? (r.translated ? '“' + r.original + '” → “' + r.query + '”'
+                    : '⚠️ no English term found for “' + r.original + '” — searched as typed')
+    : '';
+  // Show what is actually being searched for, not what was typed.
+  if (input && r.query !== query) input.value = r.query;
+  if (status) status.textContent = '';
+  // Awaited and returned, so a caller can tell when the search has actually
+  // finished. Fire-and-forget meant the promise resolved while the request was
+  // still in flight — harmless for a click handler, but it makes the function
+  // untestable and quietly swallows anything doPhotoSearch throws.
+  return doPhotoSearch();
 }
 
 // "See more" — advance to the next source (wrapping to page 2, 3… of the first)
@@ -16936,12 +17036,14 @@ async function doPhotoSearch() {
         continue;
       }
       if (!data.images || !data.images.length) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos from ' + label + '. Tap “See more” to try another source.</div>';
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos from ' + label + ' for “' + escH(_photoQuery) + '”. Tap “See more” to try another source, or edit the search above.</div>';
+        if (status) status.textContent = _photoOriginal || '';
         updatePhotoMoreBtn(); return;
       }
       _photoSearchResults = data.images;
       renderPhotoSearchGrid(data.images);
-      status.textContent = data.images.length + ' from ' + label + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select';
+      status.textContent = data.images.length + ' from ' + label + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select'
+        + (_photoOriginal ? '  ·  ' + _photoOriginal : '');
       updatePhotoMoreBtn(); return;
     } catch(err) {
       failures.push({ label: label, why: photoErrText(err.message) });

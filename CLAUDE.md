@@ -395,6 +395,17 @@ found only because a test was written first and disagreed with the code.
   many releases and harmless, because the photo search always returned nothing.
   Making the search work (v33.2) turned it destructive. When fixing "X never
   works", ask what happens downstream once it does.
+- **When a fix is about the OUTSIDE WORLD, every path to that world needs it.** The photo
+  libraries are English-only. v33.2 taught the bulk auto-fetch to translate; the manual
+  "Add photo" search went on sending the raw Hebrew name for five more releases, because the
+  fix was filed mentally as "the auto-fetch bug" rather than "the sources do not read
+  Hebrew". After fixing a constraint imposed by something external — an API's language, a
+  rate limit, a size cap — grep for every other caller that reaches the same place.
+- **An equivalent mutant is a real result, not a survivor to chase.** Removing the Hebrew
+  guard in `photoQueryForSearch` changed nothing, because `photoSearchTerms` holds the same
+  guard one layer down — proven by mutating THAT one and watching `photo_hebrew_terms` catch
+  it. Before writing a test to kill a survivor, check whether the behaviour is still enforced
+  elsewhere; if it is, the mutant is equivalent and the honest move is to say so.
 - **Read the interface; do not assume it.** Three defects in one session came from
   guessing a shape instead of looking: `\b` as a Hebrew boundary, `/item/` as a
   shop-only path (it is where Walla files recipes), and `author`/`sourceUrl` as the
