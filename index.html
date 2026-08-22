@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.4 -->
+<!-- Tony's Recipes Collection v33.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -70,6 +70,30 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js" onerror="console.error('Failed to load Firebase firestore SDK')"></script>
 <script>
   var _fbAuth, _fbDb, _fbProvider, _autoLoginTimer;
+  // A Firestore call carries no timeout of its own. On a wedged connection it
+  // neither resolves nor rejects, so the line that clears the status pill never
+  // runs and it reads "☁️ Syncing…" for ever — the UI asserting something nothing
+  // has verified, which is the one thing this app must never do. Long enough for
+  // a genuine megabyte-or-two upload on a slow phone; short enough that a stuck
+  // connection is REPORTED rather than spun on.
+  var SYNC_WATCHDOG_MS = 90000;
+  function withSyncWatchdog(promise, phase) {
+    var timer;
+    return Promise.race([
+      Promise.resolve(promise).then(function(v){ clearTimeout(timer); return v; },
+                                    function(e){ clearTimeout(timer); throw e; }),
+      new Promise(function(_, reject){
+        timer = setTimeout(function(){
+          var err = new Error('cloud ' + phase + ' did not finish in '
+            + Math.round(SYNC_WATCHDOG_MS / 1000) + 's');
+          err._syncTimeout = true; err._syncPhase = phase;
+          reject(err);
+        }, SYNC_WATCHDOG_MS);
+      })
+    ]);
+  }
+  window.withSyncWatchdog = withSyncWatchdog;
+  window.SYNC_WATCHDOG_MS = SYNC_WATCHDOG_MS;
 
   document.addEventListener('DOMContentLoaded', function() {
     var attempts = 0;
@@ -143,20 +167,37 @@
             try {
               if (typeof loadFromFirestore === 'function') {
                 var localRecipeCount = recipes.length;
-                var loaded = await loadFromFirestore();
+                var loaded = await withSyncWatchdog(loadFromFirestore(), 'read');
                 if (!loaded) {
                   // Nothing in Firestore yet for this user
                   // Only save to Firestore if we have recipes beyond the 5 defaults
                   if (localRecipeCount > 5) {
                     toast('Saving your local recipes to cloud...');
-                    if (typeof saveToFirestore === 'function') await saveToFirestore();
+                    if (typeof saveToFirestore === 'function') await withSyncWatchdog(saveToFirestore(), 'write');
                   }
                   // If only defaults, don't write to Firestore yet — wait for user to add something real
                 }
                 if (typeof renderFilters === 'function') renderFilters();
                 if (typeof renderGrid    === 'function') renderGrid();
               }
-            } catch(e) { console.warn('Firestore error:', e); }
+            } catch(e) {
+              console.warn('Firestore error:', e);
+              if (typeof recordError === 'function') recordError('sync', e && e.message, 'signIn');
+              if (e && e._syncTimeout) {
+                // Report what is actually known — it did not finish, and the work
+                // is safe here — instead of spinning for ever or claiming success.
+                if (typeof setDriveStatus === 'function')
+                  setDriveStatus('error', '☁️ Sync did not finish — saved on this device');
+                if (typeof showServiceError === 'function') showServiceError(
+                  'SYNC_TIMEOUT: the cloud ' + e._syncPhase + ' did not finish within '
+                  + Math.round(SYNC_WATCHDOG_MS / 1000) + ' seconds.\n\nEverything is saved on this '
+                  + 'device and nothing is lost. This is usually a slow or blocked connection, or an '
+                  + 'unusually large upload — restoring photos can be a megabyte or two.\n\n'
+                  + 'Try ⚙️ Settings → Sync now when the connection is better.');
+                _autoLoginTimer = null;
+                return;
+              }
+            }
             _autoLoginTimer = null;
             if (typeof setDriveStatus === 'function')
               setDriveStatus('synced', '☁️ Shared · ' + (user.displayName || user.email));
@@ -2714,6 +2755,42 @@ const SELF_TESTS = [
       } finally {
         recipes=savedRecipes; window.hydratePhotosFromIDB=realHyd; window.idbGetAll=realAll;
       }
+    } },
+
+  { id:'sync_watchdog', group:'Cloud Sync', name:'A wedged sync is reported, never spun on for ever (5g.3)',
+    test: async()=>{
+      if(typeof withSyncWatchdog!=='function') throw new Error('withSyncWatchdog not defined');
+      // A promise that settles normally must pass straight through, unchanged.
+      if(await withSyncWatchdog(Promise.resolve('ok'),'read')!=='ok')
+        throw new Error('a successful call did not pass through the watchdog');
+      var threw=null;
+      try{ await withSyncWatchdog(Promise.reject(new Error('real failure')),'write'); }
+      catch(e){ threw=e; }
+      if(!threw||threw.message!=='real failure') throw new Error('a real error was swallowed or replaced');
+      if(threw._syncTimeout) throw new Error('a real error was mislabelled as a timeout');
+
+      // The case that stranded Tony: a Firestore call that NEVER settles. Without
+      // a watchdog the status pill says "Syncing…" for ever, which is the UI
+      // asserting something nothing has verified.
+      var realMs=window.SYNC_WATCHDOG_MS;
+      try{
+        window.SYNC_WATCHDOG_MS=60;
+        // Rebuild the race against the shortened limit — the constant is read at
+        // call time, so this exercises the real function, not a copy.
+        var never=new Promise(function(){});
+        var timedOut=null;
+        try{ await withSyncWatchdog(never,'read'); } catch(e){ timedOut=e; }
+        if(!timedOut) throw new Error('a call that never settles was awaited for ever — the pill would spin indefinitely');
+        if(!timedOut._syncTimeout) throw new Error('the timeout is not flagged, so the caller cannot report it honestly');
+        if(timedOut._syncPhase!=='read') throw new Error('the timeout does not say which phase hung');
+      } finally { window.SYNC_WATCHDOG_MS=realMs; }
+
+      // ...and the sign-in path must actually USE it, or none of the above helps.
+      var src=document.documentElement.innerHTML;
+      if(src.indexOf('withSyncWatchdog(loadFromFirestore()')===-1)
+        throw new Error('the cloud READ on sign-in is not wrapped, so it can still hang for ever');
+      if(src.indexOf('withSyncWatchdog(saveToFirestore()')===-1)
+        throw new Error('the cloud WRITE on sign-in is not wrapped');
     } },
 
   { id:'photo_rescue', group:'Backup', name:'Photos can be restored from a backup without losing newer recipes (5g.2)',
@@ -6683,7 +6760,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.4';
+var APP_VERSION = 'v33.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9198,7 +9275,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9774,7 +9851,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
