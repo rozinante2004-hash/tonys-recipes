@@ -377,6 +377,12 @@ found only because a test was written first and disagreed with the code.
   never fires proves it) or has crashed (Playwright reports the target closed), then
   bisect by running the suspect function's statements one at a time. Restore mutations
   in a `finally`, and treat a timeout as CAUGHT rather than as a broken run.
+- **Read the interface; do not assume it.** Three defects in one session came from
+  guessing a shape instead of looking: `\b` as a Hebrew boundary, `/item/` as a
+  shop-only path (it is where Walla files recipes), and `author`/`sourceUrl` as the
+  Worker's photo-credit fields (they are `credit`/`creditUrl`, and the correct code
+  was already in the file twelve thousand lines away). Each check took under a
+  minute. Before writing a second consumer of any shape, grep for the first one.
 - **Test the ROUTE, not the helper.** Three separate times in one session a
   mutation survived because the test called a helper directly (`waRenumber()`,
   `waMarkImported()`) instead of going through the thing that calls it (switching

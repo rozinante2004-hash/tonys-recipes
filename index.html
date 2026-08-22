@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.2 -->
+<!-- Tony's Recipes Collection v33.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2713,6 +2713,26 @@ const SELF_TESTS = [
       // ...and it must NOT bolt "food recipe" onto an already-specific dish: stock
       // libraries match on tags, and the extra words find nothing.
       if(plan[0].q!=='chicken soup') throw new Error('the first attempt is not the plain dish term: '+plan[0].q);
+
+      // The credit record. Every source returns `credit`/`creditUrl`; the
+      // auto-fetch guessed `author`/`sourceUrl` and so wrote a credit naming
+      // nobody. For Openverse that is worse than none: CC-BY makes attribution a
+      // licence CONDITION, and an empty name asserts compliance falsely.
+      if(typeof photoCreditOf!=='function') throw new Error('photoCreditOf not defined');
+      var ov=photoCreditOf({ credit:'Jane Doe', creditUrl:'https://openverse.org/x',
+                             license:'CC-BY 4.0', sourceLabel:'Openverse' });
+      if(!ov) throw new Error('a photo with a named creator produced no credit at all');
+      if(ov.name!=='Jane Doe') throw new Error('the creator was lost: '+JSON.stringify(ov));
+      if(ov.url!=='https://openverse.org/x') throw new Error('the credit link was lost: '+ov.url);
+      if(ov.license!=='CC-BY 4.0'||ov.source!=='Openverse') throw new Error('licence or source lost');
+      // Nothing to credit → nothing written, so no empty attribution is stored.
+      if(photoCreditOf({ license:'Pixabay licence', sourceLabel:'Pixabay' })!==null)
+        throw new Error('a credit was invented for a photo with no named creator');
+      if(photoCreditOf(null)!==null) throw new Error('a missing image produced a credit');
+      // Both the picker and the auto-fetch must go through it, or they drift and
+      // one of them silently stops honouring the licence.
+      if(String(autoFetchMissingPhotos).indexOf('photoCreditOf')===-1)
+        throw new Error('the auto-fetch builds its own credit record instead of using the shared one');
 
       // One AI call for the whole batch, and an English name needs none at all.
       var realAi=window.aiCall, calls=0;
@@ -5980,6 +6000,19 @@ async function photoSearchTerms(names) {
 }
 window.photoSearchTerms = photoSearchTerms;
 
+// The attribution record for a chosen photo, in ONE place. The Worker returns
+// `credit` and `creditUrl` from every source; the auto-fetch guessed `author` and
+// `sourceUrl`, which do not exist, so it wrote a credit naming nobody. For
+// Openverse that is worse than writing none at all — CC-BY makes attribution a
+// licence CONDITION, and an empty name is a claim of compliance that is false.
+// Returns null when there is nothing to credit, so the caller deletes the field.
+function photoCreditOf(img) {
+  if (!img || !img.credit) return null;
+  return { name: img.credit, url: img.creditUrl || '', license: img.license || '',
+           source: img.sourceLabel || '' };
+}
+window.photoCreditOf = photoCreditOf;
+
 // One search, one source. Returns [] rather than throwing so a dead source never
 // takes the whole run down.
 async function photoSearchOnce(query, source) {
@@ -6035,10 +6068,8 @@ async function autoFetchMissingPhotos() {
         r.photo = photoUrl;
         // Openverse is Creative Commons: attribution is a licence CONDITION, not
         // a courtesy, so the credit travels with the photo (v30.3).
-        if (images[0].license || images[0].sourceLabel) {
-          r.photoCredit = { name: images[0].author || '', url: images[0].sourceUrl || images[0].url,
-                            license: images[0].license || '', source: images[0].sourceLabel || '' };
-        }
+        var credit = photoCreditOf(images[0]);
+        if (credit) r.photoCredit = credit; else delete r.photoCredit;
         r.updatedAt = Date.now();
         fetched++;
       } else { failed.push(r.name + ' (could not be stored)'); }
@@ -6386,7 +6417,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.2';
+var APP_VERSION = 'v33.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8901,7 +8932,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9474,7 +9505,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16450,8 +16481,8 @@ async function useSelectedSearchPhoto() {
     var r=recipes.find(function(x){ return x.id===heroPhotoTargetId; });
     if (!r) throw new Error('Recipe not found');
     r.photo=photoUrl; r.updatedAt=Date.now(); pendingPhoto=photoUrl;
-    if (img.credit) r.photoCredit = { name: img.credit, url: img.creditUrl || '', license: img.license || '', source: img.sourceLabel || '' };
-    else delete r.photoCredit;
+    var _cr = photoCreditOf(img);
+    if (_cr) r.photoCredit = _cr; else delete r.photoCredit;
     saveData();
     var heroImg=document.getElementById('viewHeroImg'); if(heroImg) heroImg.src=photoUrl;
     renderGrid(); toast('\u2705 Photo updated!');

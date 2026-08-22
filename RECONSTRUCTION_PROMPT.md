@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v33.2` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v33.3` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v33.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v33.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -599,6 +599,12 @@ dish name, which stock libraries match on tags and so find nothing; it never val
 reply, so a refusal or a truncated answer went into the query; and a failed translation left
 the query in Hebrew. It also made one AI call per recipe against a rate-limited Worker and then
 `continue`d silently, ending on "Fetched 0/20" with no reason given.
+**Photo attribution goes through ONE builder** (`photoCreditOf`). Every source returns
+`credit`/`creditUrl`; a second consumer written from memory used `author`/`sourceUrl`, which
+exist nowhere, so every auto-fetched photo carried a credit naming nobody. For Openverse that
+is worse than no credit at all: CC-BY makes attribution a licence CONDITION, and an empty name
+asserts compliance falsely. Write nothing when there is no named creator.
+
 The shape that works: strip what an image library cannot photograph (`photoQueryFromName` —
 possessives, family attributions, "best"/"homemade"/"recipe") **before** the AI; ask ONE batched
 call for the 1–3 word dish; validate every answer (`photoTermIsUsable`) and fall back to the
