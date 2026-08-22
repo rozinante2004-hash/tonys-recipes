@@ -414,6 +414,16 @@ found only because a test was written first and disagreed with the code.
   diagnostic that overstates loss during an investigation into loss is worse than no
   diagnostic. When a number appears in two places, derive both from one predicate, or
   print both and say what separates them.
+- **When two templates render the same thing, a test that exercises one covers half.**
+  The grid and list cards are independent template literals and only one runs per
+  render; `viewMode` defaults to `'list'`, so mutations to the *grid* card survived a
+  test that rendered and asserted without setting the mode. Loop over both modes.
+  The same applies anywhere a second rendering path exists — print, export, share.
+- **Check whether a restriction was ever real before defending it.** Clips were
+  excluded from the photo plumbing in four places on the premise that a video card
+  should not carry a photograph. Both card templates had *always* rendered `r.photo`
+  for clips; the premise was never implemented, only assumed. Before explaining why a
+  restriction exists, grep for the code that would enforce it — it may not be there.
 - **A computed-but-unprinted figure fixes nothing.** The mutation that deleted the
   `L.push` for the honest count survived the first round: the data was right and the
   user still read the misleading line. Assert the rendered output, not only the

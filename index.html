@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.8 -->
+<!-- Tony's Recipes Collection v33.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1563,19 +1563,24 @@ const SELF_TESTS = [
                  { id:4, name:'a clip', isClip:true },
                  { id:5, name:'another clip', isClip:true }];
         var h2=syncHealth();
-        if(!('photoless' in h2)) throw new Error('syncHealth() does not report how many recipes are genuinely missing a photo');
-        var chip=recipes.filter(function(r){ return !r.photo && !r.isClip; }).length;
+        if(!('photoless' in h2)) throw new Error('syncHealth() does not report how many recipes are missing a photo');
+        // The chip's own predicate, written out here so the two are compared
+        // rather than assumed equal.
+        var chip=recipes.filter(function(r){ return !r.photo; }).length;
         if(h2.photoless!==chip)
           throw new Error('the panel says '+h2.photoless+' are missing a photo but the "No photo" chip says '+chip+' — one is wrong and the user cannot tell which');
-        if(h2.photoless!==2) throw new Error('clips were counted as missing a photo: got '+h2.photoless+', expected 2');
-        if(h2.clips!==2) throw new Error('the panel does not say how many are clips, so "of 5" cannot be interpreted');
+        // Four: two bare recipes AND two bare clips. A clip can carry a photo as
+        // of v33.9, so excluding them here would put the panel back at odds with
+        // the chip and under-report what the auto-fetch will actually go after.
+        if(h2.photoless!==4) throw new Error('expected 4 recipes missing a photo (clips included), got '+h2.photoless);
+        if(h2.clips!==2) throw new Error('the panel does not say how many are clips, so the composition cannot be read');
         // ...and it must actually PRINT it. Computing the honest figure and not
         // showing it leaves the user reading the same misleading line as before.
         var txt=syncHealthText();
-        if(txt.indexOf('genuinely missing a photo: 2')===-1)
-          throw new Error('the panel never shows how many recipes are genuinely missing a photo — the figure is computed and thrown away');
+        if(txt.indexOf('missing a photo: 4')===-1)
+          throw new Error('the panel never shows how many recipes are missing a photo — the figure is computed and thrown away');
         if(txt.indexOf('clips')===-1)
-          throw new Error('the panel does not explain that clips have no photo by design, so the headline count still reads as loss');
+          throw new Error('the panel does not report the clip count, so the composition of the headline cannot be read');
       } finally { recipes=savedHR; }
 
       // Tony's standing rule: never assert what the code has not verified. Signed
@@ -2823,9 +2828,15 @@ const SELF_TESTS = [
         if(names.indexOf('in IDB, unflagged')>-1)
           throw new Error('the IDB row was never consulted, so a photo present on disk was judged missing');
         if(names.indexOf('hydrated')>-1) throw new Error('a recipe with a photo in memory was judged missing');
-        if(names.indexOf('a clip')>-1) throw new Error('a clip was judged missing');
-        if(names.length!==1||names[0]!=='genuinely bare')
-          throw new Error('expected exactly the one bare recipe, got: '+names.join(', '));
+        // v33.9 — a clip with no photo IS a candidate. It was excluded on the
+        // assumption that a video card should not carry a photograph, which the
+        // card template never agreed with: it has always rendered r.photo for
+        // clips. The exclusion only made a clip the one thing you could not get
+        // a picture for.
+        if(names.indexOf('a clip')===-1)
+          throw new Error('a clip with no photo was skipped — clips can have photos, so it is a candidate like any other');
+        if(names.length!==2||names.indexOf('genuinely bare')===-1)
+          throw new Error('expected the bare recipe and the bare clip, got: '+names.join(', '));
 
         // If the photo store cannot be READ, there is no safe way to tell what is
         // missing — so fetch nothing rather than risk overwriting everything.
@@ -4855,18 +4866,58 @@ const SELF_TESTS = [
     test: async()=>{
       if(typeof toggleNoPhotoFilter!=='function') throw new Error('toggleNoPhotoFilter not defined');
       if(!document.getElementById('noPhotoPrompt')) throw new Error('#noPhotoPrompt missing');
-      var testId=888902;
+      var testId=888902, clipId=888903, clipPhotoId=888904;
       recipes.unshift(normalizeRecipe({id:testId,name:'NoPhotoTest',photo:'',updatedAt:Date.now()}));
+      // v33.9 — a clip is a recipe like any other as far as photos go. It was
+      // excluded from this filter, the chip count and the auto-fetch, which made
+      // it the one kind of recipe you could not get a picture for.
+      recipes.unshift(normalizeRecipe({id:clipId,name:'ClipNoPhoto',photo:'',isClip:true,updatedAt:Date.now()}));
+      recipes.unshift(normalizeRecipe({id:clipPhotoId,name:'ClipWithPhoto',photo:'data:image/gif;base64,R0lGODlhAQABAAAAACw=',isClip:true,updatedAt:Date.now()}));
       try {
         renderFilters();
-        if(!document.querySelector('button[onclick*="toggleNoPhotoFilter"]')) throw new Error('no-photo filter chip missing while photoless recipes exist');
+        var chipBtn=document.querySelector('button[onclick*="toggleNoPhotoFilter"]');
+        if(!chipBtn) throw new Error('no-photo filter chip missing while photoless recipes exist');
+        var expected=recipes.filter(function(r){ return !r.photo; }).length;
+        if(chipBtn.textContent.indexOf('('+expected+')')===-1)
+          throw new Error('the chip says "'+chipBtn.textContent.trim()+'" but '+expected+' recipes have no photo — a photoless clip is not being counted');
         toggleNoPhotoFilter();
         if(document.getElementById('noPhotoPrompt').style.display==='none') throw new Error('auto-fetch prompt should appear with the filter on');
         var shown=Array.prototype.slice.call(document.querySelectorAll('#recipeGrid .recipe-card,#recipeGrid .recipe-list-item'));
         if(!shown.length) throw new Error('filter hid everything, including photoless recipes');
+        var labels=shown.map(function(el){ return el.getAttribute('aria-label')||''; });
+        if(labels.indexOf('ClipNoPhoto')===-1)
+          throw new Error('a clip with no photo is hidden from the "No photo" filter, so there is no way to find it and give it one');
+        if(labels.indexOf('ClipWithPhoto')>-1)
+          throw new Error('a clip that HAS a photo is listed as missing one');
         toggleNoPhotoFilter();
         if(document.getElementById('noPhotoPrompt').style.display!=='none') throw new Error('prompt should hide when the filter is off');
-      } finally { showNoPhotoOnly=false; recipes=recipes.filter(function(r){return r.id!==testId;}); renderFilters(); renderGrid(); }
+
+        // ...and the card must actually show it. The template has always rendered
+        // r.photo for clips; if that ever changed, giving a clip a photo would be
+        // pointless work the user cannot see.
+        //
+        // BOTH view modes, because there are two independent templates and only
+        // one runs per render. Asserting against whichever mode happened to be
+        // active tested half the code: viewMode defaults to 'list', so mutations
+        // to the grid template survived untouched.
+        var savedView=viewMode;
+        try{
+          ['list','grid'].forEach(function(mode){
+            viewMode=mode; renderGrid();
+            var card=Array.prototype.slice.call(document.querySelectorAll('#recipeGrid .recipe-card,#recipeGrid .recipe-list-item'))
+              .filter(function(el){ return el.getAttribute('aria-label')==='ClipWithPhoto'; })[0];
+            if(!card) throw new Error('['+mode+'] the clip with a photo is missing from the grid entirely');
+            if(!card.querySelector('img'))
+              throw new Error('['+mode+"] a clip's photo is not rendered — the card falls back to the emoji, so giving a clip a photo achieves nothing visible");
+            if(!card.querySelector('.clip-badge'))
+              throw new Error('['+mode+'] the clip badge vanished once the clip had a photo, so it no longer reads as a clip');
+          });
+        } finally { viewMode=savedView; }
+      } finally {
+        showNoPhotoOnly=false;
+        recipes=recipes.filter(function(r){ return r.id!==testId && r.id!==clipId && r.id!==clipPhotoId; });
+        renderFilters(); renderGrid();
+      }
     } },
   { id:'feat_sort_added', group:'Features', name:'Recently-added sort',
     test: async()=>{
@@ -6598,7 +6649,10 @@ async function recipesWithNoPhoto() {
     return null;
   }
   return recipes.filter(function(r){
-    if (r.isClip) return false;
+    // Clips used to be excluded here, on the assumption that a video card has no
+    // business carrying a photograph. It never held: the card template has always
+    // rendered r.photo for clips, with the clip badge on top. All the exclusion did
+    // was make a clip the one recipe you could not get a picture for.
     if (r.photo) return false;
     if (r._ph || r._po) return false;
     var row = rows[r.id];
@@ -6899,12 +6953,14 @@ function syncHealthText() {
   L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
   L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
-  // Two numbers, because one cannot answer both questions. The first is what is
-  // hydrated; the second is what the "No photo" chip counts, and they differ by
-  // the clips — which have no photograph by design.
+  // Two numbers that must AGREE with the "No photo" chip. They did not: the panel
+  // counted !!r.photo while the chip excluded clips, so "30 of 44" sat beside
+  // "No photo (9)" and neither explained the other. Clips can carry a photo as of
+  // v33.9, so the exclusion is gone everywhere and these are now the same figure
+  // computed two ways — which is exactly what makes a disagreement a bug.
   L.push('recipes showing a photo: ' + h.photosLocal + ' of ' + h.localRecipes
-    + (h.clips ? ' (' + h.clips + ' of those are clips, which have no photo by design)' : ''));
-  L.push('recipes genuinely missing a photo: ' + h.photoless);
+    + (h.clips ? ' (' + h.clips + ' of them clips)' : ''));
+  L.push('recipes missing a photo: ' + h.photoless);
   L.push('cloud photo deletions refused: ' + h.photoDeletesRefused
     + (h.photoDeletesRefused ? ' (ids ' + photoDeletesRefused().join(', ') + ' — deletion is admin-only)' : ''));
   L.push('photos missing from this device: ' + h.photosMissing
@@ -7120,7 +7176,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.8';
+var APP_VERSION = 'v33.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9635,7 +9691,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10211,7 +10267,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10767,7 +10823,7 @@ function renderFilters() {
     + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
     + (recentIds.length ? '<button class="filter-btn' + (showRecentOnly ? ' active' : '') + '" style="background:' + (showRecentOnly ? '#4F7AFF' : '#EEF2FF') + ';border-color:' + (showRecentOnly ? '#4F7AFF' : '#C0CAFF') + ';color:' + (showRecentOnly ? 'white' : '#3451CC') + ';" onclick="toggleRecentFilter()">🕐 Recent</button>' : '')
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
-    + (function(){ var n = recipes.filter(function(r){ return !r.photo && !r.isClip; }).length;
+    + (function(){ var n = recipes.filter(function(r){ return !r.photo; }).length;
         return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (' + n + ')</button>' : ''; })()
     // 5f.5 — only offered when it can answer: no pantry, or nothing one item
     // away, and the chip would be a dead end rather than a shortcut.
@@ -11831,7 +11887,7 @@ function renderGrid() {
     // Frame 1: Favourites + Clips + Recent filter
     if (showFavOnly && !r.fav) return false;
     if (showClipsOnly && !r.isClip) return false;
-    if (showNoPhotoOnly && (r.photo || r.isClip)) return false;
+    if (showNoPhotoOnly && r.photo) return false;
     if (showRecentOnly) {
       var recentIds = []; try { recentIds = JSON.parse(localStorage.getItem('recent_views')||'[]'); } catch(e){}
       if (!recentIds.includes(r.id)) return false;
@@ -11895,7 +11951,12 @@ function renderGrid() {
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
-          ${r.isClip ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="clip-badge clip-badge-sm">🎬</div></div>` : ''}
+          ${r.isClip ? (r.photo
+            /* Over a photo the badge moves to a corner: centred, it covered the
+               picture the clip now finally gets to have. Over the emoji
+               placeholder it stays centred, which is the long-standing look. */
+            ? `<div class="clip-badge clip-badge-sm" style="position:absolute;bottom:4px;right:4px;">🎬</div>`
+            : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="clip-badge clip-badge-sm">🎬</div></div>`) : ''}
         </div>
         <div class="recipe-list-info">
           <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
@@ -15645,7 +15706,7 @@ function syncHealth() {
     // "No photo (9)") and quietly overstated how many photos were missing, right
     // while a photo incident was being diagnosed from these very numbers.
     clips:         (recipes || []).filter(function(r){ return !!r.isClip; }).length,
-    photoless:     (recipes || []).filter(function(r){ return !r.photo && !r.isClip; }).length,
+    photoless:     (recipes || []).filter(function(r){ return !r.photo; }).length,
     photosMissing: _idbPhotosMissing,
     photoRepair:   _photoRepairLog,
     photoDeletesRefused: Object.keys(_photoDeleteRefused).length

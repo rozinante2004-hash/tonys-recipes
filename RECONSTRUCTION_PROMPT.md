@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v33.8` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v33.9` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v33.8"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v33.9"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1031,7 +1031,16 @@ resembles the desktop cube grid. Cards show photo or emoji tile, a category **pi
 prep/servings (**desktop only** — hidden in the phone grid, where the card is barely wider than a thumb and both are one tap away inside the recipe; list view keeps them at every width), difficulty pill, favourite heart, a 🔥 badge when `cookCount ≥ 3`, and a
 `.clip-badge` 🎬 circle for `r.isClip` (4.10 — one shared component, not the two hand‑rolled
 inline SVGs it replaced; `.clip-badge-sm` in list view). `isClip` is the only flag read here:
-`isVideoBookmark` was folded into it in 2.3. On phone‑width screens the grid uses a configurable column count
+`isVideoBookmark` was folded into it in 2.3.
+**A clip can carry a photo like any other recipe (v33.9).** Both card templates have always
+rendered `r.photo` for clips — there is no `isClip` condition on the `<img>`, the badge simply
+sits on top — but the photo *plumbing* excluded them in four places: the auto‑fetch candidate
+list, the "No photo (n)" chip count, the No‑photo grid filter, and Sync Health's `photoless`.
+The effect was that a clip was the one kind of recipe you could not obtain a picture for, and
+the panel disagreed with the chip about how many were missing. All four exclusions are gone;
+`missingFromPantry`'s clip exclusion is unrelated (it is about ingredients) and stays. In list
+view the badge moves to the bottom‑right corner when a photo is present, since centred it
+covered the picture. On phone‑width screens the grid uses a configurable column count
 (`--mobile-cols`, 1–5, default 3) with square (`aspect-ratio:1/1`) cubes — see **Settings → Grid
 Layout** (`openGridSettings`, stored in `tonys_mobile_cols`). Desktop grid uses
 `repeat(auto-fill, minmax(220px, 1fr))`. There is a **sort** control (`setSort`): default /
