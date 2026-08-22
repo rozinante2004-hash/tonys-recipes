@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v33.3` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v33.4` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v33.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v33.4"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -588,6 +588,22 @@ far below anything that could run up a bill by accident.
 
 Both of these shipped. Both were invisible to a full green suite. A rebuild will reproduce them
 exactly unless it is told, because in each case the *obvious* code is the broken code.
+
+**0a. "Missing a photo" is NOT `!r.photo` — and getting this wrong DESTROYS photos.**
+Photos live in IndexedDB; `r.photo` is empty in memory until `hydratePhotosFromIDB` resolves,
+which is the normal state for a second or two after every load and permanent for any recipe
+hydration cannot reach (`_ph`/`_po` is then the only record that a photo exists at all). The
+auto-fetch tested `!r.photo`, so it judged un-hydrated recipes "missing" and overwrote real
+photographs — reported by Tony after it replaced an entire collection's photos. Await hydration,
+then require ALL THREE of `r.photo`, `r._ph`/`r._po` and the IDB row to be absent; re-check
+again immediately before assigning, because hydration can land mid-run; and if IndexedDB cannot
+be read, do NOTHING rather than guess. Ship a **photos-only restore from a backup**
+(`rescuePlan`) as well: restoring a whole backup is not an acceptable recovery, because it
+discards every recipe added since. Match on `uid` first, then `id`, then name — and report
+name matches separately, since they are the only ones that can be wrong.
+Note how this arrived: the filter was wrong for many releases and harmless, because the search
+always returned nothing. Fixing the search (v33.2) armed it. **When fixing "X never works", ask
+what happens downstream once it does.**
 
 **0. Auto-fetching photos must search for the DISH, in English (v33.2).** Every photo
 source is English-only, so a Hebrew name returns nothing — but translation alone was not
@@ -1375,7 +1391,7 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **185 checks** in 13 groups —
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **187 checks** in 13 groups —
 **Features (45), UI (28), WhatsApp (24), Cloud Sync (21), Storage (13), Import/Export (13),
 CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup and Performance (3 each)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.3 -->
+<!-- Tony's Recipes Collection v33.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2667,6 +2667,106 @@ const SELF_TESTS = [
         if(t.indexOf('מיונז')===-1) throw new Error('the copied list omits the in-text recipes');
         if(t.indexOf('Dana')===-1) throw new Error('the copied list omits who shared what');
       } finally { _waHarvest=saved; }
+    } },
+
+  { id:'photo_never_overwrites', group:'Features', name:'Auto-fetch never touches a recipe that already has a photo (5g.2)',
+    test: async()=>{
+      if(typeof recipesWithNoPhoto!=='function') throw new Error('recipesWithNoPhoto not defined');
+      var savedRecipes=recipes, realHyd=window.hydratePhotosFromIDB, realAll=window.idbGetAll;
+      try{
+        window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
+
+        // THE INCIDENT. r.photo is empty in memory for every recipe whose photo
+        // lives in IndexedDB and has not hydrated yet — the normal state for a
+        // second or two after every load. The old test was `!r.photo`, so those
+        // counted as "missing" and were overwritten. Real photos were destroyed.
+        recipes=[
+          { id:1, name:'hydrated',      photo:'data:image/jpeg;base64,AAA' },
+          { id:2, name:'in IDB, flagged', photo:'', _ph:1 },
+          { id:3, name:'original in IDB', photo:'', _po:1 },
+          { id:4, name:'in IDB, unflagged', photo:'' },
+          { id:5, name:'genuinely bare', photo:'' },
+          { id:6, name:'a clip',        photo:'', isClip:true }
+        ];
+        window.idbGetAll=function(){ return Promise.resolve([{ id:4, photo:'data:image/jpeg;base64,BBB' }]); };
+        var missing=await recipesWithNoPhoto();
+        var names=missing.map(function(r){ return r.name; });
+        if(names.indexOf('in IDB, flagged')>-1)
+          throw new Error('a recipe whose photo is in IndexedDB was judged missing — this is exactly what destroyed real photos');
+        if(names.indexOf('original in IDB')>-1) throw new Error('a recipe with an original photo in IDB was judged missing');
+        if(names.indexOf('in IDB, unflagged')>-1)
+          throw new Error('the IDB row was never consulted, so a photo present on disk was judged missing');
+        if(names.indexOf('hydrated')>-1) throw new Error('a recipe with a photo in memory was judged missing');
+        if(names.indexOf('a clip')>-1) throw new Error('a clip was judged missing');
+        if(names.length!==1||names[0]!=='genuinely bare')
+          throw new Error('expected exactly the one bare recipe, got: '+names.join(', '));
+
+        // If the photo store cannot be READ, there is no safe way to tell what is
+        // missing — so fetch nothing rather than risk overwriting everything.
+        window.idbGetAll=function(){ return Promise.reject(new Error('IDB unavailable')); };
+        if(await recipesWithNoPhoto()!==null)
+          throw new Error('an unreadable photo store did not stop the run — it would guess, and guessing overwrites');
+
+        // The last-line guard must exist in the fetch loop too: hydration can land
+        // mid-run, seconds after the list was chosen.
+        if(String(autoFetchMissingPhotos).indexOf('r.photo || r._ph || r._po')===-1)
+          throw new Error('nothing re-checks the recipe just before overwriting it, so a photo arriving mid-run is still lost');
+      } finally {
+        recipes=savedRecipes; window.hydratePhotosFromIDB=realHyd; window.idbGetAll=realAll;
+      }
+    } },
+
+  { id:'photo_rescue', group:'Backup', name:'Photos can be restored from a backup without losing newer recipes (5g.2)',
+    test: async()=>{
+      ['rescueResolvePhotos','rescuePlan','openPhotoRescue','runPhotoRescue'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('photoRescueItem')) throw new Error('no menu entry to reach the rescue tool');
+      if(!document.getElementById('photoRescueFile')) throw new Error('no file input for the rescue tool');
+
+      // Real backup shape: photos are de-duplicated into a map and referenced as
+      // __photo__N. Reading them back wrongly would silently restore nothing.
+      var backup={ exportedAt:'2026-08-15T14:39:11.700Z',
+        photos:{ '0':'data:image/jpeg;base64,ORIGINAL0', '1':'data:image/jpeg;base64,ORIGINAL1' },
+        recipes:[ { uid:'legacy-19', id:19, name:'Brisket', photo:'__photo__0' },
+                  { uid:'legacy-20', id:20, name:'Biltong', photo:'__photo__1' },
+                  { uid:'legacy-21', id:21, name:'No photo here', photo:'' } ] };
+      var have=rescueResolvePhotos(backup);
+      if(have.length!==2) throw new Error('expected 2 recipes with photos, got '+have.length);
+      if(have[0].photo!=='data:image/jpeg;base64,ORIGINAL0')
+        throw new Error('the __photo__N reference was not resolved to the real image: '+have[0].photo);
+
+      // The collection now: two damaged by the auto-fetch, plus recipes added
+      // AFTER the backup which must not be disturbed in any way.
+      var now=[
+        { id:19, uid:'legacy-19', name:'Brisket', photo:'https://cdn/wrong1.jpg', photoCredit:{name:''} },
+        { id:20, uid:'legacy-20', name:'Biltong', photo:'https://cdn/wrong2.jpg' },
+        { id:99, uid:'new-99',    name:'Added last week', photo:'data:image/jpeg;base64,MINE' }
+      ];
+      var plan=rescuePlan(have, now);
+      if(plan.restore.length!==2) throw new Error('expected to restore 2, planned '+plan.restore.length);
+      if(plan.noMatch.length!==1||plan.noMatch[0]!=='Added last week')
+        throw new Error('a recipe absent from the backup was not reported as untouched');
+      if(plan.restore.some(function(p){ return p.id===99; }))
+        throw new Error('a recipe added after the backup would be overwritten — that is the whole thing this must not do');
+
+      // Identity first: a RENAMED recipe still matches on uid, and must not be
+      // matched by name to something else.
+      var renamed=[{ id:19, uid:'legacy-19', name:'Brisket, my way', photo:'https://cdn/wrong1.jpg' }];
+      var p2=rescuePlan(have, renamed);
+      if(p2.restore.length!==1||p2.restore[0].photo!=='data:image/jpeg;base64,ORIGINAL0')
+        throw new Error('a renamed recipe was not matched by its stable uid');
+      if(p2.byName.length) throw new Error('a uid match was wrongly reported as a name match');
+
+      // A name-only match is the one that can be wrong, so it must be FLAGGED.
+      var noIds=[{ id:501, uid:'unknown-501', name:'Brisket', photo:'https://cdn/wrong1.jpg' }];
+      var p3=rescuePlan(have, noIds);
+      if(!p3.byName.length) throw new Error('a name-only match was not flagged for the user to check');
+
+      // Nothing to do is said plainly, not reported as a restore.
+      var same=[{ id:19, uid:'legacy-19', name:'Brisket', photo:'data:image/jpeg;base64,ORIGINAL0' }];
+      var p4=rescuePlan(have, same);
+      if(p4.restore.length) throw new Error('an identical photo was counted as needing restoring');
+      if(p4.already.length!==1) throw new Error('an already-correct photo was not reported as such');
     } },
 
   { id:'photo_hebrew_terms', group:'Features', name:'A Hebrew recipe name becomes a searchable English dish (5g.1)',
@@ -6039,16 +6139,61 @@ function photoAttemptPlan(term, category) {
 }
 window.photoAttemptPlan = photoAttemptPlan; window.photoSearchOnce = photoSearchOnce;
 
+// WHICH recipes are actually missing a photo. This is the whole incident of
+// v33.4: the test was `!r.photo`, and `r.photo` is EMPTY IN MEMORY for every
+// recipe whose photo lives in IndexedDB and has not been hydrated yet — which is
+// the normal state for a second or two after every load, and permanently for any
+// recipe hydration could not reach. So "fetch the missing ones" quietly meant
+// "overwrite the ones that have not loaded yet", and it destroyed real photos.
+//
+// Three independent checks now, because one of them being wrong must not be
+// enough to lose a photo:
+//   1. r.photo        — hydrated into memory
+//   2. r._ph / r._po  — the flag that says a photo lives in IndexedDB
+//   3. the IDB row    — read it and look
+// And hydration is AWAITED first, so the in-memory view is settled before
+// anything is judged missing.
+async function recipesWithNoPhoto() {
+  try { if (typeof hydratePhotosFromIDB === 'function') await hydratePhotosFromIDB(); } catch (e) {}
+  var rows = {};
+  try {
+    var all = await idbGetAll();
+    (all || []).forEach(function(row){ rows[row.id] = row; });
+  } catch (e) {
+    // If IndexedDB cannot be read we CANNOT tell what is missing. Returning [] is
+    // the safe answer: fetch nothing rather than risk overwriting everything.
+    recordError('auto-photo', 'IndexedDB unreadable — refusing to guess', 'recipesWithNoPhoto');
+    return null;
+  }
+  return recipes.filter(function(r){
+    if (r.isClip) return false;
+    if (r.photo) return false;
+    if (r._ph || r._po) return false;
+    var row = rows[r.id];
+    if (row && (row.photo || row.originalPhoto)) return false;
+    return true;
+  });
+}
+window.recipesWithNoPhoto = recipesWithNoPhoto;
+
 async function autoFetchMissingPhotos() {
-  var noPhoto = recipes.filter(function(r){ return !r.photo && !r.isClip; });
+  toast('Checking which recipes really have no photo…');
+  var noPhoto = await recipesWithNoPhoto();
+  if (noPhoto === null) {
+    showServiceError('This device\'s photo store could not be read, so there is no safe way to '
+      + 'tell which recipes are missing a photo. Nothing was changed. Reload and try again.');
+    return;
+  }
   if (!noPhoto.length) { toast('✅ All recipes already have photos!'); return; }
   if (!await askConfirm({ icon:'📸', title:'Fetch photos for ' + noPhoto.length + ' recipe' + (noPhoto.length!==1?'s':'') + '?',
-      message:'Hebrew names are translated to an English dish name first — the photo libraries have no Hebrew. Each is searched across every source, and you can change any photo afterwards.', okLabel:'Fetch photos' })) return;
+      message:'Only these ' + noPhoto.length + ' have no photo anywhere — on this device or in the cloud. '
+        + 'Nothing that already has a picture is touched. Hebrew names are translated to an English dish '
+        + 'name first, because the photo libraries have no Hebrew.', okLabel:'Fetch photos' })) return;
 
   toast('🈯 Working out what to search for…');
   var terms = await photoSearchTerms(noPhoto.map(function(r){ return r.name; }));
 
-  var fetched = 0, noResults = [], failed = [];
+  var fetched = 0, noResults = [], failed = [], skipped = [];
   for (var i = 0; i < noPhoto.length; i++) {
     var r = noPhoto[i];
     var term = terms[i] || photoQueryFromName(r.name) || r.name;
@@ -6064,6 +6209,13 @@ async function autoFetchMissingPhotos() {
       var blob = await imgResp.blob();
       var file = new File([blob], 'auto-photo.jpg', { type: blob.type || 'image/jpeg' });
       var photoUrl = await uploadPhotoToStorage(file, r.id);
+      // Last line of defence. Hydration or a cloud attach can land DURING the
+      // run, several seconds after the list was chosen. Never overwrite a photo
+      // that exists now, whatever the list said when it was built.
+      if (r.photo || r._ph || r._po) {
+        skipped.push(r.name + ' (its photo appeared while fetching — left alone)');
+        continue;
+      }
       if (photoUrl) {
         r.photo = photoUrl;
         // Openverse is Creative Commons: attribution is a licence CONDITION, not
@@ -6096,9 +6248,123 @@ async function autoFetchMissingPhotos() {
     lines.push('', failed.length + ' found a picture but could not save it:');
     lines.push(failed.slice(0, 6).map(function(x){ return '  • ' + x; }).join('\n'));
   }
+  if (skipped.length) {
+    lines.push('', skipped.length + ' were left alone because a photo turned up mid-run.');
+  }
   showServiceError(lines.join('\n'));
 }
 window.autoFetchMissingPhotos = autoFetchMissingPhotos;
+
+// ─── PHOTO RESCUE ────────────────────────────────────────────────────────────
+// v33.4, written because "Auto-fetch missing photos" replaced photos that were
+// not missing (above). Restoring a whole backup is not an acceptable answer: it
+// would discard every recipe added since the backup was taken. This puts the
+// PHOTOS back and touches nothing else — no recipe is added, removed, renamed,
+// re-categorised or re-dated, and a recipe absent from the backup is left
+// exactly as it is.
+//
+// Matching is by `uid` first, because it is stable across devices and renames;
+// then `id`; then an exact name match, which is the only one that can be wrong,
+// so it is reported separately and the user sees the count before agreeing.
+function rescueResolvePhotos(backup) {
+  var photos = (backup && backup.photos) || {};
+  return ((backup && backup.recipes) || []).map(function(rec) {
+    var out = { uid: rec.uid || '', id: rec.id, name: rec.name || '', photo: '', originalPhoto: '' };
+    var p = rec.photo, o = rec.originalPhoto;
+    if (p && String(p).indexOf('__photo__') === 0) p = photos[String(p).replace('__photo__', '')] || '';
+    if (o && String(o).indexOf('__photo__') === 0) o = photos[String(o).replace('__photo__', '')] || '';
+    out.photo = p || ''; out.originalPhoto = o || '';
+    return out;
+  }).filter(function(x){ return x.photo || x.originalPhoto; });
+}
+// Work out what WOULD change, without changing anything. The plan is shown
+// before a single recipe is touched — the whole point is that this tool must
+// never be another surprise.
+function rescuePlan(backupPhotos, list) {
+  var byUid = {}, byId = {}, byName = {};
+  (backupPhotos || []).forEach(function(b){
+    if (b.uid) byUid[b.uid] = b;
+    if (b.id != null) byId[b.id] = b;
+    if (b.name) byName[b.name.trim().toLowerCase()] = b;
+  });
+  var plan = { restore: [], byName: [], already: [], noMatch: [] };
+  (list || []).forEach(function(r){
+    var hit = (r.uid && byUid[r.uid]) || byId[r.id] || null, viaName = false;
+    if (!hit && r.name && byName[r.name.trim().toLowerCase()]) { hit = byName[r.name.trim().toLowerCase()]; viaName = true; }
+    if (!hit) { plan.noMatch.push(r.name); return; }
+    // Same picture already? Nothing to do — and say so rather than "restoring" it.
+    if (r.photo && hit.photo && r.photo === hit.photo) { plan.already.push(r.name); return; }
+    var entry = { id: r.id, name: r.name, photo: hit.photo, originalPhoto: hit.originalPhoto, viaName: viaName };
+    plan.restore.push(entry);
+    if (viaName) plan.byName.push(r.name);
+  });
+  return plan;
+}
+window.rescueResolvePhotos = rescueResolvePhotos; window.rescuePlan = rescuePlan;
+
+function openPhotoRescue() {
+  var inp = document.getElementById('photoRescueFile');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+async function runPhotoRescue(file) {
+  if (!file) return;
+  var backup;
+  try {
+    backup = JSON.parse(await file.text());
+  } catch (e) {
+    showServiceError('That file is not a readable backup: ' + (e.message || 'could not be parsed'));
+    return;
+  }
+  if (!backup || !Array.isArray(backup.recipes)) {
+    showServiceError('That file has no recipes in it, so there are no photos to take from it.');
+    return;
+  }
+  var have = rescueResolvePhotos(backup);
+  if (!have.length) {
+    showServiceError('That backup contains no photos at all, so there is nothing to restore.');
+    return;
+  }
+  var plan = rescuePlan(have, recipes);
+  if (!plan.restore.length) {
+    showServiceError('Nothing to restore: every recipe already has the same photo this backup holds'
+      + (plan.noMatch.length ? ', and ' + plan.noMatch.length + ' recipes are not in it at all.' : '.'));
+    return;
+  }
+  var msg = 'Put back the photos of ' + plan.restore.length + ' recipe'
+    + (plan.restore.length === 1 ? '' : 's') + ' from this backup ('
+    + (backup.exportedAt || 'date unknown').slice(0, 10) + ')?\n\n'
+    + 'ONLY the photo changes. No recipe is added, removed, renamed or re-dated, and the '
+    + (plan.noMatch.length ? plan.noMatch.length + ' recipes not in the backup are left untouched.'
+                           : 'rest are left untouched.');
+  if (plan.byName.length) {
+    msg += '\n\n⚠️ ' + plan.byName.length + ' matched by NAME rather than identity, so check those after: '
+        + plan.byName.slice(0, 5).join(', ') + (plan.byName.length > 5 ? '…' : '');
+  }
+  if (!await askConfirm({ icon:'🖼️', title:'Restore ' + plan.restore.length + ' photo'
+      + (plan.restore.length === 1 ? '' : 's') + '?', message: msg, okLabel:'Restore photos' })) return;
+
+  var done = 0;
+  plan.restore.forEach(function(p){
+    var r = recipes.find(function(x){ return x.id === p.id; });
+    if (!r) return;
+    if (p.photo) { r.photo = p.photo; delete r._ph; }
+    if (p.originalPhoto) { r.originalPhoto = p.originalPhoto; delete r._po; }
+    // The photo came from the backup, not from a stock library, so any credit
+    // attached by the auto-fetch no longer describes it.
+    delete r.photoCredit;
+    r.updatedAt = Date.now();
+    done++;
+  });
+  saveData();
+  renderGrid();
+  showServiceError('✅ Restored ' + done + ' photo' + (done === 1 ? '' : 's') + '.\n\n'
+    + (plan.already.length ? plan.already.length + ' already matched the backup.\n' : '')
+    + (plan.noMatch.length ? plan.noMatch.length + ' recipes are not in this backup — their photos were '
+        + 'not changed. If any of those are wrong too, they can only come back from this device\'s own '
+        + 'store or the cloud.\n' : '')
+    + '\nCheck a few, then take a fresh backup.');
+}
+window.openPhotoRescue = openPhotoRescue; window.runPhotoRescue = runPhotoRescue;
 
 
 
@@ -6417,7 +6683,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.3';
+var APP_VERSION = 'v33.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8932,7 +9198,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8984,6 +9250,9 @@ body.banner-shown .header {
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
+        <button class="drop-item" id="photoRescueItem" onclick="closeDrop('moreDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
+        <input type="file" id="photoRescueFile" accept=".json,application/json" style="display:none"
+               onchange="runPhotoRescue(this.files&&this.files[0])">
         </div>
       </div>
       <div class="drop-group">
@@ -9505,7 +9774,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

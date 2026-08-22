@@ -377,6 +377,20 @@ found only because a test was written first and disagreed with the code.
   never fires proves it) or has crashed (Playwright reports the target closed), then
   bisect by running the suspect function's statements one at a time. Restore mutations
   in a `finally`, and treat a timeout as CAUGHT rather than as a broken run.
+- **"Missing" is not `!r.photo`. Photos live in IndexedDB, and `r.photo` is EMPTY
+  IN MEMORY until `hydratePhotosFromIDB` finishes** — the normal state for a second
+  or two after every load, and permanently for any recipe hydration cannot reach.
+  "Auto-fetch missing photos" tested `!r.photo`, so it treated un-hydrated recipes
+  as missing and OVERWROTE real photos (v33.4, destructive, reported by Tony). Any
+  code deciding a recipe lacks a photo must await hydration and then check all
+  three of `r.photo`, `r._ph`/`r._po`, and the IDB row — and if the store cannot be
+  read, do nothing rather than guess. More generally: **before a bulk operation
+  overwrites anything, prove the thing is absent; do not infer it from an empty
+  field that is empty for ordinary reasons.**
+- **A latent bug can be armed by an unrelated fix.** That filter was wrong for
+  many releases and harmless, because the photo search always returned nothing.
+  Making the search work (v33.2) turned it destructive. When fixing "X never
+  works", ask what happens downstream once it does.
 - **Read the interface; do not assume it.** Three defects in one session came from
   guessing a shape instead of looking: `\b` as a Hebrew boundary, `/item/` as a
   shop-only path (it is where Walla files recipes), and `author`/`sourceUrl` as the
