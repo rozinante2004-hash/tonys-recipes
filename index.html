@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.7 -->
+<!-- Tony's Recipes Collection v33.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1549,6 +1549,35 @@ const SELF_TESTS = [
         if(!(k in h)) throw new Error('syncHealth() does not report '+k);
       });
       if(h.localRecipes!==recipes.length) throw new Error('the panel disagrees with the actual recipe count');
+
+      // The panel and the "No photo" chip must count the same thing. They did not:
+      // the chip excludes clips (a video card has no photograph by design, and the
+      // auto-fetch skips them too) while the panel counted them as missing. Tony
+      // saw "30 of 44" beside "No photo (9)" and reasonably asked which was
+      // lying — during a photo incident being diagnosed from these very numbers.
+      var savedHR=recipes;
+      try{
+        recipes=[{ id:1, name:'has one', photo:'data:image/jpeg;base64,A' },
+                 { id:2, name:'bare' },
+                 { id:3, name:'also bare' },
+                 { id:4, name:'a clip', isClip:true },
+                 { id:5, name:'another clip', isClip:true }];
+        var h2=syncHealth();
+        if(!('photoless' in h2)) throw new Error('syncHealth() does not report how many recipes are genuinely missing a photo');
+        var chip=recipes.filter(function(r){ return !r.photo && !r.isClip; }).length;
+        if(h2.photoless!==chip)
+          throw new Error('the panel says '+h2.photoless+' are missing a photo but the "No photo" chip says '+chip+' — one is wrong and the user cannot tell which');
+        if(h2.photoless!==2) throw new Error('clips were counted as missing a photo: got '+h2.photoless+', expected 2');
+        if(h2.clips!==2) throw new Error('the panel does not say how many are clips, so "of 5" cannot be interpreted');
+        // ...and it must actually PRINT it. Computing the honest figure and not
+        // showing it leaves the user reading the same misleading line as before.
+        var txt=syncHealthText();
+        if(txt.indexOf('genuinely missing a photo: 2')===-1)
+          throw new Error('the panel never shows how many recipes are genuinely missing a photo — the figure is computed and thrown away');
+        if(txt.indexOf('clips')===-1)
+          throw new Error('the panel does not explain that clips have no photo by design, so the headline count still reads as loss');
+      } finally { recipes=savedHR; }
+
       // Tony's standing rule: never assert what the code has not verified. Signed
       // out, the cloud has not been observed at all, so it must say so.
       renderSyncHealth();
@@ -2810,6 +2839,86 @@ const SELF_TESTS = [
           throw new Error('nothing re-checks the recipe just before overwriting it, so a photo arriving mid-run is still lost');
       } finally {
         recipes=savedRecipes; window.hydratePhotosFromIDB=realHyd; window.idbGetAll=realAll;
+      }
+    } },
+
+  { id:'cloud_photo_docid', group:'Cloud Sync', name:'The photo document name has ONE builder, and the range follows it (5g.4)',
+    test: async()=>{
+      if(typeof photoDocId!=='function') throw new Error('photoDocId not defined');
+      // The wire format is pinned LITERALLY and on purpose: every photo document
+      // already in the cloud is named this way, so a rename does not migrate
+      // anything — it orphans the lot. This assertion must not go through
+      // photoDocId, or it would follow a rename instead of catching it.
+      if(photoDocId(7)!=='photo_7')
+        throw new Error('the photo document name changed to "'+photoDocId(7)+'" — every photo already in the cloud is stored under the old name');
+
+      // The bounds must BRACKET what the builder produces. They were written out
+      // by hand; if a prefix ever drifted from them the bulk read would not see
+      // those documents, would still report complete, and would clear _ph.
+      [0, 7, 42, 999999, 'legacy-19'].forEach(function(id){
+        var name=photoDocId(id);
+        if(!(name>=PHOTO_DOC_LO && name<PHOTO_DOC_HI))
+          throw new Error('the range ['+PHOTO_DOC_LO+', '+PHOTO_DOC_HI+') does not cover '+name+' — that photo would be invisible to the bulk read');
+      });
+      // ...and exclude every other family sharing the collection, or the read
+      // would parse recipes and chats as photo documents.
+      ['meta','access','recipe_7','chat_x','chatpart_x_1','photo'].forEach(function(name){
+        if(name>=PHOTO_DOC_LO && name<PHOTO_DOC_HI)
+          throw new Error('the photo range swallows "'+name+'", which is not a photo document');
+      });
+
+      // The builder must be the only speller left. A hand-written copy is how the
+      // prefix drifts from the bounds in the first place. Scoped to these three
+      // function bodies, not the page source, so it cannot match its own text.
+      var appSrc=String(syncCloudPhotos)+String(attachCloudPhotos)+String(readCloudPhotoDocs);
+      if(appSrc.indexOf("'photo_'")!==-1 || appSrc.indexOf('"photo_"')!==-1)
+        throw new Error('a photo document name is still spelled out by hand — it can drift from the range bounds silently');
+    } },
+
+  { id:'cloud_undo_delete', group:'Cloud Sync', name:'Undo takes the cloud deletion back off the queue (5g.4)',
+    test: async()=>{
+      ['queueCloudDelete','unqueueCloudDelete','undoDelete'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var savedRecipes=recipes, savedUndo=window._pendingUndo, savedRaw=localStorage.getItem('tonys_cloud_deletes');
+      var realSave=window.saveData, realRF=window.renderFilters, realRG=window.renderGrid, realToast=window.toast;
+      try{
+        window.saveData=function(){}; window.renderFilters=function(){};
+        window.renderGrid=function(){}; window.toast=function(){};
+        function queued(){ try{ return (JSON.parse(localStorage.getItem('tonys_cloud_deletes')||'[]')||[]).map(String); }catch(e){ return []; } }
+
+        // Driven through undoDelete — the route the ↩︎ Undo button uses. Calling
+        // unqueueCloudDelete directly would leave the button free to stop calling
+        // it, which is exactly the defect that matters: the recipe returns on
+        // screen while the cloud copy is still condemned, so it vanishes again
+        // everywhere else and comes back to haunt this device on the next sync.
+        recipes=[];
+        queueCloudDelete(77);
+        if(queued().indexOf('77')===-1)
+          throw new Error('the deletion was never queued, so nothing below proves anything about un-queueing');
+        window._pendingUndo={ items:[{ idx:0, recipe:{ id:77, name:'Brought back' } }] };
+        undoDelete();
+        if(queued().indexOf('77')!==-1)
+          throw new Error('Undo restored the recipe locally but left it queued for cloud deletion — it would still be deleted for every other device');
+        if(!recipes.some(function(r){ return r.id===77; }))
+          throw new Error('Undo did not restore the recipe at all');
+
+        // Un-queueing one must not drop the others: an unrelated pending deletion
+        // has to survive, or it never reaches the cloud and the recipe returns.
+        recipes=[];
+        queueCloudDelete(88); queueCloudDelete(99);
+        window._pendingUndo={ items:[{ idx:0, recipe:{ id:88, name:'Also back' } }] };
+        undoDelete();
+        var q2=queued();
+        if(q2.indexOf('99')===-1)
+          throw new Error('undoing one deletion dropped an unrelated pending one, which would then never reach the cloud');
+        if(q2.indexOf('88')!==-1) throw new Error('the undone deletion is still queued');
+      } finally {
+        recipes=savedRecipes; window._pendingUndo=savedUndo;
+        window.saveData=realSave; window.renderFilters=realRF;
+        window.renderGrid=realRG; window.toast=realToast;
+        try{ [77,88,99].forEach(function(k){ delete _pendingCloudDeletes[k]; delete _pendingCloudDeletes[String(k)]; }); }catch(e){}
+        if(savedRaw===null) localStorage.removeItem('tonys_cloud_deletes');
+        else localStorage.setItem('tonys_cloud_deletes', savedRaw);
       }
     } },
 
@@ -6790,7 +6899,12 @@ function syncHealthText() {
   L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
   L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
-  L.push('recipes showing a photo: ' + h.photosLocal + ' of ' + h.localRecipes);
+  // Two numbers, because one cannot answer both questions. The first is what is
+  // hydrated; the second is what the "No photo" chip counts, and they differ by
+  // the clips — which have no photograph by design.
+  L.push('recipes showing a photo: ' + h.photosLocal + ' of ' + h.localRecipes
+    + (h.clips ? ' (' + h.clips + ' of those are clips, which have no photo by design)' : ''));
+  L.push('recipes genuinely missing a photo: ' + h.photoless);
   L.push('cloud photo deletions refused: ' + h.photoDeletesRefused
     + (h.photoDeletesRefused ? ' (ids ' + photoDeletesRefused().join(', ') + ' — deletion is admin-only)' : ''));
   L.push('photos missing from this device: ' + h.photosMissing
@@ -7006,7 +7120,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.7';
+var APP_VERSION = 'v33.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9521,7 +9635,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10097,7 +10211,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15080,7 +15194,7 @@ async function migratePhotosToStorage() {
     say('Moving ' + (i + 1) + ' of ' + pending.length + '…');
     try {
       var url = await uploadPhotoToStorageBucket(r.id, r.photo);
-      await _fbDb.collection('shared').doc('photo_' + r.id)
+      await _fbDb.collection('shared').doc(photoDocId(r.id))
         .set({ photoUrl: url, storage: true, updatedAt: r.updatedAt || Date.now() });
       // The local copy stays base64 on purpose: export, email and print all
       // consume data URLs, and re-fetching every photo to prove a point would
@@ -15131,7 +15245,7 @@ async function repairMissingPhotos() {
     if (r.photo || r._ph || r.hp || probed[r.id]) continue;
     checked++;
     try {
-      var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
+      var snap = await _fbDb.collection('shared').doc(photoDocId(r.id)).get();
       countCloudRead();
       var pd = snap.exists ? (snap.data() || {}) : {};
       if (pd.photo || pd.photoUrl) {
@@ -15281,7 +15395,7 @@ async function syncCloudPhotos() {
       if (useStorage) {
         try {
           var url = await uploadPhotoToStorageBucket(r.id, r.photo);
-          await _fbDb.collection('shared').doc('photo_' + r.id)
+          await _fbDb.collection('shared').doc(photoDocId(r.id))
             .set({ photoUrl: url, storage: true, updatedAt: r.updatedAt || Date.now() });
           _cloudPhotoStamps[r.id] = r.photo;
           _cloudPhotoIds[r.id] = true;
@@ -15302,7 +15416,7 @@ async function syncCloudPhotos() {
         continue;
       }
       try {
-        await _fbDb.collection('shared').doc('photo_' + r.id)
+        await _fbDb.collection('shared').doc(photoDocId(r.id))
           .set(isRemote ? { photoUrl: r.photo, storage: true, updatedAt: r.updatedAt || Date.now() }
                         : { photo: r.photo, updatedAt: r.updatedAt || Date.now() });
         _cloudPhotoStamps[r.id] = r.photo;
@@ -15318,7 +15432,7 @@ async function syncCloudPhotos() {
       // the app forgot a document it had failed to remove and nothing ever
       // cleaned it up. Keep the record and report, as flushCloudDeletes does.
       try {
-        await _fbDb.collection('shared').doc('photo_' + r.id).delete();
+        await _fbDb.collection('shared').doc(photoDocId(r.id)).delete();
         if (await storageReady()) await deletePhotoFromStorageBucket(r.id);
         delete _cloudPhotoIds[r.id];
         delete _cloudPhotoStamps[r.id];
@@ -15329,7 +15443,7 @@ async function syncCloudPhotos() {
   var goneIds = Object.keys(_cloudPhotoIds).filter(function(id){ return !currentIds[id]; });
   for (var g = 0; g < goneIds.length; g++) {
     try {
-      await _fbDb.collection('shared').doc('photo_' + goneIds[g]).delete();
+      await _fbDb.collection('shared').doc(photoDocId(goneIds[g])).delete();
       delete _cloudPhotoIds[goneIds[g]];
       delete _cloudPhotoStamps[goneIds[g]];
     } catch(e) { _photoDeleteRefused[goneIds[g]] = true; }
@@ -15352,8 +15466,21 @@ window.photoDeletesRefused = function(){ return Object.keys(_photoDeleteRefused)
 // Returns { byId, complete }. `complete` is the important half: when the query
 // FAILED we do not know what the cloud holds, and clearing `_ph` on that
 // ignorance is precisely how a network blip becomes permanent photo loss.
-var PHOTO_DOC_LO = 'photo_';
-var PHOTO_DOC_HI = 'photo' + String.fromCharCode(96);
+// ONE builder for the photo document's name. Recipes have had `recipeDocId`
+// since 5.4; photo documents were spelled out by hand in ten separate places,
+// and v33.6 added an eleventh as the lower bound of a documentId() range query.
+// That coupling is invisible and unforgiving: if any writer's prefix ever drifted
+// from the range bounds, the bulk read would simply not see those documents,
+// still report `complete: true`, and clear `_ph` — permanent photo loss, no error
+// anywhere. The bounds are DERIVED from the builder now, so they cannot drift:
+// rename the prefix and the range follows.
+function photoDocId(id) { return 'photo_' + id; }
+var PHOTO_DOC_LO = photoDocId('');
+// The upper bound is the prefix with its last character stepped up by one, so the
+// range covers every id and nothing else. For 'photo_' that is 'photo`' — '_' is
+// 0x5F and backtick is 0x60, the same trick the recipe documents use.
+var PHOTO_DOC_HI = PHOTO_DOC_LO.slice(0, -1)
+  + String.fromCharCode(PHOTO_DOC_LO.charCodeAt(PHOTO_DOC_LO.length - 1) + 1);
 async function readCloudPhotoDocs(db) {
   db = db || _fbDb;
   var byId = {};
@@ -15393,10 +15520,10 @@ async function attachCloudPhotos(list) {
         // to a single round trip if that query could not run at all.
         var d = null, exists = false;
         if (bulk.complete) {
-          d = bulk.byId['photo_' + r.id] || null;
+          d = bulk.byId[photoDocId(r.id)] || null;
           exists = !!d;
         } else {
-          var snap = await _fbDb.collection('shared').doc('photo_' + r.id).get();
+          var snap = await _fbDb.collection('shared').doc(photoDocId(r.id)).get();
           countCloudRead();
           exists = snap.exists;
           d = exists ? (snap.data() || {}) : null;
@@ -15512,6 +15639,13 @@ function syncHealth() {
     // v30.2 — a device can lose its photos while every other device is fine.
     // Silent before; now it is the first thing the panel would show.
     photosLocal:   (recipes || []).filter(function(r){ return !!r.photo; }).length,
+    // Clips are video/link cards and are not supposed to carry a photograph —
+    // the "No photo" chip and the auto-fetch both exclude them. Counting them in
+    // the denominator here made the panel disagree with the chip (30 of 44 vs
+    // "No photo (9)") and quietly overstated how many photos were missing, right
+    // while a photo incident was being diagnosed from these very numbers.
+    clips:         (recipes || []).filter(function(r){ return !!r.isClip; }).length,
+    photoless:     (recipes || []).filter(function(r){ return !r.photo && !r.isClip; }).length,
     photosMissing: _idbPhotosMissing,
     photoRepair:   _photoRepairLog,
     photoDeletesRefused: Object.keys(_photoDeleteRefused).length
@@ -15774,6 +15908,8 @@ window.cloudDirtyIds      = cloudDirtyIds;
 window.cloudWriteAllowed  = cloudWriteAllowed;
 window.mergeNextId        = mergeNextId;
 window.recipeDocId        = recipeDocId;
+window.photoDocId         = photoDocId;
+window.PHOTO_DOC_LO = PHOTO_DOC_LO; window.PHOTO_DOC_HI = PHOTO_DOC_HI;
 
 // Write one recipe's document, refusing a stale-base write.
 // Returns {id, ok} | {id, skipped:'conflict'} | {id, skipped:'too-big', bytes}
@@ -15858,7 +15994,7 @@ async function flushCloudDeletes(db) {
     var id = ids[i];
     try {
       await db.collection('shared').doc(recipeDocId(id)).delete();
-      await db.collection('shared').doc('photo_' + id).delete();
+      await db.collection('shared').doc(photoDocId(id)).delete();
     } catch(e) {
       if (e && e.code === 'permission-denied') denied.push(id);
       // anything else: the document is already gone, or will be retried next save
@@ -15955,7 +16091,7 @@ async function sweepOrphanPhotos() {
   var removed = 0, denied = 0;
   for (var i = 0; i < orphans.length; i++) {
     try {
-      await _fbDb.collection('shared').doc('photo_' + orphans[i]).delete();
+      await _fbDb.collection('shared').doc(photoDocId(orphans[i])).delete();
       delete _cloudPhotoIds[orphans[i]];
       delete _cloudPhotoStamps[orphans[i]];
       removed++;

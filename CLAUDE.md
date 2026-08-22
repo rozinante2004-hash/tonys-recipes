@@ -406,6 +406,18 @@ found only because a test was written first and disagreed with the code.
   guard one layer down — proven by mutating THAT one and watching `photo_hebrew_terms` catch
   it. Before writing a test to kill a survivor, check whether the behaviour is still enforced
   elsewhere; if it is, the mutant is equivalent and the honest move is to say so.
+- **Two counters for the same thing must use the same predicate, or the panel and the
+  UI call each other liars.** Sync Health counted `!!r.photo`; the "No photo" chip and
+  the auto-fetch count `!r.photo && !r.isClip`, because a clip is a video card with no
+  photograph by design. Tony read "30 of 44" beside "No photo (9)" and asked which was
+  wrong — while those very numbers were being used to diagnose a photo incident. A
+  diagnostic that overstates loss during an investigation into loss is worse than no
+  diagnostic. When a number appears in two places, derive both from one predicate, or
+  print both and say what separates them.
+- **A computed-but-unprinted figure fixes nothing.** The mutation that deleted the
+  `L.push` for the honest count survived the first round: the data was right and the
+  user still read the misleading line. Assert the rendered output, not only the
+  function's return value — `syncHealthText()` exists for exactly this.
 - **Read the interface; do not assume it.** Three defects in one session came from
   guessing a shape instead of looking: `\b` as a Hebrew boundary, `/item/` as a
   shop-only path (it is where Walla files recipes), and `author`/`sourceUrl` as the

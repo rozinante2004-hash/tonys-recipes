@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v33.7` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v33.8` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v33.7"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v33.8"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -862,6 +862,16 @@ existing `match /shared/{document=**}` rule already permits them — no rules ch
 `loadFromFirestore`/`applyRemoteUpdate` re‑attach photos via `attachCloudPhotos` (fetch
 `shared/photo_<id>` for `_ph` recipes — reads also accept the pre‑5.8 spelling `hp`, writes never
 emit it; legacy inline photos are kept and migrated on next save).
+**That name has ONE builder, `photoDocId(id)` (v33.8),** exactly as recipes have `recipeDocId`.
+It was spelled `'photo_' + id` by hand in ten places, and v33.6 added an eleventh copy as the
+range‑query bound. `PHOTO_DOC_LO`/`PHOTO_DOC_HI` are **derived** from the builder — the upper
+bound is the prefix with its last character stepped up by one — so a rename moves the range with
+it. That coupling is otherwise invisible and unforgiving: a writer whose prefix drifted from the
+bounds would produce documents the bulk read cannot see, and the read would still report
+`complete: true` and clear `_ph` — permanent photo loss, no error anywhere. Pin the wire format
+(`photo_7`) with a **literal** in the test; asserting it through `photoDocId` would follow a
+rename instead of catching one, and a rename does not migrate the existing documents, it orphans
+them.
 **Fetch them in ONE query, not one per recipe (v33.6).** `readCloudPhotoDocs` runs a
 `documentId()` range query over `['photo_', 'photo` ')` — the same trick the recipe documents
 use — and returns `{ byId, complete }`. The first version awaited a separate
