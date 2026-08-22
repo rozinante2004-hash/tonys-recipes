@@ -377,6 +377,10 @@ found only because a test was written first and disagreed with the code.
   never fires proves it) or has crashed (Playwright reports the target closed), then
   bisect by running the suspect function's statements one at a time. Restore mutations
   in a `finally`, and treat a timeout as CAUGHT rather than as a broken run.
+  Corollary: **a test whose subject is an await that might never return must race a
+  sentinel**, never `await` it bare. The first `sync_watchdog` did, so removing the
+  watchdog hung the runner and it printed no summary at all — indistinguishable from a
+  broken harness. `Promise.race([subject, timer])` turns the same defect into a red line.
 - **"Missing" is not `!r.photo`. Photos live in IndexedDB, and `r.photo` is EMPTY
   IN MEMORY until `hydratePhotosFromIDB` finishes** — the normal state for a second
   or two after every load, and permanently for any recipe hydration cannot reach.
@@ -421,6 +425,33 @@ found only because a test was written first and disagreed with the code.
 - **Do not edit a file while a mutation script is cycling it.** The harness rewrites
   the original after each run, so an edit made in between is silently reverted. Wait
   for it to finish; if an edit vanished, that is why.
+- **An assertion that greps the page source can match ITSELF.** The tests live in the
+  same inline script as the code, so `document.documentElement.innerHTML.indexOf(
+  "withSyncWatchdog(loadFromFirestore(")` was satisfied by the test's own text. It
+  passed with the wiring deleted; only mutation testing showed it. Wiring is
+  behaviour — check it by *calling* the thing (extract a named function if the code
+  is buried in an event handler) and observing what it does. Reserve source greps for
+  properties with no observable behaviour at all, and then pick a needle that cannot
+  appear in the test.
+- **One `await` per item inside a loop is an N-round-trip operation, and N grows with
+  the user's collection.** `attachCloudPhotos` fetched `shared/photo_<id>` one document
+  at a time; at 44 recipes of ~60 KB each that stopped finishing, so Tony's sign-in
+  timed out and only 9 of his 44 photos ever arrived (v33.6). Firestore can answer the
+  whole set in one `documentId()` range query — `'_'` (0x5F) sorts before backtick
+  (0x60), which is what makes `photo_` … `` photo` `` exact. Before writing `await`
+  inside a `for` over user data, ask what it costs at 500 items; if there is a bulk
+  form, use it, and keep the per-item path only as a fallback.
+- **A "we could not read it" result must be distinguishable from "there is nothing
+  there".** The bulk photo read returns `{byId, complete}` for exactly this reason: on
+  a failed query `complete` is false, so nothing clears `_ph` — the only record that a
+  photo exists elsewhere. A read helper that answers a failure with an empty collection
+  hands its caller a confident, wrong "empty", and every destructive branch downstream
+  believes it.
+- **A watchdog turns "slow" into "failed", and that is a real trade.** `withSyncWatchdog`
+  stops the status pill claiming "Syncing…" for ever, but a genuinely slow read that
+  would have finished at 100s now reports SYNC_TIMEOUT. That was the right call only
+  because the slowness had a fixable cause. Adding a timeout is not a substitute for
+  finding out why something is slow — say so out loud when shipping one.
 
 ## Outstanding
 

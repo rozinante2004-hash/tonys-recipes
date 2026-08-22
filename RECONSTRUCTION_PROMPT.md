@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v33.4` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v33.6` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v33.4"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v33.6"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -849,6 +849,16 @@ existing `match /shared/{document=**}` rule already permits them — no rules ch
 `loadFromFirestore`/`applyRemoteUpdate` re‑attach photos via `attachCloudPhotos` (fetch
 `shared/photo_<id>` for `_ph` recipes — reads also accept the pre‑5.8 spelling `hp`, writes never
 emit it; legacy inline photos are kept and migrated on next save).
+**Fetch them in ONE query, not one per recipe (v33.6).** `readCloudPhotoDocs` runs a
+`documentId()` range query over `['photo_', 'photo` ')` — the same trick the recipe documents
+use — and returns `{ byId, complete }`. The first version awaited a separate
+`doc('photo_'+id).get()` per recipe inside a `for` loop: at 44 recipes of ~60 KB apiece that
+is 44 consecutive round trips, which stopped finishing inside the sign-in watchdog, and Tony
+signed in to a stuck "☁️ Syncing…" with 9 of his 44 photos attached. `complete` is the half
+that matters for safety: when the query *failed* we do not know what the cloud holds, so
+nothing clears `_ph`, and the code falls back to per-document reads rather than concluding
+"no photos". A read helper that answers failure with an empty collection hands every
+destructive branch downstream a confident, wrong "empty".
 Photos remain inline in memory + localStorage, so rendering/backup/export are unchanged.
 **`originalPhoto` (the full‑res scan backup, potentially many MB) is never synced — local‑only**;
 it is captured before a cloud load and re‑attached afterward so a load doesn't drop it.
@@ -937,6 +947,19 @@ Rules that follow from that:
 - `onAuthStateChanged`: on auto‑login (not a fresh click) show an "auto‑login" notice and wait
   ~3s before syncing (gives the user a chance to cancel); on explicit sign‑in, sync immediately.
   Then `loadFromFirestore()`, render, and set drive status to `☁️ Shared · <name/email>`.
+- **That sign‑in work lives in a named function, `signInCloudSync()`, not inline in the auth
+  handler** — so a test can *call* it. It was inline, and the only way to check the watchdog
+  below was still wired was to grep the page source; because the tests live in the same inline
+  script, the assertion matched **its own text** and passed with the wiring deleted (v33.6,
+  found by mutation testing). Wiring is behaviour: exercise it.
+- **Every cloud await on that path is wrapped in `withSyncWatchdog(promise, phase)`**
+  (`SYNC_WATCHDOG_MS = 90000`). A Firestore call that never settles used to leave the pill
+  saying "☁️ Syncing…" for ever — the UI asserting something nothing had verified. The
+  watchdog rejects with `_syncTimeout` / `_syncPhase` set so the caller reports `SYNC_TIMEOUT`
+  honestly and names the phase. It passes a normal resolve or reject straight through
+  unchanged — a real error must never be relabelled a timeout. **Be honest about the trade:
+  this converts "slow but would finish" into "gives up at 90s", and is only justified when the
+  slowness has a cause you have actually found and fixed** (here, the per‑recipe photo read).
 - **`loadFromFirestore()`**: one‑time `get()`, then an `onSnapshot` listener that **skips the
   first (echo) snapshot**, ignores `hasPendingWrites`/`fromCache`/own‑write‑settling, and for a
   genuine remote change shows a "refresh" banner (`#refreshBanner`, `window._pendingRemoteData`,
