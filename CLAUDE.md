@@ -438,6 +438,20 @@ found only because a test was written first and disagreed with the code.
   chat-coverage block rendered by looking for the group name passed with the block deleted —
   the quoted messages carry that name too. Assert on something only the code under test can
   produce (here, "Searched N chats").
+- **Apply a lesson to EVERY instance of the shape, not just the code you were touching.**
+  In one session I wrote the rule "a 'we could not read it' result must be distinguishable
+  from 'there is nothing there'" after fixing `readCloudPhotoDocs` — and left the identical
+  fault in `idbGetAll`, which resolved `[]` on a failed read and so made
+  `recipesWithNoPhoto`'s "refusing to guess" branch dead code. It fed the most destructive
+  operation in the app, and Tony's photos were overwritten a second time a week later. When
+  you learn a rule, grep for every other place it applies **that day**.
+- **A safety net that can only fire on a condition nothing produces is not a safety net.**
+  That branch was tested — with a stubbed *rejection*, which the real function never
+  returned. When you test an error path, check that the real code can actually reach it.
+- **Two failures of the same operation mean the guard is the wrong tool. Make it
+  reversible.** After the auto-fetch destroyed photos twice, the fix was not a third guard:
+  it was a snapshot, an independent second opinion that aborts the whole run, and a
+  one-press undo. A guard has to be right every time; an undo only has to exist.
 - **Mutate on purpose to FIND gaps, not only to validate a new test.** Eight mutations
   aimed at the data-safety paths found five holes the 186-test suite could not see —
   including `repairMissingPhotos`, the only route back for a device whose photo flags

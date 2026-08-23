@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.2 -->
+<!-- Tony's Recipes Collection v34.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2964,6 +2964,172 @@ const SELF_TESTS = [
         if(st.indexOf('⚠')===-1)
           throw new Error('a failed translation was not reported — the user would think English was searched');
       } finally { window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
+    } },
+
+  { id:'photo_store_read_failure', group:'Storage', name:'A failed photo-store read is not an empty store (5g.6)',
+    test: async()=>{
+      // THE root-cause bug, found while hunting why Tony's photos were replaced a
+      // second time. idbGetAll resolved [] when the read FAILED, so
+      // recipesWithNoPhoto's "IndexedDB unreadable — refusing to guess" branch was
+      // dead code: it can only run on a rejection, and nothing ever rejected. With
+      // the store unreadable every recipe whose photo lives only there reads as
+      // photoless, and the auto-fetch overwrites it.
+      var savedRecipes=recipes, realAll=window.idbGetAll, realHyd=window.hydratePhotosFromIDB;
+      try{
+        recipes=[{ id:1, name:'photo only in IDB', photo:'', _ph:1 }];
+        window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
+        // A read that FAILS must stop the run dead.
+        window.idbGetAll=function(){ return Promise.reject(new Error('read failed')); };
+        if(await recipesWithNoPhoto()!==null)
+          throw new Error('an unreadable photo store did not stop the run — every photo stored only there would be overwritten');
+        // ...and a genuinely EMPTY store is a different answer: it may proceed.
+        window.idbGetAll=function(){ return Promise.resolve([]); };
+        var out=await recipesWithNoPhoto();
+        if(out===null) throw new Error('an empty store was treated as unreadable, so the feature could never run at all');
+      } finally { recipes=savedRecipes; window.idbGetAll=realAll; window.hydratePhotosFromIDB=realHyd; }
+
+      // The real idbGetAll must REJECT rather than resolve [] when the request
+      // errors — that is the distinction the branch above depends on.
+      if(typeof idbGetAll!=='function') throw new Error('idbGetAll not defined');
+      var realStore=window.idbStore;
+      try{
+        window.idbStore=function(){ return Promise.resolve({ getAll:function(){
+          var req={}; setTimeout(function(){ req.onerror && req.onerror(); }, 0); return req;
+        } }); };
+        var threw=false;
+        try{ await idbGetAll(); } catch(e){ threw=true; }
+        if(!threw) throw new Error('idbGetAll resolved instead of rejecting on a failed read — "could not read" is being reported as "nothing there"');
+      } finally { window.idbStore=realStore; }
+
+      // Hydration must survive that rejection WITHOUT clearing a single flag:
+      // clearing _ph because the store could not be read is how a transient
+      // failure becomes permanent loss.
+      var keep2=recipes, realAll2=window.idbGetAll;
+      try{
+        recipes=[{ id:2, name:'flagged', photo:'', _ph:1, _po:1 }];
+        window.idbGetAll=function(){ return Promise.reject(new Error('read failed')); };
+        window._idbPhotosMissing=0;
+        await hydratePhotosFromIDB();
+        if(!recipes[0]._ph||!recipes[0]._po)
+          throw new Error('a failed hydration cleared the flags that say where the photo lives — that photo is now unrecoverable');
+        // ...and it must not report loss it has not observed. Treating an
+        // unreadable store as "empty" walks the whole list finding nothing and
+        // tells Sync Health photos are missing from this device — an alarm about
+        // data loss, raised by a transient read failure.
+        if(window._idbPhotosMissing)
+          throw new Error('an unreadable store was counted as '+window._idbPhotosMissing+' missing photo(s) — the panel would report loss that has not happened');
+      } finally { recipes=keep2; window.idbGetAll=realAll2; }
+    } },
+
+  { id:'photo_autofetch_undo', group:'Features', name:'Auto-fetch verifies itself and can be undone (5g.6)',
+    test: async()=>{
+      ['autoFetchVerifyTargets','autoFetchUndoSave','autoFetchUndoLoad','autoFetchUndoClear','undoAutoFetch']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('autoFetchUndoItem')) throw new Error('there is no menu entry to undo a run');
+
+      // 1. The independent check catches a filter that is wrong, from IDB rather
+      // than from the filter's own view.
+      var realAll=window.idbGetAll;
+      try{
+        window.idbGetAll=function(){ return Promise.resolve([{ id:7, photo:'data:image/jpeg;base64,REAL' }]); };
+        var wrong=await autoFetchVerifyTargets([{ id:7, name:'has one really', photo:'' },
+                                                { id:8, name:'genuinely bare', photo:'' }]);
+        if(!wrong) throw new Error('the verification returned null when the store was readable');
+        if(wrong.length!==1||wrong[0].id!==7)
+          throw new Error('the second opinion missed a recipe whose photo is in IndexedDB: '+JSON.stringify(wrong.map(function(r){return r.id;})));
+        // A recipe flagged in memory counts too.
+        var wrong2=await autoFetchVerifyTargets([{ id:9, name:'flagged', photo:'', _ph:1 }]);
+        if(wrong2.length!==1) throw new Error('a recipe carrying _ph was not treated as having a photo');
+        // Unable to verify is NOT permission to continue.
+        window.idbGetAll=function(){ return Promise.reject(new Error('nope')); };
+        if(await autoFetchVerifyTargets([{ id:1, photo:'' }])!==null)
+          throw new Error('an unreadable store did not return null — the run would proceed unverified');
+      } finally { window.idbGetAll=realAll; }
+
+      // 2. A run that would overwrite must ABORT, not partially succeed.
+      var kR=recipes, kHyd=window.hydratePhotosFromIDB, kAll=window.idbGetAll, kErr=window.showServiceError,
+          kToast=window.toast, kAsk=window.askConfirm, kOnce=window.photoSearchOnce, asked=0, errored=0, searched=0;
+      try{
+        window.toast=function(){}; window.showServiceError=function(){ errored++; };
+        window.askConfirm=function(){ asked++; return Promise.resolve(true); };
+        window.photoSearchOnce=function(){ searched++; return Promise.resolve([]); };
+        window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
+        // The filter has to be WRONG for this branch to matter, so it is stubbed
+        // wrong on purpose: the real one would exclude this recipe correctly, and
+        // the whole point of the second opinion is to catch the day it does not.
+        recipes=[{ id:11, name:'actually has one', photo:'' }];
+        window.idbGetAll=function(){ return Promise.resolve([{ id:11, photo:'data:image/jpeg;base64,MINE' }]); };
+        var kFilter=window.recipesWithNoPhoto;
+        try{
+          window.recipesWithNoPhoto=function(){ return Promise.resolve(recipes.slice()); };
+          await autoFetchMissingPhotos();
+        } finally { window.recipesWithNoPhoto=kFilter; }
+        if(searched) throw new Error('the run searched for photos even though a target already had one');
+        if(!errored) throw new Error('the run stopped but said nothing — silence after refusing is its own fault');
+        if(recipes[0].photo) throw new Error('the aborted run still wrote a photo');
+      } finally {
+        recipes=kR; window.hydratePhotosFromIDB=kHyd; window.idbGetAll=kAll;
+        window.showServiceError=kErr; window.toast=kToast; window.askConfirm=kAsk; window.photoSearchOnce=kOnce;
+      }
+
+      // 3. A real run must LEAVE a snapshot. Asserting that autoFetchUndoSave works
+      // proved only that the helper works — the run was free to stop calling it,
+      // which is exactly the shape that has bitten this suite before.
+      var sR=recipes, sHyd=window.hydratePhotosFromIDB, sAll=window.idbGetAll, sAsk=window.askConfirm,
+          sTerms=window.photoSearchTerms, sOnce=window.photoSearchOnce, sFetch=window.fetch,
+          sUp=window.uploadPhotoToStorage, sToast=window.toast, sErr=window.showServiceError,
+          sSave=window.saveData, sGrid=window.renderGrid;
+      try{
+        await autoFetchUndoClear();
+        window.toast=function(){}; window.showServiceError=function(){};
+        window.saveData=function(){}; window.renderGrid=function(){};
+        window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
+        window.idbGetAll=function(){ return Promise.resolve([]); };
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        window.photoSearchTerms=function(){ return Promise.resolve({ 0:'beef' }); };
+        window.photoSearchOnce=function(){ return Promise.resolve([{ url:'https://x/p.jpg', credit:'C' }]); };
+        window.fetch=function(){ return Promise.resolve({ blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
+        window.uploadPhotoToStorage=function(){ return Promise.resolve('data:image/jpeg;base64,FETCHED'); };
+        recipes=[{ id:31, name:'blank one', photo:'' }];
+        await autoFetchMissingPhotos();
+        if(recipes[0].photo!=='data:image/jpeg;base64,FETCHED')
+          throw new Error('the run did not apply a photo, so this proves nothing about the snapshot');
+        var snap=await autoFetchUndoLoad();
+        if(!snap||!snap.items.length)
+          throw new Error('a completed run left NO snapshot — there is nothing to undo, which is the whole point of this release');
+        if(snap.items[0].id!==31) throw new Error('the snapshot records the wrong recipe');
+        if(snap.items[0].photo!=='')
+          throw new Error('the snapshot recorded the NEW photo instead of what was there before, so undo would restore the stock picture');
+      } finally {
+        recipes=sR; window.hydratePhotosFromIDB=sHyd; window.idbGetAll=sAll; window.askConfirm=sAsk;
+        window.photoSearchTerms=sTerms; window.photoSearchOnce=sOnce; window.fetch=sFetch;
+        window.uploadPhotoToStorage=sUp; window.toast=sToast; window.showServiceError=sErr;
+        window.saveData=sSave; window.renderGrid=sGrid;
+        await autoFetchUndoClear();
+      }
+
+      // 4. Undo puts back BOTH kinds of "before": a real photo, and none at all.
+      var uR=recipes, uToast=window.toast, uAsk=window.askConfirm, uSave=window.saveData,
+          uGrid=window.renderGrid;
+      try{
+        window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        recipes=[{ id:21, name:'was blank', photo:'data:image/jpeg;base64,STOCK1', photoCredit:{name:'X'} },
+                 { id:22, name:'was mine',  photo:'data:image/jpeg;base64,STOCK2', photoCredit:{name:'Y'} }];
+        await autoFetchUndoSave([{ id:21, name:'was blank', photo:'', originalPhoto:'', credit:null },
+                                 { id:22, name:'was mine', photo:'data:image/jpeg;base64,MINE', originalPhoto:'', credit:null }]);
+        await undoAutoFetch();
+        if(recipes[0].photo!=='')
+          throw new Error('undo left a stock photo on a recipe that had none before — it must go back to blank, not keep the picture');
+        if(recipes[0].photoCredit) throw new Error('undo kept a credit describing a photo that is gone');
+        if(recipes[1].photo!=='data:image/jpeg;base64,MINE')
+          throw new Error("undo did not put back the user's own photograph");
+        if(await autoFetchUndoLoad()) throw new Error('the snapshot survived the undo, so pressing it twice would undo something else');
+      } finally {
+        recipes=uR; window.toast=uToast; window.askConfirm=uAsk;
+        window.saveData=uSave; window.renderGrid=uGrid;
+        await autoFetchUndoClear();
+      }
     } },
 
   { id:'photo_never_overwrites', group:'Features', name:'Auto-fetch never touches a recipe that already has a photo (5g.2)',
@@ -7135,6 +7301,95 @@ async function recipesWithNoPhoto() {
 }
 window.recipesWithNoPhoto = recipesWithNoPhoto;
 
+// ─── Auto-fetch: snapshot, verify, undo (v34.3) ─────────────────────────────
+// This operation has destroyed Tony's photos twice. A guard was added the first
+// time and a test the second; both were necessary and neither was sufficient,
+// because a filter only has to be wrong once. So it is now REVERSIBLE, and it
+// re-checks its own answer against the authoritative store immediately before
+// writing anything.
+//
+// The snapshot is stored in the photo store under a reserved STRING key, so the
+// numeric-id sweep in savePhotosToIDB cannot touch it. Its size is proportional
+// to the damage: a correct run records only empty "before" values and costs
+// almost nothing; a broken run records the real photos, which is exactly when
+// they are needed.
+var AUTOFETCH_UNDO_KEY = 'undo:autofetch';
+
+async function autoFetchUndoSave(items) {
+  try { await idbPut({ id: AUTOFETCH_UNDO_KEY, at: Date.now(), items: items || [] }); return true; }
+  catch (e) { recordError('auto-photo', 'could not store the undo snapshot: ' + (e && e.message), 'autoFetchUndoSave'); return false; }
+}
+async function autoFetchUndoLoad() {
+  try { var row = await idbGet(AUTOFETCH_UNDO_KEY); return (row && Array.isArray(row.items)) ? row : null; }
+  catch (e) { return null; }
+}
+async function autoFetchUndoClear() {
+  try { await idbDelete(AUTOFETCH_UNDO_KEY); } catch (e) {}
+}
+window.autoFetchUndoSave = autoFetchUndoSave;
+window.autoFetchUndoLoad = autoFetchUndoLoad;
+window.autoFetchUndoClear = autoFetchUndoClear;
+
+// A SECOND opinion on "these have no photo", read straight from IndexedDB rather
+// than from the filter's own view, and taken immediately before the first write.
+// Returns the targets that actually DO have a photo — anything in it means the
+// filter is wrong and the run must not proceed. A read failure returns null:
+// unable to verify is not permission to continue.
+async function autoFetchVerifyTargets(targets) {
+  var rows = {};
+  try { (await idbGetAll() || []).forEach(function(row){ rows[row.id] = row; }); }
+  catch (e) { return null; }
+  return (targets || []).filter(function(r) {
+    var row = rows[r.id];
+    return !!(r.photo || r._ph || r._po || (row && (row.photo || row.originalPhoto)));
+  });
+}
+window.autoFetchVerifyTargets = autoFetchVerifyTargets;
+
+// Put back everything the last run changed. Restores an empty "before" too — a
+// correct run added photos to blank recipes, and undoing that means blanking them
+// again, not leaving the stock pictures behind.
+async function undoAutoFetch() {
+  var snap = await autoFetchUndoLoad();
+  if (!snap || !snap.items.length) { toast('There is nothing to undo.'); return; }
+  var when = new Date(snap.at || Date.now());
+  var hadPhoto = snap.items.filter(function(x){ return x.photo; }).length;
+  if (!await askConfirm({ icon:'↩︎', title:'Undo the last auto-fetch?',
+      message: 'Put back the photos of ' + snap.items.length + ' recipe'
+        + (snap.items.length === 1 ? '' : 's') + ' as they were before the run on '
+        + when.toLocaleString() + '.\n\n'
+        + (hadPhoto ? hadPhoto + ' had a photograph of your own, which is restored. ' : '')
+        + (snap.items.length - hadPhoto ? (snap.items.length - hadPhoto)
+            + ' had no photo, so they go back to having none. ' : '')
+        + 'Nothing else about any recipe changes.',
+      okLabel:'Undo it' })) return;
+  var done = 0;
+  snap.items.forEach(function(x) {
+    var r = recipes.find(function(y){ return y.id === x.id; });
+    if (!r) return;
+    r.photo = x.photo || '';
+    if (x.originalPhoto) r.originalPhoto = x.originalPhoto; else delete r.originalPhoto;
+    if (x.credit) r.photoCredit = x.credit; else delete r.photoCredit;
+    delete r._ph; delete r._po;
+    r.updatedAt = Date.now();
+    done++;
+  });
+  await autoFetchUndoClear();
+  saveData(); renderGrid();
+  refreshAutoFetchUndoItem();
+  toast('↩︎ Put back ' + done + ' photo' + (done === 1 ? '' : 's'));
+}
+window.undoAutoFetch = undoAutoFetch;
+
+// The menu entry only appears when there is something to undo.
+async function refreshAutoFetchUndoItem() {
+  var el = document.getElementById('autoFetchUndoItem');
+  if (!el) return;
+  var snap = await autoFetchUndoLoad();
+  el.style.display = (snap && snap.items.length) ? 'block' : 'none';
+}
+window.refreshAutoFetchUndoItem = refreshAutoFetchUndoItem;
+
 async function autoFetchMissingPhotos() {
   toast('Checking which recipes really have no photo…');
   var noPhoto = await recipesWithNoPhoto();
@@ -7144,15 +7399,42 @@ async function autoFetchMissingPhotos() {
     return;
   }
   if (!noPhoto.length) { toast('✅ All recipes already have photos!'); return; }
+
+  // A SECOND opinion, from IndexedDB rather than from the filter's own view. If
+  // any target actually has a photo the filter is wrong, and the run stops dead
+  // rather than "mostly" working — that is the failure that cost Tony his photos
+  // twice, and it is not worth a partial success.
+  var wrong = await autoFetchVerifyTargets(noPhoto);
+  if (wrong === null) {
+    showServiceError('This device\'s photo store could not be read, so there is no safe way to confirm '
+      + 'which recipes are missing a photo. Nothing was changed.');
+    return;
+  }
+  if (wrong.length) {
+    showServiceError('Stopped before changing anything.\n\n'
+      + wrong.length + ' of the ' + noPhoto.length + ' recipes picked out as "no photo" actually DO have one:\n\n'
+      + wrong.slice(0, 10).map(function(r){ return '  • ' + (r.name || ('#' + r.id)); }).join('\n')
+      + (wrong.length > 10 ? '\n  …and ' + (wrong.length - 10) + ' more.' : '')
+      + '\n\nThat means the check that decides which photos are missing is wrong, so nothing was fetched. '
+      + 'Please report this — it is the fault that has destroyed photos before.');
+    recordError('auto-photo', wrong.length + ' targets already had photos — run aborted', 'autoFetchMissingPhotos');
+    return;
+  }
+
+  // Names, not just a count. "Fetch photos for 30 recipes?" is agreeable when you
+  // expect 14; a list you can read is not.
+  var names = noPhoto.slice(0, 12).map(function(r){ return '  • ' + (r.name || ('#' + r.id)); }).join('\n');
   if (!await askConfirm({ icon:'📸', title:'Fetch photos for ' + noPhoto.length + ' recipe' + (noPhoto.length!==1?'s':'') + '?',
-      message:'Only these ' + noPhoto.length + ' have no photo anywhere — on this device or in the cloud. '
-        + 'Nothing that already has a picture is touched. Hebrew names are translated to an English dish '
-        + 'name first, because the photo libraries have no Hebrew.', okLabel:'Fetch photos' })) return;
+      message:'These have no photo anywhere — on this device or in the cloud:\n\n' + names
+        + (noPhoto.length > 12 ? '\n  …and ' + (noPhoto.length - 12) + ' more.' : '')
+        + '\n\nNothing that already has a picture is touched, and this can be undone in one press '
+        + 'afterwards (⚙️ → Undo last auto-fetch). Hebrew names are translated to an English dish name '
+        + 'first, because the photo libraries have no Hebrew.', okLabel:'Fetch photos' })) return;
 
   toast('🈯 Working out what to search for…');
   var terms = await photoSearchTerms(noPhoto.map(function(r){ return r.name; }));
 
-  var fetched = 0, noResults = [], failed = [], skipped = [];
+  var fetched = 0, noResults = [], failed = [], skipped = [], undoItems = [];
   for (var i = 0; i < noPhoto.length; i++) {
     var r = noPhoto[i];
     var term = terms[i] || photoQueryFromName(r.name) || r.name;
@@ -7176,6 +7458,12 @@ async function autoFetchMissingPhotos() {
         continue;
       }
       if (photoUrl) {
+        // The "before" state, captured at the moment of the change rather than up
+        // front, so it reflects what was really there — including a photo that
+        // arrived mid-run. Usually an empty string, which is what makes undo able
+        // to blank a recipe again rather than leaving a stock picture behind.
+        undoItems.push({ id: r.id, name: r.name, photo: r.photo || '',
+                         originalPhoto: r.originalPhoto || '', credit: r.photoCredit || null });
         r.photo = photoUrl;
         // Openverse is Creative Commons: attribution is a licence CONDITION, not
         // a courtesy, so the credit travels with the photo (v30.3).
@@ -7195,7 +7483,18 @@ async function autoFetchMissingPhotos() {
 
   // Say what happened. "Fetched 0/20" with no reason is the message this used to
   // end on, and it is impossible to act on.
-  if (fetched === noPhoto.length) { toast('✅ Fetched all ' + fetched + ' photos!'); return; }
+  // Store the snapshot BEFORE reporting, so the undo exists by the time the user
+  // reads what happened and decides they do not like it.
+  var undoSaved = undoItems.length ? await autoFetchUndoSave(undoItems) : (await autoFetchUndoClear(), false);
+  refreshAutoFetchUndoItem();
+  var undoNote = undoSaved
+    ? '\n\nNot what you wanted? ⚙️ → “↩︎ Undo last auto-fetch” puts every one of them back.'
+    : '';
+  if (fetched === noPhoto.length) {
+    if (undoSaved) showServiceError('✅ Fetched all ' + fetched + ' photos.' + undoNote);
+    else toast('✅ Fetched all ' + fetched + ' photos!');
+    return;
+  }
   var lines = ['Fetched ' + fetched + ' of ' + noPhoto.length + '.'];
   if (noResults.length) {
     lines.push('', 'No picture found for ' + noResults.length + ' — the search term is shown, '
@@ -7210,6 +7509,7 @@ async function autoFetchMissingPhotos() {
   if (skipped.length) {
     lines.push('', skipped.length + ' were left alone because a photo turned up mid-run.');
   }
+  if (undoNote) lines.push(undoNote);
   showServiceError(lines.join('\n'));
 }
 window.autoFetchMissingPhotos = autoFetchMissingPhotos;
@@ -7458,6 +7758,7 @@ window.copySyncHealth = copySyncHealth;
 function openSyncHealth() {
   renderSyncHealth();
   refreshStorageMigrateBox().catch(function(){});
+  refreshAutoFetchUndoItem().catch(function(){});
   document.getElementById('syncHealthOverlay').classList.add('open');
 }
 window.openSyncHealth   = openSyncHealth;
@@ -7649,7 +7950,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.2';
+var APP_VERSION = 'v34.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8601,6 +8902,15 @@ window.addEventListener('unhandledrejection', function(e) {
   font-size: 18px; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
 }
 .clip-badge-sm { width: 28px; height: 28px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+
+/* A masked field that is NOT an <input type="password">. See the markup comment:
+   with no <form> on the page, Chrome pairs a password input with any nearby text
+   box and offers to save the pair on almost any DOM change. -webkit-text-security
+   is supported in Chrome, Edge and Safari; Firefox gained it in 119. Where it is
+   not supported the secret is simply visible while typing, which is a fair trade
+   for a value entered once on your own device — and far better than the browser
+   filing your recipe names as usernames. */
+.masked-secret { -webkit-text-security: disc; text-security: disc; }
 
 /* 4.3 — on a wide screen, ingredients sit alongside the method and stay put
    while the method scrolls. One column everywhere else, unchanged. */
@@ -10164,7 +10474,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10217,6 +10527,7 @@ body.banner-shown .header {
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
         <button class="drop-item" id="photoRescueItem" onclick="closeDrop('moreDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
+        <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('moreDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
         <input type="file" id="photoRescueFile" accept=".json,application/json" style="display:none"
                onchange="runPhotoRescue(this.files&&this.files[0])">
         </div>
@@ -10740,7 +11051,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11124,7 +11435,15 @@ body.banner-shown .header {
         public repo, which made it no secret at all.
       </p>
       <div style="display:flex;gap:8px;">
-        <input id="bringSecretInput" type="password" autocomplete="off" placeholder="paste the secret"
+        <!-- NOT type="password" (v34.3). This page has no <form>, so Chrome's password
+             manager falls back to heuristics: it pairs any nearby text input as the
+             "username" and offers to save the pair whenever the DOM changes in a way
+             that looks like a submit. Tony got "Save password? Username: denver cut
+             steak" every time he changed a photo. Masking with CSS gives the same
+             concealment with nothing for a credential manager to latch onto. -->
+        <input id="bringSecretInput" type="text" inputmode="text" autocomplete="off"
+          autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"
+          class="masked-secret" placeholder="paste the secret"
           style="flex:1;min-width:0;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;">
         <button onclick="saveBringSecret()" style="flex-shrink:0;padding:8px 14px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
       </div>
@@ -15407,9 +15726,19 @@ function idbDelete(id) {
   return idbStore('readwrite').then(function(s) { return new Promise(function(res) {
     var r = s.delete(id); r.onsuccess = function(){res();}; r.onerror = function(){res();}; }); });
 }
+// A FAILED read must not look like an EMPTY store. `r.onerror` used to resolve
+// `[]`, which made recipesWithNoPhoto's "IndexedDB unreadable — refusing to guess"
+// branch dead code: it can only run on a rejection, and this never rejected. The
+// consequence is the worst one in the app — every recipe whose photo lives only
+// here reads as photoless, and the auto-fetch overwrites it. Same rule as
+// readCloudPhotoDocs: "could not read" and "nothing there" are different answers,
+// and only one of them is safe to act on. (v34.3)
 function idbGetAll() {
-  return idbStore('readonly').then(function(s) { return new Promise(function(res) {
-    var r = s.getAll(); r.onsuccess = function(){res(r.result || []);}; r.onerror = function(){res([]);}; }); });
+  return idbStore('readonly').then(function(s) { return new Promise(function(res, rej) {
+    var r = s.getAll();
+    r.onsuccess = function(){ res(r.result || []); };
+    r.onerror   = function(){ rej(r.error || new Error('IndexedDB read failed')); };
+  }); });
 }
 // Wipe every stored photo (used by Reset — otherwise photos would be orphaned in IDB).
 function idbClearAll() {
@@ -15578,7 +15907,15 @@ function migrateRecipes(list) {
 
 // Pull photos back out of IndexedDB into the in-memory recipes, then re-render.
 function hydratePhotosFromIDB() {
-  return idbGetAll().then(function(rows) {
+  // idbGetAll now REJECTS on a failed read (v34.3). Swallow it here and change
+  // nothing: every _ph/_po flag stays exactly as it was. Clearing one because the
+  // store could not be read is precisely how a transient failure becomes
+  // permanent photo loss.
+  return idbGetAll().catch(function(e) {
+    dlog('[photos] hydration skipped — the photo store could not be read:', e && e.message);
+    return null;
+  }).then(function(rows) {
+    if (rows === null) return;
     var byId = {};
     rows.forEach(function(row) { byId[row.id] = row; });
     var changed = false;

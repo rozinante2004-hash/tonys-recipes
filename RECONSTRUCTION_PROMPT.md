@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.2` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.3` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v34.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v34.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -589,6 +589,19 @@ far below anything that could run up a bill by accident.
 Both of these shipped. Both were invisible to a full green suite. A rebuild will reproduce them
 exactly unless it is told, because in each case the *obvious* code is the broken code.
 
+**0b. The auto-fetch must be REVERSIBLE, and must check its own answer (v34.3).** A guard was
+added after the first incident and a test after the second; both were necessary and neither was
+sufficient, because a filter only has to be wrong once. Three things now stand between it and your
+photographs. (1) A **second opinion**: after the filter picks its targets, IndexedDB is re-read
+independently and any target that actually has a photo **aborts the entire run**, naming them —
+a partial success is not worth having here, and being unable to verify is not permission to
+proceed. (2) The confirmation lists the affected recipes **by name**, because "Fetch photos for 30
+recipes?" is easy to agree to when you expect 14. (3) Every change is **snapshotted first**, into
+the photo store under a reserved string key (the numeric-id sweep in `savePhotosToIDB` cannot
+touch it), and ⚙️ → *Undo last auto-fetch* puts them all back — restoring an empty "before" too,
+so undoing a correct run blanks the recipes again rather than leaving stock pictures behind. The
+snapshot's size is proportional to the damage: a correct run stores only empty values.
+
 **0a. "Missing a photo" is NOT `!r.photo` — and getting this wrong DESTROYS photos.**
 Photos live in IndexedDB; `r.photo` is empty in memory until `hydratePhotosFromIDB` resolves,
 which is the normal state for a second or two after every load and permanent for any recipe
@@ -943,6 +956,14 @@ Rules that follow from that:
 
 - Clear the flag **only** when the photo actually arrived, or when the cloud states there is
   genuinely no photo document. A **failed read is neither** — keep the flag and try again.
+- **`idbGetAll` must REJECT on a failed read, never resolve `[]` (v34.3).** It used to resolve an
+  empty array, which made `recipesWithNoPhoto`'s "IndexedDB unreadable — refusing to guess" branch
+  **dead code**: that branch can only run on a rejection, and nothing ever rejected. With the store
+  unreadable, its most authoritative check silently became inert, every recipe whose photo lives
+  only there read as photoless, and the auto-fetch overwrote it — which is how Tony lost his photos
+  a *second* time, a week after the first fix. `hydratePhotosFromIDB` swallows the rejection and
+  changes nothing, keeping every `_ph`/`_po`, and must not inflate `_idbPhotosMissing` either: a
+  transient read failure reported as missing photos is an alarm about loss that has not happened.
 - Clearing on a failed read also arms the delete branch in `syncCloudPhotos`, which would remove
   the photo for *every* device.
 - `repairMissingPhotos()` rescues a device whose flags were already cleared by an older build —
