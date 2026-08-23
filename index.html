@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.0 -->
+<!-- Tony's Recipes Collection v34.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1988,8 +1988,18 @@ const SELF_TESTS = [
       var kept=waFilterListing(listing);
       if(kept.length!==1||kept[0]!=='Meat_Whatsapp.txt')
         throw new Error('the folder listing kept files that are not chats: '+JSON.stringify(kept));
-      if(String(waListFolder).indexOf('waFilterListing')===-1)
-        throw new Error('waListFolder does not use the filter, so the listing is unguarded');
+      // ...and waListFolder must actually apply it. Grepping its source for
+      // 'waFilterListing' is satisfied by `return (false ? waFilterListing(j) : j)`,
+      // which ships the unfiltered listing with the suite green (proved by
+      // mutation, v34.1). Drive it with a stubbed fetch instead.
+      var realFetch=window.fetch;
+      try{
+        window.fetch=function(){ return Promise.resolve({ ok:true, json:function(){ return Promise.resolve(listing); } }); };
+        var viaRoute=await waListFolder('https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/');
+        if(!viaRoute) throw new Error('waListFolder returned nothing for a listing it should have parsed');
+        if(viaRoute.length!==1||viaRoute[0]!=='Meat_Whatsapp.txt')
+          throw new Error('waListFolder returned the UNFILTERED listing: '+JSON.stringify(viaRoute));
+      } finally { window.fetch=realFetch; }
       // ...without rejecting real exports. WhatsApp's download can arrive with
       // no extension at all, which is why this is a denylist and not .txt/.zip.
       ['Meat_Whatsapp.txt','_chat.zip','WhatsApp Chat with Family.txt','download',
@@ -2087,8 +2097,32 @@ const SELF_TESTS = [
       if(String(waImportFiles).indexOf('saveChatDoc')===-1)
         throw new Error('importing a chat never syncs it, so the phone case is unsolved');
       // Removing a shared chat affects everyone; it must ask first.
-      if(String(waRemove).indexOf('askConfirm')===-1)
-        throw new Error('a cloud chat is deleted for every device without asking');
+      // Removing a CLOUD chat removes it for every device, so it must ask first.
+      // Grepping waRemove for 'askConfirm' passes with the call wrapped in a
+      // ternary that never runs, which deletes for everyone silently (the
+      // false-green shape proved by mutation across this suite, v34.1).
+      var rAsk=window.askConfirm, rDel=window.deleteCloudChat, rIdx=window.waIndex,
+          rSaveIx=window.waSaveIndex, rRender=window.renderWaSources, rT=window.toast,
+          askedToRemove=0, deleted=0;
+      try{
+        window.toast=function(){}; window.renderWaSources=function(){};
+        window.waSaveIndex=function(){};
+        window.waIndex=function(){ return [{ id:'cloud:X.txt', group:'Meat', source:'cloud', file:'X.txt', slug:'x' }]; };
+        window.deleteCloudChat=function(){ deleted++; return Promise.resolve(); };
+        window.askConfirm=function(){ askedToRemove++; return Promise.resolve(false); };   // user says NO
+        await waRemove('cloud:X.txt');
+        if(!askedToRemove)
+          throw new Error('a cloud chat was removed for EVERY device without asking anyone');
+        if(deleted)
+          throw new Error('the removal went ahead after the user declined it');
+        // ...and it must proceed when the answer is yes, or the button does nothing.
+        window.askConfirm=function(){ askedToRemove++; return Promise.resolve(true); };
+        await waRemove('cloud:X.txt');
+        if(!deleted) throw new Error('confirming the removal deleted nothing');
+      } finally {
+        window.askConfirm=rAsk; window.deleteCloudChat=rDel; window.waIndex=rIdx;
+        window.waSaveIndex=rSaveIx; window.renderWaSources=rRender; window.toast=rT;
+      }
       // The UI has to exist, or none of the above is reachable.
       if(!document.getElementById('waCloudSyncBox')) throw new Error('#waCloudSyncBox missing from the setup panel');
       var health=waChatHealth();
@@ -2123,8 +2157,29 @@ const SELF_TESTS = [
       // Running it twice must not accumulate — the panel refreshes on every open.
       var again=waMergeCloudIntoIndex(res.index, cloud);
       if(again.index.length!==res.index.length) throw new Error('a second refresh changed the list length');
-      if(String(waRefreshCloud).indexOf('waMergeCloudIntoIndex')===-1)
-        throw new Error('waRefreshCloud does not use the merge, so the list is unguarded');
+      // ...and waRefreshCloud must actually apply it. Grepping its source is
+      // satisfied by a ternary that never evaluates the call, which leaves cloud
+      // chats permanently invisible with the suite green (proved by mutation,
+      // v34.1). Drive it with a stubbed reader and a stubbed store.
+      var realDb2=window._fbDb, realRead=window.readCloudChatIndex,
+          realSaveIdx=window.waSaveIndex, realIndex=window.waIndex, saved=null;
+      try{
+        window._fbDb={};
+        window.waIndex=function(){ return [{ id:'local:Solo.txt', group:'Solo', source:'local', file:'Solo.txt' }]; };
+        window.waSaveIndex=function(ix){ saved=ix; };
+        window.readCloudChatIndex=function(){ return Promise.resolve([
+          { file:'FromCloud.txt', group:'Meat', slug:'fromcloud', parts:1, size:10, count:3, updatedAt:1 }
+        ]); };
+        await waRefreshCloud(true);
+        if(!saved) throw new Error('waRefreshCloud never wrote an index at all');
+        if(!saved.some(function(e){ return e.file==='FromCloud.txt'; }))
+          throw new Error('a chat that exists only in the cloud never reached the index — waRefreshCloud does not apply the merge, so cloud chats stay invisible on this device');
+        if(!saved.some(function(e){ return e.file==='Solo.txt'; }))
+          throw new Error('the refresh dropped a local-only chat');
+      } finally {
+        window._fbDb=realDb2; window.readCloudChatIndex=realRead;
+        window.waSaveIndex=realSaveIdx; window.waIndex=realIndex;
+      }
     } },
 
   { id:'stor_photo_marker_survives', group:'Storage', name:'A photo missing from IndexedDB is recoverable, not lost (v30.2)',
@@ -2235,7 +2290,36 @@ const SELF_TESTS = [
         if(html.indexOf(g)===-1) throw new Error(g+' is missing from the coverage list, so the user cannot tell it was searched');
       });
       if(html.indexOf('nothing relevant')===-1) throw new Error('a chat with no hits is silently omitted rather than reported');
-      if(String(waAsk).indexOf('waCoverageHtml')===-1) throw new Error('the answer never shows which chats were searched');
+      // The answer must SAY which chats it searched — an answer drawn from one of
+      // three chats, presented as if drawn from all three, is the app asserting
+      // something it has not verified. Grepping waAsk for 'waCoverageHtml' passes
+      // with the call in a dead ternary (v34.1), so the coverage is checked in
+      // the rendered output instead.
+      var covKeep=window.waLoadAllMessages, covAi=window.aiCall, covT=window.toast;
+      try{
+        window.toast=function(){};
+        window.aiCall=function(){ return Promise.resolve('Use the brisket at 230.'); };
+        window.waLoadAllMessages=function(){ return Promise.resolve({
+          messages:[{ text:'brisket at 230 degrees', group:'Meat', who:'A', chat:'local:A.txt', date:new Date() }],
+          chats:[{ id:'local:A.txt', group:'Meat', count:1 }, { id:'local:B.txt', group:'Cakes', count:0 }],
+          problems:[] }); };
+        var box=document.getElementById('waAskAnswer');
+        if(!box) throw new Error('the ask panel has no answer element');
+        box.innerHTML='';
+        var inp=document.getElementById('waAskInput');
+        if(!inp) throw new Error('the ask panel has no input');
+        inp.value='brisket';
+        await waAsk();
+        var txt=box.textContent||'';
+        // Assert on text only the COVERAGE block emits. Looking for the group
+        // name was not enough: the quoted messages carry it too, so the
+        // assertion passed with the coverage removed (v34.1) — the same shape as
+        // a negative test whose fixture already forces the expected answer.
+        if(txt.indexOf('Searched ')===-1)
+          throw new Error('the answer never says how many chats were searched, so an answer drawn from one chat of three looks complete');
+        if(txt.indexOf('nothing relevant')===-1)
+          throw new Error('a chat that contributed nothing is silently omitted, which reads as "everything was searched and agreed"');
+      } finally { window.waLoadAllMessages=covKeep; window.aiCall=covAi; window.toast=covT; }
 
       // Everything above works on a hand-built array, which cannot catch a
       // loader that stops after the first chat — and that is the actual question
@@ -2844,10 +2928,60 @@ const SELF_TESTS = [
         if(await recipesWithNoPhoto()!==null)
           throw new Error('an unreadable photo store did not stop the run — it would guess, and guessing overwrites');
 
-        // The last-line guard must exist in the fetch loop too: hydration can land
-        // mid-run, seconds after the list was chosen.
-        if(String(autoFetchMissingPhotos).indexOf('r.photo || r._ph || r._po')===-1)
-          throw new Error('nothing re-checks the recipe just before overwriting it, so a photo arriving mid-run is still lost');
+        // The last-line guard in the FETCH LOOP, driven for real. This used to be
+        // `String(autoFetchMissingPhotos).indexOf('r.photo || r._ph || r._po')`,
+        // which is satisfied by the text alone: wrapping the guard in `if (false &&
+        // ...)` left the suite fully green while the exact incident that destroyed
+        // Tony's photos was live again. Proven by mutation, v34.1.
+        //
+        // The scenario: the list is chosen, then hydration or a cloud attach lands
+        // seconds later while a download is in flight. Whatever the list said, a
+        // recipe that has a photo NOW must not be overwritten.
+        window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
+        window.idbGetAll=function(){ return Promise.resolve([]); };
+        recipes=[{ id:501, name:'Late arrival', photo:'' }];
+        var realConfirm=window.askConfirm, realTerms=window.photoSearchTerms,
+            realOnce=window.photoSearchOnce, realUpload=window.uploadPhotoToStorage,
+            realFetch=window.fetch, realToast=window.toast, realErr=window.showServiceError,
+            realSave=window.saveData, realRG=window.renderGrid;
+        try{
+          window.toast=function(){}; window.showServiceError=function(){};
+          window.saveData=function(){}; window.renderGrid=function(){};
+          window.askConfirm=function(){ return Promise.resolve(true); };
+          window.photoSearchTerms=function(){ return Promise.resolve({ 0:'late arrival' }); };
+          window.photoSearchOnce=function(){ return Promise.resolve([{ url:'https://x/p.jpg', credit:'A' }]); };
+          window.fetch=function(){ return Promise.resolve({ blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
+          // The photo lands DURING the fetch — exactly the race the guard exists for.
+          window.uploadPhotoToStorage=function(){
+            recipes[0].photo='data:image/jpeg;base64,ARRIVED';
+            return Promise.resolve('https://stock/photo.jpg');
+          };
+          await autoFetchMissingPhotos();
+          if(recipes[0].photo!=='data:image/jpeg;base64,ARRIVED')
+            throw new Error('a photo that arrived mid-run was overwritten with the stock one — this is the incident that destroyed real photographs');
+
+          // ...and when it DOES apply a photo, the credit must come with it.
+          // Openverse is Creative Commons: attribution is a licence CONDITION,
+          // and an empty credit is a false claim of compliance. Grepping
+          // autoFetchMissingPhotos for 'photoCreditOf' passes with the call
+          // wrapped in a ternary that never runs (proved by mutation, v34.1).
+          recipes=[{ id:502, name:'Needs a photo', photo:'' }];
+          window.photoSearchOnce=function(){ return Promise.resolve([
+            { url:'https://x/p.jpg', credit:'Jane Photographer', creditUrl:'https://x/jane',
+              license:'CC-BY', sourceLabel:'Openverse' }]); };
+          window.uploadPhotoToStorage=function(){ return Promise.resolve('https://stock/photo.jpg'); };
+          await autoFetchMissingPhotos();
+          if(!recipes[0].photo) throw new Error('the auto-fetch applied no photo at all');
+          if(!recipes[0].photoCredit || !recipes[0].photoCredit.name)
+            throw new Error('an auto-fetched photo was stored crediting nobody — on a CC-BY source that is a licence breach, not a cosmetic gap');
+          if(recipes[0].photoCredit.name!=='Jane Photographer')
+            throw new Error('the credit names the wrong person: '+JSON.stringify(recipes[0].photoCredit));
+        } finally {
+          window.askConfirm=realConfirm; window.photoSearchTerms=realTerms;
+          window.photoSearchOnce=realOnce; window.uploadPhotoToStorage=realUpload;
+          window.fetch=realFetch; window.toast=realToast; window.showServiceError=realErr;
+          window.saveData=realSave; window.renderGrid=realRG;
+        }
       } finally {
         recipes=savedRecipes; window.hydratePhotosFromIDB=realHyd; window.idbGetAll=realAll;
       }
@@ -3245,9 +3379,11 @@ const SELF_TESTS = [
         throw new Error('a credit was invented for a photo with no named creator');
       if(photoCreditOf(null)!==null) throw new Error('a missing image produced a credit');
       // Both the picker and the auto-fetch must go through it, or they drift and
-      // one of them silently stops honouring the licence.
-      if(String(autoFetchMissingPhotos).indexOf('photoCreditOf')===-1)
-        throw new Error('the auto-fetch builds its own credit record instead of using the shared one');
+      // one of them silently stops honouring the licence. That the auto-fetch
+      // actually STORES a credit is asserted behaviourally in
+      // photo_never_overwrites, which drives the real fetch — grepping
+      // autoFetchMissingPhotos for 'photoCreditOf' passed with the call wrapped
+      // in a ternary that never ran (proved by mutation, v34.1).
 
       // One AI call for the whole batch, and an English name needs none at all.
       var realAi=window.aiCall, calls=0;
@@ -3418,8 +3554,30 @@ const SELF_TESTS = [
         if(got.url!=='https://site.com/recipe/1')
           throw new Error('the URL was not carried across, so the recipe would have no source: '+got.url);
       } finally { window.openFreehandModal=realOpen; closeM('urlImportOverlay'); }
-      if(String(runFreehandImport).indexOf('_freehandSourceUrl')===-1)
-        throw new Error('free-hand never applies the carried URL as the recipe source');
+      // ...and the carried URL must actually LAND on the parsed recipe. Grepping
+      // runFreehandImport for '_freehandSourceUrl' is satisfied by `if (false &&
+      // _freehandSourceUrl ...)`, which drops the source with the suite green
+      // (proved by mutation, v34.1). Run the real import with a stubbed AI.
+      var realAi=window.aiCall, realApply=window.applyParsedRecipe,
+          realPrev=window.applyParsedToFormPreview, realToast2=window.toast, applied=null;
+      try{
+        window.toast=function(){};
+        window.aiCall=function(){ return Promise.resolve('{"name":"Pasted dish","ingredients":[],"steps":["s"]}'); };
+        window.applyParsedRecipe=function(pr){ applied=pr; };
+        window.applyParsedToFormPreview=function(pr){ applied=pr; };
+        openFreehandModal('some pasted recipe text', 'https://site.com/recipe/1');
+        var ta=document.getElementById('freehandText');
+        if(!ta) throw new Error('the free-hand modal has no text area');
+        ta.value='some pasted recipe text';
+        await runFreehandImport();
+        if(!applied) throw new Error('the free-hand import produced no recipe at all');
+        if(applied.source!=='https://site.com/recipe/1')
+          throw new Error('the recipe came out with source "'+applied.source+'" — the URL carried over from the failed import was dropped, so the harvest panel can never mark it imported');
+      } finally {
+        window.aiCall=realAi; window.applyParsedRecipe=realApply;
+        window.applyParsedToFormPreview=realPrev; window.toast=realToast2;
+        closeM('freehandOverlay');
+      }
     } },
 
   { id:'wa_scan_load_parallel', group:'WhatsApp', name:'Chats load concurrently, in order, and report progress (5f.9)',
@@ -3611,9 +3769,28 @@ const SELF_TESTS = [
 
         // Replacing a DUPLICATE is a successful import, not a cancel. This path
         // closes the overlay from confirmImportChecked, which used to forget to
-        // say so — another way the batch ended after one.
-        if(String(confirmImportChecked).indexOf('_waQueue.imported = true')===-1)
-          throw new Error('replacing a duplicate does not tell the queue it succeeded, so a replace ends the batch');
+        // say so — another way the batch ended after one. Grepping that function
+        // for '_waQueue.imported = true' passes with the line wrapped in a dead
+        // branch, so it is driven for real here (v34.1).
+        var qKeep=window._waQueue, rAskDup2=window.askDuplicateAction, rClose=window.closeM,
+            rRF3=window.renderFilters, rRG3=window.renderGrid, rSD=window.saveData,
+            rT3=window.toast, rPush=window.pushHistory, rKeepRecipes=recipes;
+        try{
+          window.toast=function(){}; window.renderFilters=function(){}; window.renderGrid=function(){};
+          window.saveData=function(){}; window.closeM=function(){}; window.pushHistory=function(){};
+          window.askDuplicateAction=function(){ return Promise.resolve('replace'); };
+          window._waQueue={ items:[], imported:false };
+          var existing=normalizeRecipe({ id:9101, name:'Dup Target', ingredients:[{a:'1',n:'old'}], steps:['old'] });
+          recipes=[existing];
+          await confirmImportChecked({ name:'Dup Target', ingredients:[{a:'2',n:'new'}], steps:['new'] },
+                                     'urlImportOverlay', { recipe:existing, why:'name' });
+          if(!_waQueue.imported)
+            throw new Error('replacing a duplicate left the queue thinking the import was cancelled, so the rest of the batch would be abandoned');
+        } finally {
+          window._waQueue=qKeep; window.askDuplicateAction=rAskDup2; window.closeM=rClose;
+          window.renderFilters=rRF3; window.renderGrid=rRG3; window.saveData=rSD;
+          window.toast=rT3; window.pushHistory=rPush; recipes=rKeepRecipes;
+        }
 
         // Stopping must still be possible, and must be a deliberate act.
         if(typeof waQueueAbort!=='function') throw new Error('there is no way to stop a running batch');
@@ -4336,8 +4513,53 @@ const SELF_TESTS = [
       var src=document.documentElement.innerHTML;
       if(src.indexOf('id: nextId++, uid: newUid()')===-1)
         throw new Error('new recipes are created without a uid, so collisions stay undetectable');
-      if(String(_loadFromFirestoreInner).indexOf('mergeRecipeLists')===-1)
-        throw new Error('the load path still uses the old id-only merge');
+      // ...and the LOAD PATH must apply it. Grepping _loadFromFirestoreInner for
+      // 'mergeRecipeLists' is satisfied by a ternary that never evaluates the
+      // call, which turns an offline load back into a wholesale replace with the
+      // suite green (proved by mutation, v34.1). Drive the real load instead.
+      var savedRecipes2=recipes, savedNext=nextId, savedQ=localStorage.getItem('tonys_offline_queue');
+      var rDb=window._fbDb, rRead=window.readCloudRecipeDocs, rAttach=window.attachCloudPhotos,
+          rRepair=window.repairMissingPhotos, rSave=window.saveLocal, rGrid=window.renderGrid,
+          rFilters=window.renderFilters, rToast=window.toast, rCount=window.countCloudRead,
+          rSetMeta=window.setLastCloudMetaAt;
+      try{
+        window.saveLocal=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
+        window.toast=function(){}; window.countCloudRead=function(){}; window.setLastCloudMetaAt=function(){};
+        window.attachCloudPhotos=function(){ return Promise.resolve(); };
+        window.repairMissingPhotos=function(){ return Promise.resolve({restored:0,checked:0}); };
+        // readCloudRecipeDocs returns plain {id, data} objects with the recipe as
+        // JSON in data.r — NOT Firestore snapshots. Assuming the snapshot shape
+        // made this test fail honestly on its first run.
+        window.readCloudRecipeDocs=function(){ return Promise.resolve([
+          { id:'recipe_1', data:{ updatedAt:5000,
+            r: JSON.stringify({ id:1, uid:'u-cloud-1', name:'From the cloud', updatedAt:5000 }) } }
+        ]); };
+        window._fbDb={ collection:function(){ return {
+          doc:function(){ return {
+            get:function(){ return Promise.resolve({ exists:true, data:function(){ return { schema:2, nextId:9, updatedAt:1 }; } }); },
+            onSnapshot:function(){ return function(){}; }
+          }; },
+          where:function(){ return this; },
+          onSnapshot:function(){ return function(){}; }
+        }; } };
+        // An offline edit exists locally, and the cloud holds a different recipe.
+        localStorage.setItem('tonys_offline_queue','1');
+        recipes=[{ id:2, uid:'u-local-2', name:'Added while offline', updatedAt:6000 }];
+        await _loadFromFirestoreInner({ uid:'test' });
+        var loadedNames=recipes.map(function(r){ return r.name; });
+        if(loadedNames.indexOf('Added while offline')===-1)
+          throw new Error('an offline load REPLACED instead of merging — the recipe added while offline is gone: '+loadedNames.join(', '));
+        if(loadedNames.indexOf('From the cloud')===-1)
+          throw new Error('the merge dropped the cloud recipe: '+loadedNames.join(', '));
+      } finally {
+        recipes=savedRecipes2; nextId=savedNext;
+        window._fbDb=rDb; window.readCloudRecipeDocs=rRead; window.attachCloudPhotos=rAttach;
+        window.repairMissingPhotos=rRepair; window.saveLocal=rSave; window.renderGrid=rGrid;
+        window.renderFilters=rFilters; window.toast=rToast; window.countCloudRead=rCount;
+        window.setLastCloudMetaAt=rSetMeta;
+        if(savedQ===null) localStorage.removeItem('tonys_offline_queue');
+        else localStorage.setItem('tonys_offline_queue', savedQ);
+      }
     } },
 
   { id:'ux_signin_always_reachable', group:'UI', name:'Sign in is never unclickable text (v31.5)',
@@ -4470,10 +4692,42 @@ const SELF_TESTS = [
       if(findDuplicate({name:'Anything',source:''},list)&&!findDuplicate({name:'Anything'},list))
         throw new Error('an empty source matched something');
       // The check must run BEFORE anything is written.
-      if(String(confirmImportParsed).indexOf('findDuplicate')===-1)
-        throw new Error('the import path never checks for duplicates');
-      if(String(confirmImportParsed).indexOf('recipes.unshift')!==-1)
-        throw new Error('confirmImportParsed still writes directly, so the check cannot block it');
+      // The import path must CONSULT the duplicate check before writing. Grepping
+      // confirmImportParsed for 'findDuplicate' is satisfied by a ternary that
+      // never evaluates it, which lets every duplicate straight through with the
+      // suite green (proved by mutation, v34.1). Drive it: a real duplicate must
+      // reach the ask-first branch, never the silent-add one.
+      var keepR=recipes, keepN=nextId, realAskDup=window.askDuplicateAction,
+          realNow=window.importParsedNow, realToast3=window.toast,
+          realRF2=window.renderFilters, realRG2=window.renderGrid, asked=null, addedSilently=0;
+      try{
+        window.toast=function(){}; window.renderFilters=function(){}; window.renderGrid=function(){};
+        // Order matters: the ask must come FIRST. Answering "keep both" then adding
+        // is correct behaviour, so counting adds alone proves nothing.
+        var seq=[];
+        window.askDuplicateAction=function(d){ asked=d; seq.push('ask'); return Promise.resolve('add'); };
+        window.importParsedNow=function(){ addedSilently++; seq.push('add'); };
+        recipes=[normalizeRecipe({ id:1, name:'Grandmas Lasagna', source:'http://example.com/lasagna',
+                                   ingredients:[{a:'1',n:'pasta'}], steps:['bake'] })];
+        confirmImportParsed({ name:"Grandma's Lasagna!", ingredients:[{a:'1',n:'pasta'}], steps:['bake'] }, 'urlImportOverlay');
+        await new Promise(function(res){ setTimeout(res, 0); });
+        if(!asked)
+          throw new Error('an obvious duplicate was imported without asking — the import path does not consult findDuplicate');
+        if(seq[0]!=='ask')
+          throw new Error('the duplicate reached importParsedNow before anything asked — the check cannot block it, sequence was: '+seq.join(' -> '));
+        if(asked.why!=='name') throw new Error('the duplicate was matched on '+asked.why+', expected the name');
+
+        // ...and a genuine NON-duplicate must not be interrogated.
+        asked=null; addedSilently=0; seq=[];
+        confirmImportParsed({ name:'Something Else Entirely', ingredients:[{a:'1',n:'x'}], steps:['y'] }, 'urlImportOverlay');
+        await new Promise(function(res){ setTimeout(res, 0); });
+        if(asked) throw new Error('a recipe that is not a duplicate triggered the duplicate prompt');
+        if(addedSilently!==1) throw new Error('a non-duplicate was not imported');
+      } finally {
+        recipes=keepR; nextId=keepN; window.askDuplicateAction=realAskDup;
+        window.importParsedNow=realNow; window.toast=realToast3;
+        window.renderFilters=realRF2; window.renderGrid=realRG2;
+      }
 
       // ACTUALLY RUN AN IMPORT. The assertions above are all about the source
       // text, and they all passed while `importParsedNow` was null at runtime —
@@ -4594,8 +4848,26 @@ const SELF_TESTS = [
       if(safeUrl('data:image/png;base64,AAA').indexOf('data:image/')!==0) throw new Error('recipe photo data URLs must survive');
       if(safeUrl('data:text/html,<script>')!=='') throw new Error('a non-image data: URL was allowed');
       // The preview iframe must be sandboxed — defence in depth for the above.
-      if(String(showEmailModal).indexOf("setAttribute('sandbox'")===-1)
-        throw new Error('the email preview iframe is not sandboxed, so any future escaping slip reaches this origin');
+      // Checked on the ELEMENT, not by grepping showEmailModal for
+      // "setAttribute('sandbox'": that text survives `if (false) iframe.set...`,
+      // which leaves the preview un-sandboxed with the suite green. Mutation
+      // proved it, v34.1.
+      var savedRec=recipes, realT=window.toast;
+      try{
+        window.toast=function(){};
+        recipes=[normalizeRecipe({ id:777001, name:'Sandbox probe', ingredients:[], steps:['x'] })];
+        showEmailModal(777001);
+        var frame=document.querySelector('#emailModalOverlay iframe');
+        if(!frame) throw new Error('the email preview rendered no iframe at all');
+        var sb=frame.getAttribute('sandbox');
+        if(sb===null)
+          throw new Error('the email preview iframe is NOT sandboxed, so any future escaping slip in rHtml reaches this origin — localStorage and the Firebase session included');
+        if(/allow-scripts|allow-same-origin/.test(sb))
+          throw new Error('the preview sandbox grants '+sb+' — allow-scripts or allow-same-origin defeats the point of sandboxing it');
+      } finally {
+        var ov=document.getElementById('emailModalOverlay'); if(ov) ov.remove();
+        recipes=savedRec; window.toast=realT;
+      }
     } },
 
   { id:'safe_restore_confirms', group:'Backup', name:'Restore asks before replacing everything (audit v31.0)',
@@ -4630,9 +4902,26 @@ const SELF_TESTS = [
       if(b[2].getAttribute('aria-label')!=='Send to Bring!') throw new Error('an empty button did not fall back to its title');
       if(b[3].getAttribute('aria-label')!=='Already named') throw new Error('an existing aria-label was overwritten');
       if(b[4].getAttribute('aria-label')) throw new Error('a button with real text was given a redundant label');
-      // Dialogs built at runtime must be covered, not just the boot-time sweep.
-      if(String(trapFocus).indexOf('labelIconButtons')===-1)
-        throw new Error('dialogs opened later are never labelled');
+      // Dialogs built at runtime must be covered, not just the boot-time sweep —
+      // and that is checked by OPENING one. `String(trapFocus).indexOf(
+      // 'labelIconButtons')` is satisfied by `if (false) labelIconButtons(el)`,
+      // which leaves every runtime dialog unlabelled with the suite green
+      // (proved by mutation, v34.1).
+      var probe=document.createElement('div');
+      probe.id='a11yTrapProbe';
+      probe.innerHTML='<button>✕</button><button>🤍</button>';
+      document.body.appendChild(probe);
+      try{
+        trapFocus('a11yTrapProbe');
+        var pb=probe.querySelectorAll('button');
+        if(pb[0].getAttribute('aria-label')!=='Close')
+          throw new Error('a dialog opened at runtime was never labelled — trapFocus does not reach labelIconButtons');
+        if(!pb[1].getAttribute('aria-label'))
+          throw new Error('an icon button inside a runtime dialog has no accessible name');
+      } finally {
+        probe.remove();
+        if(Array.isArray(window._focusReturn)) _focusReturn.pop();
+      }
     } },
 
   { id:'leak_mobile_panel_listener', group:'Performance', name:'The mobile filter panel does not stack listeners (audit v31.0)',
@@ -4781,8 +5070,46 @@ const SELF_TESTS = [
       if(src.indexOf('failures')===-1) throw new Error('nothing collects why each source declined');
       // Attribution must survive being applied, or CC-BY photos breach their licence.
       if(typeof photoCreditHtml!=='function') throw new Error('photoCreditHtml not defined');
-      if(String(useSelectedSearchPhoto).indexOf('photoCredit')===-1)
-        throw new Error('credit is discarded when the photo is applied — a CC-BY photo would be uncredited');
+      // The picker must STORE the credit, not merely mention it. Grepping
+      // useSelectedSearchPhoto for 'photoCredit' passes with the assignment in a
+      // dead branch (v34.1), so it is applied for real here — on a CC-BY source
+      // an uncredited photo is a licence breach, not a cosmetic gap.
+      // heroPhotoTargetId is a top-level `let`, so it is NOT a window property:
+      // `window.heroPhotoTargetId = ...` silently creates a shadow while the real
+      // binding stays null, and the recipe is never found. Assign the identifier.
+      // closeM is deliberately NOT stubbed — stubbing it leaves the overlay open
+      // and the next test finds a dialog that will not close.
+      var pcRecipes=recipes, pcSel=_photoSearchSelected, pcRes=_photoSearchResults,
+          pcTarget=heroPhotoTargetId, pcFetch=window.fetch, pcUp=window.uploadPhotoToStorage,
+          pcSave=window.saveData, pcGrid=window.renderGrid, pcToast=window.toast;
+      try{
+        window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
+        window.fetch=function(){ return Promise.resolve({ ok:true, blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
+        window.uploadPhotoToStorage=function(){ return Promise.resolve('data:image/jpeg;base64,PICKED'); };
+        recipes=[normalizeRecipe({ id:9301, name:'Credit target', ingredients:[], steps:['x'] })];
+        heroPhotoTargetId=9301;
+        _photoSearchResults=[{ url:'https://x/p.jpg', credit:'Ada Lens',
+          creditUrl:'https://x/ada', license:'CC BY 4.0', sourceLabel:'Openverse' }];
+        _photoSearchSelected=0;
+        await useSelectedSearchPhoto();
+        var pr=recipes[0];
+        if(pr.photo!=='data:image/jpeg;base64,PICKED') throw new Error('the chosen photo was not applied at all');
+        if(!pr.photoCredit || pr.photoCredit.name!=='Ada Lens')
+          throw new Error('the photo was applied with no credit stored — a CC-BY photo would be published uncredited, which breaches its licence');
+
+        // ...and a photo with no named creator must NOT gain an empty credit,
+        // which would be a false claim of compliance.
+        _photoSearchResults=[{ url:'https://x/q.jpg', license:'Pixabay licence', sourceLabel:'Pixabay' }];
+        _photoSearchSelected=0;
+        await useSelectedSearchPhoto();
+        if(recipes[0].photoCredit)
+          throw new Error('a credit was invented for a photo with no named creator: '+JSON.stringify(recipes[0].photoCredit));
+      } finally {
+        recipes=pcRecipes; _photoSearchSelected=pcSel; _photoSearchResults=pcRes;
+        heroPhotoTargetId=pcTarget; window.fetch=pcFetch; window.uploadPhotoToStorage=pcUp;
+        window.saveData=pcSave; window.renderGrid=pcGrid; window.toast=pcToast;
+        closeM('photoSearchOverlay');
+      }
       var withCredit=photoCreditHtml({ photo:'data:x', photoCredit:{ name:'A Person', url:'https://example.com/p', license:'CC BY 4.0', source:'Openverse' } });
       ['A Person','CC BY 4.0','Openverse'].forEach(function(bit){
         if(withCredit.indexOf(bit)===-1) throw new Error('the credit line omits '+bit);
@@ -7299,7 +7626,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.0';
+var APP_VERSION = 'v34.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9814,7 +10141,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10390,7 +10717,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

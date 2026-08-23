@@ -414,6 +414,24 @@ found only because a test was written first and disagreed with the code.
   diagnostic that overstates loss during an investigation into loss is worse than no
   diagnostic. When a number appears in two places, derive both from one predicate, or
   print both and say what separates them.
+- **Sweep every source-text assertion with `if (false && …)`.** Break the behaviour, leave
+  the searched string in place, and see whether anything fails. Of nineteen such assertions
+  in this suite, **thirteen were false-greens** — including the guard against the photo
+  overwrite that destroyed a real collection, the email iframe's `sandbox`, the import
+  duplicate check, the offline merge on load, and the confirm before deleting a cloud chat
+  for every device. This trap was already written up here with five past instances while
+  thirteen live ones sat in the suite: **documenting a trap does not remove it.** Where a
+  source check is genuinely irreducible (dormant code that cannot run in the test
+  environment, like the Firebase Storage path), say so in a comment beside it.
+- **A top-level `let`/`const` is NOT a window property.** `window.heroPhotoTargetId = 9301`
+  creates a shadow while the real binding stays `null`, so the function under test sees
+  nothing and the test fails for a reason that has nothing to do with the code. Assign the
+  bare identifier. Related: stubbing `closeM` to a no-op leaves a modal open and breaks a
+  later test — let it close, or clean up in the `finally`.
+- **A positive assertion needs isolating just as much as a negative one.** Checking that the
+  chat-coverage block rendered by looking for the group name passed with the block deleted —
+  the quoted messages carry that name too. Assert on something only the code under test can
+  produce (here, "Searched N chats").
 - **Mutate on purpose to FIND gaps, not only to validate a new test.** Eight mutations
   aimed at the data-safety paths found five holes the 186-test suite could not see —
   including `repairMissingPhotos`, the only route back for a device whose photo flags

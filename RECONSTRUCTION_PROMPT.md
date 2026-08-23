@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.0` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.1` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v34.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v34.1"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1557,6 +1557,25 @@ Several tests here were written, passed, and were later shown to assert nothing:
   load out to allow parallel loading broke the test while the behaviour was untouched — the same
   source-text anti-pattern as above, one release later. It now stubs the cloud reader, forbids
   the network, and checks which one is actually called.
+
+**The `if (false && ...)` sweep — run it on every source-text assertion in the suite (v34.1).**
+Take each `String(fn).indexOf('X')` check, break the BEHAVIOUR while leaving `X` in the source
+(`if (false && cond)`, `(false ? call() : fallback)`), and see whether anything fails. Nineteen
+such assertions existed; **thirteen were false-greens**, including the guard against the photo
+overwrite that had destroyed a real collection, the email preview's iframe `sandbox`, the
+duplicate check on import, the offline merge on load, and the confirm before deleting a cloud
+chat for every device. This anti-pattern was already documented here with five past instances and
+the suite still had thirteen live ones: **documenting a trap does not remove it — only the sweep
+does.** Convert each to a behavioural drive (stub the collaborators, call the real function, check
+what it produced). Where a source check is genuinely irreducible — code that cannot run in the
+test environment, such as the dormant Firebase Storage path — say so in a comment beside it, so
+the next reader knows it is a knowing compromise and not an oversight.
+
+**Two binding traps that make a stub silently do nothing.** A top-level `let`/`const` (e.g.
+`heroPhotoTargetId`) is **not** a window property: `window.heroPhotoTargetId = 9301` creates a
+shadow while the real binding stays null, and the function under test sees no change — assign the
+bare identifier instead. And stubbing `closeM` to a no-op leaves a modal open for every later
+test; let it close, or restore the DOM in the `finally`.
 
 **Mutating on PURPOSE, to find the gaps, is a separate exercise from mutating to validate a new
 test — and it is how the worst holes were found.** Pick the code where a defect is silent,
