@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v33.9 -->
+<!-- Tony's Recipes Collection v34.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4149,6 +4149,129 @@ const SELF_TESTS = [
       if(!/minute/i.test(workerErrorText(429,{}))) throw new Error('a 429 does not say to wait');
     } },
 
+  { id:'sync_merge_precedence', group:'Cloud Sync', name:'A merge keeps the NEWER copy and never resurrects an old edit (5g.5)',
+    test: async()=>{
+      if(typeof mergeRecipeLists!=='function') throw new Error('mergeRecipeLists not defined');
+
+      // Same recipe, same id, edited in both places. The newer edit must win in
+      // BOTH directions — a merge that always prefers local silently reverts work
+      // done on another device, and one that always prefers cloud discards what
+      // was just typed here. Neither reports anything: the recipe is simply wrong
+      // afterwards, and the older text looks like a recipe the user mis-remembers.
+      var cloudNewer=mergeRecipeLists(
+        [{ id:5, name:'Brisket', steps:['cloud edit'], updatedAt:2000 }],
+        [{ id:5, name:'Brisket', steps:['local edit'], updatedAt:1000 }], 6);
+      var got=cloudNewer.list.filter(function(r){ return r.id===5; })[0];
+      if(!got||got.steps[0]!=='cloud edit')
+        throw new Error('an OLDER local copy overwrote a newer cloud one — the edit made on the other device is gone with no warning');
+
+      var localNewer=mergeRecipeLists(
+        [{ id:5, name:'Brisket', steps:['cloud edit'], updatedAt:1000 }],
+        [{ id:5, name:'Brisket', steps:['local edit'], updatedAt:2000 }], 6);
+      var got2=localNewer.list.filter(function(r){ return r.id===5; })[0];
+      if(!got2||got2.steps[0]!=='local edit')
+        throw new Error('a newer local edit lost to an older cloud copy — the merge always prefers the cloud, so nothing typed offline survives');
+
+      // A missing updatedAt must not read as "newest". Undated data comes from
+      // old exports and hand-edited backups.
+      var undated=mergeRecipeLists(
+        [{ id:5, name:'Brisket', steps:['cloud edit'], updatedAt:2000 }],
+        [{ id:5, name:'Brisket', steps:['undated'] }], 6);
+      if(undated.list.filter(function(r){ return r.id===5; })[0].steps[0]!=='cloud edit')
+        throw new Error('a recipe with no updatedAt beat a dated one — undated data would overwrite everything');
+
+      // A renumbered recipe must LOSE its photo flags. `_ph` means "a photo for
+      // this id lives elsewhere", and after renumbering that is a claim about a
+      // different recipe's photo — it would attach the wrong picture, and worse,
+      // arm the delete branch against the other recipe's cloud copy.
+      // Distinct uids, or these are the SAME recipe by identity and the older one
+      // simply loses — which is correct, and not the branch under test here.
+      var clash=mergeRecipeLists(
+        [{ id:7, uid:'u-cloud', name:'Cloud recipe', updatedAt:2000 }],
+        [{ id:7, uid:'u-local', name:'A different recipe', updatedAt:1000, _ph:1, _po:1 }], 8);
+      var moved=clash.list.filter(function(r){ return r.name==='A different recipe'; })[0];
+      if(!moved) throw new Error('the colliding local recipe was dropped instead of renumbered');
+      if(moved.id===7) throw new Error('the local recipe was not renumbered, so one of the two is lost');
+      if(moved._ph||moved._po)
+        throw new Error('a renumbered recipe kept its photo flags, which now point at another recipe’s photo');
+    } },
+
+  { id:'photo_repair_bounds', group:'Storage', name:'The photo repair is bounded and never guesses absence (5g.5)',
+    test: async()=>{
+      if(typeof repairMissingPhotos!=='function') throw new Error('repairMissingPhotos not defined');
+      var savedRecipes=recipes, realDb=window._fbDb, realUser=window._fbUser,
+          realToast=window.toast, realSave=window.saveLocal, realRG=window.renderGrid,
+          savedProbed=localStorage.getItem('tonys_photo_probed');
+      try{
+        window.toast=function(){}; window.saveLocal=function(){}; window.renderGrid=function(){};
+        window._fbUser={ uid:'test' };
+        localStorage.removeItem('tonys_photo_probed');
+
+        // This is the LAST line of defence for a device whose _ph flags were
+        // already cleared by an older build: no reload, restart or re-sync brings
+        // those photos back, only this. It had no test at all.
+        var reads=0;
+        function stub(answer){
+          return { collection:function(){ return { doc:function(id){ return { get:function(){
+            reads++; return answer(id);
+          } }; } }; } };
+        }
+
+        // 1. Bounded. 200 photoless recipes must not spend 200 of the day's reads.
+        recipes=[]; for(var i=1;i<=200;i++) recipes.push({ id:i, name:'r'+i, photo:'' });
+        window._fbDb=stub(function(){ return Promise.resolve({ exists:false, data:function(){ return {}; } }); });
+        var out=await repairMissingPhotos();
+        if(reads>PHOTO_REPAIR_MAX)
+          throw new Error('the repair made '+reads+' reads for 200 recipes — unbounded, it would burn the daily quota every load');
+        if(out.checked>PHOTO_REPAIR_MAX) throw new Error('checked '+out.checked+', above the bound of '+PHOTO_REPAIR_MAX);
+
+        // 2. A recipe that already HAS a photo, or a flag saying where it is, must
+        // never be read for — that is a wasted round trip per load, for ever.
+        localStorage.removeItem('tonys_photo_probed');
+        reads=0;
+        recipes=[{ id:1, name:'has one', photo:'data:image/jpeg;base64,A' },
+                 { id:2, name:'flagged',  photo:'', _ph:1 },
+                 { id:3, name:'old flag', photo:'', hp:1 }];
+        await repairMissingPhotos();
+        if(reads!==0)
+          throw new Error('the repair read '+reads+' document(s) for recipes that already have a photo or know where it is');
+
+        // 3. A FAILED read is not proof of absence. Recording it as probed means
+        // the recipe is never asked about again — a network blip made permanent.
+        localStorage.removeItem('tonys_photo_probed');
+        recipes=[{ id:9, name:'unknown', photo:'' }];
+        window._fbDb=stub(function(){ return Promise.reject(new Error('offline')); });
+        await repairMissingPhotos();
+        var probed=[]; try{ probed=JSON.parse(localStorage.getItem('tonys_photo_probed')||'[]')||[]; }catch(e){}
+        if(probed.map(String).indexOf('9')>-1)
+          throw new Error('a failed read was recorded as "genuinely has no photo" — that recipe would never be asked about again, so a blip becomes permanent loss');
+
+        // 4. ...but a document that genuinely does not exist IS remembered, or the
+        // photoless recipes are re-probed on every single load for ever.
+        localStorage.removeItem('tonys_photo_probed');
+        recipes=[{ id:11, name:'really none', photo:'' }];
+        window._fbDb=stub(function(){ return Promise.resolve({ exists:false, data:function(){ return {}; } }); });
+        await repairMissingPhotos();
+        var probed2=[]; try{ probed2=JSON.parse(localStorage.getItem('tonys_photo_probed')||'[]')||[]; }catch(e){}
+        if(probed2.map(String).indexOf('11')===-1)
+          throw new Error('a recipe the cloud says has no photo was not remembered, so it is re-probed on every load and costs reads for ever');
+
+        // 5. A photo that IS there comes back.
+        localStorage.removeItem('tonys_photo_probed');
+        recipes=[{ id:12, name:'recoverable', photo:'' }];
+        window._fbDb=stub(function(){ return Promise.resolve({ exists:true, data:function(){ return { photo:'data:image/jpeg;base64,BACK' }; } }); });
+        var res=await repairMissingPhotos();
+        if(recipes[0].photo!=='data:image/jpeg;base64,BACK')
+          throw new Error('a photo present in the cloud was not restored — the whole point of the repair');
+        if(res.restored!==1) throw new Error('the repair does not report what it restored: '+JSON.stringify(res));
+      } finally {
+        recipes=savedRecipes; window._fbDb=realDb; window._fbUser=realUser;
+        window.toast=realToast; window.saveLocal=realSave; window.renderGrid=realRG;
+        if(savedProbed===null) localStorage.removeItem('tonys_photo_probed');
+        else localStorage.setItem('tonys_photo_probed', savedProbed);
+      }
+    } },
+
   { id:'sync_id_collision_keeps_both', group:'Cloud Sync', name:'Two devices adding offline do not overwrite each other (v31.6)',
     test: async()=>{
       // Reported by Tony: he added a recipe on the PC and Peleg added one on his
@@ -7176,7 +7299,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v33.9';
+var APP_VERSION = 'v34.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9691,7 +9814,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10267,7 +10390,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v33.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

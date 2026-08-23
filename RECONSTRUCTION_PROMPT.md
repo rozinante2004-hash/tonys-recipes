@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v33.9` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.0` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v33.9"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v34.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -949,6 +949,12 @@ Rules that follow from that:
   the only route back for one that has gone wrong. Bound it (60 reads per run) and remember which
   recipes are genuinely photoless in `tonys_photo_probed`, because photoless recipes are normal
   (there is a "No photo" filter for them) and re-probing every load would cost reads forever.
+  **All four of its properties need tests** (`photo_repair_bounds`, added v34.0 after every one of
+  them survived a mutation — it had no test at all, despite being the last line of defence):
+  the 60-read bound, skipping any recipe that already has `photo`/`_ph`/`hp`, remembering a
+  *genuine* absence, and — the one that matters — **never** recording a **failed** read as an
+  absence. That last mistake makes a network blip permanent: the recipe is marked probed and
+  never asked about again.
 - Blob URL hygiene: `photoSrc` keys its cache on a content signature and revokes the previous URL
   when a photo changes; `prunePhotoUrlCache` releases URLs for deleted recipes;
   `savePhotosToIDB` calls `releaseThumb` when a photo changes so the grid cannot show a stale
@@ -994,6 +1000,17 @@ Rules that follow from that:
   catches up with the cloud even if the banner was never seen or tapped.
 - **Offline‑merge:** if `tonys_offline_queue==='1'`, merge local into remote by keeping the
   higher `updatedAt` per id and unshifting local‑only recipes, then push merged back.
+- **`mergeRecipeLists` has four separately-testable properties, and only two were covered until
+  v34.0** (`sync_merge_precedence`). It starts from the **cloud** list and unions the local one,
+  so a local-only recipe survives a load and a partial read can never look like a mass deletion —
+  that is why nothing was actually lost when Tony feared it had been. On a shared id it keeps the
+  **newer** `updatedAt` **in both directions**: always-prefer-local silently reverts an edit made
+  on another device, always-prefer-cloud discards what was just typed here, and neither says a
+  word — the recipe is simply wrong afterwards. Undated data must not read as newest. And when a
+  collision forces a renumber (two *different* recipes sharing an id — identity is decided by
+  `uid`, so a fixture without uids exercises the wrong branch entirely), the moved recipe must
+  **lose `_ph`/`_po`**: those say "a photo for this id lives elsewhere", which after renumbering
+  is a claim about a different recipe's photo, and would arm the delete branch against it.
 - **`saveData()`** = `saveLocal()` + debounced (1.5s) `saveToFirestore()` when signed in &
   online; when offline it sets the offline queue and retries every 30s. Quota errors surface a
   detailed `showServiceError(...)` modal.
@@ -1446,9 +1463,9 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **187 checks** in 13 groups —
-**Features (45), UI (28), WhatsApp (24), Cloud Sync (21), Storage (13), Import/Export (13),
-CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup and Performance (3 each)** —
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **194 checks** in 13 groups —
+**Features (47), UI (28), Cloud Sync (26), WhatsApp (24), Storage (14), Import/Export (13),
+CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup (4), Performance (3)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`slimRecipeForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
 persistence, shared‑URL prefill, unit conversion, and HTML escaping. The modal
@@ -1540,6 +1557,23 @@ Several tests here were written, passed, and were later shown to assert nothing:
   load out to allow parallel loading broke the test while the behaviour was untouched — the same
   source-text anti-pattern as above, one release later. It now stubs the cloud reader, forbids
   the network, and checks which one is actually called.
+
+**Mutating on PURPOSE, to find the gaps, is a separate exercise from mutating to validate a new
+test — and it is how the worst holes were found.** Pick the code where a defect is silent,
+destructive or irreversible, mutate it, and see what the suite notices. In v34.0 that exercise
+put eight mutations through the data-safety paths; three were caught by existing tests (a
+local-only recipe surviving a load, the cloud-first merge, `nextId` never regressing) and **five
+survived**. `repairMissingPhotos` — the only route back for a device whose photo flags were
+already lost — turned out to have **no test at all**, and every one of its four properties could
+be broken silently. Two more were in `mergeRecipeLists`: nothing checked which copy wins when the
+same recipe is edited in two places, and nothing checked that a renumbered recipe drops its photo
+flags. A suite of 180-odd tests can still be blind to the functions that matter most; only
+mutation shows you where.
+
+A related trap from the same round: **a test that fails honestly on its first run is doing its
+job.** The new collision fixture failed because it had no `uid`s, and identity is decided by
+`uid` — so its two recipes were the *same* recipe and the older correctly lost rather than being
+renumbered. The fixture was wrong, not the code. Read the failure before assuming which.
 
 When a mutation unexpectedly survives, check the mutation actually applied before concluding the
 test is weak — `perl` without `/g` hits the first match in the file, which twice was a different

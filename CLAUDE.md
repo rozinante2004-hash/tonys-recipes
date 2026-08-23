@@ -414,6 +414,12 @@ found only because a test was written first and disagreed with the code.
   diagnostic that overstates loss during an investigation into loss is worse than no
   diagnostic. When a number appears in two places, derive both from one predicate, or
   print both and say what separates them.
+- **Mutate on purpose to FIND gaps, not only to validate a new test.** Eight mutations
+  aimed at the data-safety paths found five holes the 186-test suite could not see —
+  including `repairMissingPhotos`, the only route back for a device whose photo flags
+  were already lost, which had no test at all. Pick the code where a defect is silent,
+  destructive or irreversible, break it, and watch. A large suite is not evidence that
+  the important functions are covered.
 - **When two templates render the same thing, a test that exercises one covers half.**
   The grid and list cards are independent template literals and only one runs per
   render; `viewMode` defaults to `'list'`, so mutations to the *grid* card survived a
