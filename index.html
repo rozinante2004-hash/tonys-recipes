@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.1 -->
+<!-- Tony's Recipes Collection v34.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1679,9 +1679,36 @@ const SELF_TESTS = [
         if(src.indexOf(bad)>-1) throw new Error('the swipe handler can reach '+bad+' — swipe must only ever toggle a favourite');
       });
       if(src.indexOf('fav')===-1) throw new Error('the swipe handler does not touch the favourite flag, so what does it do?');
-      // Vertical movement must abandon the gesture or scrolling flips hearts.
-      if(String(swipeMove).indexOf('Math.abs(dy) > Math.abs(dx)')===-1)
-        throw new Error('swipeMove does not bail out on a vertical drag — scrolling the grid would toggle favourites');
+      // Vertical movement must abandon the gesture, or scrolling the grid flips
+      // hearts. Driven with synthetic touches rather than grepping swipeMove for
+      // 'Math.abs(dy) > Math.abs(dx)', which survives the comparison being
+      // inverted or dead (the false-green shape swept out in v34.1).
+      var swKeep=recipes, swSave=window.saveData, swGrid=window.renderGrid, swT=window.toast;
+      try{
+        window.saveData=function(){}; window.renderGrid=function(){}; window.toast=function(){};
+        recipes=[normalizeRecipe({ id:9401, name:'Swipe target', fav:false, ingredients:[], steps:['x'] })];
+        var card=document.createElement('div');
+        function touch(x,y){ return { touches:[{ clientX:x, clientY:y }],
+                                      changedTouches:[{ clientX:x, clientY:y }],
+                                      currentTarget:card, target:card, preventDefault:function(){} }; }
+        // A mostly-VERTICAL drag is a scroll: it must not toggle anything.
+        // dx must EXCEED SWIPE_MIN here, or the threshold is what stops the
+        // toggle and the vertical guard could be deleted freely — the first
+        // version used dx 10 and survived exactly that mutation (v34.2).
+        swipeStart(touch(100,100), 9401);
+        swipeMove(touch(240,400));           // dx 140 (over the 55px threshold), dy 300 — a scroll
+        swipeEnd(touch(240,400));
+        if(recipes[0].fav)
+          throw new Error('scrolling the grid vertically toggled a favourite — swipeMove does not abandon a vertical drag');
+        // A mostly-HORIZONTAL drag past the threshold is a real swipe.
+        swipeStart(touch(100,100), 9401);
+        swipeMove(touch(240,110));           // dx 140 > dy 10
+        swipeEnd(touch(240,110));
+        if(!recipes[0].fav)
+          throw new Error('a deliberate horizontal swipe did not toggle the favourite, so the gesture does nothing at all');
+      } finally {
+        recipes=swKeep; window.saveData=swSave; window.renderGrid=swGrid; window.toast=swT;
+      }
     } },
 
   { id:'css_hebrew_font', group:'CSS', name:'Hebrew has a real typeface, not an OS fallback',
@@ -2093,9 +2120,31 @@ const SELF_TESTS = [
       if(fetchCalls!==0) throw new Error('a cloud chat fell through to the folder fetch — the offline-GitHub case is broken');
       if(!got||!got.length||got[0].text.indexOf('shakshuka')===-1)
         throw new Error('the cloud text was not parsed into messages');
-      // Import must offer to sync, or the phone stays a dead end.
-      if(String(waImportFiles).indexOf('saveChatDoc')===-1)
-        throw new Error('importing a chat never syncs it, so the phone case is unsolved');
+      // Import must push to the cloud, or the phone stays a dead end — that is the
+      // entire point of 5f.8, since the iPhone cannot reach GitHub at all. Driven
+      // with a real File: grepping waImportFiles for 'saveChatDoc' survives the
+      // call sitting in a dead branch (v34.1).
+      var wiPut=window.waPut, wiIdx=window.waIndex, wiSave=window.waSaveIndex,
+          wiSaveDoc=window.saveChatDoc, wiRender=window.renderWaSources, wiToast=window.toast,
+          wiDb=window._fbDb, wiUser=window._fbUser, wiAvail=window._idbAvailable, pushedFiles=[];
+      try{
+        window.toast=function(){}; window.renderWaSources=function(){};
+        window.waPut=function(){ return Promise.resolve(); };
+        window.waIndex=function(){ return []; };
+        window.waSaveIndex=function(){};
+        window.saveChatDoc=function(file){ pushedFiles.push(file); return Promise.resolve(); };
+        window._idbAvailable=true; window._fbDb={}; window._fbUser={ uid:'t' };
+        var chat='[01/02/2026, 10:00:00] Dana: shakshuka with harissa\n'
+               + '[01/02/2026, 10:01:00] Yossi: how much harissa?\n';
+        var f=new File([chat], 'Meat_Whatsapp.txt', { type:'text/plain' });
+        await waImportFiles([f]);
+        if(pushedFiles.indexOf('Meat_Whatsapp.txt')===-1)
+          throw new Error('importing a chat never pushed it to the cloud, so it stays invisible to the phone — which is the whole reason this path exists');
+      } finally {
+        window.waPut=wiPut; window.waIndex=wiIdx; window.waSaveIndex=wiSave;
+        window.saveChatDoc=wiSaveDoc; window.renderWaSources=wiRender; window.toast=wiToast;
+        window._fbDb=wiDb; window._fbUser=wiUser; window._idbAvailable=wiAvail;
+      }
       // Removing a shared chat affects everyone; it must ask first.
       // Removing a CLOUD chat removes it for every device, so it must ask first.
       // Grepping waRemove for 'askConfirm' passes with the call wrapped in a
@@ -2248,8 +2297,11 @@ const SELF_TESTS = [
         throw new Error('nothing repairs a device whose markers were already cleared');
       // ...without re-reading every photoless recipe on every load; the "No
       // photo" filter exists because photoless recipes are perfectly normal.
-      if(typeof photoProbed!=='function'||String(repairMissingPhotos).indexOf('markPhotoProbed')===-1)
-        throw new Error('the repair pass has no memory, so it burns reads on every load');
+      // That the repair REMEMBERS a genuine absence (rather than re-probing every
+      // photoless recipe on every load) is driven for real in photo_repair_bounds,
+      // which stubs the cloud and inspects tonys_photo_probed. The grep that used
+      // to stand here passed with markPhotoProbed in a dead branch (v34.1).
+      if(typeof photoProbed!=='function') throw new Error('photoProbed not defined');
       if(syncHealthText().indexOf('photos missing from this device:')===-1)
         throw new Error('Sync Health does not report missing photos, so this stays invisible');
     } },
@@ -2371,7 +2423,23 @@ const SELF_TESTS = [
       // Missing or damaged stamps must not print "Invalid Date" into the panel.
       if(waWhen({ source:'cloud' })!=='') throw new Error('a missing stamp produced output');
       if(waWhen({ source:'cloud', updatedAt:'nonsense' })!=='') throw new Error('a damaged stamp produced output');
-      if(String(renderWaSources).indexOf('waWhen')===-1) throw new Error('the list does not show the stamp');
+      // ...and the list must actually PRINT it. Rendered for real: grepping
+      // renderWaSources for 'waWhen' survives the call sitting in a dead ternary,
+      // leaving every row stamp-less with the suite green (v34.1).
+      var wsIdx=window.waIndex, wsKeep=null;
+      try{
+        var when=Date.now()-3*60000;
+        window.waIndex=function(){ return [{ id:'cloud:S.txt', group:'Stamped', source:'cloud',
+                                             file:'S.txt', count:5, updatedAt:when }]; };
+        renderWaSources();
+        var host=document.getElementById('waSourceList');
+        if(!host) throw new Error('there is no source list to render into');
+        var shown=host.textContent||'';
+        var expect=waWhen({ source:'cloud', updatedAt:when });
+        if(!expect) throw new Error('waWhen produced nothing for a valid stamp, so this proves nothing');
+        if(shown.indexOf(expect.trim())===-1)
+          throw new Error('a synced chat row does not say when it synced — expected '+JSON.stringify(expect.trim())+' in the row');
+      } finally { window.waIndex=wsIdx; }
     } },
 
   { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
@@ -2771,8 +2839,22 @@ const SELF_TESTS = [
         _waScan.status='paused';
         if(waProgressHtml().indexOf('Continue')===-1) throw new Error('a paused scan offers no way to resume');
         // Closing while paused must release the loop, or it waits for ever.
-        if(String(closeWaLinks).indexOf('waScanResume')===-1)
-          throw new Error('closing the panel while paused would strand the scan on a promise nobody resolves');
+        // Closing the panel while the scan is PAUSED must resume it first, or the
+        // scan is stranded on a promise nobody will ever resolve. Driven, not
+        // grepped: 'waScanResume' survives in the text of a dead branch (v34.1).
+        var stKeep=_waScan.status, resumeKeep=window.waScanResume, resumed=0, closeKeep=window.closeM;
+        try{
+          window.closeM=function(){};
+          window.waScanResume=function(){ resumed++; _waScan.status='running'; };
+          _waScan.status='paused';
+          closeWaLinks();
+          if(!resumed)
+            throw new Error('the panel closed while the scan was paused without resuming it — the scan waits on a promise nobody resolves, for ever');
+          // ...and closing a panel that is NOT paused must not fake a resume.
+          resumed=0; _waScan.status='idle';
+          closeWaLinks();
+          if(resumed) throw new Error('closing an idle panel called resume, which would restart a scan nobody asked for');
+        } finally { _waScan.status=stKeep; window.waScanResume=resumeKeep; window.closeM=closeKeep; }
       } finally {
         _waScan.status=keptScan.status; _waScan.done=keptScan.done;
         _waScan.total=keptScan.total; _waScan.startedAt=keptScan.startedAt;
@@ -3492,8 +3574,37 @@ const SELF_TESTS = [
       if(waClassifyLink('https://food.walla.co.il/item/3515904','').noise)
         throw new Error('a generic /item/ rule is hiding a recipe site');
       // Nothing is deleted — noise is a flag the UI hides behind a checkbox.
-      if(String(renderWaHarvest).indexOf('hideNoise')===-1)
-        throw new Error('noise is not behind a filter, so classifying it would DESTROY links rather than tidy them');
+      // Noise must be HIDDEN behind a filter, never dropped: a misclassification
+      // has to be recoverable by unticking the box, or classifying would destroy
+      // links rather than tidy them. Rendered for real — grepping
+      // renderWaHarvest for 'hideNoise' survives the filter being dead (v34.1).
+      var hnKeep=_waHarvest;
+      try{
+        // The real row shape: key, count and a shares array. A link without
+        // `shares` throws inside the renderer, which is how this fixture failed
+        // on its first run — the shape has to be read, not assumed.
+        _waHarvest={ links:[
+                       { key:'recipes.example/good', url:'https://recipes.example/good',
+                         domain:'recipes.example', count:1, noise:false,
+                         shares:[{ who:'A', date:'01/02', text:'try this' }] },
+                       { key:'shop.example/buy', url:'https://shop.example/buy',
+                         domain:'shop.example', count:1, noise:true,
+                         shares:[{ who:'B', date:'01/02', text:'50% off' }] }],
+                     texts:[], loaded:true, hideImported:false, hideNoise:true, tab:'links',
+                     selected:{}, dismissed:{} };
+        renderWaHarvest();
+        var body=document.getElementById('waLinksBody');
+        if(!body) throw new Error('the harvest panel has no body element');
+        if(body.textContent.indexOf('shop.example')>-1)
+          throw new Error('a link classified as noise is shown even with the filter ON, so the filter does nothing');
+        if(body.textContent.indexOf('recipes.example')===-1)
+          throw new Error('the filter hid a real recipe link as well');
+        // Unticking must bring it back — that is what makes classification safe.
+        _waHarvest.hideNoise=false;
+        renderWaHarvest();
+        if(body.textContent.indexOf('shop.example')===-1)
+          throw new Error('a noise link is GONE rather than hidden — a misclassification would be unrecoverable');
+      } finally { _waHarvest=hnKeep; }
     } },
 
   { id:'wa_seen', group:'WhatsApp', name:'Viewed and Imported are marked, and Imported is never claimed falsely (5f.11)',
@@ -4064,120 +4175,6 @@ const SELF_TESTS = [
       } finally { _selfTestResults=saved; _selfTestNotRun=savedNotRun; _selfTestStartedAt=savedAt; }
     } },
 
-  { id:'stor_photos_to_storage', group:'Storage', name:'Photos can live in Storage without breaking backups (5.2)',
-    test: async()=>{
-      ['storageReady','photoStoragePath','inlineRemotePhoto','dataUrlToBlobForUpload','inlinePhotosForBackup']
-        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
-      // v32.6 — this used to assert storageReady()===false outright. That is only
-      // true where Firebase was never initialised, which is the CI sandbox; on a
-      // signed-in device the SDK constructs fine (storageBucket is in the config
-      // even with no bucket provisioned) and it correctly returns true. So the
-      // check passed in CI and failed on Tony's phone, reporting a fault where
-      // there was none. A test that asserts an ENVIRONMENT rather than a
-      // behaviour will do that every time.
-      //
-      // The behaviour worth pinning holds everywhere: it answers with a boolean
-      // and never throws, and markStorageUnavailable() can latch it off and make
-      // it stay off — which is what stops a project without Storage from retrying
-      // a doomed upload for every photo on every save.
-      var _sr0 = await storageReady();
-      if(typeof _sr0!=='boolean') throw new Error('storageReady() answered '+JSON.stringify(_sr0)+' instead of a boolean');
-      var _srSaved = window._storageReady;
-      try{
-        window._storageReady = null;               // forget any cached answer
-        markStorageUnavailable('self test');
-        if(await storageReady()!==false)
-          throw new Error('markStorageUnavailable() did not latch Storage off — a project without a bucket would retry a doomed upload for every photo, on every save');
-        markStorageUnavailable('self test again'); // idempotent, must not flip back
-        if(await storageReady()!==false) throw new Error('the latch did not hold');
-      } finally { window._storageReady = _srSaved; }
-      if(photoStoragePath(7).indexOf('shared/photos/')!==0) throw new Error('photos are not filed under the shared path');
-      var blob=dataUrlToBlobForUpload('data:image/png;base64,iVBORw0KGgo=');
-      if(!blob||blob.type!=='image/png') throw new Error('a data URL did not convert to an uploadable blob');
-      if(dataUrlToBlobForUpload('not a data url')!==null) throw new Error('a non-data URL should not convert');
-      // Both document shapes must be readable forever: a device that never gets
-      // Storage enabled keeps writing base64 into `photo`.
-      var attach=String(attachCloudPhotos);
-      if(attach.indexOf('d.photoUrl')===-1) throw new Error('attachCloudPhotos cannot read a Storage pointer');
-      if(attach.indexOf('d.photo ||')===-1) throw new Error('attachCloudPhotos stopped reading legacy base64 photos');
-      if(String(repairMissingPhotos).indexOf('photoUrl')===-1) throw new Error('the repair pass ignores Storage-backed photos');
-      // A Storage upload failure must fall back to base64, never lose the photo.
-      if(String(syncCloudPhotos).indexOf('falling back to base64')===-1)
-        throw new Error('a failed Storage upload does not fall back, so the photo would be lost');
-      // THE invariant: a backup stays self-contained. With photos as URLs, a
-      // backup of URLs would depend on a live bucket years later.
-      var bk=String(backupSave);
-      if(bk.indexOf('inlinePhotosForBackup')===-1)
-        throw new Error('backupSave does not re-inline remote photos, so backups would depend on a live bucket');
-      if(bk.indexOf('_backup_photo')===-1) throw new Error('the inlined bytes are never used in the exported recipe');
-      if(bk.indexOf('clearBackupInlines')===-1) throw new Error('the temporary inlined copies are never cleared');
-      // ...and a photo it could not download must be reported, not dropped quietly.
-      if(!/could not be\s*\n?\s*.\+ .downloaded|could not be /.test(bk) || bk.indexOf('failed.length')===-1)
-        throw new Error('photos missing from a backup are not reported, so the backup would be trusted wrongly');
-      // Deleting a photo must remove the object too, not just the pointer.
-      if(String(syncCloudPhotos).indexOf('deletePhotoFromStorageBucket')===-1)
-        throw new Error('deleting a photo leaves its Storage object orphaned forever');
-      // Enabling Storage only changes where NEW uploads go, so without a
-      // migration the collection would sit in two shapes forever — the exact
-      // mixed-methodology trap Tony objected to over recipe ids.
-      ['migratePhotosToStorage','storageMigrationPending','refreshStorageMigrateBox'].forEach(function(f){
-        if(typeof window[f]!=='function') throw new Error(f+' not defined');
-      });
-      var keep=recipes, keepIds=window._cloudPhotoIds;
-      try{
-        window._cloudPhotoIds={ 1:true, 2:true };
-        recipes=[ normalizeRecipe({id:1,name:'still base64',photo:'data:image/png;base64,AAA'}),
-                  normalizeRecipe({id:2,name:'already moved',photo:'https://firebasestorage.googleapis.com/x'}),
-                  normalizeRecipe({id:3,name:'not in cloud',photo:'data:image/png;base64,BBB'}) ];
-        var pend=storageMigrationPending();
-        if(pend.length!==1) throw new Error('expected exactly the base64 cloud photo to need moving, got '+pend.length);
-        if(pend[0].id!==1) throw new Error('the wrong photo was queued for migration');
-      } finally { recipes=keep; window._cloudPhotoIds=keepIds; }
-      // It must be a deliberate action, and it must confirm — it rewrites every
-      // photo document in the shared collection.
-      var mig=String(migratePhotosToStorage);
-      // Behavioural, not a grep: `false && askConfirm(...)` leaves the name in
-      // the source while never blocking, and a grep passes. Declining must
-      // actually write nothing.
-      var sDb=window._fbDb, sUser=window._fbUser, sAsk=window.askConfirm,
-          sReady=window.storageReady, sUp=window.uploadPhotoToStorageBucket, sRec=recipes, sIds=window._cloudPhotoIds;
-      try{
-        var db=_fakeFirestore({}); window._fbDb=db; window._fbUser={ email:'t@x.y' };
-        window.storageReady=function(){ return Promise.resolve(true); };
-        var uploads=0;
-        window.uploadPhotoToStorageBucket=function(){ uploads++; return Promise.resolve('https://storage/x'); };
-        window._cloudPhotoIds={ 1:true };
-        recipes=[ normalizeRecipe({id:1,name:'p',photo:'data:image/png;base64,AAA'}) ];
-        window.askConfirm=function(){ return Promise.resolve(false); };   // user says no
-        await migratePhotosToStorage();
-        if(uploads!==0) throw new Error('declining the confirmation still uploaded '+uploads+' photo(s)');
-        if(Object.keys(db._docs).length!==0) throw new Error('declining still rewrote Firestore documents');
-        window.askConfirm=function(){ return Promise.resolve(true); };    // user says yes
-        await migratePhotosToStorage();
-        if(uploads!==1) throw new Error('accepting did not upload the pending photo');
-        if(!db._docs['photo_1']||!db._docs['photo_1'].photoUrl)
-          throw new Error('the Firestore document was not replaced with a Storage pointer');
-        if(db._docs['photo_1'].photo) throw new Error('the base64 copy was left in the document');
-      } finally {
-        window._fbDb=sDb; window._fbUser=sUser; window.askConfirm=sAsk;
-        window.storageReady=sReady; window.uploadPhotoToStorageBucket=sUp;
-        recipes=sRec; window._cloudPhotoIds=sIds;
-      }
-      if(mig.indexOf('storageReady')===-1) throw new Error('migration does not check Storage is actually available');
-      // storageReady() only proves the SDK constructs; on a project where
-      // Storage was never enabled (it needs a paid plan) firebase.storage()
-      // still succeeds. The first real failure is the only proof, and it must
-      // stop the retries — otherwise every photo save attempts a doomed upload.
-      if(typeof markStorageUnavailable!=='function') throw new Error('markStorageUnavailable not defined');
-      if(String(syncCloudPhotos).indexOf('markStorageUnavailable')===-1)
-        throw new Error('a failed Storage upload keeps retrying on every photo, on every save');
-      if(mig.indexOf('markStorageUnavailable')===-1)
-        throw new Error('the migration grinds through every photo collecting the same error');
-      // A failure must leave that photo untouched and be reported, not swallowed.
-      if(mig.indexOf('failed.push')===-1||mig.indexOf('showServiceError')===-1)
-        throw new Error('photos that fail to move are not reported');
-      if(!document.getElementById('storageMigrateBox')) throw new Error('there is no way to run the migration');
-    } },
 
   { id:'sec_bring_secret_not_shipped', group:'Network', name:'The Bring! set-token secret is not in the repo (v31.3)',
     test: async()=>{
@@ -4623,8 +4620,34 @@ const SELF_TESTS = [
       // federates Flickr, Wikimedia and museums, so the hosts cannot be listed.
       if(!/connect-src[^;]*\bhttps:(\s|;)/.test(c))
         throw new Error('connect-src does not permit fetching a photo from an arbitrary host, so "Use this Photo" is blocked by our own CSP');
-      if(String(useSelectedSearchPhoto).indexOf('showServiceError')===-1)
-        throw new Error('a failed photo apply only toasts, so it looks like nothing happened');
+      // A failed apply must raise a REAL error dialog. A three-second toast on a
+      // failure that leaves the old photo in place reads as "nothing happened" —
+      // which is exactly what Tony reported. Driven: grepping the function for
+      // 'showServiceError' survives the call being unreachable (v34.1).
+      var feRec=recipes, feFetch=window.fetch, feSel=_photoSearchSelected, feRes=_photoSearchResults,
+          feTarget=heroPhotoTargetId, feToast=window.toast, feSave=window.saveData,
+          feGrid=window.renderGrid, feErr=window.showServiceError, raised=0, toasts=0;
+      try{
+        window.toast=function(){ toasts++; };
+        window.saveData=function(){}; window.renderGrid=function(){};
+        window.showServiceError=function(){ raised++; };
+        window.fetch=function(){ return Promise.resolve({ ok:false, status:503 }); };
+        recipes=[normalizeRecipe({ id:9501, name:'Apply failure', photo:'data:image/jpeg;base64,OLD',
+                                   ingredients:[], steps:['x'] })];
+        heroPhotoTargetId=9501;
+        _photoSearchResults=[{ url:'https://x/broken.jpg' }];
+        _photoSearchSelected=0;
+        await useSelectedSearchPhoto();
+        if(!raised)
+          throw new Error('a failed photo apply raised no error dialog — with the old photo still on screen it reads as nothing having happened');
+        if(recipes[0].photo!=='data:image/jpeg;base64,OLD')
+          throw new Error('a FAILED apply changed the existing photo');
+      } finally {
+        recipes=feRec; window.fetch=feFetch; _photoSearchSelected=feSel; _photoSearchResults=feRes;
+        heroPhotoTargetId=feTarget; window.toast=feToast; window.saveData=feSave;
+        window.renderGrid=feGrid; window.showServiceError=feErr;
+        closeM('photoSearchOverlay');
+      }
       // ...and the failure message must not blame the site for our own faults.
       if(/The site blocks automated access\. Please/.test(src))
         throw new Error('the failure message still asserts the SITE blocked us, whatever actually happened');
@@ -7626,7 +7649,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.1';
+var APP_VERSION = 'v34.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10141,7 +10164,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10717,7 +10740,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

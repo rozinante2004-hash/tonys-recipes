@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.1` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.2` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v34.1"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v34.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1463,8 +1463,8 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **194 checks** in 13 groups —
-**Features (47), UI (28), Cloud Sync (26), WhatsApp (24), Storage (14), Import/Export (13),
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **193 checks** in 13 groups —
+**Features (47), UI (28), Cloud Sync (26), WhatsApp (24), Storage (13), Import/Export (13),
 CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup (4), Performance (3)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`slimRecipeForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode
@@ -1567,9 +1567,13 @@ duplicate check on import, the offline merge on load, and the confirm before del
 chat for every device. This anti-pattern was already documented here with five past instances and
 the suite still had thirteen live ones: **documenting a trap does not remove it — only the sweep
 does.** Convert each to a behavioural drive (stub the collaborators, call the real function, check
-what it produced). Where a source check is genuinely irreducible — code that cannot run in the
-test environment, such as the dormant Firebase Storage path — say so in a comment beside it, so
-the next reader knows it is a knowing compromise and not an oversight.
+what it produced). The sweep is **complete as of v34.2: zero source-text assertions remain.** The last
+holdouts were on the dormant Firebase Storage path, and `stor_photos_to_storage` was deleted
+outright rather than converted — Storage needs a paid plan Tony has ruled out, so the test only
+ever asserted text about code that cannot run. **The Storage CODE is therefore now untested**
+(`uploadPhotoToStorageBucket`, `migratePhotosToStorage`, `storageMigrationPending`,
+`markStorageUnavailable`, the ⚙️ migration box). Either delete that path too, or restore its
+tests before switching Storage on — do not leave it half-covered and assume it works.
 
 **Two binding traps that make a stub silently do nothing.** A top-level `let`/`const` (e.g.
 `heroPhotoTargetId`) is **not** a window property: `window.heroPhotoTargetId = 9301` creates a

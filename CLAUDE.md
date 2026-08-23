@@ -428,6 +428,12 @@ found only because a test was written first and disagreed with the code.
   nothing and the test fails for a reason that has nothing to do with the code. Assign the
   bare identifier. Related: stubbing `closeM` to a no-op leaves a modal open and breaks a
   later test — let it close, or clean up in the `finally`.
+- **A fixture must make the property under test the ONLY thing that can produce the
+  answer — including in the numbers you pick.** The swipe test dragged 10px sideways
+  and 120px down to prove a vertical drag does not toggle a favourite. It passed with
+  the vertical guard deleted, because 10px is under the 55px `SWIPE_MIN` and the
+  *threshold* was refusing the toggle. Exceed every other guard so only the one under
+  test is left standing (140px across, 300px down).
 - **A positive assertion needs isolating just as much as a negative one.** Checking that the
   chat-coverage block rendered by looking for the group name passed with the block deleted —
   the quoted messages carry that name too. Assert on something only the code under test can
