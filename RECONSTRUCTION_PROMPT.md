@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.3` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.4` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,11 +55,10 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v34.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v34.4"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
-| `storage.rules` | Firebase **Storage** rules (§4d). Dormant: Storage needs a paid Firebase plan, so photos stay base64 in Firestore and this file is unpublished. Keep it in the repo anyway — the code path exists and the rules must be ready before it is ever switched on. |
 | `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
 | `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. |
@@ -544,43 +543,39 @@ removes it from their own device but **cannot** remove the cloud documents, so i
 their next sync. `flushCloudDeletes` reports the refusal into Sync Health rather than letting it
 look like a bug (§4b).
 
-### `storage.rules` — written, not published
+### Firebase Storage — considered, built, and REMOVED in v34.4
 
-Firebase Storage requires a **paid plan** (Blaze), which needs a billing account and offers only
-budget *alerts*, not a hard spending cap. For a family recipe collection that is a poor trade, so
-Storage stays off and photos remain base64 in Firestore. Keep the rules file anyway — the code
-path exists and the rules must be ready before it is ever switched on.
+Storage requires the paid **Blaze** plan, which needs a billing account and offers only budget
+*alerts*, not a hard spending cap. For a family recipe collection that is a poor trade, so it was
+never switched on — `storageReady()` returned false on every device, every branch fell through to
+base64, and the feature did nothing for anyone for its entire life. **Do not rebuild it.** Photos
+are base64 in `shared/photo_<id>`, one shape, no branches, and `storage.rules` is deleted.
 
-```
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /shared/photos/{photoId} {
-      allow read:   if request.auth != null;
-      allow write:  if request.auth != null
-                    && request.resource.size < 12 * 1024 * 1024
-                    && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
-    }
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
+What went with it: `storageReady`, `markStorageUnavailable`, the Storage SDK loader,
+`photoStoragePath`, `uploadPhotoToStorageBucket`, `deletePhotoFromStorageBucket`,
+`dataUrlToBlobForUpload`, `migratePhotosToStorage`, `storageMigrationPending`,
+`refreshStorageMigrateBox` and its ⚙️ box, the `isRemote`/`useStorage` branches in
+`syncCloudPhotos`, and the backup re-inlining (`inlineRemotePhoto`, `inlinePhotosForBackup`,
+`clearBackupInlines`, `_backup_photo`) — which existed only because a photo could be a URL. A
+backup is still self-contained; it is simply self-contained for free now.
 
-Deliberately **less** strict than Firestore on delete: a deleted *recipe* is data loss, so it is
-admin-only; an orphaned photo blob is only waste, and whoever removed the recipe must be able to
-remove it. The 12 MB ceiling sits far above anything the app produces (it compresses first) and
-far below anything that could run up a bill by accident.
+**What must NOT be removed with it:** `compressPhotoToDataUrl` (called `uploadPhotoToStorage`
+until v34.4). It uploads nothing — it resizes a picked file to 600px and steps JPEG quality down
+until it fits, returning a data URL, and it sits on the path of every photo added. The old name
+read like part of the Storage feature, which is precisely the kind of misreading that deletes a
+working code path; it was renamed at the same time for that reason.
 
-> **The trap this file taught:** `storageReady()` originally called `firebase.storage()` and
-> treated a successful construction as proof Storage worked. But `storageBucket` is present in the
-> Firebase config, so the SDK constructs happily on a project with **no bucket provisioned** —
-> every photo save then attempted a doomed upload before falling back, and the migration button
-> appeared and could only fail. **A client library constructing is not evidence a service exists.**
-> Latch availability off on the first genuine failure (`markStorageUnavailable`), never on a
-> constructor.
+**The trap this feature taught, worth keeping after it:** `storageReady()` originally called
+`firebase.storage()` and treated a successful construction as proof Storage worked. But
+`storageBucket` is present in the Firebase config, so the SDK constructs happily on a project with
+**no bucket provisioned** — every photo save then attempted a doomed upload before falling back.
+**A client library constructing is not evidence the service exists.** Prove a service by using it,
+and latch it off on the first genuine failure, never on a constructor.
+
+**If Storage is ever wanted again**, the invariant that made it hard is the one to rebuild first:
+a backup must stay self-contained, so any photo held as a URL has to be downloaded and inlined
+before the file is written, and a photo that cannot be downloaded must be *named* in the report
+rather than silently omitted.
 
 ---
 
@@ -1104,7 +1099,7 @@ action bar: ✏️ Edit · 🍳 Cooked! · 🌐 Translate · 📊 Excel · 📄 
 records it in `recent_views` and requests a **screen wake lock** (re‑acquired on visibility).
 
 **Add/Edit modal (`openAddModal`/`saveRecipe`)**: name, emoji picker (first 14 of `EMOJIS`),
-photo upload (compressed via `uploadPhotoToStorage`), category, difficulty, prep, servings, an
+photo upload (compressed via `compressPhotoToDataUrl`), category, difficulty, prep, servings, an
 **ingredient table** (`addIngRow`/`syncIngsTextarea`/`loadIngsTable` — amount + name rows kept in
 sync with a hidden textarea), a steps textarea (one step per line), diet tag buttons
 (`renderDietButtons`/`getSelectedDiets`), source, notes, and an "is clip" checkbox. Ingredient
@@ -1484,8 +1479,8 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **193 checks** in 13 groups —
-**Features (47), UI (28), Cloud Sync (26), WhatsApp (24), Storage (13), Import/Export (13),
+A first‑class feature — recreate it. `SELF_TESTS` is an array of **196 checks** in 13 groups —
+**Features (48), UI (28), Cloud Sync (26), WhatsApp (24), Storage (15), Import/Export (13),
 CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup (4), Performance (3)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
 photo‑split (`slimRecipeForCloud`/`byteLen`/`isSizeError`), phone grid columns, view‑mode

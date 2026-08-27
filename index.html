@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.3 -->
+<!-- Tony's Recipes Collection v34.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2966,6 +2966,72 @@ const SELF_TESTS = [
       } finally { window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
     } },
 
+  { id:'photo_one_shape_no_storage', group:'Storage', name:'Photos have ONE shape: base64, no Storage path (5g.7)',
+    test: async()=>{
+      // v34.4 deleted the Firebase Storage path — it needed a paid plan, was never
+      // switched on, and put branches into the two most dangerous paths in the app
+      // (photo sync and backup). This pins what must still be true afterwards.
+      ['storageReady','uploadPhotoToStorageBucket','deletePhotoFromStorageBucket','photoStoragePath',
+       'migratePhotosToStorage','storageMigrationPending','markStorageUnavailable','inlineRemotePhoto',
+       'inlinePhotosForBackup','dataUrlToBlobForUpload'].forEach(function(f){
+        if(typeof window[f]!=='undefined')
+          throw new Error(f+' is back — the Storage path was removed, and a second photo shape is exactly the mixed-methodology trap this app refuses');
+      });
+      if(document.getElementById('storageMigrateBox'))
+        throw new Error('the Storage migration box is back in Settings, offering a feature that cannot run');
+
+      // The compressor is NOT Storage code and must survive, under its honest name.
+      if(typeof compressPhotoToDataUrl!=='function')
+        throw new Error('compressPhotoToDataUrl is gone — every photo the user adds goes through it, so adding a photo is now broken');
+
+      // syncCloudPhotos writes exactly one shape: base64 in `photo`. No photoUrl,
+      // no `storage:true`, no branch on whether the value looks remote.
+      var kR=recipes, kDb=window._fbDb, kStamps=window._cloudPhotoStamps, kIds=window._cloudPhotoIds,
+          written=null;
+      try{
+        window._cloudPhotoStamps={}; window._cloudPhotoIds={};
+        recipes=[{ id:41, name:'has a photo', photo:'data:image/jpeg;base64,AAA', updatedAt:5 }];
+        window._fbDb={ collection:function(){ return { doc:function(){ return {
+          set:function(payload){ written=payload; return Promise.resolve(); },
+          delete:function(){ return Promise.resolve(); }
+        }; } }; } };
+        await syncCloudPhotos();
+        if(!written) throw new Error('nothing was written to the cloud at all');
+        if(written.photo!=='data:image/jpeg;base64,AAA')
+          throw new Error('the photo document no longer carries the base64 photo: '+JSON.stringify(Object.keys(written)));
+        if('photoUrl' in written || 'storage' in written)
+          throw new Error('a Storage-shaped photo document was written: '+JSON.stringify(Object.keys(written)));
+      } finally {
+        recipes=kR; window._fbDb=kDb; window._cloudPhotoStamps=kStamps; window._cloudPhotoIds=kIds;
+      }
+
+      // A backup stays self-contained — every photo travels as base64 inside the
+      // file. That used to need a download step for remote photos; it is free now,
+      // but the property is what matters and it must still hold.
+      var bR=recipes, bToast=window.toast, bMark=window.markBackupTaken, captured=null;
+      var realCreate=URL.createObjectURL, realRevoke=URL.revokeObjectURL, realAppend=document.body.appendChild;
+      try{
+        window.toast=function(){}; window.markBackupTaken=function(){};
+        URL.createObjectURL=function(blob){ captured=blob; return 'blob:stub'; };
+        URL.revokeObjectURL=function(){};
+        document.body.appendChild=function(node){ if(node && node.tagName==='A'){ node.click=function(){}; return node; } return realAppend.call(document.body,node); };
+        recipes=[normalizeRecipe({ id:42, name:'backed up', photo:'data:image/jpeg;base64,BBB', ingredients:[], steps:['x'] })];
+        await backupSave();
+        if(!captured) throw new Error('the backup produced no file');
+        var text=await captured.text(), parsed=JSON.parse(text);
+        var vals=Object.keys(parsed.photos||{}).map(function(k){ return parsed.photos[k]; });
+        if(!vals.length) throw new Error('the backup carries no photo bytes, so a restore would lose the picture');
+        if(vals.some(function(v){ return !/^data:/.test(v); }))
+          throw new Error('a backup photo is not self-contained — it would depend on a live server years later');
+        if(JSON.stringify(parsed.recipes).indexOf('_backup_photo')!==-1)
+          throw new Error('the temporary backup field leaked into the exported file');
+      } finally {
+        recipes=bR; window.toast=bToast; window.markBackupTaken=bMark;
+        URL.createObjectURL=realCreate; URL.revokeObjectURL=realRevoke;
+        document.body.appendChild=realAppend;
+      }
+    } },
+
   { id:'photo_store_read_failure', group:'Storage', name:'A failed photo-store read is not an empty store (5g.6)',
     test: async()=>{
       // THE root-cause bug, found while hunting why Tony's photos were replaced a
@@ -3077,7 +3143,7 @@ const SELF_TESTS = [
       // which is exactly the shape that has bitten this suite before.
       var sR=recipes, sHyd=window.hydratePhotosFromIDB, sAll=window.idbGetAll, sAsk=window.askConfirm,
           sTerms=window.photoSearchTerms, sOnce=window.photoSearchOnce, sFetch=window.fetch,
-          sUp=window.uploadPhotoToStorage, sToast=window.toast, sErr=window.showServiceError,
+          sUp=window.compressPhotoToDataUrl, sToast=window.toast, sErr=window.showServiceError,
           sSave=window.saveData, sGrid=window.renderGrid;
       try{
         await autoFetchUndoClear();
@@ -3089,7 +3155,7 @@ const SELF_TESTS = [
         window.photoSearchTerms=function(){ return Promise.resolve({ 0:'beef' }); };
         window.photoSearchOnce=function(){ return Promise.resolve([{ url:'https://x/p.jpg', credit:'C' }]); };
         window.fetch=function(){ return Promise.resolve({ blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
-        window.uploadPhotoToStorage=function(){ return Promise.resolve('data:image/jpeg;base64,FETCHED'); };
+        window.compressPhotoToDataUrl=function(){ return Promise.resolve('data:image/jpeg;base64,FETCHED'); };
         recipes=[{ id:31, name:'blank one', photo:'' }];
         await autoFetchMissingPhotos();
         if(recipes[0].photo!=='data:image/jpeg;base64,FETCHED')
@@ -3103,7 +3169,7 @@ const SELF_TESTS = [
       } finally {
         recipes=sR; window.hydratePhotosFromIDB=sHyd; window.idbGetAll=sAll; window.askConfirm=sAsk;
         window.photoSearchTerms=sTerms; window.photoSearchOnce=sOnce; window.fetch=sFetch;
-        window.uploadPhotoToStorage=sUp; window.toast=sToast; window.showServiceError=sErr;
+        window.compressPhotoToDataUrl=sUp; window.toast=sToast; window.showServiceError=sErr;
         window.saveData=sSave; window.renderGrid=sGrid;
         await autoFetchUndoClear();
       }
@@ -3189,7 +3255,7 @@ const SELF_TESTS = [
         window.idbGetAll=function(){ return Promise.resolve([]); };
         recipes=[{ id:501, name:'Late arrival', photo:'' }];
         var realConfirm=window.askConfirm, realTerms=window.photoSearchTerms,
-            realOnce=window.photoSearchOnce, realUpload=window.uploadPhotoToStorage,
+            realOnce=window.photoSearchOnce, realUpload=window.compressPhotoToDataUrl,
             realFetch=window.fetch, realToast=window.toast, realErr=window.showServiceError,
             realSave=window.saveData, realRG=window.renderGrid;
         try{
@@ -3200,7 +3266,7 @@ const SELF_TESTS = [
           window.photoSearchOnce=function(){ return Promise.resolve([{ url:'https://x/p.jpg', credit:'A' }]); };
           window.fetch=function(){ return Promise.resolve({ blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
           // The photo lands DURING the fetch — exactly the race the guard exists for.
-          window.uploadPhotoToStorage=function(){
+          window.compressPhotoToDataUrl=function(){
             recipes[0].photo='data:image/jpeg;base64,ARRIVED';
             return Promise.resolve('https://stock/photo.jpg');
           };
@@ -3217,7 +3283,7 @@ const SELF_TESTS = [
           window.photoSearchOnce=function(){ return Promise.resolve([
             { url:'https://x/p.jpg', credit:'Jane Photographer', creditUrl:'https://x/jane',
               license:'CC-BY', sourceLabel:'Openverse' }]); };
-          window.uploadPhotoToStorage=function(){ return Promise.resolve('https://stock/photo.jpg'); };
+          window.compressPhotoToDataUrl=function(){ return Promise.resolve('https://stock/photo.jpg'); };
           await autoFetchMissingPhotos();
           if(!recipes[0].photo) throw new Error('the auto-fetch applied no photo at all');
           if(!recipes[0].photoCredit || !recipes[0].photoCredit.name)
@@ -3226,7 +3292,7 @@ const SELF_TESTS = [
             throw new Error('the credit names the wrong person: '+JSON.stringify(recipes[0].photoCredit));
         } finally {
           window.askConfirm=realConfirm; window.photoSearchTerms=realTerms;
-          window.photoSearchOnce=realOnce; window.uploadPhotoToStorage=realUpload;
+          window.photoSearchOnce=realOnce; window.compressPhotoToDataUrl=realUpload;
           window.fetch=realFetch; window.toast=realToast; window.showServiceError=realErr;
           window.saveData=realSave; window.renderGrid=realRG;
         }
@@ -5269,12 +5335,12 @@ const SELF_TESTS = [
       // closeM is deliberately NOT stubbed — stubbing it leaves the overlay open
       // and the next test finds a dialog that will not close.
       var pcRecipes=recipes, pcSel=_photoSearchSelected, pcRes=_photoSearchResults,
-          pcTarget=heroPhotoTargetId, pcFetch=window.fetch, pcUp=window.uploadPhotoToStorage,
+          pcTarget=heroPhotoTargetId, pcFetch=window.fetch, pcUp=window.compressPhotoToDataUrl,
           pcSave=window.saveData, pcGrid=window.renderGrid, pcToast=window.toast;
       try{
         window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
         window.fetch=function(){ return Promise.resolve({ ok:true, blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
-        window.uploadPhotoToStorage=function(){ return Promise.resolve('data:image/jpeg;base64,PICKED'); };
+        window.compressPhotoToDataUrl=function(){ return Promise.resolve('data:image/jpeg;base64,PICKED'); };
         recipes=[normalizeRecipe({ id:9301, name:'Credit target', ingredients:[], steps:['x'] })];
         heroPhotoTargetId=9301;
         _photoSearchResults=[{ url:'https://x/p.jpg', credit:'Ada Lens',
@@ -5295,7 +5361,7 @@ const SELF_TESTS = [
           throw new Error('a credit was invented for a photo with no named creator: '+JSON.stringify(recipes[0].photoCredit));
       } finally {
         recipes=pcRecipes; _photoSearchSelected=pcSel; _photoSearchResults=pcRes;
-        heroPhotoTargetId=pcTarget; window.fetch=pcFetch; window.uploadPhotoToStorage=pcUp;
+        heroPhotoTargetId=pcTarget; window.fetch=pcFetch; window.compressPhotoToDataUrl=pcUp;
         window.saveData=pcSave; window.renderGrid=pcGrid; window.toast=pcToast;
         closeM('photoSearchOverlay');
       }
@@ -6662,7 +6728,6 @@ function selfTestReportText() {
   L.push('  online:      ' + (navigator.onLine ? 'yes' : 'no'));
   L.push('  standalone:  ' + (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'yes (installed PWA)' : 'no (browser tab)'));
   L.push('  worker:      ' + WORKER_ENDPOINT);
-  L.push('  storage:     _storageReady=' + String(window._storageReady));
   L.push('');
 
   // ── The failures, in full. Message AND stack AND the standing fix note. ───
@@ -7449,7 +7514,7 @@ async function autoFetchMissingPhotos() {
       var imgResp = await fetch(images[0].url);
       var blob = await imgResp.blob();
       var file = new File([blob], 'auto-photo.jpg', { type: blob.type || 'image/jpeg' });
-      var photoUrl = await uploadPhotoToStorage(file, r.id);
+      var photoUrl = await compressPhotoToDataUrl(file, r.id);
       // Last line of defence. Hydration or a cloud attach can land DURING the
       // run, several seconds after the list was chosen. Never overwrite a photo
       // that exists now, whatever the list said when it was built.
@@ -7757,7 +7822,6 @@ window.copySyncHealth = copySyncHealth;
 
 function openSyncHealth() {
   renderSyncHealth();
-  refreshStorageMigrateBox().catch(function(){});
   refreshAutoFetchUndoItem().catch(function(){});
   document.getElementById('syncHealthOverlay').classList.add('open');
 }
@@ -7950,7 +8014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.3';
+var APP_VERSION = 'v34.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10474,7 +10538,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11051,7 +11115,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13268,7 +13332,12 @@ function showPhotoSourcePicker(id, recipeName) {
   document.body.appendChild(picker);
 }// Compress photo for cross-device sync via Firestore
 // Targets under 60KB so it fits within Firestore's 1MB document limit
-async function uploadPhotoToStorage(file, recipeId) {
+// NOT Firebase Storage — it was called uploadPhotoToStorage until v34.4 and
+// uploads nothing anywhere. It RESIZES a picked file to at most 600px and steps
+// the JPEG quality down until it fits, returning a base64 data URL. It sits on
+// the path of every photo you add, which is exactly why the old name was
+// dangerous: it read like part of the Storage feature that was being deleted.
+async function compressPhotoToDataUrl(file, recipeId) {
   return new Promise(function(resolve) {
     var rd = new FileReader();
     rd.onload = function(e) {
@@ -13301,7 +13370,7 @@ async function uploadPhotoToStorage(file, recipeId) {
     rd.readAsDataURL(file);
   });
 }
-function resizePhotoForStorage(file) { return uploadPhotoToStorage(file, 'tmp'); }
+function resizePhotoToDataUrl(file) { return compressPhotoToDataUrl(file, 'tmp'); }
 
 
 function heroPhotoChanged(event){
@@ -13309,7 +13378,7 @@ function heroPhotoChanged(event){
   const r=recipes.find(x=>x.id===heroPhotoTargetId);
   if(!r)return;
   toast('Uploading photo...');
-  uploadPhotoToStorage(file, r.id).then(function(url){
+  compressPhotoToDataUrl(file, r.id).then(function(url){
     r.photo=url; r.updatedAt=Date.now(); drawView(); renderGrid(); saveData(); toast('Photo updated!');
   }).catch(function(err){
     toast('Photo upload failed: ' + err.message);
@@ -14197,7 +14266,7 @@ function onPhotoFile(event){
   };
   localRd.readAsDataURL(file);
   // Compress and store result
-  uploadPhotoToStorage(file, 'form').then(function(url){
+  compressPhotoToDataUrl(file, 'form').then(function(url){
     pendingPhoto = url;
     photoUploadInProgress = false;
   }).catch(function(err){
@@ -16025,87 +16094,6 @@ function forgetPhotoProbes() { try { localStorage.removeItem(PHOTO_PROBED_KEY); 
 // asks the cloud directly for any recipe that has no photo, once per recipe.
 // Bounded: at most PHOTO_REPAIR_MAX reads per run, and each answer remembered.
 var PHOTO_REPAIR_MAX = 60;
-// ─── Moving photos already in Firestore over to Storage (5.2) ───────────────
-// Enabling Storage only changes where NEW uploads go: syncCloudPhotos skips a
-// photo whose content has not changed, so everything already in Firestore as
-// base64 would stay there indefinitely. That is precisely the mixed-methodology
-// state Tony objected to over recipe ids, and he is right — two storage shapes
-// for the same kind of data is a trap for whoever looks next.
-//
-// This is deliberately a BUTTON, not something that happens on load: it rewrites
-// every photo document in the shared collection, and a bulk cloud write should
-// be a decision, taken once, with a backup in hand.
-function storageMigrationPending() {
-  // Only what is genuinely still base64 in the cloud. _cloudPhotoStamps holds
-  // what we last wrote; a photo already stored as a URL has an http(s) stamp.
-  return (recipes || []).filter(function(r) {
-    return r.photo && /^data:/i.test(r.photo) && _cloudPhotoIds[r.id];
-  });
-}
-async function migratePhotosToStorage() {
-  var btn = document.getElementById('storageMigrateBtn');
-  var st  = document.getElementById('storageMigrateStatus');
-  var say = function(html){ if (st) st.innerHTML = html; };
-  if (!_fbDb || !window._fbUser) { say('<span style="color:#c62828;">Sign in first.</span>'); return; }
-  if (!await storageReady()) {
-    say('<span style="color:#c62828;">Firebase Storage is not enabled on the project yet.</span>'); return;
-  }
-  var pending = storageMigrationPending();
-  if (!pending.length) { say('<span style="color:#2e7d32;">Nothing to move — every photo is already in Storage.</span>'); return; }
-  if (!await askConfirm({ icon:'🗄️', title:'Move ' + pending.length + ' photo' + (pending.length===1?'':'s') + ' to Storage?',
-      message:'Each photo is uploaded to Firebase Storage and its Firestore document is replaced with a pointer.\n\n'
-        + 'The photos on this device are untouched, and a photo that fails to move simply stays where it is. '
-        + 'Other devices pick up the change on their next sync.\n\nTake a backup first if you have not.',
-      okLabel:'Move them' })) return;
-
-  if (btn) { btn.disabled = true; btn.textContent = 'Moving…'; }
-  var moved = 0, failed = [];
-  for (var i = 0; i < pending.length; i++) {
-    var r = pending[i];
-    say('Moving ' + (i + 1) + ' of ' + pending.length + '…');
-    try {
-      var url = await uploadPhotoToStorageBucket(r.id, r.photo);
-      await _fbDb.collection('shared').doc(photoDocId(r.id))
-        .set({ photoUrl: url, storage: true, updatedAt: r.updatedAt || Date.now() });
-      // The local copy stays base64 on purpose: export, email and print all
-      // consume data URLs, and re-fetching every photo to prove a point would
-      // cost bandwidth for nothing.
-      _cloudPhotoStamps[r.id] = r.photo;
-      moved++;
-    } catch(e) {
-      failed.push((r.name || ('#' + r.id)) + ' — ' + (e && e.message ? e.message : 'upload failed'));
-      // If the very first one fails, Storage is not really there. Stop rather
-      // than grinding through every photo to collect the same error N times.
-      if (!moved) { markStorageUnavailable(e && e.message); break; }
-    }
-  }
-  if (btn) { btn.disabled = false; btn.textContent = 'Move existing photos to Storage'; }
-  say('<span style="color:' + (failed.length ? '#8A6D00' : '#2e7d32') + ';">Moved ' + moved + ' of ' + pending.length + '.</span>');
-  if (failed.length) {
-    showServiceError('Moved ' + moved + ' photo(s). ' + failed.length + ' could not be moved and are UNCHANGED '
-      + 'in Firestore — nothing was lost, and you can run this again:\n\n' + failed.join('\n'));
-  }
-  renderSyncHealth();
-}
-window.migratePhotosToStorage = migratePhotosToStorage;
-window.storageMigrationPending = storageMigrationPending;
-
-// Show the control only when it can do something.
-async function refreshStorageMigrateBox() {
-  var box = document.getElementById('storageMigrateBox');
-  if (!box) return;
-  var ready = await storageReady();
-  box.style.display = ready ? 'block' : 'none';
-  if (!ready) return;
-  var n = storageMigrationPending().length;
-  var info = document.getElementById('storageMigrateInfo');
-  if (info) info.textContent = n
-    ? n + ' photo' + (n===1?' is':'s are') + ' still stored as base64 inside Firestore. Moving them keeps recipe documents small and lifts the 1 MB per-photo limit.'
-    : 'Every photo is in Storage. New ones go there automatically.';
-  var btn = document.getElementById('storageMigrateBtn');
-  if (btn) btn.style.display = n ? 'block' : 'none';
-}
-window.refreshStorageMigrateBox = refreshStorageMigrateBox;
 
 async function repairMissingPhotos() {
   if (!_fbDb || !window._fbUser) return { restored: 0, checked: 0 };
@@ -16169,88 +16157,6 @@ function isSizeError(err) {
 
 // Write each changed photo to its own doc; remove docs for cleared/deleted photos.
 // Returns an array of human-readable descriptions of photos too large to sync.
-// ─── Photos in Firebase Storage (5.2) ───────────────────────────────────────
-// Base64 in Firestore caps a photo at ~1 MiB (it inflates bytes by a third) and
-// every photo is re-read as document data. Storage holds the bytes and Firestore
-// keeps a pointer, so recipe documents stay small.
-//
-// SAFE BY DEFAULT: if Storage is not enabled on the project, or its SDK will not
-// load, `storageReady()` is false and everything behaves exactly as it did
-// before — base64 in `photo_<id>`. Nothing needs to be turned on for the app to
-// keep working, and nothing breaks if it is turned off again later.
-//
-// Invariant this must not break: **a backup is self-contained.** Once a photo is
-// a URL rather than a data URL, `backupSave` has to fetch the bytes back and
-// inline them, or a restore months later would depend on a live Storage bucket.
-var STORAGE_SDK = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js';
-var _storageReady = null;   // null = untried, false = unavailable, true = ready
-async function storageReady() {
-  if (_storageReady !== null) return _storageReady;
-  try {
-    if (!window.firebase || !firebase.apps || !firebase.apps.length) { _storageReady = false; return false; }
-    if (!firebase.storage) await loadScriptOnce(STORAGE_SDK, null);
-    if (!firebase.storage) { _storageReady = false; return false; }
-    // NOTE: this only proves the SDK constructs. It does NOT prove the project
-    // has a Storage bucket provisioned — `storageBucket` is in the config, so
-    // this succeeds even on a project where Storage was never enabled (it now
-    // needs a paid plan). Real proof only arrives when an upload is attempted,
-    // which is why markStorageUnavailable() exists.
-    firebase.storage();
-    _storageReady = true;
-  } catch (e) {
-    dlog('[storage] unavailable, staying on base64:', e && e.message);
-    _storageReady = false;
-  }
-  return _storageReady;
-}
-// The first failed upload is the real answer. Without this, a project without
-// Storage retried a doomed upload for EVERY photo on EVERY save — a wasted round
-// trip each time — and the migration button appeared and could only fail.
-function markStorageUnavailable(reason) {
-  if (_storageReady === false) return;
-  _storageReady = false;
-  dlog('[storage] disabled for this session:', reason);
-  var box = document.getElementById('storageMigrateBox');
-  if (box) box.style.display = 'none';
-}
-window.markStorageUnavailable = markStorageUnavailable;
-
-function dataUrlToBlobForUpload(dataUrl) {
-  var m = /^data:([^;,]+)[^,]*,(.*)$/.exec(String(dataUrl || ''));
-  if (!m) return null;
-  try {
-    var bytes = Uint8Array.from(atob(m[2]), function(c){ return c.charCodeAt(0); });
-    return new Blob([bytes], { type: m[1] });
-  } catch (e) { return null; }
-}
-// Shared path, matching the shared collection: every family member reads the
-// same photos, so they are not filed per-user.
-function photoStoragePath(id) { return 'shared/photos/' + id + '.bin'; }
-async function uploadPhotoToStorageBucket(id, dataUrl) {
-  var blob = dataUrlToBlobForUpload(dataUrl);
-  if (!blob) throw new Error('the photo is not a readable data URL');
-  var ref = firebase.storage().ref(photoStoragePath(id));
-  await ref.put(blob, { cacheControl: 'public,max-age=31536000' });
-  return await ref.getDownloadURL();
-}
-async function deletePhotoFromStorageBucket(id) {
-  try { await firebase.storage().ref(photoStoragePath(id)).delete(); } catch (e) {}
-}
-// Turn an http(s) photo back into a data URL. Used by backup so the file stays
-// self-contained, and as the fallback if a bucket ever goes away.
-async function inlineRemotePhoto(url) {
-  var r = await fetch(url, { mode: 'cors' });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  var blob = await r.blob();
-  return await new Promise(function(res, rej) {
-    var fr = new FileReader();
-    fr.onload = function(){ res(fr.result); };
-    fr.onerror = function(){ rej(new Error('could not read the downloaded photo')); };
-    fr.readAsDataURL(blob);
-  });
-}
-window.storageReady = storageReady; window.photoStoragePath = photoStoragePath;
-window.inlineRemotePhoto = inlineRemotePhoto; window.dataUrlToBlobForUpload = dataUrlToBlobForUpload;
 
 async function syncCloudPhotos() {
   var errors = [];
@@ -16260,36 +16166,17 @@ async function syncCloudPhotos() {
     currentIds[r.id] = true;
     if (r.photo) {
       if (_cloudPhotoStamps[r.id] === r.photo) continue; // unchanged — already synced
-      // A photo already stored as a URL needs no upload — only the pointer.
-      var isRemote = !/^data:/i.test(r.photo);
-      var useStorage = !isRemote && await storageReady();
-      if (useStorage) {
-        try {
-          var url = await uploadPhotoToStorageBucket(r.id, r.photo);
-          await _fbDb.collection('shared').doc(photoDocId(r.id))
-            .set({ photoUrl: url, storage: true, updatedAt: r.updatedAt || Date.now() });
-          _cloudPhotoStamps[r.id] = r.photo;
-          _cloudPhotoIds[r.id] = true;
-          continue;
-        } catch(e) {
-          // Storage failed for this one photo. Fall through to base64 rather
-          // than losing it — a bucket problem must not cost a photo. And stop
-          // trying for the rest of the session: on a project without Storage
-          // this would otherwise fail once per photo, per save, forever.
-          dlog('[storage] upload failed for ' + r.id + ', falling back to base64:', e && e.message);
-          markStorageUnavailable(e && e.message);
-        }
-      }
+      // Every photo is a base64 data URL: the compressor produces one, imports set
+      // none, and the Firebase Storage path was removed in v34.4 (it needed a paid
+      // plan and was never switched on). One shape, no branches.
       var pbytes = byteLen(r.photo);
       if (pbytes > FIRESTORE_DOC_LIMIT) {
-        errors.push((r.name || ('#' + r.id)) + ' — ' + Math.round(pbytes / 1024) + ' KB'
-          + (await storageReady() ? '' : ' (enable Firebase Storage to lift this limit)'));
+        errors.push((r.name || ('#' + r.id)) + ' — ' + Math.round(pbytes / 1024) + ' KB');
         continue;
       }
       try {
         await _fbDb.collection('shared').doc(photoDocId(r.id))
-          .set(isRemote ? { photoUrl: r.photo, storage: true, updatedAt: r.updatedAt || Date.now() }
-                        : { photo: r.photo, updatedAt: r.updatedAt || Date.now() });
+          .set({ photo: r.photo, updatedAt: r.updatedAt || Date.now() });
         _cloudPhotoStamps[r.id] = r.photo;
         _cloudPhotoIds[r.id] = true;
       } catch(e) {
@@ -16304,7 +16191,6 @@ async function syncCloudPhotos() {
       // cleaned it up. Keep the record and report, as flushCloudDeletes does.
       try {
         await _fbDb.collection('shared').doc(photoDocId(r.id)).delete();
-        if (await storageReady()) await deletePhotoFromStorageBucket(r.id);
         delete _cloudPhotoIds[r.id];
         delete _cloudPhotoStamps[r.id];
       } catch(e) { _photoDeleteRefused[r.id] = true; }
@@ -18141,7 +18027,7 @@ async function useSelectedSearchPhoto() {
     var resp=await fetch(img.url); if(!resp.ok) throw new Error('Could not download: '+resp.status);
     var blob=await resp.blob(); var file=new File([blob],'web-photo.jpg',{type:blob.type||'image/jpeg'});
     photoUploadInProgress=true;
-    var photoUrl=await uploadPhotoToStorage(file,heroPhotoTargetId);
+    var photoUrl=await compressPhotoToDataUrl(file,heroPhotoTargetId);
     photoUploadInProgress=false;
     if (!photoUrl) throw new Error('Compression failed');
     var r=recipes.find(function(x){ return x.id===heroPhotoTargetId; });
@@ -20910,42 +20796,17 @@ window.backupAgeDays   = backupAgeDays;
 // every photo is gone. So fetch the bytes back and inline them at backup time.
 // Failures are reported, never silently dropped: a backup that quietly lost
 // photos would be worse than no backup, because it would be trusted.
-async function inlinePhotosForBackup() {
-  var failed = [];
-  var list = recipes.map(function(r){ return r; });
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i];
-    for (var f = 0; f < 2; f++) {
-      var field = f === 0 ? 'photo' : 'originalPhoto';
-      var v = r[field];
-      if (!v || /^data:/i.test(v)) continue;
-      try { r['_backup_' + field] = await inlineRemotePhoto(v); }
-      catch (e) { failed.push((r.name || ('#' + r.id)) + ' — ' + (e && e.message ? e.message : 'could not be downloaded')); }
-    }
-  }
-  return failed;
-}
-function clearBackupInlines() {
-  recipes.forEach(function(r){ delete r._backup_photo; delete r._backup_originalPhoto; });
-}
-
+// A backup is SELF-CONTAINED — every photo travels as base64 inside the file, so
+// a restore years later depends on nothing. Until v34.4 a photo could also be a
+// Storage URL, so this had to download those bytes back before writing the file
+// (`inlinePhotosForBackup` / `_backup_photo` / `clearBackupInlines`). With the
+// Storage path gone a photo is only ever '' or a data: URL, and the round trip
+// with it. If a remote photo shape is ever reintroduced, this has to come back.
 async function backupSave() {
-  var failed = [];
-  try {
-    // Only worth a round trip if something is actually remote.
-    if (recipes.some(function(r){ return (r.photo && !/^data:/i.test(r.photo)) || (r.originalPhoto && !/^data:/i.test(r.originalPhoto)); })) {
-      toast('Fetching photos so the backup is self-contained…');
-      failed = await inlinePhotosForBackup();
-    }
-  } catch (e) { failed.push('photo download failed: ' + e.message); }
   try {
     var photoMap={}; var photoIndex=0;
     var exportRecipes=recipes.map(function(r){
       var rec=JSON.parse(JSON.stringify(r));
-      // Prefer the inlined bytes over the URL, and never ship the temp field.
-      if(rec._backup_photo){ rec.photo=rec._backup_photo; }
-      if(rec._backup_originalPhoto){ rec.originalPhoto=rec._backup_originalPhoto; }
-      delete rec._backup_photo; delete rec._backup_originalPhoto;
       if(rec.photo&&rec.photo.startsWith('data:')){ if(photoMap[rec.photo]!==undefined){rec.photo='__photo__'+photoMap[rec.photo];}else{var k=photoIndex++;photoMap[rec.photo]=k;rec.photo='__photo__'+k;} }
       if(rec.originalPhoto&&rec.originalPhoto.startsWith('data:')){ if(photoMap[rec.originalPhoto]!==undefined){rec.originalPhoto='__photo__'+photoMap[rec.originalPhoto];}else{var k2=photoIndex++;photoMap[rec.originalPhoto]=k2;rec.originalPhoto='__photo__'+k2;} }
       return rec;
@@ -20960,15 +20821,8 @@ async function backupSave() {
     a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     toast('\u2705 Backup saved! '+recipes.length+' recipes, '+(Object.keys(photos).length)+' photos');
-    // Say so plainly. A backup missing photos it could not download is still
-    // worth having, but only if you know which ones are missing.
-    if(failed.length) showServiceError('The backup was saved, but ' + failed.length + ' photo(s) could not be '
-      + 'downloaded and are NOT in the file:\n\n' + failed.join('\n')
-      + '\n\nThose recipes will restore without their photos. The cloud copies are untouched.');
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
-  finally { clearBackupInlines(); }
 }
-window.inlinePhotosForBackup = inlinePhotosForBackup;
 
 async function backupRestore() {
   if(!await askConfirm({ icon:'📂', title:'Restore from backup?',
@@ -21600,14 +21454,6 @@ function updateFilterBarTop() {
       <div style="display:flex;gap:8px;margin-top:14px;">
         <button onclick="renderSyncHealth()" style="flex:1;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">↻ Refresh</button>
         <button onclick="copySyncHealth()" style="flex:1;padding:11px 18px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy</button>
-      </div>
-      <!-- Only shown once Firebase Storage is actually reachable, so it cannot
-           be pressed into a dead end. -->
-      <div id="storageMigrateBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
-        <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">🗄️ Photos in Firebase Storage</div>
-        <div id="storageMigrateInfo" style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px;"></div>
-        <button id="storageMigrateBtn" onclick="migratePhotosToStorage()" style="width:100%;padding:11px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;">Move existing photos to Storage</button>
-        <div id="storageMigrateStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:6px;"></div>
       </div>
     </div>
   </div>
