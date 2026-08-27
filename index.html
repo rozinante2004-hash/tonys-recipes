@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.4 -->
+<!-- Tony's Recipes Collection v34.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,7 +47,7 @@
      alternative is proxying every image download through the Worker, which is a
      fair trade to revisit — it would also fix image hosts that send no CORS
      headers — but it needs a Worker deploy, and this needs to work now. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https: https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https: http://127.0.0.1:27182 http://localhost:27182 https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -2964,6 +2964,89 @@ const SELF_TESTS = [
         if(st.indexOf('⚠')===-1)
           throw new Error('a failed translation was not reported — the user would think English was searched');
       } finally { window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
+    } },
+
+  { id:'sec_save_helper_optin', group:'Network', name:'The Save Helper is opt-in and permitted by our own CSP (5g.8)',
+    test: async()=>{
+      ['saveHelperEnabled','setSaveHelperEnabled','localSaveUrl','checkHelperStatus']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // The CSP must PERMIT the helper. It did not for eleven releases: connect-src
+      // carries a bare `https:` but no http: source, so every export fired a request
+      // the browser refused before it left the page — a CSP violation logged on the
+      // console each time, and a feature that could never work.
+      var meta=document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+      if(!meta) throw new Error('no CSP meta tag');
+      var csp=meta.getAttribute('content')||'';
+      var conn=(csp.split(';').filter(function(d){ return d.trim().indexOf('connect-src')===0; })[0]||'');
+      if(conn.indexOf('http://127.0.0.1:'+LOCAL_SAVE_PORT)===-1)
+        throw new Error('connect-src does not permit the Save Helper, so our own CSP blocks it and logs a violation on every export');
+
+      // ...and the address has ONE builder, so the CSP entry and the callers
+      // cannot drift apart the way the photo document name once did.
+      if(localSaveUrl()!=='http://127.0.0.1:'+LOCAL_SAVE_PORT)
+        throw new Error('localSaveUrl() does not match the port the CSP allows: '+localSaveUrl());
+
+      var saved=null; try{ saved=localStorage.getItem('save_helper_enabled'); }catch(e){}
+      var realFetch=window.fetch, realToast=window.toast;
+      try{
+        window.toast=function(){};
+        var calls=[];
+        window.fetch=function(u){ calls.push(String(u)); return Promise.reject(new Error('no helper here')); };
+
+        // OFF (the default): nothing may be sent to localhost at all. A request
+        // that is merely caught still logs, which is the whole complaint.
+        setSaveHelperEnabled(false);
+        if(saveHelperEnabled()) throw new Error('the helper reports enabled after being switched off');
+        var offAnswer=null;
+        await new Promise(function(res){ checkHelperStatus(function(ok){ offAnswer=ok; res(); }); });
+        if(calls.length)
+          throw new Error('the helper was contacted while switched off — that is the console error this release exists to remove');
+        if(offAnswer!==false) throw new Error('a disabled helper did not report itself unavailable');
+
+        // ON: it is allowed to try.
+        setSaveHelperEnabled(true);
+        if(!saveHelperEnabled()) throw new Error('the helper did not stay enabled');
+        await new Promise(function(res){ checkHelperStatus(function(){ res(); }); });
+        if(calls.length!==1) throw new Error('an enabled helper made '+calls.length+' request(s), expected exactly 1');
+        if(calls[0]!==localSaveUrl()) throw new Error('the probe went to '+calls[0]+' rather than '+localSaveUrl());
+
+        // The EXPORT path, not just the probe. Removing the switch from
+        // downloadBlob survived a mutation because this test only drove
+        // checkHelperStatus — the route, not the helper, again.
+        calls=[]; setSaveHelperEnabled(false);
+        // _localSaveAvailable must be "untested" here, or the OTHER half of the
+        // condition is what blocks the request and the switch could be deleted
+        // freely — the fixture has to leave only the property under test standing.
+        window._localSaveAvailable = null;
+        var clicked=0, realCreate=URL.createObjectURL, realRevoke=URL.revokeObjectURL,
+            realClick=HTMLAnchorElement.prototype.click;
+        try{
+          URL.createObjectURL=function(){ return 'blob:stub'; };
+          URL.revokeObjectURL=function(){};
+          HTMLAnchorElement.prototype.click=function(){ clicked++; };
+          downloadBlob(new Blob(['x'],{type:'text/plain'}), 'export.txt');
+          // FileReader is async, so give the whole chain time to reach a fetch.
+          await new Promise(function(res){ setTimeout(res, 250); });
+          if(calls.length)
+            throw new Error('an export contacted the Save Helper while it was switched off — that request is the console error on every download');
+          if(!clicked) throw new Error('the export produced no browser download either, so saving is broken');
+        } finally {
+          URL.createObjectURL=realCreate; URL.revokeObjectURL=realRevoke;
+          HTMLAnchorElement.prototype.click=realClick;
+        }
+
+        // Turning it off again must forget any cached "available", or a probe from
+        // when it was on would keep exports routed away from the browser.
+        setSaveHelperEnabled(false);
+        if(window._localSaveAvailable!==false)
+          throw new Error('switching the helper off left it marked available, so exports would still be routed to it');
+      } finally {
+        window.fetch=realFetch; window.toast=realToast;
+        try{ if(saved===null) localStorage.removeItem('save_helper_enabled');
+             else localStorage.setItem('save_helper_enabled', saved); }catch(e){}
+        window._localSaveAvailable=null;
+      }
     } },
 
   { id:'photo_one_shape_no_storage', group:'Storage', name:'Photos have ONE shape: base64, no Storage path (5g.7)',
@@ -8014,7 +8097,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.4';
+var APP_VERSION = 'v34.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8560,7 +8643,15 @@ window.sendViaGmailApi = sendViaGmailApi;
 // ─── LOCAL SAVE HELPER ────────────────────────────────────────────────────────
 
 function checkHelperStatus(callback) {
-  fetch('http://127.0.0.1:27182', {method:'POST',
+  // Switched off means switched off: no request, so no console noise.
+  if (!saveHelperEnabled()) {
+    _localSaveAvailable = false;
+    var indOff = document.getElementById('helperIndicator');
+    if (indOff) indOff.style.background = '#ccc';
+    if (callback) callback(false);
+    return;
+  }
+  fetch(localSaveUrl(), {method:'POST',
     headers: workerHeaders(),
     body:JSON.stringify({ping:true, filename:'ping', data:''}),
     signal: AbortSignal.timeout(1000)
@@ -8618,6 +8709,29 @@ function showSaveHelperInfo() {
   statusBar.appendChild(statusDot);
   statusBar.appendChild(statusText);
 
+  // The switch. Off by default: with it off nothing is ever sent to localhost,
+  // and exports go to the browser's Downloads folder exactly as they do today.
+  var enableWrap = document.createElement('label');
+  enableWrap.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;'
+    + 'color:#5C3D2E;font-family:DM Sans,Heebo,sans-serif;flex-shrink:0;';
+  var enableBox = document.createElement('input');
+  enableBox.type = 'checkbox';
+  enableBox.id = 'saveHelperEnabledBox';
+  enableBox.checked = saveHelperEnabled();
+  enableBox.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+  enableBox.onchange = function() {
+    setSaveHelperEnabled(enableBox.checked);
+    toast(enableBox.checked
+      ? '📁 Save Helper on — exports will go to your chosen folder when it is running'
+      : '📁 Save Helper off — exports use the browser download', 4000);
+    updateHelperStatus();
+  };
+  var enableText = document.createElement('span');
+  enableText.textContent = 'Use it';
+  enableWrap.appendChild(enableBox);
+  enableWrap.appendChild(enableText);
+  statusBar.appendChild(enableWrap);
+
   // Body
   var body = document.createElement('div');
   body.style.cssText = 'padding:16px 20px;';
@@ -8648,7 +8762,7 @@ function showSaveHelperInfo() {
   stopBtn.textContent = '⏹ Stop Helper';
   stopBtn.onclick = function() {
     // Send stop signal to helper
-    fetch('http://127.0.0.1:27182', {method:'POST',
+    fetch(localSaveUrl(), {method:'POST',
       headers: workerHeaders(),
       body: JSON.stringify({action:'stop'})
     }).catch(function(){});
@@ -8740,6 +8854,12 @@ function updateHelperStatus() {
     if(running) {
       dot.style.background = '#2E7D32';
       text.textContent = '🟢 Running — exports save directly to your chosen folder';
+    } else if (!saveHelperEnabled()) {
+      // Distinguish "switched off" from "switched on but not answering". Saying
+      // "not running" when nothing was even asked is the panel stating something
+      // it has not observed.
+      dot.style.background = '#ccc';
+      text.textContent = '⚪ Off — exports use the browser download. Tick “Use it” to enable.';
     } else {
       dot.style.background = '#c0392b';
       text.textContent = '🔴 Not running — exports will use browser download';
@@ -10538,7 +10658,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11115,7 +11235,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13712,15 +13832,49 @@ function buildZip(files){
 var LOCAL_SAVE_PORT = 27182;
 var _localSaveAvailable = null; // null=untested, true=available, false=unavailable
 
+// ONE builder for the helper's address — it was written out by hand in three
+// places, which is the same drift risk as the photo document name (v34.5).
+function localSaveUrl() { return 'http://127.0.0.1:' + LOCAL_SAVE_PORT; }
+
+// The helper is OPT-IN. Two reasons, both learned the hard way:
+//
+// 1. Until v34.5 the CSP had no `http:` source, so every export fired a fetch at
+//    the helper that the browser refused before it left the page — a Content
+//    Security Policy violation logged on the console on EVERY download and every
+//    load, for eleven releases. The app was generating errors against itself and
+//    the feature could never have worked.
+// 2. With the CSP fixed, probing unconditionally would still log a connection
+//    error whenever the helper is not running, which is most of the time — and
+//    would silently start re-routing exports away from the browser's Downloads
+//    folder for anyone who happens to have it running. Neither is acceptable as
+//    a default.
+//
+// So: nothing is attempted unless this is switched on in ⚙️ → Save Helper.
+var SAVE_HELPER_KEY = 'save_helper_enabled';
+function saveHelperEnabled() {
+  try { return localStorage.getItem(SAVE_HELPER_KEY) === '1'; } catch (e) { return false; }
+}
+function setSaveHelperEnabled(on) {
+  try {
+    if (on) localStorage.setItem(SAVE_HELPER_KEY, '1');
+    else localStorage.removeItem(SAVE_HELPER_KEY);
+  } catch (e) {}
+  _localSaveAvailable = on ? null : false;   // re-probe when turned on, never when off
+}
+window.localSaveUrl = localSaveUrl;
+window.saveHelperEnabled = saveHelperEnabled;
+window.setSaveHelperEnabled = setSaveHelperEnabled;
+
 function downloadBlob(blob, filename) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var b64 = e.target.result.split(',')[1];
     var hasNonAscii = /[^\x00-\x7F]/.test(filename);
 
-    // Try local save helper first (if available or untested)
-    if(_localSaveAvailable !== false) {
-      fetch('http://127.0.0.1:' + LOCAL_SAVE_PORT, {
+    // Try the local save helper first — only when it is switched on. Left
+    // unconditional this fired a blocked request on every single export.
+    if(saveHelperEnabled() && _localSaveAvailable !== false) {
+      fetch(localSaveUrl(), {
         method: 'POST',
         headers: workerHeaders(),
         body: JSON.stringify({
