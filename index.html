@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.6 -->
+<!-- Tony's Recipes Collection v34.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3105,6 +3105,47 @@ const SELF_TESTS = [
         recipes=kR; window._fbDb=kDb; window._fbUser=kUser; window.readCloudPhotoDocs=kBulk;
         window._cloudPhotoStamps=kStamps; window._cloudPhotoIds=kIds;
       }
+    } },
+
+  { id:'ui_menu_directions_true', group:'UI', name:'Every “⚙️ → X” the app prints is really in Settings (5g.10)',
+    test: async()=>{
+      // Tony went to ⚙️ Settings for "Send my photos to the cloud" because three
+      // of the app's own messages told him to. The item was in the ··· More menu.
+      // Directing someone to a menu that does not contain the thing is the same
+      // class of fault as a status line asserting something unverified — it is
+      // the UI stating something untrue — and it is entirely checkable.
+      var settings=document.getElementById('settingsDrop');
+      if(!settings) throw new Error('no settings menu to check against');
+      var labels={};
+      settings.querySelectorAll('.drop-item').forEach(function(b){
+        labels[(b.textContent||'').replace(/\s+/g,' ').trim().toLowerCase()]=true;
+      });
+      function inSettings(name){
+        var want=String(name).replace(/\s+/g,' ').trim().toLowerCase();
+        return Object.keys(labels).some(function(l){ return l.indexOf(want)>-1; });
+      }
+
+      // Collect what the CODE claims, from the functions that print these
+      // messages — quoted names only, so the check is about a specific item.
+      var sources=[autoFetchMissingPhotos, runPhotoRescue, undoAutoFetch, healCloudPhotos]
+        .map(function(f){ return String(f); }).join('\n');
+      var claims=[], re=/⚙️\s*(?:Settings\s*)?→\s*[“"]([^”"]{3,60})[”"]/g, m;
+      while((m=re.exec(sources))) claims.push(m[1]);
+      if(!claims.length)
+        throw new Error('no “⚙️ → …” directions found at all — this check would pass vacuously');
+      claims.forEach(function(c){
+        var name=c.replace(/^[^A-Za-z\u0590-\u05FF]+/, '').trim();
+        if(!inSettings(name))
+          throw new Error('the app tells the user “⚙️ → ' + c + '” but no such item is in the Settings menu — they will look and not find it, which is exactly what happened');
+      });
+
+      // And the three photo-repair tools must be reachable at all.
+      ['healCloudPhotosItem','photoRescueItem','autoFetchUndoItem'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(!el) throw new Error(id+' is not in the page, so that repair cannot be reached');
+        if(!settings.contains(el))
+          throw new Error(id+' is not inside the Settings menu, but the app directs the user there');
+      });
     } },
 
   { id:'feat_cat_skills', group:'Features', name:'“Skills & Methods” is a first-class category (5g.9)',
@@ -8246,7 +8287,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.6';
+var APP_VERSION = 'v34.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10807,7 +10848,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10831,6 +10872,13 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
+          <!-- Photo repair lives HERE, next to the orphan sweep, because that is
+               where the app's own messages send you: several say ⚙️ → "Send my
+               photos to the cloud". They were in the ··· More menu, so the app was
+               directing Tony to a menu that did not contain the item (v34.7). -->
+          <button class="drop-item" id="healCloudPhotosItem" onclick="closeDrop('settingsDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
+          <button class="drop-item" id="photoRescueItem" onclick="closeDrop('settingsDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
+          <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
           <button class="drop-item" id="debugModeItem" onclick="closeDrop('settingsDrop');toggleDebugMode()">🐞 Debug mode: Off</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -10859,9 +10907,6 @@ body.banner-shown .header {
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
-        <button class="drop-item" id="photoRescueItem" onclick="closeDrop('moreDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
-        <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('moreDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
-        <button class="drop-item" id="healCloudPhotosItem" onclick="closeDrop('moreDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
         <input type="file" id="photoRescueFile" accept=".json,application/json" style="display:none"
                onchange="runPhotoRescue(this.files&&this.files[0])">
         </div>
@@ -11386,7 +11431,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

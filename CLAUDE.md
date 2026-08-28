@@ -449,6 +449,12 @@ found only because a test was written first and disagreed with the code.
 - **A safety net that can only fire on a condition nothing produces is not a safety net.**
   That branch was tested — with a stubbed *rejection*, which the real function never
   returned. When you test an error path, check that the real code can actually reach it.
+- **A message that says where to find something is a claim, and it can be wrong.**
+  Three messages told Tony "⚙️ → Send my photos to the cloud" while the item sat in
+  the ··· More menu. He looked in Settings, as instructed, and it was not there. This
+  is the same class as a status line asserting something unverified, and it is fully
+  checkable: `ui_menu_directions_true` parses every "⚙️ → X" the code prints and
+  requires a matching item in the Settings menu.
 - **Fixing the copy the user can see is not fixing the data.** Photos kept "coming back
   wrong" days after Tony had restored them, because the cloud wins on every load and the
   rescue's cloud write was debounced, fire-and-forget, and reported as success before it
