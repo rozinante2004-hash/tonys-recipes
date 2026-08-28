@@ -564,11 +564,34 @@ found only because a test was written first and disagreed with the code.
   and `syncCloudPhotos` silently fails to remove their orphaned `photo_<id>` documents.
   The role labels in Family Access — "Read + Write" vs "Full (incl. delete)" — describe
   what actually happens now, which they did not before.
-- **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
-  (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome. Since v34.5 it is
-  **opt-in and off by default**, and `connect-src` finally permits it — it had been
-  unreachable behind the app's own CSP since v31.1, so any earlier judgement about
-  whether it was worth keeping was made about a feature that could not run.
+- **2.6 — the local Save Helper stays** until Tony runs `filename-test.html` **test 1**
+  on his own Ubuntu desktop. Since v34.5 it is **opt-in and off by default**, and
+  `connect-src` finally permits it — it had been unreachable behind the app's own CSP
+  since v31.1, so any earlier judgement about whether it was worth keeping was made
+  about a feature that could not run.
+  - **The determinant is the process locale, not the browser and not the download
+    method.** Chromium sanitises download filenames against the character encoding of
+    the *process* locale. Under `LANG=`/`C`/`POSIX` it strips every non-ASCII character
+    and falls back to `Download` — for `<a download>`, for `data:` URLs, **and** for a
+    standards-compliant `Content-Disposition: filename*=UTF-8''…`, so no download route
+    escapes it. Under `LANG=C.utf8` the same Chromium 141 build preserves
+    `עוגת שוקולד של סבתא.docx` and `Бабушкин шоколадный торт.docx` byte for byte,
+    verified through the app's own `downloadBlob` with the helper switched off. Nothing
+    in JavaScript can fix or detect the broken case.
+  - **A filename result obtained in this container is worthless unless the locale is
+    set.** The container defaults to `POSIX`, so earlier runs of `fname*.js` "proved"
+    that Chromium mangles even `café.docx` — which is not real Chrome behaviour, and the
+    conclusion drawn from it was wrong. Prefix filename experiments with
+    `LANG=C.utf8 LC_ALL=C.utf8` or they will lie to you. Headed-vs-headless is not the
+    variable here; both agreed, in both directions.
+  - `navigator.language` reads `en-US@posix` under **both** locales, so the page cannot
+    self-diagnose; test 1 needs a human to look in the Downloads folder. That is why it
+    ends in two verdict buttons rather than an automatic check.
+  - Route 3 (Worker) is a fallback of last resort even if it works: it would push every
+    backup, photos included, through Cloudflare to fix a filename. Route 2
+    (`showSaveFilePicker`) is the sane replacement if test 1 fails, but it pops a Save
+    dialog on every export and does not exist on iOS Safari, so the plain
+    `<a download>` path has to stay for the phone regardless.
 - **Classifier long tail (5f.11).** ~900 bare `youtu.be` / `x.com` links in Tony's
   harvest carry no signal in the URL and little in the message. Waiting on more
   dismissal data from him rather than guessing a rule.

@@ -1172,6 +1172,14 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   (`downloadBlob` tries the helper first, falls back to a normal browser download + a rename hint
   for non‑ASCII names). `checkHelperStatus` flips the ⚙️ indicator dot green when reachable.
   The helper enforces `Access-Control-Allow-Origin: https://rozinante2004-hash.github.io`.
+  **Its whole justification is one environment variable.** Chromium sanitises download filenames
+  against the *process* locale's encoding: under `LANG=`/`C`/`POSIX` it strips non‑ASCII and falls
+  back to `Download` — for `<a download>`, `data:` URLs and even a compliant
+  `Content-Disposition: filename*=UTF-8''…` alike — while under a `.UTF-8` locale the same build
+  keeps Hebrew and Cyrillic names exactly, through `downloadBlob` with the helper off. So the helper
+  is redundant on any normally‑configured desktop. It stays only until `filename-test.html` test 1
+  is run on Tony's machine (see CLAUDE.md → Outstanding → 2.6); if that passes, delete the helper,
+  `SAVE_HELPER_KEY`, `localSaveUrl`, `showRenameHint` and the `127.0.0.1:27182` `connect-src` entry.
 
 ---
 

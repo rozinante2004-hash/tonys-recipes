@@ -39,19 +39,59 @@
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;
         background:#EEF2FF;color:#3451CC;margin-left:6px;vertical-align:middle;}
   .pill.auto{background:#EAF5E9;color:#2E7D32;}
+  .pill.key{background:#FDE8DC;color:#B03A0E;}
+  .card.headline{border:2px solid var(--terracotta);}
+  .verdict-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .verdict-row button{font-size:13px;padding:9px 14px;}
+  button.yes{background:var(--green);}
+  button.no{background:#B03030;}
+  dl.env{margin:10px 0 0;font-size:13px;}
+  dl.env dt{font-weight:600;color:var(--warm-brown);}
+  dl.env dd{margin:0 0 6px;font-family:ui-monospace,Menlo,monospace;font-size:12px;
+            word-break:break-all;}
+  pre.cmd{background:#F0EBE4;border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+          font-size:12px;overflow-x:auto;margin:8px 0;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>🍴 Filename Test</h1>
   <div class="sub">
-    Which download method preserves <strong>Hebrew / Russian filenames</strong> in your Chrome on Ubuntu?
-    Run each test, then check your Downloads folder. This page saves nothing and changes nothing in the app.
+    <strong>The question:</strong> is the local Python Save Helper still needed, or does plain Chrome on your
+    Ubuntu box already keep <strong>Hebrew / Russian filenames</strong> intact? <strong>Test 1 decides it.</strong>
+    This page saves nothing and changes nothing in the app.
   </div>
 
   <div class="card" id="originCard" style="display:none;">
     <h2 id="originTitle"></h2>
     <div class="why" id="originNote"></div>
+  </div>
+
+  <div class="card">
+    <h2>What actually decides this: your desktop's locale</h2>
+    <div class="why">
+      Chromium sanitises download filenames against the <em>character encoding of the process locale</em>,
+      not the page's. Launched under a non-UTF-8 locale (<code>LANG</code> empty, or <code>C</code>/<code>POSIX</code>)
+      it throws away every non-ASCII character in the name and falls back to <code>Download</code> —
+      which is exactly the symptom that made us write the helper. Launched under a UTF-8 locale the same
+      Chromium build keeps <code>עוגת שוקולד של סבתא.docx</code> byte for byte, through the app's own export code,
+      with the helper switched off. So this is not a Chrome limitation and not something the app can fix in
+      JavaScript — it is one environment variable on the machine doing the downloading.
+    </div>
+    <div class="why" style="margin-bottom:6px;"><strong>Run this in a terminal on the same machine:</strong></div>
+    <pre class="cmd">locale</pre>
+    <div class="why">
+      If <code>LC_CTYPE</code> reads <code>en_US.UTF-8</code> (or any <code>.UTF-8</code>), Chrome should preserve the
+      names and the helper is redundant. If it reads <code>POSIX</code> or <code>C</code>, that is the bug — and the
+      fix is the locale, not the helper. Note that a Chrome started from a desktop launcher can inherit a
+      different environment from your terminal, so <strong>test 1 below is still the authority</strong>.
+    </div>
+    <div class="why" style="margin-bottom:4px;"><strong>What this page can see from inside the browser:</strong></div>
+    <dl class="env" id="envList"></dl>
+    <div class="why" style="margin-top:2px;">
+      These are the browser's <em>UI</em> locale settings — they are <em>not</em> the process locale and cannot
+      answer the question on their own. They are here only as context to send back with the results.
+    </div>
   </div>
 
   <div class="card">
@@ -65,14 +105,20 @@
   </div>
 
   <!-- 1 -->
-  <div class="card">
-    <h2>1. Classic browser download <span class="pill">manual check</span></h2>
+  <div class="card headline">
+    <h2>1. Classic browser download <span class="pill key">the deciding test</span></h2>
     <div class="why">
-      <code>&lt;a download="…"&gt;</code> + blob URL — <strong>what the app uses today</strong> when the
-      Python helper isn't running. This is the one suspected of producing “Download”.
+      <code>&lt;a download="…"&gt;</code> + blob URL — <strong>exactly what the app does</strong> when the
+      Python helper is switched off. In the lab this keeps the name perfectly under a UTF-8 locale and
+      destroys it under <code>POSIX</code>. Only your machine can say which one you have.
+      <br><strong>If this passes, the helper is not required and can be retired.</strong>
     </div>
     <button onclick="test1()">Run test 1</button>
     <div class="res" id="r1">Not run yet.</div>
+    <div class="verdict-row" id="v1" style="display:none;">
+      <button class="yes" onclick="verdict1(true)">✅ It kept the full name</button>
+      <button class="no" onclick="verdict1(false)">❌ It came out as “Download” / mangled</button>
+    </div>
   </div>
 
   <!-- 2 -->
@@ -81,6 +127,10 @@
     <div class="why">
       <code>showSaveFilePicker({suggestedName})</code> — opens a real Save dialog. The browser tells us
       the filename it actually used, so this one verifies itself. (Chrome only, needs https.)
+      <br>This is the natural replacement if test 1 fails: no background process, no upload, and it is
+      self-verifying. The cost is that every export pops a Save dialog instead of dropping straight into
+      Downloads, and it does not exist on iOS Safari — so the app would need to keep the plain
+      <code>&lt;a download&gt;</code> path anyway for the phone.
     </div>
     <button onclick="test2()">Run test 2</button>
     <div class="res" id="r2">Not run yet.</div>
@@ -93,9 +143,19 @@
       Uploads the file to your Worker, which serves it back with
       <code>Content-Disposition: attachment; filename*=UTF-8''…</code> — the standards-compliant way to
       send a non-ASCII filename. <strong>Your Worker already supports this; the app doesn't use it yet.</strong>
+      <br><strong>⚠️ Only a fallback of last resort.</strong> Routing real exports this way would send every
+      backup — recipes and photos — through Cloudflare purely to fix a filename. Worth knowing it works;
+      not worth adopting unless tests 1 <em>and</em> 2 both fail.
+      <br>Note the same locale caveat applies: under a non-UTF-8 locale Chromium mangles a
+      <code>Content-Disposition</code> name just as thoroughly as an <code>&lt;a download&gt;</code> one, so a
+      failure here is evidence about the locale, not about the Worker.
     </div>
     <button onclick="test3()">Run test 3</button>
     <div class="res" id="r3">Not run yet.</div>
+    <div class="verdict-row" id="v3" style="display:none;">
+      <button class="yes" onclick="verdict3(true)">✅ It kept the full name</button>
+      <button class="no" onclick="verdict3(false)">❌ It came out as “download” / mangled</button>
+    </div>
   </div>
 
   <!-- 4 -->
@@ -112,8 +172,13 @@
   <div class="verdict">
     <h2>📋 Results to send back</h2>
     <div style="font-size:13px;opacity:.85;">
-      After running the tests, look in your Downloads folder (and the helper folder for test 4) and fill in
-      what each file was <em>actually</em> called. Then copy this box back to me.
+      Run test 1, look in your Downloads folder, and press one of its two buttons — that alone answers the
+      question. Paste the output of <code style="color:#1C1A18;">locale</code> in at the bottom if you have it,
+      then copy this box back to me.
+      <br><br><strong>The rule:</strong> test 1 passes → the helper is redundant, and we delete it and its CSP
+      exception. Test 1 fails but your locale is UTF-8 → something else is wrong and we keep the helper while
+      we dig. Test 1 fails and your locale is <code style="color:#1C1A18;">POSIX</code>/<code style="color:#1C1A18;">C</code>
+      → fixing the locale is the real repair; the helper has been papering over it.
     </div>
     <textarea id="summary"></textarea>
     <button style="margin-top:10px;background:var(--gold);color:var(--warm-brown);" onclick="copySummary()">📋 Copy</button>
@@ -143,6 +208,7 @@ function blobToB64(blob){
 }
 
 var results = {1:'not run',2:'not run',3:'not run',4:'not run'};
+var asked   = {1:'',3:''};
 
 // 1 — classic <a download>
 function test1(){
@@ -153,10 +219,25 @@ function test1(){
     a.href=url; a.download=n; a.style.display='none';
     document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },500);
-    results[1]='ran — CHECK FOLDER (asked for: '+n+')';
+    asked[1]=n;
+    results[1]='ran, awaiting your verdict (asked for: '+n+')';
+    $('v1').style.display='flex';
     show('r1','Download triggered asking for:\n  '+n+
-              '\n\n👉 Now look in your Downloads folder. Was it saved with the Hebrew name, or as "Download"/"download.docx"?','warn');
+              '\n\n👉 Open your Downloads folder and look at the file that just arrived.'+
+              '\n   Then press one of the two buttons below.','warn');
   }catch(err){ results[1]='ERROR '+err.message; show('r1','Failed: '+err.message,'fail'); }
+}
+
+function verdict1(ok){
+  results[1] = ok ? 'PASS — kept "'+asked[1]+'"'
+                  : 'FAIL — mangled (asked for "'+asked[1]+'")';
+  show('r1', ok
+    ? '✅ PASS — Chrome kept the name.\n\nThat settles it: the Save Helper is redundant on this machine. '+
+      'The app can drop it, and the CSP exception for 127.0.0.1:27182 goes with it.'
+    : '❌ FAIL — Chrome mangled the name.\n\nNext step is the locale check above (run `locale` in a terminal). '+
+      'If LC_CTYPE is POSIX or C, that is the cause and the fix is the locale, not the helper. '+
+      'If it is already UTF-8, something else is going on and the helper stays until we know what.',
+    ok ? 'pass' : 'fail');
 }
 
 // 2 — File System Access API (self-verifying)
@@ -202,15 +283,27 @@ async function test3(){
     // single-use link and made the real download report "File expired".
     var a=document.createElement('a'); a.href=data.url; a.style.display='none';
     document.body.appendChild(a); a.click(); setTimeout(function(){a.remove();},500);
-    results[3]='ran — CHECK FOLDER (asked for: '+n+')';
+    asked[3]=n;
+    results[3]='ran, awaiting your verdict (asked for: '+n+')';
+    $('v3').style.display='flex';
     show('r3','Worker stored the file and the download was triggered.\n'
             +'The Worker serves it with: Content-Disposition: attachment; filename*=UTF-8\'\'<encoded name>\n\n'
-            +'👉 Check your Downloads folder — was it saved with the correct Hebrew name, or as "download"?\n'
+            +'👉 Check your Downloads folder, then press one of the buttons below.\n'
             +'(The link is single-use; press "Run test 3" again for a fresh one.)','warn');
   }catch(err){
     results[3]='ERROR '+err.message;
     show('r3','Failed: '+err.message+'\n\nIf this says the URL was missing, the Worker may not have the KV binding.','fail');
   }
+}
+
+function verdict3(ok){
+  results[3] = ok ? 'PASS — kept "'+asked[3]+'"'
+                  : 'FAIL — mangled (asked for "'+asked[3]+'")';
+  show('r3', ok
+    ? '✅ PASS — the server-sent UTF-8 filename survived.'
+    : '❌ FAIL — even the standards-compliant header was mangled, which points at the '+
+      'locale rather than at any one download method.',
+    ok ? 'pass' : 'fail');
 }
 
 // 4 — local Python helper (self-verifying)
@@ -270,17 +363,41 @@ async function test4(){
   card.style.display='block';
 })();
 
+// What the browser can tell us about locale. None of it is the *process* locale that
+// actually governs filename sanitisation — it is context to send back, nothing more.
+function envInfo(){
+  var tz='?', res='?';
+  try{ var o=Intl.DateTimeFormat().resolvedOptions(); tz=o.timeZone||'?'; res=o.locale||'?'; }catch(e){}
+  return {
+    'navigator.language': navigator.language || '(none)',
+    'navigator.languages': (navigator.languages||[]).join(', ') || '(none)',
+    'Intl resolved locale': res,
+    'Time zone': tz,
+    'User agent': navigator.userAgent
+  };
+}
+(function renderEnv(){
+  var dl=$('envList'), info=envInfo();
+  Object.keys(info).forEach(function(k){
+    var dt=document.createElement('dt'); dt.textContent=k;
+    var dd=document.createElement('dd'); dd.textContent=info[k];
+    dl.appendChild(dt); dl.appendChild(dd);
+  });
+})();
+
 function refresh(){
+  var info=envInfo(), envLines='';
+  Object.keys(info).forEach(function(k){ envLines += '  '+k+': '+info[k]+'\n'; });
   $('summary').value =
     'FILENAME TEST RESULTS\n'+
-    'Browser  : '+navigator.userAgent+'\n'+
-    'Filename : '+fname()+'\n\n'+
-    '1. <a download>        : '+results[1]+'\n'+
-    '   actual filename on disk: ______________________\n\n'+
-    '2. File System Access  : '+results[2]+'\n\n'+
-    '3. Worker (UTF-8 header): '+results[3]+'\n'+
-    '   actual filename on disk: ______________________\n\n'+
-    '4. Python helper       : '+results[4]+'\n';
+    'Filename tried : '+fname()+'\n\n'+
+    'Browser-visible locale (NOT the process locale):\n'+envLines+'\n'+
+    'Output of `locale` in a terminal on this machine:\n'+
+    '  ______________________________________________\n\n'+
+    '1. <a download>  [DECIDES IT] : '+results[1]+'\n'+
+    '2. File System Access         : '+results[2]+'\n'+
+    '3. Worker (UTF-8 header)      : '+results[3]+'\n'+
+    '4. Python helper              : '+results[4]+'\n';
 }
 function copySummary(){
   $('summary').select();
