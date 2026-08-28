@@ -564,22 +564,35 @@ found only because a test was written first and disagreed with the code.
   and `syncCloudPhotos` silently fails to remove their orphaned `photo_<id>` documents.
   The role labels in Family Access — "Read + Write" vs "Full (incl. delete)" — describe
   what actually happens now, which they did not before.
-- **2.6 — the local Save Helper stays. Tony ran the test on 28 Aug 2026 and his
-  machine reproduces the bug**, so the helper is earning its keep as things stand.
-  Chrome 137, X11, `navigator.language` `en-GB`:
-  - test 1 (`<a download>`) — **mangled**;
-  - test 2 (`showSaveFilePicker`) — saved as **`download`**, and this one is
-    *self-verifying*, so it is the browser's own report, not an eyeball reading;
-  - test 4 (helper) — wrote `עוגת שוקולד של סבתא (2).docx`, i.e. the name intact plus
-    the helper's own no-overwrite suffix. **The helper works; Chrome is the broken part.**
+- **2.6 — DIAGNOSED, 28 Aug 2026. Tony's Chrome runs with no locale at all, and that
+  is the entire cause.** `/proc/<chrome pid>/environ` matched none of
+  `LANG|LC_|LANGUAGE|GDM_LANG` — empty. Chrome is `/opt/google/chrome/chrome`, a plain
+  deb, so snap/flatpak confinement is *not* the mechanism; the graphical session simply
+  never exported a locale. His terminal has one (`LANG=en_IL.UTF-8`) but also reports
+  `locale: Cannot set LC_ALL to default locale: No such file or directory`, so at least
+  one of the locales it names is **not generated** — check `locale -a` before setting
+  anything system-wide, or the broken value propagates to the session.
 
-  Two independent Chrome download paths failing identically is the locale signature.
-  The outstanding question is now narrow: what does the **Chrome process's** environment
-  say (`tr '\0' '\n' < /proc/$(pgrep -o -f 'chrome|chromium')/environ | grep '^LANG'`)?
-  A GUI session's environment can differ from a terminal's, so `locale` alone is not
-  conclusive. If it is unset/`C`/`POSIX`, the repair is the session locale and the helper
-  can then go; if it is already `.UTF-8`, the locale theory is wrong for his machine and
-  the helper stays until we find the real cause.
+  His four results, all on build `2026-08-28c`:
+  - test 1 (`<a download>`) — mangled;
+  - test 2 (`showSaveFilePicker`) — saved as `download`, and this one is *self-verifying*,
+    so it is the browser's own report rather than an eyeball reading;
+  - test 3 (RFC 5987 `Content-Disposition`) — mangled. **This is the one that closes it**:
+    a standards-compliant filename arriving in an HTTP header, nowhere near a DOM
+    attribute, destroyed just the same. Three independent paths into Chrome's downloader,
+    three identical failures;
+  - test 4 (helper, which never touches Chrome's downloader) — name intact.
+
+  Reproduced exactly in the container: `env -u LANG -u LANGUAGE -u LC_ALL` → `download`,
+  the literal string Tony sees; add `LC_ALL=C.UTF-8` and every name survives, through the
+  app's own `downloadBlob` with the helper off. **Nothing in the app is broken and nothing
+  in JavaScript can fix it.**
+
+  The helper therefore stays until Tony repairs the session locale — it is the only route
+  that works on his machine today. Retirement checklist once test 1 passes: delete
+  `local-save-helper.py`, `SAVE_HELPER_KEY`, `localSaveUrl`, `saveHelperEnabled`,
+  `setSaveHelperEnabled`, `checkHelperStatus`, `showRenameHint`, the Save Helper settings
+  panel and the `http://127.0.0.1:27182` / `http://localhost:27182` `connect-src` entries.
 
   Since v34.5 the helper is **opt-in and off by default**, and
   `connect-src` finally permits it — it had been unreachable behind the app's own CSP

@@ -1191,9 +1191,12 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   back to `Download` — for `<a download>`, `data:` URLs and even a compliant
   `Content-Disposition: filename*=UTF-8''…` alike — while under a `.UTF-8` locale the same build
   keeps Hebrew and Cyrillic names exactly, through `downloadBlob` with the helper off. So the helper
-  is redundant on any normally‑configured desktop. It stays only until `filename-test.html` test 1
-  is run on Tony's machine (see CLAUDE.md → Outstanding → 2.6); if that passes, delete the helper,
-  `SAVE_HELPER_KEY`, `localSaveUrl`, `showRenameHint` and the `127.0.0.1:27182` `connect-src` entry.
+  is redundant on any normally‑configured desktop. **Tony's desktop is not one: measured on
+  28 Aug 2026, his Chrome process has no locale variables set at all** (`/proc/<pid>/environ`
+  matches none of `LANG|LC_|LANGUAGE`), so all three browser routes mangle and only the helper
+  works. It is a plain deb at `/opt/google/chrome/chrome`, so snap confinement is not the cause —
+  the graphical session simply never exported one. The helper stays until that is repaired; see
+  CLAUDE.md → Outstanding → 2.6 for the full evidence and the retirement checklist.
 
 ---
 
