@@ -10,7 +10,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~13 200 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~22 400 lines,
   no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
@@ -65,9 +65,12 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v32.1: 171 checks, 165 passing.** The 6 failures are `net_*` and
-`stor_firebase` only — they need real network and a signed-in Firebase session,
-and cannot pass in a sandbox. Any *other* failure is a real regression.
+**As of v34.8: 194 checks, all passing, 6 skipped.** The skips are `net_*` and
+`stor_firebase` — they need real network and a signed-in Firebase session and
+cannot run in a sandbox. Any failure at all is a real regression. Note the runner
+skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
+disables it, which happened in v34.5 and read as coverage until a mutation
+survived.
 
 **Run the suite with `#selfTestOverlay` open**, not just by calling each `t.test()`.
 Some tests interact with modals, and "topmost dialog" means something different
@@ -102,7 +105,7 @@ found only because a test was written first and disagreed with the code.
 | Decision | Why |
 |---|---|
 | **No Cook Mode.** Removed in v27.7. | Tony wants the whole recipe visible at once. Do not reintroduce a step-at-a-time view. |
-| **`history` syncs per-recipe but never in the legacy doc.** | 3 revisions take a recipe from 1.7 KB → 6.2 KB. Per-document that is irrelevant; in the single shared document it cut capacity from ~610 recipes to ~170. `slimRecipeForCloud(r, keepHistory)` is the one switch — `true` for `recipe_<id>`, `false` for `recipes`. |
+| **`history` always travels; there is ONE cloud shape.** | 3 revisions take a recipe from 1.7 KB → 6.2 KB, which mattered only for the legacy single `shared/recipes` document (capacity ~610 → ~170). That document is deleted and `slimRecipeForCloud`'s `keepHistory` flag was removed in v32.2 — it takes **one** parameter now. Do not reintroduce a second shape or a flag that silently drops a field. |
 | **Voice is disabled on iOS.** | iOS defines `webkitSpeechRecognition` but cannot honour `continuous`; an unguarded `onend → start()` froze the whole app. Restarts must stay deferred and capped. |
 | **Ticks are session-only.** | Explicitly requested. In memory only, wiped when the recipe closes. Never persist them. |
 | **Bring! status comes from the Worker.** | The token lives in KV and is shared; the per-device `bring_token_expiry` is a cache. It may say "unknown" but must **never** assert "expired". |
@@ -562,6 +565,14 @@ found only because a test was written first and disagreed with the code.
   The role labels in Family Access — "Read + Write" vs "Full (incl. delete)" — describe
   what actually happens now, which they did not before.
 - **2.6 — the local Save Helper stays** until the Worker UTF-8 download test
-  (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome.
+  (`filename-test.html`, test 3) is re-run on Ubuntu/Chrome. Since v34.5 it is
+  **opt-in and off by default**, and `connect-src` finally permits it — it had been
+  unreachable behind the app's own CSP since v31.1, so any earlier judgement about
+  whether it was worth keeping was made about a feature that could not run.
+- **Classifier long tail (5f.11).** ~900 bare `youtu.be` / `x.com` links in Tony's
+  harvest carry no signal in the URL and little in the message. Waiting on more
+  dismissal data from him rather than guessing a rule.
+- **First-run config screen** — deferred by Tony pending a decision about whether the
+  app is ever released publicly.
 - The Bring! token that leaked into git history **was rotated on 1 Aug 2026**. The old value is
   still in the history and always will be; it is simply dead now. Nothing further to do.
