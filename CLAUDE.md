@@ -564,8 +564,24 @@ found only because a test was written first and disagreed with the code.
   and `syncCloudPhotos` silently fails to remove their orphaned `photo_<id>` documents.
   The role labels in Family Access — "Read + Write" vs "Full (incl. delete)" — describe
   what actually happens now, which they did not before.
-- **2.6 — the local Save Helper stays** until Tony runs `filename-test.html` **test 1**
-  on his own Ubuntu desktop. Since v34.5 it is **opt-in and off by default**, and
+- **2.6 — the local Save Helper stays. Tony ran the test on 28 Aug 2026 and his
+  machine reproduces the bug**, so the helper is earning its keep as things stand.
+  Chrome 137, X11, `navigator.language` `en-GB`:
+  - test 1 (`<a download>`) — **mangled**;
+  - test 2 (`showSaveFilePicker`) — saved as **`download`**, and this one is
+    *self-verifying*, so it is the browser's own report, not an eyeball reading;
+  - test 4 (helper) — wrote `עוגת שוקולד של סבתא (2).docx`, i.e. the name intact plus
+    the helper's own no-overwrite suffix. **The helper works; Chrome is the broken part.**
+
+  Two independent Chrome download paths failing identically is the locale signature.
+  The outstanding question is now narrow: what does the **Chrome process's** environment
+  say (`tr '\0' '\n' < /proc/$(pgrep -o -f 'chrome|chromium')/environ | grep '^LANG'`)?
+  A GUI session's environment can differ from a terminal's, so `locale` alone is not
+  conclusive. If it is unset/`C`/`POSIX`, the repair is the session locale and the helper
+  can then go; if it is already `.UTF-8`, the locale theory is wrong for his machine and
+  the helper stays until we find the real cause.
+
+  Since v34.5 the helper is **opt-in and off by default**, and
   `connect-src` finally permits it — it had been unreachable behind the app's own CSP
   since v31.1, so any earlier judgement about whether it was worth keeping was made
   about a feature that could not run.
@@ -587,6 +603,10 @@ found only because a test was written first and disagreed with the code.
   - `navigator.language` reads `en-US@posix` under **both** locales, so the page cannot
     self-diagnose; test 1 needs a human to look in the Downloads folder. That is why it
     ends in two verdict buttons rather than an automatic check.
+  - **`filename-test.html` test 3 must send `appKey` in the body**, like every other
+    Worker call — it did not, so Tony's run returned `FORBIDDEN: missing or wrong app
+    key` and never tested anything. Fixed 28 Aug 2026. The key travels in the body, not
+    a header, because a custom header forces a CORS preflight the Worker will not answer.
   - Route 3 (Worker) is a fallback of last resort even if it works: it would push every
     backup, photos included, through Cloudflare to fix a filename. Route 2
     (`showSaveFilePicker`) is the sane replacement if test 1 fails, but it pops a Save
