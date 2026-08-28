@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.5` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.6` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v34.5"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v34.6"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -949,6 +949,20 @@ and every photo vanished on one Android phone while two other devices were fine.
 
 Rules that follow from that:
 
+- **THE CLOUD WINS ON EVERY LOAD, so a local photo fix that does not reach it does not last
+  (v34.6).** `loadFromFirestore` replaces `recipes` with the cloud copies and `attachCloudPhotos`
+  fills them from the photo documents; the `_localPhoto` safety net only fires when the cloud
+  supplies **nothing**. A wrong cloud photo therefore beats a right local one, silently, on every
+  device, for ever. `runPhotoRescue` used to fix memory, call `saveData()` — whose cloud write is
+  **debounced and fire-and-forget** — and immediately report "✅ Restored N photos". When that
+  write did not land, the cloud handed the bad copies straight back and the user fixed the same
+  photos again days later, twice. The rescue now **awaits** `pushLocalPhotosToCloud` and reports
+  what actually reached the cloud, including "not signed in, so these will come back".
+  `healCloudPhotos` (⚙️ → "Send my photos to the cloud") repairs a cloud that has already gone
+  wrong, and Sync Health reports **"photos differing from the cloud"**, which says *not checked
+  yet* until it has genuinely been compared. `pushLocalPhotosToCloud` deliberately **ignores**
+  `_cloudPhotoStamps`: the only-if-changed optimisation is right for ordinary saves and exactly
+  wrong when the point is to overwrite what the cloud believes.
 - Clear the flag **only** when the photo actually arrived, or when the cloud states there is
   genuinely no photo document. A **failed read is neither** — keep the flag and try again.
 - **`idbGetAll` must REJECT on a failed read, never resolve `[]` (v34.3).** It used to resolve an

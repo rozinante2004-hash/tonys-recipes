@@ -107,7 +107,8 @@ found only because a test was written first and disagreed with the code.
 | **Ticks are session-only.** | Explicitly requested. In memory only, wiped when the recipe closes. Never persist them. |
 | **Bring! status comes from the Worker.** | The token lives in KV and is shared; the per-device `bring_token_expiry` is a cache. It may say "unknown" but must **never** assert "expired". |
 | **Metric leaves tsp/tbsp/cup alone.** | Only lb/oz/fl oz are converted. They are standard kitchen measures in metric kitchens too. |
-| **Full photos stay base64 LOCALLY.** | Export, email and print consume data URLs; only thumbnails are Blobs. Since v31.1 the CLOUD copy may be a Firebase Storage URL (`photo_<id>.photoUrl`) instead of base64 — but a **backup must stay self-contained**, so `backupSave` fetches remote photos back and inlines them. Both document shapes must be readable forever. |
+| **Full photos stay base64, everywhere.** | Export, email and print consume data URLs; only thumbnails are Blobs. The Firebase Storage path (a `photoUrl` pointer instead of base64) was removed in **v34.4** — it needed a paid plan, was never switched on, and put branches into photo sync and backup. ONE shape now. A **backup must stay self-contained**: that is free while photos are base64, but if a remote shape is ever reintroduced, `backupSave` has to download and inline them again. |
+| **A local photo fix must reach the CLOUD.** | The cloud wins on every load — `loadFromFirestore` replaces `recipes` with the cloud copies and the local-photo net only fires when the cloud gives nothing. A rescue that only fixes memory is undone by the next reload, which is why Tony's photos "came back wrong" twice. `runPhotoRescue` awaits `pushLocalPhotosToCloud`; `healCloudPhotos` repairs a cloud already gone wrong. |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 
@@ -448,6 +449,11 @@ found only because a test was written first and disagreed with the code.
 - **A safety net that can only fire on a condition nothing produces is not a safety net.**
   That branch was tested — with a stubbed *rejection*, which the real function never
   returned. When you test an error path, check that the real code can actually reach it.
+- **Fixing the copy the user can see is not fixing the data.** Photos kept "coming back
+  wrong" days after Tony had restored them, because the cloud wins on every load and the
+  rescue's cloud write was debounced, fire-and-forget, and reported as success before it
+  had happened. Ask *which* copy is authoritative on the next read, and make the fix reach
+  THAT one — then report what actually landed, not what was attempted.
 - **Two failures of the same operation mean the guard is the wrong tool. Make it
   reversible.** After the auto-fetch destroyed photos twice, the fix was not a third guard:
   it was a snapshot, an independent second opinion that aborts the whole run, and a

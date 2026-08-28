@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.5 -->
+<!-- Tony's Recipes Collection v34.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3049,6 +3049,84 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'cloud_photo_heal', group:'Cloud Sync', name:'A local photo fix reaches the cloud, which wins on load (5g.9)',
+    test: async()=>{
+      ['comparePhotosWithCloud','pushLocalPhotosToCloud','healCloudPhotos']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('healCloudPhotosItem')) throw new Error('no menu entry to send photos to the cloud');
+
+      var kR=recipes, kDb=window._fbDb, kUser=window._fbUser, kBulk=window.readCloudPhotoDocs,
+          kStamps=window._cloudPhotoStamps, kIds=window._cloudPhotoIds;
+      try{
+        window._fbUser={ uid:'t' }; window._cloudPhotoStamps={}; window._cloudPhotoIds={};
+        recipes=[{ id:1, name:'mine is right', photo:'data:image/jpeg;base64,GOOD' },
+                 { id:2, name:'agrees',        photo:'data:image/jpeg;base64,SAME' },
+                 { id:3, name:'only here',     photo:'data:image/jpeg;base64,LOCAL' }];
+        window._fbDb={};
+        window.readCloudPhotoDocs=function(){ return Promise.resolve({ complete:true, byId:{
+          'photo_1': { photo:'data:image/jpeg;base64,STOCKJUNK' },   // the cloud disagrees
+          'photo_2': { photo:'data:image/jpeg;base64,SAME' }         // the cloud agrees
+        } }); };
+        var cmp=await comparePhotosWithCloud();
+        if(!cmp) throw new Error('the comparison returned null when the cloud was readable');
+        if(cmp.differ.length!==1||cmp.differ[0].id!==1)
+          throw new Error('the photo the cloud disagrees about was not identified: '+JSON.stringify(cmp.differ.map(function(r){return r.id;})));
+        if(cmp.onlyLocal.length!==1||cmp.onlyLocal[0].id!==3)
+          throw new Error('a photo that exists only on this device was not identified');
+
+        // Not being able to read the cloud is NOT agreement.
+        window.readCloudPhotoDocs=function(){ return Promise.resolve({ complete:false, byId:{} }); };
+        if(await comparePhotosWithCloud()!==null)
+          throw new Error('an unreadable cloud was reported as a comparison — "not known" is not "agrees"');
+
+        // The push must OVERWRITE, ignoring the only-if-changed stamp. That
+        // optimisation is right for ordinary saves and exactly wrong here: the
+        // whole point is to overwrite what the cloud believes.
+        var written={};
+        window._fbDb={ collection:function(){ return { doc:function(id){ return {
+          set:function(payload){ written[id]=payload; return Promise.resolve(); }
+        }; } }; } };
+        window._cloudPhotoStamps={ 1:'data:image/jpeg;base64,GOOD' };   // "unchanged" by the stamp
+        var res=await pushLocalPhotosToCloud([recipes[0]]);
+        if(res.pushed!==1) throw new Error('the push wrote nothing: '+JSON.stringify(res));
+        if(!written['photo_1']||written['photo_1'].photo!=='data:image/jpeg;base64,GOOD')
+          throw new Error('the local photo was not written over the cloud copy: '+JSON.stringify(written));
+        if('photoUrl' in written['photo_1']) throw new Error('a Storage-shaped document was written');
+
+        // A refused write must be REPORTED, not counted as success — the cloud
+        // still holds the wrong copy and it will come back on the next load.
+        window._fbDb={ collection:function(){ return { doc:function(){ return {
+          set:function(){ return Promise.reject(new Error('permission-denied')); }
+        }; } }; } };
+        var bad=await pushLocalPhotosToCloud([recipes[0]]);
+        if(bad.pushed!==0) throw new Error('a refused write was counted as pushed');
+        if(!bad.failed.length) throw new Error('a refused write was swallowed — the user would think the cloud was fixed');
+      } finally {
+        recipes=kR; window._fbDb=kDb; window._fbUser=kUser; window.readCloudPhotoDocs=kBulk;
+        window._cloudPhotoStamps=kStamps; window._cloudPhotoIds=kIds;
+      }
+    } },
+
+  { id:'feat_cat_skills', group:'Features', name:'“Skills & Methods” is a first-class category (5g.9)',
+    test: async()=>{
+      if(CATS.indexOf('Skills & Methods')===-1)
+        throw new Error('Skills & Methods is not in CATS, so it cannot be chosen or filtered');
+      // It must survive normalizeRecipe, or every save would rewrite it to Dinner.
+      var r=normalizeRecipe({ id:9601, name:'Deboning a chicken', category:'Skills & Methods',
+                              ingredients:[], steps:['x'] });
+      if(r.category!=='Skills & Methods')
+        throw new Error('normalizeRecipe rewrote the category to "'+r.category+'" — the choice would not stick');
+      // And the filter bar must offer it, with an icon like every other category.
+      var kR=recipes;
+      try{
+        recipes=[r];
+        renderFilters();
+        var bar=document.getElementById('filterBar')||document.body;
+        if((bar.textContent||'').indexOf('Skills & Methods')===-1)
+          throw new Error('the filter bar does not offer Skills & Methods, so recipes filed under it cannot be found');
+      } finally { recipes=kR; renderFilters(); renderGrid(); }
+    } },
+
   { id:'photo_one_shape_no_storage', group:'Storage', name:'Photos have ONE shape: base64, no Storage path (5g.7)',
     test: async()=>{
       // v34.4 deleted the Firebase Storage path — it needed a paid plan, was never
@@ -3713,6 +3791,48 @@ const SELF_TESTS = [
       var p4=rescuePlan(have, same);
       if(p4.restore.length) throw new Error('an identical photo was counted as needing restoring');
       if(p4.already.length!==1) throw new Error('an already-correct photo was not reported as such');
+
+      // ...and the RESTORE must reach the cloud, driven end to end. This is the
+      // whole fix for photos "coming back wrong" days later: the cloud wins on
+      // every load, saveData's cloud write is debounced and fire-and-forget, so
+      // reporting success without pushing was a claim nobody had checked.
+      var rR=recipes, rDb=window._fbDb, rUser=window._fbUser, rAsk=window.askConfirm,
+          rSave=window.saveData, rGrid=window.renderGrid, rToast=window.toast,
+          rErr=window.showServiceError, rStamps=window._cloudPhotoStamps, rIds=window._cloudPhotoIds,
+          cloudWrites={}, report='';
+      try{
+        window.saveData=function(){}; window.renderGrid=function(){}; window.toast=function(){};
+        window.showServiceError=function(m){ report=String(m||''); };
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        window._fbUser={ uid:'t' }; window._cloudPhotoStamps={}; window._cloudPhotoIds={};
+        window._fbDb={ collection:function(){ return { doc:function(id){ return {
+          set:function(payload){ cloudWrites[id]=payload; return Promise.resolve(); }
+        }; } }; } };
+        recipes=[{ id:19, uid:'legacy-19', name:'Brisket', photo:'https://cdn/wrong1.jpg' }];
+        var file=new File([JSON.stringify(backup)], 'b.json', { type:'application/json' });
+        await runPhotoRescue(file);
+        if(recipes[0].photo!=='data:image/jpeg;base64,ORIGINAL0')
+          throw new Error('the rescue did not restore the photo locally');
+        if(!cloudWrites['photo_19'])
+          throw new Error('the restore never reached the cloud — the cloud wins on the next load, so the wrong photo comes straight back');
+        if(cloudWrites['photo_19'].photo!=='data:image/jpeg;base64,ORIGINAL0')
+          throw new Error('the cloud was written with the wrong bytes: '+JSON.stringify(cloudWrites['photo_19']));
+        if(report.indexOf('cloud')===-1)
+          throw new Error('the report says nothing about the cloud, so the user cannot tell whether the fix will stick');
+
+        // Not signed in: it must SAY the cloud still holds the old photos rather
+        // than reporting a clean success it has not earned.
+        cloudWrites={}; report='';
+        window._fbUser=null; window._fbDb=null;
+        recipes=[{ id:19, uid:'legacy-19', name:'Brisket', photo:'https://cdn/wrong1.jpg' }];
+        await runPhotoRescue(new File([JSON.stringify(backup)], 'b.json', { type:'application/json' }));
+        if(report.indexOf('Not signed in')===-1)
+          throw new Error('a restore with no cloud connection did not warn that the cloud still holds the old photos');
+      } finally {
+        recipes=rR; window._fbDb=rDb; window._fbUser=rUser; window.askConfirm=rAsk;
+        window.saveData=rSave; window.renderGrid=rGrid; window.toast=rToast;
+        window.showServiceError=rErr; window._cloudPhotoStamps=rStamps; window._cloudPhotoIds=rIds;
+      }
     } },
 
   { id:'photo_hebrew_terms', group:'Features', name:'A Hebrew recipe name becomes a searchable English dish (5g.1)',
@@ -7764,11 +7884,33 @@ async function runPhotoRescue(file) {
   });
   saveData();
   renderGrid();
-  showServiceError('✅ Restored ' + done + ' photo' + (done === 1 ? '' : 's') + '.\n\n'
-    + (plan.already.length ? plan.already.length + ' already matched the backup.\n' : '')
-    + (plan.noMatch.length ? plan.noMatch.length + ' recipes are not in this backup — their photos were '
-        + 'not changed. If any of those are wrong too, they can only come back from this device\'s own '
-        + 'store or the cloud.\n' : '')
+
+  // Push to the cloud and WAIT. saveData's cloud write is debounced and
+  // fire-and-forget, so reporting success here used to be a claim about
+  // something nobody had checked — and if that write never landed, the cloud
+  // kept the wrong photos and handed them back on the next load. That is why
+  // Tony's photos "came back wrong" days after he had fixed them.
+  var cloudLine = '';
+  if (_fbDb && window._fbUser) {
+    toast('Sending the restored photos to the cloud…');
+    var res = await pushLocalPhotosToCloud(plan.restore.map(function(p2){
+      return recipes.find(function(x){ return x.id === p2.id; });
+    }).filter(Boolean));
+    cloudLine = res.failed.length
+      ? '\n⚠️ ' + res.pushed + ' reached the cloud, ' + res.failed.length + ' did NOT. The cloud still '
+        + 'holds the old copy for those, and the cloud wins on every load — so they may come back. '
+        + 'Try ⚙️ → “Send my photos to the cloud” once the connection is better.\n'
+      : '\n☁️ All ' + res.pushed + ' also sent to the cloud, so a reload will not undo them.\n';
+  } else {
+    cloudLine = '\n⚠️ Not signed in, so the cloud still holds the old photos. It wins on every load, '
+      + 'so these will come back. Sign in and use ⚙️ → “Send my photos to the cloud”.\n';
+  }
+
+  showServiceError('✅ Restored ' + done + ' photo' + (done === 1 ? '' : 's') + '.\n'
+    + cloudLine
+    + (plan.already.length ? '\n' + plan.already.length + ' already matched the backup.\n' : '')
+    + (plan.noMatch.length ? plan.noMatch.length + ' of your recipes have no photo in this backup, so '
+        + 'theirs were left alone.\n' : '')
     + '\nCheck a few, then take a fresh backup.');
 }
 window.openPhotoRescue = openPhotoRescue; window.runPhotoRescue = runPhotoRescue;
@@ -7886,6 +8028,13 @@ function syncHealthText() {
     + (h.photoDeletesRefused ? ' (ids ' + photoDeletesRefused().join(', ') + ' — deletion is admin-only)' : ''));
   L.push('photos missing from this device: ' + h.photosMissing
     + (h.photoRepair ? ' (last repair: ' + h.photoRepair + ')' : ''));
+  // The cloud wins on every load, so a disagreement here is not a curiosity: it
+  // is a prediction that these photos will revert. Says "not checked" rather
+  // than "agree" until it has actually been compared — never assert what has not
+  // been observed.
+  L.push('photos differing from the cloud: ' + (_photoCloudDiff === null ? 'not checked yet'
+    : (_photoCloudDiff + (_photoCloudDiff ? ' — these WILL come back wrong on the next load until sent up'
+                                          : ' (the cloud agrees with this device)'))));
   L.push('whatsapp chats: ' + h.chats.synced + ' synced (' + Math.round(h.chats.bytes / 1024) + ' KB), '
     + h.chats.folder + ' from the folder, ' + h.chats.local + ' on this device only');
   return L.join('\n');
@@ -8097,7 +8246,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.5';
+var APP_VERSION = 'v34.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10658,7 +10807,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10712,6 +10861,7 @@ body.banner-shown .header {
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
         <button class="drop-item" id="photoRescueItem" onclick="closeDrop('moreDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
         <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('moreDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
+        <button class="drop-item" id="healCloudPhotosItem" onclick="closeDrop('moreDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
         <input type="file" id="photoRescueFile" accept=".json,application/json" style="display:none"
                onchange="runPhotoRescue(this.files&&this.files[0])">
         </div>
@@ -10779,6 +10929,7 @@ body.banner-shown .header {
 <div class="mobile-dropdown-panel" id="mobileMealPanel">
   <div class="panel-title">Meal type</div>
   <label class="mobile-check-item"><input type="checkbox" value="Breakfast" onchange="mobileCatChange()">🌅 Breakfast</label>
+          <label class="mobile-check-item"><input type="checkbox" value="Skills &amp; Methods" onchange="mobileCatChange()">🔪 Skills &amp; Methods</label>
   <label class="mobile-check-item"><input type="checkbox" value="Lunch" onchange="mobileCatChange()">☀️ Lunch</label>
   <label class="mobile-check-item"><input type="checkbox" value="Dinner" onchange="mobileCatChange()">🌙 Dinner</label>
   <label class="mobile-check-item"><input type="checkbox" value="Snack" onchange="mobileCatChange()">🍿 Snack</label>
@@ -11235,7 +11386,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11686,7 +11837,7 @@ body.banner-shown .header {
 // DATA
 // ═══════════════════════════════════
 const EMOJIS = ['🍝','🍕','🥗','🍛','🥘','🍲','🥩','🍗','🐟','🥚','🍜','🫕','🥞','🍰','🎂','🫙','🥦','🥑','🫔','🌮','🍣','🍤','🥨','🧆','🫛'];
-const CATS   = ['Breakfast','Lunch','Dinner','Snack','Dessert','Soup'];
+const CATS   = ['Breakfast','Lunch','Dinner','Snack','Dessert','Soup','Skills & Methods'];
 const DIETS  = ['Keto','Carnivore','Vegetarian','Vegan','Omnivore'];
 const BGS    = ['#FFF0E8','#EAF5E9','#E8F0FF','#FFF8E8','#F5E8FF','#E8FFF5','#FFE8F0','#F0F8FF'];
 
@@ -11808,7 +11959,7 @@ function renderFilters() {
     + '</div>';
 
   // Frame 2: Meal categories (with icons)
-  var catIcons = {Breakfast:'🌅',Lunch:'☀️',Dinner:'🌙',Snack:'🍿',Dessert:'🍰',Soup:'🍜'};
+  var catIcons = {Breakfast:'🌅',Lunch:'☀️',Dinner:'🌙',Snack:'🍿',Dessert:'🍰',Soup:'🍜','Skills & Methods':'🔪'};
   var frame2 = '<div class="filter-frame">'
     + CATS.map(function(c) {
         var icon = catIcons[c] ? catIcons[c] + ' ' : '';
@@ -14149,7 +14300,7 @@ async function importFromFile(event){
     // Send to AI for recipe extraction
     toast('🤖 Extracting recipe with AI…');
     var aiText = await aiCall(
-      'Extract all recipes from the following text. For each recipe return a JSON object with fields: name, category (one of: Breakfast/Lunch/Dinner/Snack/Dessert/Soup), difficulty (Easy/Medium/Hard), prep (e.g. "30 min"), servings (e.g. "4"), ingredients (array of {a: amount, n: name}), steps (array of strings), notes (string). Return a JSON array. Keep the original language — do NOT translate.\n\nTEXT:\n' + text.slice(0, 8000),
+      'Extract all recipes from the following text. For each recipe return a JSON object with fields: name, category (one of: Breakfast/Lunch/Dinner/Snack/Dessert/Soup/Skills & Methods — use Skills & Methods for a technique or how-to rather than a dish), difficulty (Easy/Medium/Hard), prep (e.g. "30 min"), servings (e.g. "4"), ingredients (array of {a: amount, n: name}), steps (array of strings), notes (string). Return a JSON array. Keep the original language — do NOT translate.\n\nTEXT:\n' + text.slice(0, 8000),
       2000
     );
 
@@ -15486,7 +15637,7 @@ async function runFreehandImport() {
   const prompt = `Extract the recipe from the following text and return ONLY valid JSON (no markdown fences) with this exact structure:
 {
   "name": "Recipe Name",
-  "category": "one of: Breakfast, Lunch, Dinner, Snack, Dessert, Vegetarian, Pasta, Soup",
+  "category": "one of: Breakfast, Lunch, Dinner, Snack, Dessert, Soup, Skills & Methods (a technique or how-to rather than a dish)",
   "difficulty": "Easy, Medium, or Hard",
   "prep": "e.g. 30 min",
   "servings": "e.g. 4",
@@ -16311,6 +16462,102 @@ function isSizeError(err) {
 
 // Write each changed photo to its own doc; remove docs for cleared/deleted photos.
 // Returns an array of human-readable descriptions of photos too large to sync.
+
+// ─── Healing the cloud's photos (v34.6) ─────────────────────────────────────
+// Tony's photos kept coming back wrong days after he had fixed them. The reason
+// is not the auto-fetch (v34.3 stopped that creating bad data) — it is that a
+// LOCAL fix does not necessarily reach the cloud, and THE CLOUD WINS ON EVERY
+// LOAD: loadFromFirestore replaces `recipes` with the cloud copies, and
+// attachCloudPhotos fills them from the cloud documents. The local-photo safety
+// net only fires when the cloud supplies NOTHING, so a wrong cloud photo quietly
+// beats a right local one, for ever, on every device.
+//
+// runPhotoRescue used to fix memory, call saveData() — whose cloud write is
+// DEBOUNCED and fire-and-forget — and immediately report "✅ Restored N photos".
+// If that write failed, or the tab was reloaded first, the cloud kept the bad
+// copies and handed them straight back. The message was a claim about something
+// nobody had verified.
+//
+// So: compare, push, and report what actually happened.
+
+// Which recipes' photos differ from what the cloud holds. Returns null when the
+// cloud could not be read — not knowing is not the same as agreeing.
+var _photoCloudDiff = null;   // null = never compared; a number = last observed disagreement
+async function comparePhotosWithCloud() {
+  if (!_fbDb || !window._fbUser) return null;
+  var bulk = await readCloudPhotoDocs();
+  if (!bulk || !bulk.complete) return null;
+  var differ = [], onlyLocal = [];
+  recipes.forEach(function(r) {
+    if (!r.photo) return;
+    var d = bulk.byId[photoDocId(r.id)];
+    var cloudPhoto = d ? (d.photo || d.photoUrl || '') : '';
+    if (!cloudPhoto) { onlyLocal.push(r); return; }
+    if (cloudPhoto !== r.photo) differ.push(r);
+  });
+  _photoCloudDiff = differ.length;
+  return { differ: differ, onlyLocal: onlyLocal, cloudCount: Object.keys(bulk.byId).length };
+}
+window.comparePhotosWithCloud = comparePhotosWithCloud;
+
+// Write every local photo over the cloud's copy, ignoring the "only if changed"
+// stamp. That optimisation is right for ordinary saves and exactly wrong here:
+// the whole point is to overwrite what the cloud believes.
+async function pushLocalPhotosToCloud(list) {
+  if (!_fbDb || !window._fbUser) return { pushed: 0, failed: ['not signed in'] };
+  var targets = (list || recipes).filter(function(r){ return !!r.photo; });
+  var pushed = 0, failed = [];
+  for (var i = 0; i < targets.length; i++) {
+    var r = targets[i];
+    try {
+      await _fbDb.collection('shared').doc(photoDocId(r.id))
+        .set({ photo: r.photo, updatedAt: r.updatedAt || Date.now() });
+      _cloudPhotoStamps[r.id] = r.photo;
+      _cloudPhotoIds[r.id] = true;
+      pushed++;
+      if (_photoCloudDiff) _photoCloudDiff--;
+    } catch (e) {
+      failed.push((r.name || ('#' + r.id)) + ' — ' + (e && e.message ? e.message : 'write refused'));
+    }
+  }
+  return { pushed: pushed, failed: failed };
+}
+window.pushLocalPhotosToCloud = pushLocalPhotosToCloud;
+
+// The manual repair, for a cloud that has already gone wrong.
+async function healCloudPhotos() {
+  if (!_fbDb || !window._fbUser) { toast('Sign in first — there is no cloud to fix.'); return; }
+  toast('Comparing your photos with the cloud…');
+  var cmp = await comparePhotosWithCloud();
+  if (!cmp) {
+    showServiceError('The cloud photo list could not be read, so there is no way to tell what it holds. '
+      + 'Nothing was changed. Check the connection and try again.');
+    return;
+  }
+  var n = cmp.differ.length + cmp.onlyLocal.length;
+  if (!n) { toast('✅ The cloud already matches every photo on this device.'); return; }
+  var names = cmp.differ.slice(0, 10).map(function(r){ return '  • ' + (r.name || ('#' + r.id)); }).join('\n');
+  if (!await askConfirm({ icon:'☁️', title:'Send ' + n + ' photo' + (n===1?'':'s') + ' to the cloud?',
+      message: (cmp.differ.length
+          ? cmp.differ.length + ' photo' + (cmp.differ.length===1?' is':'s are') + ' DIFFERENT in the cloud'
+            + ' — the cloud copy wins on every load, so those are what keeps coming back:\n\n' + names
+            + (cmp.differ.length > 10 ? '\n  …and ' + (cmp.differ.length - 10) + ' more.' : '') + '\n\n'
+          : '')
+        + (cmp.onlyLocal.length ? cmp.onlyLocal.length + ' exist only on this device.\n\n' : '')
+        + 'This device\'s photos are the ones kept. Nothing on this device changes.',
+      okLabel:'Send them up' })) return;
+  var res = await pushLocalPhotosToCloud(cmp.differ.concat(cmp.onlyLocal));
+  if (res.failed.length) {
+    showServiceError('Sent ' + res.pushed + ' of ' + n + '. ' + res.failed.length + ' could not be written, '
+      + 'so the cloud still holds the old copy for those and they may come back:\n\n'
+      + res.failed.slice(0, 8).join('\n'));
+  } else {
+    showServiceError('✅ Sent ' + res.pushed + ' photo' + (res.pushed===1?'':'s') + ' to the cloud.\n\n'
+      + 'The cloud now matches this device, so a reload will not undo them.');
+  }
+  renderSyncHealth();
+}
+window.healCloudPhotos = healCloudPhotos;
 
 async function syncCloudPhotos() {
   var errors = [];
@@ -18221,7 +18468,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Search bar in the header searches recipe names, ingredients, and steps",
   "- Filter bar has 3 frames on desktop: All/Favourites/Clips | Meal type | Diet type",
   "- On mobile: compact All/Fav/Clips buttons + Meal ▾ and Diet ▾ dropdown panels",
-  "- Meal filters: Breakfast, Lunch, Dinner, Snack, Dessert, Soup (multi-select)",
+  "- Meal filters: Breakfast, Lunch, Dinner, Snack, Dessert, Soup, Skills \u0026 Methods (multi-select)",
   "- Diet filters: Keto, Carnivore, Vegetarian, Vegan, Omnivore (multi-select)",
   "- Omnivore in the filter shows all recipes regardless of diet",
   "- Clicking 'All' resets all filters",
