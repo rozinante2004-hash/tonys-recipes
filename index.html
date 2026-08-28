@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v34.7 -->
+<!-- Tony's Recipes Collection v34.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3101,9 +3101,35 @@ const SELF_TESTS = [
         var bad=await pushLocalPhotosToCloud([recipes[0]]);
         if(bad.pushed!==0) throw new Error('a refused write was counted as pushed');
         if(!bad.failed.length) throw new Error('a refused write was swallowed — the user would think the cloud was fixed');
+        // Opening Sync Health must ANSWER the question, not just pose it.
+        // _photoCloudDiff is per-session, so after a reload — exactly when the
+        // panel is opened to confirm a fix held — it said "not checked yet" and
+        // stopped there.
+        window._photoCloudDiff=null;
+        window.readCloudPhotoDocs=function(){ return Promise.resolve({ complete:true, byId:{
+          'photo_1': { photo:'data:image/jpeg;base64,STOCKJUNK' }
+        } }); };
+        recipes=[{ id:1, name:'mine is right', photo:'data:image/jpeg;base64,GOOD' }];
+        if(typeof checkPhotoCloudDiff!=='function') throw new Error('checkPhotoCloudDiff not defined');
+        // Driven by OPENING the panel and reading what is on screen. Calling
+        // checkPhotoCloudDiff() and reading syncHealthText() tested neither the
+        // opening nor the re-render, and both could be deleted with this green.
+        openSyncHealth();
+        await new Promise(function(res){ setTimeout(res, 200); });
+        var body=document.getElementById('syncHealthBody');
+        if(!body) throw new Error('the panel rendered no body');
+        var shown=(body.textContent||'').replace(/\s+/g,' ');
+        if(shown.indexOf('not checked yet')>-1)
+          throw new Error('the panel still says "not checked yet" after being opened — it poses the question and refuses to answer it, which is exactly when the user needs it');
+        // The row renders as label+value with no separator ("…the cloud1"), so
+        // match that shape rather than assuming a space.
+        if(!/differing from the cloud\s*1(?!\d)/i.test(shown))
+          throw new Error('the measured disagreement never reached the screen — the comparison ran but nothing re-rendered');
       } finally {
         recipes=kR; window._fbDb=kDb; window._fbUser=kUser; window.readCloudPhotoDocs=kBulk;
         window._cloudPhotoStamps=kStamps; window._cloudPhotoIds=kIds;
+        window._photoCloudDiff=null;
+        closeM('syncHealthOverlay');
       }
     } },
 
@@ -8012,6 +8038,16 @@ function renderSyncHealth() {
 
   out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Collection</div>';
   out += healthRow('Recipes on this device', String(h.localRecipes), '');
+  // On SCREEN, not only in the copyable dump. The cloud wins on load, so a
+  // disagreement here predicts exactly which photos will revert — and it is the
+  // line you open this panel to read after a reload. Warn when it is non-zero.
+  out += healthRow('Photos differing from the cloud',
+    _photoCloudDiff === null
+      ? (_photoCloudChecking ? 'checking…'
+         : (h.signedIn ? 'could not be read' : 'unknown — signed out'))
+      : String(_photoCloudDiff),
+    _photoCloudDiff ? 'warn' : (_photoCloudDiff === 0 ? 'good' : ''),
+    _photoCloudDiff ? 'the cloud copy wins on every load, so these will come back wrong until you use ⚙️ → “Send my photos to the cloud”' : '');
   // Only ever report what has actually been observed this session.
   out += healthRow('Recipe documents seen in cloud', h.signedIn ? String(h.cloudRecipes) : 'unknown — signed out',
                    (h.signedIn && h.cloudRecipes && h.cloudRecipes !== h.localRecipes) ? 'warn' : '',
@@ -8073,7 +8109,8 @@ function syncHealthText() {
   // is a prediction that these photos will revert. Says "not checked" rather
   // than "agree" until it has actually been compared — never assert what has not
   // been observed.
-  L.push('photos differing from the cloud: ' + (_photoCloudDiff === null ? 'not checked yet'
+  L.push('photos differing from the cloud: ' + (_photoCloudDiff === null
+    ? (_photoCloudChecking ? 'checking…' : (_fbDb && window._fbUser ? 'could not be read' : 'not signed in'))
     : (_photoCloudDiff + (_photoCloudDiff ? ' — these WILL come back wrong on the next load until sent up'
                                           : ' (the cloud agrees with this device)'))));
   L.push('whatsapp chats: ' + h.chats.synced + ' synced (' + Math.round(h.chats.bytes / 1024) + ' KB), '
@@ -8093,9 +8130,28 @@ function copySyncHealth() {
 window.syncHealthText = syncHealthText;
 window.copySyncHealth = copySyncHealth;
 
+// The panel used to print "photos differing from the cloud: not checked yet" and
+// leave it there. That number is the whole point of opening it after a reload —
+// the cloud wins on load, so a disagreement predicts which photos will revert —
+// and _photoCloudDiff is per-session, so a reload always reset it to unchecked.
+// Posing the question and declining to answer it is not honesty, it is a panel
+// that does not work. It costs ONE bulk read, and the panel is opened rarely and
+// deliberately. (v34.8)
+var _photoCloudChecking = false;
+function checkPhotoCloudDiff() {
+  if (_photoCloudChecking) return;
+  if (!_fbDb || !window._fbUser) return;      // nothing to compare against
+  _photoCloudChecking = true;
+  comparePhotosWithCloud()
+    .catch(function(){ return null; })
+    .then(function(){ _photoCloudChecking = false; renderSyncHealth(); });
+}
+window.checkPhotoCloudDiff = checkPhotoCloudDiff;
+
 function openSyncHealth() {
   renderSyncHealth();
   refreshAutoFetchUndoItem().catch(function(){});
+  checkPhotoCloudDiff();          // answer it, do not just ask it
   document.getElementById('syncHealthOverlay').classList.add('open');
 }
 window.openSyncHealth   = openSyncHealth;
@@ -8287,7 +8343,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v34.7';
+var APP_VERSION = 'v34.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10848,7 +10904,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11431,7 +11487,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v34.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
