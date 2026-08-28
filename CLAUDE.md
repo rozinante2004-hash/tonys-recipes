@@ -603,6 +603,20 @@ found only because a test was written first and disagreed with the code.
   - `navigator.language` reads `en-US@posix` under **both** locales, so the page cannot
     self-diagnose; test 1 needs a human to look in the Downloads folder. That is why it
     ends in two verdict buttons rather than an automatic check.
+  - **The service worker was pinning `filename-test.html`, so two fixes never
+    reached Tony at all.** He ran the test twice and sent back byte-identical results
+    (bar the helper's de-dup counter ticking `(2)`→`(3)`, which is what gave it away).
+    `sw.js`'s fetch handler claimed every request in scope, and
+    `event.request.destination === 'document'` matches **every** html page, not just
+    the app — so the test page got stale-while-revalidate and the first copy a browser
+    ever fetched was served for ever after. `index.html` survives that because it polls
+    `version.json` and raises the update banner; a standalone page has no such tell.
+    The cache-first branch below it was the same trap for any other file fetched once
+    under that path. Fixed in v34.9: `isAppDocument()` and `isPrecachedAsset()` gate
+    the two branches and everything else returns without `respondWith`, i.e. straight
+    to the network. `CACHE_NAME` bumped to `v8` to evict what is already pinned.
+    `filename-test.html` now carries a `PAGE_BUILD` stamp, shown in the header and in
+    the results box, so a stale copy announces itself.
   - **`filename-test.html` test 3 must send `appKey` in the body**, like every other
     Worker call — it did not, so Tony's run returned `FORBIDDEN: missing or wrong app
     key` and never tested anything. Fixed 28 Aug 2026. The key travels in the body, not

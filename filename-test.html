@@ -55,7 +55,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🍴 Filename Test</h1>
+  <h1>🍴 Filename Test <span class="pill" id="buildStamp" style="font-weight:600;"></span></h1>
   <div class="sub">
     <strong>The question:</strong> is the local Python Save Helper still needed, or does plain Chrome on your
     Ubuntu box already keep <strong>Hebrew / Russian filenames</strong> intact? <strong>Test 1 decides it.</strong>
@@ -195,6 +195,13 @@ tr '\0' '\n' &lt; /proc/$pid/environ | grep -E '^(LANG|LC_|GDM_LANG|LANGUAGE)=' 
 </div>
 
 <script>
+// Bump this on every edit to this file. It appears in the header and in the
+// results box, so a stale copy announces itself. This page has no version.json
+// poll and no update banner — when the service worker was pinning it (fixed in
+// v34.9), Tony ran the same broken test twice and neither of us could tell from
+// the results that the fix had never reached his browser.
+var PAGE_BUILD = '2026-08-28c';
+
 var WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
 var WORKER_APP_KEY = 'tonys-recipes-web-v1';   // matches index.html; not a secret, it ships there
 var HELPER_PORT = 27182;
@@ -406,6 +413,7 @@ function envInfo(){
   };
 }
 (function renderEnv(){
+  $('buildStamp').textContent = 'build ' + PAGE_BUILD;
   var dl=$('envList'), info=envInfo();
   Object.keys(info).forEach(function(k){
     var dt=document.createElement('dt'); dt.textContent=k;
@@ -419,6 +427,7 @@ function refresh(){
   Object.keys(info).forEach(function(k){ envLines += '  '+k+': '+info[k]+'\n'; });
   $('summary').value =
     'FILENAME TEST RESULTS\n'+
+    'Page build     : '+PAGE_BUILD+'\n'+
     'Filename tried : '+fname()+'\n\n'+
     'Browser-visible locale (NOT the process locale):\n'+envLines+'\n'+
     'Output of `locale` in a terminal:\n'+

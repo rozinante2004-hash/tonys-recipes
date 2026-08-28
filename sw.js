@@ -3,7 +3,7 @@
 // version.json is never cached, and the in-app update banner is what tells the
 // user a newer version has landed — see the note on the fetch handler below.
 
-const CACHE_NAME = 'tonys-recipes-v7';
+const CACHE_NAME = 'tonys-recipes-v8';
 const URLS_TO_CACHE = [
   '/tonys-recipes/',
   '/tonys-recipes/index.html',
@@ -11,6 +11,29 @@ const URLS_TO_CACHE = [
   '/tonys-recipes/icons/icon-192.png',
   '/tonys-recipes/icons/icon-512.png',
 ];
+
+// This worker caches THE APP SHELL AND NOTHING ELSE. Everything above is listed
+// deliberately; anything else under /tonys-recipes/ goes straight to the network.
+//
+// It did not used to. The fetch handler claimed every same-scope request, and
+// `event.request.destination === 'document'` matches EVERY html page, not just
+// the app — so filename-test.html landed in the stale-while-revalidate branch and
+// the first copy a browser ever fetched was served for ever after. index.html can
+// survive that because it polls version.json and raises the update banner; a
+// standalone page has no such tell, so it went silently stale, and a fixed copy
+// simply could not reach Tony — he ran the same broken test twice and reported
+// identical results while the fix sat deployed. The old catch-all also meant any
+// other file fetched once under this path was pinned cache-first for ever.
+function swPath(url) {
+  try { return new URL(url).pathname; } catch (e) { return ''; }
+}
+function isAppDocument(url) {
+  const p = swPath(url);
+  return p === '/tonys-recipes/' || p === '/tonys-recipes/index.html';
+}
+function isPrecachedAsset(url) {
+  return URLS_TO_CACHE.indexOf(swPath(url)) !== -1;
+}
 
 // Install: pre-cache core files
 self.addEventListener('install', function(event) {
@@ -64,9 +87,7 @@ self.addEventListener('fetch', function(event) {
   // update banner when they differ. So a user on a stale copy is TOLD, rather
   // than left to wonder — and the fresh copy is already downloaded by then, so
   // tapping Update Now is instant.
-  if (event.request.destination === 'document' ||
-      event.request.url.endsWith('/tonys-recipes/') ||
-      event.request.url.endsWith('/tonys-recipes/index.html')) {
+  if (isAppDocument(event.request.url)) {
     event.respondWith(
       caches.match(event.request).then(function(cached) {
         var network = fetch(event.request)
@@ -92,7 +113,12 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // For other assets (icons, manifest): cache first, network fallback
+  // Anything else under this path — filename-test.html, and any future diagnostic
+  // or one-off page — is none of this worker's business. Returning without calling
+  // respondWith hands the request back to the browser, which fetches it normally.
+  if (!isPrecachedAsset(event.request.url)) return;
+
+  // For the pre-cached assets (icons, manifest): cache first, network fallback
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       return cached || fetch(event.request).then(function(response) {

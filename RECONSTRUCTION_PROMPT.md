@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.8` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v34.9` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -52,23 +52,24 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~19,300 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~22,500 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
-| `sw.js` | Service worker. Stale‑while‑revalidate for the document (5.12), cache‑first for assets. |
-| `version.json` | `{"version": "v34.8"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
+| `version.json` | `{"version": "v34.9"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
 | `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
 | `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. **OPT-IN since v34.5** (⚙️ → Save Helper → "Use it"), and `connect-src` must list `http://127.0.0.1:27182` — loopback is a potentially-trustworthy origin, so `http:` there is not mixed content. Without that entry the app fires a request its own CSP refuses on every single export. |
-| `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. |
+| `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. Carries a `PAGE_BUILD` stamp, shown in the header and the results box — bump it on every edit, because this page has no update banner of its own. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
 | `logo.svg` | Brand mark (brown disc, gold ring, fork + terracotta/gold flame). |
 | `icons/icon-192.png`, `icons/icon-512.png` | PWA icons. `icon-512.png` also duplicated at repo root. |
 | `.gitignore` | Blocks `whatsapp/*.txt` and `whatsapp/*.zip`. Not tidiness — see §2a. |
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
+| `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler. Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
 | `tests/run-self-tests.js` | The headless driver for `SELF_TESTS`. Opens `#selfTestOverlay` first — see the note in its header for why that is not optional. |
 | `tools/build-upload-guide.js` | Renders `whatsapp/UPLOAD-FROM-IPHONE.md` into `whatsapp/upload-guide.html`, inlining the mock-up SVGs so the one file works offline and prints. Needs `npm i marked@14`. **Never hand-edit the generated HTML.** |
 | `tools/build-guide-mockups.py` | Draws `whatsapp/img/*.svg` — diagrams of each Shortcuts action, so the guide can be compared against at a glance. |
@@ -106,15 +107,28 @@ uses `actions/checkout@v4`, `actions/configure-pages@v5`, `actions/upload-pages-
 The `share_target` lets Android/iOS "Share to app" send a URL/text; the app reads
 `?url=&text=&title=` on load and opens the URL‑import modal (`handleShareTarget()`).
 
-### 2.3 `sw.js` (service worker, "v4", `CACHE_NAME = 'tonys-recipes-v7'`)
+### 2.3 `sw.js` (service worker, "v4", `CACHE_NAME = 'tonys-recipes-v8'`)
 - On `install`: `skipWaiting()` + pre‑cache core files
   (`/tonys-recipes/`, `index.html`, `manifest.json`, both icons).
 - On `activate`: `clients.claim()` + delete any cache whose name ≠ `CACHE_NAME`.
 - On `fetch`: ignore requests whose URL doesn't include `/tonys-recipes/`.
-  `version.json` → always `fetch` with `cache: 'no-store'`. The document (HTML) →
+  `version.json` → always `fetch` with `cache: 'no-store'`. **The app document only**
+  (`isAppDocument()`: pathname is exactly `/tonys-recipes/` or `/tonys-recipes/index.html`) →
   **stale‑while‑revalidate** (5.12): serve the cached copy immediately, refresh the cache in
   the background. Safe only because the in‑app version banner tells the user when a newer
-  version has landed. Other assets → **cache‑first**, then network.
+  version has landed. The **pre‑cached assets only** (`isPrecachedAsset()`) → cache‑first,
+  then network. **Everything else returns without `respondWith`** and goes straight to the
+  network.
+- **This worker caches the app shell and nothing else, and that is load‑bearing (v34.9).**
+  It used to match the document branch on `event.request.destination === 'document'`, which
+  is true of *every* html page in scope — so `filename-test.html` was served stale‑while‑
+  revalidate and the first copy a browser ever fetched was pinned for ever. Only `index.html`
+  polls `version.json`, so a standalone page went silently stale and two fixes to it never
+  reached Tony; he ran the same broken test twice. The cache‑first fall‑through was the same
+  trap for any other file fetched once under that path. `sw_serves_only_the_app_shell` guards
+  it by driving the real handler in a dedicated worker (`tests/sw-probe.js`) — including that
+  the app document is *revalidated* rather than merely served, since cache‑first there would
+  pin a device on its first‑downloaded version for ever.
 - Listens for `postMessage({type:'SKIP_WAITING'})` and calls `skipWaiting()`.
 
 ---
