@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.5 -->
+<!-- Tony's Recipes Collection v35.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -560,6 +560,123 @@ function syncLogReportText() {
 }
 window.syncLogReportText = syncLogReportText;
 
+// ─── THE NUDGE (v35.6) ────────────────────────────────────────────────────────
+//
+// The log only helps if someone looks at it. This notices when the log has
+// grown something worth reporting and says so once — instead of the log
+// uploading itself somewhere, which was the alternative and is worse: nothing
+// here can reach a person who is not already looking, and shipping recipe names
+// and family members' identities off the device to make a diagnostic marginally
+// more convenient is a bad trade.
+//
+// PER-DEVICE, and off by default. It lives in localStorage, so switching it on
+// at the desk does not start nagging the phone — which is the point, since the
+// phone is not where anyone is reading a report.
+//
+// It must not nag. Two guards: at most once per session, and never twice for the
+// same set of problems. Nagging would train the reflex to dismiss it unread,
+// which costs more than showing nothing.
+var LOG_NUDGE_KEY      = 'tonys_log_nudge';
+var LOG_NUDGE_SEEN_KEY = 'tonys_log_nudge_seen';
+var _logNudgeShownThisSession = false;
+
+function logNudgeEnabled() {
+  try { return localStorage.getItem(LOG_NUDGE_KEY) === '1'; } catch(e) { return false; }
+}
+function setLogNudgeEnabled(on) {
+  try {
+    if (on) localStorage.setItem(LOG_NUDGE_KEY, '1');
+    else localStorage.removeItem(LOG_NUDGE_KEY);
+  } catch(e) {}
+}
+
+// What set of problems is currently present, as a stable string. Titles carry
+// counts ("3 saves were refused"), so a fourth refusal changes the signature and
+// is worth mentioning again; the same three are not.
+function logNudgeSignature(findings) {
+  return (findings || []).filter(function(f){ return f.level === 'bad'; })
+    .map(function(f){ return f.title; }).sort().join(' ¶ ');
+}
+
+// Returns the reason it did nothing, or 'shown'. Every branch is named so the
+// test can tell "correctly stayed quiet" from "silently broken" — which is the
+// distinction this whole app keeps having to relearn.
+function maybeNudgeAboutLog(opts) {
+  opts = opts || {};
+  if (!logNudgeEnabled())            return 'nudge-off';
+  if (!logEnabled())                 return 'logging-off';
+  if (_logNudgeShownThisSession && !opts.force) return 'already-shown-this-session';
+  var findings = analyseSyncLog(readSyncLog());
+  var bad = findings.filter(function(f){ return f.level === 'bad'; });
+  if (!bad.length)                   return 'nothing-wrong';
+  var sig = logNudgeSignature(findings);
+  var seen = null;
+  try { seen = localStorage.getItem(LOG_NUDGE_SEEN_KEY); } catch(e) {}
+  if (seen === sig)                  return 'already-mentioned';
+  try { localStorage.setItem(LOG_NUDGE_SEEN_KEY, sig); } catch(e) {}
+  _logNudgeShownThisSession = true;
+  showLogNudge(bad);
+  return 'shown';
+}
+
+function dismissLogNudge() {
+  var el = document.getElementById('logNudge');
+  if (el) el.remove();
+}
+
+function showLogNudge(bad) {
+  dismissLogNudge();
+  var div = document.createElement('div');
+  div.id = 'logNudge';
+  div.setAttribute('role', 'status');
+  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
+    + 'z-index:9998;background:var(--warm-brown);color:#fff;border-radius:12px;'
+    + 'padding:13px 16px;max-width:420px;width:calc(100vw - 32px);'
+    + 'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:DM Sans,Heebo,sans-serif;';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:13px;font-weight:700;margin-bottom:5px;';
+  title.textContent = '🪵 The log has something worth reporting';
+
+  var body = document.createElement('div');
+  body.style.cssText = 'font-size:12px;color:rgba(255,255,255,0.85);line-height:1.55;margin-bottom:10px;';
+  // Names, not counts alone: "1 problem" tells you nothing about whether to care.
+  body.textContent = bad.slice(0, 3).map(function(f){ return f.title; }).join(' · ')
+    + (bad.length > 3 ? ' · and ' + (bad.length - 3) + ' more' : '');
+
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;';
+
+  var copy = document.createElement('button');
+  copy.style.cssText = 'flex:1;padding:9px;background:var(--terracotta);color:#fff;border:none;'
+    + 'border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
+  copy.textContent = '📋 Copy report';
+  copy.onclick = function(){ copySyncLogReport(); dismissLogNudge(); };
+
+  var open = document.createElement('button');
+  open.style.cssText = 'padding:9px 12px;background:rgba(255,255,255,0.15);color:#fff;'
+    + 'border:1px solid rgba(255,255,255,0.3);border-radius:7px;font-size:12.5px;cursor:pointer;'
+    + 'font-family:DM Sans,Heebo,sans-serif;';
+  open.textContent = 'Look';
+  open.onclick = function(){ dismissLogNudge(); showLoggingPanel(); };
+
+  var close = document.createElement('button');
+  close.style.cssText = 'padding:9px 12px;background:rgba(255,255,255,0.15);color:#fff;'
+    + 'border:1px solid rgba(255,255,255,0.3);border-radius:7px;font-size:12.5px;cursor:pointer;'
+    + 'font-family:DM Sans,Heebo,sans-serif;';
+  close.textContent = '✕';
+  close.setAttribute('aria-label', 'Dismiss');
+  close.onclick = dismissLogNudge;
+
+  row.appendChild(copy); row.appendChild(open); row.appendChild(close);
+  div.appendChild(title); div.appendChild(body); div.appendChild(row);
+  document.body.appendChild(div);
+}
+
+window.logNudgeEnabled = logNudgeEnabled;   window.setLogNudgeEnabled = setLogNudgeEnabled;
+window.maybeNudgeAboutLog = maybeNudgeAboutLog; window.logNudgeSignature = logNudgeSignature;
+window.showLogNudge = showLogNudge;         window.dismissLogNudge = dismissLogNudge;
+
 // ─── THE PANEL ────────────────────────────────────────────────────────────────
 // One screen: the switch, the retention window, what the log means, the events
 // themselves, and the two buttons that matter. Debug mode moved in here too —
@@ -593,6 +710,21 @@ function renderLoggingPanel() {
      + 'Off by default. Records what sync did — loads, saves, refused writes, refreshes, photo sync, sign-in — '
      + 'with recipe names and ids, never recipe contents. It stays on this device: it is never uploaded and '
      + 'never goes into a backup.</div></div>';
+
+  // 1b — the nudge, per device
+  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;'
+     + (on ? '' : 'opacity:0.55;') + '">'
+     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
+     + '<input type="checkbox" id="logNudgeBox"' + (logNudgeEnabled() ? ' checked' : '') + (on ? '' : ' disabled')
+     + ' onchange="setLogNudgeEnabled(this.checked);renderLoggingPanel();" style="width:18px;height:18px;">'
+     + 'Tell me when the log finds something</label>'
+     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+     + 'Off by default. Shows a small note when the log has grown a problem worth reporting, with a '
+     + 'Copy button on it. <strong>This setting is per device</strong> — switch it on where you actually '
+     + 'read reports and leave it off on the phone. At most once per session, and never twice for the '
+     + 'same problems.'
+     + (on ? '' : ' <em>Needs recording switched on above.</em>')
+     + '</div></div>';
 
   // 2 — retention
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
@@ -3830,6 +3962,92 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'log_nudge_is_quiet_and_per_device', group:'Features', name:'The nudge is off by default, per device, and does not nag (v35.6)',
+    test: async()=>{
+      ['logNudgeEnabled','setLogNudgeEnabled','maybeNudgeAboutLog','logNudgeSignature','dismissLogNudge']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var kOn=null,kNudge=null,kSeen=null,kLog=null;
+      try{ kOn=localStorage.getItem('tonys_log_enabled'); kNudge=localStorage.getItem('tonys_log_nudge');
+           kSeen=localStorage.getItem('tonys_log_nudge_seen'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      try{
+        localStorage.removeItem('tonys_log_nudge');
+        localStorage.removeItem('tonys_log_nudge_seen');
+        if(logNudgeEnabled()) throw new Error('the nudge is on with no setting stored');
+
+        // Every refusal is NAMED, so "it stayed quiet" can be told apart from
+        // "it is broken". A boolean here would hide the difference.
+        setLogEnabled(true); purgeSyncLog();
+        syncLog('conflict','Save refused for "Soup" — changed on another device');
+        if(maybeNudgeAboutLog()!=='nudge-off')
+          throw new Error('the nudge fired while switched off — the default must be silence');
+        if(document.getElementById('logNudge')) throw new Error('a nudge was rendered while switched off');
+
+        setLogNudgeEnabled(true);
+        if(!logNudgeEnabled()) throw new Error('the nudge setting did not persist');
+        // It is a localStorage key, which is what makes it per-device: the PC can
+        // have it on while the phone does not.
+        if(localStorage.getItem('tonys_log_nudge')!=='1')
+          throw new Error('the nudge setting is not stored per device');
+
+        setLogEnabled(false);
+        if(maybeNudgeAboutLog()!=='logging-off')
+          throw new Error('the nudge fired with nothing being recorded');
+
+        setLogEnabled(true); purgeSyncLog();
+        syncLog('load','Read 44 recipe(s) from the cloud');
+        if(maybeNudgeAboutLog()!=='nothing-wrong')
+          throw new Error('the nudge fired on a healthy log');
+        if(document.getElementById('logNudge')) throw new Error('a nudge was rendered with nothing wrong');
+
+        // A real problem: it shows, and it names the problem rather than saying
+        // "1 issue", which would tell nobody whether to care.
+        syncLog('conflict','Save refused for "Soup" — changed on another device');
+        if(maybeNudgeAboutLog()!=='shown') throw new Error('the nudge did not fire on a real problem');
+        var el=document.getElementById('logNudge');
+        if(!el) throw new Error('the nudge reported "shown" but rendered nothing');
+        if(!/refused/i.test(el.textContent)) throw new Error('the nudge does not say what the problem is');
+        var btns=Array.prototype.slice.call(el.querySelectorAll('button')).map(function(b){ return b.textContent; });
+        if(!btns.some(function(t){ return /Copy report/.test(t); }))
+          throw new Error('the nudge has no Copy button, which is the only way this reaches anyone');
+        if(!btns.some(function(t){ return /✕/.test(t); })) throw new Error('the nudge cannot be dismissed');
+
+        // Guard 1: once per session.
+        if(maybeNudgeAboutLog()!=='already-shown-this-session')
+          throw new Error('the nudge fired twice in one session');
+
+        // Guard 2: never twice for the same problems, even across sessions.
+        if(maybeNudgeAboutLog({force:true})!=='already-mentioned')
+          throw new Error('the nudge repeated itself for problems it had already raised');
+
+        // ...but a NEW problem is worth mentioning.
+        syncLog('error','Cloud read timed out after 45s');
+        if(maybeNudgeAboutLog({force:true})!=='shown')
+          throw new Error('a new problem did not produce a fresh nudge');
+
+        dismissLogNudge();
+        if(document.getElementById('logNudge')) throw new Error('dismiss left the nudge on screen');
+
+        // The signature must track the COUNT, not just the kind: a fourth
+        // refusal is news, the same three are not.
+        // These must differ ONLY in the digit, or a mutation that strips digits
+        // still produces two different strings and the check proves nothing.
+        var three=logNudgeSignature([{level:'bad',title:'3 saves were refused as edited elsewhere'}]);
+        var four =logNudgeSignature([{level:'bad',title:'4 saves were refused as edited elsewhere'}]);
+        if(three===four) throw new Error('the signature ignores how many problems there are, so a fourth refusal is never mentioned');
+        if(logNudgeSignature([{level:'ok',title:'Nothing looks wrong'}])!=='')
+          throw new Error('a healthy finding contributed to the signature');
+      } finally {
+        dismissLogNudge();
+        try{
+          if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
+          if(kNudge===null) localStorage.removeItem('tonys_log_nudge'); else localStorage.setItem('tonys_log_nudge',kNudge);
+          if(kSeen===null) localStorage.removeItem('tonys_log_nudge_seen'); else localStorage.setItem('tonys_log_nudge_seen',kSeen);
+          if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',kLog);
+        }catch(e){}
+      }
+    } },
+
   { id:'log_panel_controls', group:'UI', name:'Logging & debugging panel has all five controls (v35.4)',
     test: async()=>{
       ['showLoggingPanel','renderLoggingPanel','copySyncLogReport','purgeSyncLogUI','applyLogRetention']
@@ -3864,6 +4082,16 @@ const SELF_TESTS = [
         if(html.indexOf('setLogFilter(')===-1) throw new Error('no filter controls in the viewer');
         if(html.indexOf('What this looks like')===-1) throw new Error('the panel shows no analysis');
         if(html.indexOf('debugModeItem')===-1) throw new Error('debug mode did not move into this panel');
+        // The nudge switch, and it must be unusable while nothing is being
+        // recorded — an switch that promises notifications about a log that is
+        // not being written is a lie.
+        var nudgeBox=body.querySelector('#logNudgeBox');
+        if(!nudgeBox) throw new Error('no switch for the nudge');
+        if(nudgeBox.disabled) throw new Error('the nudge switch is disabled while recording is on');
+        setLogEnabled(false); renderLoggingPanel();
+        var off=document.getElementById('loggingBody').querySelector('#logNudgeBox');
+        if(!off || !off.disabled) throw new Error('the nudge switch stays usable while recording is off');
+        setLogEnabled(true); renderLoggingPanel();
         // The findings must be visible, not just computed.
         if(html.indexOf('Try:')===-1) throw new Error('the findings are shown without their proposed fixes');
       } finally {
@@ -9373,7 +9601,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.5';
+var APP_VERSION = 'v35.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11669,7 +11897,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12251,7 +12479,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -22843,6 +23071,9 @@ function updateFilterBarTop() {
   try {
     var _dropped = pruneSyncLog();
     if (_dropped) dlog('[log] pruned ' + _dropped + ' expired entr(y/ies)');
+    // Opening the app is the quiet moment to mention what the log has grown.
+    // Delayed so it does not compete with the first paint or the update banner.
+    setTimeout(function(){ try { dlog('[log] nudge:', maybeNudgeAboutLog()); } catch(e) {} }, 4000);
   } catch(e) {}
   applyAriaLabels();
   initWhatsAppSources();

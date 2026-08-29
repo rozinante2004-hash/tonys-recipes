@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v35.5: 203 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v35.6: 204 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -656,6 +656,23 @@ found only because a test was written first and disagreed with the code.
     drives one function cannot notice that a *different* function is the one instrumented.
   - `'system'` is a kind of its own for the log's own lifecycle ("Logging enabled"). Filing
     that under `'load'` quietly polluted the load filter.
+  - **The nudge (v35.6) is the answer to "should errors upload themselves somewhere?" —
+    and the answer is no.** Nothing the app could upload can reach anyone who is not
+    already looking: there is no service at the other end, the repo would need a GitHub
+    token in a publicly-served `index.html`, and the Worker or Firestore would mean recipe
+    names and family members' identities sitting somewhere indefinitely to make a
+    diagnostic marginally more convenient. So the log stays put and the app says when it
+    has grown something worth reporting. Guards: **off by default**, **per device** (it is
+    a localStorage key, so the desk can have it while the phone does not — Tony asked for
+    exactly that), at most **once per session**, and **never twice for the same problems**
+    (`logNudgeSignature` over the `bad` findings; titles carry counts, so a fourth refusal
+    is news and the same three are not). It fires ~4s after start, which is the quiet
+    moment; a problem arising mid-session is mentioned next open, because every BAD finding
+    already surfaces its own message at the time and a second one on top is noise.
+  - `maybeNudgeAboutLog` returns a **named reason** for every path — `nudge-off`,
+    `logging-off`, `nothing-wrong`, `already-shown-this-session`, `already-mentioned`,
+    `shown` — so "correctly stayed quiet" can be told from "silently broken". A boolean
+    would have hidden exactly the distinction this codebase keeps having to relearn.
 
 ## Outstanding
 
