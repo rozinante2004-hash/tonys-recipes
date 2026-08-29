@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v34.9` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v35.0` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -52,16 +52,15 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~22,500 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~22,050 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v34.9"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v35.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
 | `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
 | `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
-| `local-save-helper.py` | Optional localhost (port 27182) helper to save exports with Hebrew/Russian filenames on Linux. **OPT-IN since v34.5** (⚙️ → Save Helper → "Use it"), and `connect-src` must list `http://127.0.0.1:27182` — loopback is a potentially-trustworthy origin, so `http:` there is not mixed content. Without that entry the app fires a request its own CSP refuses on every single export. |
 | `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. Carries a `PAGE_BUILD` stamp, shown in the header and the results box — bump it on every edit, because this page has no update banner of its own. |
 | `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
 | `logo.svg` | Brand mark (brown disc, gold ring, fork + terracotta/gold flame). |
@@ -1065,8 +1064,8 @@ Rules that follow from that:
 
 **Header** (`.header`, sticky, brown): SVG logo + "Tony's *Recipes* Collection" + version
 badge; right side: sync‑status pill with Sign in/out, a `?` help button, and a ⚙️ **Settings**
-dropdown (Family Access, Gmail Setup, Save Helper, Self Test, Payments, Deployments — the last
-two with a little green "helper running" indicator dot). Second header row: **search input**
+dropdown (Family Access, Gmail Setup, Self Test, Payments, Deployments, plus the photo tools —
+Send photos to the cloud, Photo rescue, Undo auto-fetch, Clean up orphaned photos). Second header row: **search input**
 (filters live via `renderGrid()`), plus three dropdown button‑groups:
 - **··· More** → Explore meal ideas, Suggest recipes, Convert measurements, Share this app,
   Auto‑tag diet types, Auto‑fetch missing photos.
@@ -1181,22 +1180,21 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   buttons are desktop‑only. **Restore is the app's most destructive action — see §4c** for the
   confirmation and validation it must carry. `backupIsOverdue()`/`checkBackupOverdue()` nudge
   after 30 days (5d.1); the nudge never claims a backup happened.
-- **Local Save Helper**: on desktop, exports can POST base64 to `http://127.0.0.1:27182` so files
-  land in `~/Documents/Projects/Recipes App/Backups` with correct Hebrew/Russian names
-  (`downloadBlob` tries the helper first, falls back to a normal browser download + a rename hint
-  for non‑ASCII names). `checkHelperStatus` flips the ⚙️ indicator dot green when reachable.
-  The helper enforces `Access-Control-Allow-Origin: https://rozinante2004-hash.github.io`.
-  **Its whole justification is one environment variable.** Chromium sanitises download filenames
-  against the *process* locale's encoding: under `LANG=`/`C`/`POSIX` it strips non‑ASCII and falls
-  back to `Download` — for `<a download>`, `data:` URLs and even a compliant
-  `Content-Disposition: filename*=UTF-8''…` alike — while under a `.UTF-8` locale the same build
-  keeps Hebrew and Cyrillic names exactly, through `downloadBlob` with the helper off. So the helper
-  is redundant on any normally‑configured desktop. **Tony's desktop is not one: measured on
-  28 Aug 2026, his Chrome process has no locale variables set at all** (`/proc/<pid>/environ`
-  matches none of `LANG|LC_|LANGUAGE`), so all three browser routes mangle and only the helper
-  works. It is a plain deb at `/opt/google/chrome/chrome`, so snap confinement is not the cause —
-  the graphical session simply never exported one. The helper stays until that is repaired; see
-  CLAUDE.md → Outstanding → 2.6 for the full evidence and the retirement checklist.
+- **Exports use a plain `<a download>` + blob URL and nothing else.** `downloadBlob` is
+  synchronous: it makes an object URL, sets `download`, clicks, revokes. Until **v35.0** it
+  base64‑encoded the whole blob through a `FileReader` so it could POST it to a local Python
+  daemon on `127.0.0.1:27182` that wrote the file itself, because Chrome saved Tony's Hebrew
+  filenames as `Download`. **The cause was his machine's locale, not the browser and not the
+  app** — Chromium sanitises download filenames against the character encoding of its *process*
+  locale, and `/etc/default/locale` was handing the session `LANG="en_IL"`, the non‑UTF‑8 twin of
+  `en_IL.UTF-8`. Fixing that fixed `<a download>`, `showSaveFilePicker` and server‑sent
+  `Content-Disposition` simultaneously, all three having failed identically before.
+  **Do not add a local helper back.** Besides being unnecessary, the one we had took its target
+  directory from the request body: CORS stops a cross‑origin POST from being *read*, not from
+  being *sent*, so any website open in any browser could write a file anywhere the user could.
+  A file‑writing daemon whose only client is a public web page cannot be secured, because any
+  token it checks ships in `index.html`. `sec_no_local_save_helper` fails if it returns, the
+  `connect-src` loopback exception included. Full account in CLAUDE.md → Traps.
 
 ---
 
@@ -1703,8 +1701,7 @@ use via `loadScriptOnce()` (5.11). qrcodejs and the Excel export were removed in
 3. `renderFilters()` + `renderGrid()`.
 4. `handleShareTarget()` (process any `?url/text/title`).
 5. `checkAppVersion()`.
-6. After ~2s, `checkHelperStatus()` (local save helper probe).
-7. If no recipes, paint 4 skeleton cards.
+6. If no recipes, paint 4 skeleton cards.
 Firebase auth state then updates everything asynchronously. Register `sw.js` for PWA/offline.
 
 ---
@@ -1719,8 +1716,9 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
       errors with the friendly modal.
 - [ ] URL/Instagram/YouTube/free‑hand/camera/file imports all produce correct recipe JSON or a
       video bookmark; RTL Hebrew renders correctly throughout.
-- [ ] Hand‑rolled Word export/import, JSON backup/restore (with de‑duped photos), and the
-      localhost save helper all work; non‑ASCII filenames handled. **There is no Excel export** —
+- [ ] Hand‑rolled Word export/import and JSON backup/restore (with de‑duped photos) work, and a
+      Hebrew filename survives the download. If it does not, the fault is the machine's process
+      locale — see §10; do **not** add a local save helper back. **There is no Excel export** —
       it and the QR code were removed in v28.5 as unused; do not rebuild them.
 - [ ] Bring! send + all three token‑refresh paths function; expiry pill accurate. The per-device
       secret can be entered from a route that **exists**, and a failure shows the server's reason
@@ -1793,7 +1791,8 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 5. `cloudflare-worker.js` + `aiCall` + `extractJSON`, then every AI feature. Write
    `tests/worker-cors.mjs` **at the same time as the Worker**, not after — §4a1 is what a
    Worker without tests costs.
-6. Import/Export/Backup + local save helper (`local-save-helper.py`, `setup-save-helper.sh`).
+6. Import/Export/Backup. `downloadBlob` is a plain `<a download>` + blob URL and nothing else —
+   see §10 before adding any other save route.
 7. Firebase auth + Firestore sync + offline merge + remote‑change banner.
 8. Bring! integration + `bring-relay.html`.
 9. Sharing/email/Gmail/converter/print/access‑control/deployments (no QR — removed v28.5).

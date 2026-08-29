@@ -10,7 +10,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~22 400 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~22 200 lines,
   no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v34.8: 194 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v35.0: 195 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -545,6 +545,51 @@ found only because a test was written first and disagreed with the code.
   because the slowness had a fixable cause. Adding a timeout is not a substitute for
   finding out why something is slow — say so out loud when shipping one.
 
+- **The Save Helper was compensating for one wrong environment variable, and it is gone
+  (v35.0).** For months the app POSTed exports to a local Python daemon on
+  `127.0.0.1:27182` because Chrome saved Tony's Hebrew filenames as `Download`. The cause
+  was never Chrome and never the app: **Chromium sanitises download filenames against the
+  character encoding of its PROCESS locale**, and his `/etc/default/locale` read
+  `LANG="en_IL"` — the non-UTF-8 twin of `en_IL.UTF-8`, both generated as separate
+  locales. `sudo locale-gen he_IL.UTF-8 && sudo update-locale LANG=en_IL.UTF-8` plus a
+  re-login fixed it, and the helper became dead weight. What this cost, and what to take
+  from it:
+  - **Three independent routes failed identically, and that was the diagnosis.**
+    `<a download>`, `showSaveFilePicker` and a standards-compliant server-sent
+    `Content-Disposition: filename*=UTF-8''…` all produced `download`. When every route
+    into a subsystem fails the same way, the fault is under all of them, not in any one.
+    A fourth route that bypassed Chrome entirely — the helper — kept the name.
+  - **A lab result is worthless unless the environment is stated.** This container
+    defaults to the `POSIX` locale, so early runs of `fname*.js` "proved" Chromium
+    mangles even `café.docx`, which is not real Chrome behaviour, and a wrong conclusion
+    was reported before the sweep caught it. Prefix filename experiments with
+    `LANG=C.utf8 LC_ALL=C.utf8`. Headed-vs-headless was never the variable; both agreed,
+    in both directions.
+  - **`navigator.language` cannot see the process locale** — it read `en-US@posix` under
+    both locales — so no page can self-diagnose this. It needs a human to look in the
+    Downloads folder, which is why `filename-test.html` ends in verdict buttons.
+  - **To reproduce a user's environment, strip yours**: `env -u LANG -u LANGUAGE -u LC_ALL`
+    produced the literal string `download` that Tony was seeing. To test a fix on a live
+    desktop without changing anything, run the browser with a separate profile:
+    `LC_ALL=C.UTF-8 /opt/google/chrome/chrome --user-data-dir=/tmp/…`. Both parts matter —
+    without the separate `--user-data-dir` Chrome hands the URL to the running process and
+    the old environment comes with it. A fresh profile also asks to be made the default
+    browser, which looks alarmingly like a second installation and is not.
+  - **Removing it closed a real hole.** The daemon took its target directory from the
+    request body, unrestricted, and `mkdir(parents=True)`'d it. CORS stops a cross-origin
+    POST from being **read**, not from being **sent**, and a `fetch` with a string body
+    defaults to `text/plain` — a simple request, no preflight. Loopback is a
+    potentially-trustworthy origin, so `https` pages reach it without mixed-content
+    blocking. Any site open in any browser could therefore write a file anywhere Tony
+    could, `~/.config/autostart` included. It was running and autostarting on his machine
+    when we found it. **Never add a local file-writing daemon whose only client is a
+    public web page** — any token it checks has to ship in `index.html`, so the ceiling is
+    drive-by protection, not security.
+  - The code is not lost and does not need copying anywhere: `git log --oneline --diff-filter=D
+    -- local-save-helper.py` finds the removal, and `git show <commit>^:local-save-helper.py`
+    prints it. `setup-save-helper.sh` went with it. `sec_no_local_save_helper` fails if any
+    of it returns, including the `connect-src` loopback exception.
+
 ## Outstanding
 
 - **5.4 — per-recipe Firestore documents. Complete as of v32.2.** All four steps are
@@ -564,106 +609,6 @@ found only because a test was written first and disagreed with the code.
   and `syncCloudPhotos` silently fails to remove their orphaned `photo_<id>` documents.
   The role labels in Family Access — "Read + Write" vs "Full (incl. delete)" — describe
   what actually happens now, which they did not before.
-- **2.6 — DIAGNOSED, 28 Aug 2026. Tony's Chrome runs with no locale at all, and that
-  is the entire cause.** `/proc/<chrome pid>/environ` matched none of
-  `LANG|LC_|LANGUAGE|GDM_LANG` — empty. Chrome is `/opt/google/chrome/chrome`, a plain
-  deb, so snap/flatpak confinement is *not* the mechanism; the graphical session simply
-  never exported a locale. His terminal has one (`LANG=en_IL.UTF-8`) but also reports
-  `locale: Cannot set LC_ALL to default locale: No such file or directory`, so at least
-  one of the locales it names is **not generated** — check `locale -a` before setting
-  anything system-wide, or the broken value propagates to the session.
-
-  His four results, all on build `2026-08-28c`:
-  - test 1 (`<a download>`) — mangled;
-  - test 2 (`showSaveFilePicker`) — saved as `download`, and this one is *self-verifying*,
-    so it is the browser's own report rather than an eyeball reading;
-  - test 3 (RFC 5987 `Content-Disposition`) — mangled. **This is the one that closes it**:
-    a standards-compliant filename arriving in an HTTP header, nowhere near a DOM
-    attribute, destroyed just the same. Three independent paths into Chrome's downloader,
-    three identical failures;
-  - test 4 (helper, which never touches Chrome's downloader) — name intact.
-
-  Reproduced exactly in the container: `env -u LANG -u LANGUAGE -u LC_ALL` → `download`,
-  the literal string Tony sees; add `LC_ALL=C.UTF-8` and every name survives, through the
-  app's own `downloadBlob` with the helper off. **Nothing in the app is broken and nothing
-  in JavaScript can fix it.**
-
-  **Confirmed on Tony's own machine, same day.** Running his existing Chrome as
-  `LC_ALL=C.UTF-8 /opt/google/chrome/chrome --user-data-dir=/tmp/chrome-locale-test`
-  turned tests 1, 2 **and** 3 from fail to pass. Same binary, same version 137, one
-  environment variable. The separate `--user-data-dir` is what makes the experiment valid —
-  without it Chrome hands the URL to the already-running process and the broken environment
-  is inherited unchanged. It also means a **fresh profile**, so Chrome asks to be made the
-  default browser and to sign in; that is not a second installation. The tell is
-  `navigator.languages`, a per-profile preference: `en-GB, en, en-US, he` on his real
-  profile, `en-US, en` on the throwaway.
-
-  **Root cause found: `/etc/default/locale` reads `LANG="en_IL"`, with no `.UTF-8`.**
-  `locale -a` lists `en_IL` and `en_IL.utf8` as two separate generated locales — the bare
-  one is not UTF-8. So the graphical session, and therefore Chrome, is handed a non-UTF-8
-  locale, which is precisely the condition that makes Chromium strip non-ASCII from
-  download filenames. No shell rc sets anything (`~/.bashrc`, `~/.profile`,
-  `~/.bash_profile`, `~/.pam_environment`, `/etc/environment` are all clean), so this one
-  file is the whole story.
-
-  Separately, his regional formats point at `he_IL.UTF-8` (whence `LC_NUMERIC`, `LC_TIME`,
-  `LC_COLLATE`, `LC_MEASUREMENT`) and `he_IL` is not generated at all — that is what
-  `locale: Cannot set LC_COLLATE to default locale` is reporting. Fix is
-  `sudo locale-gen he_IL.UTF-8 && sudo update-locale LANG=en_IL.UTF-8`, then log out and
-  in; `en_IL.utf8` is already generated so it needs no `locale-gen`. Reversible with
-  `sudo update-locale LANG=en_IL`.
-
-  The helper therefore stays until Tony repairs the session locale — it is the only route
-  that works on his machine today. Retirement checklist once test 1 passes: delete
-  `local-save-helper.py`, `SAVE_HELPER_KEY`, `localSaveUrl`, `saveHelperEnabled`,
-  `setSaveHelperEnabled`, `checkHelperStatus`, `showRenameHint`, the Save Helper settings
-  panel and the `http://127.0.0.1:27182` / `http://localhost:27182` `connect-src` entries.
-
-  Since v34.5 the helper is **opt-in and off by default**, and
-  `connect-src` finally permits it — it had been unreachable behind the app's own CSP
-  since v31.1, so any earlier judgement about whether it was worth keeping was made
-  about a feature that could not run.
-  - **The determinant is the process locale, not the browser and not the download
-    method.** Chromium sanitises download filenames against the character encoding of
-    the *process* locale. Under `LANG=`/`C`/`POSIX` it strips every non-ASCII character
-    and falls back to `Download` — for `<a download>`, for `data:` URLs, **and** for a
-    standards-compliant `Content-Disposition: filename*=UTF-8''…`, so no download route
-    escapes it. Under `LANG=C.utf8` the same Chromium 141 build preserves
-    `עוגת שוקולד של סבתא.docx` and `Бабушкин шоколадный торт.docx` byte for byte,
-    verified through the app's own `downloadBlob` with the helper switched off. Nothing
-    in JavaScript can fix or detect the broken case.
-  - **A filename result obtained in this container is worthless unless the locale is
-    set.** The container defaults to `POSIX`, so earlier runs of `fname*.js` "proved"
-    that Chromium mangles even `café.docx` — which is not real Chrome behaviour, and the
-    conclusion drawn from it was wrong. Prefix filename experiments with
-    `LANG=C.utf8 LC_ALL=C.utf8` or they will lie to you. Headed-vs-headless is not the
-    variable here; both agreed, in both directions.
-  - `navigator.language` reads `en-US@posix` under **both** locales, so the page cannot
-    self-diagnose; test 1 needs a human to look in the Downloads folder. That is why it
-    ends in two verdict buttons rather than an automatic check.
-  - **The service worker was pinning `filename-test.html`, so two fixes never
-    reached Tony at all.** He ran the test twice and sent back byte-identical results
-    (bar the helper's de-dup counter ticking `(2)`→`(3)`, which is what gave it away).
-    `sw.js`'s fetch handler claimed every request in scope, and
-    `event.request.destination === 'document'` matches **every** html page, not just
-    the app — so the test page got stale-while-revalidate and the first copy a browser
-    ever fetched was served for ever after. `index.html` survives that because it polls
-    `version.json` and raises the update banner; a standalone page has no such tell.
-    The cache-first branch below it was the same trap for any other file fetched once
-    under that path. Fixed in v34.9: `isAppDocument()` and `isPrecachedAsset()` gate
-    the two branches and everything else returns without `respondWith`, i.e. straight
-    to the network. `CACHE_NAME` bumped to `v8` to evict what is already pinned.
-    `filename-test.html` now carries a `PAGE_BUILD` stamp, shown in the header and in
-    the results box, so a stale copy announces itself.
-  - **`filename-test.html` test 3 must send `appKey` in the body**, like every other
-    Worker call — it did not, so Tony's run returned `FORBIDDEN: missing or wrong app
-    key` and never tested anything. Fixed 28 Aug 2026. The key travels in the body, not
-    a header, because a custom header forces a CORS preflight the Worker will not answer.
-  - Route 3 (Worker) is a fallback of last resort even if it works: it would push every
-    backup, photos included, through Cloudflare to fix a filename. Route 2
-    (`showSaveFilePicker`) is the sane replacement if test 1 fails, but it pops a Save
-    dialog on every export and does not exist on iOS Safari, so the plain
-    `<a download>` path has to stay for the phone regardless.
 - **Classifier long tail (5f.11).** ~900 bare `youtu.be` / `x.com` links in Tony's
   harvest carry no signal in the URL and little in the message. Waiting on more
   dismissal data from him rather than guessing a rule.

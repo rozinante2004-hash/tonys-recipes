@@ -57,9 +57,11 @@
 <div class="wrap">
   <h1>🍴 Filename Test <span class="pill" id="buildStamp" style="font-weight:600;"></span></h1>
   <div class="sub">
-    <strong>The question:</strong> is the local Python Save Helper still needed, or does plain Chrome on your
-    Ubuntu box already keep <strong>Hebrew / Russian filenames</strong> intact? <strong>Test 1 decides it.</strong>
-    This page saves nothing and changes nothing in the app.
+    <strong>Resolved 29 Aug 2026 — kept as a regression bench.</strong> This page asked whether the local
+    Python Save Helper was still needed. It was not: Chrome was mangling <strong>Hebrew / Russian filenames</strong>
+    because it had been handed a non-UTF-8 locale, and fixing that fixed all three browser routes at once.
+    The helper was removed in v35.0. Run these again if non-ASCII filenames ever break — test 1 is the one
+    that matters. This page saves nothing and changes nothing in the app.
   </div>
 
   <div class="card" id="originCard" style="display:none;">
@@ -71,12 +73,17 @@
     <h2>What actually decides this: your desktop's locale</h2>
     <div class="why">
       Chromium sanitises download filenames against the <em>character encoding of the process locale</em>,
-      not the page's. Launched under a non-UTF-8 locale (<code>LANG</code> empty, or <code>C</code>/<code>POSIX</code>)
-      it throws away every non-ASCII character in the name and falls back to <code>Download</code> —
-      which is exactly the symptom that made us write the helper. Launched under a UTF-8 locale the same
-      Chromium build keeps <code>עוגת שוקולד של סבתא.docx</code> byte for byte, through the app's own export code,
-      with the helper switched off. So this is not a Chrome limitation and not something the app can fix in
-      JavaScript — it is one environment variable on the machine doing the downloading.
+      not the page's. Under a non-UTF-8 locale it throws away every non-ASCII character and falls back to
+      <code>Download</code> — and it does that identically for <code>&lt;a download&gt;</code>,
+      <code>showSaveFilePicker</code> <em>and</em> a standards-compliant
+      <code>Content-Disposition: filename*=UTF-8''…</code>, so no download route escapes it and nothing in
+      JavaScript can fix it. Under a UTF-8 locale the same build keeps
+      <code>עוגת שוקולד של סבתא.docx</code> byte for byte.
+      <br><br><strong>What it turned out to be here:</strong> <code>/etc/default/locale</code> read
+      <code>LANG="en_IL"</code> — the non-UTF-8 twin of <code>en_IL.UTF-8</code>, both of which were generated
+      as separate locales. The session, and therefore Chrome, got the wrong one. The repair was
+      <code>sudo locale-gen he_IL.UTF-8</code> then <code>sudo update-locale LANG=en_IL.UTF-8</code> and a
+      log out and back in, after which tests 1, 2 and 3 all passed.
     </div>
     <div class="why" style="margin-bottom:6px;"><strong>Run this in a terminal on the same machine:</strong></div>
     <pre class="cmd">locale</pre>
@@ -117,10 +124,10 @@ tr '\0' '\n' &lt; /proc/$pid/environ | grep -E '^(LANG|LC_|GDM_LANG|LANGUAGE)=' 
   <div class="card headline">
     <h2>1. Classic browser download <span class="pill key">the deciding test</span></h2>
     <div class="why">
-      <code>&lt;a download="…"&gt;</code> + blob URL — <strong>exactly what the app does</strong> when the
-      Python helper is switched off. In the lab this keeps the name perfectly under a UTF-8 locale and
-      destroys it under <code>POSIX</code>. Only your machine can say which one you have.
-      <br><strong>If this passes, the helper is not required and can be retired.</strong>
+      <code>&lt;a download="…"&gt;</code> + blob URL — <strong>exactly what the app does</strong>, and since
+      v35.0 the only thing it does. It keeps the name under a UTF-8 locale and destroys it under a non-UTF-8
+      one. Only the machine doing the downloading can say which it has.
+      <br><strong>If this ever fails again, the fault is the locale, not the app.</strong>
     </div>
     <button onclick="test1()">Run test 1</button>
     <div class="res" id="r1">Not run yet.</div>
@@ -167,27 +174,17 @@ tr '\0' '\n' &lt; /proc/$pid/environ | grep -E '^(LANG|LC_|GDM_LANG|LANGUAGE)=' 
     </div>
   </div>
 
-  <!-- 4 -->
-  <div class="card">
-    <h2>4. Local Python Save Helper <span class="pill auto">auto-verified</span></h2>
-    <div class="why">
-      The current primary method. The helper replies with the exact path it wrote, so this verifies itself.
-      Only works if the helper is running on this machine.
-    </div>
-    <button onclick="test4()">Run test 4</button>
-    <div class="res" id="r4">Not run yet.</div>
-  </div>
 
   <div class="verdict">
     <h2>📋 Results to send back</h2>
     <div style="font-size:13px;opacity:.85;">
-      Run test 1, look in your Downloads folder, and press one of its two buttons — that alone answers the
-      question. Paste the output of <code style="color:#1C1A18;">locale</code> in at the bottom if you have it,
-      then copy this box back to me.
-      <br><br><strong>The rule:</strong> test 1 passes → the helper is redundant, and we delete it and its CSP
-      exception. Test 1 fails but your locale is UTF-8 → something else is wrong and we keep the helper while
-      we dig. Test 1 fails and your locale is <code style="color:#1C1A18;">POSIX</code>/<code style="color:#1C1A18;">C</code>
-      → fixing the locale is the real repair; the helper has been papering over it.
+      Run test 1, look in your Downloads folder, and press one of its two buttons. Fill in the two locale
+      readings if you have them, then copy this box back.
+      <br><br><strong>If test 1 fails again:</strong> read the Chrome process environment first. A non-UTF-8
+      or missing <code style="color:#1C1A18;">LANG</code> explains it completely, and the repair is the locale.
+      The Save Helper is <em>not</em> coming back — besides being unnecessary, it took its target directory
+      from the request body, and CORS does not stop a cross-origin POST from being sent, only from being read.
+      Any site open in any browser could write a file anywhere you could.
     </div>
     <textarea id="summary"></textarea>
     <button style="margin-top:10px;background:var(--gold);color:var(--warm-brown);" onclick="copySummary()">📋 Copy</button>
@@ -200,11 +197,10 @@ tr '\0' '\n' &lt; /proc/$pid/environ | grep -E '^(LANG|LC_|GDM_LANG|LANGUAGE)=' 
 // poll and no update banner — when the service worker was pinning it (fixed in
 // v34.9), Tony ran the same broken test twice and neither of us could tell from
 // the results that the fix had never reached his browser.
-var PAGE_BUILD = '2026-08-28c';
+var PAGE_BUILD = '2026-08-29a';
 
 var WORKER_URL = 'https://lively-bread-273a.rozinante2004.workers.dev';
 var WORKER_APP_KEY = 'tonys-recipes-web-v1';   // matches index.html; not a secret, it ships there
-var HELPER_PORT = 27182;
 
 function $(id){ return document.getElementById(id); }
 function fname(){ return $('fname').value || 'test.docx'; }
@@ -224,14 +220,9 @@ function blobToB64(blob){
   });
 }
 
-var results = {1:'not run',2:'not run',3:'not run',4:'not run'};
+var results = {1:'not run',2:'not run',3:'not run'};
 var asked   = {1:'',3:''};
 
-// "עוגה (2).docx" -> "עוגה.docx". Used only to tell a de-duplication suffix apart
-// from a genuinely changed name.
-function stripDedup(name){
-  return name.replace(/ \(\d+\)(\.[^.]+)$/, '$1').replace(/ \(\d+\)$/, '');
-}
 
 // 1 — classic <a download>
 function test1(){
@@ -334,42 +325,10 @@ function verdict3(ok){
     ok ? 'pass' : 'fail');
 }
 
-// 4 — local Python helper (self-verifying)
-async function test4(){
-  var n=fname();
-  show('r4','Contacting the local helper…');
-  try{
-    var b64 = await blobToB64(makeBlob());
-    var resp = await fetch('http://127.0.0.1:'+HELPER_PORT, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ filename:n, data:b64 })
-    });
-    var data = await resp.json();
-    if(!data.ok) throw new Error(data.error||'helper returned an error');
-    var actual = data.filename || '(unknown)';
-    // The helper never overwrites: a second run of the same test writes
-    // "name (2).docx". That is a de-duplication suffix, not a mangled name, so
-    // strip it before comparing — an earlier version of this test reported it
-    // as a MISMATCH and made a passing helper look broken.
-    var deduped = actual !== n && stripDedup(actual) === n;
-    var ok = (actual === n) || deduped;
-    results[4] = ok ? 'PASS — wrote '+actual+(deduped?' (de-dup suffix only)':'')
-                    : 'MISMATCH — wrote '+actual;
-    show('r4',(ok?'✅ PASS':'⚠️ MISMATCH')
-       +'\nAsked for : '+n+'\nWrote     : '+actual+'\nFull path : '+(data.path||'?')
-       +(deduped?'\n\nThe name is intact — the " (2)" is the helper refusing to overwrite '
-                +'a file it wrote on an earlier run.':''), ok?'pass':'warn');
-  }catch(err){
-    results[4]='not running';
-    show('r4','Could not reach the helper on port '+HELPER_PORT+'.\n'
-            +'That just means it is not running right now — start it with:\n'
-            +'  python3 ~/local-save-helper.py','warn');
-  }
-}
 
 // Tell the user upfront which tests can work from wherever they opened this page.
-// (The Python helper only accepts requests from the GitHub Pages origin, and the
-// File System Access API needs a secure context.)
+// (The File System Access API needs a secure context, and the Worker only answers
+// origins on its allowlist.)
 (function originAdvice(){
   var card=$('originCard'), title=$('originTitle'), note=$('originNote');
   var o=location.origin, proto=location.protocol;
@@ -378,22 +337,20 @@ async function test4(){
   var isFile = proto === 'file:';
   var msg, t;
   if (isPages) {
-    t='✅ Opened from the live site — all four tests can run';
+    t='✅ Opened from the live site — all three tests can run';
     msg='This is the ideal place to run the tests.';
   } else if (isLocalhost) {
-    t='⚠️ Opened from localhost — tests 1, 2 and 3 will run';
-    msg='Test 4 (Python helper) will fail here: the helper only accepts requests from '
-      + 'https://rozinante2004-hash.github.io. That is fine — tests 1–3 are the ones we need. '
-      + 'Current origin: ' + o;
+    t='✅ Opened from localhost — all three tests can run';
+    msg='Current origin: ' + o;
   } else if (isFile) {
-    t='⚠️ Opened directly from disk — test 2 (and probably 4) will not run';
+    t='⚠️ Opened directly from disk — test 2 will not run';
     msg='The File System Access API needs a real http(s) origin. For the full set, either upload this '
       + 'file to the repo and open it from the live site, or serve the folder locally:\n'
       + '    cd <folder containing this file> && python3 -m http.server 8000\n'
       + 'then open http://localhost:8000/filename-test.html';
   } else {
     t='ℹ️ Origin: ' + o;
-    msg='Test 4 (Python helper) only works from https://rozinante2004-hash.github.io.';
+    msg='Test 3 needs the Worker to accept this origin.';
   }
   title.textContent=t; note.style.whiteSpace='pre-wrap'; note.textContent=msg;
   card.style.display='block';
@@ -436,8 +393,8 @@ function refresh(){
     '  ______________________________________________\n\n'+
     '1. <a download>  [DECIDES IT] : '+results[1]+'\n'+
     '2. File System Access         : '+results[2]+'\n'+
-    '3. Worker (UTF-8 header)      : '+results[3]+'\n'+
-    '4. Python helper              : '+results[4]+'\n';
+    '3. Worker (UTF-8 header)      : '+results[3]+'\n';
+    '';
 }
 function copySummary(){
   $('summary').select();

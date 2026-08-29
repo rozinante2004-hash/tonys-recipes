@@ -18,8 +18,7 @@ It is one self-contained `index.html` — inline CSS and JS, dependencies from a
 | `manifest.json`, `sw.js`, `icons/`, `logo.svg` | PWA plumbing. |
 | `version.json` | Polled by the running app to notice a new deployment. |
 | `whatsapp/` | Exported WhatsApp chats the app can answer cooking questions from. See [`whatsapp/README.md`](whatsapp/README.md) — **these are other people's messages, and they are as public as this repository is.** |
-| `local-save-helper.py`, `setup-save-helper.sh` | Optional localhost helper so exports keep their Hebrew/Russian filenames on Linux. |
-| `bring-relay.html`, `filename-test.html` | Standalone helper pages — a Bring! token refresh relay and a filename-download bench. |
+| `bring-relay.html`, `filename-test.html` | Standalone helper pages — a Bring! token refresh relay, and a bench for the three browser download routes (kept as a regression check; see CLAUDE.md on the locale that once broke all three). |
 
 ## Deploying
 
