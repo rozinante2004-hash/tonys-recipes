@@ -52,7 +52,7 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~22,250 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
 | `version.json` | `{"version": "v35.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
@@ -863,6 +863,19 @@ cloud, unreadable — has its own sentence and changes nothing (`refreshRecipeRe
 `tonys_cloud_deletes`, flushed by `flushCloudDeletes`), never inferred by diffing the cloud
 against memory — a partial read would otherwise look exactly like a mass deletion. Undo takes
 the id back off the queue. Deleting removes `recipe_<id>` *and* `photo_<id>`.
+
+**Sync event log (v35.4):** an **opt-in, off-by-default** record of what sync did — loads,
+saves, refused writes, refreshes, photo sync, sign-in, errors — in `localStorage` under
+`tonys_sync_log`, surfaced at ⚙️ Settings → 🪵 **Logging & debugging** (which also holds Debug
+mode). Bounded **twice**: by a retention window (`tonys_log_days`, default **7**, clamped 1–365)
+and by a 500-entry ceiling, applied on every write as well as by `pruneSyncLog()` — which runs
+at app start, when the panel opens, and when the retention is changed. There is no timer,
+because one cannot run while the app is closed. It records recipe ids and names, **never recipe
+contents**; it is never synced and never reaches a backup. `analyseSyncLog(list, now)` is a pure
+function turning entries into findings that each carry a **fix**; `syncLogReportText()` is the
+plain-text Copy payload. Because it shares `localStorage` with the recipes, **a logging failure
+must never break a save**: every path is wrapped, and on a quota error the log halves and then
+deletes itself rather than letting the error reach the caller.
 
 **Change notification:** one `onSnapshot` listener, on `shared/meta`, which every save
 touches. The snapshot does **not** carry the recipes — with per‑recipe documents the only

@@ -10,7 +10,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~22 250 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~23 400 lines,
   no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v35.3: 200 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v35.4: 203 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -620,6 +620,33 @@ found only because a test was written first and disagreed with the code.
   - **JPEG stores height before width** in the SOF marker. `imagePixelSize` reads
     it from the bytes because `makeDocxBlob` is synchronous and `new Image()` is
     not available; getting the order wrong rotates every landscape photo silently.
+- **The sync event log is opt-in, bounded twice, and local (v35.4).** Tony asked for
+  activity logging after the two-device test; what got built is deliberately narrower
+  than that. Rules it must keep, because each one is a way this could turn into a
+  liability rather than a diagnostic:
+  - **Off by default, and off means nothing is written** — not "written and hidden".
+    `syncLog` returns `false` and never touches storage while disabled.
+  - **Bounded by age AND by count.** Retention days alone lets a busy afternoon fill
+    localStorage; the 500-entry ceiling alone lets one stale entry sit there for a year.
+    The window is applied on every write as well as by `pruneSyncLog`, or the log only
+    stays trimmed when someone happens to open the panel — a mutation removing the
+    write-path filter survived the first test pass on exactly that gap.
+  - **It shares localStorage with the recipes.** A logging failure must never break a
+    save: every path is wrapped, and on a quota error the log halves itself and then
+    deletes itself rather than letting the error reach the caller.
+  - **Local only.** Never synced, and it stays out of backups because `backupSave`
+    writes an explicit `settings:{viewMode}` rather than sweeping localStorage — that
+    allowlist is load-bearing now.
+  - **Cleanup is on open and on write, not on a timer.** A timer cannot run while the
+    app is closed, so it would buy nothing an on-open prune does not.
+  - It records **recipe ids and names, never recipe contents**, and the panel escapes
+    every message — a name reaches the log and then the viewer, and names are user data.
+  - `analyseSyncLog(list, now)` is a pure function so findings can be driven from a
+    fixture. **Every finding carries a fix**: a conclusion with no next step is just a
+    prettier error message, and this app treats a dead end as a bug.
+  - Two real defects were found by these tests rather than by review: `parseInt(x)||default`
+    turned a deliberate `0` retention into 7, and the analyser matched `/timeout/` while
+    the watchdog logs `"timed out"` — so it stayed silent on the exact event it existed for.
 
 ## Outstanding
 
@@ -642,6 +669,7 @@ found only because a test was written first and disagreed with the code.
   **The local version is pushed onto `r.history` before being replaced**, so the
   existing 🕘 Version history → ↩ Restore is the way back; a refresh that silently
   discarded unsynced work would be the very bug the 5.4 guard exists to prevent.
+  **Tony re-ran the two-device test on v35.3 and it behaves.**
 - **Deletion is genuinely admin-only, published 1 Aug 2026.** v28.1 split `write` into
   `create, update` — `write` in Firestore means create + update + delete and allow rules
   are OR'd, so the `allow delete` line below it had been restricting nothing. Consequences

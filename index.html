@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.3 -->
+<!-- Tony's Recipes Collection v35.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,6 +87,10 @@
           var err = new Error('cloud ' + phase + ' did not finish in '
             + Math.round(SYNC_WATCHDOG_MS / 1000) + 's');
           err._syncTimeout = true; err._syncPhase = phase;
+          // syncLog is declared further down this same script; function
+          // declarations hoist, and this runs from a timer long after parse.
+          try { syncLog('error', 'Cloud ' + phase + ' timed out after '
+                + Math.round(SYNC_WATCHDOG_MS / 1000) + 's'); } catch(_) {}
           reject(err);
         }, SYNC_WATCHDOG_MS);
       })
@@ -162,6 +166,7 @@
       });
 
       _fbAuth.onAuthStateChanged(function(user) {
+        try { syncLog('auth', user ? 'Signed in' : 'Signed out'); } catch(e) {}
         if (user) {
           var isAutoLogin = !window._justSignedIn;
           window._justSignedIn = false;
@@ -263,6 +268,434 @@ function toggleDebugMode() { setDebugMode(!_debugMode); }
 window.dlog = dlog;
 window.toggleDebugMode = toggleDebugMode;
 window.setDebugMode = setDebugMode;
+
+// ─── SYNC EVENT LOG (v35.4) ───────────────────────────────────────────────────
+//
+// A bounded, local, OFF-BY-DEFAULT record of the handful of events that explain
+// sync behaviour. It exists because the two-device test in v35.3 showed how much
+// of this subsystem is invisible after the fact: a save is refused, and by the
+// time anyone asks what happened the toast is long gone.
+//
+// Deliberately NOT general activity logging. It records what sync DID — loads,
+// saves, refusals, refreshes, photo syncs, sign-in — with recipe ids and names,
+// and never recipe contents. Five rules it must keep:
+//
+//  1. OFF unless switched on. Nothing is written, and no storage is touched.
+//  2. Bounded TWICE — by age and by count. Age alone lets a busy afternoon fill
+//     localStorage; count alone lets one stale entry sit there for a year.
+//  3. It shares localStorage with the recipes. A logging failure must therefore
+//     never break a save: every path is wrapped, and on a quota error the log
+//     throws ITSELF away rather than the caller's data.
+//  4. Local only. It is never synced and never reaches a backup — backupSave
+//     writes an explicit `settings:{viewMode}`, not a sweep of localStorage, and
+//     that is load-bearing now.
+//  5. Cleanup happens on open and on write, not on a timer. A timer cannot run
+//     while the app is closed, so it would buy nothing an on-open prune doesn't.
+var LOG_KEY         = 'tonys_sync_log';
+var LOG_ENABLED_KEY = 'tonys_log_enabled';
+var LOG_DAYS_KEY    = 'tonys_log_days';
+var LOG_MAX_ENTRIES = 500;      // hard ceiling regardless of retention
+var LOG_DEFAULT_DAYS = 7;
+var LOG_MIN_DAYS = 1, LOG_MAX_DAYS = 365;
+var LOG_MSG_MAX = 300;          // one runaway message must not fill the store
+var LOG_KINDS = ['load','save','conflict','refresh','photo','auth','error'];
+
+function logEnabled() {
+  try { return localStorage.getItem(LOG_ENABLED_KEY) === '1'; } catch(e) { return false; }
+}
+function setLogEnabled(on) {
+  try {
+    if (on) localStorage.setItem(LOG_ENABLED_KEY, '1');
+    else localStorage.removeItem(LOG_ENABLED_KEY);
+  } catch(e) {}
+  // Switching it off leaves what was already collected — deleting someone's
+  // diagnostics as a side effect of a toggle would be a surprise. Purge is a
+  // separate, explicit button.
+  if (on) syncLog('load', 'Logging enabled');
+}
+function logRetentionDays() {
+  var n;
+  try { n = parseInt(localStorage.getItem(LOG_DAYS_KEY), 10); } catch(e) { n = NaN; }
+  // `!n` would swallow a stored 0 and silently return 7. Someone who typed 0
+  // wants the shortest window there is, not the default one back.
+  if (isNaN(n)) return LOG_DEFAULT_DAYS;
+  return Math.min(LOG_MAX_DAYS, Math.max(LOG_MIN_DAYS, n));
+}
+function setLogRetentionDays(days) {
+  var raw = parseInt(days, 10);
+  if (isNaN(raw)) raw = LOG_DEFAULT_DAYS;
+  var n = Math.min(LOG_MAX_DAYS, Math.max(LOG_MIN_DAYS, raw));
+  try { localStorage.setItem(LOG_DAYS_KEY, String(n)); } catch(e) {}
+  // Shortening the window takes effect immediately, not at the next event.
+  pruneSyncLog();
+  return n;
+}
+
+// Always an array, whatever is in storage. A corrupt log is a reason to start a
+// new one, never a reason to throw from a caller that was only saving a recipe.
+function readSyncLog() {
+  var raw;
+  try { raw = localStorage.getItem(LOG_KEY); } catch(e) { return []; }
+  if (!raw) return [];
+  var list;
+  try { list = JSON.parse(raw); } catch(e) { return []; }
+  if (!Array.isArray(list)) return [];
+  return list.filter(function(e){ return e && typeof e === 'object' && typeof e.at === 'number'; });
+}
+
+function writeSyncLog(list) {
+  try {
+    localStorage.setItem(LOG_KEY, JSON.stringify(list));
+    return true;
+  } catch(e) {
+    // Out of room. The log is the least important thing in this origin, so it is
+    // what gives way — halve it, and if even that fails, drop it entirely. What
+    // must NOT happen is this bubbling up into a recipe save.
+    try {
+      localStorage.setItem(LOG_KEY, JSON.stringify(list.slice(0, Math.floor(list.length / 2))));
+      return true;
+    } catch(e2) {
+      try { localStorage.removeItem(LOG_KEY); } catch(e3) {}
+      return false;
+    }
+  }
+}
+
+// Drop everything older than the retention window, and anything past the count
+// ceiling. Returns how many were removed so the UI can say so.
+function pruneSyncLog(now) {
+  var list = readSyncLog();
+  if (!list.length) return 0;
+  var cutoff = (typeof now === 'number' ? now : Date.now()) - logRetentionDays() * 86400000;
+  var kept = list.filter(function(e){ return e.at >= cutoff; });
+  if (kept.length > LOG_MAX_ENTRIES) kept = kept.slice(0, LOG_MAX_ENTRIES);
+  if (kept.length !== list.length) writeSyncLog(kept);
+  return list.length - kept.length;
+}
+
+// The recorder. Newest first, so the viewer and the cap agree on which end is
+// old without re-sorting.
+function syncLog(kind, message, data) {
+  if (!logEnabled()) return false;
+  try {
+    var entry = {
+      at: Date.now(),
+      k: LOG_KINDS.indexOf(kind) === -1 ? 'error' : kind,
+      m: String(message == null ? '' : message).slice(0, LOG_MSG_MAX)
+    };
+    if (data !== undefined && data !== null) {
+      entry.d = String(typeof data === 'string' ? data : JSON.stringify(data)).slice(0, LOG_MSG_MAX);
+    }
+    var list = readSyncLog();
+    list.unshift(entry);
+    var cutoff = entry.at - logRetentionDays() * 86400000;
+    list = list.filter(function(e){ return e.at >= cutoff; });
+    if (list.length > LOG_MAX_ENTRIES) list = list.slice(0, LOG_MAX_ENTRIES);
+    return writeSyncLog(list);
+  } catch(e) { return false; }   // logging must never be the thing that breaks
+}
+
+function purgeSyncLog() {
+  try { localStorage.removeItem(LOG_KEY); } catch(e) {}
+  return true;
+}
+
+function syncLogBytes() {
+  try { return (localStorage.getItem(LOG_KEY) || '').length; } catch(e) { return 0; }
+}
+
+window.logEnabled = logEnabled;            window.setLogEnabled = setLogEnabled;
+window.logRetentionDays = logRetentionDays; window.setLogRetentionDays = setLogRetentionDays;
+window.readSyncLog = readSyncLog;          window.pruneSyncLog = pruneSyncLog;
+window.syncLog = syncLog;                  window.purgeSyncLog = purgeSyncLog;
+window.syncLogBytes = syncLogBytes;
+window.LOG_MAX_ENTRIES = LOG_MAX_ENTRIES;  window.LOG_KINDS = LOG_KINDS;
+
+// ─── WHAT THE LOG MEANS ───────────────────────────────────────────────────────
+//
+// A list of events is not a diagnosis. This turns one into findings a person can
+// act on: what happened, why it matters, and what to do about it. Every finding
+// carries a fix, because a conclusion with no next step is just a nicer-looking
+// error message — and this app treats a dead end with no way forward as a bug.
+//
+// Pure function of (entries, now) so it can be driven by a test with a fixture
+// instead of by hoping the right thing goes wrong on someone's device.
+// Returns [{level:'bad'|'warn'|'ok', title, detail, fix}], worst first.
+function analyseSyncLog(list, now) {
+  list = Array.isArray(list) ? list : [];
+  now = typeof now === 'number' ? now : Date.now();
+  var out = [];
+  if (!list.length) {
+    return [{ level:'ok', title:'Nothing recorded yet',
+      detail:'The log is empty. Either logging was switched on only just now, or nothing that it watches has happened since.',
+      fix:'Leave it on and use the app normally — open it, edit a recipe, let it sync. Come back here afterwards.' }];
+  }
+
+  var by = {};
+  LOG_KINDS.forEach(function(k){ by[k] = []; });
+  list.forEach(function(e){ (by[e.k] || (by[e.k] = [])).push(e); });
+  var span = Math.max(1, Math.round((list[0].at - list[list.length-1].at) / 60000));
+
+  // Conflicts — the thing that started all this.
+  if (by.conflict.length) {
+    var names = {};
+    by.conflict.forEach(function(e){ var m=/"([^"]+)"/.exec(e.m); if(m) names[m[1]] = (names[m[1]]||0)+1; });
+    var which = Object.keys(names);
+    out.push({ level:'bad',
+      title: by.conflict.length + ' save' + (by.conflict.length===1?' was':'s were') + ' refused as edited elsewhere',
+      detail: 'Another device changed ' + (which.length ? which.map(function(n){ return '"'+n+'"'; }).join(', ')
+                                                       : 'a recipe')
+            + ' after this one last synced, so the write was refused rather than overwriting it. '
+            + 'Nothing was lost, but the two versions have to be reconciled.',
+      fix: 'Open the recipe. The red banner at the top has "↻ Take the other device’s version", which fetches that '
+         + 'one recipe on its own — your copy is kept in its 🕘 Version history so you can compare and restore it.' });
+  }
+
+  // A refusal that keeps repeating for the same recipe means the way out was never taken.
+  var repeats = {};
+  by.conflict.forEach(function(e){ var m=/"([^"]+)"/.exec(e.m); if(m) repeats[m[1]] = (repeats[m[1]]||0)+1; });
+  var stuck = Object.keys(repeats).filter(function(n){ return repeats[n] >= 3; });
+  if (stuck.length) {
+    out.push({ level:'bad', title:'The same recipe keeps being refused',
+      detail: stuck.map(function(n){ return '"'+n+'" ('+repeats[n]+' times)'; }).join(', ')
+            + ' — each save is being refused for the same reason, so the two versions were never reconciled.',
+      fix:'Take the cloud version once, from the banner in the recipe. Repeating the save cannot succeed on its own; '
+        + 'the refusal is not a transient error.' });
+  }
+
+  // Timeouts.
+  // The watchdog writes "timed out", not "timeout" — matching only the latter
+  // meant the analyser stayed silent on the exact event it was written for.
+  var timeouts = list.filter(function(e){ return /timed out|timeout|SYNC_TIMEOUT/i.test(e.m); });
+  if (timeouts.length) {
+    out.push({ level:'bad', title: timeouts.length + ' sync operation' + (timeouts.length===1?'':'s') + ' timed out',
+      detail:'A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, '
+           + 'but a repeated timeout on the same operation points at something bigger than the network.',
+      fix:'Check ⚙️ Settings → 📡 Sync Health. If the timeouts cluster on photo sync, the collection may be pushing '
+        + 'the per-document limit; if they are spread evenly, it is the connection.' });
+  }
+
+  // Errors.
+  if (by.error.length) {
+    var msgs = {};
+    by.error.forEach(function(e){ msgs[e.m] = (msgs[e.m]||0)+1; });
+    var top = Object.keys(msgs).sort(function(x,y){ return msgs[y]-msgs[x]; }).slice(0,3);
+    out.push({ level:'bad', title: by.error.length + ' error' + (by.error.length===1?'':'s') + ' recorded',
+      detail: top.map(function(m){ return '• ' + m + (msgs[m]>1 ? ' (×'+msgs[m]+')' : ''); }).join('\n'),
+      fix:'Copy this report and send it on. The exact wording is what identifies the cause; a summary usually is not.' });
+  }
+
+  // Saving but never loading, or the reverse.
+  if (by.save.length && !by.load.length) {
+    out.push({ level:'warn', title:'Saves without a load',
+      detail:'This device wrote to the cloud but never read from it in the logged period, so it may be working from a '
+           + 'stale copy of the collection.',
+      fix:'Reload the app once so it pulls the current collection down before making further changes.' });
+  }
+
+  // Photos.
+  var photoDiff = by.photo.filter(function(e){ return /differ|missing|not in the cloud/i.test(e.m); });
+  if (photoDiff.length) {
+    out.push({ level:'warn', title:'Photos are out of step with the cloud',
+      detail:'Photo sync reported local photos that the cloud does not have, or that differ from it. The cloud copy '
+           + 'wins on every load, so a photo that only exists here can be replaced by an older one.',
+      fix:'⚙️ Settings → ☁️ Send my photos to the cloud, which lists the differences and pushes the local ones up.' });
+  }
+
+  // Signed out.
+  var signedOut = by.auth.filter(function(e){ return /signed out|not signed in/i.test(e.m); });
+  if (signedOut.length && !by.save.length) {
+    out.push({ level:'warn', title:'Nothing was syncing',
+      detail:'The logged period was spent signed out, so changes stayed on this device only.',
+      fix:'Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.' });
+  }
+
+  if (!out.length) {
+    out.push({ level:'ok', title:'Nothing looks wrong',
+      detail: list.length + ' event' + (list.length===1?'':'s') + ' over about ' + span + ' minute'
+            + (span===1?'':'s') + ', with no refusals, timeouts or errors.',
+      fix:'Nothing to do. If you came here chasing a specific problem, reproduce it with logging on and look again — '
+        + 'the log only covers what happened after it was switched on.' });
+  }
+  var rank = { bad:0, warn:1, ok:2 };
+  return out.sort(function(x,y){ return rank[x.level] - rank[y.level]; });
+}
+window.analyseSyncLog = analyseSyncLog;
+
+// The Copy button's payload. Plain text on purpose: it gets pasted into a chat.
+function syncLogReportText() {
+  var list = readSyncLog();
+  var findings = analyseSyncLog(list);
+  var L = [];
+  L.push('TONY’S RECIPES — SYNC LOG REPORT');
+  L.push('App ' + (typeof APP_VERSION === 'string' ? APP_VERSION : '?')
+       + '  ·  ' + new Date().toISOString());
+  L.push('Logging ' + (logEnabled() ? 'ON' : 'OFF') + ', keeping ' + logRetentionDays() + ' day(s)'
+       + '  ·  ' + list.length + ' event(s), ' + Math.round(syncLogBytes()/1024) + ' KB');
+  try { L.push('Browser: ' + navigator.userAgent); } catch(e) {}
+  L.push('');
+  L.push('WHAT THIS LOOKS LIKE');
+  findings.forEach(function(f, i) {
+    L.push((i+1) + '. [' + f.level.toUpperCase() + '] ' + f.title);
+    String(f.detail).split('\n').forEach(function(d){ L.push('   ' + d); });
+    L.push('   → ' + f.fix);
+    L.push('');
+  });
+  L.push('EVENTS (newest first)');
+  if (!list.length) L.push('   (none)');
+  list.forEach(function(e) {
+    L.push('  ' + new Date(e.at).toISOString() + '  ' + (e.k + '        ').slice(0,9) + e.m
+         + (e.d ? '  ' + e.d : ''));
+  });
+  return L.join('\n');
+}
+window.syncLogReportText = syncLogReportText;
+
+// ─── THE PANEL ────────────────────────────────────────────────────────────────
+// One screen: the switch, the retention window, what the log means, the events
+// themselves, and the two buttons that matter. Debug mode moved in here too —
+// it is the same subject, and the Settings dropdown was already twelve items.
+var _logFilter = 'all';
+function showLoggingPanel() {
+  pruneSyncLog();              // opening it is exactly when stale entries should go
+  renderLoggingPanel();
+  document.getElementById('loggingOverlay').classList.add('open');
+}
+function setLogFilter(k) { _logFilter = k; renderLoggingPanel(); }
+
+function renderLoggingPanel() {
+  var host = document.getElementById('loggingBody');
+  if (!host) return;
+  var on = logEnabled();
+  var all = readSyncLog();
+  var list = _logFilter === 'all' ? all : all.filter(function(e){ return e.k === _logFilter; });
+  var findings = analyseSyncLog(all);
+  var COLOR = { bad:['#FEECEC','#F0B4B4','#B03030'], warn:['#FFF8E8','#E8D9A8','#7A5C00'], ok:['#EAF5E9','#B4D9B4','#1B5E20'] };
+
+  var h = '';
+
+  // 1 — the switch
+  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
+     + '<input type="checkbox" id="logEnabledBox"' + (on ? ' checked' : '')
+     + ' onchange="setLogEnabled(this.checked);renderLoggingPanel();" style="width:18px;height:18px;">'
+     + 'Record sync events on this device</label>'
+     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+     + 'Off by default. Records what sync did — loads, saves, refused writes, refreshes, photo sync, sign-in — '
+     + 'with recipe names and ids, never recipe contents. It stays on this device: it is never uploaded and '
+     + 'never goes into a backup.</div></div>';
+
+  // 2 — retention
+  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+     + '<span style="font-size:14px;font-weight:600;">Keep for</span>'
+     + '<input type="number" id="logDaysInput" min="' + LOG_MIN_DAYS + '" max="' + LOG_MAX_DAYS + '" value="' + logRetentionDays() + '"'
+     + ' onchange="applyLogRetention(this.value)" style="width:80px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;">'
+     + '<span style="font-size:14px;">days</span></div>'
+     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+     + 'Anything older is deleted automatically — when the app opens, when this panel opens, and as each new event '
+     + 'is recorded. There is no background timer, because one could not run while the app is closed. '
+     + 'A hard ceiling of ' + LOG_MAX_ENTRIES + ' entries applies as well, so a busy day cannot fill up storage.'
+     + '</div></div>';
+
+  // 3 — findings
+  h += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 6px;">What this looks like</div>';
+  findings.forEach(function(f) {
+    var c = COLOR[f.level] || COLOR.ok;
+    h += '<div style="background:' + c[0] + ';border:1px solid ' + c[1] + ';border-radius:10px;padding:11px 13px;margin-bottom:8px;">'
+       + '<div style="font-weight:700;font-size:13px;color:' + c[2] + ';margin-bottom:4px;">' + escH(f.title) + '</div>'
+       + '<div style="font-size:12.5px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">' + escH(f.detail) + '</div>'
+       + '<div style="font-size:12.5px;color:' + c[2] + ';line-height:1.6;margin-top:6px;"><strong>Try:</strong> ' + escH(f.fix) + '</div>'
+       + '</div>';
+  });
+
+  // 4 — the events
+  h += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 6px;">'
+     + 'Events (' + all.length + ', ' + Math.round(syncLogBytes()/1024) + ' KB)</div>';
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">';
+  ['all'].concat(LOG_KINDS).forEach(function(k) {
+    var n = k === 'all' ? all.length : all.filter(function(e){ return e.k === k; }).length;
+    if (k !== 'all' && !n) return;                       // don't offer an empty filter
+    h += '<button onclick="setLogFilter(&quot;' + k + '&quot;)" style="padding:5px 10px;border-radius:999px;font-size:11.5px;'
+       + 'font-family:inherit;cursor:pointer;border:1px solid var(--border);'
+       + (_logFilter === k ? 'background:var(--terracotta);color:#fff;font-weight:700;' : 'background:var(--card);color:var(--warm-brown);')
+       + '">' + k + ' (' + n + ')</button>';
+  });
+  h += '</div>';
+  if (!list.length) {
+    h += '<div style="font-size:13px;color:var(--muted);padding:10px 0;">'
+       + (on ? 'No events yet. Use the app and come back.' : 'Logging is off, so nothing is being recorded.')
+       + '</div>';
+  } else {
+    h += '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">';
+    list.forEach(function(e, i) {
+      h += '<div style="padding:8px 11px;font-size:12px;line-height:1.5;'
+         + (i ? 'border-top:1px solid var(--border);' : '') + '">'
+         + '<div style="color:var(--muted);font-size:11px;">' + escH(new Date(e.at).toLocaleString())
+         + ' · ' + escH(e.k) + '</div>'
+         + '<div dir="auto" style="color:var(--ink);">' + escH(e.m) + '</div>'
+         + (e.d ? '<div style="color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all;">' + escH(e.d) + '</div>' : '')
+         + '</div>';
+    });
+    h += '</div>';
+  }
+
+  // 5 — the buttons
+  h += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
+     + '<button onclick="copySyncLogReport()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Copy report</button>'
+     + '<button onclick="purgeSyncLogUI()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--card-bg);color:#B03030;border:1px solid #F0B4B4;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🗑 Purge logs</button>'
+     + '</div>'
+     + '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;">'
+     + 'The report is plain text: the findings above plus every event. Nobody but you can read this log — '
+     + 'it never leaves the device on its own — so paste it into the chat if you want it looked at.</div>';
+
+  // 6 — debug mode, which lives here now
+  h += '<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;">'
+     + '<button class="drop-item" id="debugModeItem" onclick="toggleDebugMode();updateDebugMenuLabel();"'
+     + ' style="width:100%;text-align:start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;'
+     + 'background:var(--card);font-family:inherit;font-size:13.5px;cursor:pointer;">🐞 Debug mode: '
+     + (typeof _debugMode !== 'undefined' && _debugMode ? 'On' : 'Off') + '</button>'
+     + '<div style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+     + 'Separate from the log above: this prints verbose tracing to the browser console while you watch, '
+     + 'and stores nothing.</div></div>';
+
+  host.innerHTML = h;
+}
+
+function applyLogRetention(v) {
+  var n = setLogRetentionDays(v);
+  toast('🪵 Keeping ' + n + ' day' + (n === 1 ? '' : 's') + ' of log');
+  renderLoggingPanel();
+}
+
+function copySyncLogReport() {
+  var text = syncLogReportText();
+  navigator.clipboard.writeText(text)
+    .then(function(){ toast('📋 Log report copied — paste it into the chat'); })
+    .catch(function(){
+      // Never claim a copy that did not happen; show it to be selected by hand.
+      showServiceError('Could not reach the clipboard. Here it is to copy manually:\n\n' + text);
+    });
+}
+
+async function purgeSyncLogUI() {
+  var n = readSyncLog().length;
+  if (!n) { toast('Nothing to purge — the log is already empty'); return; }
+  if (!await askConfirm({ icon:'🗑', title:'Delete ' + n + ' log entr' + (n === 1 ? 'y' : 'ies') + '?',
+      message:'This clears the whole log on this device immediately. It changes nothing about your recipes, '
+            + 'and logging stays ' + (logEnabled() ? 'on' : 'off') + '.',
+      okLabel:'Delete the log', danger:true })) return;
+  purgeSyncLog();
+  toast('🗑 Log purged');
+  renderLoggingPanel();
+}
+
+window.showLoggingPanel = showLoggingPanel;
+window.renderLoggingPanel = renderLoggingPanel;
+window.setLogFilter = setLogFilter;
+window.applyLogRetention = applyLogRetention;
+window.copySyncLogReport = copySyncLogReport;
+window.purgeSyncLogUI = purgeSyncLogUI;
 
 // ─── THEME / DARK MODE (4.6) ─────────────────────────────────────────────────
 // Three settings: 'light' | 'dark' | 'auto' (follow the operating system).
@@ -3185,6 +3618,222 @@ const SELF_TESTS = [
         clearRecipeConflict(testId);
         recipes=recipes.filter(function(x){ return x.id!==testId; });
         var ov=document.getElementById('serviceErrorOverlay'); if(ov) ov.remove();
+      }
+    } },
+
+  { id:'log_off_by_default_and_bounded', group:'Features', name:'The sync log is off by default and bounded twice (v35.4)',
+    test: async()=>{
+      ['logEnabled','setLogEnabled','logRetentionDays','setLogRetentionDays','readSyncLog',
+       'pruneSyncLog','syncLog','purgeSyncLog','analyseSyncLog','syncLogReportText']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var kOn=null,kDays=null,kLog=null;
+      try{ kOn=localStorage.getItem('tonys_log_enabled'); kDays=localStorage.getItem('tonys_log_days');
+           kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      try{
+        // OFF is the default, and off means nothing is written at all — not
+        // "written and hidden". A log that collects while switched off is the
+        // opposite of what an opt-in switch promises.
+        localStorage.removeItem('tonys_log_enabled');
+        purgeSyncLog();
+        if(logEnabled()) throw new Error('logging reports enabled with no setting stored');
+        if(syncLog('save','should not be recorded')!==false)
+          throw new Error('syncLog claimed to record while switched off');
+        if(readSyncLog().length) throw new Error('an event was recorded while logging was off');
+        if(localStorage.getItem('tonys_sync_log')!==null)
+          throw new Error('the log key was created while logging was off');
+
+        // Default retention, and clamping rather than trusting the input.
+        localStorage.removeItem('tonys_log_days');
+        if(logRetentionDays()!==7) throw new Error('default retention is '+logRetentionDays()+', expected 7');
+        if(setLogRetentionDays(0)!==1) throw new Error('0 days was not clamped to the minimum');
+        if(setLogRetentionDays(9999)!==365) throw new Error('9999 days was not clamped to the maximum');
+        if(setLogRetentionDays('rubbish')!==7) throw new Error('a non-number did not fall back to the default');
+
+        setLogEnabled(true);
+        purgeSyncLog();
+        if(!logEnabled()) throw new Error('logging did not stay enabled');
+        syncLog('save','one');
+        if(readSyncLog().length!==1) throw new Error('an event was not recorded while switched on');
+        if(readSyncLog()[0].k!=='save') throw new Error('the kind was not stored');
+
+        // Newest first — the viewer and the count cap both assume it.
+        syncLog('load','two');
+        var l=readSyncLog();
+        if(l[0].m!=='two') throw new Error('the log is not newest-first');
+
+        // Bound 1: age. An entry older than the window goes, and pruning is what
+        // the "automatic cleanup" claim rests on.
+        setLogRetentionDays(1);
+        var old=readSyncLog();
+        old.push({at: Date.now()-3*86400000, k:'save', m:'ancient'});
+        localStorage.setItem('tonys_sync_log', JSON.stringify(old));
+        var dropped=pruneSyncLog();
+        if(dropped!==1) throw new Error('pruning dropped '+dropped+' entries, expected 1');
+        if(readSyncLog().some(function(e){ return e.m==='ancient'; }))
+          throw new Error('an entry past the retention window survived the prune');
+
+        // ...and the write path applies the window too, not just an explicit
+        // prune. Between prunes every new event is what keeps the log trimmed,
+        // and a mutation that removed that filter survived on this gap.
+        purgeSyncLog();
+        setLogRetentionDays(1);
+        localStorage.setItem('tonys_sync_log', JSON.stringify([
+          { at: Date.now()-5*86400000, k:'save', m:'five days old' }]));
+        syncLog('save','a fresh event');           // no pruneSyncLog() call here
+        var afterWrite=readSyncLog();
+        if(afterWrite.some(function(e){ return e.m==='five days old'; }))
+          throw new Error('recording an event did not drop entries past the retention window');
+        if(afterWrite.length!==1) throw new Error('expected only the fresh event, got '+afterWrite.length);
+
+        // Bound 2: count. Age alone lets a busy afternoon fill localStorage.
+        purgeSyncLog();
+        setLogRetentionDays(365);
+        for(var i=0;i<LOG_MAX_ENTRIES+25;i++) syncLog('save','entry '+i);
+        if(readSyncLog().length!==LOG_MAX_ENTRIES)
+          throw new Error('the log grew to '+readSyncLog().length+', past the '+LOG_MAX_ENTRIES+' ceiling');
+        if(readSyncLog()[0].m!=='entry '+(LOG_MAX_ENTRIES+24))
+          throw new Error('the ceiling dropped the newest entries instead of the oldest');
+
+        // Corrupt storage is a reason to start again, never a reason to throw
+        // into a caller that was only trying to save a recipe.
+        localStorage.setItem('tonys_sync_log','{not json');
+        if(!Array.isArray(readSyncLog()) || readSyncLog().length)
+          throw new Error('a corrupt log did not read as empty');
+        localStorage.setItem('tonys_sync_log','{"not":"an array"}');
+        // `.length` on an object is undefined, so checking only that is not a
+        // check — a mutation returning the object untouched survived on it.
+        if(!Array.isArray(readSyncLog()))
+          throw new Error('a non-array log was handed back as-is instead of an empty array');
+        if(readSyncLog().length) throw new Error('a non-array log did not read as empty');
+        // Junk entries inside a valid array must not reach the viewer either.
+        localStorage.setItem('tonys_sync_log', JSON.stringify(
+          [{at:Date.now(),k:'save',m:'good'}, null, 'nonsense', {k:'save',m:'no timestamp'}]));
+        var cleaned=readSyncLog();
+        if(cleaned.length!==1 || cleaned[0].m!=='good')
+          throw new Error('malformed entries were not filtered out: '+JSON.stringify(cleaned));
+        if(syncLog('save','after corruption')===undefined)
+          throw new Error('syncLog threw after finding a corrupt log');
+
+        // An unwritable store must not break the caller either.
+        var realSet=localStorage.setItem;
+        try{
+          localStorage.setItem=function(){ throw new Error('QuotaExceededError'); };
+          var res=syncLog('save','while full');
+          if(res!==false) throw new Error('syncLog reported success when storage refused the write');
+        } finally { localStorage.setItem=realSet; }
+
+        purgeSyncLog();
+        if(readSyncLog().length) throw new Error('purge did not empty the log');
+      } finally {
+        try{
+          if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
+          if(kDays===null) localStorage.removeItem('tonys_log_days'); else localStorage.setItem('tonys_log_days',kDays);
+          if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',kLog);
+        }catch(e){}
+      }
+    } },
+
+  { id:'log_says_what_it_means', group:'Features', name:'The log viewer draws conclusions and proposes fixes (v35.4)',
+    test: async()=>{
+      var now=Date.now();
+      // Empty is its own answer, not a blank screen.
+      var none=analyseSyncLog([], now);
+      if(none.length!==1 || !/nothing recorded/i.test(none[0].title))
+        throw new Error('an empty log produced '+JSON.stringify(none.map(function(f){return f.title;})));
+      if(!none[0].fix) throw new Error('even the empty case must say what to do next');
+
+      // The case this whole feature exists for.
+      var conflicts=[];
+      for(var i=0;i<4;i++) conflicts.push({at:now-i*1000, k:'conflict',
+        m:'Save refused for "Chocolate Cake" — changed on another device'});
+      var f=analyseSyncLog(conflicts, now);
+      if(f[0].level!=='bad') throw new Error('repeated refusals were not ranked worst-first');
+      var titles=f.map(function(x){ return x.title; }).join(' | ');
+      if(!/refused/i.test(titles)) throw new Error('no finding mentions the refusals: '+titles);
+      if(!/keeps being refused/i.test(titles))
+        throw new Error('four refusals of the same recipe were not called out as stuck: '+titles);
+      f.forEach(function(x){
+        if(!x.fix) throw new Error('finding "'+x.title+'" has no proposed fix');
+        if(!x.detail) throw new Error('finding "'+x.title+'" has no detail');
+      });
+      if(!/Version history/i.test(f.map(function(x){return x.fix;}).join(' ')))
+        throw new Error('the conflict fix does not point at the way out that exists');
+
+      // A healthy log must not invent problems.
+      var fine=analyseSyncLog([{at:now,k:'load',m:'Read 44 recipe(s) from the cloud'},
+                               {at:now-60000,k:'save',m:'Wrote "Soup"'}], now);
+      if(fine.some(function(x){ return x.level==='bad'; }))
+        throw new Error('a clean log produced a "bad" finding: '+JSON.stringify(fine.map(function(x){return x.title;})));
+
+      // Timeouts and errors each get their own finding.
+      var t=analyseSyncLog([{at:now,k:'error',m:'Cloud read timed out after 45s'}], now);
+      if(!/timed out/i.test(t.map(function(x){return x.title;}).join(' ')))
+        throw new Error('a timeout produced no finding of its own');
+
+      // The report is what reaches a human — it must carry both halves.
+      var kOn=null,kLog=null;
+      try{ kOn=localStorage.getItem('tonys_log_enabled'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      try{
+        setLogEnabled(true); purgeSyncLog();
+        syncLog('conflict','Save refused for "Soup" — changed on another device');
+        var txt=syncLogReportText();
+        if(txt.indexOf('WHAT THIS LOOKS LIKE')===-1) throw new Error('the report has no findings section');
+        if(txt.indexOf('EVENTS')===-1) throw new Error('the report has no events section');
+        if(txt.indexOf('Soup')===-1) throw new Error('the report does not contain the event it was built from');
+        if(txt.indexOf('→')===-1) throw new Error('the report carries no proposed fix');
+        if(typeof APP_VERSION==='string' && txt.indexOf(APP_VERSION)===-1)
+          throw new Error('the report does not say which version produced it');
+      } finally {
+        try{
+          if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
+          if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',kLog);
+        }catch(e){}
+      }
+    } },
+
+  { id:'log_panel_controls', group:'UI', name:'Logging & debugging panel has all five controls (v35.4)',
+    test: async()=>{
+      ['showLoggingPanel','renderLoggingPanel','copySyncLogReport','purgeSyncLogUI','applyLogRetention']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('loggingOverlay')) throw new Error('#loggingOverlay missing');
+      // The way in: three in-app messages point at ⚙️ Settings, so it has to be there.
+      var drop=document.getElementById('settingsDrop');
+      if(!drop || drop.innerHTML.indexOf('showLoggingPanel()')===-1)
+        throw new Error('no ⚙️ Settings entry opens the logging panel');
+
+      var kOn=null,kLog=null;
+      try{ kOn=localStorage.getItem('tonys_log_enabled'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      try{
+        setLogEnabled(true); purgeSyncLog();
+        // A recipe name reaches the log and then the panel. Names are user data
+        // and can contain anything; the panel must render it as text.
+        syncLog('conflict','Save refused for "<img src=x onerror=alert(1)>" — changed on another device');
+        renderLoggingPanel();
+        var body=document.getElementById('loggingBody');
+        if(!body || !body.innerHTML) throw new Error('the panel rendered nothing');
+        if(body.querySelector('img[src="x"]'))
+          throw new Error('a recipe name from the log was rendered as live HTML');
+
+        if(!body.querySelector('#logEnabledBox')) throw new Error('no enable/disable switch');
+        if(!body.querySelector('#logEnabledBox').checked) throw new Error('the switch does not reflect the stored setting');
+        var days=body.querySelector('#logDaysInput');
+        if(!days) throw new Error('no retention setting');
+        if(String(days.value)!==String(logRetentionDays())) throw new Error('the retention field shows the wrong value');
+        var html=body.innerHTML;
+        if(html.indexOf('copySyncLogReport()')===-1) throw new Error('no Copy report button');
+        if(html.indexOf('purgeSyncLogUI()')===-1) throw new Error('no Purge logs button');
+        if(html.indexOf('setLogFilter(')===-1) throw new Error('no filter controls in the viewer');
+        if(html.indexOf('What this looks like')===-1) throw new Error('the panel shows no analysis');
+        if(html.indexOf('debugModeItem')===-1) throw new Error('debug mode did not move into this panel');
+        // The findings must be visible, not just computed.
+        if(html.indexOf('Try:')===-1) throw new Error('the findings are shown without their proposed fixes');
+      } finally {
+        try{
+          if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
+          if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',kLog);
+        }catch(e){}
+        var ov=document.getElementById('loggingOverlay'); if(ov) ov.classList.remove('open');
       }
     } },
 
@@ -8686,7 +9335,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.3';
+var APP_VERSION = 'v35.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9238,6 +9887,9 @@ var _recentErrors = [];
 function recordError(kind, message, where) {
   _recentErrors.push({ at: new Date().toISOString(), kind: kind,
                        message: String(message || '(no message)'), where: where || '' });
+  // The in-memory buffer dies with the tab; the log survives it, so an error
+  // that only happens once a week is still there when someone comes looking.
+  try { syncLog('error', String(message || '(no message)'), where || undefined); } catch(e) {}
   if (_recentErrors.length > 20) _recentErrors.shift();   // ring buffer, newest kept
 }
 window.recentErrors = function(){ return _recentErrors.slice(); };
@@ -10979,7 +11631,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11009,7 +11661,7 @@ body.banner-shown .header {
           <button class="drop-item" id="healCloudPhotosItem" onclick="closeDrop('settingsDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
           <button class="drop-item" id="photoRescueItem" onclick="closeDrop('settingsDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
           <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
-          <button class="drop-item" id="debugModeItem" onclick="closeDrop('settingsDrop');toggleDebugMode()">🐞 Debug mode: Off</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
@@ -11561,7 +12213,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16854,6 +17506,9 @@ async function syncCloudPhotos() {
       delete _cloudPhotoStamps[goneIds[g]];
     } catch(e) { _photoDeleteRefused[goneIds[g]] = true; }
   }
+  if (errors.length) syncLog('photo', errors.length + ' photo(s) could not be synced', errors.slice(0, 5).join('; '));
+  var refusedCount = Object.keys(_photoDeleteRefused).length;
+  if (refusedCount) syncLog('photo', refusedCount + ' orphaned photo document(s) could not be deleted — delete is admin-only');
   return errors;
 }
 // Photo documents this device tried and failed to delete — almost always the
@@ -17348,6 +18003,7 @@ async function saveRecipeDoc(r, db) {
   });
   if (refused) return { id: r.id, skipped: 'conflict' };
   r.updatedAt             = stamped;   // keep local and cloud in lockstep
+  syncLog('save', 'Wrote "' + (r.name || ('#'+r.id)) + '"', { id: r.id, at: stamped, bytes: bytes });
   clearRecipeConflict(r.id);           // a write that lands ends the conflict
   _cloudRecipeBase[r.id]  = stamped;
   _cloudRecipeStamp[r.id] = hashStr(json);
@@ -17479,6 +18135,8 @@ function parseCloudRecipeDocs(docs) {
   // conflict — this is why restarting the app cleared it before there was any
   // other way out.
   clearAllRecipeConflicts();
+  syncLog('load', 'Read ' + list.length + ' recipe(s) from the cloud',
+          { docs: docs.length, unreadable: Object.keys(_cloudUnreadable).length });
   saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
   return list;
 }
@@ -17519,7 +18177,10 @@ async function refreshRecipeFromCloud(id) {
 
   var snap;
   try { snap = await _fbDb.collection('shared').doc(recipeDocId(id)).get(); }
-  catch(e) { return { ok:false, reason:'read-failed', error:(e && e.message) || String(e) }; }
+  catch(e) {
+    syncLog('error', 'Refresh of #' + id + ' could not read the cloud: ' + ((e && e.message) || e));
+    return { ok:false, reason:'read-failed', error:(e && e.message) || String(e) };
+  }
   // A read that failed and a document that is not there are different answers,
   // and only one of them means "the other device deleted it".
   if (!snap || !snap.exists) return { ok:false, reason:'not-in-cloud' };
@@ -17554,6 +18215,8 @@ async function refreshRecipeFromCloud(id) {
   _cloudRecipeIds[id]   = true;
   delete _cloudUnreadable[id];
   clearRecipeConflict(id);
+  syncLog('refresh', 'Took the cloud version of "' + (local.name || ('#'+id)) + '"',
+          { id: id, at: d.updatedAt || null });
   saveCloudBase();
   saveData();
   if (typeof renderGrid === 'function') renderGrid();
@@ -17694,7 +18357,9 @@ async function saveToFirestore() {
       var dr = recipes.find(function(x) { return x.id === dirty[di]; });
       if (!dr) continue;
       var res = await saveRecipeDoc(dr);
-      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id); }
+      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id);
+        syncLog('conflict', 'Save refused for "' + (dr.name || ('#'+dr.id)) + '" — changed on another device',
+                { id: dr.id, base: _cloudRecipeBase[dr.id], mine: dr.updatedAt || 0 }); }
       else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
     }
 
@@ -22127,6 +22792,13 @@ function updateFilterBarTop() {
   initViewMode();
   applyTheme();          // re-run now the Settings menu exists, to label it
   updateDebugMenuLabel();
+  // Automatic cleanup, such as it can be: entries past the retention window go
+  // when the app opens. There is no background timer because one cannot run
+  // while the app is closed, so it would buy nothing this does not.
+  try {
+    var _dropped = pruneSyncLog();
+    if (_dropped) dlog('[log] pruned ' + _dropped + ' expired entr(y/ies)');
+  } catch(e) {}
   applyAriaLabels();
   initWhatsAppSources();
   renderFilters();
@@ -22227,6 +22899,21 @@ function updateFilterBarTop() {
         <button onclick="renderSyncHealth()" style="flex:1;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">↻ Refresh</button>
         <button onclick="copySyncHealth()" style="flex:1;padding:11px 18px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="loggingOverlay" onclick="bgClose(event,'loggingOverlay')">
+  <div class="modal" style="max-width:560px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('loggingOverlay')" aria-label="Close" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">🪵 Logging &amp; debugging</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">A record of what sync did, kept on this device only</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 20px;">
+      <div id="loggingBody"></div>
     </div>
   </div>
 </div>
