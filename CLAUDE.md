@@ -10,7 +10,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~22 200 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~22 250 lines,
   no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v35.0: 195 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v35.1: 198 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -589,6 +589,37 @@ found only because a test was written first and disagreed with the code.
     -- local-save-helper.py` finds the removal, and `git show <commit>^:local-save-helper.py`
     prints it. `setup-save-helper.sh` went with it. `sec_no_local_save_helper` fails if any
     of it returns, including the `connect-src` loopback exception.
+- **Word treats Hebrew as a "complex script", and LibreOffice does not care (v35.1).**
+  Tony reported the export dropping a letter and the apostrophe from
+  `צ'ילי קון קרנה`. The document XML was provably intact — the apostrophe was
+  right there — and the renderer used to check it showed the name correctly. The
+  fault was that `makeDocxBlob` declared **no `w:rFonts` at all**. Word picks the
+  font for Hebrew from the **`w:cs` (complex-script)** slot, not `w:ascii`/`w:hAnsi`,
+  and with it empty it chooses per machine — so the same file renders with missing
+  glyphs on one box and perfectly on another. `w:szCs` is the same story for size.
+  Hebrew paragraphs also need `<w:bidi/>` and their runs `<w:rtl/>` or Word lays
+  them out left-to-right.
+  - **A LibreOffice render is not evidence that Word is happy.** It guesses fonts
+    and direction far more forgivingly. `libreoffice --headless --convert-to pdf`
+    plus `pdftoppm` is still the fastest way to see an export (both are installed
+    now; Writer is a separate package from the `libreoffice` binary), but it will
+    not reproduce a Word-only complex-script fault. Say which renderer a result
+    came from.
+  - **OOXML property order is a schema sequence, not a suggestion.** `w:pStyle`
+    first in `w:pPr`; `w:bidi` after `w:pBdr` and before `w:spacing`/`w:jc`;
+    `w:rtl` last in `w:rPr`. The Title style had `w:jc` before `w:pStyle` for
+    several releases.
+  - **A DOCX image needs four things or Word refuses the whole file**: the
+    `word/media/*` part, a `<Default Extension=…>` in `[Content_Types].xml`, an
+    image relationship, and an `r:embed` naming it. A missing Default is not a
+    missing image — it is an unopenable document. Image relationship ids start at
+    2000 to stay clear of the hyperlink ids, which start at 10.
+  - **`<wp:inline>`, never `<wp:anchor>`.** Inline gives the picture its own line
+    box so it cannot be drawn over the text; anchored floats it across whatever is
+    underneath.
+  - **JPEG stores height before width** in the SOF marker. `imagePixelSize` reads
+    it from the bytes because `makeDocxBlob` is synchronous and `new Image()` is
+    not available; getting the order wrong rotates every landscape photo silently.
 
 ## Outstanding
 

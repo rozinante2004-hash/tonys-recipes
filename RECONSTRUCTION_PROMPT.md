@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v35.0` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v35.1` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -52,10 +52,10 @@ slide‑up modal animation.
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~22,050 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~22,250 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v35.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v35.1"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1170,7 +1170,30 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   there is a test pinning this. Only Firebase compat 10.12.0 and GSI are in `<head>`.
 - **Word** (`.docx`): **built by hand** as an OOXML zip — `makeDocxBlob` + a tiny `buildZip`
   (store‑only, CRC32) — no library for export. Import `.docx` via **mammoth** 1.6.0 CDN
-  (`parseWordText`).
+  (`parseWordText`). Three things here are load‑bearing and were all wrong before **v35.1**:
+  - **Photos are embedded for real**, not noted. `dataUrlToBytes` decodes the data URL and
+    `imagePixelSize` reads the intrinsic size straight out of the JPEG SOF marker or PNG IHDR —
+    `makeDocxBlob` is synchronous, so `new Image()` is not available, and `<wp:extent>` must carry
+    real dimensions or Word draws the photo to a guessed box. **JPEG stores height before width**;
+    getting that backwards silently rotates every landscape photo. A package needs all four of:
+    the `word/media/*` part, a `<Default Extension=…>` in `[Content_Types].xml` (missing one makes
+    Word reject the *whole file*, not just the image), an image relationship, and a matching
+    `r:embed`. Image relationship ids start at **2000** so they cannot collide with the hyperlink
+    ids, which start at 10 and grow with the number of recipes carrying a source.
+  - **The picture is `<wp:inline>`, never `<wp:anchor>`.** Inline gives it a line box of its own, so
+    it can never be drawn on top of the text. Anchored is how photos end up printed across the
+    ingredients.
+  - **Hebrew is a complex script to Word.** Every style declares `w:rFonts` with a **`w:cs`** slot
+    (Arial — on Windows, macOS and Word Online, and it covers Hebrew and Cyrillic); Word picks the
+    Hebrew font from `w:cs`, not `w:ascii`, and with the slot empty it chooses per machine, which
+    renders names with missing glyphs on one box and correctly on another. Every `w:sz` needs its
+    `w:szCs` twin for the same reason. Hebrew paragraphs also get `<w:bidi/>` and their runs
+    `<w:rtl/>`; without them Word lays Hebrew out left‑to‑right. **LibreOffice guesses all of this
+    far more forgivingly than Word**, so a LibreOffice render is not evidence that Word is happy.
+  - OOXML property order is a **schema sequence, not a suggestion**: `w:pStyle` first in `w:pPr`,
+    `w:bidi` after `w:pBdr` and before `w:spacing`/`w:jc`, and `w:rtl` last in `w:rPr`.
+  - `buildZip` values may be a string **or a `Uint8Array`**. Running image bytes through
+    `TextEncoder` mangles everything above 0x7F and yields a broken‑image placeholder.
 - **PDF/HTML/TXT** import supported by `importFromFile` (accept
   `.xlsx,.xls,.docx,.doc,.pdf,.html,.htm,.txt`), plus a **drag‑and‑drop** zone (`handleFileDrop`)
   and the native **File System Access API** picker (`importViaFilePicker`) as an option.

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.0 -->
+<!-- Tony's Recipes Collection v35.1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5677,6 +5677,154 @@ const SELF_TESTS = [
       var buf=new Uint8Array(await blob.arrayBuffer());
       if(buf[0]!==0x50||buf[1]!==0x4B) throw new Error('DOCX is not a valid ZIP — missing PK signature');
     } },
+  { id:'export_docx_photo_embedded', group:'Import/Export', name:'The Word export embeds the photo itself (v35.1)',
+    test: async()=>{
+      // Until v35.1 this wrote "[📸 Recipe photo included — see app for full
+      // image]" and shipped no image at all — the placeholder Tony was seeing.
+      // Everything below reads the ZIP that was actually produced, because the
+      // failure mode is a package Word rejects, not source text that looks wrong.
+
+      // Our writer stores every entry uncompressed, so a tiny reader is enough
+      // and it doubles as a check that the local headers are well formed.
+      function unzip(bytes){
+        var out={}, i=0, dv=new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        while(i+30<=bytes.length && dv.getUint32(i,true)===0x04034b50){
+          var comp=dv.getUint16(i+8,true), size=dv.getUint32(i+18,true),
+              nlen=dv.getUint16(i+26,true), elen=dv.getUint16(i+28,true);
+          if(comp!==0) throw new Error('entry is compressed; the reader assumes store method');
+          var name=new TextDecoder().decode(bytes.subarray(i+30, i+30+nlen));
+          out[name]=bytes.subarray(i+30+nlen+elen, i+30+nlen+elen+size);
+          i += 30+nlen+elen+size;
+        }
+        return out;
+      }
+      var text=function(b){ return b?new TextDecoder().decode(b):''; };
+
+      // A real 40x20 PNG (2:1) — a deliberately non-square ratio, so a swapped
+      // width/height or a hard-coded box shows up as a wrong aspect below.
+      var cv=document.createElement('canvas'); cv.width=40; cv.height=20;
+      var cx2=cv.getContext('2d'); cx2.fillStyle='#C1440E'; cx2.fillRect(0,0,40,20);
+      var pngUrl=cv.toDataURL('image/png');
+
+      var withPhoto={emoji:'🥘',name:'Photo Test',category:'Dinner',difficulty:'Easy',
+        prep:'5',servings:'2',ingredients:[{a:'1',n:'egg'}],steps:['Cook'],
+        photo:pngUrl,notes:'',diets:[],source:''};
+      var z=unzip(new Uint8Array(await makeDocxBlob([withPhoto]).arrayBuffer()));
+
+      var media=Object.keys(z).filter(function(n){ return n.indexOf('word/media/')===0; });
+      if(media.length!==1) throw new Error('expected one image part, got '+media.length+': '+media.join(','));
+      var img=z[media[0]];
+      if(!(img[0]===0x89 && img[1]===0x50 && img[2]===0x4E && img[3]===0x47))
+        throw new Error('the stored image is not PNG bytes — it was run through a text encoder');
+
+      var doc=text(z['word/document.xml']);
+      if(doc.indexOf('see app for full image')!==-1)
+        throw new Error('the placeholder note is still being written instead of the photo');
+      if(doc.indexOf('<w:drawing>')===-1) throw new Error('no <w:drawing> in the document');
+      if(doc.indexOf('<wp:anchor')!==-1)
+        throw new Error('the picture is anchored/floating, so it can be drawn on top of the text');
+      if(doc.indexOf('<wp:inline')===-1)
+        throw new Error('the picture is not inline, so it does not get a line box of its own');
+
+      // The r:embed must resolve to a relationship pointing at the part we stored.
+      var embed=/r:embed="([^"]+)"/.exec(doc);
+      if(!embed) throw new Error('the drawing has no r:embed relationship id');
+      var rels=text(z['word/_rels/document.xml.rels']);
+      var rel=new RegExp('Id="'+embed[1]+'"[^>]*Target="([^"]+)"').exec(rels);
+      if(!rel) throw new Error('r:embed '+embed[1]+' has no matching relationship — Word shows a broken image');
+      if('word/'+rel[1]!==media[0])
+        throw new Error('the relationship points at '+rel[1]+' but the stored part is '+media[0]);
+      // ...and a part whose extension has no Default is an invalid package.
+      if(text(z['[Content_Types].xml']).indexOf('Extension="png"')===-1)
+        throw new Error('[Content_Types].xml does not declare png, so Word rejects the whole file');
+
+      // Aspect ratio preserved: the source is 2:1, so cx must be twice cy.
+      var ext=/<wp:extent cx="(\d+)" cy="(\d+)"\/>/.exec(doc);
+      if(!ext) throw new Error('no <wp:extent> — Word has no size to draw');
+      var cx=+ext[1], cy=+ext[2];
+      if(Math.abs((cx/cy) - 2) > 0.02)
+        throw new Error('aspect ratio not preserved: cx/cy is '+(cx/cy).toFixed(3)+', expected 2');
+      if(cx > 4.5*914400 + 1 || cy > 4*914400 + 1)
+        throw new Error('the picture exceeds the page box: '+cx+'x'+cy+' EMU');
+
+      // No photo: no image part, and no drawing.
+      var noPhoto=Object.assign({}, withPhoto, {photo:''});
+      var z2=unzip(new Uint8Array(await makeDocxBlob([noPhoto]).arrayBuffer()));
+      if(Object.keys(z2).some(function(n){ return n.indexOf('word/media/')===0; }))
+        throw new Error('a recipe with no photo still produced an image part');
+      if(text(z2['word/document.xml']).indexOf('<w:drawing>')!==-1)
+        throw new Error('a recipe with no photo still produced a drawing');
+    } },
+
+  { id:'export_docx_image_size', group:'Import/Export', name:'Image dimensions are read from the bytes, not guessed (v35.1)',
+    test: async()=>{
+      ['imagePixelSize','dataUrlToBytes'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // Non-square on purpose: JPEG stores height BEFORE width, which is the
+      // easy mistake, and it would silently rotate every landscape photo.
+      var cv=document.createElement('canvas'); cv.width=64; cv.height=16;
+      var g=cv.getContext('2d'); g.fillStyle='#123456'; g.fillRect(0,0,64,16);
+      [['image/png',1],['image/jpeg',0.9]].forEach(function(pair){
+        var url=cv.toDataURL(pair[0], pair[1]);
+        var got=dataUrlToBytes(url);
+        if(!got) throw new Error(pair[0]+' data URL was not decoded');
+        var size=imagePixelSize(got.bytes);
+        if(!size) throw new Error('could not read the size of a '+pair[0]);
+        if(size.w!==64 || size.h!==16)
+          throw new Error(pair[0]+' read as '+size.w+'x'+size.h+', expected 64x16');
+      });
+      // Things that are not embeddable must say so rather than produce junk.
+      if(dataUrlToBytes('https://example.com/photo.jpg')!==null)
+        throw new Error('an http photo URL was treated as embeddable, but it cannot be fetched synchronously');
+      if(dataUrlToBytes('data:image/jpeg;base64,!!!not base64!!!')!==null)
+        throw new Error('a malformed data URL was accepted and would corrupt the ZIP');
+      if(imagePixelSize(new Uint8Array([1,2,3]))!==null)
+        throw new Error('garbage bytes returned a size instead of null');
+    } },
+
+  { id:'export_docx_hebrew_bidi', group:'Import/Export', name:'Hebrew in the Word export is marked RTL and given a font (v35.1)',
+    test: async()=>{
+      function unzip(bytes){
+        var out={}, i=0, dv=new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        while(i+30<=bytes.length && dv.getUint32(i,true)===0x04034b50){
+          var size=dv.getUint32(i+18,true), nlen=dv.getUint16(i+26,true), elen=dv.getUint16(i+28,true);
+          out[new TextDecoder().decode(bytes.subarray(i+30,i+30+nlen))] =
+            bytes.subarray(i+30+nlen+elen, i+30+nlen+elen+size);
+          i += 30+nlen+elen+size;
+        }
+        return out;
+      }
+      var text=function(b){ return b?new TextDecoder().decode(b):''; };
+      var base={emoji:'🥘',category:'Dinner',difficulty:'Easy',prep:'5',servings:'2',
+                photo:'',diets:[],source:''};
+
+      var he=Object.assign({},base,{ name:"צ'ילי קון קרנה",
+        ingredients:[{a:'1',n:'בצל בגודל בינוני'}], steps:['מטגנים את הבצל'], notes:'טעים יותר למחרת' });
+      var z=unzip(new Uint8Array(await makeDocxBlob([he]).arrayBuffer()));
+      var doc=text(z['word/document.xml']);
+
+      // The apostrophe must survive intact — it is not escaped and must not be.
+      if(doc.indexOf("צ'ילי קון קרנה")===-1)
+        throw new Error('the Hebrew name with its apostrophe is not in the document XML');
+      if(doc.indexOf('<w:bidi/>')===-1)
+        throw new Error('no paragraph is marked bidi, so Word lays Hebrew out left-to-right');
+      if(doc.indexOf('<w:rtl/>')===-1)
+        throw new Error('no run is marked rtl, so Word treats Hebrew as left-to-right text');
+      // Word picks the Hebrew font from the complex-script slot, not w:ascii.
+      var styles=text(z['word/styles.xml']);
+      if(!/<w:rFonts[^>]*\bw:cs="/.test(styles))
+        throw new Error('no complex-script font is declared, so Word chooses one per machine and Hebrew can render with missing glyphs');
+      if(!/<w:rFonts[^>]*\bw:ascii="/.test(styles))
+        throw new Error('no ascii font is declared');
+
+      // An English-only recipe must NOT be flipped right-to-left.
+      var en=Object.assign({},base,{ name:'Grandma Cake',
+        ingredients:[{a:'1',n:'egg'}], steps:['Bake it'], notes:'Nice' });
+      var doc2=text(unzip(new Uint8Array(await makeDocxBlob([en]).arrayBuffer()))['word/document.xml']);
+      if(doc2.indexOf('<w:bidi/>')!==-1 || doc2.indexOf('<w:rtl/>')!==-1)
+        throw new Error('an English-only recipe was marked right-to-left');
+    } },
+
   { id:'stor_photo_race', group:'Storage', name:'localStorage save keeps un-hydrated photo flag',
     test: async()=>{
       if(typeof stripPhotosLocal!=='function') throw new Error('stripPhotosLocal not defined');
@@ -8366,7 +8514,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.0';
+var APP_VERSION = 'v35.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10659,7 +10807,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11241,7 +11389,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.1</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13654,24 +13802,145 @@ window.exportRecipesToWord = exportRecipesToWord;
 // We generate a proper .docx using the Office Open XML format, embedded as a blob.
 // This avoids needing an external docx library and works in any browser.
 
+// Read an image's intrinsic pixel size out of its own bytes, synchronously.
+//
+// makeDocxBlob has to stay synchronous — it returns a Blob straight to
+// downloadBlob — so `new Image()` is not available to us here. A DOCX needs real
+// dimensions: <wp:extent> is what Word draws to, and guessing a box distorts the
+// photo. So parse the header. Returns {w,h} or null, and null is honest — the
+// caller falls back to a note rather than embedding at an invented size.
+function imagePixelSize(bytes) {
+  if (!bytes || bytes.length < 24) return null;
+  // PNG: 8-byte signature, then IHDR with width/height as big-endian uint32.
+  if (bytes[0]===0x89 && bytes[1]===0x50 && bytes[2]===0x4E && bytes[3]===0x47) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { w: dv.getUint32(16), h: dv.getUint32(20) };
+  }
+  // JPEG: walk the marker segments to the frame header. Height comes before
+  // width, which is easy to get backwards and would silently rotate every photo.
+  if (bytes[0]===0xFF && bytes[1]===0xD8) {
+    var i = 2;
+    while (i + 9 < bytes.length) {
+      if (bytes[i] !== 0xFF) { i++; continue; }          // resync on padding
+      var marker = bytes[i+1];
+      if (marker === 0xD8 || marker === 0xD9 || marker === 0x01 ||
+          (marker >= 0xD0 && marker <= 0xD7)) { i += 2; continue; }  // no payload
+      var len = (bytes[i+2] << 8) | bytes[i+3];
+      if (len < 2) return null;
+      // SOF0..SOF15, minus DHT (C4), JPG (C8) and DAC (CC), which are not frames.
+      if (marker >= 0xC0 && marker <= 0xCF &&
+          marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+        return { h: (bytes[i+5] << 8) | bytes[i+6],
+                 w: (bytes[i+7] << 8) | bytes[i+8] };
+      }
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+window.imagePixelSize = imagePixelSize;
+
+// "data:image/jpeg;base64,…" -> { bytes, ext }. Anything else returns null:
+// an http(s) photo URL cannot be fetched from a synchronous function, and a
+// truncated or non-base64 data URL must not become a corrupt ZIP entry.
+function dataUrlToBytes(dataUrl) {
+  var m = /^data:image\/(jpeg|jpg|png|gif|webp);base64,([A-Za-z0-9+/=\s]+)$/.exec(String(dataUrl||''));
+  if (!m) return null;
+  try {
+    var bin = atob(m[2].replace(/\s/g, ''));
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return { bytes: out, ext: m[1] === 'jpg' ? 'jpeg' : m[1] };
+  } catch (e) { return null; }
+}
+window.dataUrlToBytes = dataUrlToBytes;
+
 function makeDocxBlob(recipeList){
   // Build the document XML content
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // Hebrew is a COMPLEX SCRIPT as far as Word is concerned, and that has two
+  // consequences this export ignored until v35.1.
+  //
+  // 1. Word picks the font for Hebrew from the `w:cs` slot of `w:rFonts`, not
+  //    `w:ascii`/`w:hAnsi`. We declared no rFonts at all, so the complex-script
+  //    font was whatever Word felt like — which is how a name renders with
+  //    missing glyphs or a dropped punctuation mark on one machine and fine on
+  //    another. LibreOffice guesses more forgivingly, which is why this
+  //    reproduced for Tony in Word and not in the renderer used to check it.
+  // 2. A paragraph of Hebrew needs `w:bidi` (paragraph reads right-to-left) and
+  //    its runs need `w:rtl`. Without them Word applies the bidi algorithm to
+  //    an LTR paragraph, which puts leading punctuation and any Latin fragment
+  //    in the wrong place.
+  const RTL_RE = /[\u0590-\u05FF\u0600-\u06FF]/;
+  const isRtl = t => RTL_RE.test(String(t == null ? '' : t));
+  // `w:bidi` belongs after w:pBdr and before w:spacing/w:jc in CT_PPrBase, and
+  // `w:rtl` goes last in w:rPr. OOXML property order is a schema sequence, not
+  // a suggestion.
+  const pBidi = t => isRtl(t) ? '<w:bidi/>' : '';
+  const rRtl  = t => isRtl(t) ? '<w:rtl/>' : '';
+
   let bodyXml='';
   var srcUrls = []; // Collect hyperlink URLs for relationships
+  var images = [];  // {name, bytes, ext} -> word/media/*, one relationship each
 
   // Title
-  bodyXml+=`<w:p><w:pPr><w:jc w:val="center"/><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Tony's Recipes Collection</w:t></w:r></w:p>`;
+  bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Title"/><w:jc w:val="center"/></w:pPr><w:r><w:t>Tony's Recipes Collection</w:t></w:r></w:p>`;
 
   recipeList.forEach((r,idx)=>{
     if(idx>0) bodyXml+=`<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
 
     // Recipe heading
-    bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>${esc(r.emoji+' '+r.name)}</w:t></w:r></w:p>`;
+    bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading1"/>${pBidi(r.name)}</w:pPr>`
+      + `<w:r><w:rPr>${rRtl(r.name)}</w:rPr><w:t xml:space="preserve">${esc(r.emoji+' '+r.name)}</w:t></w:r></w:p>`;
 
-    // Photo note (full image embedding in custom DOCX is complex; note it instead)
-    if(r.photo && r.photo.startsWith('data:image')) {
-      bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>[📸 Recipe photo included — see app for full image]</w:t></w:r></w:p>`;
+    // The photo, embedded for real (v35.1). It used to be a "[📸 Recipe photo
+    // included — see app for full image]" note, which is the placeholder Tony
+    // was seeing in Word.
+    //
+    // It is an INLINE drawing in a paragraph of its own, and that is deliberate:
+    // an inline image occupies its own line box and can never sit on top of
+    // text. The alternative, <wp:anchor>, floats the picture over the page and
+    // is exactly how photos end up printed across the ingredients.
+    var pic = r.photo ? dataUrlToBytes(r.photo) : null;
+    var picSize = pic ? imagePixelSize(pic.bytes) : null;
+    if (pic && picSize && picSize.w > 0 && picSize.h > 0) {
+      // Scale to fit a box, preserving the aspect ratio. The page is 8.5" wide
+      // with 1" margins, so 6.5" of content; 4.5" keeps the photo a figure
+      // rather than a full-width banner, and the 4" height cap stops a portrait
+      // shot from pushing the ingredients onto a second page.
+      var EMU_PER_INCH = 914400, MAX_W = 4.5 * EMU_PER_INCH, MAX_H = 4 * EMU_PER_INCH;
+      var cx = picSize.w * (EMU_PER_INCH / 96), cy = picSize.h * (EMU_PER_INCH / 96);
+      var scale = Math.min(MAX_W / cx, MAX_H / cy, 1);
+      cx = Math.round(cx * scale); cy = Math.round(cy * scale);
+
+      var picName = 'image' + (images.length + 1) + '.' + pic.ext;
+      // Image relationship ids live at 2000+ so they can never collide with the
+      // hyperlink ids, which start at 10 and count up with the number of
+      // recipes that have a source.
+      var picRel = 'rId' + (2000 + images.length);
+      images.push({ name: picName, bytes: pic.bytes, ext: pic.ext });
+      var picId = images.length;
+      bodyXml += `<w:p><w:pPr><w:spacing w:before="120" w:after="240"/><w:jc w:val="center"/></w:pPr>`
+        + `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">`
+        + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>`
+        + `<wp:docPr id="${picId}" name="Picture ${picId}" descr="${esc(r.name)}"/>`
+        + `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>`
+        + `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`
+        + `<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`
+        + `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`
+        + `<pic:nvPicPr><pic:cNvPr id="${picId}" name="${esc(picName)}"/><pic:cNvPicPr/></pic:nvPicPr>`
+        + `<pic:blipFill><a:blip r:embed="${picRel}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
+        + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>`
+        + `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
+        + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+    } else if (r.photo) {
+      // Say which of the two it was. "See app for full image" told Tony nothing
+      // about why the photo was missing, and both causes are actionable.
+      bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>${
+        pic ? '[This recipe has a photo, but its dimensions could not be read, so it was left out rather than stretched to a guessed size]'
+            : '[This recipe has a photo, but it is not stored in this device — open the recipe in the app once to fetch it, then export again]'
+      }</w:t></w:r></w:p>`;
     }
 
     // Meta
@@ -13681,20 +13950,25 @@ function makeDocxBlob(recipeList){
     // Ingredients
     bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Ingredients</w:t></w:r></w:p>`;
     r.ingredients.forEach(i=>{
-      bodyXml+=`<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${esc(i.a)}  </w:t></w:r><w:r><w:t>${esc(i.n)}</w:t></w:r></w:p>`;
+      bodyXml+=`<w:p><w:pPr>${pBidi(i.n)}</w:pPr>`
+        + `<w:r><w:rPr><w:b/>${rRtl(i.n)}</w:rPr><w:t xml:space="preserve">${esc(i.a)}  </w:t></w:r>`
+        + `<w:r><w:rPr>${rRtl(i.n)}</w:rPr><w:t>${esc(i.n)}</w:t></w:r></w:p>`;
     });
     bodyXml+=`<w:p></w:p>`;
 
     // Method
     bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Method</w:t></w:r></w:p>`;
     r.steps.forEach((s,si)=>{
-      bodyXml+=`<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${si+1}. </w:t></w:r><w:r><w:t>${esc(s)}</w:t></w:r></w:p>`;
+      bodyXml+=`<w:p><w:pPr>${pBidi(s)}</w:pPr>`
+        + `<w:r><w:rPr><w:b/>${rRtl(s)}</w:rPr><w:t xml:space="preserve">${si+1}. </w:t></w:r>`
+        + `<w:r><w:rPr>${rRtl(s)}</w:rPr><w:t>${esc(s)}</w:t></w:r></w:p>`;
     });
 
     // Notes section
     if(r.notes && r.notes.trim()) {
       bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Notes</w:t></w:r></w:p>`;
-      bodyXml+=`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="12" w:space="6" w:color="D4A843"/></w:pBdr></w:pPr><w:r><w:rPr><w:i/><w:color w:val="5C3D2E"/></w:rPr><w:t xml:space="preserve">${esc(r.notes.trim())}</w:t></w:r></w:p>`;
+      bodyXml+=`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="12" w:space="6" w:color="D4A843"/></w:pBdr>${pBidi(r.notes)}</w:pPr>`
+        + `<w:r><w:rPr><w:i/><w:color w:val="5C3D2E"/>${rRtl(r.notes)}</w:rPr><w:t xml:space="preserve">${esc(r.notes.trim())}</w:t></w:r></w:p>`;
     }
 
     // Diet tags
@@ -13723,25 +13997,41 @@ function makeDocxBlob(recipeList){
 
 
 
+  // Every style names a font in all three slots. `w:cs` is the one that matters
+  // for Hebrew — see the note on RTL_RE above — and Arial is the safe choice
+  // because it ships with Windows, macOS and Word Online and covers Hebrew and
+  // Cyrillic. Leaving the slots unset let Word choose, and its choice depended on
+  // the machine. `w:szCs` must accompany every `w:sz` for the same reason: the
+  // complex-script size is a separate property, so Hebrew ignores `w:sz` alone.
+  const FONTS = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
   const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/>
-    <w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:style>
+  <w:docDefaults><w:rPrDefault><w:rPr>${FONTS}<w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>
+    <w:rPr>${FONTS}<w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/>
-    <w:pPr><w:jc w:val="center"/><w:spacing w:after="200"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="52"/><w:szCs w:val="52"/><w:color w:val="5C3D2E"/></w:rPr></w:style>
+    <w:pPr><w:spacing w:after="200"/><w:jc w:val="center"/></w:pPr>
+    <w:rPr>${FONTS}<w:b/><w:color w:val="5C3D2E"/><w:sz w:val="52"/><w:szCs w:val="52"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/>
     <w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="36"/><w:szCs w:val="36"/><w:color w:val="5C3D2E"/></w:rPr></w:style>
+    <w:rPr>${FONTS}<w:b/><w:color w:val="5C3D2E"/><w:sz w:val="36"/><w:szCs w:val="36"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/>
     <w:pPr><w:spacing w:before="160" w:after="80"/></w:pPr>
-    <w:rPr><w:b/><w:sz w:val="28"/><w:szCs w:val="28"/><w:color w:val="C1440E"/></w:rPr></w:style>
+    <w:rPr>${FONTS}<w:b/><w:color w:val="C1440E"/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr></w:style>
 </w:styles>`;
 
+  // A part whose extension has no Default (or Override) is not a valid package:
+  // Word refuses the whole file rather than skipping the image. Only the
+  // extensions actually present are declared.
+  var imgExts = {};
+  images.forEach(function(im){ imgExts[im.ext] = true; });
+  var imgDefaults = Object.keys(imgExts).map(function(ext){
+    return '<Default Extension="' + ext + '" ContentType="image/' + ext + '"/>';
+  }).join('');
   const contentTypesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>${imgDefaults}
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 </Types>`;
@@ -13757,18 +14047,27 @@ function makeDocxBlob(recipeList){
   srcUrls.forEach(function(url, i) {
     relsEntries.push('<Relationship Id="rId' + (i+10) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + url.replace(/&/g,'&amp;') + '" TargetMode="External"/>');
   });
+  // Must match the r:embed ids emitted above — same 2000+ base, same order.
+  images.forEach(function(im, i) {
+    relsEntries.push('<Relationship Id="rId' + (2000+i) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/' + im.name + '"/>');
+  });
   const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + relsEntries.join('') + '</Relationships>';
 
-  return buildZip({
+  var parts = {
     '[Content_Types].xml': contentTypesXml,
     '_rels/.rels': rootRelsXml,
     'word/document.xml': docXml,
     'word/styles.xml': stylesXml,
     'word/_rels/document.xml.rels': relsXml,
-  });
+  };
+  images.forEach(function(im){ parts['word/media/' + im.name] = im.bytes; });
+  return buildZip(parts);
 }
 
-// Minimal synchronous ZIP builder (store method, no compression)
+// Minimal synchronous ZIP builder (store method, no compression).
+// Values may be a string (XML parts) or a Uint8Array (word/media images) —
+// running a JPEG through TextEncoder would mangle every byte above 0x7F and
+// produce a file Word opens with a broken-image placeholder.
 function buildZip(files){
   const enc=new TextEncoder();
   const parts=[];
@@ -13796,7 +14095,7 @@ function buildZip(files){
 
   for(const[name,content]of Object.entries(files)){
     const nameBytes=str(name);
-    const dataBytes=enc.encode(content);
+    const dataBytes=(content instanceof Uint8Array)?content:enc.encode(content);
     const crc=crc32(dataBytes);
     const localHeader=concat(
       new Uint8Array([0x50,0x4B,0x03,0x04]), // sig
