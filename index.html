@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.1 -->
+<!-- Tony's Recipes Collection v35.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5817,6 +5817,11 @@ const SELF_TESTS = [
       if(!/<w:rFonts[^>]*\bw:ascii="/.test(styles))
         throw new Error('no ascii font is declared');
 
+      // The emoji is the app's stand-in for a missing photo; a printed document
+      // gets the photo itself, and the glyph rendered as a tofu box for Tony.
+      if(doc.indexOf('🥘')!==-1)
+        throw new Error('the recipe emoji is still written into the document');
+
       // An English-only recipe must NOT be flipped right-to-left.
       var en=Object.assign({},base,{ name:'Grandma Cake',
         ingredients:[{a:'1',n:'egg'}], steps:['Bake it'], notes:'Nice' });
@@ -8514,7 +8519,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.1';
+var APP_VERSION = 'v35.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10807,7 +10812,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11389,7 +11394,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.1</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13891,8 +13896,12 @@ function makeDocxBlob(recipeList){
     if(idx>0) bodyXml+=`<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
 
     // Recipe heading
+    // The name only. `r.emoji` is the app's on-screen stand-in for a photo — it
+    // belongs on a grid card, not in a printed document, and since v35.1 the real
+    // photo is embedded right below this heading anyway. It also rendered as a
+    // tofu box wherever the reader's font lacked the glyph.
     bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading1"/>${pBidi(r.name)}</w:pPr>`
-      + `<w:r><w:rPr>${rRtl(r.name)}</w:rPr><w:t xml:space="preserve">${esc(r.emoji+' '+r.name)}</w:t></w:r></w:p>`;
+      + `<w:r><w:rPr>${rRtl(r.name)}</w:rPr><w:t xml:space="preserve">${esc(r.name)}</w:t></w:r></w:p>`;
 
     // The photo, embedded for real (v35.1). It used to be a "[📸 Recipe photo
     // included — see app for full image]" note, which is the placeholder Tony

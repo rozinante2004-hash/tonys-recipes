@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v35.1` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v35.2` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~22,250 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v35.1"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v35.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1183,6 +1183,9 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   - **The picture is `<wp:inline>`, never `<wp:anchor>`.** Inline gives it a line box of its own, so
     it can never be drawn on top of the text. Anchored is how photos end up printed across the
     ingredients.
+  - **The heading is the recipe name only — no `r.emoji`.** The emoji is the app's
+    on-screen stand-in for a missing photo; a printed document gets the photo itself, and
+    the glyph rendered as a tofu box wherever the reader's font lacked it.
   - **Hebrew is a complex script to Word.** Every style declares `w:rFonts` with a **`w:cs`** slot
     (Arial — on Windows, macOS and Word Online, and it covers Hebrew and Cyrillic); Word picks the
     Hebrew font from `w:cs`, not `w:ascii`, and with the slot empty it chooses per machine, which
