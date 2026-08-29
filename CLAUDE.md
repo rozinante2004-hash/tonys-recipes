@@ -598,10 +598,20 @@ found only because a test was written first and disagreed with the code.
   `navigator.languages`, a per-profile preference: `en-GB, en, en-US, he` on his real
   profile, `en-US, en` on the throwaway.
 
-  Still to do: find *where* the session locale should be set (his shell has
-  `LANG=en_IL.UTF-8` from somewhere, but the graphical session exports nothing — so
-  `/etc/default/locale` is the likely gap and a shell rc the likely source), generate the
-  missing locale, and re-test on the normal Chrome.
+  **Root cause found: `/etc/default/locale` reads `LANG="en_IL"`, with no `.UTF-8`.**
+  `locale -a` lists `en_IL` and `en_IL.utf8` as two separate generated locales — the bare
+  one is not UTF-8. So the graphical session, and therefore Chrome, is handed a non-UTF-8
+  locale, which is precisely the condition that makes Chromium strip non-ASCII from
+  download filenames. No shell rc sets anything (`~/.bashrc`, `~/.profile`,
+  `~/.bash_profile`, `~/.pam_environment`, `/etc/environment` are all clean), so this one
+  file is the whole story.
+
+  Separately, his regional formats point at `he_IL.UTF-8` (whence `LC_NUMERIC`, `LC_TIME`,
+  `LC_COLLATE`, `LC_MEASUREMENT`) and `he_IL` is not generated at all — that is what
+  `locale: Cannot set LC_COLLATE to default locale` is reporting. Fix is
+  `sudo locale-gen he_IL.UTF-8 && sudo update-locale LANG=en_IL.UTF-8`, then log out and
+  in; `en_IL.utf8` is already generated so it needs no `locale-gen`. Reversible with
+  `sudo update-locale LANG=en_IL`.
 
   The helper therefore stays until Tony repairs the session locale — it is the only route
   that works on his machine today. Retirement checklist once test 1 passes: delete
