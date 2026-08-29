@@ -588,6 +588,21 @@ found only because a test was written first and disagreed with the code.
   app's own `downloadBlob` with the helper off. **Nothing in the app is broken and nothing
   in JavaScript can fix it.**
 
+  **Confirmed on Tony's own machine, same day.** Running his existing Chrome as
+  `LC_ALL=C.UTF-8 /opt/google/chrome/chrome --user-data-dir=/tmp/chrome-locale-test`
+  turned tests 1, 2 **and** 3 from fail to pass. Same binary, same version 137, one
+  environment variable. The separate `--user-data-dir` is what makes the experiment valid —
+  without it Chrome hands the URL to the already-running process and the broken environment
+  is inherited unchanged. It also means a **fresh profile**, so Chrome asks to be made the
+  default browser and to sign in; that is not a second installation. The tell is
+  `navigator.languages`, a per-profile preference: `en-GB, en, en-US, he` on his real
+  profile, `en-US, en` on the throwaway.
+
+  Still to do: find *where* the session locale should be set (his shell has
+  `LANG=en_IL.UTF-8` from somewhere, but the graphical session exports nothing — so
+  `/etc/default/locale` is the likely gap and a shell rc the likely source), generate the
+  missing locale, and re-test on the normal Chrome.
+
   The helper therefore stays until Tony repairs the session locale — it is the only route
   that works on his machine today. Retirement checklist once test 1 passes: delete
   `local-save-helper.py`, `SAVE_HELPER_KEY`, `localSaveUrl`, `saveHelperEnabled`,
