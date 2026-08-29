@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v35.4: 203 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v35.5: 203 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -647,6 +647,15 @@ found only because a test was written first and disagreed with the code.
   - Two real defects were found by these tests rather than by review: `parseInt(x)||default`
     turned a deliberate `0` retention into 7, and the analyser matched `/timeout/` while
     the watchdog logs `"timed out"` — so it stayed silent on the exact event it existed for.
+  - **Log an outcome where the outcome happens.** v35.4 logged the successful write inside
+    `saveRecipeDoc` but the refusal one level up, in `saveToFirestore`'s collection loop.
+    Every self test passed; an **end-to-end run in a browser** caught it, because driving
+    `saveRecipeDoc` directly recorded a success and stayed silent on a refusal. Both halves
+    of that fact now live in `saveRecipeDoc`; the caller keeps only `markRecipeConflicted`,
+    which is UI state and belongs there. The unit suite could not see this — a test that
+    drives one function cannot notice that a *different* function is the one instrumented.
+  - `'system'` is a kind of its own for the log's own lifecycle ("Logging enabled"). Filing
+    that under `'load'` quietly polluted the load filter.
 
 ## Outstanding
 

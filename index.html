@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.4 -->
+<!-- Tony's Recipes Collection v35.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -298,7 +298,16 @@ var LOG_MAX_ENTRIES = 500;      // hard ceiling regardless of retention
 var LOG_DEFAULT_DAYS = 7;
 var LOG_MIN_DAYS = 1, LOG_MAX_DAYS = 365;
 var LOG_MSG_MAX = 300;          // one runaway message must not fill the store
-var LOG_KINDS = ['load','save','conflict','refresh','photo','auth','error'];
+// 'system' marks the log's own lifecycle — when collection started, so it is
+// obvious the log cannot cover anything earlier. It is not a sync event, and
+// filing it under 'load' would have quietly polluted that filter.
+var LOG_KINDS = ['system','load','save','conflict','refresh','photo','auth','error'];
+
+// Small sizes must read as small, not round to "0 KB".
+function formatBytes(n) {
+  if (n < 1024) return n + ' bytes';
+  return Math.round(n / 1024) + ' KB';
+}
 
 function logEnabled() {
   try { return localStorage.getItem(LOG_ENABLED_KEY) === '1'; } catch(e) { return false; }
@@ -311,7 +320,7 @@ function setLogEnabled(on) {
   // Switching it off leaves what was already collected — deleting someone's
   // diagnostics as a side effect of a toggle would be a surprise. Purge is a
   // separate, explicit button.
-  if (on) syncLog('load', 'Logging enabled');
+  if (on) syncLog('system', 'Logging enabled — nothing before this point was recorded');
 }
 function logRetentionDays() {
   var n;
@@ -408,7 +417,7 @@ window.logEnabled = logEnabled;            window.setLogEnabled = setLogEnabled;
 window.logRetentionDays = logRetentionDays; window.setLogRetentionDays = setLogRetentionDays;
 window.readSyncLog = readSyncLog;          window.pruneSyncLog = pruneSyncLog;
 window.syncLog = syncLog;                  window.purgeSyncLog = purgeSyncLog;
-window.syncLogBytes = syncLogBytes;
+window.syncLogBytes = syncLogBytes;  window.formatBytes = formatBytes;
 window.LOG_MAX_ENTRIES = LOG_MAX_ENTRIES;  window.LOG_KINDS = LOG_KINDS;
 
 // ─── WHAT THE LOG MEANS ───────────────────────────────────────────────────────
@@ -531,7 +540,7 @@ function syncLogReportText() {
   L.push('App ' + (typeof APP_VERSION === 'string' ? APP_VERSION : '?')
        + '  ·  ' + new Date().toISOString());
   L.push('Logging ' + (logEnabled() ? 'ON' : 'OFF') + ', keeping ' + logRetentionDays() + ' day(s)'
-       + '  ·  ' + list.length + ' event(s), ' + Math.round(syncLogBytes()/1024) + ' KB');
+       + '  ·  ' + list.length + ' event(s), ' + formatBytes(syncLogBytes()));
   try { L.push('Browser: ' + navigator.userAgent); } catch(e) {}
   L.push('');
   L.push('WHAT THIS LOOKS LIKE');
@@ -611,7 +620,7 @@ function renderLoggingPanel() {
 
   // 4 — the events
   h += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 6px;">'
-     + 'Events (' + all.length + ', ' + Math.round(syncLogBytes()/1024) + ' KB)</div>';
+     + 'Events (' + all.length + ', ' + formatBytes(syncLogBytes()) + ')</div>';
   h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">';
   ['all'].concat(LOG_KINDS).forEach(function(k) {
     var n = k === 'all' ? all.length : all.filter(function(e){ return e.k === k; }).length;
@@ -3572,6 +3581,9 @@ const SELF_TESTS = [
         // Drive the real refusal path rather than setting the flag by hand: a
         // test that sets its own state proves nothing about the code under it.
         var kBase=window._cloudRecipeBase, kDb=window._fbDb;
+        var kOn=null,kLog=null;
+        try{ kOn=localStorage.getItem('tonys_log_enabled'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+        setLogEnabled(true); purgeSyncLog();
         try{
           window._cloudRecipeBase={}; window._cloudRecipeBase[testId]=500;
           window._fbDb={ collection:function(){ return { doc:function(){ return {}; } }; },
@@ -3580,7 +3592,23 @@ const SELF_TESTS = [
               set:function(){ throw new Error('a refused write must not call set()'); } }); } };
           var out=await saveRecipeDoc(r, window._fbDb);
           if(out.skipped!=='conflict') throw new Error('expected the write to be refused, got '+JSON.stringify(out));
-        } finally { window._cloudRecipeBase=kBase; window._fbDb=kDb; }
+
+          // The refusal must be recorded WHERE IT HAPPENS. An end-to-end run found
+          // this logged one level up, in the caller — so the successful write was
+          // logged by saveRecipeDoc and the refusal was not, and any other caller
+          // recorded a success and stayed silent on a refusal.
+          var logged=readSyncLog().filter(function(e){ return e.k==='conflict'; });
+          if(!logged.length)
+            throw new Error('a refused write recorded no conflict event');
+          if(logged[0].m.indexOf('Banner Test')===-1)
+            throw new Error('the conflict event does not name the recipe: '+logged[0].m);
+        } finally {
+          window._cloudRecipeBase=kBase; window._fbDb=kDb;
+          try{
+            if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
+            if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',kLog);
+          }catch(e){}
+        }
 
         // saveRecipeDoc reports the refusal; the flag is set where conflicts are
         // collected, by this same function.
@@ -3782,6 +3810,16 @@ const SELF_TESTS = [
         if(txt.indexOf('EVENTS')===-1) throw new Error('the report has no events section');
         if(txt.indexOf('Soup')===-1) throw new Error('the report does not contain the event it was built from');
         if(txt.indexOf('→')===-1) throw new Error('the report carries no proposed fix');
+        // A few hundred bytes must read as a few hundred bytes. "0 KB" is a
+        // rounding artefact, and this app does not let the UI state things the
+        // code has not checked.
+        if(/·\s*\d+ event\(s\), 0 KB/.test(txt))
+          throw new Error('a small log reported its size as "0 KB"');
+        if(txt.indexOf(' bytes')===-1 && txt.indexOf(' KB')===-1)
+          throw new Error('the report does not state the log size at all');
+        if(formatBytes(0)!=='0 bytes') throw new Error('formatBytes(0) is '+formatBytes(0));
+        if(formatBytes(688)!=='688 bytes') throw new Error('formatBytes(688) is '+formatBytes(688));
+        if(formatBytes(2048)!=='2 KB') throw new Error('formatBytes(2048) is '+formatBytes(2048));
         if(typeof APP_VERSION==='string' && txt.indexOf(APP_VERSION)===-1)
           throw new Error('the report does not say which version produced it');
       } finally {
@@ -9335,7 +9373,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.4';
+var APP_VERSION = 'v35.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11631,7 +11669,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12213,7 +12251,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18001,7 +18039,15 @@ async function saveRecipeDoc(r, db) {
     if (!cloudWriteAllowed(cloudAt, base, r.updatedAt)) { refused = true; return; }
     tx.set(ref, { r: json, updatedAt: stamped, id: r.id });
   });
-  if (refused) return { id: r.id, skipped: 'conflict' };
+  if (refused) {
+    // Logged HERE, not in the caller. The successful write is logged a few lines
+    // down, and splitting the two halves of the same fact across two levels
+    // means any other caller of saveRecipeDoc records a success and stays silent
+    // on a refusal — which is exactly what an end-to-end run caught.
+    syncLog('conflict', 'Save refused for "' + (r.name || ('#'+r.id)) + '" — changed on another device',
+            { id: r.id, base: base, mine: r.updatedAt || 0 });
+    return { id: r.id, skipped: 'conflict' };
+  }
   r.updatedAt             = stamped;   // keep local and cloud in lockstep
   syncLog('save', 'Wrote "' + (r.name || ('#'+r.id)) + '"', { id: r.id, at: stamped, bytes: bytes });
   clearRecipeConflict(r.id);           // a write that lands ends the conflict
@@ -18357,9 +18403,8 @@ async function saveToFirestore() {
       var dr = recipes.find(function(x) { return x.id === dirty[di]; });
       if (!dr) continue;
       var res = await saveRecipeDoc(dr);
-      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id);
-        syncLog('conflict', 'Save refused for "' + (dr.name || ('#'+dr.id)) + '" — changed on another device',
-                { id: dr.id, base: _cloudRecipeBase[dr.id], mine: dr.updatedAt || 0 }); }
+      // saveRecipeDoc logs the refusal itself; this level owns the UI state.
+      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id); }
       else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
     }
 
