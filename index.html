@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.2 -->
+<!-- Tony's Recipes Collection v35.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3018,6 +3018,173 @@ const SELF_TESTS = [
       } finally {
         window.fetch=realFetch; URL.createObjectURL=realCreate;
         URL.revokeObjectURL=realRevoke; HTMLAnchorElement.prototype.click=realClick;
+      }
+    } },
+
+  { id:'cloud_refresh_one_recipe', group:'Cloud Sync', name:'One recipe can be pulled from the cloud without a reload (5.4 §7, v35.3)',
+    test: async()=>{
+      // The two-device test: PC edits, phone edits and saves, PC's save is
+      // refused. Correct. But closing and reopening the recipe still showed the
+      // PC's version and saving failed again — nothing re-read a single document
+      // between full loads, so the only cure was restarting the app.
+      ['refreshRecipeFromCloud','refreshRecipeFromCloudUI','recipeIsInConflict','conflictBannerHtml']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var testId=771001;
+      var kDb=window._fbDb, kUser=window._fbUser, kBase=window._cloudRecipeBase,
+          kStamp=window._cloudRecipeStamp, kIds=window._cloudRecipeIds, kToast=window.toast;
+      var mine={id:testId,name:'My PC version',emoji:'🥘',category:'Dinner',difficulty:'Easy',
+        prep:'10',servings:'2',bg:'#fff',fav:false,photo:'data:image/png;base64,AAAA',
+        ingredients:[{a:'1',n:'mine'}],steps:['mine'],diets:[],history:[],updatedAt:1000};
+      recipes.unshift(mine);
+      try{
+        window.toast=function(){};
+        var theirs={id:testId,name:'Phone version',emoji:'🥘',category:'Dinner',difficulty:'Easy',
+          prep:'10',servings:'2',bg:'#fff',fav:false,photo:'',
+          ingredients:[{a:'2',n:'theirs'}],steps:['theirs'],diets:[],updatedAt:2000};
+        var doc={ exists:true, data:function(){ return { r:JSON.stringify(theirs), updatedAt:2000, id:testId }; } };
+        var asked=null;
+        window._fbUser={uid:'u1'};
+        window._fbDb={ collection:function(){ return { doc:function(n){ asked=n; return {
+          get:function(){ return Promise.resolve(doc); } }; } }; } };
+        window._cloudRecipeBase={}; window._cloudRecipeStamp={}; window._cloudRecipeIds={};
+
+        // Flag it first, the way a refused save does — otherwise "not in conflict
+        // afterwards" is true for a recipe that was never in conflict, and the
+        // clearing is untested. A mutation that removed it survived on that.
+        markRecipeConflicted(testId);
+        if(!recipeIsInConflict(testId)) throw new Error('the fixture did not flag the recipe');
+
+        var res=await refreshRecipeFromCloud(testId);
+        if(!res.ok) throw new Error('refresh failed: '+JSON.stringify(res));
+        if(asked!==recipeDocId(testId)) throw new Error('read the wrong document: '+asked);
+
+        // Same object, replaced contents — viewId and any open dialog hold this
+        // exact reference, so swapping the array entry would strand them.
+        var now=recipes.find(function(x){ return x.id===testId; });
+        if(now!==mine) throw new Error('the recipe object was replaced rather than updated in place');
+        if(now.name!=='Phone version') throw new Error('the cloud version did not win, name is '+now.name);
+        if(now.steps[0]!=='theirs') throw new Error('the body was not replaced');
+
+        // Nothing is lost: the local version is on the history, where ↩ Restore lives.
+        if(!now.history || !now.history.length) throw new Error('the local version was discarded instead of kept in history');
+        if(now.history[0].name!=='My PC version')
+          throw new Error('history[0] is "'+now.history[0].name+'", expected the local version');
+        // The photo lives in its own document, so an empty one here means
+        // "not in this document", never "deleted".
+        if(now.photo!=='data:image/png;base64,AAAA')
+          throw new Error('the local photo was wiped by a recipe document that never carries one');
+
+        if(window._cloudRecipeBase[testId]!==2000) throw new Error('the concurrency base was not updated, so the next save is refused again');
+        if(!window._cloudRecipeStamp[testId]) throw new Error('the sync stamp was not recorded, so the recipe is rewritten on every save');
+        if(recipeIsInConflict(testId)) throw new Error('the recipe is still flagged as in conflict after a successful refresh');
+
+        // A read that FAILS must change nothing — that is the whole lesson of
+        // the photo incidents: "could not read" is not "there is nothing there".
+        var before=JSON.stringify(now);
+        window._fbDb={ collection:function(){ return { doc:function(){ return {
+          get:function(){ return Promise.reject(new Error('network down')); } }; } }; } };
+        var bad=await refreshRecipeFromCloud(testId);
+        if(bad.ok) throw new Error('a failed read reported success');
+        if(bad.reason!=='read-failed') throw new Error('a failed read reported "'+bad.reason+'"');
+        if(JSON.stringify(recipes.find(function(x){return x.id===testId;}))!==before)
+          throw new Error('a failed read modified the recipe anyway');
+
+        // A missing document is a different answer from a failed read.
+        window._fbDb={ collection:function(){ return { doc:function(){ return {
+          get:function(){ return Promise.resolve({ exists:false }); } }; } }; } };
+        var gone=await refreshRecipeFromCloud(testId);
+        if(gone.ok || gone.reason!=='not-in-cloud')
+          throw new Error('a document that is not there reported '+JSON.stringify(gone));
+        if(JSON.stringify(recipes.find(function(x){return x.id===testId;}))!==before)
+          throw new Error('a missing cloud document blanked the local recipe');
+
+        // Unparseable cloud data must not overwrite a good local copy either.
+        window._fbDb={ collection:function(){ return { doc:function(){ return {
+          get:function(){ return Promise.resolve({ exists:true, data:function(){ return { r:'{not json', updatedAt:9 }; } }); } }; } }; } };
+        var junk=await refreshRecipeFromCloud(testId);
+        if(junk.ok || junk.reason!=='unreadable')
+          throw new Error('unreadable cloud data reported '+JSON.stringify(junk));
+        if(JSON.stringify(recipes.find(function(x){return x.id===testId;}))!==before)
+          throw new Error('unreadable cloud data overwrote the local recipe');
+
+        // Signed out is its own answer, and every reason has words of its own.
+        window._fbUser=null;
+        var out=await refreshRecipeFromCloud(testId);
+        if(out.ok || out.reason!=='signed-out') throw new Error('signed out reported '+JSON.stringify(out));
+        var seen={};
+        ['signed-out','offline','not-here','read-failed','not-in-cloud','unreadable'].forEach(function(rn){
+          var t=refreshRecipeReason({reason:rn});
+          if(!t || seen[t]) throw new Error('reason "'+rn+'" has no message of its own');
+          seen[t]=true;
+        });
+      } finally {
+        recipes=recipes.filter(function(x){ return x.id!==testId; });
+        window._fbDb=kDb; window._fbUser=kUser; window._cloudRecipeBase=kBase;
+        window._cloudRecipeStamp=kStamp; window._cloudRecipeIds=kIds; window.toast=kToast;
+      }
+    } },
+
+  { id:'cloud_conflict_has_a_way_out', group:'Cloud Sync', name:'A refused save says so on reopening and offers the fix (v35.3)',
+    test: async()=>{
+      var testId=771002;
+      recipes.unshift({id:testId,name:'Banner Test',emoji:'🥘',category:'Dinner',difficulty:'Easy',
+        prep:'1',servings:'1',bg:'#fff',fav:false,photo:'',ingredients:[],steps:[],diets:[],
+        history:[],updatedAt:1});
+      try{
+        var r=recipes.find(function(x){ return x.id===testId; });
+        if(conflictBannerHtml(r)!=='')
+          throw new Error('a recipe with no conflict is showing the conflict banner');
+
+        // Drive the real refusal path rather than setting the flag by hand: a
+        // test that sets its own state proves nothing about the code under it.
+        var kBase=window._cloudRecipeBase, kDb=window._fbDb;
+        try{
+          window._cloudRecipeBase={}; window._cloudRecipeBase[testId]=500;
+          window._fbDb={ collection:function(){ return { doc:function(){ return {}; } }; },
+            runTransaction:function(fn){ return fn({
+              get:function(){ return Promise.resolve({ exists:true, data:function(){ return { updatedAt:9999 }; } }); },
+              set:function(){ throw new Error('a refused write must not call set()'); } }); } };
+          var out=await saveRecipeDoc(r, window._fbDb);
+          if(out.skipped!=='conflict') throw new Error('expected the write to be refused, got '+JSON.stringify(out));
+        } finally { window._cloudRecipeBase=kBase; window._fbDb=kDb; }
+
+        // saveRecipeDoc reports the refusal; the flag is set where conflicts are
+        // collected, by this same function.
+        markRecipeConflicted(testId);
+        if(!recipeIsInConflict(testId)) throw new Error('recipeIsInConflict did not report a flagged recipe');
+        if(conflictIds().indexOf(testId)===-1) throw new Error('conflictIds() does not list the flagged recipe');
+
+        var html=conflictBannerHtml(r);
+        if(!html) throw new Error('a conflicted recipe shows no banner when reopened');
+        if(html.indexOf('refreshRecipeFromCloudUI('+testId+')')===-1)
+          throw new Error('the banner offers no way to fetch the other version');
+        if(html.indexOf('Version history')===-1)
+          throw new Error('the banner does not say the local version is kept');
+
+        // ...and the view actually renders it.
+        var kView=viewId;
+        try { viewId=testId; drawView();
+          var modal=document.getElementById('viewModal');
+          if(modal.innerHTML.indexOf('Changed on another device')===-1)
+            throw new Error('the banner is not rendered in the recipe view');
+        } finally { viewId=kView; if(viewId!=null) drawView(); }
+
+        // The service-error modal must be able to carry the action at all.
+        var fired=0;
+        showServiceError('TEST: a message', [{label:'Do it', primary:true, onClick:function(){ fired++; }}]);
+        var ov=document.getElementById('serviceErrorOverlay');
+        if(!ov) throw new Error('the service error modal did not open');
+        var btn=Array.prototype.slice.call(ov.querySelectorAll('button'))
+          .filter(function(b){ return b.textContent==='Do it'; })[0];
+        if(!btn) throw new Error('the action button was not rendered');
+        btn.click();
+        if(fired!==1) throw new Error('the action button did not run its handler');
+        if(document.getElementById('serviceErrorOverlay')) throw new Error('the modal stayed open after the action');
+      } finally {
+        clearRecipeConflict(testId);
+        recipes=recipes.filter(function(x){ return x.id!==testId; });
+        var ov=document.getElementById('serviceErrorOverlay'); if(ov) ov.remove();
       }
     } },
 
@@ -8519,7 +8686,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.2';
+var APP_VERSION = 'v35.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10812,7 +10979,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11394,7 +11561,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13280,6 +13447,26 @@ function recipeIsRTL(r) {
 }
 window.recipeIsRTL = recipeIsRTL;
 
+// Reopening a recipe whose save was refused used to look completely normal, so
+// the next save failed the same way and the only cure was restarting the app.
+// The state is now visible where it matters, with the way out attached.
+function conflictBannerHtml(r){
+  if (!recipeIsInConflict(r.id)) return '';
+  return '<div style="background:#FEECEC;border:1px solid #F0B4B4;border-radius:10px;'
+    + 'padding:12px 14px;margin-bottom:14px;font-size:13px;color:#B03030;line-height:1.6;">'
+    + '<div style="font-weight:700;margin-bottom:4px;">⚠️ Changed on another device</div>'
+    + 'This recipe was edited somewhere else after this device last synced, so your changes to it '
+    + 'have not been saved to the cloud and will keep being refused.'
+    + '<button onclick="refreshRecipeFromCloudUI(' + r.id + ')" '
+    + 'style="margin-top:10px;width:100%;padding:10px;background:var(--terracotta);color:#fff;'
+    + 'border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;'
+    + 'font-weight:700;cursor:pointer;">↻ Take the other device’s version</button>'
+    + '<div style="font-size:11px;opacity:0.85;margin-top:6px;">Your version is kept in '
+    + '🕘 Version history below, so you can compare and restore it.</div>'
+    + '</div>';
+}
+window.conflictBannerHtml = conflictBannerHtml;
+
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
   var _awkward = [];
@@ -13308,6 +13495,7 @@ function drawView(){
     </div>
     ${photoCreditHtml(r)}
     <div class="modal-content">
+      ${conflictBannerHtml(r)}
       <div class="modal-category">${escH(r.category)}</div>
       <div class="modal-title" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
@@ -15150,7 +15338,10 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
 }
 
 // Show a service error modal with full details and links
-function showServiceError(message) {
+// `actions` is an optional list of {label, onClick, primary} shown above OK.
+// It exists because a message that says "reload the whole app" is not a way out
+// — see refreshRecipeFromCloud and the EDITED_ELSEWHERE case below.
+function showServiceError(message, actions) {
   // Parse multi-line messages with URLs into clickable links
   var lines = message.split('\n').filter(function(l){ return l.trim(); });
   var html = '';
@@ -15194,6 +15385,16 @@ function showServiceError(message) {
   var inner = document.createElement('div');
   inner.style.cssText = 'background:var(--card-bg);border-radius:16px;width:90%;max-width:440px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
   inner.innerHTML = html;
+  (actions || []).forEach(function(a) {
+    var b = document.createElement('button');
+    b.textContent = a.label;
+    b.style.cssText = 'width:100%;padding:12px;border:none;border-radius:10px;'
+      + 'font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:12px;'
+      + (a.primary ? 'background:var(--terracotta);color:white;'
+                   : 'background:var(--card);color:var(--warm-brown);border:1.5px solid var(--border);');
+    b.onclick = function() { overlay.remove(); a.onClick(); };
+    inner.appendChild(b);
+  });
   inner.appendChild(closeBtn);
   overlay.appendChild(inner);
   document.body.appendChild(overlay);
@@ -17147,6 +17348,7 @@ async function saveRecipeDoc(r, db) {
   });
   if (refused) return { id: r.id, skipped: 'conflict' };
   r.updatedAt             = stamped;   // keep local and cloud in lockstep
+  clearRecipeConflict(r.id);           // a write that lands ends the conflict
   _cloudRecipeBase[r.id]  = stamped;
   _cloudRecipeStamp[r.id] = hashStr(json);
   _cloudRecipeIds[r.id]   = true;
@@ -17273,10 +17475,125 @@ function parseCloudRecipeDocs(docs) {
     _cloudRecipeStamp[r.id] = hashStr(d.r || '');
     _cloudRecipeIds[r.id]   = true;
   }
+  // A full read replaces `recipes` with the cloud's copies, so nothing is left in
+  // conflict — this is why restarting the app cleared it before there was any
+  // other way out.
+  clearAllRecipeConflicts();
   saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
   return list;
 }
 window.cloudUnreadableIds = function(){ return Object.keys(_cloudUnreadable); };
+
+// ─── ONE RECIPE, PULLED DOWN ON ITS OWN (5.4 §7, v35.3) ──────────────────────
+//
+// The two-device test finally got run. The conflict guard did its job — the save
+// was refused, nothing was overwritten — but the only way forward it offered was
+// "Reload", and even closing and reopening the recipe still showed the local
+// version, because nothing re-reads a single document between full loads. Tony
+// had to restart the whole app to see his phone's edit.
+//
+// `_conflictIds` remembers which recipes are in that state, so the recipe view
+// can say so when it is reopened rather than looking normal and failing again.
+var _conflictIds = {};
+// One owner for this state. The self test drives these rather than reaching into
+// the variable — the app's CSP has no 'unsafe-eval', and a test that sets its own
+// state by hand proves nothing about the code underneath it anyway.
+function markRecipeConflicted(id) { _conflictIds[id] = true; }
+function clearRecipeConflict(id)  { delete _conflictIds[id]; }
+function clearAllRecipeConflicts(){ _conflictIds = {}; }
+window.markRecipeConflicted = markRecipeConflicted;
+window.clearRecipeConflict  = clearRecipeConflict;
+function recipeIsInConflict(id) { return !!_conflictIds[id]; }
+window.recipeIsInConflict = recipeIsInConflict;
+window.conflictIds = function(){ return Object.keys(_conflictIds).map(Number); };
+
+// Replace one local recipe with the cloud's copy. Returns a result object rather
+// than toasting, so the caller decides what to say and a test can drive it.
+//   {ok:true, name, at}  |  {ok:false, reason:'signed-out'|'offline'|'not-here'
+//                            |'read-failed'|'not-in-cloud'|'unreadable', error?}
+async function refreshRecipeFromCloud(id) {
+  if (!_fbDb || !window._fbUser) return { ok:false, reason:'signed-out' };
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok:false, reason:'offline' };
+  var local = recipes.find(function(x){ return x.id === id; });
+  if (!local) return { ok:false, reason:'not-here' };
+
+  var snap;
+  try { snap = await _fbDb.collection('shared').doc(recipeDocId(id)).get(); }
+  catch(e) { return { ok:false, reason:'read-failed', error:(e && e.message) || String(e) }; }
+  // A read that failed and a document that is not there are different answers,
+  // and only one of them means "the other device deleted it".
+  if (!snap || !snap.exists) return { ok:false, reason:'not-in-cloud' };
+  var d = snap.data() || {};
+  var cloud;
+  try { cloud = JSON.parse(d.r || 'null'); } catch(e) { cloud = null; }
+  if (!cloud || typeof cloud !== 'object') return { ok:false, reason:'unreadable' };
+
+  // The local version is NOT discarded — it goes onto the revision history,
+  // where the existing 🕘 Version history → ↩ Restore brings it back. Overwriting
+  // someone's unsynced work with no way back is the thing the 5.4 guard exists to
+  // prevent; this must not become a nicer-looking way to do it.
+  pushHistory(local);
+  var keptHistory  = local.history;
+  var keptPhoto    = local.photo;
+  var keptOriginal = local.originalPhoto;
+
+  // Mutate in place: `recipes`, `viewId` and any open dialog all hold this exact
+  // object, and replacing the array entry would leave them pointing at the old one.
+  Object.keys(local).forEach(function(k){ delete local[k]; });
+  Object.keys(cloud).forEach(function(k){ local[k] = cloud[k]; });
+  local.id = id;
+  local.history = keptHistory;
+  // Recipe documents never carry the photo — it lives in photo_<id>, synced
+  // separately — so an empty photo here means "not in this document", never
+  // "deleted". Keeping the local one is the same rule loadFromFirestore follows.
+  if (!local.photo && keptPhoto) local.photo = keptPhoto;
+  if (!local.originalPhoto && keptOriginal) local.originalPhoto = keptOriginal;
+
+  _cloudRecipeBase[id]  = d.updatedAt === undefined ? null : d.updatedAt;
+  _cloudRecipeStamp[id] = hashStr(d.r || '');
+  _cloudRecipeIds[id]   = true;
+  delete _cloudUnreadable[id];
+  clearRecipeConflict(id);
+  saveCloudBase();
+  saveData();
+  if (typeof renderGrid === 'function') renderGrid();
+  if (typeof viewId !== 'undefined' && viewId === id && typeof drawView === 'function') drawView();
+  return { ok:true, name: local.name, at: d.updatedAt || null };
+}
+window.refreshRecipeFromCloud = refreshRecipeFromCloud;
+
+// Say what happened in the words of the thing that happened.
+function refreshRecipeReason(res) {
+  switch (res && res.reason) {
+    case 'signed-out':   return 'You are not signed in, so there is no cloud copy to fetch.';
+    case 'offline':      return 'This device is offline. Reconnect and try again.';
+    case 'not-here':     return 'That recipe is not on this device any more.';
+    case 'read-failed':  return 'The cloud could not be read: ' + (res.error || 'unknown error')
+                              + '. Nothing was changed.';
+    case 'not-in-cloud': return 'There is no copy of this recipe in the cloud — the other device may '
+                              + 'have deleted it. Your version is untouched; saving it will put it back.';
+    case 'unreadable':   return 'The cloud copy of this recipe will not parse, so it was not used. '
+                              + 'Your version is untouched and will replace it on the next save.';
+    default:             return 'The recipe could not be refreshed. Nothing was changed.';
+  }
+}
+
+// The button behind both entry points: the conflict message and the banner in
+// the recipe view.
+async function refreshRecipeFromCloudUI(id) {
+  var r = recipes.find(function(x){ return x.id === id; });
+  var name = (r && r.name) || ('#' + id);
+  if (!await askConfirm({ icon:'↻', title:'Take the other device’s version?',
+      message:'This replaces "' + name + '" on this device with the copy in the cloud.\n\n'
+            + 'Your current version is kept — it goes into this recipe’s '
+            + '🕘 Version history, so you can compare the two and restore yours if you prefer.',
+      okLabel:'Take the cloud version' })) return;
+  var res = await refreshRecipeFromCloud(id);
+  if (res.ok) toast('↻ Refreshed "' + (res.name || name) + '" from the cloud', 4000);
+  else showServiceError('REFRESH_FAILED: ' + refreshRecipeReason(res));
+}
+window.refreshRecipeFromCloudUI = refreshRecipeFromCloudUI;
+
 window.parseCloudRecipeDocs = parseCloudRecipeDocs;
 
 // 5d.2 — since deletion became admin-only, a write-role member removing a photo
@@ -17377,7 +17694,7 @@ async function saveToFirestore() {
       var dr = recipes.find(function(x) { return x.id === dirty[di]; });
       if (!dr) continue;
       var res = await saveRecipeDoc(dr);
-      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; }
+      if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id); }
       else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
     }
 
@@ -17414,9 +17731,18 @@ async function saveToFirestore() {
                  + ', this device ' + (r.updatedAt || 0) + ']';
           }).join('\n')
         + (saved > 0 ? '\n\n' + saved + ' other recipe(s) saved normally.' : '')
-        + '\n\nYour version is still safe on this device. Reload to pull the other device\'s copy '
-        + 'down first, then re-apply your change — nothing has been lost, but the two versions '
-        + 'have to be reconciled by you rather than guessed at.');
+        + '\n\nYour version is still safe on this device, and nothing has been lost — but the two '
+        + 'versions have to be reconciled by you rather than guessed at.'
+        + (conflicts.length === 1
+            ? '\n\n"Take the cloud version" below fetches this one recipe on its own and keeps '
+              + 'your copy in its 🕘 Version history, so you can compare them and restore yours.'
+            : '\n\nOpen any of them and use the ↻ button on the banner to fetch that one recipe '
+              + 'on its own; your copy is kept in its 🕘 Version history.'),
+        conflicts.length === 1
+          ? [{ label: '↻ Take the cloud version of "' + (conflicts[0].name || ('#' + conflicts[0].id)) + '"',
+               primary: true,
+               onClick: function(){ refreshRecipeFromCloudUI(conflicts[0].id); } }]
+          : []);
       return;
     }
     // Deletion is admin-only. Say so, and say what it means, rather than letting

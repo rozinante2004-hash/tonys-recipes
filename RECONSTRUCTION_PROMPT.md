@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v35.2` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v35.3` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~22,250 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v35.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v35.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -843,6 +843,21 @@ transaction that compares the cloud document's `updatedAt` against the base we l
 (`cloudWriteAllowed`) and **refuses** if another device wrote in between, telling the user
 plainly. Deliberately not a field‑by‑field merge: a wrong silent merge is worse than an
 honest refusal. `nextId` is merged upward, never lowered, or two devices mint the same id.
+
+**A refused write must come with a way out (v35.3).** Refusing is only half the job: before
+v35.3 the recipe stayed diverged with no route back, because nothing re‑read a single document
+between full loads — reopening it showed the local copy and the next save failed identically,
+and only restarting the whole app cleared it. So: `_conflictIds` (set by
+`markRecipeConflicted`, cleared by `clearRecipeConflict` on a successful write, on a refresh,
+and wholesale by `clearAllRecipeConflicts` after a full read) records which recipes are stuck;
+`conflictBannerHtml` puts that on the recipe view so reopening it says so; and
+`refreshRecipeFromCloud(id)` pulls **one** document down on its own, updating
+`_cloudRecipeBase`/`_cloudRecipeStamp` so the next save is accepted. Two rules it must keep:
+it **mutates the recipe object in place** (`viewId` and any open dialog hold that exact
+reference), and it **pushes the local version onto `r.history` first**, so 🕘 Version history →
+↩ Restore is the way back — a refresh that silently discarded unsynced work would be the very
+bug the refusal exists to prevent. Every failure — signed out, offline, read failed, not in the
+cloud, unreadable — has its own sentence and changes nothing (`refreshRecipeReason`).
 
 **Deleting:** propagated **explicitly** (`queueCloudDelete`, persisted in
 `tonys_cloud_deletes`, flushed by `flushCloudDeletes`), never inferred by diffing the cloud

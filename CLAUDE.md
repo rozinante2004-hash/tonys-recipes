@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v35.2: 198 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v35.3: 200 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -630,8 +630,18 @@ found only because a test was written first and disagreed with the code.
   `reconcileLegacyStragglers`, `migrateToPerRecipeDocs`, `stripPhotosForCloud`,
   `slimRecipeForCloud`'s `keepHistory` flag, `meta.legacyAt`, the `recipes` listener and
   the unconditional-read branch. **Do not reintroduce a second cloud shape.** The two-
-  browser concurrency checks in `PLAN-5.4-per-recipe-docs.md` §7 have **not** been run;
-  they need two real signed-in sessions.
+  browser concurrency checks in `PLAN-5.4-per-recipe-docs.md` §7 were **run by Tony on
+  29 Aug 2026** and the guard behaved: PC edited, phone edited and saved, PC's save
+  refused, nothing overwritten. What it also found is that **detecting a conflict is
+  not the same as offering a way out of one.** Closing and reopening the recipe still
+  showed the local version and saving failed again, because nothing re-read a single
+  document between full loads — only restarting the whole app cleared it. Fixed in
+  v35.3: `refreshRecipeFromCloud(id)` pulls one document down on its own, and
+  `_conflictIds` (owned by `markRecipeConflicted`/`clearRecipeConflict`) makes the state
+  visible in the recipe view instead of leaving it invisible until the next full load.
+  **The local version is pushed onto `r.history` before being replaced**, so the
+  existing 🕘 Version history → ↩ Restore is the way back; a refresh that silently
+  discarded unsynced work would be the very bug the 5.4 guard exists to prevent.
 - **Deletion is genuinely admin-only, published 1 Aug 2026.** v28.1 split `write` into
   `create, update` — `write` in Firestore means create + update + delete and allow rules
   are OR'd, so the `allow delete` line below it had been restricting nothing. Consequences
