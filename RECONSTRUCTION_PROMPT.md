@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.0` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v36.1` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v36.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.1"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1234,6 +1234,32 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   recipe when only one part is left. Ticks are namespaced per part (`ing-p0-3`). A
   collection shows neither a prep/servings/difficulty line nor a nutrition panel, because
   it has no single value for either.
+- **Long articles are extracted IN PIECES, never in one call (v36.1).** v36.0 asked for a
+  whole ten‑recipe round‑up in one answer of up to 16,000 tokens. Nothing streams through
+  the Worker (it does `await r.json()`), so that is minutes of a connection with no bytes
+  on it — the thing Anthropic's docs say not to do without streaming — behind one
+  unchanging spinner. `extractRecipesFromText(text, hint, onProgress)` is the single entry
+  point all import paths use. Over `MULTI_SPLIT_OVER` (7,000 chars) it runs a cheap
+  outline pass (`multiOutlinePrompt`, 1,500 tokens) for the recipe titles, cuts the
+  article at them with `sliceByTitles`, and extracts each slice separately at
+  `MULTI_CONCURRENCY` 3 via `mapLimited`. **A title the AI paraphrased is not in the text:
+  it is skipped, never given a guessed position** — its recipe stays inside its
+  neighbour's slice, where it is still read. Fewer than two locatable titles falls back to
+  one call capped at 8,000 tokens over 24,000 chars of text. **A failed slice costs one
+  recipe, not the import**; `_partial`/`_expected` carry the count and the preview says it
+  out loud, because 8 recipes that should have been 10 look exactly like 8 recipes. Below
+  the threshold it is still ONE call — do not make a single recipe pay for three round
+  trips.
+- **Every AI call is bounded and failures are classified (v36.1).** `aiTimeoutMs(maxTokens)`
+  → a finite `AbortSignal.timeout` on the fetch, capped at 180s; before this there was no
+  signal at all and a stalled connection hung the app forever. `aiRetryable(e)` retries
+  **only** 408/409/425/5xx and bare network errors — **never a 4xx, never an abort/timeout,
+  never a rate limit**. Retrying what cannot succeed is what turned a permanent failure into
+  "stuck, possibly in a loop": five attempts with 2/4/8/16s of backoff. A
+  `stop_reason: 'max_tokens'` reply is rejected as `TRUNCATED:` rather than handed on as
+  half a JSON document. `ai` and `import` are `LOG_KINDS`, and the import path logs — it
+  logged **nothing** before v36.1, so turning logging on during the hang showed an empty
+  panel.
 - **Word** (`.docx`): **built by hand** as an OOXML zip — `makeDocxBlob` + a tiny `buildZip`
   (store‑only, CRC32) — no library for export. Import `.docx` via **mammoth** 1.6.0 CDN
   (`parseWordText`). Three things here are load‑bearing and were all wrong before **v35.1**:

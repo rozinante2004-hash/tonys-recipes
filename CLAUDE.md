@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.0: 208 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.1: 213 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -707,6 +707,53 @@ found only because a test was written first and disagreed with the code.
     hidden rather than shown empty or invented.
   - Promoting the last-but-one part collapses the collection back into an
     ordinary recipe. A container holding one thing is a container for nothing.
+- **The import that never finished (v36.1).** v36.0 shipped the collection model
+  and then hung on the very article it was built for. Four separate faults, each
+  enough on its own to produce "stuck, possibly in a loop":
+  - **The AI fetch carried no `AbortSignal` at all.** Nothing streams through the
+    Worker — it does `await r.json()` on the whole answer — so a request asking
+    for 16,000 tokens sits with no bytes on the wire for minutes, which is
+    exactly what Anthropic's own guidance says not to do without streaming
+    (networks drop idle connections and the caller waits for a response that is
+    never coming). Every AI call now has a finite budget, `aiTimeoutMs()`,
+    scaled to what it asked for and capped at 180s.
+  - **The retry loop retried everything.** Only `BILLING:`, `API_KEY:` and rate
+    limits were re-thrown, so a hard 400 was sent five times with 2/4/8/16s of
+    backoff between them — half a minute of silence for an answer that could
+    never change, and ten minutes when each attempt was a slow timeout. That is
+    what looked like a loop. `aiRetryable()` now retries only 408/409/425/5xx and
+    bare network failures. **Never retry a 4xx.**
+  - **Nothing in the import path was logged.** Tony turned logging on during the
+    hang and the panel showed one `load` line. The log's whole purpose is the
+    moment something goes wrong, and it had no coverage of the one thing that
+    had. `ai` and `import` are log kinds now, and every AI call records its size,
+    its budget, how long it took and its `stop_reason`.
+  - **Every failure ended at the same place: "save as a video bookmark?"** A
+    timeout, a 400 and a genuinely recipe-less page are different answers. Only
+    the last is a bookmark; the others now say what happened and offer Try again.
+  - **The real fix is that a long article is no longer one question.** A cheap
+    outline pass asks what recipes are in the text; `sliceByTitles` cuts the
+    article at those headings (a title the AI paraphrased is *skipped*, not given
+    a guessed position — its recipe stays inside its neighbour's slice, where it
+    is still read); then each slice is extracted on its own, three at a time. No
+    call asks for more than ~2,600 tokens where one used to ask for 16,000, the
+    spinner counts real progress, and **a failed slice costs one recipe instead
+    of the import** — `_partial` says how many are missing, because a list of 8
+    that should have been 10 looks exactly like a list of 8. Total input is about
+    the same as the single call it replaces. Below `MULTI_SPLIT_OVER` (7,000
+    chars) it is still one call: splitting a single recipe would be three round
+    trips where one did.
+  - **A stop at the token ceiling is now named.** `stop_reason: 'max_tokens'`
+    means half a JSON document; the import used to report "could not parse",
+    which was true and useless.
+  - **A stub that never settles does not test an AbortSignal, it ignores it.**
+    The first `ai_hang_ends_by_itself` returned `new Promise(()=>{})` and hung
+    the whole runner — a real fetch *rejects* when its signal aborts. The stub
+    now honours the signal, and asserts that one was passed at all.
+  - The 404 in the browser console (`/tonys-recipes/sw.js`) when serving the repo
+    from a bare `http.server` root is the SW registration path, not a fault; it
+    predates v36.1. A driver that needs the page to stay put should pass
+    `serviceWorkers: 'block'`, since `controllerchange` reloads the page.
 
 ## Outstanding
 

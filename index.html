@@ -301,7 +301,11 @@ var LOG_MSG_MAX = 300;          // one runaway message must not fill the store
 // 'system' marks the log's own lifecycle — when collection started, so it is
 // obvious the log cannot cover anything earlier. It is not a sync event, and
 // filing it under 'load' would have quietly polluted that filter.
-var LOG_KINDS = ['system','load','save','conflict','refresh','photo','auth','error'];
+// 'ai' and 'import' were added in v36.1. The log had nothing at all to say
+// about an import — so when one hung, turning logging on showed an empty panel
+// and the one thing worth knowing (how long the call had been waiting) was the
+// one thing nowhere recorded.
+var LOG_KINDS = ['system','load','save','conflict','refresh','photo','auth','ai','import','error'];
 
 // Small sizes must read as small, not round to "0 KB".
 function formatBytes(n) {
@@ -6834,6 +6838,241 @@ const SELF_TESTS = [
         throw new Error('a heading with no ingredients or steps was imported as a recipe');
     } },
 
+  { id:'ai_call_is_bounded', group:'Import/Export', name:'An AI call cannot wait forever, and a 400 is not retried (v36.1)',
+    test: async()=>{
+      // v36.0's fetch had no AbortSignal, so a stalled connection hung the app
+      // with an unchanging spinner; the retry loop then repeated it four times.
+      var small = aiTimeoutMs(2000), big = aiTimeoutMs(16000);
+      if(!(small>0 && isFinite(small))) throw new Error('a small call has no time limit');
+      if(!(big>small)) throw new Error('a bigger answer is not given more time ('+big+' vs '+small+')');
+      if(big>180000) throw new Error('the budget is not capped — '+big+'ms');
+      if(aiTimeoutMs(2000000)>180000) throw new Error('an absurd token count escapes the cap');
+
+      // Retrying something that cannot succeed is what made a permanent failure
+      // look like a hang: 5 attempts with 2/4/8/16s of backoff between them.
+      var perm = [ new Error('API error 400: bad request'),
+                   new Error('API error 404: not found'),
+                   new Error('API error 413: too large'),
+                   new Error('BILLING: out of credits'),
+                   new Error('API_KEY: expired'),
+                   new Error('Rate limit reached. Please wait a moment and try again.') ];
+      perm.forEach(function(e){
+        if(aiRetryable(e)) throw new Error('retried a permanent failure: '+e.message);
+      });
+      // Two separate guards, and each must hold on its own. A raw abort from the
+      // browser arrives as a TimeoutError whose message says only "signal timed
+      // out" — nothing this code wrote — so the NAME is all there is to go on.
+      var raw = new Error('signal timed out');
+      raw.name = 'TimeoutError';
+      if(aiRetryable(raw)) throw new Error('a raw aborted fetch is retried, which multiplies the wait');
+      var ab = new Error('The user aborted a request.');
+      ab.name = 'AbortError';
+      if(aiRetryable(ab)) throw new Error('an aborted request is retried');
+      // And once _aiCallUncached has re-worded it for the user, the name is gone
+      // and the message is all there is. Both paths reach the same answer.
+      if(aiRetryable(new Error('The AI request took too long (over 158s) and was stopped.')))
+        throw new Error('a re-worded timeout is retried, which multiplies the wait');
+      // ...but a genuine blip still gets another go, or one dropped packet
+      // would lose an import that would have worked.
+      [ new Error('API error 500: internal'),
+        new Error('API error 529: overloaded'),
+        new Error('API error 408: request timeout'),
+        new Error('Failed to fetch') ].forEach(function(e){
+        if(!aiRetryable(e)) throw new Error('gave up on a transient failure: '+e.message);
+      });
+    } },
+
+  { id:'ai_hang_ends_by_itself', group:'Import/Export', name:'A stalled AI call ends on its own, once (v36.1)',
+    test: async()=>{
+      // The exact shape of the bug: the Worker accepts the request and then the
+      // response never arrives. In v36.0 there was no signal on that fetch, so
+      // this waited forever behind an unchanging spinner.
+      var realFetch = window.fetch, realBudget = window.aiTimeoutMs, calls = 0;
+      try{
+        window.aiTimeoutMs = function(){ return 700; };   // keep the suite quick
+        var sawSignal = true;
+        window.fetch = function(url, opts){
+          var body = {}; try { body = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(!body.messages) return realFetch.apply(window, arguments);
+          calls++;
+          var sig = opts && opts.signal;
+          if(!sig) { sawSignal = false; return Promise.reject(new Error('no AbortSignal was passed')); }
+          // A real fetch answers an abort by rejecting. A promise that merely
+          // never settles would ignore the signal — and then this test would
+          // hang exactly the way the bug did, proving nothing.
+          return new Promise(function(_, reject){
+            sig.addEventListener('abort', function(){
+              var e = new Error('signal timed out'); e.name = 'TimeoutError'; reject(e);
+            });
+          });
+        };
+        var t0 = Date.now(), msg = '';
+        try {
+          await aiCall('a prompt no cache has ever seen ' + Date.now() + Math.random(), 2000);
+          throw new Error('a request that never answered was reported as a success');
+        } catch(e){ msg = e.message; }
+        var took = Date.now() - t0;
+        if(msg.indexOf('a request that never answered')!==-1) throw new Error(msg);
+        if(!sawSignal) throw new Error('the AI fetch carries no AbortSignal — nothing can end a stall');
+        if(took > 4000) throw new Error('took '+took+'ms to give up on a 700ms budget — it was retried');
+        if(calls !== 1) throw new Error('a stalled request was sent '+calls+' times, multiplying the wait');
+        if(!/took too long/.test(msg))
+          throw new Error('the failure does not say it ran out of time: '+msg);
+        if(/TimeoutError|signal timed out/.test(msg))
+          throw new Error('the raw abort text was shown to the user: '+msg);
+
+        // The other way a big answer fails: it arrives, but the model ran out of
+        // tokens partway through. That is half a JSON document, and the import
+        // then failed with "could not parse" — true, and useless.
+        window.fetch = function(url, opts){
+          var body = {}; try { body = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(!body.messages) return realFetch.apply(window, arguments);
+          return Promise.resolve(new Response(JSON.stringify({
+            content:[{ text:'{"recipes":[{"name":"half a rec' }], stop_reason:'max_tokens'
+          }), { status:200, headers:{'Content-Type':'application/json'} }));
+        };
+        var cutMsg = '';
+        try {
+          await aiCall('another prompt no cache has seen ' + Date.now() + Math.random(), 2000);
+          throw new Error('a reply cut off at the token ceiling was passed on as if it were whole');
+        } catch(e){ cutMsg = e.message; }
+        if(cutMsg.indexOf('was passed on as if')!==-1) throw new Error(cutMsg);
+        if(!/TRUNCATED|ceiling/.test(cutMsg))
+          throw new Error('a truncated answer does not say so: '+cutMsg);
+      } finally { window.fetch = realFetch; window.aiTimeoutMs = realBudget; }
+    } },
+
+  { id:'ai_slice_by_titles', group:'Import/Export', name:'A long article is cut at its recipe headings (v36.1)',
+    test: async()=>{
+      var text = 'Chestnuts: 3 recipes\nAn intro paragraph.\n'
+               + 'Mushroom gnocchi\ningredients A\nsteps A\n'
+               + 'Chestnut soup\ningredients B\nsteps B\n'
+               + 'Sweet potato pasta\ningredients C\nsteps C\n';
+      var sl = sliceByTitles(text, ['Mushroom gnocchi','Chestnut soup','Sweet potato pasta']);
+      if(sl.length!==3) throw new Error('cut into '+sl.length+' pieces, not 3');
+      if(sl[0].text.indexOf('ingredients A')===-1) throw new Error('a slice lost its own body');
+      if(sl[0].text.indexOf('ingredients B')!==-1) throw new Error('a slice ran into the next recipe');
+      if(sl[2].text.indexOf('ingredients C')===-1) throw new Error('the last slice stops short of the end');
+
+      // A title the AI paraphrased is not in the text. Guessing where it would
+      // have been would cut a recipe in half, so it is skipped instead — and
+      // its recipe stays inside its neighbour's slice, where it is still read.
+      var sl2 = sliceByTitles(text, ['Mushroom gnocchi','Soup of chestnuts','Sweet potato pasta']);
+      if(sl2.length!==2) throw new Error('an unfindable title was invented a position');
+      if(sl2[0].text.indexOf('ingredients B')===-1)
+        throw new Error('the skipped recipe was dropped instead of left in its neighbour');
+
+      // Nothing to gain from splitting — the caller must fall back to one call.
+      if(sliceByTitles(text, ['Mushroom gnocchi']).length!==0)
+        throw new Error('a single title was treated as a split worth making');
+      if(sliceByTitles(text, []).length!==0) throw new Error('no titles produced slices');
+      if(sliceByTitles(text, ['','  ','x']).length!==0) throw new Error('junk titles produced slices');
+    } },
+
+  { id:'ai_map_limited', group:'Import/Export', name:'Slices run a few at a time, in order (v36.1)',
+    test: async()=>{
+      var live=0, peak=0;
+      var out = await mapLimited([1,2,3,4,5,6,7], 3, async function(n){
+        live++; peak = Math.max(peak, live);
+        await new Promise(function(r){ setTimeout(r, 5); });
+        live--;
+        return n*10;
+      });
+      if(out.join(',')!=='10,20,30,40,50,60,70') throw new Error('results came back out of order: '+out.join(','));
+      if(peak>3) throw new Error('ran '+peak+' at once against a limit of 3');
+      if(peak<2) throw new Error('ran them one at a time — the limit is not being used');
+      if((await mapLimited([], 3, async function(){ return 1; })).length!==0)
+        throw new Error('an empty list did not come back empty');
+    } },
+
+  { id:'ai_chunked_extract', group:'Import/Export', name:'A ten-recipe article is asked for in pieces (v36.1)',
+    test: async()=>{
+      var realAi = window.aiCall, asked = [];
+      var body = function(n){
+        return 'Recipe number '+n+'\n'+'filler '.repeat(120)+'\nsteps for '+n+'\n';
+      };
+      var article = 'Chestnuts: 10 recipes\nIntro.\n';
+      for(var i=1;i<=10;i++) article += body(i);
+      if(article.length<=MULTI_SPLIT_OVER) throw new Error('the fixture is not long enough to be split');
+      try{
+        window.aiCall = function(prompt, maxTokens){
+          asked.push({ prompt:prompt, maxTokens:maxTokens });
+          if(prompt.indexOf('List the recipes in it')!==-1){
+            var t=[]; for(var k=1;k<=10;k++) t.push('Recipe number '+k);
+            return Promise.resolve(JSON.stringify({ collectionName:'Chestnuts: 10 recipes',
+              collectionNotes:'Intro.', category:'Dinner', titles:t }));
+          }
+          var m = prompt.match(/Recipe number (\d+)/);
+          return Promise.resolve(JSON.stringify({ recipes:[{ name:'Recipe number '+m[1],
+            ingredients:[{a:'1',n:'chestnuts'}], steps:['do '+m[1]] }] }));
+        };
+        var seen=[];
+        var parsed = await extractRecipesFromText(article, 'webpage text',
+          function(done,total){ seen.push(done+'/'+total); });
+
+        if(asked.length!==11) throw new Error('made '+asked.length+' calls, not 1 outline + 10 recipes');
+        // The whole point: no single call asks for a huge answer any more.
+        asked.forEach(function(a){
+          if(a.maxTokens>8000) throw new Error('a call still asked for '+a.maxTokens+' tokens');
+        });
+        if(parsed.recipes.length!==10) throw new Error('got '+parsed.recipes.length+' recipes, not 10');
+        if(parsed.recipes[0].name!=='Recipe number 1' || parsed.recipes[9].name!=='Recipe number 10')
+          throw new Error('the recipes came back out of the order they appear in');
+        if(parsed.collectionName!=='Chestnuts: 10 recipes') throw new Error('the article title was lost');
+        if(!seen.length) throw new Error('nothing reported progress — the spinner cannot count');
+        if(seen[seen.length-1]!=='10/10') throw new Error('progress never reached the end: '+seen.join(' '));
+        // And it must still build the same collection as a single-call answer.
+        var built = buildImportFromParsed(parsed, 'https://example.com/a');
+        if(built.kind!=='collection') throw new Error('the assembled answer built a '+built.kind);
+        if(built.recipe.parts.length!==10) throw new Error('the collection has '+built.recipe.parts.length+' parts');
+
+        // One bad slice costs one recipe, not the import. Before v36.1 the whole
+        // article was one call, so any failure lost all ten.
+        asked.length=0;
+        window.aiCall = function(prompt){
+          if(prompt.indexOf('List the recipes in it')!==-1){
+            var t=[]; for(var k=1;k<=10;k++) t.push('Recipe number '+k);
+            return Promise.resolve(JSON.stringify({ collectionName:'C', category:'Dinner', titles:t }));
+          }
+          var m = prompt.match(/Recipe number (\d+)/);
+          if(m[1]==='4') return Promise.reject(new Error('API error 500: internal'));
+          return Promise.resolve(JSON.stringify({ recipes:[{ name:'Recipe number '+m[1],
+            ingredients:[{a:'1',n:'x'}], steps:['s'] }] }));
+        };
+        var part = await extractRecipesFromText(article, 'webpage text');
+        if(part.recipes.length!==9) throw new Error('a failed slice cost '+(10-part.recipes.length)+' recipes');
+        if(part._partial!==1) throw new Error('the import did not report that 1 of 10 was missing');
+        if(part.recipes.some(function(r){ return r.name==='Recipe number 4'; }))
+          throw new Error('the failed recipe came back anyway');
+
+        // Everything failing is a failure, not an empty success.
+        window.aiCall = function(prompt){
+          if(prompt.indexOf('List the recipes in it')!==-1){
+            return Promise.resolve(JSON.stringify({ titles:['Recipe number 1','Recipe number 2'] }));
+          }
+          return Promise.reject(new Error('API error 500: internal'));
+        };
+        var threw=false;
+        try { await extractRecipesFromText(article, 'webpage text'); } catch(e){ threw=true; }
+        if(!threw) throw new Error('every slice failed and the import still reported success');
+
+        // A short text is still ONE call — splitting a single recipe would be
+        // three round trips where one did.
+        asked.length=0;
+        window.aiCall = function(prompt, maxTokens){
+          asked.push({prompt:prompt, maxTokens:maxTokens});
+          return Promise.resolve(JSON.stringify({ recipes:[{ name:'Just one',
+            ingredients:[{a:'1',n:'egg'}], steps:['beat'] }] }));
+        };
+        var shortText = 'Just one\n'+'a '.repeat(50)+'\nbeat it';
+        var single = await extractRecipesFromText(shortText, 'pasted text');
+        if(asked.length!==1) throw new Error('a short recipe took '+asked.length+' calls');
+        if(asked[0].prompt.indexOf('List the recipes in it')!==-1)
+          throw new Error('a short recipe paid for an outline pass');
+        if(single.recipes.length!==1) throw new Error('the short path lost the recipe');
+      } finally { window.aiCall = realAi; }
+    } },
+
   { id:'coll_nothing_is_half_read', group:'Import/Export', name:'Search, export and Bring! see a whole collection (v36.0)',
     test: async()=>{
       var built = buildImportFromParsed({ collectionName:'Two things', category:'Dinner', recipes:[
@@ -9836,7 +10075,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.0';
+var APP_VERSION = 'v36.1';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12147,7 +12386,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.0</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.1</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15919,14 +16158,16 @@ async function importFromFile(event){
     // "all recipes" and made a separate recipe out of each, so what you got
     // depended on which import button you pressed.
     var fileText = text.slice(0, 40000);
-    var aiText = await aiCall(multiRecipePrompt(fileText, 'document text'),
-                              multiRecipeMaxTokens(fileText));
-
     var parsed;
     try {
-      parsed = extractJSON(aiText);
+      parsed = await extractRecipesFromText(fileText, 'document text', function(done, total) {
+        if (total > 1) toast('🤖 Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…', 1500);
+      });
     } catch(e) {
-      throw new Error('AI could not parse a recipe from this file. Try the Free-hand text import instead.');
+      // A timeout and "this file has no recipe in it" used to read the same.
+      // Pass the real reason through — it is the only thing that tells Tony
+      // whether trying again is worth anything.
+      throw new Error((e && e.message) || 'AI could not parse a recipe from this file. Try the Free-hand text import instead.');
     }
 
     var built = buildImportFromParsed(parsed, file.name);
@@ -16637,6 +16878,39 @@ async function aiCall(prompt, maxTokens=2000, tools=null) {
   }
   return _aiCallUncached(prompt, maxTokens, tools, _ck);
 }
+// How long one AI call may wait before we stop waiting. Nothing streams through
+// the Worker — it does `await r.json()` on the whole answer — so a request that
+// asks for a big reply sits with no bytes on the wire for minutes. That is the
+// very thing Anthropic's own guidance says not to do without streaming, because
+// networks drop idle connections and the caller is then waiting for a response
+// that is never coming.
+//
+// Before v36.1 this fetch carried NO signal at all. A stalled connection left
+// the spinner turning forever, and the retry loop below then did it four more
+// times behind the same spinner. That is what "got stuck, possibly in a loop"
+// was: not a loop in the code, a loop you could not see the end of.
+function aiTimeoutMs(maxTokens) {
+  return Math.min(180000, 30000 + (maxTokens || 2000) * 8);
+}
+// Which failures are worth another attempt. Retrying a 400 cannot succeed — it
+// only turns an instant, explainable failure into half a minute of silence, and
+// five slow timeouts into ten minutes of it. Only what might genuinely differ
+// next time is retried.
+function aiRetryable(e) {
+  var m = (e && e.message) || '';
+  if (e && (e.name === 'AbortError' || e.name === 'TimeoutError')) return false;
+  if (m.indexOf('took too long') !== -1) return false;
+  if (m.indexOf('BILLING:') === 0 || m.indexOf('API_KEY:') === 0) return false;
+  if (m.indexOf('Rate limit') !== -1) return false;
+  var code = m.match(/^API error (\d{3})/);
+  if (code) {
+    var n = +code[1];
+    return n === 408 || n === 409 || n === 425 || n >= 500;   // a plain 4xx is our request's fault
+  }
+  return true;                                   // a bare network failure — worth one more go
+}
+window.aiTimeoutMs = aiTimeoutMs; window.aiRetryable = aiRetryable;
+
 async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
@@ -16644,6 +16918,10 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
 
   const MAX_RETRIES = 4;
   let delay = 2000;
+  const budget = aiTimeoutMs(maxTokens);
+  const t0 = Date.now();
+  syncLog('ai', 'AI call: ' + Math.round(prompt.length / 1000) + 'k chars in, '
+    + maxTokens + ' tokens out, ' + Math.round(budget / 1000) + 's budget');
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -16657,7 +16935,8 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
       const r = await fetch(WORKER_URL, {
         method: 'POST',
         headers: workerHeaders(),
-        body: workerBody(body)
+        body: workerBody(body),
+        signal: AbortSignal.timeout(budget)
       });
 
       if (r.status === 429 || r.status === 529) {
@@ -16691,11 +16970,31 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
       var _out = (d.content || []).map(function(b){ return b.text || ''; }).join('\n');
       // Only successful, non-empty answers are worth remembering.
       if (_ck && _out && _out.trim()) aiCachePut(_ck, _out);
+      syncLog('ai', 'AI answered in ' + Math.round((Date.now() - t0) / 1000) + 's, '
+        + _out.length + ' chars'
+        + (d.stop_reason ? ' (stop: ' + d.stop_reason + ')' : ''));
+      // A reply cut off at the token ceiling is not valid JSON, and "could not
+      // parse" told nobody why. Say what actually happened.
+      if (d.stop_reason === 'max_tokens') {
+        throw new Error('TRUNCATED: the answer hit the ' + maxTokens + '-token ceiling before it finished.');
+      }
       return _out;
     } catch(e) {
-      if (attempt === MAX_RETRIES) throw e;
-      if (e.message && (e.message.startsWith('BILLING:') || e.message.startsWith('API_KEY:'))) throw e;
-      if (e.message && e.message.includes('Rate limit')) throw e;
+      // An aborted fetch arrives as a bare TimeoutError with no useful text.
+      // Name it, so every layer above — and the log — can tell a request that
+      // ran out of time from one that was refused.
+      if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+        e = new Error('The AI request took too long (over ' + Math.round(budget / 1000)
+          + 's) and was stopped. A very long article can do this — try importing less of it at once.');
+      }
+      var last = (attempt === MAX_RETRIES) || !aiRetryable(e);
+      if (last) {
+        syncLog('error', 'AI call failed after ' + Math.round((Date.now() - t0) / 1000)
+          + 's on attempt ' + (attempt + 1), (e && e.message || String(e)).slice(0, 300));
+        throw e;
+      }
+      syncLog('ai', 'AI attempt ' + (attempt + 1) + ' failed, retrying in ' + (delay / 1000) + 's',
+        (e && e.message || String(e)).slice(0, 200));
       await sleep(delay);
       delay *= 2;
     }
@@ -17248,8 +17547,11 @@ async function runFreehandImport() {
   res.innerHTML = `<div class="explore-loading"><div class="ai-spinner"></div><br>Parsing recipe…</div>`;
 
   try {
-    const raw = await aiCall(multiRecipePrompt(text, 'pasted text'), multiRecipeMaxTokens(text));
-    const parsed = extractJSON(raw);
+    const parsed = await extractRecipesFromText(text, 'pasted text', function(done, total, label) {
+      res.innerHTML = spinner(label || (total > 1
+        ? 'Parsing recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
+        : 'Parsing recipe…'));
+    });
     if (parsed.error) throw new Error(parsed.error);
     // Filling the EDIT FORM can only ever take one recipe, so that route keeps
     // the first and says so rather than silently dropping the rest.
@@ -17482,18 +17784,34 @@ async function runUrlImport() {
   }
 
   res.innerHTML = spinner('Extracting recipe…');
+  syncLog('import', 'URL import: ' + pageText.length + ' chars of page text', url.slice(0, 120));
   try {
-    const raw = await aiCall(multiRecipePrompt(pageText, 'webpage text'),
-                             multiRecipeMaxTokens(pageText));
-    const parsed = extractJSON(raw);
+    const parsed = await extractRecipesFromText(pageText, 'webpage text', function(done, total, label) {
+      res.innerHTML = spinner(label || (total > 1
+        ? 'Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
+        : 'Extracting recipe…'));
+    });
     if (parsed.error) throw new Error(parsed.error);
     const built = buildImportFromParsed(parsed, url);
     if (built.kind === 'none') throw new Error('no recipe found');
     if (_pageWasTruncated) built.recipe._truncated = true;
+    if (parsed._partial) built.recipe._partial = parsed._partial + ' of ' + parsed._expected;
     applyParsedRecipe(built.recipe, 'urlImportResult', 'urlImportOverlay');
   } catch(err) {
-    // No recipe found — offer to save as video/link bookmark
-    showSaveAsVideoBookmark(url, '', '🎥');
+    // "There is no recipe here" and "the request timed out" are different
+    // answers, and offering a video bookmark for both hid every failure this
+    // import can have behind a suggestion about something else. Only the first
+    // one is a bookmark; the second is a fault, and it says so.
+    var msg = (err && err.message) || String(err);
+    syncLog('error', 'URL import failed', msg.slice(0, 300));
+    if (/no recipe found|not a recipe/i.test(msg)) {
+      showSaveAsVideoBookmark(url, '', '🎥');
+    } else {
+      res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
+        + 'Could not import this page: ' + escH(msg) + '</div>'
+        + '<button class="save-translation-btn" style="margin-top:10px;" '
+        + 'onclick="runUrlImport()">&#8635; Try again</button>';
+    }
   }
 }
 
@@ -17573,6 +17891,15 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
       + 'If the article says it has more than ' + parts.length + ', import these and then paste the rest '
       + 'into Free-hand text.</div>'
     : '';
+  // A long article is extracted one recipe at a time (v36.1). If some of those
+  // calls failed, the list is short by exactly that many — and a list of 8 that
+  // should have been 10 looks identical to a list of 8. Say the number.
+  var missed = parsed._partial
+    ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">⚠️ <strong>'
+      + escH(String(parsed._partial)) + ' of these could not be read</strong> and are missing from the '
+      + 'list below. Import what came back, then run the import again for the rest.</div>'
+    : '';
   var thin = parts.filter(function(p){ return !p.ingredients.length || !p.steps.length; });
   var warn = thin.length
     ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
@@ -17590,7 +17917,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
     + (parsed.notes ? '<div dir="auto" style="font-size:12px;color:var(--muted);margin-bottom:8px;'
         + 'line-height:1.5;">' + escH(parsed.notes) + '</div>' : '')
     + '<div style="margin-top:8px;">' + rows + '</div>'
-    + cut + warn
+    + cut + missed + warn
     + '</div>'
     + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encoded + ',&quot;' + overlayId + '&quot;)">'
     + '&#10003; Add all ' + parts.length + ' as one collection</button>';
@@ -17732,6 +18059,145 @@ function multiRecipeMaxTokens(text) {
   var n = Math.ceil(String(text || '').length / 900);      // rough recipes-in-page
   return Math.max(2000, Math.min(16000, 1200 + n * 700));
 }
+
+// ─── CHUNKED EXTRACTION (v36.1) ──────────────────────────────────────────────
+// v36.0 asked for a whole ten-recipe round-up in ONE answer — up to 16,000
+// tokens. Nothing streams through the Worker, so that is several minutes of a
+// connection with no bytes on it, and the app showed one unchanging spinner for
+// all of it. It did not fail; it just never visibly finished.
+//
+// So a long article is no longer one question. First ask a cheap one — what
+// recipes are in here, by name, in order — then ask for each recipe on its own
+// slice of the text. Every call is small and quick, the count is real progress,
+// a failed slice costs one recipe rather than the import, and the total input
+// is about the same as the single call it replaces.
+var MULTI_SPLIT_OVER = 7000;      // chars — below this, one call is still faster
+var MULTI_CONCURRENCY = 3;        // the Worker allows 40 AI requests a minute
+
+function multiOutlinePrompt(text) {
+  return 'The following text is a food article. List the recipes in it.\n\n'
+    + 'Return ONLY valid JSON, no markdown fences:\n'
+    + '{"collectionName":"the article\'s own overall title",'
+    + '"collectionNotes":"the article\'s intro paragraph, if any",'
+    + '"category":"one of Breakfast/Lunch/Dinner/Snack/Dessert/Soup/Skills & Methods",'
+    + '"titles":["each recipe\'s heading, copied EXACTLY as it appears in the text, in order"]}\n\n'
+    + 'Copy each title character for character — do not translate, tidy or renumber it. '
+    + 'The titles are used to find where each recipe starts, so a title that is not in '
+    + 'the text word for word is worse than useless.\n\n'
+    + 'TEXT:\n' + text;
+}
+
+// Cut the article at its recipe headings. A title the AI paraphrased will not
+// be found; rather than guess a boundary, those are dropped from the cut list
+// and their recipe stays inside its neighbour's slice, where it is still read.
+function sliceByTitles(text, titles) {
+  var marks = [], from = 0;
+  (titles || []).forEach(function(t) {
+    if (typeof t !== 'string' || t.trim().length < 3) return;
+    var at = text.indexOf(t.trim(), from);
+    if (at === -1) return;
+    marks.push({ at: at, title: t.trim() });
+    from = at + t.trim().length;
+  });
+  if (marks.length < 2) return [];         // nothing to gain — one call is simpler
+  return marks.map(function(m, i) {
+    var end = (i + 1 < marks.length) ? marks[i + 1].at : text.length;
+    return { title: m.title, text: text.slice(m.at, end) };
+  });
+}
+
+// Run jobs a few at a time. Serial would be ten round trips end to end; all at
+// once would walk into the Worker's per-minute limit on a long article.
+async function mapLimited(items, limit, fn) {
+  var out = new Array(items.length), next = 0;
+  async function worker() {
+    while (next < items.length) {
+      var i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  var runners = [];
+  for (var w = 0; w < Math.min(limit, items.length); w++) runners.push(worker());
+  await Promise.all(runners);
+  return out;
+}
+
+// The one entry point every import path uses. Returns what the AI would have
+// returned from a single call, so buildImportFromParsed is unchanged.
+// `onProgress(done, total, label)` is optional and is what the spinner reads.
+async function extractRecipesFromText(text, hint, onProgress) {
+  text = String(text || '');
+  var say = (typeof onProgress === 'function') ? onProgress : function(){};
+
+  if (text.length <= MULTI_SPLIT_OVER) {
+    syncLog('import', 'Extracting ' + text.length + ' chars in one call');
+    say(0, 1, 'Reading the recipe…');
+    var one = extractJSON(await aiCall(multiRecipePrompt(text, hint), multiRecipeMaxTokens(text)));
+    say(1, 1, '');
+    return one;
+  }
+
+  say(0, 0, 'Finding the recipes…');
+  syncLog('import', 'Long text (' + text.length + ' chars) — asking for an outline first');
+  var outline = {};
+  try { outline = extractJSON(await aiCall(multiOutlinePrompt(text), 1500)) || {}; }
+  catch (e) { syncLog('import', 'Outline pass failed — falling back to one call', String(e && e.message)); }
+
+  var slices = sliceByTitles(text, outline.titles);
+  if (!slices.length) {
+    // Either it is genuinely one recipe, or the titles could not be located.
+    // Either way the honest fallback is the single call — but capped, so it
+    // cannot become the multi-minute wait this function exists to prevent.
+    syncLog('import', 'Could not cut the article into recipes — one capped call instead');
+    say(0, 1, 'Reading the article…');
+    var capped = extractJSON(await aiCall(multiRecipePrompt(text.slice(0, 24000), hint), 8000));
+    say(1, 1, '');
+    return capped;
+  }
+
+  syncLog('import', 'Cut into ' + slices.length + ' recipes — extracting each separately');
+  var done = 0, failures = [];
+  say(0, slices.length, '');
+  var results = await mapLimited(slices, MULTI_CONCURRENCY, async function(sl) {
+    try {
+      var p = extractJSON(await aiCall(multiRecipePrompt(sl.text, hint), multiRecipeMaxTokens(sl.text)));
+      var got = Array.isArray(p && p.recipes) ? p.recipes
+              : (p && (p.name || p.ingredients)) ? [p] : [];
+      return got;
+    } catch (e) {
+      // One recipe out of ten is not a reason to lose the other nine.
+      failures.push(sl.title + ': ' + ((e && e.message) || e));
+      syncLog('error', 'Recipe "' + sl.title + '" could not be extracted', String(e && e.message).slice(0, 200));
+      return [];
+    } finally {
+      say(++done, slices.length, '');
+    }
+  });
+
+  var recipes = [];
+  results.forEach(function(list) { (list || []).forEach(function(r) { recipes.push(r); }); });
+
+  if (!recipes.length) {
+    syncLog('error', 'Every slice failed — ' + failures.length + ' of ' + slices.length);
+    throw new Error(failures[0] || 'no recipe found');
+  }
+  syncLog('import', 'Extracted ' + recipes.length + ' of ' + slices.length + ' recipes'
+    + (failures.length ? ' (' + failures.length + ' failed)' : ''));
+
+  return {
+    collectionName:  outline.collectionName || '',
+    collectionNotes: outline.collectionNotes || '',
+    category:        outline.category || '',
+    recipes:         recipes,
+    _partial:        failures.length ? failures.length : 0,
+    _expected:       slices.length
+  };
+}
+window.MULTI_SPLIT_OVER = MULTI_SPLIT_OVER;
+window.multiOutlinePrompt = multiOutlinePrompt;
+window.sliceByTitles = sliceByTitles;
+window.mapLimited = mapLimited;
+window.extractRecipesFromText = extractRecipesFromText;
 
 // Turn the AI's answer into either ONE ordinary recipe or ONE collection.
 // Pure, so it can be driven from a fixture instead of the network — the AI is
