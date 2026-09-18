@@ -8,7 +8,7 @@
  *     python3 -m http.server 8137 &
  *     node tests/run-self-tests.js --port 8137
  *
- * Two things about it are deliberate and easy to get wrong:
+ * Three things about it are deliberate and easy to get wrong:
  *
  * 1. It opens #selfTestOverlay before running anything. Some checks interact
  *    with modals, and "the topmost dialog" means something different when the
@@ -20,6 +20,14 @@
  *    signed-in Firebase session, so they are skipped by default rather than
  *    quietly tolerated. --include-network runs them and holds them to the same
  *    standard, for use somewhere they can actually pass.
+ *
+ * 3. It raises window._selfTestRunning around the loop, because the app's own
+ *    runSelfTests() does. This runner calls each t.test() DIRECTLY rather than
+ *    going through that function, so anything the app does differently while
+ *    tests are running is invisible here otherwise. That is not hypothetical:
+ *    v36.3 made syncLog mark the events a test run causes so the log analyser
+ *    stops reporting staged failures ("boom", "network down") as real problems,
+ *    and without this line the marking worked in Tony's browser and not in CI.
  */
 const path = require('path');
 
@@ -76,6 +84,11 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
   const results = await page.evaluate(async (includeNetwork) => {
     const overlay = document.getElementById('selfTestOverlay');
     if (overlay) overlay.classList.add('open');   // see note 1 in the header
+    // see note 3 — the app raises this flag around its own run, and anything
+    // that behaves differently while tests are running is invisible here unless
+    // this runner raises it too.
+    const hasFlag = typeof window._selfTestRunning !== 'undefined';
+    if (hasFlag) window._selfTestRunning = true;
     const out = [];
     for (const t of window.SELF_TESTS) {
       const skip = !includeNetwork && (/^net_/.test(t.id) || t.id === 'stor_firebase');
@@ -89,8 +102,10 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
                    err: String((e && e.message) || e) });
       }
     }
+    if (hasFlag) window._selfTestRunning = false;
     return {
       tests: out,
+      sawSelfTestFlag: hasFlag,
       suiteStillOpen: !!(overlay && overlay.classList.contains('open')),
       leftOpen: Array.from(document.querySelectorAll('.open')).map(e => e.id).filter(Boolean)
     };

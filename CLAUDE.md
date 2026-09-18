@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.2: 219 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.3: 219 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -842,6 +842,33 @@ found only because a test was written first and disagreed with the code.
     id and fails if any is below it. A future test that picks a low id fails
     immediately instead of quietly syncing. Real ids come from `nextId`, which
     counts from 1.
+
+- **Two things Tony's own log report caught (v36.3).**
+  - **A truncated answer was retried five times.** v36.2 added the
+    `stop_reason: 'max_tokens'` check and threw `TRUNCATED:` from inside the
+    `try`, where `aiRetryable` fell through to "retryable". Same prompt, same
+    `max_tokens` — it truncates again every time, so one truncated reply became
+    **five paid calls over 30 seconds**, none of which could succeed. That is
+    precisely the bug `aiRetryable` was written to prevent, reintroduced by its
+    own new guard. Anything thrown from inside that `try` must be classified.
+  - **The suite's staged failures were reported as real problems.** Half of what
+    the self tests do is fail on purpose — "boom", "AI down", "network down",
+    "Cloud read timed out after 0s", "Every slice failed — 2 of 2". Tony hard-
+    refreshed and got a report announcing 3 timeouts and 15 errors, every one of
+    them staged. A report that is confidently wrong is worse than none, and a
+    nudge that cries wolf trains the reflex v35.6 exists to avoid. `syncLog`
+    stamps `t:1` while `_selfTestRunning`, `analyseSyncLog` ignores those, and
+    the report still LISTS them marked `[test]` — hiding them would make
+    debugging the suite impossible.
+  - **The headless runner was not reproducing the app's own conditions.** It
+    calls each `t.test()` directly and never goes through `runSelfTests()`, so
+    `_selfTestRunning` was never raised and the marking worked in Tony's browser
+    but not in CI. The runner sets it now (note 3 in its header). **Anything the
+    app does differently during a test run is invisible to that runner unless it
+    is told to do the same.**
+  - A test that needs a GENUINE problem in the log must write it unmarked —
+    `log_nudge_is_quiet_and_per_device` builds its fixtures with `writeSyncLog`
+    rather than `syncLog` for exactly that reason.
 
 ## Outstanding
 

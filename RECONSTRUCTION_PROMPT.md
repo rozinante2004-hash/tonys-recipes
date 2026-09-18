@@ -13,6 +13,12 @@
 
 ---
 
+- **A self test never writes to the cloud OR to the log's analysis (v36.2–v36.3).**
+  `isTestFixture`/`cloudBound` keep fixture recipes off Firestore; `syncLog` stamps `t:1`
+  while `_selfTestRunning` and `analyseSyncLog` ignores those, because the suite fails on
+  purpose and staged failures are not evidence. `tests/run-self-tests.js` must raise
+  `_selfTestRunning` itself — it calls each `t.test()` directly, not `runSelfTests()`.
+
 ## 1. What the app is
 
 A **personal/family recipe manager** delivered as an installable **PWA**, hosted free on
@@ -24,7 +30,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.2` — app. **Worker: v38**, deployed separately and versioned separately
+**Current version:** `v36.3` — app. **Worker: v38**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +61,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v36.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.3"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1286,7 +1292,9 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   never a rate limit**. Retrying what cannot succeed is what turned a permanent failure into
   "stuck, possibly in a loop": five attempts with 2/4/8/16s of backoff. A
   `stop_reason: 'max_tokens'` reply is rejected as `TRUNCATED:` rather than handed on as
-  half a JSON document. `ai` and `import` are `LOG_KINDS`, and the import path logs — it
+  half a JSON document — and **`TRUNCATED:` is NOT retryable** (v36.3): same prompt, same
+  `max_tokens`, so retrying it is five paid calls that cannot succeed. Everything thrown
+  from inside that `try` must be classified by `aiRetryable`, including new guards. `ai` and `import` are `LOG_KINDS`, and the import path logs — it
   logged **nothing** before v36.1, so turning logging on during the hang showed an empty
   panel.
 - **Word** (`.docx`): **built by hand** as an OOXML zip — `makeDocxBlob` + a tiny `buildZip`

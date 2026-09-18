@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.2 -->
+<!-- Tony's Recipes Collection v36.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -396,6 +396,14 @@ function syncLog(kind, message, data) {
       k: LOG_KINDS.indexOf(kind) === -1 ? 'error' : kind,
       m: String(message == null ? '' : message).slice(0, LOG_MSG_MAX)
     };
+    // v36.3 — events the SELF TEST SUITE caused are marked and excluded from the
+    // analysis. Half of what the suite does is fail on purpose: "boom", "AI
+    // down", "network down", "Cloud read timed out after 0s", "Every slice
+    // failed". Reporting those as real problems made the report confidently
+    // wrong and the nudge cry wolf, which is the one thing v35.6 said it must
+    // never do. They stay IN the log, because debugging the suite is a real
+    // use for it — they just are not evidence about the app.
+    if (typeof _selfTestRunning !== 'undefined' && _selfTestRunning) entry.t = 1;
     if (data !== undefined && data !== null) {
       entry.d = String(typeof data === 'string' ? data : JSON.stringify(data)).slice(0, LOG_MSG_MAX);
     }
@@ -436,9 +444,21 @@ window.LOG_MAX_ENTRIES = LOG_MAX_ENTRIES;  window.LOG_KINDS = LOG_KINDS;
 // Returns [{level:'bad'|'warn'|'ok', title, detail, fix}], worst first.
 function analyseSyncLog(list, now) {
   list = Array.isArray(list) ? list : [];
+  // Events the self test suite caused are not evidence about the app — it fails
+  // on purpose. See syncLog. They are still in the log and still shown in the
+  // viewer; they just cannot produce a finding.
+  var testEvents = list.filter(function(e){ return e && e.t; }).length;
+  list = list.filter(function(e){ return e && !e.t; });
   now = typeof now === 'number' ? now : Date.now();
   var out = [];
   if (!list.length) {
+    if (testEvents) {
+      return [{ level:'ok', title:'Nothing but a self test run',
+        detail:'The ' + testEvents + ' event(s) recorded all came from the Self Test suite, which fails on '
+             + 'purpose to prove the app notices. None of them say anything about how the app is behaving for you.',
+        fix:'Use the app normally for a while and come back. If you wanted to look at the test run itself, the '
+          + 'events are still listed below.' }];
+    }
     return [{ level:'ok', title:'Nothing recorded yet',
       detail:'The log is empty. Either logging was switched on only just now, or nothing that it watches has happened since.',
       fix:'Leave it on and use the app normally — open it, edit a recipe, let it sync. Come back here afterwards.' }];
@@ -554,10 +574,13 @@ function syncLogReportText() {
     L.push('   → ' + f.fix);
     L.push('');
   });
-  L.push('EVENTS (newest first)');
+  var fromTests = list.filter(function(e){ return e && e.t; }).length;
+  L.push('EVENTS (newest first)'
+    + (fromTests ? '  —  ' + fromTests + ' marked [test] came from the Self Test suite '
+                 + 'and were NOT used in the analysis above' : ''));
   if (!list.length) L.push('   (none)');
   list.forEach(function(e) {
-    L.push('  ' + new Date(e.at).toISOString() + '  ' + (e.k + '        ').slice(0,9) + e.m
+    L.push('  ' + new Date(e.at).toISOString() + '  ' + (e.t ? '[test] ' : '') + (e.k + '        ').slice(0,9) + e.m
          + (e.d ? '  ' + e.d : ''));
   });
   return L.join('\n');
@@ -3926,6 +3949,54 @@ const SELF_TESTS = [
         throw new Error('an empty log produced '+JSON.stringify(none.map(function(f){return f.title;})));
       if(!none[0].fix) throw new Error('even the empty case must say what to do next');
 
+      // v36.3 — the suite fails ON PURPOSE. "boom", "AI down", "network down",
+      // "Cloud read timed out after 0s", "Every slice failed" are all things a
+      // test injects to prove the app notices them. Tony hard-refreshed and got
+      // a report announcing 3 timeouts and 15 errors, every one of them staged.
+      // A report that is confidently wrong is worse than no report, and a nudge
+      // that cries wolf trains the reflex to dismiss it unread.
+      var staged=[];
+      for(var s=0;s<6;s++) staged.push({at:now-s*1000, k:'error', m:'boom', t:1});
+      staged.push({at:now-9000, k:'conflict', m:'Save refused for "old" — changed on another device', t:1});
+      var onlyTests=analyseSyncLog(staged, now);
+      if(onlyTests.some(function(x){ return x.level==='bad'; }))
+        throw new Error('staged test failures were reported as real problems: '
+          + JSON.stringify(onlyTests.map(function(x){return x.title;})));
+      if(!/self test/i.test(onlyTests[0].title+onlyTests[0].detail))
+        throw new Error('a log holding only test events does not say so: '+onlyTests[0].title);
+      // A REAL problem alongside them must still be found — suppressing the
+      // staged ones must not suppress the evidence.
+      var mixed=staged.concat([
+        {at:now-20000, k:'conflict', m:'Save refused for "Chocolate Cake" — changed on another device'}]);
+      var mf=analyseSyncLog(mixed, now);
+      if(!mf.some(function(x){ return x.level==='bad' && /refused/i.test(x.title); }))
+        throw new Error('a real conflict was swallowed along with the test events');
+      if(mf.some(function(x){ return /15 errors|6 errors/i.test(x.title); }))
+        throw new Error('the staged errors were counted into a finding anyway');
+      // They stay IN the log and are shown, marked — hiding them would make
+      // debugging the suite impossible.
+      var before=readSyncLog();
+      try{
+        var wasOn=logEnabled(); setLogEnabled(true);
+        purgeSyncLog();
+        syncLog('error','a staged failure');           // _selfTestRunning is true here
+        var rec=readSyncLog();
+        if(!rec.length) throw new Error('the event was not recorded at all');
+        if(!rec[0].t) throw new Error('an event recorded during a self test run is not marked as one');
+        var txt=syncLogReportText();
+        // The marker has to be on the EVENT LINE. Searching the whole report
+        // finds "[test]" in the summary header even when every event line has
+        // lost its marker — a mutation proved that assertion worthless.
+        var line=txt.split('\n').filter(function(l){ return l.indexOf('a staged failure')!==-1; })[0];
+        if(!line) throw new Error('a marked event is hidden from the report');
+        if(line.indexOf('[test]')===-1)
+          throw new Error('the event line does not say it came from a test: '+line.trim());
+        if(!wasOn) setLogEnabled(false);
+      } finally {
+        purgeSyncLog();
+        if(before.length) writeSyncLog(before);
+      }
+
       // The case this whole feature exists for.
       var conflicts=[];
       for(var i=0;i<4;i++) conflicts.push({at:now-i*1000, k:'conflict',
@@ -3993,6 +4064,11 @@ const SELF_TESTS = [
       var kOn=null,kNudge=null,kSeen=null,kLog=null;
       try{ kOn=localStorage.getItem('tonys_log_enabled'); kNudge=localStorage.getItem('tonys_log_nudge');
            kSeen=localStorage.getItem('tonys_log_nudge_seen'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      // This test is about how the nudge reacts to a GENUINE problem, so its
+      // fixtures go in unmarked. syncLog() stamps t:1 while the suite is running
+      // (v36.3) and the analyser ignores those, which is exactly right for the
+      // staged failures other tests cause — and exactly wrong here.
+      var put=function(k,m){ var l=readSyncLog(); l.unshift({at:Date.now(),k:k,m:m}); writeSyncLog(l); };
       try{
         localStorage.removeItem('tonys_log_nudge');
         localStorage.removeItem('tonys_log_nudge_seen');
@@ -4001,7 +4077,7 @@ const SELF_TESTS = [
         // Every refusal is NAMED, so "it stayed quiet" can be told apart from
         // "it is broken". A boolean here would hide the difference.
         setLogEnabled(true); purgeSyncLog();
-        syncLog('conflict','Save refused for "Soup" — changed on another device');
+        put('conflict','Save refused for "Soup" — changed on another device');
         if(maybeNudgeAboutLog()!=='nudge-off')
           throw new Error('the nudge fired while switched off — the default must be silence');
         if(document.getElementById('logNudge')) throw new Error('a nudge was rendered while switched off');
@@ -4018,14 +4094,14 @@ const SELF_TESTS = [
           throw new Error('the nudge fired with nothing being recorded');
 
         setLogEnabled(true); purgeSyncLog();
-        syncLog('load','Read 44 recipe(s) from the cloud');
+        put('load','Read 44 recipe(s) from the cloud');
         if(maybeNudgeAboutLog()!=='nothing-wrong')
           throw new Error('the nudge fired on a healthy log');
         if(document.getElementById('logNudge')) throw new Error('a nudge was rendered with nothing wrong');
 
         // A real problem: it shows, and it names the problem rather than saying
         // "1 issue", which would tell nobody whether to care.
-        syncLog('conflict','Save refused for "Soup" — changed on another device');
+        put('conflict','Save refused for "Soup" — changed on another device');
         if(maybeNudgeAboutLog()!=='shown') throw new Error('the nudge did not fire on a real problem');
         var el=document.getElementById('logNudge');
         if(!el) throw new Error('the nudge reported "shown" but rendered nothing');
@@ -4044,7 +4120,7 @@ const SELF_TESTS = [
           throw new Error('the nudge repeated itself for problems it had already raised');
 
         // ...but a NEW problem is worth mentioning.
-        syncLog('error','Cloud read timed out after 45s');
+        put('error','Cloud read timed out after 45s');
         if(maybeNudgeAboutLog({force:true})!=='shown')
           throw new Error('a new problem did not produce a fresh nudge');
 
@@ -7361,6 +7437,12 @@ const SELF_TESTS = [
                    new Error('API error 413: too large'),
                    new Error('BILLING: out of credits'),
                    new Error('API_KEY: expired'),
+                   // Same prompt, same max_tokens — it will truncate again. v36.2
+                   // added this error and left it falling through to "retryable",
+                   // so ONE truncated answer became five PAID calls over 30
+                   // seconds. Tony's log caught it: five "stop: max_tokens" in a
+                   // row with 2/4/8/16s between them.
+                   new Error('TRUNCATED: the answer hit the 2000-token ceiling before it finished.'),
                    new Error('Rate limit reached. Please wait a moment and try again.') ];
       perm.forEach(function(e){
         if(aiRetryable(e)) throw new Error('retried a permanent failure: '+e.message);
@@ -10581,7 +10663,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.2';
+var APP_VERSION = 'v36.3';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12892,7 +12974,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.2</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.3</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13474,7 +13556,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.2</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.3</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17477,6 +17559,12 @@ function aiRetryable(e) {
   var m = (e && e.message) || '';
   if (e && (e.name === 'AbortError' || e.name === 'TimeoutError')) return false;
   if (m.indexOf('took too long') !== -1) return false;
+  // v36.3 — a reply that hit the token ceiling will hit it again: same prompt,
+  // same max_tokens. v36.2 added the TRUNCATED check inside the try and left it
+  // falling through to "retryable", so one truncated answer became FIVE PAID
+  // CALLS over 30 seconds, none of which could succeed. That is the same
+  // mistake this function exists to prevent, reintroduced by its own new guard.
+  if (m.indexOf('TRUNCATED:') === 0) return false;
   if (m.indexOf('BILLING:') === 0 || m.indexOf('API_KEY:') === 0) return false;
   if (m.indexOf('Rate limit') !== -1) return false;
   var code = m.match(/^API error (\d{3})/);
