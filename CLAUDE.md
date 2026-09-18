@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.1: 213 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.2: 219 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -110,6 +110,7 @@ found only because a test was written first and disagreed with the code.
 | **Ticks are session-only.** | Explicitly requested. In memory only, wiped when the recipe closes. Never persist them. |
 | **Bring! status comes from the Worker.** | The token lives in KV and is shared; the per-device `bring_token_expiry` is a cache. It may say "unknown" but must **never** assert "expired". |
 | **Metric leaves tsp/tbsp/cup alone.** | Only lb/oz/fl oz are converted. They are standard kitchen measures in metric kitchens too. |
+| **A self test's recipes never reach the cloud.** | Fixtures belong in the live `recipes` array — a test against a private copy proves the copy works. But `isTestFixture`/`cloudBound` filter them at the one place recipes leave the device (recipe docs, `syncCloudPhotos`, `writeCloudMeta`, `queueCloudDelete`). A suite that runs for 90 seconds on a signed-in device WILL overlap a sync, and in v36.1 it did: a 1.1 MB "ThumbTest" photo reached Firestore and was refused. Never rely on a test's cleanup winning that race. `TEST_ID_MIN = 700000`. |
 | **A collection's recipes live in `parts`, and ONLY there.** | A collection's own `ingredients`/`steps` stay EMPTY; everything that wants the whole list calls `allIngredients()`/`allSteps()`. Copying the parts up into the flat fields would spare ~20 read-only consumers a one-line change and create two copies that drift, with no way to say which is right. `isCollection(r)` is derived from `parts.length`, never stored — a stored flag is what let `isVideoBookmark` and `isClip` disagree for three releases. Each part carries its own `uid` **from import**, so promoting the same part on two devices yields one recipe, not two. |
 | **Full photos stay base64, everywhere.** | Export, email and print consume data URLs; only thumbnails are Blobs. The Firebase Storage path (a `photoUrl` pointer instead of base64) was removed in **v34.4** — it needed a paid plan, was never switched on, and put branches into photo sync and backup. ONE shape now. A **backup must stay self-contained**: that is free while photos are base64, but if a remote shape is ever reintroduced, `backupSave` has to download and inline them again. |
 | **A local photo fix must reach the CLOUD.** | The cloud wins on every load — `loadFromFirestore` replaces `recipes` with the cloud copies and the local-photo net only fires when the cloud gives nothing. A rescue that only fixes memory is undone by the next reload, which is why Tony's photos "came back wrong" twice. `runPhotoRescue` awaits `pushLocalPhotosToCloud`; `healCloudPhotos` repairs a cloud already gone wrong. |
@@ -754,6 +755,80 @@ found only because a test was written first and disagreed with the code.
     from a bare `http.server` root is the SW registration path, not a fault; it
     predates v36.1. A driver that needs the page to stay put should pass
     `serviceWorkers: 'block'`, since `controllerchange` reloads the page.
+- **The duplicate check ate a collection whole (v36.2).** Tony imported the
+  chestnut round-up, was offered "keep both / update the existing one" against a
+  recipe he already had, chose update — and the existing recipe was NOT updated
+  while all ten parsed recipes vanished. One cause, both halves:
+  `confirmImportChecked` read `parsed.ingredients` and `parsed.steps`, which on a
+  collection are **deliberately empty** because the content lives in `parts`. It
+  found nothing, so its `n.length ? new : old` guards kept every old value, and
+  then it closed the overlay anyway — discarding the parse. **A function that
+  could not do what was asked must not return quietly.** `applyParsedOntoRecipe`
+  now returns false in that case and every caller treats false as a refusal:
+  the recipe is imported separately rather than dropped.
+  - **A collection is duplicate-checked PART BY PART.** The article's own title
+    is not what you already own — the recipes inside it are. `collectionDuplicates`
+    pairs each part with what it matches, refuses to let two parts replace one
+    recipe, and asks ONE question ("3 of these 10 you already have") rather than
+    ten. Updating replaces those and imports the rest; the remaining parts still
+    collapse to an ordinary recipe when only one is left.
+  - **`historySnapshot` never captured `parts`.** So version history recorded an
+    empty recipe for every collection from v36.0 on, and Restore would have
+    written that emptiness over the real thing. Both directions are covered now,
+    and `normalizeRecipe` is what re-establishes the invariant after a restore.
+  - **A collapsing collection takes the remaining part's NAME.** It kept the
+    article's, so a round-up promoted down to its last recipe was a card reading
+    "Chestnuts: 10 recipes" containing one gnocchi recipe.
+  - `removePartFromCollection` — Tony asked for it: dropping a recipe from a
+    collection without first creating a card to delete. It snapshots the whole
+    collection before removing, so ↩ Restore brings the removed recipe back.
+  - **The test that missed it first.** `dup_collection_loses_nothing` originally
+    called `confirmImportCollection` directly and passed against the broken
+    build — the bug was in the ROUTING, in `confirmImportParsed`. It calls the
+    real entry point now, which is why `confirmImportParsed` returns a promise.
+    This is the third time in two releases that a tested function had an
+    untested call site. **Drive the entry point the button calls.**
+- **Link round-ups (v36.2).** Some pages contain no recipes at all — "10 soups
+  in 15 minutes" is ten names, ten ratings, ten photo credits and ten links
+  reading "to the recipe". Every heading is correctly refused for having no
+  content, so the import came back empty and offered a video bookmark. When the
+  ordinary extraction yields nothing AND the page had links, `extractRecipesFromLinks`
+  asks the AI which links are individual recipes, then opens each one through the
+  Worker's existing `fetch-url` and imports it as the ordinary single recipe it
+  is, three at a time, behind counted progress.
+  - **The Worker must return the links or none of this is possible** — the text
+    pipeline turns every `<a>` into its label and throws the href away. `fetch-url`
+    now also returns `links[]`, collected from the *stripped* html (raw html
+    would return the whole site navigation). **This list is what the app then
+    fetches**, so it is deliberately narrow: http(s) only, SAME HOST, no
+    fragments, no duplicates, no self-link, capped at 80. It must never become a
+    way to make the Worker fetch anywhere on anyone's behalf. **Needs Tony to
+    paste `cloudflare-worker.js` into Cloudflare — v38.**
+  - Several links point at the same recipe (its rating, its prep time, its "to
+    the recipe" button), so picks are de-duplicated by href before anything is
+    opened; the real ynet page has twelve links for six recipes.
+- **A self test must never write to the cloud (v36.2).** Tony ran the suite on
+  his signed-in phone. All 219 passed — and it finished with a red
+  `PHOTO_TOO_BIG` box naming **"ThumbTest"**, which is not one of his recipes but
+  the 1.1 MB fixture `photo_thumbnails` injects into the live `recipes` array to
+  exercise the real thumbnailing code. The test cleans up in its `finally`, but
+  it `await`s four times first, and the suite runs for 91 seconds: **a sync
+  fired inside that window** and Firestore refused the photo. Both things were
+  true at once — every test passed, and the suite tried to write its own data
+  into the family's collection.
+  - **Fixtures belong in the live array.** A test against a private copy proves
+    the copy works. So the guard is not "stop doing that", it is `isTestFixture`
+    / `cloudBound` at the ONE place recipes leave the device — the recipe
+    documents, `syncCloudPhotos` and `writeCloudMeta` — rather than trusting
+    every test to finish cleaning up before the next sync fires.
+  - `queueCloudDelete` ignores fixtures too. A fixture was never in the cloud, so
+    asking to delete one can only produce a `DELETE_NOT_PERMITTED` box about a
+    recipe nobody has — which is what a family member without the admin role
+    would have seen.
+  - **`TEST_ID_MIN = 700000`**, and the test scans `index.html` for every fixture
+    id and fails if any is below it. A future test that picks a low id fails
+    immediately instead of quietly syncing. Real ids come from `nextId`, which
+    counts from 1.
 
 ## Outstanding
 

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.0 -->
+<!-- Tony's Recipes Collection v36.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1671,6 +1671,25 @@ const SELF_TESTS = [
       if(!r.ok) throw new Error('version.json could not be read ('+r.status+') — the update banner has nothing to compare against');
       var declared=(await r.json()).version;
       if(declared!==APP_VERSION) throw new Error('version.json says '+declared+' but this build is '+APP_VERSION+' — devices would be told to "update" to a version older than the one they are running');
+
+      // There are FIVE version strings and this compared only two of them, so
+      // v36.1 shipped with the HTML comment and one badge still reading v36.0:
+      // green here, red in CI, after the push. CI catching it is not the same
+      // as catching it — check in the browser what CI checks, first.
+      var page=await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'});
+      if(page.ok){
+        var src=await page.text(), found={};
+        var c=src.match(/<!-- Tony's Recipes Collection (v[\d.]+) -->/);
+        if(!c) throw new Error('the version comment on line 1 is gone, so nothing pins the build');
+        found[c[1]]=true;
+        var badges=src.match(/letter-spacing:0\.5px;">(v[\d.]+)<\/div>/g)||[];
+        if(badges.length<2) throw new Error('found '+badges.length+' version badge(s) in the markup, expected 2');
+        badges.forEach(function(b){ found[b.match(/(v[\d.]+)/)[1]]=true; });
+        var versions=Object.keys(found);
+        if(versions.length!==1 || versions[0]!==APP_VERSION)
+          throw new Error('APP_VERSION is '+APP_VERSION+' but the page itself carries: '+versions.join(', ')
+            +' — a release that bumps some of the five strings and not the others fails CI after the push');
+      }
     } },
 
   { id:'stor_local',     group:'Storage', name:'localStorage read/write',
@@ -6838,6 +6857,493 @@ const SELF_TESTS = [
         throw new Error('a heading with no ingredients or steps was imported as a recipe');
     } },
 
+  { id:'test_fixtures_stay_local', group:'Storage', name:'A self test never puts its own recipes in the cloud (v36.2)',
+    test: async()=>{
+      // Tony ran the suite on his signed-in phone. All 219 passed — and it ended
+      // in a red PHOTO_TOO_BIG box naming "ThumbTest", the 1.1 MB fixture the
+      // thumbnail test injects into the LIVE recipes array before awaiting four
+      // times. A sync fired inside that window and Firestore refused it. The
+      // test cleans up; the window between unshift and cleanup is the bug.
+      if(typeof cloudBound!=='function') throw new Error('cloudBound not defined');
+      var real = normalizeRecipe({ id:7, uid:'real-one', name:'A real recipe' });
+      var fixture = normalizeRecipe({ id:888911, uid:'fix', name:'ThumbTest', photo:'data:image/jpeg;base64,'+'A'.repeat(200) });
+      var out = cloudBound([real, fixture]);
+      if(out.length!==1) throw new Error('cloudBound let '+out.length+' of 2 through');
+      if(out[0].id!==7) throw new Error('cloudBound kept the fixture and dropped the real recipe');
+      if(!isTestFixture(fixture)) throw new Error('a fixture id was not recognised as one');
+      if(isTestFixture(real)) throw new Error('a real recipe was mistaken for a fixture');
+      // The boundary itself, in both directions.
+      if(isTestFixture({id:TEST_ID_MIN-1})) throw new Error('an id just below the line is treated as a fixture');
+      if(!isTestFixture({id:TEST_ID_MIN})) throw new Error('an id exactly on the line is not treated as a fixture');
+      if(isTestFixture({})||isTestFixture(null)||isTestFixture({id:'888911'}))
+        throw new Error('a missing or non-numeric id was treated as a fixture');
+
+      // Deleting a fixture must not queue a cloud delete either: it was never
+      // there, so the only possible outcome is a DELETE_NOT_PERMITTED box about
+      // a recipe nobody has.
+      var before = Object.keys(_pendingCloudDeletes).length;
+      queueCloudDelete(888911);
+      if(Object.keys(_pendingCloudDeletes).length!==before)
+        throw new Error('deleting a fixture queued a cloud delete');
+      queueCloudDelete(7);
+      var queued = Object.keys(_pendingCloudDeletes).length!==before;
+      unqueueCloudDelete(7);
+      if(!queued) throw new Error('deleting a REAL recipe no longer queues a cloud delete');
+
+      // And the line has to be where the suite actually works. Every fixture id
+      // in this file must be above it, or the guard protects nothing.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var ids = [], m, re = /(?:testId\s*=\s*|id:\s*)(\d{4,})/g;
+      while((m = re.exec(src)) !== null) ids.push(+m[1]);
+      var fixtures = ids.filter(function(n){ return n >= 100000; });
+      if(fixtures.length < 20) throw new Error('only found '+fixtures.length+' fixture ids — the scan is not finding them');
+      var stray = fixtures.filter(function(n){ return n < TEST_ID_MIN; });
+      if(stray.length) throw new Error('fixture id(s) below TEST_ID_MIN would sync to the cloud: '+stray.join(', '));
+
+      // A guard nothing calls is not a guard. Both of the paths that write
+      // recipes to Firestore need real Firebase, so they cannot be driven here —
+      // but their SOURCE can be read, and what it must not contain is a bare
+      // `recipes`. Checking cloudBound() in isolation passed happily while both
+      // call sites used the unfiltered array, which is the whole bug.
+      // Comments AND quoted strings come out first: both functions talk about
+      // "recipes" in the messages they show ("Your recipes synced fine…"), and
+      // an English sentence is not a use of the array. Template literals are
+      // left in, so a `${recipes…}` would still be caught.
+      var nocomments = function(fn){
+        return String(fn)
+          .replace(/\/\*[\s\S]*?\*\//g,' ').replace(/\/\/[^\n]*/g,' ')
+          .replace(/'(?:[^'\\\n]|\\.)*'/g,"''").replace(/"(?:[^"\\\n]|\\.)*"/g,'""');
+      };
+      [['saveToFirestore', saveToFirestore], ['syncCloudPhotos', syncCloudPhotos]].forEach(function(pair){
+        var body = nocomments(pair[1]);
+        if(body.indexOf('cloudBound(recipes)') === -1)
+          throw new Error(pair[0]+' does not filter test fixtures out — cloudBound(recipes) is not called');
+        var rest = body.split('cloudBound(recipes)').join('«guarded»');
+        if(/\brecipes\b/.test(rest))
+          throw new Error(pair[0]+' still reaches the unfiltered `recipes` array somewhere, '
+            + 'so a fixture can reach the cloud: ' + (rest.match(/.{0,40}\brecipes\b.{0,30}/)||[''])[0].trim());
+      });
+    } },
+
+  { id:'link_roundup_import', group:'Import/Export', name:'A page that only LINKS to its recipes still imports (v36.2)',
+    test: async()=>{
+      // "10 soups in 15 minutes" is ten names, ten ratings, ten photo credits
+      // and ten links reading "to the recipe" — and not one ingredient. Every
+      // heading is correctly refused for having no content, so before v36.2 the
+      // whole import came back empty and offered a video bookmark instead.
+      var realAi = window.aiCall, realFetch = window.fetch;
+      var pageText = '10 great soups\nA winter round-up.\n'
+        + 'Sweet potato soup\n58 ratings\nkosher vegan 10 minutes\nto the recipe\n'
+        + 'Tomato soup\n48 ratings\nkosher vegan 15 minutes\nto the recipe\n'
+        + 'Onion soup\n91 ratings\nkosher 10 minutes\nto the recipe\n';
+      // As the Worker returns them: several links per recipe, plus site furniture.
+      var links = [
+        { href:'https://ynet.co.il/food', text:'Food' },
+        { href:'https://ynet.co.il/topics/soup', text:'soup' },
+        { href:'https://ynet.co.il/food/article/aaa', text:'kosher' },
+        { href:'https://ynet.co.il/food/article/aaa2', text:'to the recipe' },
+        { href:'https://ynet.co.il/food/article/bbb', text:'to the recipe' },
+        { href:'https://ynet.co.il/food/article/ccc', text:'to the recipe' }
+      ];
+      var fetched = [];
+      try{
+        window.fetch = function(u, opts){
+          var b = {}; try { b = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(b.action === 'fetch-url'){
+            fetched.push(b.url);
+            var slug = b.url.slice(b.url.lastIndexOf('/')+1);
+            return Promise.resolve(new Response(JSON.stringify({
+              text:'Recipe page for '+slug+'\nIngredients: 2 onions 1 litre stock\n'
+                 + 'Method:\n1. Fry the onions.\n2. Add the stock and simmer.\n'
+                 + 'x '.repeat(40) }), { status:200 }));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        window.aiCall = function(prompt){
+          if(prompt.indexOf('LINKS TO its recipes')!==-1 || prompt.indexOf('links found on it')!==-1){
+            return Promise.resolve(JSON.stringify({ collectionName:'10 great soups',
+              collectionNotes:'A winter round-up.', category:'Soup',
+              picks:[ {n:3,title:'Sweet potato soup'}, {n:4,title:'Tomato soup'}, {n:5,title:'Onion soup'} ] }));
+          }
+          var m = prompt.match(/Recipe page for (\w+)/);
+          return Promise.resolve(JSON.stringify({ recipes:[{ name:'Page '+(m?m[1]:'?'),
+            ingredients:[{a:'2',n:'onions'},{a:'1l',n:'stock'}], steps:['fry','simmer'] }] }));
+        };
+
+        var seen = [];
+        var out = await extractRecipesFromLinks(pageText, links, 'https://ynet.co.il/food/article/roundup',
+          function(done,total){ seen.push(done+'/'+total); });
+        if(!out) throw new Error('a page of recipe links produced nothing at all');
+        if(out.recipes.length!==3) throw new Error('got '+out.recipes.length+' recipes, not 3');
+        if(fetched.length!==3) throw new Error('opened '+fetched.length+' pages, not 3 — the picks were not deduplicated');
+        if(fetched.some(function(u){ return /topics|^https:\/\/ynet\.co\.il\/food$/.test(u); }))
+          throw new Error('followed a navigation link: '+fetched.join(', '));
+        // The round-up's own wording is the better name, and each recipe must
+        // point at ITS page, not at the round-up.
+        if(out.recipes[0].name!=='Sweet potato soup')
+          throw new Error('the recipe is called "'+out.recipes[0].name+'", not what the round-up called it');
+        // picks n:3/4/5 are links[3]=aaa2, links[4]=bbb, links[5]=ccc, in that order.
+        if(out.recipes[0].source!=='https://ynet.co.il/food/article/aaa2')
+          throw new Error('recipe 1 points at "'+out.recipes[0].source+'" instead of its own page');
+        if(out.recipes[1].source!=='https://ynet.co.il/food/article/bbb')
+          throw new Error('recipe 2 points at "'+out.recipes[1].source+'" instead of its own page');
+        if(out.recipes[2].source!=='https://ynet.co.il/food/article/ccc')
+          throw new Error('recipe 3 points at "'+out.recipes[2].source+'" instead of its own page');
+        if(out.collectionName!=='10 great soups') throw new Error('the round-up title was lost');
+        if(seen[seen.length-1]!=='3/3') throw new Error('progress never reached the end: '+seen.join(' '));
+
+        // It must build the same kind of collection as any other import.
+        var built = buildImportFromParsed(out, 'https://ynet.co.il/food/article/roundup');
+        if(built.kind!=='collection') throw new Error('the assembled answer built a '+built.kind);
+        if(built.recipe.parts.length!==3) throw new Error('the collection holds '+built.recipe.parts.length);
+
+        // One page failing costs one recipe, not the import.
+        fetched.length = 0;
+        window.fetch = function(u, opts){
+          var b = {}; try { b = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(b.action === 'fetch-url'){
+            if(/bbb/.test(b.url)) return Promise.resolve(new Response('{}', { status:502 }));
+            return Promise.resolve(new Response(JSON.stringify({
+              text:'Recipe page for ok\nIngredients: 2 onions\nMethod:\n1. Fry.\n'+'x '.repeat(40) }), { status:200 }));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        var partial = await extractRecipesFromLinks(pageText, links, 'https://ynet.co.il/x');
+        if(!partial) throw new Error('one dead link sank the whole import');
+        if(partial.recipes.length!==2) throw new Error('got '+partial.recipes.length+' of the 2 that worked');
+        if(partial._partial!==1) throw new Error('the import did not report that 1 of 3 was missing');
+
+        // The SAME recipe reached by two different picks must be opened once.
+        // A real round-up links each recipe three or four times.
+        fetched.length = 0;
+        window.fetch = function(u, opts){
+          var b = {}; try { b = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(b.action === 'fetch-url'){
+            fetched.push(b.url);
+            return Promise.resolve(new Response(JSON.stringify({
+              text:'Recipe page\nIngredients: 2 onions\nMethod:\n1. Fry.\n'+'x '.repeat(40) }), { status:200 }));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        window.aiCall = function(prompt){
+          if(prompt.indexOf('LINKS to its recipes')!==-1)
+            return Promise.resolve(JSON.stringify({ picks:[
+              {n:2,title:'Sweet potato soup'}, {n:2,title:'Sweet potato soup again'},
+              {n:3,title:'Tomato soup'} ] }));
+          return Promise.resolve(JSON.stringify({ recipes:[{ name:'One',
+            ingredients:[{a:'2',n:'onions'}], steps:['fry'] }] }));
+        };
+        var dedup = await extractRecipesFromLinks(pageText, links, 'https://ynet.co.il/x');
+        if(fetched.length!==2) throw new Error('opened '+fetched.length+' pages for 2 distinct links — picks are not de-duplicated');
+        if(dedup.recipes.length!==2) throw new Error('the same recipe came back twice');
+
+        // Picks found, but EVERY page dead: that is a failure, not an empty
+        // success. Returning {recipes:[]} would show a preview of nothing.
+        window.fetch = function(u, opts){
+          var b = {}; try { b = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(b.action === 'fetch-url') return Promise.resolve(new Response('{}', { status:502 }));
+          return realFetch.apply(window, arguments);
+        };
+        if(await extractRecipesFromLinks(pageText, links, 'https://ynet.co.il/x') !== null)
+          throw new Error('every linked page failed and it still reported an import');
+
+        // Not a link round-up at all. The per-recipe stub must keep WORKING here,
+        // or "it returned nothing" proves nothing about the guard being tested.
+        window.fetch = function(u, opts){
+          var b = {}; try { b = JSON.parse((opts&&opts.body)||'{}'); } catch(e){}
+          if(b.action === 'fetch-url') return Promise.resolve(new Response(JSON.stringify({
+            text:'Recipe page\nIngredients: 2 onions\nMethod:\n1. Fry.\n'+'x '.repeat(40) }), { status:200 }));
+          return realFetch.apply(window, arguments);
+        };
+        window.aiCall = function(prompt){
+          if(prompt.indexOf('LINKS to its recipes')!==-1)
+            return Promise.resolve(JSON.stringify({ picks:[] }));       // none are recipes
+          return Promise.resolve(JSON.stringify({ recipes:[{ name:'Would have worked',
+            ingredients:[{a:'2',n:'onions'}], steps:['fry'] }] }));
+        };
+        if(await extractRecipesFromLinks(pageText, links, 'https://ynet.co.il/x') !== null)
+          throw new Error('a page whose links are not recipes still produced an import');
+        // Too few links to be a round-up. The point of the guard is that no AI
+        // call is PAID FOR — "it returned null" is true either way, so counting
+        // the calls is the only way to know the guard is doing anything.
+        var asked = 0;
+        window.aiCall = function(){ asked++; return Promise.resolve(JSON.stringify({ picks:[] })); };
+        if(await extractRecipesFromLinks(pageText, [], 'https://ynet.co.il/x') !== null)
+          throw new Error('a page with no links at all still produced an import');
+        if(await extractRecipesFromLinks(pageText, [links[0]], 'https://ynet.co.il/x') !== null)
+          throw new Error('a page with one link still produced an import');
+        if(asked) throw new Error('paid for '+asked+' AI call(s) on a page that cannot be a link round-up');
+      } finally { window.aiCall = realAi; window.fetch = realFetch; }
+    } },
+
+  { id:'link_roundup_via_import', group:'Import/Export', name:'runUrlImport falls through to the links by itself (v36.2)',
+    test: async()=>{
+      // The routing, not the function. Three times in two releases a tested
+      // function has shipped with a call site that never called it — so this
+      // drives runUrlImport, the thing the button actually runs.
+      var realFetch=window.fetch, realApply=window.applyParsedRecipe, realToast=window.toast;
+      var input=document.getElementById('urlImportInput');
+      var realVal=input?input.value:'', captured=null, opened=[];
+      if(!input) throw new Error('the URL import field is gone');
+      try{
+        window.toast=function(){};
+        window.applyParsedRecipe=function(r){ captured=r; };
+        var roundup='10 great soups\nA winter round-up.\n'
+          + 'Sweet potato soup\n58 ratings\nto the recipe\n'
+          + 'Tomato soup\n48 ratings\nto the recipe\n'
+          + 'Onion soup\n91 ratings\nto the recipe\n'+'padding '.repeat(30);
+        var links=[{href:'https://x.test/food',text:'Food'},
+                   {href:'https://x.test/food/article/aaa',text:'to the recipe'},
+                   {href:'https://x.test/food/article/bbb',text:'to the recipe'}];
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          if(b.action==='fetch-url'){
+            if(/roundup/.test(b.url))
+              return Promise.resolve(new Response(JSON.stringify({text:roundup, links:links}), {status:200}));
+            opened.push(b.url);
+            return Promise.resolve(new Response(JSON.stringify({text:
+              'A soup\nIngredients: 2 onions 1l stock\nMethod:\n1. Fry.\n2. Simmer.\n'+'x '.repeat(40)}), {status:200}));
+          }
+          if(b.messages){
+            var p=b.messages[0].content, ans;
+            if(p.indexOf('LINKS to its recipes')!==-1)
+              ans=JSON.stringify({collectionName:'10 great soups', category:'Soup',
+                picks:[{n:1,title:'Sweet potato soup'},{n:2,title:'Tomato soup'}]});
+            else if(p.indexOf('A soup')!==-1)
+              ans=JSON.stringify({recipes:[{name:'A soup',ingredients:[{a:'2',n:'onions'}],steps:['fry']}]});
+            else
+              // The round-up itself: headings with NO content, which
+              // buildImportFromParsed must refuse. This is the whole premise.
+              ans=JSON.stringify({recipes:[{name:'Sweet potato soup'},{name:'Tomato soup'}]});
+            return Promise.resolve(new Response(JSON.stringify({content:[{text:ans}],stop_reason:'end_turn'}), {status:200}));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        input.value='https://x.test/food/article/roundup';
+        await runUrlImport();
+        if(!captured) throw new Error('a page of recipe links imported nothing — it never fell through to them');
+        if(!recipeParts(normalizeRecipe(Object.assign({id:978001}, captured))).length)
+          throw new Error('what came back is not a collection');
+        if(opened.length!==2) throw new Error('opened '+opened.length+' recipe pages, not 2');
+        if(opened.some(function(u){ return /\/food$/.test(u); }))
+          throw new Error('it followed a navigation link: '+opened.join(', '));
+      } finally {
+        window.fetch=realFetch; window.applyParsedRecipe=realApply; window.toast=realToast;
+        if(input) input.value=realVal;
+        closeM('urlImportOverlay');
+      }
+    } },
+
+  { id:'coll_remove_part', group:'Import/Export', name:'A recipe can be dropped from a collection without keeping it (v36.2)',
+    test: async()=>{
+      var realAsk=window.askConfirm, realToast=window.toast;
+      var before=recipes.slice(), beforeId=nextId;
+      try{
+        window.toast=function(){}; window.askConfirm=function(){ return Promise.resolve(true); };
+        var built = buildImportFromParsed({ collectionName:'Soups', category:'Soup', recipes:[
+          { name:'Onion',  ingredients:[{a:'3',n:'onions'}], steps:['fry'] },
+          { name:'Tomato', ingredients:[{a:'5',n:'tomatoes'}], steps:['simmer'] },
+          { name:'Lentil', ingredients:[{a:'1c',n:'lentils'}], steps:['boil'], servings:'4' }
+        ]}, 'https://example.com/soups');
+        var coll = normalizeRecipe(Object.assign({id:976001, uid:'rm-coll', bg:'#fff'}, built.recipe));
+        recipes.unshift(coll);
+        var uids = recipeParts(coll).map(function(p){ return p.uid; });
+        var countBefore = recipes.length;
+
+        // The button has to exist where the recipe is shown, or the function is
+        // unreachable — the thing v36.1 taught twice over.
+        var html = collectionSectionsHtml(coll);
+        if(html.indexOf('removePartFromCollection('+coll.id)===-1)
+          throw new Error('no way to remove a recipe from the collection in the view');
+
+        await removePartFromCollection(976001, uids[1]);
+        if(recipeParts(coll).length!==2) throw new Error('removing left '+recipeParts(coll).length+' parts, not 2');
+        if(recipeParts(coll).some(function(p){ return p.name==='Tomato'; }))
+          throw new Error('the removed recipe is still in the collection');
+        // The point of Remove rather than "Make its own": nothing new appears.
+        if(recipes.length!==countBefore)
+          throw new Error('removing created '+(recipes.length-countBefore)+' new recipe(s)');
+        if(!coll.history.length) throw new Error('the collection was changed with no way back');
+        if(!(coll.history[0].parts||[]).some(function(p){ return p.name==='Tomato'; }))
+          throw new Error('version history does not hold the removed recipe');
+
+        // Down to one: a container with one thing in it is not a container, and
+        // it must take that recipe's NAME — not keep the article's title.
+        await removePartFromCollection(976001, uids[0]);
+        if(isCollection(coll)) throw new Error('one part left and it is still a collection');
+        if(coll.name!=='Lentil') throw new Error('the collapsed recipe is still called "'+coll.name+'"');
+        if(coll.steps[0]!=='boil') throw new Error('the collapsed recipe did not take the last part\'s content');
+        if(coll.servings!=='4') throw new Error('the collapsed recipe lost the part\'s servings');
+        if(recipes.length!==countBefore) throw new Error('collapsing created a new recipe');
+
+        // Saying no changes nothing at all.
+        window.askConfirm=function(){ return Promise.resolve(false); };
+        var coll2 = normalizeRecipe(Object.assign({id:976002, uid:'rm-coll2', bg:'#fff'},
+          buildImportFromParsed({ collectionName:'More', category:'Soup', recipes:[
+            { name:'A', ingredients:[{a:'1',n:'x'}], steps:['s'] },
+            { name:'B', ingredients:[{a:'2',n:'y'}], steps:['t'] }
+          ]}, '').recipe));
+        recipes.unshift(coll2);
+        await removePartFromCollection(976002, recipeParts(coll2)[0].uid);
+        if(recipeParts(coll2).length!==2) throw new Error('cancelling removed it anyway');
+
+        // Version history has to survive the round trip, in both directions —
+        // it recorded an EMPTY recipe for every collection before v36.2, so
+        // Restore would have wiped the real one with nothing.
+        var snap = historySnapshot(coll2);
+        if(!(snap.parts||[]).length) throw new Error('a snapshot of a collection holds no parts');
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        coll2.parts = [recipeParts(coll2)[0]];
+        collapseCollectionIfThin(coll2);
+        if(isCollection(coll2)) throw new Error('setup: it should be an ordinary recipe now');
+        coll2.history = [snap];
+        await restoreVersion(976002, 0);
+        if(!isCollection(coll2)) throw new Error('restoring a collection did not bring the parts back');
+        if(recipeParts(coll2).length!==2) throw new Error('restore brought back '+recipeParts(coll2).length+' of 2 parts');
+        if(coll2.ingredients.length||coll2.steps.length)
+          throw new Error('restore left a stale flat copy beside the parts');
+        // ...and back the other way: restoring a plain version must clear parts.
+        coll2.history = [{ at:Date.now(), name:'Plain', category:'Soup', difficulty:'Easy',
+          prep:'—', servings:'—', notes:'', ingredients:[{a:'1',n:'z'}], steps:['only step'] }];
+        await restoreVersion(976002, 0);
+        if(isCollection(coll2)) throw new Error('restoring a plain version left the old parts behind');
+        if(allIngredients(coll2).length!==1) throw new Error('readers still see the old parts');
+      } finally {
+        window.askConfirm=realAsk; window.toast=realToast;
+        recipes.length=0; before.forEach(function(r){ recipes.push(r); }); nextId=beforeId;
+      }
+    } },
+
+  { id:'dup_collection_loses_nothing', group:'Import/Export', name:'A collection meeting a duplicate loses nothing (v36.2)',
+    test: async()=>{
+      // The v36.1 bug, exactly: import a collection whose first recipe you
+      // already own, choose "update the existing one", and BOTH halves were
+      // lost — the existing recipe kept its old content, and all ten freshly
+      // parsed recipes vanished with the overlay. confirmImportChecked read
+      // parsed.ingredients on a collection, where they live in parts.
+      var realAsk = window.askConfirm, realToast = window.toast, realClose = window.closeM;
+      var before = recipes.slice(), beforeId = nextId;
+      try{
+        window.toast = function(){}; window.closeM = function(){};
+        var existing = normalizeRecipe({ id:975001, uid:'dup-existing', name:'Chestnut soup',
+          photo:'PHOTO', fav:true, cookCount:7, bg:'#fff',
+          ingredients:[{a:'1',n:'old onion'}], steps:['the old method'] });
+        recipes.unshift(existing);
+
+        var coll = { name:'Chestnuts: 3 recipes', category:'Dinner', source:'https://example.com/nuts',
+          parts:[
+            { name:'Chestnut soup', ingredients:[{a:'200g',n:'chestnuts'}], steps:['the new method'], servings:'10' },
+            { name:'Chestnut pasta', ingredients:[{a:'500g',n:'pasta'}], steps:['boil'] },
+            { name:'Chestnut cake',  ingredients:[{a:'3',n:'eggs'}],      steps:['bake'] }
+          ]};
+
+        // Through confirmImportParsed, NOT confirmImportCollection — the bug was
+        // in the routing, and a test that calls the inner function directly
+        // passes happily while the real button does the wrong thing.
+        window.askConfirm = function(){ return Promise.resolve(true); };   // "Update"
+        await confirmImportParsed(JSON.parse(JSON.stringify(coll)), 'freehandOverlay');
+
+        // 1. The existing recipe was actually updated...
+        if(existing.steps[0]!=='the new method')
+          throw new Error('the existing recipe was not updated — it still says "'+existing.steps[0]+'"');
+        if(!existing.ingredients.some(function(i){ return /chestnuts/.test(i.n); }))
+          throw new Error('the existing recipe kept its old ingredients');
+        // ...while keeping everything that is its own.
+        if(existing.photo!=='PHOTO') throw new Error('updating threw away the photo');
+        if(!existing.fav) throw new Error('updating threw away the favourite');
+        if(existing.cookCount!==7) throw new Error('updating threw away the cooking history');
+        if(!existing.history.length) throw new Error('the replaced version was not kept in history');
+        if(existing.id!==975001) throw new Error('updating changed the recipe identity');
+
+        // 2. ...and the OTHER two recipes were still imported. This is the half
+        //    that silently disappeared.
+        var added = recipes.filter(function(r){ return before.indexOf(r)===-1 && r!==existing; });
+        if(!added.length) throw new Error('the rest of the collection was thrown away');
+        var names = [];
+        added.forEach(function(r){
+          recipeParts(r).forEach(function(p){ names.push(p.name); });
+          if(!recipeParts(r).length) names.push(r.name);
+        });
+        if(names.indexOf('Chestnut pasta')===-1 || names.indexOf('Chestnut cake')===-1)
+          throw new Error('imported: '+names.join(', ')+' — the untouched recipes are missing');
+        if(names.indexOf('Chestnut soup')!==-1)
+          throw new Error('the updated recipe was ALSO imported as a new one');
+
+        // 3. "Keep both" imports the whole collection and touches nothing.
+        var mark = existing.steps[0];
+        window.askConfirm = function(){ return Promise.resolve(false); };  // "Keep both"
+        await confirmImportParsed(JSON.parse(JSON.stringify(coll)), 'freehandOverlay');
+        if(existing.steps[0]!==mark) throw new Error('"Keep both" changed the existing recipe anyway');
+        var kept = recipes[0];
+        if(recipeParts(kept).length!==3)
+          throw new Error('"Keep both" imported '+recipeParts(kept).length+' of 3 recipes');
+
+        // 4. Two parts naming the SAME existing recipe must not both replace it.
+        var twice = { name:'Two the same', category:'Dinner', parts:[
+          { name:'Chestnut soup', ingredients:[{a:'1',n:'first'}],  steps:['first'] },
+          { name:'Chestnut soup', ingredients:[{a:'2',n:'second'}], steps:['second'] }
+        ]};
+        var d = collectionDuplicates(twice, recipes);
+        if(d.parts.length!==1) throw new Error(d.parts.length+' parts were matched to one recipe');
+      } finally {
+        window.askConfirm = realAsk; window.toast = realToast; window.closeM = realClose;
+        recipes.length = 0; before.forEach(function(r){ recipes.push(r); }); nextId = beforeId;
+      }
+    } },
+
+  { id:'dup_replace_never_silently_drops', group:'Import/Export', name:'A replace with nothing to replace with still keeps the recipe (v36.2)',
+    test: async()=>{
+      // applyParsedOntoRecipe returning false is the caller's cue that it could
+      // NOT do what was asked. Treating that as success is what closed the
+      // overlay on ten parsed recipes.
+      var r = normalizeRecipe({ id:975101, uid:'dup-empty', name:'Untouched',
+        ingredients:[{a:'1',n:'original'}], steps:['original step'] });
+      if(applyParsedOntoRecipe(r, { ingredients:[], steps:[] }))
+        throw new Error('an empty parse reported that it replaced something');
+      if(r.steps[0]!=='original step') throw new Error('an empty parse damaged the recipe anyway');
+      if(applyParsedOntoRecipe(r, {}))
+        throw new Error('a parse with no content at all reported success');
+
+      // A collection replacing an ordinary recipe, and the reverse. Both have to
+      // leave the parts/flat invariant intact, or every reader sees the wrong one.
+      if(!applyParsedOntoRecipe(r, { parts:[
+          { name:'A', ingredients:[{a:'1',n:'x'}], steps:['s'] },
+          { name:'B', ingredients:[{a:'2',n:'y'}], steps:['t'] } ] }))
+        throw new Error('a collection could not replace an ordinary recipe');
+      if(!isCollection(r)) throw new Error('it did not become a collection');
+      if(r.ingredients.length||r.steps.length)
+        throw new Error('the flat fields kept a stale copy beside the parts');
+      if(allIngredients(r).length!==2) throw new Error('the new parts are not readable');
+
+      if(!applyParsedOntoRecipe(r, { ingredients:[{a:'9',n:'plain'}], steps:['plain step'] }))
+        throw new Error('an ordinary recipe could not replace a collection');
+      if(isCollection(r)) throw new Error('the old parts survived — it is still a collection');
+      if(allIngredients(r).length!==1) throw new Error('readers still see the old parts');
+      if(recipeParts(r).length) throw new Error('parts were left behind on the record');
+
+      // And the same thing through the real entry point: choosing "update" when
+      // there is nothing to update with must not swallow the import. v36.1 closed
+      // the overlay here and the parse was gone.
+      var realAsk=window.askConfirm, realToast=window.toast, realClose=window.closeM;
+      var before=recipes.slice(), beforeId=nextId;
+      try{
+        window.toast=function(){}; window.closeM=function(){};
+        window.askConfirm=function(){ return Promise.resolve(true); };     // "Update"
+        var target = normalizeRecipe({ id:975102, uid:'dup-target', name:'Tomato soup', bg:'#fff',
+          ingredients:[{a:'1',n:'tomato'}], steps:['simmer'] });
+        recipes.unshift(target);
+        await confirmImportParsed({ name:'Tomato soup', category:'Soup',
+          ingredients:[], steps:[], source:'https://example.com/t' }, 'freehandOverlay');
+        var added = recipes.filter(function(x){ return before.indexOf(x)===-1 && x!==target; });
+        if(!added.length)
+          throw new Error('a replace with nothing to replace with threw the parse away');
+        if(target.steps[0]!=='simmer') throw new Error('the existing recipe was damaged anyway');
+      } finally {
+        window.askConfirm=realAsk; window.toast=realToast; window.closeM=realClose;
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); }); nextId=beforeId;
+      }
+    } },
+
   { id:'ai_call_is_bounded', group:'Import/Export', name:'An AI call cannot wait forever, and a 400 is not retried (v36.1)',
     test: async()=>{
       // v36.0's fetch had no AbortSignal, so a stalled connection hung the app
@@ -10075,7 +10581,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.1';
+var APP_VERSION = 'v36.2';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12386,7 +12892,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.1</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.2</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12968,7 +13474,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.0</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.2</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13949,13 +14455,19 @@ window.buildRecipePage = buildRecipePage; window.shareAsPage = shareAsPage;
 var HISTORY_MAX = 3;
 
 function historySnapshot(r) {
-  return {
+  var snap = {
     at: Date.now(),
     name: r.name, category: r.category, difficulty: r.difficulty,
     prep: r.prep, servings: r.servings, notes: r.notes || '',
     ingredients: JSON.parse(JSON.stringify(r.ingredients || [])),
     steps: (r.steps || []).slice()
   };
+  // A collection keeps ALL its content in `parts` and its flat fields empty, so
+  // without this a snapshot of one recorded an empty recipe — version history
+  // was silently useless for every collection from v36.0, and Restore would
+  // have restored nothing over the top of the real thing.
+  if (Array.isArray(r.parts) && r.parts.length) snap.parts = JSON.parse(JSON.stringify(r.parts));
+  return snap;
 }
 function pushHistory(r) {
   if (!Array.isArray(r.history)) r.history = [];
@@ -13977,6 +14489,12 @@ async function restoreVersion(id, idx) {
   r.prep = v.prep; r.servings = v.servings; r.notes = v.notes;
   r.ingredients = JSON.parse(JSON.stringify(v.ingredients));
   r.steps = v.steps.slice();
+  // Restoring across the collection boundary in either direction: a snapshot
+  // with parts puts them back, and one without must clear any that are there,
+  // or the old parts would outlive the version that held them.
+  if (Array.isArray(v.parts) && v.parts.length) r.parts = JSON.parse(JSON.stringify(v.parts));
+  else delete r.parts;
+  normalizeRecipe(r);           // owns the parts/flat invariant
   r.nutrition = null;           // the numbers described the other version
   r.updatedAt = Date.now();
   saveData(); drawView(); renderGrid();
@@ -14948,9 +15466,14 @@ function collectionSectionsHtml(r) {
       + escH(p.name) + '</div>'
       + (meta.length ? '<div style="font-size:11.5px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '')
       + '</div>'
-      + '<button class="action-btn" style="flex-shrink:0;font-size:11.5px;padding:6px 10px;" '
+      + '<div style="flex-shrink:0;display:flex;gap:6px;">'
+      + '<button class="action-btn" style="font-size:11.5px;padding:6px 10px;" '
       + 'onclick="promotePartToRecipe(' + r.id + ',&quot;' + escA(p.uid) + '&quot;)" '
       + 'title="Make this a recipe of its own">⤴ Make its own</button>'
+      + '<button class="action-btn" style="font-size:11.5px;padding:6px 9px;" '
+      + 'onclick="removePartFromCollection(' + r.id + ',&quot;' + escA(p.uid) + '&quot;)" '
+      + 'title="Remove this recipe from the collection">🗑 Remove</button>'
+      + '</div>'
       + '</div>'
       + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + escH(p.notes) + '</div>' : '')
       + '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
@@ -15007,27 +15530,81 @@ async function promotePartToRecipe(collId, partUid) {
   var made = recipeFromPart(coll, part);
   recipes.unshift(made);
   coll.parts = recipeParts(coll).filter(function(p){ return p.uid !== partUid; });
-  // One part left is not a collection any more — it is that recipe. Leaving a
-  // one-part collection behind would be a container with nothing to contain.
-  if (coll.parts.length === 1) {
-    var last = coll.parts[0];
-    coll.ingredients = last.ingredients;
-    coll.steps = last.steps;
-    coll.parts = [];
-    normalizeRecipe(coll);
-    toast('⤴ “' + made.name + '” is its own recipe now — “' + coll.name + '” had one left, so it is an ordinary recipe again', 6000);
-  } else if (!coll.parts.length) {
-    normalizeRecipe(coll);
-    toast('⤴ “' + made.name + '” is its own recipe now', 4000);
-  } else {
-    toast('⤴ “' + made.name + '” is its own recipe now — ' + coll.parts.length + ' left in the collection', 5000);
-  }
+  var how = collapseCollectionIfThin(coll);
+  toast('⤴ “' + made.name + '” is its own recipe now'
+    + (how === 'collapsed' ? ' — “' + coll.name + '” had one left, so it is an ordinary recipe again'
+      : coll.parts.length ? ' — ' + coll.parts.length + ' left in the collection' : ''),
+    how === 'collapsed' ? 6000 : 5000);
   coll.updatedAt = Date.now();
   saveData(); renderGrid();
   if (viewId === coll.id) drawView();
   syncLog('save', 'Promoted “' + made.name + '” out of “' + coll.name + '”', { id: made.id });
 }
 window.promotePartToRecipe = promotePartToRecipe;
+
+// One part left is not a collection any more — it is that recipe. Leaving a
+// one-part collection behind would be a container with nothing to contain.
+// Returns 'collapsed' | 'emptied' | 'still-a-collection'.
+//
+// The collapsing recipe takes the remaining part's NAME. It did not before, so a
+// ten-recipe round-up promoted down to its last recipe kept the article's title
+// — a card reading "Chestnuts: 10 recipes" holding one gnocchi recipe.
+function collapseCollectionIfThin(coll) {
+  var parts = recipeParts(coll);
+  if (parts.length === 1) {
+    var last = parts[0];
+    if (last.name) coll.name = last.name;
+    coll.ingredients = last.ingredients;
+    coll.steps = last.steps;
+    if (last.servings) coll.servings = last.servings;
+    if (last.prep) coll.prep = last.prep;
+    coll.parts = [];
+    normalizeRecipe(coll);
+    return 'collapsed';
+  }
+  if (!parts.length) { coll.parts = []; normalizeRecipe(coll); return 'emptied'; }
+  return 'still-a-collection';
+}
+window.collapseCollectionIfThin = collapseCollectionIfThin;
+
+// Drop one recipe from a collection outright. "⤴ Make its own" keeps it, which
+// is not what you want for the three recipes in the round-up you will never
+// cook — and tidying those away should not mean creating three cards first and
+// deleting them afterwards.
+async function removePartFromCollection(collId, partUid) {
+  var coll = recipes.find(function(x){ return x.id === collId; });
+  if (!coll) { toast('That collection is no longer here'); return; }
+  var part = recipeParts(coll).find(function(p){ return p.uid === partUid; });
+  if (!part) { toast('That recipe is no longer in this collection'); return; }
+
+  var left = recipeParts(coll).length - 1;
+  if (!await askConfirm({ icon:'🗑', title:'Remove “' + part.name + '”?',
+      message:'It is deleted from “' + coll.name + '” and is NOT kept as a recipe of its own.\n\n'
+        + (left === 1
+            ? 'One recipe would be left, so the collection becomes that ordinary recipe.'
+          : left === 0
+            ? 'It is the last one, so the collection is left empty — delete it from the recipe menu if you no longer want it.'
+            : left + ' recipes would be left in the collection.')
+        + '\n\nThe collection’s previous state is kept in 🕘 Version history, so this can be undone.',
+      okLabel:'Remove it', danger:true })) return;
+
+  // The whole collection goes into history BEFORE the part is taken out, so
+  // "↩ Restore" brings the removed recipe back with it.
+  if (typeof pushHistory === 'function') { try { pushHistory(coll); } catch(e) {} }
+  coll.parts = recipeParts(coll).filter(function(p){ return p.uid !== partUid; });
+  var how = collapseCollectionIfThin(coll);
+  coll.updatedAt = Date.now();
+  saveData(); renderGrid();
+  if (viewId === coll.id) drawView();
+  syncLog('save', 'Removed “' + part.name + '” from “' + coll.name + '”', { left: left });
+  toast(how === 'collapsed'
+      ? '🗑 Removed — one recipe was left, so “' + coll.name + '” is an ordinary recipe now'
+    : how === 'emptied'
+      ? '🗑 Removed — “' + coll.name + '” is empty now'
+      : '🗑 Removed “' + part.name + '” — ' + left + ' left in the collection',
+    how === 'still-a-collection' ? 4000 : 6000);
+}
+window.removePartFromCollection = removePartFromCollection;
 
 async function splitCollection(collId) {
   var coll = recipes.find(function(x){ return x.id === collId; });
@@ -17597,6 +18174,105 @@ function extractInstagramId(url) {
 }
 
 var _pageWasTruncated = false;
+var _pageLinks = [];
+
+// ─── LINK ROUND-UPS (v36.2) ──────────────────────────────────────────────────
+// Some round-ups do not contain their recipes at all. "10 soups in 15 minutes"
+// is ten names, ten ratings, ten photo credits and ten links reading "to the
+// recipe" — and not one ingredient. Extracting the page text finds ten headings
+// with nothing under them, every one of which buildImportFromParsed correctly
+// refuses, so the whole import came back empty and offered a video bookmark.
+//
+// The answer is the same shape as the long-article one: ask a cheap question
+// first (which of these links ARE the recipes?), then do the small per-recipe
+// work behind real progress. Each linked page is an ordinary single-recipe
+// import, so nothing new is needed to read one.
+var LINK_ROUNDUP_MAX = 12;        // pages we are willing to open for one import
+
+function linkPickPrompt(text, links) {
+  return 'This page is a round-up that LINKS to its recipes instead of containing them. '
+    + 'Below is the page text, then the links found on it, numbered.\n\n'
+    + 'Return the links that lead to ONE INDIVIDUAL RECIPE each, in the order they '
+    + 'appear. Ignore navigation, tags, categories, comments, author pages, adverts '
+    + 'and anything that leads to another list. Several links often point at the same '
+    + 'recipe (its rating, its prep time, its "to the recipe" button) — return each '
+    + 'recipe ONCE.\n\n'
+    + 'Return ONLY valid JSON, no markdown fences:\n'
+    + '{"collectionName":"the page\'s own title","collectionNotes":"its intro paragraph, if any",'
+    + '"category":"one of Breakfast/Lunch/Dinner/Snack/Dessert/Soup/Skills & Methods",'
+    + '"picks":[{"n":<the link number>,"title":"the recipe\'s name as the page gives it"}]}\n'
+    + 'Return {"picks":[]} if none of them are individual recipes.\n\n'
+    + 'PAGE TEXT:\n' + text.slice(0, 20000) + '\n\nLINKS:\n'
+    + links.map(function(l, i){ return i + '. ' + l.href + '  — ' + (l.text || ''); }).join('\n');
+}
+
+// Returns the same shape as extractRecipesFromText, or null when this is not a
+// link round-up after all — so the caller can fail the way it always did.
+async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
+  var say = (typeof onProgress === 'function') ? onProgress : function(){};
+  if (!Array.isArray(links) || links.length < 2) return null;
+
+  say(0, 0, 'Looking for links to the recipes…');
+  var plan = {};
+  try { plan = extractJSON(await aiCall(linkPickPrompt(pageText, links), 2000)) || {}; }
+  catch (e) { syncLog('import', 'Could not work out which links are recipes', String(e && e.message)); return null; }
+
+  var picks = [], seen = {};
+  (plan.picks || []).forEach(function(p) {
+    var l = links[p && p.n];
+    if (!l || seen[l.href]) return;
+    seen[l.href] = true;
+    picks.push({ href: l.href, title: (p.title || l.text || '').trim() });
+  });
+  if (!picks.length) return null;
+  if (picks.length > LINK_ROUNDUP_MAX) picks = picks.slice(0, LINK_ROUNDUP_MAX);
+
+  syncLog('import', 'Link round-up: opening ' + picks.length + ' recipe pages');
+  var done = 0, failures = [];
+  say(0, picks.length, '');
+  var got = await mapLimited(picks, MULTI_CONCURRENCY, async function(pick) {
+    try {
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'fetch-url', url: pick.href }),
+        signal: AbortSignal.timeout(25000) });
+      if (!r.ok) throw new Error('the server could not fetch it (' + r.status + ')');
+      var d = await r.json();
+      var t = (d && d.text) || '';
+      if (t.length < 100) throw new Error('that page had no readable text');
+      // An individual recipe page is short, so this is one small call each.
+      var parsed = await extractRecipesFromText(t, 'webpage text');
+      var list = Array.isArray(parsed && parsed.recipes) ? parsed.recipes
+               : (parsed && (parsed.name || parsed.ingredients)) ? [parsed] : [];
+      // The round-up's own wording for the name is usually better than the
+      // recipe page's headline, which often carries the site's furniture.
+      if (list.length === 1 && pick.title) list[0].name = pick.title;
+      list.forEach(function(x){ x.source = pick.href; });
+      return list;
+    } catch (e) {
+      failures.push((pick.title || pick.href) + ': ' + ((e && e.message) || e));
+      syncLog('error', 'Could not read “' + (pick.title || pick.href) + '”', String(e && e.message).slice(0, 200));
+      return [];
+    } finally { say(++done, picks.length, ''); }
+  });
+
+  var recipes_ = [];
+  got.forEach(function(l){ (l || []).forEach(function(x){ recipes_.push(x); }); });
+  if (!recipes_.length) {
+    syncLog('error', 'Every linked recipe failed — ' + failures.length + ' of ' + picks.length);
+    return null;
+  }
+  syncLog('import', 'Link round-up: got ' + recipes_.length + ' of ' + picks.length);
+  return {
+    collectionName:  plan.collectionName || '',
+    collectionNotes: plan.collectionNotes || '',
+    category:        plan.category || '',
+    recipes:         recipes_,
+    _partial:        failures.length ? failures.length : 0,
+    _expected:       picks.length
+  };
+}
+window.linkPickPrompt = linkPickPrompt;
+window.extractRecipesFromLinks = extractRecipesFromLinks;
 
 // Split out so it can be tested by what it PRODUCES. Only claim the SITE blocked
 // us if an attempt actually said so — our Worker refusing the call, a proxy
@@ -17715,6 +18391,7 @@ async function runUrlImport() {
   res.innerHTML = spinner('Fetching page via server…');
   let pageText = '';
   _pageWasTruncated = false;
+  _pageLinks = [];
   // Why each attempt failed, so the message at the end can be true. Blaming the
   // recipe site for our own Worker refusing us, or for our own CSP blocking the
   // fallback, is exactly the kind of confident-and-wrong error this app treats
@@ -17733,6 +18410,9 @@ async function runUrlImport() {
       // mid-article, so the last recipes simply are not there — and an import
       // that quietly returns 6 of 10 looks exactly like an import that worked.
       _pageWasTruncated = !!fetchData.truncated;
+      // v36.2 — a round-up can be nothing but links to the recipes. Kept aside
+      // in case the text alone turns out to hold no recipe at all.
+      _pageLinks = Array.isArray(fetchData.links) ? fetchData.links : [];
       if (!pageText) attempts.push('the server fetched the page but found no readable text in it');
     } else {
       var wd = null; try { wd = await fetchResp.json(); } catch(e2) {}
@@ -17784,18 +18464,40 @@ async function runUrlImport() {
   }
 
   res.innerHTML = spinner('Extracting recipe…');
-  syncLog('import', 'URL import: ' + pageText.length + ' chars of page text', url.slice(0, 120));
+  syncLog('import', 'URL import: ' + pageText.length + ' chars of page text, '
+    + _pageLinks.length + ' link(s)', url.slice(0, 120));
+  var progress = function(done, total, label) {
+    res.innerHTML = spinner(label || (total > 1
+      ? 'Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
+      : 'Extracting recipe…'));
+  };
   try {
-    const parsed = await extractRecipesFromText(pageText, 'webpage text', function(done, total, label) {
-      res.innerHTML = spinner(label || (total > 1
-        ? 'Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
-        : 'Extracting recipe…'));
-    });
-    if (parsed.error) throw new Error(parsed.error);
-    const built = buildImportFromParsed(parsed, url);
-    if (built.kind === 'none') throw new Error('no recipe found');
+    var parsed = null, built = { kind: 'none' };
+    try {
+      parsed = await extractRecipesFromText(pageText, 'webpage text', progress);
+      if (parsed && parsed.error) parsed = null;
+      if (parsed) built = buildImportFromParsed(parsed, url);
+    } catch (e) {
+      // Hold it: if this turns out to be a page of links, that is the real
+      // answer and this failure was never the interesting one.
+      var textErr = e;
+    }
+
+    // A round-up that only LINKS to its recipes leaves nothing behind here —
+    // ten headings with no ingredients under them, all correctly refused.
+    if (built.kind === 'none' && _pageLinks.length) {
+      var viaLinks = await extractRecipesFromLinks(pageText, _pageLinks, url, function(done, total, label) {
+        res.innerHTML = spinner(label || (total
+          ? 'Opening recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
+          : 'Looking for links to the recipes…'));
+      });
+      if (viaLinks) { parsed = viaLinks; built = buildImportFromParsed(viaLinks, url); }
+    }
+    if (built.kind === 'none') throw (typeof textErr !== 'undefined' && textErr) || new Error('no recipe found');
     if (_pageWasTruncated) built.recipe._truncated = true;
-    if (parsed._partial) built.recipe._partial = parsed._partial + ' of ' + parsed._expected;
+    // Just the count: the preview's own sentence supplies "of these", so
+    // passing "1 of 3" here read "1 of 3 of these could not be read".
+    if (parsed._partial) built.recipe._partial = parsed._partial;
     applyParsedRecipe(built.recipe, 'urlImportResult', 'urlImportOverlay');
   } catch(err) {
     // "There is no recipe here" and "the request timed out" are different
@@ -17993,23 +18695,92 @@ async function askDuplicateAction(dup, parsed) {
   return ok ? 'replace' : 'add';
 }
 
-function confirmImportParsed(parsed, overlayId) {
-  var dup = findDuplicate(parsed, recipes);
-  if (dup) { confirmImportChecked(parsed, overlayId, dup); return; }
-  importParsedNow(parsed, overlayId);
+// Put what was just parsed onto an existing recipe, keeping its identity, photo,
+// favourite, cooking history and place in the library.
+//
+// Returns FALSE when there was nothing to put on, and the caller must treat that
+// as "I could not do what you asked", never as a quiet success. v36.1 read
+// `parsed.ingredients` on a COLLECTION — where the content lives in `parts` and
+// the flat fields are deliberately empty — found nothing, kept every old value,
+// and then closed the overlay anyway. The existing recipe was not updated and
+// ten freshly parsed recipes were thrown away with it.
+function applyParsedOntoRecipe(r, parsed) {
+  var hasParts = Array.isArray(parsed.parts) && parsed.parts.length;
+  var n = hasParts ? null : normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
+  if (!hasParts && !n.ingredients.length && !n.steps.length) return false;
+
+  if (typeof pushHistory === 'function') { try { pushHistory(r); } catch(e) {} }
+  if (hasParts) {
+    r.parts = parsed.parts;         // normalizeRecipe empties the flat fields below
+  } else {
+    r.ingredients = n.ingredients.length ? n.ingredients : r.ingredients;
+    r.steps       = n.steps.length ? n.steps : r.steps;
+    // An ordinary recipe replacing a collection must stop being a collection,
+    // or its old parts would still be what every reader sees.
+    delete r.parts;
+    if (n.steps.length) r.isClip = false;
+  }
+  if (parsed.prep)     r.prep = parsed.prep;
+  if (parsed.servings) r.servings = parsed.servings;
+  if (parsed.source)   r.source = parsed.source;
+  if (parsed.notes)    r.notes = parsed.notes;
+  // Deliberately NOT `by`: a byline is a part's field, and an ordinary recipe
+  // has nowhere to show one. Writing it here would add a key that nothing
+  // reads, normalises or exports.
+  r.updatedAt = Date.now();
+  normalizeRecipe(r);               // owns the parts/flat invariant — do not restate it here
+  return true;
 }
+window.applyParsedOntoRecipe = applyParsedOntoRecipe;
+
+// What a collection would bring in that you already have. A collection is
+// checked PART BY PART, because the article's own title is not the thing you
+// might own already — the recipes inside it are.
+function collectionDuplicates(parsed, list) {
+  var all = list || recipes || [];
+  // The whole article arriving a second time: matched on its source, so a
+  // re-import of the same URL is recognised even after it was renamed.
+  var self = findDuplicate({ name: parsed.name, source: parsed.source }, all);
+  var parts = [], taken = {};
+  (parsed.parts || []).forEach(function(p, i) {
+    // Deliberately no `source`: every part carries the article's URL, so
+    // matching on it would make all ten duplicates of the same one recipe.
+    var d = findDuplicate({ name: p.name }, all);
+    if (!d) return;
+    var key = d.recipe.uid || ('id:' + d.recipe.id);
+    if (taken[key]) return;         // two parts cannot both replace one recipe
+    taken[key] = true;
+    if (self && self.recipe === d.recipe) self = null;   // counted once, as a part
+    parts.push({ index: i, part: p, recipe: d.recipe });
+  });
+  return { self: self, parts: parts };
+}
+window.collectionDuplicates = collectionDuplicates;
+
+// Returns a promise so a caller — or a test — can wait for the dialog and
+// everything behind it. The onclick handlers ignore it, which is fine; a test
+// that cannot await this ends up calling the inner function directly and
+// skipping the very routing that was broken in v36.1.
+function confirmImportParsed(parsed, overlayId) {
+  if (Array.isArray(parsed.parts) && parsed.parts.length)
+    return confirmImportCollection(parsed, overlayId);
+  var dup = findDuplicate(parsed, recipes);
+  if (dup) return confirmImportChecked(parsed, overlayId, dup);
+  importParsedNow(parsed, overlayId);
+  return Promise.resolve();
+}
+
 async function confirmImportChecked(parsed, overlayId, dup) {
   var action = await askDuplicateAction(dup, parsed);
   if (action === 'replace') {
-    var r = dup.recipe, n = normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
-    if (typeof pushHistory === 'function') { try { pushHistory(r); } catch(e) {} }
-    r.ingredients = n.ingredients.length ? n.ingredients : r.ingredients;
-    r.steps       = n.steps.length ? n.steps : r.steps;
-    if (parsed.prep) r.prep = parsed.prep;
-    if (parsed.servings) r.servings = parsed.servings;
-    if (parsed.source) r.source = parsed.source;
-    if (n.steps.length) r.isClip = false;
-    r.updatedAt = Date.now();
+    var r = dup.recipe;
+    if (!applyParsedOntoRecipe(r, parsed)) {
+      // Nothing usable to replace it with. Importing it as a new recipe is the
+      // one outcome that cannot lose it, and the overlay stays honest about why.
+      toast('⚠️ Nothing in this could replace “' + r.name + '” — adding it separately', 5000);
+      importParsedNow(parsed, overlayId);
+      return;
+    }
     // Replacing a duplicate IS a successful import as far as the harvest queue is
     // concerned. Without this a replace read as a cancel and stopped the batch.
     if (typeof _waQueue === 'object') _waQueue.imported = true;
@@ -18020,6 +18791,73 @@ async function confirmImportChecked(parsed, overlayId, dup) {
   }
   importParsedNow(parsed, overlayId);
 }
+
+// A collection meeting recipes you already have. One question, not ten.
+async function confirmImportCollection(parsed, overlayId) {
+  var dups = collectionDuplicates(parsed, recipes);
+
+  // The same article a second time. Replacing its parts wholesale is what
+  // "update the existing one" means here, and it now actually happens.
+  if (dups.self && !dups.parts.length) {
+    confirmImportChecked(parsed, overlayId, dups.self);
+    return;
+  }
+
+  if (!dups.parts.length) { importParsedNow(parsed, overlayId); return; }
+
+  var names = dups.parts.map(function(d){ return '  “' + d.recipe.name + '”'; }).join('\n');
+  var many  = dups.parts.length > 1;
+  var ok = await askConfirm({
+    icon: '⧉', title: 'You already have ' + (many ? 'some of these' : 'one of these'),
+    message: dups.parts.length + ' of the ' + parsed.parts.length + ' recipes here '
+      + (many ? 'match recipes' : 'matches a recipe') + ' you already have:\n\n' + names + '\n\n'
+      + 'Updating replaces ' + (many ? 'their' : 'its') + ' ingredients and method and keeps '
+      + (many ? 'their' : 'its') + ' photo, favourite and cooking history — the rest of the '
+      + 'collection is imported either way.',
+    okLabel: 'Update ' + (many ? 'those ' + dups.parts.length : 'that one'),
+    cancelLabel: 'Keep both copies' });
+
+  if (!ok) { importParsedNow(parsed, overlayId); return; }
+
+  var updated = [], failed = [], skip = {};
+  dups.parts.forEach(function(d) {
+    // A part is a recipe's worth of content, so it replaces one the same way a
+    // single import does — the flat fields are where a part keeps its own.
+    if (applyParsedOntoRecipe(d.recipe, {
+          ingredients: d.part.ingredients, steps: d.part.steps,
+          prep: d.part.prep, servings: d.part.servings, notes: d.part.notes,
+          source: parsed.source })) {
+      updated.push(d.recipe.name);
+      skip[d.index] = true;
+    } else {
+      // Nothing to update it with, so this part is NOT dropped — it stays in
+      // the collection, where it is at least still imported.
+      failed.push(d.part.name);
+    }
+  });
+
+  var rest = parsed.parts.filter(function(_, i){ return !skip[i]; });
+  if (rest.length) {
+    // One part left is not a collection. Import it as the ordinary recipe it is.
+    var remaining = Object.assign({}, parsed, { parts: rest });
+    if (rest.length === 1) {
+      remaining = Object.assign({}, parsed, rest[0], { parts: undefined,
+        category: parsed.category, source: parsed.source });
+      delete remaining.parts;
+    }
+    importParsedNow(remaining, overlayId);       // closes the overlay and saves
+  } else {
+    if (typeof _waQueue === 'object') _waQueue.imported = true;
+    closeM(overlayId);
+  }
+  activeCat = 'All'; renderFilters(); renderGrid(); saveData();
+  syncLog('import', 'Collection import updated ' + updated.length + ' existing recipe(s), '
+    + 'imported ' + rest.length, updated.join('; ').slice(0, 200));
+  if (updated.length) toast('✅ Updated ' + updated.length + ' existing recipe(s)'
+    + (rest.length ? ' and imported ' + rest.length + ' more' : ''), 5000);
+  if (failed.length) toast('⚠️ ' + failed.length + ' could not replace anything and were imported instead', 5000);
+}
+window.confirmImportCollection = confirmImportCollection;
 // ─── MULTI-RECIPE IMPORT (v36.0) ─────────────────────────────────────────────
 //
 // One prompt shape for every import path — URL, free text, file, share sheet.
@@ -18897,8 +19735,11 @@ window.healCloudPhotos = healCloudPhotos;
 async function syncCloudPhotos() {
   var errors = [];
   var currentIds = {};
-  for (var i = 0; i < recipes.length; i++) {
-    var r = recipes[i];
+  // A fixture's photo is the one that actually reached Firestore and was
+  // refused — "ThumbTest — 1150 KB". Same guard as the recipe documents.
+  var live = cloudBound(recipes);
+  for (var i = 0; i < live.length; i++) {
+    var r = live[i];
     currentIds[r.id] = true;
     if (r.photo) {
       if (_cloudPhotoStamps[r.id] === r.photo) continue; // unchanged — already synced
@@ -19250,6 +20091,10 @@ function savePendingCloudDeletes() {
 }
 // Survives a reload: a delete made offline still has to reach the cloud later.
 function queueCloudDelete(id) {
+  // A fixture was never written to the cloud, so asking to delete it can only
+  // produce a DELETE_NOT_PERMITTED box about a recipe nobody has — and for a
+  // family member without the admin role, that is exactly what it did.
+  if (isTestFixture({ id: id })) return;
   _pendingCloudDeletes[id] = true;
   savePendingCloudDeletes();
 }
@@ -19287,6 +20132,33 @@ function slimRecipeForCloud(r) {
 
 // Which recipes actually need writing. Comparing the serialised form rather than
 // updatedAt alone means a load that hands back identical data writes nothing.
+// ─── TEST FIXTURES NEVER LEAVE THE DEVICE (v36.2) ────────────────────────────
+// Self tests create real recipes in the live `recipes` array on purpose — that
+// is what makes them worth anything; a test against a private copy proves the
+// copy works. What they must NEVER do is put those recipes in the CLOUD, on
+// Tony's real collection, on every family device.
+//
+// It happened: the thumbnail test injects a deliberately oversized 1.1 MB photo
+// named "ThumbTest" and then awaits four times. A sync firing inside that
+// window picked it up, Firestore refused it for exceeding the ~1 MB per-item
+// limit, and a run reporting "219 passed, 0 failed" ended in a red
+// PHOTO_TOO_BIG box. The test cleans up after itself; the window is the bug.
+//
+// Every fixture id in the suite is far above this. Real ids come from `nextId`,
+// which counts up from 1.
+var TEST_ID_MIN = 700000;
+function isTestFixture(r) {
+  var id = r && r.id;
+  return typeof id === 'number' && id >= TEST_ID_MIN;
+}
+// The only list that may be written to the cloud.
+function cloudBound(list) {
+  return (list || []).filter(function(r){ return !isTestFixture(r); });
+}
+window.TEST_ID_MIN = TEST_ID_MIN;
+window.isTestFixture = isTestFixture;
+window.cloudBound = cloudBound;
+
 function cloudDirtyIds(list, stamps) {
   var out = [];
   for (var i = 0; i < list.length; i++) {
@@ -19795,9 +20667,13 @@ async function saveToFirestore() {
     // 1) 5.4 — one document per changed recipe. Only what actually changed is
     //    written, so favouriting one recipe no longer re-uploads all of them.
     var conflicts = [], oversized = [];
-    var dirty = cloudDirtyIds(recipes, _cloudRecipeStamp);
+    // Test fixtures are filtered out HERE, at the one place recipes leave the
+    // device, rather than trusting every test to finish its cleanup before the
+    // next sync fires. See isTestFixture.
+    var live = cloudBound(recipes);
+    var dirty = cloudDirtyIds(live, _cloudRecipeStamp);
     for (var di = 0; di < dirty.length; di++) {
-      var dr = recipes.find(function(x) { return x.id === dirty[di]; });
+      var dr = live.find(function(x) { return x.id === dirty[di]; });
       if (!dr) continue;
       var res = await saveRecipeDoc(dr);
       // saveRecipeDoc logs the refusal itself; this level owns the UI state.
@@ -19809,7 +20685,7 @@ async function saveToFirestore() {
     var delRes = await flushCloudDeletes();
     // 5.9 — record the stamp we just wrote, so our own save doesn't force the
     // next load to re-read the whole collection.
-    setLastCloudMetaAt(await writeCloudMeta(recipes, nextId));
+    setLastCloudMetaAt(await writeCloudMeta(live, nextId));
     saveCloudBase();   // v29.2 — so the next session still knows its base
 
     // 3) Each changed photo into its own doc

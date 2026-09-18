@@ -1,4 +1,13 @@
-// Tony's Recipes — Cloudflare Worker v37
+// Tony's Recipes — Cloudflare Worker v38
+// v38: fetch-url also returns `links[]`. Some round-ups contain no recipes at
+//      all — ten names, ten ratings and ten links reading "to the recipe" — and
+//      the text extraction turns every <a> into its label and discards the href,
+//      so the app could see ten recipe names and reach none of them. The list is
+//      collected from the STRIPPED html (raw html returns the whole site nav)
+//      and is deliberately narrow, because it is what the app then FETCHES:
+//      http(s) only, same host, no fragments, no duplicates, no self-link, max 80.
+//      It must never become a way to make this Worker fetch anywhere on
+//      anybody's behalf.
 // v37: two regressions from the hardening releases, both found by Tony, neither
 //      caught by tests. (a) The Anthropic proxy forwarded the body verbatim
 //      INCLUDING the `appKey` v35 put there, and Anthropic rejects unknown
@@ -38,7 +47,7 @@
 // commit publicly. The token that used to be hard-coded here is still in git
 // history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
 
-const WORKER_VERSION = 'v37';
+const WORKER_VERSION = 'v38';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -437,13 +446,48 @@ async function handleRequest(request, env) {
         //    so the app can say so instead of guessing.
         const BLOCK = 'address|article|aside|blockquote|br|dd|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|table|tbody|td|tfoot|th|thead|tr|ul';
         const LIMIT = 60000;
-        let text = html
+        // The chrome comes off ONCE, and both the text and the links are taken
+        // from what is left. Collecting links from the raw html instead would
+        // return the whole site navigation — on a news site that is a hundred
+        // links before the article even starts.
+        const stripped = html
           .replace(/<script[\s\S]*?<\/script>/gi, ' ')
           .replace(/<style[\s\S]*?<\/style>/gi, ' ')
           .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
           .replace(/<header[\s\S]*?<\/header>/gi, ' ')
           .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
-          .replace(/<aside[\s\S]*?<\/aside>/gi, ' ')
+          .replace(/<aside[\s\S]*?<\/aside>/gi, ' ');
+
+        // v38 — some round-ups are nothing but LINKS to the recipes: a title, a
+        // rating, a photo credit and "to the recipe". Everything below turns an
+        // <a> into its label and throws the href away, so the app could see ten
+        // recipe names and had no way to reach a single one of them.
+        //
+        // This list is what the app may go on to fetch, so it is deliberately
+        // narrow: http(s) only, SAME HOST as the page itself, de-duplicated, no
+        // self-links, and capped. It must not become a way to make this Worker
+        // fetch anywhere on anybody's behalf.
+        const links = [];
+        try {
+          const base = new URL(url);
+          const seen = new Set([base.href.replace(/#.*$/, '')]);
+          const A_RE = /<a\b[^>]*?\bhref\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)[^>]*>([\s\S]*?)<\/a>/gi;
+          let m;
+          while ((m = A_RE.exec(stripped)) !== null && links.length < 80) {
+            const raw = m[1].replace(/^["']|["']$/g, '');
+            let abs;
+            try { abs = new URL(raw, base); } catch (e) { continue; }
+            if (abs.protocol !== 'http:' && abs.protocol !== 'https:') continue;
+            if (abs.hostname !== base.hostname) continue;
+            abs.hash = '';
+            if (seen.has(abs.href)) continue;
+            seen.add(abs.href);
+            const label = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            links.push({ href: abs.href, text: label.slice(0, 120) });
+          }
+        } catch (e) { /* a page with no usable links is not an error */ }
+
+        let text = stripped
           .replace(new RegExp('</?(?:' + BLOCK + ')(?:\\s[^>]*)?>', 'gi'), '\n')
           .replace(/<[^>]+>/g, '')
           .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
@@ -454,7 +498,7 @@ async function handleRequest(request, env) {
           .trim();
         const truncated = text.length > LIMIT;
         if (truncated) text = text.slice(0, LIMIT);
-        return jsonResp({ text, truncated, fullLength: truncated ? undefined : text.length });
+        return jsonResp({ text, links, truncated, fullLength: truncated ? undefined : text.length });
       } catch(err) {
         return jsonResp({ error: err.message, text: '' });
       }

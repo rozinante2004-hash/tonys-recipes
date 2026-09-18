@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.1` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v36.2` — app. **Worker: v38**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v36.1"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.2"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1250,6 +1250,35 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   out loud, because 8 recipes that should have been 10 look exactly like 8 recipes. Below
   the threshold it is still ONE call — do not make a single recipe pay for three round
   trips.
+- **Link round-ups (v36.2).** Some pages hold no recipes at all — ten names, ten ratings,
+  ten photo credits and ten links reading "to the recipe". Every heading is correctly
+  refused for having no content, so the import came back empty. When the ordinary
+  extraction yields `kind:'none'` AND the page had links, `runUrlImport` falls through to
+  `extractRecipesFromLinks`: one cheap call asks which links are individual recipes, then
+  each is opened through `fetch-url` and imported as the ordinary single recipe it is,
+  `MULTI_CONCURRENCY` at a time, capped at `LINK_ROUNDUP_MAX` (12). Picks are
+  **de-duplicated by href** — a real round-up links each recipe three or four times (its
+  rating, its prep time, its button). The round-up's own wording wins for the name; each
+  recipe's `source` is ITS page, not the round-up's.
+  - **The Worker returns `links[]` or none of this is possible** — the text pipeline turns
+    every `<a>` into its label and discards the href. Collected from the STRIPPED html
+    (raw html returns the whole site navigation). **This list is what the app then
+    fetches**, so: http(s) only, SAME HOST, no fragments, no duplicates, no self-link,
+    capped at 80. It must never become a way to make the Worker fetch anywhere on
+    anybody's behalf. The host check alone stops `javascript:` and `mailto:` (no
+    hostname); the scheme check is what stops `ftp://same-host/…`.
+- **Collections and the duplicate check (v36.2).** `confirmImportParsed` routes a
+  collection to `confirmImportCollection` and **returns a promise** so a test can await
+  the real entry point. `applyParsedOntoRecipe(r, parsed)` is the one place a parse is
+  written over an existing recipe; it handles parts and flat content in both directions
+  and **returns false when there was nothing to write**, which every caller must treat as
+  a refusal — v36.1 treated it as success and discarded a ten-recipe parse. A collection
+  is duplicate-checked PART BY PART (`collectionDuplicates`), one dialog for all matches,
+  and two parts can never replace the same recipe. `historySnapshot`/`restoreVersion`
+  carry `parts`, or version history is empty for every collection.
+  `removePartFromCollection` drops a part without creating a card;
+  `collapseCollectionIfThin` is the shared one-part rule and takes the remaining part's
+  NAME.
 - **Every AI call is bounded and failures are classified (v36.1).** `aiTimeoutMs(maxTokens)`
   → a finite `AbortSignal.timeout` on the fetch, capped at 180s; before this there was no
   signal at all and a stalled connection hung the app forever. `aiRetryable(e)` retries

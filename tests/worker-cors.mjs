@@ -161,6 +161,71 @@ console.log('\nfetch-url text extraction (v36.0):');
   } finally { globalThis.fetch = realFetch2; }
 }
 
+console.log('\nfetch-url link collection (v38):');
+{
+  // A round-up that only LINKS to its recipes. Every <a> becomes its label and
+  // the href is thrown away by the text pipeline, so without this the app saw
+  // ten recipe names and had no way to reach a single one of them.
+  //
+  // This list is what the app goes on to FETCH, so its limits are the point:
+  // same host only, no other schemes, no duplicates, no self-link.
+  const page = '<html><body>'
+    + '<nav><a href="/news">News</a><a href="/sport">Sport</a></nav>'
+    + '<header><a href="/login">Login</a></header>'
+    + '<h1>10 great soups</h1>'
+    + '<a href="/food/article/aaa">Sweet potato soup</a>'
+    + '<a href="/food/article/aaa">10 minutes</a>'          // same recipe again
+    + '<a href="https://www.example.com/food/article/bbb">Tomato soup</a>'
+    + '<a href="https://evil.example.org/steal">Elsewhere</a>'
+    + '<a href="javascript:alert(1)">Nasty</a>'
+    + '<a href="mailto:a@b.c">Mail us</a>'
+    // Same host, different scheme. javascript: and mailto: have no hostname so
+    // the host check alone stops them — this one does NOT, so it is the only
+    // case where the scheme check is what is doing the work.
+    + '<a href="ftp://www.example.com/food/article/ddd">Download</a>'
+    + '<a href="/food/article/ccc#top">Onion soup</a>'
+    + '<a href="/food/article/roundup">This very page</a>'
+    + '<footer><a href="/terms">Terms</a></footer>'
+    + '</body></html>';
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(page, { status: 200, headers: { 'Content-Type': 'text/html' } });
+  try {
+    const resp = await worker.fetch(post({ action: 'fetch-url',
+      url: 'https://www.example.com/food/article/roundup', appKey: 'secret-k' }), env);
+    const data = await resp.json();
+    const hrefs = (data.links || []).map(l => l.href);
+
+    expect('the recipe links come back at all', hrefs.length >= 3,
+      'got ' + JSON.stringify(hrefs));
+    expect('a relative href is made absolute',
+      hrefs.includes('https://www.example.com/food/article/aaa'),
+      'relative links were dropped or left relative: ' + JSON.stringify(hrefs));
+    expect('the same recipe is not listed twice',
+      hrefs.filter(h => h.endsWith('/aaa')).length === 1,
+      'the app would open the same page twice: ' + JSON.stringify(hrefs));
+    expect('a fragment is not a different page',
+      hrefs.includes('https://www.example.com/food/article/ccc'),
+      '#top was kept, so the same page can be fetched twice: ' + JSON.stringify(hrefs));
+    expect('an off-site link is never offered',
+      !hrefs.some(h => h.includes('evil.example.org')),
+      'the Worker would fetch another site on request: ' + JSON.stringify(hrefs));
+    expect('only http(s) is ever offered',
+      hrefs.every(h => /^https?:\/\//i.test(h)),
+      'a non-http scheme survived — ftp:, javascript: or mailto:: ' + JSON.stringify(hrefs));
+    expect('the page does not link to itself',
+      !hrefs.includes('https://www.example.com/food/article/roundup'),
+      'the import could fetch the round-up again forever: ' + JSON.stringify(hrefs));
+    expect('nav, header and footer links are left out',
+      !hrefs.some(h => /\/news|\/sport|\/login|\/terms/.test(h)),
+      'site furniture became candidate recipes: ' + JSON.stringify(hrefs));
+    expect('each link keeps its own words', (data.links || []).some(l => l.text === 'Sweet potato soup'),
+      'the labels are how the AI tells a recipe from a tag: ' + JSON.stringify(data.links));
+    // The change must not have disturbed what every other import depends on.
+    expect('the page text still comes back', String(data.text || '').includes('10 great soups'),
+      'collecting links broke the text extraction: ' + JSON.stringify(String(data.text || '').slice(0, 120)));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,
