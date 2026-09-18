@@ -24,7 +24,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v35.6` — app. **Worker: v37**, deployed separately and versioned separately
+**Current version:** `v36.0` — app. **Worker: v37**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -55,7 +55,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v35.6"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.0"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -68,6 +68,7 @@ slide‑up modal animation.
 | `.gitignore` | Blocks `whatsapp/*.txt` and `whatsapp/*.zip`. Not tidiness — see §2a. |
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
+| `tests/fixtures/multi-recipe-article.json` | A faithful sample of a real multi‑recipe article (ynet's chestnut round‑up) plus the AI answer it should produce. The messiness is the point — run‑on ingredients, per‑recipe sub‑headings, bylines — and it makes the whole collection pipeline testable without the network. |
 | `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler. Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
 | `tests/run-self-tests.js` | The headless driver for `SELF_TESTS`. Opens `#selfTestOverlay` first — see the note in its header for why that is not optional. |
 | `tools/build-upload-guide.js` | Renders `whatsapp/UPLOAD-FROM-IPHONE.md` into `whatsapp/upload-guide.html`, inlining the mock-up SVGs so the one file works offline and prints. Needs `npm i marked@14`. **Never hand-edit the generated HTML.** |
@@ -284,8 +285,16 @@ default was committed to a public repo, so it was never a secret.
    `youtu.be/`, `shorts/`), call YouTube Data API v3 (`videos?part=snippet`) and return
    `{text: "Title:… Channel:… Description:…", isYouTube, title, videoId}` — with rich error
    objects for `quotaExceeded`/`keyInvalid`. Otherwise fetch the page with a browser‑ish
-   User‑Agent, strip `<script|style|nav|header|footer|aside>` and all tags, decode a few
-   entities, collapse whitespace, `slice(0,10000)`, return `{text}`.
+   User‑Agent, strip `<script|style|nav|header|footer|aside>`, then **turn BLOCK tags into
+   `\n` and inline tags into nothing**, decode a few entities, collapse whitespace,
+   `slice(0,60000)`, return `{text, truncated}`.
+   **Both of those are load‑bearing and were wrong until v36.0.** Replacing every tag with a
+   space collapsed a `<li>` ingredient list into one run‑on line — the page's own structure is
+   the strongest signal for where one ingredient ends, and it was destroyed before the AI saw
+   it. Inline tags must still vanish, or a bolded amount splits its own ingredient. The old
+   `slice(0,10000)` cut a ten‑recipe round‑up short and said nothing, so an import returned
+   six of ten and looked like it had worked; `truncated` is what lets the app say so.
+   `tests/worker-cors.mjs` covers both.
 2. **`bring-add`** `{items:[{name,spec}], listUuid?}` — PUT each item to
    `/bringlists/{uuid}` as form‑encoded `purchase`/`specification`. On any `401` return
    `{success:false, tokenExpired:true}` (status 401). Else `{success, results, listUuid}`.
@@ -1209,6 +1218,22 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   CDN library each. Do **not** rebuild them. Excel *import* remains (`.xlsx` via SheetJS).
 - **`xlsx` and `mammoth` load ON DEMAND** via `loadScriptOnce()` (5.11), never from `<head>` —
   there is a test pinning this. Only Firebase compat 10.12.0 and GSI are in `<head>`.
+- **Collections (v36.0)** — a new kind of recipe alongside the ordinary one and the clip.
+  A themed round‑up ("10 recipes with chestnuts") imports as ONE record whose **`parts`**
+  array holds the individual recipes: `{uid, name, by, servings, prep, notes,
+  ingredients:[{a,n,g}], steps:[]}`. `g` is the article's own ingredient sub‑heading inside
+  one recipe ("for the sauce"). **`parts` is the single source of truth** — a collection's
+  own `ingredients`/`steps` stay EMPTY and `allIngredients(r)`/`allSteps(r)` are how every
+  read‑only consumer (search, pantry, one‑away, nutrition, Word, print, share, Bring!) sees
+  the whole thing. `isCollection(r)` is **derived from `parts.length`**, never stored.
+  Each part's `uid` is minted at import, so "⤴ Make its own" produces the same recipe
+  identity on every device. All four import paths share `multiRecipePrompt` +
+  `buildImportFromParsed`; one recipe in the array is an ordinary single import.
+  `splitCollection` turns the whole thing into separate recipes;
+  `promotePartToRecipe` lifts one out, and collapses the collection back to an ordinary
+  recipe when only one part is left. Ticks are namespaced per part (`ing-p0-3`). A
+  collection shows neither a prep/servings/difficulty line nor a nutrition panel, because
+  it has no single value for either.
 - **Word** (`.docx`): **built by hand** as an OOXML zip — `makeDocxBlob` + a tiny `buildZip`
   (store‑only, CRC32) — no library for export. Import `.docx` via **mammoth** 1.6.0 CDN
   (`parseWordText`). Three things here are load‑bearing and were all wrong before **v35.1**:

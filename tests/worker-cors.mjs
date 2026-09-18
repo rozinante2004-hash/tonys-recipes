@@ -115,6 +115,52 @@ console.log('\nAI path — what actually reaches Anthropic:');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nfetch-url text extraction (v36.0):');
+{
+  // This is what every import path is built on. Before v36.0 every tag became a
+  // SPACE, so a <li> ingredient list arrived as one run-on line and the page's
+  // own structure — the strongest signal for where one ingredient ends — was
+  // thrown away before the AI ever saw it.
+  const page = '<html><body><nav>menu</nav>'
+    + '<h2>Gnocchi</h2><p>Ingredients:</p>'
+    + '<ul><li>1 kg potatoes</li><li>coarse salt</li><li>500 g flour</li></ul>'
+    + '<p>Mix <b>gently</b> and rest</p>'
+    + '<footer>bye</footer></body></html>';
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(page, { status: 200, headers: { 'Content-Type': 'text/html' } });
+  try {
+    const resp = await worker.fetch(post({ action: 'fetch-url', url: 'https://example.com/r', appKey: 'secret-k' }), env);
+    const data = await resp.json();
+    const lines = String(data.text || '').split('\n').map(l => l.trim()).filter(Boolean);
+
+    expect('each list item is its own line',
+      lines.includes('1 kg potatoes') && lines.includes('coarse salt') && lines.includes('500 g flour'),
+      'the ingredients ran together: ' + JSON.stringify(lines));
+    expect('an inline tag does NOT split its own sentence',
+      lines.includes('Mix gently and rest'),
+      'a <b> inside a sentence broke it apart: ' + JSON.stringify(lines));
+    expect('nav and footer are still stripped',
+      !String(data.text).includes('menu') && !String(data.text).includes('bye'),
+      'chrome leaked into the text');
+    expect('a short page is not reported as truncated', data.truncated === false,
+      `truncated was ${data.truncated}`);
+  } finally { globalThis.fetch = realFetch; }
+
+  // A long round-up must SAY it was cut short. Returning 6 of 10 recipes and
+  // calling it a success is the failure mode this flag exists to prevent.
+  const long = '<p>' + 'x'.repeat(70000) + '</p>';
+  const realFetch2 = globalThis.fetch;
+  globalThis.fetch = async () => new Response(long, { status: 200, headers: { 'Content-Type': 'text/html' } });
+  try {
+    const resp = await worker.fetch(post({ action: 'fetch-url', url: 'https://example.com/long', appKey: 'secret-k' }), env);
+    const data = await resp.json();
+    expect('a page past the cap reports truncated', data.truncated === true,
+      'a cut-short page looked complete, so an import silently returns fewer recipes than the page has');
+    expect('the cap is big enough for a ten-recipe article', String(data.text).length >= 60000,
+      `only ${String(data.text).length} characters came back`);
+  } finally { globalThis.fetch = realFetch2; }
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,

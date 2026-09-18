@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v35.6 -->
+<!-- Tony's Recipes Collection v36.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1124,7 +1124,7 @@ async function calcNutrition(id) {
   var r = recipes.find(function(x) { return x.id===id; });
   if (!r) return;
   toast('⏳ Calculating nutrition...');
-  var ings = r.ingredients.map(function(i) { return (i.a?i.a+' ':'')+i.n; }).join(', ');
+  var ings = allIngredients(r).map(function(i) { return (i.a?i.a+' ':'')+i.n; }).join(', ');
   var prompt = 'Estimate nutrition per serving for a recipe with these ingredients: ' + ings
     + '. Servings: ' + (r.servings||'4') + '. '
     + 'Return ONLY JSON: {"calories":0,"protein":0,"carbs":0,"fat":0} (numbers only, per serving).';
@@ -6759,6 +6759,241 @@ const SELF_TESTS = [
       var buf=new Uint8Array(await blob.arrayBuffer());
       if(buf[0]!==0x50||buf[1]!==0x4B) throw new Error('DOCX is not a valid ZIP — missing PK signature');
     } },
+  { id:'coll_model_one_source_of_truth', group:'Import/Export', name:'A collection keeps its recipes in parts, and only there (v36.0)',
+    test: async()=>{
+      ['recipeParts','isCollection','allIngredients','allSteps','normalizePart','buildImportFromParsed']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var ai = { collectionName:'Ten chestnut recipes', collectionNotes:'An intro', category:'Dinner',
+        recipes:[
+          { name:'Gnocchi', by:'Itai', ingredients:[{a:'1 kg',n:'potatoes',g:'for the gnocchi'},
+                                                    {a:'25 g',n:'butter',g:'for the sauce'}], steps:['Bake','Fry'] },
+          { name:'Soup', servings:'10', ingredients:[{a:'1 tbsp',n:'oil'}], steps:['Simmer'] },
+          { name:'Pasta', ingredients:[{a:'2',n:'sweet potatoes'}], steps:['Boil'] }
+        ] };
+      var built = buildImportFromParsed(ai, 'https://example.com/x');
+      if(built.kind!=='collection') throw new Error('three recipes did not build a collection, got '+built.kind);
+      var r = normalizeRecipe(Object.assign({id:970001,uid:'t-coll'}, built.recipe));
+
+      // The article's own title names the collection. Falling back to the first
+      // recipe would label ten chestnut dishes "Gnocchi".
+      if(r.name!=='Ten chestnut recipes') throw new Error('the collection is named "'+r.name+'"');
+      if(r.notes.indexOf('An intro')===-1) throw new Error('the article intro was dropped');
+      if(r.source!=='https://example.com/x') throw new Error('the source URL was dropped');
+
+      // THE INVARIANT: parts are the only copy. A flattened duplicate in the
+      // top-level fields is two copies that can drift, and no way to say which
+      // is right — the mistake this app has paid for more than once.
+      if(r.ingredients.length) throw new Error('a collection kept '+r.ingredients.length+' ingredients in the flat field as well as in parts');
+      if(r.steps.length) throw new Error('a collection kept steps in the flat field as well as in parts');
+      if(!isCollection(r)) throw new Error('isCollection is false for a recipe with parts');
+      if(recipeParts(r).length!==3) throw new Error('expected 3 parts, got '+recipeParts(r).length);
+
+      // ...so everything that wants the whole list must go through the accessor.
+      if(allIngredients(r).length!==4) throw new Error('allIngredients returned '+allIngredients(r).length+', expected 4');
+      if(allSteps(r).length!==4) throw new Error('allSteps returned '+allSteps(r).length+', expected 4');
+
+      // Sub-headings inside one recipe are real cooking information.
+      var withG = allIngredients(r).filter(function(i){ return i.g; });
+      if(withG.length!==2) throw new Error('ingredient sub-headings were dropped: '+withG.length+' of 2 kept');
+      if(withG[0].g!=='for the gnocchi') throw new Error('the wrong sub-heading survived: '+withG[0].g);
+      if(recipeParts(r)[0].by!=='Itai') throw new Error('the per-recipe byline was dropped');
+      if(recipeParts(r)[1].servings!=='10') throw new Error('per-recipe servings were dropped');
+
+      // Each part carries its own identity from import, so promoting it later on
+      // two devices produces ONE recipe rather than two.
+      var uids = recipeParts(r).map(function(p){ return p.uid; });
+      if(uids.some(function(u){ return !u; })) throw new Error('a part has no uid');
+      if(new Set(uids).size!==uids.length) throw new Error('two parts share a uid');
+      // ...and normalising again must not re-mint them.
+      var before = uids.join(',');
+      normalizeRecipe(r);
+      if(recipeParts(r).map(function(p){ return p.uid; }).join(',')!==before)
+        throw new Error('re-normalising minted new part uids, so identity is not stable');
+
+      // A collection is never a clip, and the fixture has to ARRIVE as one for
+      // that to be tested — asserting on data that was already false proves
+      // nothing, and a no-op mutation survived on exactly that.
+      var wasClip = normalizeRecipe(Object.assign({id:970003,uid:'clip-coll',isClip:true}, built.recipe));
+      if(wasClip.isClip) throw new Error('a recipe that arrived as a clip stayed one after becoming a collection — both badges would render');
+      if(!isCollection(wasClip)) throw new Error('the clip fixture did not become a collection');
+      if(r.isClip) throw new Error('a collection was marked as a clip');
+
+      // A single recipe is still a single recipe: no parts, nothing changed.
+      var one = buildImportFromParsed({ recipes:[ai.recipes[1]] }, '');
+      if(one.kind!=='single') throw new Error('one recipe built a '+one.kind);
+      var sr = normalizeRecipe(Object.assign({id:970002}, one.recipe));
+      if(isCollection(sr)) throw new Error('a single recipe became a collection');
+      if(sr.ingredients.length!==1) throw new Error('a single recipe lost its ingredients');
+      if(allIngredients(sr).length!==1) throw new Error('the accessor disagrees with a plain recipe');
+
+      // Nothing usable in, nothing invented out.
+      if(buildImportFromParsed({recipes:[]}, '').kind!=='none') throw new Error('an empty list produced a recipe');
+      if(buildImportFromParsed(null, '').kind!=='none') throw new Error('null produced a recipe');
+      if(buildImportFromParsed({recipes:[{name:'Heading only'}]}, '').kind!=='none')
+        throw new Error('a heading with no ingredients or steps was imported as a recipe');
+    } },
+
+  { id:'coll_nothing_is_half_read', group:'Import/Export', name:'Search, export and Bring! see a whole collection (v36.0)',
+    test: async()=>{
+      var built = buildImportFromParsed({ collectionName:'Two things', category:'Dinner', recipes:[
+        { name:'A', ingredients:[{a:'1',n:'saffron'},{a:'2',n:'leek'}], steps:['a1'] },
+        { name:'B', ingredients:[{a:'3',n:'tahini'}], steps:['b1','b2'] }
+      ]}, '');
+      var testId=970101;
+      var r = normalizeRecipe(Object.assign({id:testId,uid:'half-read',bg:'#fff'}, built.recipe));
+      recipes.unshift(r);
+      try{
+        // Ingredient search (5f.3). Reading r.ingredients directly would find
+        // NONE of these, and the recipe would look like it had no ingredients.
+        var names = recipeIngredientNames(r);
+        ['saffron','leek','tahini'].forEach(function(n){
+          if(!names.some(function(x){ return x.indexOf(n)!==-1; }))
+            throw new Error('ingredient search cannot see "'+n+'" inside a collection');
+        });
+        // "One item away" (5f.5) must count against the whole collection.
+        if(typeof missingFor==='function' && missingFor(r, ['saffron','leek']).length!==1)
+          throw new Error('the one-away filter miscounts a collection');
+
+        // Word export: a section per recipe, not one merged heap.
+        var blob = makeDocxBlob([r]);
+        var buf = new Uint8Array(await blob.arrayBuffer());
+        var txt = new TextDecoder().decode(buf);
+        ['saffron','leek','tahini'].forEach(function(n){
+          if(txt.indexOf(n)===-1) throw new Error('the Word export dropped "'+n+'"');
+        });
+        if(txt.indexOf('Heading2')===-1) throw new Error('the export has no per-recipe headings');
+        if((txt.match(/>Ingredients</g)||[]).length<2)
+          throw new Error('the export merged the recipes instead of giving each its own Ingredients');
+
+        // Shared page / print / email must carry everything too.
+        if(typeof rText==='function'){
+          var t = rText(r);
+          ['saffron','leek','tahini'].forEach(function(n){
+            if(t.indexOf(n)===-1) throw new Error('the shared text dropped "'+n+'"');
+          });
+        }
+      } finally { recipes = recipes.filter(function(x){ return x.id!==testId; }); }
+    } },
+
+  { id:'coll_view_and_ticks', group:'UI', name:'A collection renders per-recipe sections with their own ticks (v36.0)',
+    test: async()=>{
+      var built = buildImportFromParsed({ collectionName:'Viewable', category:'Dinner', recipes:[
+        { name:'First', ingredients:[{a:'1',n:'onion',g:'for the base'},{a:'2',n:'garlic'}], steps:['s1','s2'] },
+        { name:'Second', ingredients:[{a:'3',n:'rice'}], steps:['t1'] }
+      ]}, '');
+      var testId=970201, kView=viewId;
+      recipes.unshift(normalizeRecipe(Object.assign({id:testId,uid:'view-c',bg:'#fff'}, built.recipe)));
+      try{
+        viewId=testId; drawView();
+        var modal=document.getElementById('viewModal');
+        if(modal.querySelectorAll('.collection-part').length!==2)
+          throw new Error('expected 2 recipe sections, got '+modal.querySelectorAll('.collection-part').length);
+        if(!modal.querySelectorAll('.ing-group').length)
+          throw new Error('the ingredient sub-heading is not rendered');
+
+        // Ticking the first recipe's onion must not tick the second's rice, so
+        // the keys have to be namespaced per part.
+        var keys=Array.prototype.slice.call(modal.querySelectorAll('[data-line]'))
+          .map(function(e){ return e.getAttribute('data-line'); });
+        if(keys.length!==6) throw new Error('expected 6 tickable lines, got '+keys.length);
+        if(new Set(keys).size!==keys.length)
+          throw new Error('two lines in different recipes share a tick key: '+keys.join(','));
+        if(keys.indexOf('ing-p1-0')===-1) throw new Error('the second recipe has no namespaced keys: '+keys.join(','));
+
+        var html=modal.innerHTML;
+        if(html.indexOf('splitCollection('+testId+')')===-1) throw new Error('no way to split the collection');
+        if(html.indexOf('promotePartToRecipe('+testId)===-1) throw new Error('no way to promote one recipe out');
+        // A collection has no single prep time, serving count or difficulty.
+        // Printing "⏱ —  🍽 — servings" states three things nothing verified.
+        if(html.indexOf('servings</span>')!==-1 && html.indexOf('📚 2 recipes')===-1)
+          throw new Error('the collection shows a per-recipe meta line it cannot have');
+        // ...and "nutrition per 100g" across unrelated dishes is not a number.
+        var nut=document.getElementById('nutrition-'+testId);
+        if(nut && nut.style.display!=='none') throw new Error('the nutrition panel is offered for a whole collection');
+
+        // A plain recipe must still render the ordinary two-column body.
+        var plainId=970202;
+        recipes.unshift(normalizeRecipe({id:plainId,uid:'plain-c',bg:'#fff',name:'Plain',
+          ingredients:[{a:'1',n:'egg'}],steps:['cook']}));
+        viewId=plainId; drawView();
+        var m2=document.getElementById('viewModal');
+        if(m2.querySelectorAll('.collection-part').length) throw new Error('a plain recipe rendered collection sections');
+        if(!m2.querySelector('.recipe-columns')) throw new Error('a plain recipe lost its normal layout');
+        recipes = recipes.filter(function(x){ return x.id!==plainId; });
+      } finally {
+        recipes = recipes.filter(function(x){ return x.id!==testId; });
+        viewId=kView; if(viewId!=null) drawView();
+      }
+    } },
+
+  { id:'coll_split_and_promote', group:'Features', name:'A collection can be split, and one recipe lifted out (v36.0)',
+    test: async()=>{
+      ['splitCollection','promotePartToRecipe','recipeFromPart']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var built = buildImportFromParsed({ collectionName:'Round-up', category:'Soup', recipes:[
+        { name:'Alpha', by:'Ann', ingredients:[{a:'1',n:'a'}], steps:['sa'] },
+        { name:'Beta',  ingredients:[{a:'2',n:'b'}], steps:['sb'] },
+        { name:'Gamma', ingredients:[{a:'3',n:'c'}], steps:['sc'] }
+      ]}, 'https://example.com/roundup');
+      var testId=970301;
+      var coll = normalizeRecipe(Object.assign({id:testId,uid:'sp-c',bg:'#fff'}, built.recipe));
+      recipes.unshift(coll);
+      var kConfirm=window.askConfirm, kToast=window.toast, made=[];
+      try{
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        window.toast=function(){};
+
+        // Promote keeps the part's identity — a new uid here would mean two
+        // devices promoting the same part create two different recipes.
+        var betaUid = recipeParts(coll)[1].uid;
+        await promotePartToRecipe(testId, betaUid);
+        var beta = recipes.find(function(x){ return x.uid===betaUid; });
+        if(!beta) throw new Error('the promoted recipe did not keep the part uid');
+        if(beta.name!=='Beta') throw new Error('the wrong part was promoted: '+beta.name);
+        if(beta.ingredients.length!==1 || beta.steps.length!==1)
+          throw new Error('the promoted recipe lost its contents');
+        if(isCollection(beta)) throw new Error('the promoted recipe is itself a collection');
+        if(beta.source!=='https://example.com/roundup') throw new Error('the promoted recipe lost the source');
+        if(recipeParts(coll).length!==2) throw new Error('the part was not removed from the collection');
+        if(recipeParts(coll).some(function(p){ return p.uid===betaUid; }))
+          throw new Error('the promoted part is still in the collection too — it now exists twice');
+        made.push(beta.id);
+
+        // Down to one, a collection is just that recipe. A container holding one
+        // thing is a container for nothing.
+        await promotePartToRecipe(testId, recipeParts(coll)[0].uid);
+        var still = recipes.find(function(x){ return x.id===testId; });
+        if(isCollection(still)) throw new Error('a one-part collection stayed a collection');
+        if(still.ingredients.length!==1) throw new Error('the last part was not folded back into the recipe');
+        recipes.filter(function(x){ return x.uid && x.name==='Alpha'; }).forEach(function(x){ made.push(x.id); });
+
+        // Split takes the whole thing apart.
+        var built2 = buildImportFromParsed({ collectionName:'Splitme', category:'Dinner', recipes:[
+          { name:'One', ingredients:[{a:'1',n:'x'}], steps:['1'] },
+          { name:'Two', ingredients:[{a:'2',n:'y'}], steps:['2'] }
+        ]}, '');
+        var id2=970302;
+        recipes.unshift(normalizeRecipe(Object.assign({id:id2,uid:'split-c',bg:'#fff'}, built2.recipe)));
+        var before = recipes.length;
+        await splitCollection(id2);
+        if(recipes.find(function(x){ return x.id===id2; })) throw new Error('the collection survived the split');
+        if(recipes.length !== before + 1) throw new Error('split produced '+(recipes.length-before+1)+' recipes, expected 2 replacing 1');
+        ['One','Two'].forEach(function(n){
+          var got = recipes.find(function(x){ return x.name===n; });
+          if(!got) throw new Error('split lost "'+n+'"');
+          if(isCollection(got)) throw new Error('a split-out recipe is still a collection');
+          made.push(got.id);
+        });
+      } finally {
+        window.askConfirm=kConfirm; window.toast=kToast;
+        recipes = recipes.filter(function(x){
+          return x.id!==testId && x.id!==970302 && made.indexOf(x.id)===-1;
+        });
+      }
+    } },
+
   { id:'export_docx_photo_embedded', group:'Import/Export', name:'The Word export embeds the photo itself (v35.1)',
     test: async()=>{
       // Until v35.1 this wrote "[📸 Recipe photo included — see app for full
@@ -9601,7 +9836,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v35.6';
+var APP_VERSION = 'v36.0';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9804,12 +10039,12 @@ function rHtml(r) {
     ? r.diets.map(function(d){ return '<span style="display:inline-block;padding:3px 10px;background:#E8F5E9;color:#2E7D32;border-radius:12px;font-size:12px;font-weight:600;margin:2px;">' + escH(d) + '</span>'; }).join(' ')
     : '';
 
-  var ingredients = r.ingredients.map(function(i){
+  var ingredients = allIngredients(r).map(function(i){
     return '<tr><td dir="auto" style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.a||'') + '</td>' +
            '<td dir="auto" style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.n||'') + '</td></tr>';
   }).join('');
 
-  var steps = r.steps.map(function(s, i){
+  var steps = allSteps(r).map(function(s, i){
     var isHeb = /[\u05d0-\u05ea]/.test(s);
     var numCell = '<td style="padding:0 ' + (isHeb?'0':'12px') + ' 0 ' + (isHeb?'12px':'0') + ';vertical-align:top;">' +
       '<div style="width:28px;height:28px;border-radius:50%;background:#C1440E;color:white;font-size:12px;font-weight:700;text-align:center;line-height:28px;min-width:28px;">' + (i+1) + '</div>' +
@@ -10325,6 +10560,21 @@ window.addEventListener('unhandledrejection', function(e) {
   font-size: 18px; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
 }
 .clip-badge-sm { width: 28px; height: 28px; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+/* A collection says how many it holds — "📚" alone would not tell you whether
+   opening it is worth it. Mirrors .clip-badge so the two read as one family. */
+.collection-badge {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(92,61,46,0.92); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.collection-badge .collection-count {
+  position: absolute; bottom: -3px; inset-inline-end: -3px;
+  background: var(--terracotta); color: #fff;
+  min-width: 16px; height: 16px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+  padding: 0 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
 
 /* A masked field that is NOT an <input type="password">. See the markup comment:
    with no <form> on the page, Chrome pairs a password input with any nearby text
@@ -11897,7 +12147,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.0</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12479,7 +12729,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v35.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.0</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12969,6 +13219,7 @@ var activeCategories = new Set(); // Frame 2: meal categories
 var activeDiets      = new Set(); // Frame 3: diet types
 var showFavOnly      = false;
 var showClipsOnly    = false;
+var showCollectionsOnly = false;
 var showRecentOnly   = false;
 var showNoPhotoOnly  = false; // 1.7 — surface recipes still missing a photo
 var showOneAwayOnly  = false; // 5f.5 — recipes you could cook bar ONE pantry item
@@ -12997,7 +13248,7 @@ function parseSearchQuery(raw) {
   return { must: must, text: rest };
 }
 function recipeIngredientNames(r) {
-  return (Array.isArray(r.ingredients) ? r.ingredients : [])
+  return allIngredients(r)
     .map(function(i){ return String((i && i.n) == null ? '' : i.n).toLowerCase(); });
 }
 function recipeMatchesQuery(r, raw) {
@@ -13043,6 +13294,7 @@ function renderFilters() {
     + '<button class="filter-btn fav-btn' + (showFavOnly ? ' active' : '') + '" onclick="toggleFavFilter()">❤ Favourites</button>'
     + (recentIds.length ? '<button class="filter-btn' + (showRecentOnly ? ' active' : '') + '" style="background:' + (showRecentOnly ? '#4F7AFF' : '#EEF2FF') + ';border-color:' + (showRecentOnly ? '#4F7AFF' : '#C0CAFF') + ';color:' + (showRecentOnly ? 'white' : '#3451CC') + ';" onclick="toggleRecentFilter()">🕐 Recent</button>' : '')
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
+    + '<button class="filter-btn collection-btn' + (showCollectionsOnly ? ' active' : '') + '" onclick="toggleCollectionsFilter()">📚 Collections</button>'
     + (function(){ var n = recipes.filter(function(r){ return !r.photo; }).length;
         return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (' + n + ')</button>' : ''; })()
     // 5f.5 — only offered when it can answer: no pantry, or nothing one item
@@ -13079,6 +13331,7 @@ function resetFilters() {
   activeDiets.clear();
   showFavOnly    = false;
   showClipsOnly  = false;
+  showCollectionsOnly = false;
   showRecentOnly = false;
   showNoPhotoOnly = false;
   showOneAwayOnly = false;
@@ -13093,6 +13346,13 @@ function toggleFavFilter() {
   renderFilters();
   renderGrid();
 }
+
+function toggleCollectionsFilter() {
+  showCollectionsOnly = !showCollectionsOnly;
+  if (showCollectionsOnly) showOneAwayOnly = false;   // the two ask different questions
+  renderFilters(); renderGrid();
+}
+window.toggleCollectionsFilter = toggleCollectionsFilter;
 
 function toggleClipsFilter() {
   showClipsOnly = !showClipsOnly;
@@ -13390,10 +13650,10 @@ window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker()
 function buildRecipePage(r) {
   var esc = function(v){ return escH(v).replace(/<br>/g, '<br>'); };
   var img = r.photo ? '<img class="hero" src="' + escA(r.photo) + '" alt="">' : '';
-  var ings = (r.ingredients||[]).map(function(i){
+  var ings = allIngredients(r).map(function(i){
     return '<li><span>' + escH(i.n) + '</span><b>' + escH(i.a) + '</b></li>';
   }).join('');
-  var steps = (r.steps||[]).map(function(st){ return '<li>' + escH(st) + '</li>'; }).join('');
+  var steps = allSteps(r).map(function(st){ return '<li>' + escH(st) + '</li>'; }).join('');
   return '<!doctype html><html><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<title>' + escH(r.name) + '</title><style>'
@@ -13517,7 +13777,7 @@ function haveIngredient(name, pantry) {
   });
 }
 function missingFor(r, pantry) {
-  return (r.ingredients || [])
+  return allIngredients(r)
     .map(function(i){ return i && i.n; })
     .filter(function(n){ return n && !haveIngredient(n, pantry); });
 }
@@ -13535,7 +13795,7 @@ window.haveIngredient = haveIngredient; window.missingFor = missingFor;
 // filter with things you cannot cook. Excluded.
 function missingFromPantry(r) {
   if (!r || r.isClip) return [];
-  var ings = Array.isArray(r.ingredients) ? r.ingredients : [];
+  var ings = allIngredients(r);
   if (!ings.length) return [];
   return missingFor(r, getPantry());
 }
@@ -14051,7 +14311,7 @@ function matchReason(r, q) {
   if (!q) return '';
   var lc = function(v){ return String(v == null ? '' : v).toLowerCase(); };
   if (lc(r.name).includes(q)) return '';            // the title already shows it
-  var ings = (Array.isArray(r.ingredients) ? r.ingredients : [])
+  var ings = allIngredients(r)
     .filter(function(i){ return lc(i && i.n).includes(q); })
     .map(function(i){ return i.n; });
   if (ings.length) {
@@ -14107,6 +14367,7 @@ function renderGrid() {
     // Frame 1: Favourites + Clips + Recent filter
     if (showFavOnly && !r.fav) return false;
     if (showClipsOnly && !r.isClip) return false;
+    if (showCollectionsOnly && !isCollection(r)) return false;
     if (showNoPhotoOnly && r.photo) return false;
     if (showRecentOnly) {
       var recentIds = []; try { recentIds = JSON.parse(localStorage.getItem('recent_views')||'[]'); } catch(e){}
@@ -14133,6 +14394,7 @@ function renderGrid() {
   var labelParts = [];
   if (showFavOnly) labelParts.push('Favourites');
   if (showClipsOnly) labelParts.push('Clips');
+  if (showCollectionsOnly) labelParts.push('Collections');
   if (showNoPhotoOnly) labelParts.push('No photo');
   if (showOneAwayOnly) labelParts.push('One item away');
   if (activeCategories.size) labelParts.push(Array.from(activeCategories).join(', '));
@@ -14201,6 +14463,7 @@ function renderGrid() {
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
           <div class="card-category-badge">${escH(r.category)}</div>
           ${r.isClip ? `<div class="clip-badge" style="position:absolute;top:8px;right:8px;">🎬</div>` : ''}
+          ${isCollection(r) ? `<div class="collection-badge" style="position:absolute;top:8px;right:8px;">📚<span class="collection-count">${recipeParts(r).length}</span></div>` : ''}
         </div>
         <div class="card-body">
           <div class="card-title" dir="auto">${escH(r.name)}</div>
@@ -14356,8 +14619,8 @@ function openView(id){
 function recipeIsRTL(r) {
   if (!r) return false;
   var sample = [r.name || ''];
-  (r.ingredients || []).slice(0, 12).forEach(function(i){ sample.push((i && i.n) || ''); });
-  (r.steps || []).slice(0, 6).forEach(function(st){ sample.push(st || ''); });
+  allIngredients(r).slice(0, 12).forEach(function(i){ sample.push((i && i.n) || ''); });
+  allSteps(r).slice(0, 6).forEach(function(st){ sample.push(st || ''); });
   var text = sample.join(' ');
   var heb = (text.match(/[\u0590-\u05FF]/g) || []).length;
   var lat = (text.match(/[A-Za-z]/g) || []).length;
@@ -14384,6 +14647,172 @@ function conflictBannerHtml(r){
     + '</div>';
 }
 window.conflictBannerHtml = conflictBannerHtml;
+
+// A collection's body: each part as its own section, with its own ingredients,
+// its own steps and its own tick namespace. The tick keys are "ing-p0-3" rather
+// than "ing-3" so ticking the soup's onion does not also tick the risotto's —
+// markLine() and toggleTick() already take arbitrary keys, so nothing else had
+// to change for that.
+function collectionSectionsHtml(r) {
+  var parts = recipeParts(r);
+  return parts.map(function(p, pi) {
+    var awk = [];
+    var lastGroup = null;
+    var ings = p.ingredients.map(function(i, ii) {
+      var cv = cvtIng(i.a, viewUnit), sc = scaleAmt(cv, viewMult);
+      if (awkwardCount(i.n, sc)) awk.push(i.n);
+      // Sub-headings a real article uses inside one recipe ("for the sauce").
+      var head = '';
+      if ((i.g || '') !== (lastGroup === null ? null : lastGroup)) {
+        lastGroup = i.g || '';
+        if (lastGroup) head = '<li class="ing-group" dir="auto" style="list-style:none;font-weight:700;'
+          + 'font-size:12px;color:var(--terracotta);margin:8px 0 2px;text-transform:none;">'
+          + escH(lastGroup) + '</li>';
+      }
+      return head + '<li dir="auto" data-line="ing-p' + pi + '-' + ii + '" onclick="markLine(\'ing-p' + pi + '\',' + ii + ')">'
+        + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ' + escA(i.n) + ' as added" '
+        + 'onclick="toggleTick(\'ing-p' + pi + '-' + ii + '\',event)"></button>'
+        + '<span class="line-text">' + escH(i.n) + '</span><span class="ing-amount">' + escH(sc) + '</span></li>';
+    }).join('');
+
+    var steps = p.steps.map(function(st, si) {
+      var isHeb = /[֐-׿]/.test(st);
+      var timers = findStepTimers(st).map(function(t, ti) {
+        return '<button class="cook-timer-btn" id="cookTimer-p' + pi + '-' + si + '-' + ti + '" '
+          + 'onclick="event.stopPropagation();startCookTimer(\'p' + pi + '-' + si + '-' + ti + '\',' + t.secs + ')">⏱ '
+          + fmtClock(t.secs) + '</button>';
+      }).join('');
+      return '<li dir="' + (isHeb ? 'rtl' : 'ltr') + '"' + (isHeb ? ' class="step-rtl"' : '')
+        + ' data-line="step-p' + pi + '-' + si + '" onclick="markLine(\'step-p' + pi + '\',' + si + ')">'
+        + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ' + (si+1) + ' as done" '
+        + 'onclick="toggleTick(\'step-p' + pi + '-' + si + '\',event)"></button>'
+        + '<span class="step-num">' + (si+1) + '</span>'
+        + '<span class="step-text">' + escH(st) + (timers ? '<br>' + timers : '') + '</span></li>';
+    }).join('');
+
+    var awkNote = awk.length
+      ? '<div class="scale-warning" dir="auto">⚠️ ' + escH(awk.slice(0,3).join(', '))
+        + (awk.length > 3 ? ' and ' + (awk.length - 3) + ' more' : '')
+        + ' can\'t be split — round up or down, or pick a serving count that divides evenly.</div>'
+      : '';
+
+    var meta = [];
+    if (p.by) meta.push(escH(p.by));
+    if (p.servings) meta.push('serves ' + escH(p.servings));
+    if (p.prep) meta.push(escH(p.prep));
+
+    return '<div class="collection-part" style="border:1px solid var(--border);border-radius:12px;'
+      + 'padding:14px 16px;margin-bottom:14px;background:var(--card);">'
+      + '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div dir="auto" style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--warm-brown);">'
+      + escH(p.name) + '</div>'
+      + (meta.length ? '<div style="font-size:11.5px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '')
+      + '</div>'
+      + '<button class="action-btn" style="flex-shrink:0;font-size:11.5px;padding:6px 10px;" '
+      + 'onclick="promotePartToRecipe(' + r.id + ',&quot;' + escA(p.uid) + '&quot;)" '
+      + 'title="Make this a recipe of its own">⤴ Make its own</button>'
+      + '</div>'
+      + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + escH(p.notes) + '</div>' : '')
+      + '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
+      + '<div class="recipe-col-ings"><div class="modal-section-title">Ingredients</div>'
+      + '<ul class="ingredients-list">' + ings + '</ul>' + awkNote + '</div>'
+      + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div>'
+      + '<ol class="steps-list" dir="auto">' + steps + '</ol></div>'
+      + '</div></div>';
+  }).join('');
+}
+window.collectionSectionsHtml = collectionSectionsHtml;
+
+// ─── SPLIT AND PROMOTE ───────────────────────────────────────────────────────
+//
+// A collection is a convenience, not a cage. Either one part or all of them can
+// become ordinary recipes, and the part keeps its `uid` when it goes — so two
+// devices promoting the same part produce the SAME recipe identity rather than
+// two copies that `mergeRecipeLists` then has to guess between.
+function recipeFromPart(coll, part) {
+  return normalizeRecipe({
+    id: nextId++,
+    uid: part.uid,                    // the identity it has carried since import
+    name: part.name,
+    emoji: rndEmoji(),
+    category: coll.category,
+    difficulty: coll.difficulty,
+    prep: part.prep || coll.prep || '—',
+    servings: part.servings || '—',
+    bg: rndBg(), fav: false, photo: '', originalPhoto: '',
+    ingredients: part.ingredients,
+    steps: part.steps,
+    // Where it came from, in both senses: the original page, and the collection
+    // it was lifted out of.
+    notes: [part.by ? ('By ' + part.by) : '', part.notes || '',
+            'From “' + coll.name + '”'].filter(Boolean).join('\n'),
+    source: coll.source || '',
+    diets: Array.isArray(coll.diets) ? coll.diets.slice() : [],
+    updatedAt: Date.now()
+  });
+}
+window.recipeFromPart = recipeFromPart;
+
+async function promotePartToRecipe(collId, partUid) {
+  var coll = recipes.find(function(x){ return x.id === collId; });
+  if (!coll) { toast('That collection is no longer here'); return; }
+  var part = recipeParts(coll).find(function(p){ return p.uid === partUid; });
+  if (!part) { toast('That recipe is no longer in this collection'); return; }
+
+  if (!await askConfirm({ icon:'⤴', title:'Make “' + part.name + '” its own recipe?',
+      message:'It becomes a normal recipe you can photograph, favourite and log cooks against.\n\n'
+            + 'It is also REMOVED from “' + coll.name + '”, so it exists in one place only.',
+      okLabel:'Make it its own' })) return;
+
+  var made = recipeFromPart(coll, part);
+  recipes.unshift(made);
+  coll.parts = recipeParts(coll).filter(function(p){ return p.uid !== partUid; });
+  // One part left is not a collection any more — it is that recipe. Leaving a
+  // one-part collection behind would be a container with nothing to contain.
+  if (coll.parts.length === 1) {
+    var last = coll.parts[0];
+    coll.ingredients = last.ingredients;
+    coll.steps = last.steps;
+    coll.parts = [];
+    normalizeRecipe(coll);
+    toast('⤴ “' + made.name + '” is its own recipe now — “' + coll.name + '” had one left, so it is an ordinary recipe again', 6000);
+  } else if (!coll.parts.length) {
+    normalizeRecipe(coll);
+    toast('⤴ “' + made.name + '” is its own recipe now', 4000);
+  } else {
+    toast('⤴ “' + made.name + '” is its own recipe now — ' + coll.parts.length + ' left in the collection', 5000);
+  }
+  coll.updatedAt = Date.now();
+  saveData(); renderGrid();
+  if (viewId === coll.id) drawView();
+  syncLog('save', 'Promoted “' + made.name + '” out of “' + coll.name + '”', { id: made.id });
+}
+window.promotePartToRecipe = promotePartToRecipe;
+
+async function splitCollection(collId) {
+  var coll = recipes.find(function(x){ return x.id === collId; });
+  if (!coll) { toast('That collection is no longer here'); return; }
+  var parts = recipeParts(coll);
+  if (!parts.length) { toast('Nothing to split — this is not a collection'); return; }
+
+  if (!await askConfirm({ icon:'✂️', title:'Split into ' + parts.length + ' separate recipes?',
+      message:'Each becomes a normal recipe of its own, and the collection “' + coll.name
+            + '” is removed.\n\nThis cannot be undone from here, though nothing is lost — '
+            + 'every recipe survives as its own card.',
+      okLabel:'Split into ' + parts.length, danger:true })) return;
+
+  var made = parts.map(function(p){ return recipeFromPart(coll, p); });
+  // Insert in the order they appeared on the page, newest-first grid and all.
+  made.slice().reverse().forEach(function(rec){ recipes.unshift(rec); });
+  if (typeof queueCloudDelete === 'function') { try { queueCloudDelete(coll.id); } catch(e) {} }
+  recipes = recipes.filter(function(x){ return x.id !== collId; });
+  if (viewId === collId) closeM('viewOverlay');
+  saveData(); renderGrid(); renderFilters();
+  toast('✂️ Split into ' + made.length + ' recipes', 5000);
+  syncLog('save', 'Split “' + coll.name + '” into ' + made.length + ' recipes');
+}
+window.splitCollection = splitCollection;
 
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
@@ -14417,11 +14846,12 @@ function drawView(){
       <div class="modal-category">${escH(r.category)}</div>
       <div class="modal-title" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
+        ${isCollection(r) ? `<span>📚 ${recipeParts(r).length} recipes</span>` : `
         <span>⏱ ${escH(r.prep)}</span><span>🍽 ${escH(r.servings)} servings</span>
-        <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>
+        <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
       <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
-      <div id="nutrition-${r.id}" class="nutrition-panel">
+      <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
              <div class="nutrition-grid">
@@ -14498,6 +14928,14 @@ function drawView(){
           }).join('')}</div></details>` : ''}
       <div id="lineMarkHost">
       <div id="lineMarker"></div>
+      ${isCollection(r) ? `<div class="collection-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+          📚 ${recipeParts(r).length} recipes in this collection
+          <button class="action-btn" style="font-size:11.5px;padding:5px 9px;margin-inline-start:8px;"
+            onclick="splitCollection(${r.id})" title="Turn each into its own recipe">✂️ Split them up</button>
+        </div>
+        ${collectionSectionsHtml(r)}
+      </div>` : `
       <div class="recipe-columns"${recipeIsRTL(r) ? ' dir="rtl"' : ''}>
       <div class="recipe-col-ings">
       <div class="modal-section-title">Ingredients</div>
@@ -14523,7 +14961,7 @@ function drawView(){
         return `<li dir="ltr" ${attrs}>${box}${num}${txt}</li>`;
       }).join('')}</ol>
       </div>
-      </div>
+      </div>`}
       <p class="line-mark-hint">Tap a box to tick a line off · tap the line to mark where you are · double-tap to clear <button id="clearTicksBtn" class="voice-btn" style="display:none;" onclick="clearTicks()">Clear ticks</button>${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
       </div>
       <div class="recipe-actions">
@@ -14868,8 +15306,8 @@ function rText(r){
   let t=`🍴 ${r.name}\n`;
   t+=`Category: ${r.category} | Difficulty: ${r.difficulty} | Prep: ${r.prep} | Servings: ${r.servings}\n\n`;
   if(r.diets&&r.diets.length) t+=`Diet: ${r.diets.join(', ')}\n\n`;
-  t+=`INGREDIENTS:\n${r.ingredients.map(i=>`• ${i.a} ${i.n}`).join('\n')}\n\n`;
-  t+=`METHOD:\n${r.steps.map((s,i)=>`${i+1}. ${s}`).join('\n')}`;
+  t+=`INGREDIENTS:\n${allIngredients(r).map(i=>`• ${i.a} ${i.n}`).join('\n')}\n\n`;
+  t+=`METHOD:\n${allSteps(r).map((s,i)=>`${i+1}. ${s}`).join('\n')}`;
   if(r.notes&&r.notes.trim()) t+=`\n\nNOTES:\n${r.notes.trim()}`;
   if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
@@ -15062,21 +15500,43 @@ function makeDocxBlob(recipeList){
     bodyXml+=`<w:p><w:r><w:rPr><w:i/><w:color w:val="888888"/></w:rPr><w:t>${esc(`Category: ${r.category}   |   Difficulty: ${r.difficulty}   |   Prep: ${r.prep}   |   Servings: ${r.servings}`)}</w:t></w:r></w:p>`;
     bodyXml+=`<w:p></w:p>`;
 
-    // Ingredients
-    bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Ingredients</w:t></w:r></w:p>`;
-    r.ingredients.forEach(i=>{
-      bodyXml+=`<w:p><w:pPr>${pBidi(i.n)}</w:pPr>`
-        + `<w:r><w:rPr><w:b/>${rRtl(i.n)}</w:rPr><w:t xml:space="preserve">${esc(i.a)}  </w:t></w:r>`
-        + `<w:r><w:rPr>${rRtl(i.n)}</w:rPr><w:t>${esc(i.n)}</w:t></w:r></w:p>`;
-    });
-    bodyXml+=`<w:p></w:p>`;
+    // Ingredients and Method. A collection writes each of its recipes as its own
+    // titled block rather than one merged heap of eighty ingredients — the point
+    // of the document is to be cookable, and a flattened round-up is not.
+    var docParts = (typeof recipeParts === 'function' && recipeParts(r).length)
+      ? recipeParts(r)
+      : [{ name: null, ingredients: r.ingredients, steps: r.steps, by: '', servings: '' }];
 
-    // Method
-    bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Method</w:t></w:r></w:p>`;
-    r.steps.forEach((s,si)=>{
-      bodyXml+=`<w:p><w:pPr>${pBidi(s)}</w:pPr>`
-        + `<w:r><w:rPr><w:b/>${rRtl(s)}</w:rPr><w:t xml:space="preserve">${si+1}. </w:t></w:r>`
-        + `<w:r><w:rPr>${rRtl(s)}</w:rPr><w:t>${esc(s)}</w:t></w:r></w:p>`;
+    docParts.forEach(function(part, pidx) {
+      if (part.name) {
+        if (pidx) bodyXml+=`<w:p></w:p>`;
+        var sub = [part.by, part.servings ? ('serves ' + part.servings) : ''].filter(Boolean).join(' · ');
+        bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/>${pBidi(part.name)}</w:pPr>`
+          + `<w:r><w:rPr>${rRtl(part.name)}</w:rPr><w:t>${esc(part.name)}</w:t></w:r></w:p>`;
+        if (sub) bodyXml+=`<w:p><w:pPr>${pBidi(sub)}</w:pPr><w:r><w:rPr><w:i/><w:color w:val="888888"/>${rRtl(sub)}</w:rPr>`
+          + `<w:t>${esc(sub)}</w:t></w:r></w:p>`;
+      }
+      bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Ingredients</w:t></w:r></w:p>`;
+      var lastG = null;
+      (part.ingredients||[]).forEach(i=>{
+        // The article's own sub-heading inside one recipe ("for the sauce").
+        if ((i.g||'') !== (lastG === null ? null : lastG)) {
+          lastG = i.g || '';
+          if (lastG) bodyXml+=`<w:p><w:pPr>${pBidi(lastG)}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(lastG)}</w:rPr>`
+            + `<w:t>${esc(lastG)}</w:t></w:r></w:p>`;
+        }
+        bodyXml+=`<w:p><w:pPr>${pBidi(i.n)}</w:pPr>`
+          + `<w:r><w:rPr><w:b/>${rRtl(i.n)}</w:rPr><w:t xml:space="preserve">${esc(i.a)}  </w:t></w:r>`
+          + `<w:r><w:rPr>${rRtl(i.n)}</w:rPr><w:t>${esc(i.n)}</w:t></w:r></w:p>`;
+      });
+      bodyXml+=`<w:p></w:p>`;
+
+      bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Method</w:t></w:r></w:p>`;
+      (part.steps||[]).forEach((s,si)=>{
+        bodyXml+=`<w:p><w:pPr>${pBidi(s)}</w:pPr>`
+          + `<w:r><w:rPr><w:b/>${rRtl(s)}</w:rPr><w:t xml:space="preserve">${si+1}. </w:t></w:r>`
+          + `<w:r><w:rPr>${rRtl(s)}</w:rPr><w:t>${esc(s)}</w:t></w:r></w:p>`;
+      });
     });
 
     // Notes section
@@ -15133,6 +15593,9 @@ function makeDocxBlob(recipeList){
   <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/>
     <w:pPr><w:spacing w:before="160" w:after="80"/></w:pPr>
     <w:rPr>${FONTS}<w:b/><w:color w:val="C1440E"/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/>
+    <w:pPr><w:spacing w:before="120" w:after="60"/></w:pPr>
+    <w:rPr>${FONTS}<w:b/><w:color w:val="5C3D2E"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
 </w:styles>`;
 
   // A part whose extension has no Default (or Override) is not a valid package:
@@ -15452,46 +15915,30 @@ async function importFromFile(event){
 
     // Send to AI for recipe extraction
     toast('🤖 Extracting recipe with AI…');
-    var aiText = await aiCall(
-      'Extract all recipes from the following text. For each recipe return a JSON object with fields: name, category (one of: Breakfast/Lunch/Dinner/Snack/Dessert/Soup/Skills & Methods — use Skills & Methods for a technique or how-to rather than a dish), difficulty (Easy/Medium/Hard), prep (e.g. "30 min"), servings (e.g. "4"), ingredients (array of {a: amount, n: name}), steps (array of strings), notes (string). Return a JSON array. Keep the original language — do NOT translate.\n\nTEXT:\n' + text.slice(0, 8000),
-      2000
-    );
+    // v36.0 — the same prompt every other import path uses. This one asked for
+    // "all recipes" and made a separate recipe out of each, so what you got
+    // depended on which import button you pressed.
+    var fileText = text.slice(0, 40000);
+    var aiText = await aiCall(multiRecipePrompt(fileText, 'document text'),
+                              multiRecipeMaxTokens(fileText));
 
     var parsed;
     try {
-      var clean = aiText.replace(/```json|```/g,'').trim();
-      parsed = JSON.parse(clean);
-      if(!Array.isArray(parsed)) parsed = [parsed];
+      parsed = extractJSON(aiText);
     } catch(e) {
       throw new Error('AI could not parse a recipe from this file. Try the Free-hand text import instead.');
     }
 
-    var count = 0;
-    parsed.forEach(function(rec){
-      if(!rec.name) return;
-      recipes.unshift({
-        id: nextId++, uid: newUid(), bg: rndBg(), fav: false,
-        name:        rec.name        || '',
-        emoji:       rec.emoji       || '🍽️',
-        category:    rec.category    || 'Dinner',
-        difficulty:  rec.difficulty  || 'Medium',
-        prep:        rec.prep        || '—',
-        servings:    rec.servings    || '4',
-        ingredients: rec.ingredients || [],
-        steps:       rec.steps       || [],
-        notes:       rec.notes       || '',
-        diets:       rec.diets       || [],
-        source:      file.name,
-        photo:       '', originalPhoto: '',
-        isClip:      false,
-        updatedAt:   Date.now()
-      });
-      count++;
-    });
+    var built = buildImportFromParsed(parsed, file.name);
+    var count = built.kind === 'none' ? 0
+              : built.kind === 'collection' ? built.recipe.parts.length : 1;
 
     if(count > 0){
-      saveData(); renderGrid(); resetFilters(); renderFilters();
-      toast('✅ Imported ' + count + ' recipe(s) from ' + file.name + '!');
+      // Goes through the same preview and the same duplicate check as every
+      // other import route — this path used to write straight to `recipes`,
+      // skipping both.
+      applyParsedRecipe(built.recipe, 'freehandResult', 'freehandOverlay');
+      document.getElementById('freehandOverlay').classList.add('open');
     } else {
       toast('⚠️ No recipes found in this file. Try Free-hand text import.');
     }
@@ -16800,32 +17247,23 @@ async function runFreehandImport() {
   const res = document.getElementById('freehandResult');
   res.innerHTML = `<div class="explore-loading"><div class="ai-spinner"></div><br>Parsing recipe…</div>`;
 
-  const prompt = `Extract the recipe from the following text and return ONLY valid JSON (no markdown fences) with this exact structure:
-{
-  "name": "Recipe Name",
-  "category": "one of: Breakfast, Lunch, Dinner, Snack, Dessert, Soup, Skills & Methods (a technique or how-to rather than a dish)",
-  "difficulty": "Easy, Medium, or Hard",
-  "prep": "e.g. 30 min",
-  "servings": "e.g. 4",
-  "ingredients": [{"a": "amount", "n": "ingredient name"}],
-  "steps": ["step 1", "step 2"]
-}
-
-Keep the original language — do NOT translate any text.
-If any field is unclear, make a reasonable guess.
-
-Recipe text:
-${text}`;
-
   try {
-    const raw = await aiCall(prompt, 1500);
+    const raw = await aiCall(multiRecipePrompt(text, 'pasted text'), multiRecipeMaxTokens(text));
     const parsed = extractJSON(raw);
-    // Carry the original page through. Pasting the text of a page you had open
-    // should still produce a recipe that remembers where it came from — and the
-    // harvest panel matches "already imported" on exactly that field.
-    if (_freehandSourceUrl && !parsed.source) parsed.source = _freehandSourceUrl;
-    if (_freehandTarget === 'form') applyParsedToFormPreview(parsed, 'freehandResult');
-    else applyParsedRecipe(parsed, 'freehandResult', 'freehandOverlay');
+    if (parsed.error) throw new Error(parsed.error);
+    // Filling the EDIT FORM can only ever take one recipe, so that route keeps
+    // the first and says so rather than silently dropping the rest.
+    const built = buildImportFromParsed(parsed, _freehandSourceUrl || '');
+    if (built.kind === 'none') throw new Error('no recipe found');
+    if (_freehandTarget === 'form') {
+      var one = built.kind === 'collection'
+        ? Object.assign({}, built.recipe.parts[0], { category: built.recipe.category })
+        : built.recipe;
+      if (built.kind === 'collection' && built.recipe.parts.length > 1)
+        toast('📚 ' + built.recipe.parts.length + ' recipes found — filling the form with the first', 5000);
+      applyParsedToFormPreview(one, 'freehandResult');
+    }
+    else applyParsedRecipe(built.recipe, 'freehandResult', 'freehandOverlay');
   } catch(err) {
     res.innerHTML = `<div class="explore-result" style="color:#B03030;">Could not parse recipe: ${err.message}<br>Try adding more recipe details to your text.</div>`;
   }
@@ -16855,6 +17293,8 @@ function extractInstagramId(url) {
   var m = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
   return m ? m[1] : null;
 }
+
+var _pageWasTruncated = false;
 
 // Split out so it can be tested by what it PRODUCES. Only claim the SITE blocked
 // us if an attempt actually said so — our Worker refusing the call, a proxy
@@ -16972,6 +17412,7 @@ async function runUrlImport() {
   // ── Step 1: Fetch the page via Worker (server-side, no CORS issues) ────────
   res.innerHTML = spinner('Fetching page via server…');
   let pageText = '';
+  _pageWasTruncated = false;
   // Why each attempt failed, so the message at the end can be true. Blaming the
   // recipe site for our own Worker refusing us, or for our own CSP blocking the
   // fallback, is exactly the kind of confident-and-wrong error this app treats
@@ -16986,6 +17427,10 @@ async function runUrlImport() {
     if (fetchResp.ok) {
       const fetchData = await fetchResp.json();
       pageText = fetchData.text || '';
+      // The Worker caps how much it returns. On a long round-up that cap lands
+      // mid-article, so the last recipes simply are not there — and an import
+      // that quietly returns 6 of 10 looks exactly like an import that worked.
+      _pageWasTruncated = !!fetchData.truncated;
       if (!pageText) attempts.push('the server fetched the page but found no readable text in it');
     } else {
       var wd = null; try { wd = await fetchResp.json(); } catch(e2) {}
@@ -17038,19 +17483,14 @@ async function runUrlImport() {
 
   res.innerHTML = spinner('Extracting recipe…');
   try {
-    const prompt = 'Extract the recipe from the following webpage text. '
-      + 'Keep the original language — do NOT translate. '
-      + 'Return ONLY valid JSON: '
-      + '{"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"",'
-      + '"ingredients":[{"a":"amount","n":"ingredient"}],"steps":["step 1"]}. '
-      + 'Return {"error":"no recipe found"} only if no recipe content exists at all. '
-      + 'Text:\n\n' + pageText;
-
-    const raw = await aiCall(prompt, 2000);
+    const raw = await aiCall(multiRecipePrompt(pageText, 'webpage text'),
+                             multiRecipeMaxTokens(pageText));
     const parsed = extractJSON(raw);
     if (parsed.error) throw new Error(parsed.error);
-    parsed.source = url;
-    applyParsedRecipe(parsed, 'urlImportResult', 'urlImportOverlay');
+    const built = buildImportFromParsed(parsed, url);
+    if (built.kind === 'none') throw new Error('no recipe found');
+    if (_pageWasTruncated) built.recipe._truncated = true;
+    applyParsedRecipe(built.recipe, 'urlImportResult', 'urlImportOverlay');
   } catch(err) {
     // No recipe found — offer to save as video/link bookmark
     showSaveAsVideoBookmark(url, '', '🎥');
@@ -17063,6 +17503,14 @@ function spinner(msg) {
 }
 
 function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
+  // A collection gets its own preview: the article's title, and every recipe it
+  // found with its own counts. Showing only the first one — or a flattened heap
+  // of 80 ingredients — would hide the very thing the user needs to check
+  // before importing, which is whether all ten were actually picked up.
+  if (Array.isArray(parsed.parts) && parsed.parts.length > 1) {
+    applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto);
+    return;
+  }
   // AI sometimes returns ingredients as plain strings ("200g flour") rather than
   // {a,n} objects — normalise up front so the preview and the saved recipe match.
   var _n = normalizeRecipe({ ingredients: parsed.ingredients, steps: parsed.steps });
@@ -17092,6 +17540,62 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
     + origPhotoHtml
     + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encodedParsed + ',&quot;' + overlayId + '&quot;)">&#10003; Add to My Collection</button>';
 }
+
+// The collection preview. Each recipe is listed with what was found for it, so
+// "10 recipes" in the headline can be checked against ten entries rather than
+// taken on trust.
+function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
+  var parts = parsed.parts.map(normalizePart);
+  parsed.parts = parts;
+  if (originalPhoto) parsed._originalPhoto = originalPhoto;
+
+  var rows = parts.map(function(p, idx) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;'
+      + (idx ? 'border-top:1px solid var(--border);' : '') + '">'
+      + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--terracotta);'
+      + 'color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">'
+      + (idx + 1) + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div dir="auto" style="font-weight:600;font-size:13.5px;color:var(--ink);">' + escH(p.name) + '</div>'
+      + '<div style="font-size:11.5px;color:var(--muted);">'
+      + p.ingredients.length + ' ingredients · ' + p.steps.length + ' steps'
+      + (p.by ? ' · ' + escH(p.by) : '')
+      + (p.servings ? ' · serves ' + escH(p.servings) : '')
+      + '</div></div></div>';
+  }).join('');
+
+  // A recipe with steps but no ingredients (or the reverse) is usually where the
+  // page text ran out. Say so rather than letting a half-read recipe look whole.
+  var cut = parsed._truncated
+    ? '<div style="background:#FEECEC;border:1px solid #F0B4B4;border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:#B03030;line-height:1.5;margin-top:10px;">⚠️ <strong>The page was longer '
+      + 'than the server reads in one go</strong>, so recipes past that point are not in this list. '
+      + 'If the article says it has more than ' + parts.length + ', import these and then paste the rest '
+      + 'into Free-hand text.</div>'
+    : '';
+  var thin = parts.filter(function(p){ return !p.ingredients.length || !p.steps.length; });
+  var warn = thin.length
+    ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">⚠️ '
+      + thin.length + ' of these came back missing either their ingredients or their steps — '
+      + 'the page text may have been cut short. Import anyway and fill the gaps, or try again.</div>'
+    : '';
+
+  var encoded = JSON.stringify(parsed).replace(/"/g,'&quot;');
+  document.getElementById(resultDivId).innerHTML =
+    '<div class="translate-block" style="margin-top:12px;">'
+    + '<div class="translate-block-title" dir="auto">📚 ' + escH(parsed.name || 'Collection') + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">'
+    + parts.length + ' recipes · ' + escH(parsed.category || '') + '</div>'
+    + (parsed.notes ? '<div dir="auto" style="font-size:12px;color:var(--muted);margin-bottom:8px;'
+        + 'line-height:1.5;">' + escH(parsed.notes) + '</div>' : '')
+    + '<div style="margin-top:8px;">' + rows + '</div>'
+    + cut + warn
+    + '</div>'
+    + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encoded + ',&quot;' + overlayId + '&quot;)">'
+    + '&#10003; Add all ' + parts.length + ' as one collection</button>';
+}
+window.applyParsedCollection = applyParsedCollection;
 
 function showOriginalPhotoPreview(btn) {
   var box = btn.nextElementSibling;
@@ -17189,6 +17693,94 @@ async function confirmImportChecked(parsed, overlayId, dup) {
   }
   importParsedNow(parsed, overlayId);
 }
+// ─── MULTI-RECIPE IMPORT (v36.0) ─────────────────────────────────────────────
+//
+// One prompt shape for every import path — URL, free text, file, share sheet.
+// It always asks for an ARRAY, and one recipe in the array is just the ordinary
+// single-recipe import. Before v36.0 the URL and free-text paths asked for one
+// recipe and the file path asked for "all recipes", so what you got depended on
+// which button you pressed.
+function multiRecipePrompt(text, hint) {
+  return 'Extract EVERY recipe from the following ' + (hint || 'text') + '. '
+    + 'Many food articles are a themed round-up — "10 recipes with chestnuts" — and each '
+    + 'one must come back separately, in the order they appear. Do not merge them and do '
+    + 'not skip any.\n\n'
+    + 'Keep the original language — do NOT translate.\n\n'
+    + 'Ingredients are often run together on one line because the page structure is lost '
+    + 'when the text is extracted, e.g. "1 kg potatoes, halved  coarse salt 500 g flour 1 egg". '
+    + 'Split those into separate ingredients using the quantities as the boundary.\n\n'
+    + 'A recipe may group its ingredients under sub-headings such as "for the sauce" or '
+    + '"for the filling". Put that heading in the "g" field of each ingredient it covers.\n\n'
+    + 'If a recipe names its own cook or author, put that in "by". If it states how many '
+    + 'it serves, put just the number in "servings".\n\n'
+    + 'Return ONLY valid JSON, no markdown fences:\n'
+    + '{"collectionName":"the article\'s own title, if it has one covering all the recipes",'
+    + '"collectionNotes":"the article\'s intro paragraph, if any",'
+    + '"category":"one of Breakfast/Lunch/Dinner/Snack/Dessert/Soup/Skills & Methods",'
+    + '"recipes":[{"name":"","by":"","servings":"","prep":"","difficulty":"Easy",'
+    + '"ingredients":[{"a":"amount","n":"ingredient","g":"optional sub-heading"}],'
+    + '"steps":["step 1"],"notes":""}]}\n'
+    + 'Return {"error":"no recipe found"} only if there is no recipe content at all.\n\n'
+    + 'TEXT:\n' + text;
+}
+
+// How many tokens a reply needs. A ten-recipe article does not fit in the 2000
+// that served one recipe, and a truncated reply is invalid JSON — the import
+// failed with "could not parse" and nobody knew why. Scale with the input and
+// leave headroom.
+function multiRecipeMaxTokens(text) {
+  var n = Math.ceil(String(text || '').length / 900);      // rough recipes-in-page
+  return Math.max(2000, Math.min(16000, 1200 + n * 700));
+}
+
+// Turn the AI's answer into either ONE ordinary recipe or ONE collection.
+// Pure, so it can be driven from a fixture instead of the network — the AI is
+// the one part of this that cannot be tested offline, so everything around it
+// is kept testable.
+// Returns {kind:'single', recipe} | {kind:'collection', recipe} | {kind:'none'}
+function buildImportFromParsed(parsed, source) {
+  if (!parsed || typeof parsed !== 'object') return { kind: 'none' };
+  var list = Array.isArray(parsed) ? parsed
+           : Array.isArray(parsed.recipes) ? parsed.recipes
+           : (parsed.name || parsed.ingredients || parsed.steps) ? [parsed]
+           : [];
+  list = list.filter(function(x) {
+    return x && typeof x === 'object'
+      && ((Array.isArray(x.ingredients) && x.ingredients.length)
+       || (Array.isArray(x.steps) && x.steps.length));
+  });
+  if (!list.length) return { kind: 'none' };
+
+  var cat = CATS.includes(parsed.category) ? parsed.category : null;
+
+  if (list.length === 1) {
+    var one = list[0];
+    return { kind: 'single', recipe: {
+      name: one.name || parsed.collectionName || 'Imported Recipe',
+      category: CATS.includes(one.category) ? one.category : (cat || 'Dinner'),
+      difficulty: one.difficulty, prep: one.prep, servings: one.servings,
+      ingredients: one.ingredients, steps: one.steps,
+      notes: one.notes || '', source: source || ''
+    } };
+  }
+
+  // A round-up's own title is the best name there is. Falling back to the first
+  // recipe's name would label ten chestnut dishes "Mushroom and chestnut gnocchi".
+  var name = (typeof parsed.collectionName === 'string' && parsed.collectionName.trim())
+    ? parsed.collectionName.trim()
+    : (list.length + ' recipes');
+  return { kind: 'collection', recipe: {
+    name: name,
+    category: cat || 'Dinner',
+    notes: (typeof parsed.collectionNotes === 'string' ? parsed.collectionNotes.trim() : ''),
+    source: source || '',
+    parts: list
+  } };
+}
+window.multiRecipePrompt = multiRecipePrompt;
+window.multiRecipeMaxTokens = multiRecipeMaxTokens;
+window.buildImportFromParsed = buildImportFromParsed;
+
 function importParsedNow(parsed, overlayId) {
   // normalizeRecipe coerces AI output into the expected shape (ingredients sometimes
   // come back as plain strings) and sets updatedAt — without it a freshly imported
@@ -17201,15 +17793,22 @@ function importParsedNow(parsed, overlayId) {
     source: parsed.source || '',
     originalPhoto: parsed._originalPhoto || '',
     bg: rndBg(), fav: false,
+    notes: parsed.notes || '',
     ingredients: parsed.ingredients || [],
     steps: parsed.steps || [],
+    // A collection arrives with parts; normalizeRecipe empties the flat fields
+    // and mints a uid per part. Anything else has no parts and is unaffected.
+    parts: Array.isArray(parsed.parts) ? parsed.parts : undefined,
     updatedAt: Date.now()
   }));
   if (typeof _waQueue === 'object') _waQueue.imported = true;   // for the harvest queue
   closeM(overlayId);
   activeCat = 'All'; renderFilters(); renderGrid();
   saveData();
-  toast('Recipe imported!');
+  var made = recipes[0];
+  var n = recipeParts(made).length;
+  toast(n ? ('📚 Collection imported — ' + n + ' recipes in “' + made.name + '”') : 'Recipe imported!',
+        n ? 5000 : 3000);
 }
 window.importParsedNow = importParsedNow;
 window.confirmImportParsed = confirmImportParsed;
@@ -17357,6 +17956,86 @@ function saveLocal() {
 // malformed recipe (bad AI import, hand-edited backup, older schema) could otherwise
 // throw and blank the ENTIRE grid. Also normalises ingredients/steps, which AI imports
 // sometimes return as plain strings instead of {a,n} objects.
+// ═══════════════════════════════════════════════════════════════════════════
+// COLLECTIONS (v36.0) — one record holding several recipes
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// A magazine article is usually "N recipes around one theme" — ten chestnut
+// dishes, a Rosh Hashana spread. Importing that as ten loose cards buries the
+// thing that made them worth keeping together, so a collection is ONE recipe
+// record whose `parts` array holds the individual recipes.
+//
+// THE INVARIANT: `parts` is the single source of truth. A collection's
+// top-level `ingredients` and `steps` stay EMPTY, and everything that wants the
+// whole list calls allIngredients()/allSteps(). Copying the parts up into the
+// flat fields would be easier for the ~20 read-only consumers, and it is
+// exactly the kind of duplicated state this app has been bitten by before — two
+// copies that drift, and no way to tell which one is right.
+//
+// A part carries its own `uid` from the day it is created, so "make this its
+// own recipe" can keep its identity later. Minting those on promotion instead
+// would mean two devices promoting the same part produce two different
+// recipes, which is the same class of bug as the legacy-uid backfill.
+//
+// `g` on an ingredient is the sub-section a real article uses inside one
+// recipe — "לניוקי" / "לרוטב", for the gnocchi / for the sauce. Flattening it
+// loses genuine cooking information, so it is kept and rendered as a heading.
+function normalizePart(p, idx) {
+  if (!p || typeof p !== 'object') p = {};
+  var out = {
+    uid:  (typeof p.uid === 'string' && p.uid) ? p.uid : newUid(),
+    name: typeof p.name === 'string' && p.name.trim() ? p.name.trim() : ('Recipe ' + (idx + 1)),
+    by:   typeof p.by === 'string' ? p.by.trim() : '',
+    servings: typeof p.servings === 'string' ? p.servings : (p.servings == null ? '' : String(p.servings)),
+    prep: typeof p.prep === 'string' ? p.prep : (p.prep == null ? '' : String(p.prep)),
+    notes: typeof p.notes === 'string' ? p.notes : ''
+  };
+  // Reuse normalizeRecipe's coercion for the two list fields rather than
+  // writing a second, subtly different one — the AI returns ingredients as bare
+  // strings often enough that this matters.
+  var n = normalizeRecipe({ ingredients: p.ingredients, steps: p.steps });
+  out.ingredients = n.ingredients.map(function(i, k) {
+    var src = Array.isArray(p.ingredients) ? p.ingredients[k] : null;
+    var g = (src && typeof src === 'object' && typeof src.g === 'string') ? src.g.trim() : '';
+    return g ? { a: i.a, n: i.n, g: g } : { a: i.a, n: i.n };
+  });
+  out.steps = n.steps;
+  return out;
+}
+
+function recipeParts(r) {
+  return (r && Array.isArray(r.parts)) ? r.parts : [];
+}
+// parts.length > 0 IS what makes a collection — there is no separate flag to
+// fall out of step with the data.
+function isCollection(r) {
+  return recipeParts(r).length > 0;
+}
+// Every ingredient in the recipe, whether it has parts or not. Read-only
+// consumers (search, export, Bring!, nutrition, "one item away") call this so a
+// collection is never silently half-searched.
+function allIngredients(r) {
+  if (!r) return [];
+  if (!isCollection(r)) return Array.isArray(r.ingredients) ? r.ingredients : [];
+  var out = [];
+  recipeParts(r).forEach(function(p) {
+    (p.ingredients || []).forEach(function(i) { out.push(i); });
+  });
+  return out;
+}
+function allSteps(r) {
+  if (!r) return [];
+  if (!isCollection(r)) return Array.isArray(r.steps) ? r.steps : [];
+  var out = [];
+  recipeParts(r).forEach(function(p) {
+    (p.steps || []).forEach(function(s) { out.push(s); });
+  });
+  return out;
+}
+window.recipeParts = recipeParts;   window.isCollection = isCollection;
+window.allIngredients = allIngredients; window.allSteps = allSteps;
+window.normalizePart = normalizePart;
+
 function normalizeRecipe(r) {
   if (!r || typeof r !== 'object') r = {};
   // v31.7 — every recipe carries a uid, so there is ONE identity rule rather
@@ -17431,6 +18110,30 @@ function normalizeRecipe(r) {
   // the old field removed, so the rest of the app only ever reads `isClip`.
   if (r.isVideoBookmark) { r.isClip = true; delete r.isVideoBookmark; }
   r.isClip = !!r.isClip;
+
+  // Parts, and the invariant that goes with them (v36.0). Normalised AFTER the
+  // flat ingredients/steps above, because a collection's flat fields must end
+  // up EMPTY — parts are the only copy. Doing this before would let the flat
+  // coercion put the old values back.
+  if (Array.isArray(r.parts) && r.parts.length) {
+    r.parts = r.parts.map(normalizePart).filter(function(p) {
+      // A part with neither ingredients nor steps is not a recipe, it is a
+      // heading the AI mistook for one.
+      return p.ingredients.length || p.steps.length;
+    });
+  } else {
+    delete r.parts;
+  }
+  if (recipeParts(r).length) {
+    r.ingredients = [];
+    r.steps = [];
+    r.isClip = false;          // a collection is never a clip
+  } else {
+    delete r.parts;
+  }
+  // `isCollection` is derived, never stored: one fact, one place. A stored flag
+  // is what let isVideoBookmark and isClip disagree for three releases.
+  delete r.isCollection;
   if (typeof r.source !== 'string') r.source = '';
   if (r.nutrition === undefined) r.nutrition = null;
   if (typeof r.originalPhoto !== 'string') r.originalPhoto = '';
@@ -19384,11 +20087,11 @@ function buildPrintHtml(list) {
     + '@media print{button{display:none;}}';
 
   var body = list.map(function(r) {
-    var ings = (r.ingredients||[]).map(function(i){
+    var ings = allIngredients(r).map(function(i){
       return '<tr><td dir="auto" style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
         + escH(i.a) + '</td><td dir="auto" style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
     }).join('');
-    var steps = (r.steps||[]).map(function(s,si){
+    var steps = allSteps(r).map(function(s,si){
       return '<div style="display:flex;gap:12px;margin-bottom:10px;">'
         + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + (si+1) + '</span>'
         + '<span dir="auto">' + escH(s) + '</span></div>';
@@ -22716,16 +23419,16 @@ function openBringModal(recipeId) {
   // Falls back to ×1 metric if called any other way (defensive, e.g. future call sites).
   var mult = (recipeId === viewId) ? viewMult : 1;
   var unit = (recipeId === viewId) ? viewUnit : 'metric';
-  _bringScaledAmounts = (r.ingredients || []).map(function(ing) {
+  _bringScaledAmounts = allIngredients(r).map(function(ing) {
     return scaleAmt(cvtIng(ing.a || '', unit), mult);
   });
   // Render ingredients as checkboxes
   var list = document.getElementById('bringIngList');
   if (list) {
-    if (!r.ingredients || !r.ingredients.length) {
+    if (!allIngredients(r).length) {
       list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">No ingredients found in this recipe.</div>';
     } else {
-      list.innerHTML = r.ingredients.map(function(ing, i) {
+      list.innerHTML = allIngredients(r).map(function(ing, i) {
         var amt = _bringScaledAmounts[i];
         var label = (amt ? amt + ' ' : '') + ing.n;
         return '<label class="bring-ing-item"><input type="checkbox" class="bring-ing-cb" value="'+i+'" checked><span dir="auto">'+escH(label)+'</span></label>';
@@ -22758,7 +23461,7 @@ function bringConfirmSend() {
   var items = [];
   checked.forEach(function(cb) {
     var idx = parseInt(cb.value);
-    var ing = r.ingredients[idx];
+    var ing = allIngredients(r)[idx];
     if (ing) items.push({ name: ing.n, spec: _bringScaledAmounts[idx] || ing.a || '' });
   });
   closeM('bringOverlay');

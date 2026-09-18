@@ -421,6 +421,22 @@ async function handleRequest(request, env) {
         });
         if (!r.ok) return jsonResp({ error: 'Page returned ' + r.status, text: '' });
         const html = await r.text();
+        // v36.0 — two changes, both for multi-recipe articles.
+        //
+        // 1. BLOCK TAGS BECOME NEWLINES, not spaces. Turning every tag into a
+        //    space collapsed a <li> ingredient list into one run-on line:
+        //    "1 kg potatoes, halved  coarse salt 500 g flour 1 egg". The page's
+        //    own structure is the strongest signal for where one ingredient
+        //    ends and the next begins, and it was being thrown away before the
+        //    AI ever saw it. Inline tags (<b>, <a>, <span>) still become
+        //    nothing, so a bolded amount does not split its own ingredient.
+        // 2. The cap goes from 10,000 to 60,000 characters. A ten-recipe
+        //    round-up is far longer than 10,000, so the last recipes were
+        //    silently cut off — the import looked like it worked and simply
+        //    returned fewer recipes than the page had. `truncated` is reported
+        //    so the app can say so instead of guessing.
+        const BLOCK = 'address|article|aside|blockquote|br|dd|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|table|tbody|td|tfoot|th|thead|tr|ul';
+        const LIMIT = 60000;
         let text = html
           .replace(/<script[\s\S]*?<\/script>/gi, ' ')
           .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -428,12 +444,17 @@ async function handleRequest(request, env) {
           .replace(/<header[\s\S]*?<\/header>/gi, ' ')
           .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
           .replace(/<aside[\s\S]*?<\/aside>/gi, ' ')
-          .replace(/<[^>]+>/g, ' ')
+          .replace(new RegExp('</?(?:' + BLOCK + ')(?:\\s[^>]*)?>', 'gi'), '\n')
+          .replace(/<[^>]+>/g, '')
           .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
           .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
-          .replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n')
-          .trim().slice(0, 10000);
-        return jsonResp({ text });
+          .replace(/[ \t]{2,}/g,' ')
+          .replace(/[ \t]*\n[ \t]*/g,'\n')
+          .replace(/\n{3,}/g,'\n\n')
+          .trim();
+        const truncated = text.length > LIMIT;
+        if (truncated) text = text.slice(0, LIMIT);
+        return jsonResp({ text, truncated, fullLength: truncated ? undefined : text.length });
       } catch(err) {
         return jsonResp({ error: err.message, text: '' });
       }

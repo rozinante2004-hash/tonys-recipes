@@ -10,7 +10,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~23 400 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~24 350 lines,
   no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v35.6: 204 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.0: 208 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -110,6 +110,7 @@ found only because a test was written first and disagreed with the code.
 | **Ticks are session-only.** | Explicitly requested. In memory only, wiped when the recipe closes. Never persist them. |
 | **Bring! status comes from the Worker.** | The token lives in KV and is shared; the per-device `bring_token_expiry` is a cache. It may say "unknown" but must **never** assert "expired". |
 | **Metric leaves tsp/tbsp/cup alone.** | Only lb/oz/fl oz are converted. They are standard kitchen measures in metric kitchens too. |
+| **A collection's recipes live in `parts`, and ONLY there.** | A collection's own `ingredients`/`steps` stay EMPTY; everything that wants the whole list calls `allIngredients()`/`allSteps()`. Copying the parts up into the flat fields would spare ~20 read-only consumers a one-line change and create two copies that drift, with no way to say which is right. `isCollection(r)` is derived from `parts.length`, never stored — a stored flag is what let `isVideoBookmark` and `isClip` disagree for three releases. Each part carries its own `uid` **from import**, so promoting the same part on two devices yields one recipe, not two. |
 | **Full photos stay base64, everywhere.** | Export, email and print consume data URLs; only thumbnails are Blobs. The Firebase Storage path (a `photoUrl` pointer instead of base64) was removed in **v34.4** — it needed a paid plan, was never switched on, and put branches into photo sync and backup. ONE shape now. A **backup must stay self-contained**: that is free while photos are base64, but if a remote shape is ever reintroduced, `backupSave` has to download and inline them again. |
 | **A local photo fix must reach the CLOUD.** | The cloud wins on every load — `loadFromFirestore` replaces `recipes` with the cloud copies and the local-photo net only fires when the cloud gives nothing. A rescue that only fixes memory is undone by the next reload, which is why Tony's photos "came back wrong" twice. `runPhotoRescue` awaits `pushLocalPhotosToCloud`; `healCloudPhotos` repairs a cloud already gone wrong. |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
@@ -673,6 +674,39 @@ found only because a test was written first and disagreed with the code.
     `logging-off`, `nothing-wrong`, `already-shown-this-session`, `already-mentioned`,
     `shown` — so "correctly stayed quiet" can be told from "silently broken". A boolean
     would have hidden exactly the distinction this codebase keeps having to relearn.
+- **Collections: several recipes in one record (v36.0).** A magazine round-up —
+  "10 recipes with chestnuts" — used to import as one recipe (URL and free-text
+  paths, which asked the AI for *the* recipe) or as N loose cards (file import,
+  which asked for "all recipes"). What you got depended on which button you
+  pressed. All four paths now share `multiRecipePrompt` + `buildImportFromParsed`,
+  and two or more recipes become one collection.
+  - **The real article is the specification.** `tests/fixtures/multi-recipe-article.json`
+    holds a faithful sample of the ynet chestnut round-up, because none of its
+    messiness is guessable: ingredients arrive as ONE RUN-ON BLOB, a recipe can
+    have its own ingredient sub-headings ("לניוקי" / "לרוטב", carried as `g`),
+    most recipes have a different cook's byline, and servings appear inline in
+    three different formats. The fixture doubles as the AI's answer, so the whole
+    pipeline is testable without the network.
+  - **The Worker's text extraction was destroying the strongest signal there is.**
+    `.replace(/<[^>]+>/g, ' ')` turned every tag into a SPACE, so a `<li>`
+    ingredient list arrived as one run-on line and the page's own structure was
+    gone before the AI saw it. Block tags now become `\n` and inline tags become
+    nothing (so a bolded amount does not split its own ingredient). **This needs
+    Tony to paste the updated `cloudflare-worker.js` into Cloudflare** — the repo
+    copy is not deployed from here.
+  - **The 10,000-character cap silently truncated long round-ups**, so an import
+    returned 6 of 10 recipes and looked like it had worked. The cap is 60,000 now
+    and the response carries `truncated`, which the import preview says out loud.
+  - **`max_tokens: 2000` cannot hold ten recipes.** A truncated reply is invalid
+    JSON, so the import failed with "could not parse" and nothing said why.
+    `multiRecipeMaxTokens()` scales it with the input, capped at 16,000.
+  - Ticks are namespaced per part (`ing-p0-3`), or ticking the soup's onion also
+    ticks the risotto's. `markLine`/`toggleTick` already took arbitrary keys.
+  - A collection has **no single prep time, serving count or difficulty**, and
+    "nutrition per 100g" across ten unrelated dishes is not a number — both are
+    hidden rather than shown empty or invented.
+  - Promoting the last-but-one part collapses the collection back into an
+    ordinary recipe. A container holding one thing is a container for nothing.
 
 ## Outstanding
 
