@@ -99,6 +99,19 @@ found only because a test was written first and disagreed with the code.
 - Tony values **honest error messages** highly. Never let the UI assert something the
   code hasn't verified (see the Bring! note below). A dead end with no way forward is
   treated as a bug.
+- **Never poll for a background command you started.** The harness already notifies you
+  when it exits; a watcher loop on top of that is redundant, and on 18 Sep 2026 five of
+  them wedged and left Tony waiting ~70 minutes for work that had already finished. The
+  mutation runs take 5–15 minutes — start one, say so with a rough duration, and do
+  something else or wait for the notification.
+  - If a wait loop is genuinely unavoidable, **never `pgrep -f "name"`**: `-f` matches
+    full command lines including the watcher's own, so it finds itself and loops
+    forever. Use `pgrep -f "[n]ame"` or match on a PID.
+  - The GitHub API needs the **full 40-char SHA**; a short one silently matches nothing
+    and polls for ever.
+  - **Never tell Tony "waiting on X" without checking that X is running** (`ps`). The
+    same rule the app is held to — don't assert what you haven't verified — applies to
+    what you say about your own work. A stalled watcher looks exactly like progress.
 
 ## Decisions that must not be silently reverted
 
