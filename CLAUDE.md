@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.4: 223 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.6: 223 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -936,6 +936,29 @@ found only because a test was written first and disagreed with the code.
     mouseup and assert the row MOVED. Ordinary rows had been draggable for many
     releases with no test at all, which is how extracting the wiring could have
     broken the old feature while fixing the new one.
+
+- **Three v36.4 follow-ups, all found by Tony using it (v36.6).**
+  - **The ingredient indent rendered as ZERO.** `.ingredients-list li { padding:
+    5px 0 }` is specificity (0,1,1); `.line-indent` was (0,1,0). The shorthand
+    won **whatever the order**, so ingredients never indented. The steps list
+    sets no padding, so the identical rule worked there — which is why a
+    screenshot of one list looked right while the other was broken, and why the
+    test passed: **it asserted the CLASS was present, not that the line had
+    moved.** Assertions on rendering must read `getComputedStyle`. Selector is
+    `.ingredients-list li.line-indent, .steps-list li.line-indent` now.
+  - **The method toolbar acted on the wrong line.** `stepLineRange` fell back to
+    the end of the text when no caret had been placed, so pressing ▸ Sub-title
+    without first tapping a line turned the LAST line into a heading. Tony
+    concluded the button did not work and typed `#` by hand for a whole recipe.
+    Now the caret is remembered across focus loss (pressing a button IS a focus
+    change, hence `onmousedown="event.preventDefault()"`), and with no line
+    chosen the buttons **refuse and say so** rather than picking one.
+  - **Shared text was never checked against what a person receives.** It is
+    right — heading on its own line, blank line before, no bullet, two leading
+    spaces on the lines under it — and now pinned by a test, because plain text
+    has no styling and position is the only thing carrying the structure.
+  - RTL verified by measurement, not by eye: `padding-inline-start` resolves to
+    `padding-right: 22px` / `padding-left: 0` under `direction: rtl`.
 
 ## Outstanding
 

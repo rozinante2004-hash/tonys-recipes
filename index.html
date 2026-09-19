@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.5 -->
+<!-- Tony's Recipes Collection v36.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8617,6 +8617,21 @@ const SELF_TESTS = [
       var ta = document.getElementById('f-steps'); var old = ta.value;
       try{
         ta.value = 'Boil water\nAdd salt\nServe';
+        // Focus first, the way a person does by tapping the line. Without a
+        // chosen line the buttons must REFUSE rather than pick one — v36.4
+        // defaulted to the end of the text, so clicking "Sub-title" turned the
+        // LAST line into a heading and Tony went back to typing "#" by hand.
+        _stepCaret = null; ta.blur();
+        if(stepToolSub()!==false) throw new Error('the button acted on a line nobody chose');
+        if(ta.value.indexOf('#')!==-1) throw new Error('it edited a line anyway: '+ta.value);
+        // Refusing focuses the box so the cursor is visible to place — which
+        // means the NEXT press does have a line. Reset to test indent's refusal
+        // on its own rather than the state the first refusal left behind.
+        _stepCaret = null; ta.blur();
+        if(stepToolIndent(1)!==false) throw new Error('indent acted on a line nobody chose');
+        if(/^ /m.test(ta.value)) throw new Error('indent moved a line anyway: '+JSON.stringify(ta.value));
+
+        ta.focus();
         ta.selectionStart = ta.selectionEnd = ta.value.indexOf('Add salt') + 2;
         stepToolSub();
         if(ta.value.split('\n')[1]!=='# Add salt') throw new Error('sub-title button gave: '+ta.value.split('\n')[1]);
@@ -8629,6 +8644,15 @@ const SELF_TESTS = [
         // A heading is never indented - it is the thing being indented under.
         stepToolSub(); stepToolIndent(1);
         if(ta.value.split('\n')[1]!=='# Add salt') throw new Error('a heading was indented');
+
+        // The caret is remembered across losing focus, because clicking a
+        // toolbar button is itself a focus change.
+        ta.selectionStart = ta.selectionEnd = ta.value.indexOf('Boil') + 2;
+        rememberStepCaret();
+        ta.blur();
+        stepToolSub();
+        if(ta.value.split('\n')[0]!=='# Boil water')
+          throw new Error('the remembered line was lost when focus moved: '+ta.value.split('\n')[0]);
       } finally { ta.value = old; loadIngsTable([]); }
     } },
 
@@ -8665,9 +8689,38 @@ const SELF_TESTS = [
         if(nums.join(',')!=='1,2,3')
           throw new Error('a heading took a step number - got '+nums.join(',')+', expected 1,2,3');
         if(!modal.querySelectorAll('.line-indent').length) throw new Error('nothing was drawn indented');
+        // THE CLASS IS NOT THE BEHAVIOUR. v36.4 shipped with the ingredient
+        // indent rendering as ZERO: `.ingredients-list li { padding: 5px 0 }`
+        // is (0,1,1) and `.line-indent` was (0,1,0), so the shorthand won
+        // whatever the order. The steps list sets no padding, so the identical
+        // rule worked there — which is why a screenshot of one list looked
+        // right while the other was broken. Measure the computed value.
+        var padOf = function(sel){
+          var e = modal.querySelector(sel);
+          if(!e) throw new Error('no element for '+sel);
+          return parseFloat(getComputedStyle(e).paddingInlineStart) || 0;
+        };
+        var ingInd = padOf('.ingredients-list li.line-indent');
+        var ingFlat = padOf('.ingredients-list li:not(.line-indent):not(.line-sub)');
+        if(!(ingInd > ingFlat + 8))
+          throw new Error('an indented INGREDIENT is not actually indented: '+ingInd+'px vs '+ingFlat+'px');
+        var stepInd = padOf('.steps-list li.line-indent');
+        var stepFlat = padOf('.steps-list li:not(.line-indent):not(.line-sub)');
+        if(!(stepInd > stepFlat + 8))
+          throw new Error('an indented STEP is not actually indented: '+stepInd+'px vs '+stepFlat+'px');
 
         // Shared text and print are read by PEOPLE, so they keep the headings.
         var txt=rText(r);
+        // Tony asked what this looks like in WhatsApp or email. Plain text has
+        // no styling, so the heading has to stand out by POSITION: its own line,
+        // a blank line before it, and no bullet — and the lines under it carry
+        // real leading spaces.
+        var tl = txt.split('\n');
+        var hi = tl.indexOf('Brine option #1');
+        if(hi===-1) throw new Error('the ingredient heading is not on a line of its own: '+txt);
+        if(tl[hi-1].trim()!=='') throw new Error('no blank line before the heading, so it runs into the list');
+        if(/^[\s]*\u2022/.test(tl[hi])) throw new Error('the heading was given a bullet, so it reads as an ingredient');
+        if(!/^  \u2022 /.test(tl[hi+1])) throw new Error('the line under the heading is not indented: '+JSON.stringify(tl[hi+1]));
         if(txt.indexOf('Brine option #1')===-1) throw new Error('shared text dropped the ingredient heading');
         if(txt.indexOf('If brining')===-1) throw new Error('shared text dropped the method heading');
         if(/\[object Object\]/.test(txt)) throw new Error('shared text printed a raw object');
@@ -10962,7 +11015,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.5';
+var APP_VERSION = 'v36.6';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12109,7 +12162,21 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .line-sub { list-style: none; font-weight: 700; font-size: 12px; color: var(--terracotta);
             margin: 10px 0 3px; letter-spacing: 0.3px; cursor: default; display: block; }
 .line-sub:first-child { margin-top: 0; }
-.line-indent { padding-inline-start: 20px; }
+/* Specificity, not order: `.ingredients-list li { padding: 5px 0 }` is (0,1,1)
+   and `.line-indent` is (0,1,0), so the shorthand won and the ingredient indent
+   rendered as ZERO however it was written. The steps list sets no padding, so
+   the same rule worked there — which is exactly why it looked fine in a
+   screenshot of one list and was broken in the other. Tony saw it immediately;
+   the test did not, because it asserted the CLASS was present rather than that
+   the line had actually moved. */
+.ingredients-list li.line-indent,
+.steps-list li.line-indent,
+li.line-indent { padding-inline-start: 22px; }
+/* A faint rule makes the grouping readable rather than merely present, and
+   inline-start keeps it on the correct side in Hebrew. */
+.ingredients-list li.line-indent, .steps-list li.line-indent {
+  border-inline-start: 2px solid var(--border);
+}
 
 /* Recipe action bar */
 .recipe-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
@@ -13307,7 +13374,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.5</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.6</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13591,12 +13658,12 @@ body.banner-shown .header {
       <div class="form-group">
         <label class="form-label">Steps — one per line</label>
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap;">
-          <button type="button" class="step-tool-btn" onclick="stepToolSub()" title="Make this line a sub-title (no step number)">&#9656; Sub-title</button>
-          <button type="button" class="step-tool-btn" onclick="stepToolIndent(1)" aria-label="Indent this line" title="Indent this line">&#8677;</button>
-          <button type="button" class="step-tool-btn" onclick="stepToolIndent(-1)" aria-label="Outdent this line" title="Outdent this line">&#8676;</button>
+          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolSub()" title="Make this line a sub-title (no step number)">&#9656; Sub-title</button>
+          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(1)" aria-label="Indent this line" title="Indent this line">&#8677;</button>
+          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line" title="Outdent this line">&#8676;</button>
           <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in</span>
         </div>
-        <textarea class="form-textarea" id="f-steps" dir="auto" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
+        <textarea class="form-textarea" id="f-steps" dir="auto" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Source</label>
@@ -13903,7 +13970,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.5</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.6</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -22321,35 +22388,67 @@ function reapplyLineStructure(original, translated) {
 }
 window.reapplyLineStructure = reapplyLineStructure;
 
+// Where the caret last was in the method box. Clicking a toolbar button can
+// move focus, and if the box was never focused at all `selectionStart` is 0 or
+// null — so the buttons acted on whatever line that happened to point at,
+// usually the last one. Tony clicked "Sub-title" and watched it turn the wrong
+// line into a heading, concluded it did not work, and typed "#" by hand for the
+// rest of the recipe. A toolbar that silently edits a line you did not choose
+// is worse than no toolbar.
+var _stepCaret = null;
+function rememberStepCaret() {
+  var ta = document.getElementById('f-steps');
+  if (ta && document.activeElement === ta) _stepCaret = ta.selectionStart;
+}
+window.rememberStepCaret = rememberStepCaret;
+
 // Which line the cursor is in, as [start, end) offsets into the textarea.
 function stepLineRange(ta) {
-  var v = ta.value, pos = ta.selectionStart == null ? v.length : ta.selectionStart;
+  var v = ta.value;
+  var pos = (document.activeElement === ta && ta.selectionStart != null)
+    ? ta.selectionStart
+    : (_stepCaret == null ? null : _stepCaret);
+  if (pos == null) return null;              // never placed — the caller must say so
+  if (pos > v.length) pos = v.length;
   var start = v.lastIndexOf('\n', pos - 1) + 1;
   var end = v.indexOf('\n', pos);
   if (end === -1) end = v.length;
   return [start, end];
 }
 function replaceStepLine(ta, line) {
-  var r = stepLineRange(ta), v = ta.value;
+  var r = stepLineRange(ta);
+  if (!r) return false;
+  var v = ta.value;
   ta.value = v.slice(0, r[0]) + line + v.slice(r[1]);
   var caret = r[0] + line.length;
+  _stepCaret = caret;
   ta.focus();
   try { ta.setSelectionRange(caret, caret); } catch (e) {}
+  return true;
+}
+// Say which line nothing happened to, rather than picking one.
+function noStepLine() {
+  toast('Tap the line you want first, then use this button', 4000);
+  var ta = document.getElementById('f-steps');
+  if (ta) ta.focus();
+  return false;
 }
 // Toggle, not "set": pressing it on a line that is already a sub-title turns it
 // back into an ordinary step, so the button can undo itself.
 function stepToolSub() {
-  var ta = document.getElementById('f-steps'); if (!ta) return;
-  var r = stepLineRange(ta), line = ta.value.slice(r[0], r[1]);
+  var ta = document.getElementById('f-steps'); if (!ta) return false;
+  var r = stepLineRange(ta); if (!r) return noStepLine();
+  var line = ta.value.slice(r[0], r[1]);
   var m = line.match(/^\s*#\s*(.*)$/);
-  replaceStepLine(ta, m ? m[1] : ('# ' + line.trim()));
+  return replaceStepLine(ta, m ? m[1] : ('# ' + line.trim()));
 }
 function stepToolIndent(dir) {
-  var ta = document.getElementById('f-steps'); if (!ta) return;
-  var r = stepLineRange(ta), line = ta.value.slice(r[0], r[1]);
-  if (/^\s*#/.test(line)) return;          // a heading is never indented
-  replaceStepLine(ta, dir > 0 ? ('    ' + line.replace(/^[ \t]+/, ''))
-                              : line.replace(/^[ \t]+/, ''));
+  var ta = document.getElementById('f-steps'); if (!ta) return false;
+  var r = stepLineRange(ta); if (!r) return noStepLine();
+  var line = ta.value.slice(r[0], r[1]);
+  if (/^\s*#/.test(line)) return false;     // a heading is never indented
+  return replaceStepLine(ta, dir > 0 ? ('    ' + line.replace(/^[ \t]+/, ''))
+                                     : line.replace(/^[ \t]+/, ''));
 }
 window.stepToolSub = stepToolSub; window.stepToolIndent = stepToolIndent;
 window.stepLineRange = stepLineRange;
