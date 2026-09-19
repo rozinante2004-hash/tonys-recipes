@@ -1026,6 +1026,53 @@ found only because a test was written first and disagreed with the code.
     says so instead of opening an empty chooser.
   - `askChoice` joins `askConfirm`/`askPrompt` as the one-of-many chooser.
 
+- **A new collection is offered its recipes' photos (v36.10).**
+  `chooseCollectionPhoto(coll, pool)` puts them up as cards, plus a **"Create
+  new"** card that hands straight over to `showPhotoSourcePicker` — the same
+  Upload / Take / Search sheet a recipe's own photo uses. One photo-picking
+  flow, not two.
+  - **The pool is copied out of `chosen` BEFORE the originals leave the list.**
+    A part has no room for a photo and the standalone copies are queued for
+    cloud deletion a few lines later, so by then there is nothing left to offer.
+  - **The chooser runs last, after the collection exists and is saved.** That is
+    what lets "Create new" reuse the recipe photo path unchanged:
+    `heroPhotoChanged` and `useSelectedSearchPhoto` both resolve
+    `heroPhotoTargetId` against `recipes`, so the target has to really be in it.
+    Do not fake a placeholder recipe to pick a photo into — that is the
+    ThumbTest mistake wearing a different hat.
+  - Only a NEW collection is asked. An existing one already has a photo, or has
+    deliberately not been given one.
+  - Cards, not a list of names: the test asserts each card's `img` carries the
+    actual photo and renders with real width, because a card showing only a name
+    passes every count check and is useless for choosing a picture.
+
+- **☑ Select lives in the filter bar, not the grid heading (v36.10).** In the
+  heading it scrolled out of reach exactly when a long list made selecting worth
+  doing. There are now **TWO Select buttons in the DOM at all times** —
+  `#selectModeBtn` in `#filterBar` and `#selectModeBtnMobile` in
+  `#mobileFilterBar` — and only one is ever displayed, so `syncSelectBtnState()`
+  writes the pressed state to **both**, or the hidden copy comes back stale when
+  the viewport crosses 700px.
+  - `renderFilters()` rebuilds `#filterBar` wholesale, so the pressed state is
+    baked into the frame-4 markup from `selectMode`. A class that
+    `toggleSelectMode` put on the previous element does not survive that.
+  - **A sticky element with no `top` is just a relative one.** Both bars were
+    `position:sticky`, but `updateFilterBarTop` set `top` on the desktop one
+    only — so the phone's bar never stuck. It now sets both, and runs on
+    `resize` as well as on render, because the header's height changes when its
+    buttons wrap.
+  - `#filterBar` is `display:none` below 700px. Every frame in it was already
+    hidden there, so it was an empty bordered strip; hiding it outright leaves
+    ONE sticky bar under the header rather than two claiming the same offset.
+    The phone bar's own Select frame is the exception, re-shown by
+    `.filter-bar-mobile .filter-frame-select` — (0,2,0) beating (0,1,0), both
+    `!important`.
+  - On a phone the frame wraps to a second line of the filter bar and sits at
+    its right end. That costs ~40px of permanently pinned height, which is the
+    price of "always reachable"; the alternative — one row with the filter chips
+    scrolling horizontally underneath it — would have hidden Meal and Diet
+    behind a swipe, which is worse.
+
 - **The "white panel" over the ingredient editor is the GINGER browser
   extension, not this app.** It came back in v36.9 and `elementsFromPoint` named
   it outright: `GWSW#gws-…` over

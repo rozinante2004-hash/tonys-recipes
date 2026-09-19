@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.9 -->
+<!-- Tony's Recipes Collection v36.10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -917,14 +917,25 @@ try {
 window.setTheme = setTheme; window.getTheme = getTheme; window.cycleTheme = cycleTheme; window.applyTheme = applyTheme;
 
 // ─── SELECT MODE ─────────────────────────────────────────────────────────────
+// Since v36.10 the ☑ Select button lives in the filter bar — the strip pinned
+// under the header — and there are TWO of them in the DOM at all times: one in
+// #filterBar for wide screens, one in #mobileFilterBar for phones. Only one is
+// ever displayed, but state has to be written to both or the hidden copy comes
+// back stale the moment the viewport crosses 700px.
+function syncSelectBtnState() {
+  ['selectModeBtn', 'selectModeBtnMobile'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b) b.classList.toggle('active-select', selectMode);
+  });
+}
+
 function toggleSelectMode() {
   selectMode = !selectMode;
   selectedIds.clear();
   renderGrid();
   var bar = document.getElementById('selectBar');
   if (bar) bar.style.display = selectMode ? 'flex' : 'none';
-  var btn = document.getElementById('selectModeBtn');
-  if (btn) btn.classList.toggle('active-select', selectMode);
+  syncSelectBtnState();
 }
 
 function cancelSelectMode() {
@@ -933,8 +944,7 @@ function cancelSelectMode() {
   renderGrid();
   var bar = document.getElementById('selectBar');
   if (bar) bar.style.display = 'none';
-  var btn = document.getElementById('selectModeBtn');
-  if (btn) btn.classList.remove('active-select');
+  syncSelectBtnState();
 }
 
 function toggleRecipeSelect(e, id) {
@@ -1107,6 +1117,7 @@ function printSelected() {
 }
 
 window.toggleSelectMode  = toggleSelectMode;
+window.syncSelectBtnState = syncSelectBtnState;
 window.cancelSelectMode  = cancelSelectMode;
 window.toggleRecipeSelect = toggleRecipeSelect;
 window.deleteSelected    = deleteSelected;
@@ -7270,12 +7281,18 @@ const SELF_TESTS = [
       // thing that must not be silently lost is anything except the photo.
       var realToast=window.toast, realSave=window.saveData, realGrid=window.renderGrid,
           realFilters=window.renderFilters, realConfirm=window.askConfirm,
-          realPrompt=window.askPrompt, realChoice=window.askChoice, realCancel=window.cancelSelectMode;
+          realPrompt=window.askPrompt, realChoice=window.askChoice, realCancel=window.cancelSelectMode,
+          realCollPhoto=window.chooseCollectionPhoto;
       var before=recipes.slice(), beforeId=nextId, beforeSel=selectedIds;
       var pend=Object.assign({}, _pendingCloudDeletes);
       try{
         window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
         window.renderFilters=function(){}; window.cancelSelectMode=function(){};
+        // The photo offer opens a real modal, so it is stubbed — but stubbed as
+        // a SPY, because "the pool it was handed" is the only thing that proves
+        // the photos were copied out before the originals were thrown away.
+        var offered=null;
+        window.chooseCollectionPhoto=function(c,p){ offered={coll:c, pool:p}; return Promise.resolve(); };
         var dialog='';
         window.askConfirm=function(o){ dialog=(o&&o.message)||''; return Promise.resolve(true); };
         window.askPrompt=function(){ return Promise.resolve('Winter soups'); };
@@ -7318,13 +7335,30 @@ const SELF_TESTS = [
         // And the user was told about the photo BEFORE it happened.
         if(!/photo will be lost/i.test(dialog))
           throw new Error('the confirmation did not mention losing the photo: '+dialog);
+        // The whole sentence, not a fragment of it: the fragment alone survived
+        // a mutation that deleted the half saying what is being offered.
+        if(!/offered it as the collection’s own photo/.test(dialog))
+          throw new Error('the confirmation did not say the photo could be kept for the collection: '+dialog);
+
+        // v36.10 — the doomed photo is offered to the new collection, and the
+        // offer carries the actual image, not just the recipe's name.
+        if(!offered) throw new Error('a new collection was created without offering it a photo');
+        if(offered.coll!==coll) throw new Error('the photo was offered for the wrong recipe');
+        if(offered.pool.length!==1)
+          throw new Error('the photo pool held '+offered.pool.length+' photo(s), expected the 1 that existed');
+        if(offered.pool[0].name!=='Onion soup')
+          throw new Error('the offered photo is attributed to "'+offered.pool[0].name+'"');
+        if((offered.pool[0].photo||'').indexOf('data:image/jpeg;base64,')!==0)
+          throw new Error('the offered photo is not the image itself: '+String(offered.pool[0].photo).slice(0,40));
 
         // Adding to an EXISTING collection appends and keeps a way back.
         recipes.unshift(normalizeRecipe({ id:978003, uid:'g3', name:'Barley soup', category:'Soup',
           bg:'#fff', ingredients:[{a:'1',n:'barley'}], steps:['Boil'] }));
         selectedIds=new Set([978003]);
         window.askChoice=function(){ return Promise.resolve(coll.id); };
+        offered=null;
         await addSelectedToCollection();
+        if(offered) throw new Error('adding to an EXISTING collection asked about its photo again');
         var after=recipes.find(function(r){ return r.id===coll.id; });
         if(recipeParts(after).length!==3) throw new Error('adding gave '+recipeParts(after).length+' parts, not 3');
         if(recipeParts(after)[2].name!=='Barley soup') throw new Error('it was not appended at the end');
@@ -7367,6 +7401,7 @@ const SELF_TESTS = [
         window.toast=realToast; window.saveData=realSave; window.renderGrid=realGrid;
         window.renderFilters=realFilters; window.askConfirm=realConfirm;
         window.askPrompt=realPrompt; window.askChoice=realChoice; window.cancelSelectMode=realCancel;
+        window.chooseCollectionPhoto=realCollPhoto;
         recipes.length=0; before.forEach(function(x){ recipes.push(x); });
         nextId=beforeId; selectedIds=beforeSel; _pendingCloudDeletes=pend;
       }
@@ -7408,6 +7443,127 @@ const SELF_TESTS = [
         window.toast=realToast; window.askConfirm=realConfirm; window.askPrompt=realPrompt;
         recipes.length=0; before.forEach(function(x){ recipes.push(x); }); selectedIds=beforeSel;
       }
+    } },
+
+  { id:'collection_photo_cards', group:'Features', name:'A new collection is offered its recipes’ photos (v36.10)',
+    test: async()=>{
+      if(typeof chooseCollectionPhoto!=='function') throw new Error('chooseCollectionPhoto not defined');
+      var realToast=window.toast, realSave=window.saveData, realGrid=window.renderGrid,
+          realPicker=window.showPhotoSourcePicker;
+      var A='data:image/jpeg;base64,'+'A'.repeat(24);
+      var B='data:image/jpeg;base64,'+'B'.repeat(24);
+      try{
+        window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
+        var coll={ id:978201, name:'Winter soups', photo:'', updatedAt:0 };
+        var pool=[{name:'Onion soup', photo:A}, {name:'Tomato soup', photo:B, credit:{name:'Someone'}}];
+
+        var p=chooseCollectionPhoto(coll, pool);
+        var ov=document.getElementById('collPhotoOverlay');
+        if(!ov) throw new Error('no photo chooser opened');
+        var cards=ov.querySelectorAll('.coll-photo-card[data-i]');
+        if(cards.length!==2) throw new Error('the chooser drew '+cards.length+' cards, expected one per photo (2)');
+        // Assert the PICTURE is on the card. A card showing only a name would
+        // pass a count check and be useless for choosing a photo.
+        var srcs=Array.prototype.map.call(cards, function(c){
+          var im=c.querySelector('img'); return im ? im.getAttribute('src') : null; });
+        if(srcs[0]!==A || srcs[1]!==B)
+          throw new Error('the cards do not carry the actual photos: '+JSON.stringify(srcs).slice(0,80));
+        if((cards[1].textContent||'').indexOf('Tomato soup')===-1)
+          throw new Error('a card does not say which recipe its photo came from');
+        if(!ov.querySelector('#collPhotoNew')) throw new Error('no “Create new” card');
+        if(!ov.querySelector('#collPhotoSkip')) throw new Error('no way to decline a photo');
+
+        cards[1].click();
+        await p;
+        if(document.getElementById('collPhotoOverlay')) throw new Error('the chooser stayed open after a pick');
+        if(coll.photo!==B) throw new Error('picking a card did not give the collection that photo');
+        if(!coll.photoCredit) throw new Error('the photo credit did not travel with the photo');
+        if(!coll.updatedAt) throw new Error('the collection was not marked changed, so the pick would not sync');
+
+        // “Create new” hands over to the recipe photo sheet, pointed at THIS
+        // collection — not at whatever recipe was last touched.
+        var asked=null;
+        window.showPhotoSourcePicker=function(id,nm){ asked={id:id, name:nm}; };
+        var p2=chooseCollectionPhoto(coll, []);
+        var ov2=document.getElementById('collPhotoOverlay');
+        if(ov2.querySelectorAll('.coll-photo-card[data-i]').length!==0)
+          throw new Error('cards were drawn for an empty pool');
+        if(!ov2.querySelector('#collPhotoNew'))
+          throw new Error('with no photos to offer, “Create new” is the only route and it is missing');
+        ov2.querySelector('#collPhotoNew').click();
+        await p2;
+        if(!asked) throw new Error('“Create new” did not open the Upload / Take / Search sheet');
+        if(asked.id!==978201) throw new Error('the photo sheet was pointed at id '+asked.id+', not the collection');
+
+        // Escape must leave the collection exactly as it was.
+        var p3=chooseCollectionPhoto(coll, pool);
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+        await p3;
+        if(document.getElementById('collPhotoOverlay')) throw new Error('Escape did not close the chooser');
+        if(coll.photo!==B) throw new Error('Escape changed the photo');
+      } finally {
+        var stray=document.getElementById('collPhotoOverlay'); if(stray) stray.remove();
+        window.toast=realToast; window.saveData=realSave; window.renderGrid=realGrid;
+        window.showPhotoSourcePicker=realPicker;
+      }
+    } },
+
+  { id:'ui_select_lives_in_filter_bar', group:'UI', name:'☑ Select rides the pinned filter bar (v36.10)',
+    test: async()=>{
+      // It used to sit in the grid heading, which scrolls away — so on a long
+      // list the button was unreachable exactly when it was wanted.
+      if(document.querySelector('.grid-section #selectModeBtn'))
+        throw new Error('Select is back in the grid heading, which scrolls out of view');
+      renderFilters();
+      var wide=document.querySelector('#filterBar .filter-frame-select #selectModeBtn');
+      if(!wide) throw new Error('no Select frame in the wide-screen filter bar');
+      var narrow=document.querySelector('#mobileFilterBar .filter-frame-select #selectModeBtnMobile');
+      if(!narrow) throw new Error('no Select frame in the phone filter bar');
+
+      // Whichever bar the viewport is showing must actually be pinned, and the
+      // frame must actually sit at the far end of it. Assert what RENDERED:
+      // `position:sticky` with no `top` is just `relative`, and that is the bug
+      // this replaced.
+      var header=document.querySelector('.header');
+      updateFilterBarTop();
+      // The hidden bar cannot be measured, but it is the visible one at the
+      // other width — so at least assert it was given an offset at all.
+      ['filterBar','mobileFilterBar'].forEach(function(id){
+        if(!document.getElementById(id).style.top)
+          throw new Error('#'+id+' has no sticky offset, so it scrolls away at the width where it is the one on screen');
+      });
+      var btn=[wide,narrow].filter(function(b){ return b.offsetParent!==null; })[0];
+      if(!btn) throw new Error('neither Select button is on screen at this width');
+      var bar=btn.closest('.filter-bar');
+      var cs=getComputedStyle(bar);
+      if(cs.position!=='sticky') throw new Error('the bar Select sits in is '+cs.position+', not sticky');
+      if(cs.top==='auto')
+        throw new Error('the bar has no top offset, so it scrolls away with the page');
+      if(Math.abs(parseFloat(cs.top)-header.offsetHeight)>2)
+        throw new Error('the bar pins at '+cs.top+' but the header is '+header.offsetHeight+'px tall — it would overlap or float');
+      var frame=btn.closest('.filter-frame-select');
+      var gap=bar.getBoundingClientRect().right - frame.getBoundingClientRect().right;
+      if(gap>parseFloat(cs.paddingRight)+3)
+        throw new Error('the Select frame is '+Math.round(gap)+'px from the end of the bar, not at its right-most point');
+
+      // ...and the pressed state survives a re-render of the bar it lives in.
+      var wasOn=selectMode;
+      try{
+        if(selectMode) cancelSelectMode();
+        toggleSelectMode();
+        if(!document.getElementById('selectModeBtn').classList.contains('active-select'))
+          throw new Error('entering select mode did not light the button up');
+        if(!document.getElementById('selectModeBtnMobile').classList.contains('active-select'))
+          throw new Error('the other bar’s Select button was left un-lit, and shows stale on a resize');
+        var sb=document.getElementById('selectBar');
+        if(sb && sb.style.display!=='flex') throw new Error('the action bar did not appear');
+        renderFilters();
+        if(!document.getElementById('selectModeBtn').classList.contains('active-select'))
+          throw new Error('re-rendering the filter bar dropped the pressed state');
+        cancelSelectMode();
+        if(document.getElementById('selectModeBtn').classList.contains('active-select'))
+          throw new Error('cancelling left the button looking active');
+      } finally { if(!wasOn && selectMode) cancelSelectMode(); }
     } },
 
   { id:'part_actions_reach_one_recipe', group:'Features', name:'Each recipe in a collection has its own actions (v36.8)',
@@ -11372,7 +11528,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.9';
+var APP_VERSION = 'v36.10';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12303,6 +12459,12 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; z-index: 150; }
 .filter-frame { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); align-items: center; }
 .filter-frame-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; white-space: nowrap; }
+/* v36.10 — ☑ Select, in its own frame at the right-most point of the bar.
+   `margin-inline-start:auto` rather than `float`/`order` so it also lands on
+   the right in RTL, and so a wrapped bar puts it at the end of the last line
+   instead of stranding it mid-row. */
+.filter-frame-select { margin-inline-start: auto; padding: 4px 6px; }
+.filter-frame-select .view-toggle-btn { white-space: nowrap; }
 .filter-btn { padding: 5px 12px; border-radius: 20px; border: 1.5px solid #D4C4B0; background: #F5EFE8; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; color: #6B5744; transition: all 0.15s; white-space: nowrap; font-weight: 500; }
 .filter-btn:hover { border-color: var(--warm-brown); color: var(--warm-brown); background: #EDE3D8; }
 .filter-btn.active { background: var(--warm-brown); border-color: var(--warm-brown); color: white; font-weight: 600; }
@@ -13344,6 +13506,37 @@ body.banner-shown .header {
 .bring-token-btn:hover { background: #c45508; }
 
 
+/* ── A PHOTO FOR A NEW COLLECTION (v36.10) ──────────────────────────────────
+   Every colour here is a variable, so dark mode needs no second block: hard
+   values are how the nutrition panel ended up unreadable at night. */
+.coll-photo-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin: 2px 0 14px; max-height: 46vh; overflow-y: auto;
+}
+.coll-photo-card {
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: 0; overflow: hidden; cursor: pointer; text-align: center;
+  border: 2px solid var(--border); border-radius: 10px;
+  background: var(--card-bg); color: var(--ink);
+  font-family: 'DM Sans', 'Heebo', sans-serif;
+  transition: border-color 0.15s;
+}
+.coll-photo-card:hover, .coll-photo-card:focus-visible { border-color: var(--terracotta); }
+.coll-photo-card img {
+  display: block; width: 100%; aspect-ratio: 1;
+  object-fit: cover; background: var(--bg);
+}
+.coll-photo-card > span {
+  padding: 5px 6px; font-size: 11px; line-height: 1.25;
+  overflow: hidden; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.coll-photo-new {
+  justify-content: center; gap: 2px; min-height: 104px;
+  border-style: dashed; color: var(--terracotta); font-weight: 600;
+}
+.coll-photo-plus { font-size: 24px; line-height: 1; }
+
 /* ── PHOTO SEARCH MODAL ── */
 .photo-search-grid {
   display: grid;
@@ -13553,6 +13746,14 @@ body.banner-shown .header {
   .filter-bar { gap: 6px; padding: 8px 12px; }
   .filter-frame { display: none !important; }
   .filter-bar-mobile { display: flex !important; }
+  /* With every frame hidden, #filterBar was an empty bordered strip on the
+     phone. Hiding it outright leaves ONE sticky filter bar below the header,
+     which is what the Select frame needs in order to stay on screen. Specificity
+     beats .filter-bar's display:flex on id alone — no !important needed. */
+  #filterBar { display: none; }
+  /* ...and the mobile bar's own Select frame is the exception to the rule two
+     lines up. (0,2,0) + !important beats (0,1,0) + !important.) */
+  .filter-bar-mobile .filter-frame-select { display: flex !important; }
 }
 @media (min-width: 701px) {
   .filter-bar-mobile { display: none !important; }
@@ -13748,7 +13949,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.9</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.10</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13871,6 +14072,13 @@ body.banner-shown .header {
   </button>
   <button class="mobile-dropdown-btn" id="mobileMealBtn" onclick="toggleMobilePanel('mobileMealPanel', 'mobileMealBtn')">🍽 Meal ▾</button>
   <button class="mobile-dropdown-btn" id="mobileDietBtn" onclick="toggleMobilePanel('mobileDietPanel', 'mobileDietBtn')">🥗 Diet ▾</button>
+  <!-- The phone's copy of the Select frame. #filterBar is hidden below 700px,
+       so the two never both exist on screen — but both elements are always in
+       the DOM, which is why every state change has to touch BOTH. -->
+  <div class="filter-frame filter-frame-select">
+    <button class="view-toggle-btn" id="selectModeBtnMobile" onclick="toggleSelectMode()"
+            title="Select recipes to act on together">☑ Select</button>
+  </div>
 </div>
 
 <!-- Mobile Meal Panel -->
@@ -13902,9 +14110,9 @@ body.banner-shown .header {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
     <div class="section-label" id="sectionLabel" style="margin-bottom:0;">All Recipes</div>
     <div style="display:flex;gap:6px;">
-      <button class="view-toggle-btn" id="selectModeBtn" onclick="toggleSelectMode()" title="Select recipes to delete">
-        ☑ Select
-      </button>
+      <!-- ☑ Select used to sit here. It scrolled out of reach exactly when a
+           long list made selecting worth doing, so v36.10 moved it into the
+           filter bar, which stays pinned under the header. -->
       <button class="view-toggle-btn" id="viewBtnGrid" onclick="setView('grid')" title="Grid view">
         ▦ Grid
       </button>
@@ -14346,7 +14554,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.9</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.10</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14938,7 +15146,16 @@ function renderFilters() {
       }).join('')
     + '</div>';
 
-  document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3;
+  // Frame 4: ☑ Select, right-most. It is rebuilt on every renderFilters(), so
+  // its pressed state has to come from selectMode rather than from a class that
+  // a previous toggle put on a now-discarded element.
+  var frame4 = '<div class="filter-frame filter-frame-select">'
+    + '<button class="view-toggle-btn' + (selectMode ? ' active-select' : '') + '"'
+    + ' id="selectModeBtn" onclick="toggleSelectMode()"'
+    + ' title="Select recipes to act on together">☑ Select</button>'
+    + '</div>';
+
+  document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3 + frame4;
   // Update sticky top position after render
   if (typeof updateFilterBarTop === 'function') updateFilterBarTop();
 }
@@ -16528,7 +16745,12 @@ async function collectSelectedInto(targetId) {
 
   var incoming = selectionAsParts(chosen);
   if (!incoming.length) { toast('Nothing in those recipes to collect'); return; }
-  var withPhotos = chosen.filter(function(r){ return r.photo; }).length;
+  // The photos have to be copied out HERE, before the originals leave the list:
+  // a part has no room for one, so a few lines further down they are gone for
+  // good. A new collection gets first refusal on them (v36.10).
+  var photoPool = chosen.filter(function(r){ return r.photo; })
+    .map(function(r){ return { name: r.name, photo: r.photo, credit: r.photoCredit }; });
+  var withPhotos = photoPool.length;
 
   var name = target ? target.name : '';
   if (!target) {
@@ -16549,6 +16771,9 @@ async function collectSelectedInto(targetId) {
         + (withPhotos
             ? (withPhotos === 1 ? 'One photo will be lost' : withPhotos + ' photos will be lost')
               + ' — recipes inside a collection do not have their own photo.'
+              + (target ? ''
+                  : ' You will be offered ' + (withPhotos === 1 ? 'it' : 'one of them')
+                    + ' as the collection’s own photo.')
             : 'None of them has a photo, so nothing is lost.')
         + '\n\nEach one can be lifted back out later with “⤴ Make its own”.',
       okLabel: target ? 'Add them' : 'Create it' })) return;
@@ -16581,7 +16806,92 @@ async function collectSelectedInto(targetId) {
   toast('📚 ' + incoming.length + ' recipe' + (incoming.length === 1 ? '' : 's') + ' now in “' + coll.name + '”', 5000);
   syncLog('save', 'Collected ' + incoming.length + ' recipe(s) into “' + coll.name + '”',
     { id: coll.id, from: goneIds.length });
+
+  // Last, once the collection really exists and is saved: give it a face. An
+  // existing collection already has one (or has deliberately not been given
+  // one), so only a brand-new one is asked about.
+  if (!target) await chooseCollectionPhoto(coll, photoPool);
 }
+
+// ─── A PHOTO FOR A NEW COLLECTION (v36.10) ───────────────────────────────────
+//
+// Cards, not a list of names: a photo is chosen by looking at it, and the whole
+// point of the offer is that these particular pictures are about to be thrown
+// away. "Create new" hands straight over to the same Upload / Take / Search
+// sheet a recipe's own photo uses — one photo-picking flow, not two.
+function chooseCollectionPhoto(coll, pool) {
+  pool = pool || [];
+  return new Promise(function(resolve) {
+    var prev = document.getElementById('collPhotoOverlay');
+    if (prev) prev.remove();
+    var ov = document.createElement('div');
+    ov.id = 'collPhotoOverlay';
+    ov.className = 'modal-overlay';
+    ov.style.cssText = 'display:flex;z-index:1300;';
+    ov.innerHTML = '<div class="ask-card" style="max-width:460px;">'
+      + '<div class="ask-icon">🖼️</div>'
+      + '<div class="ask-title">A photo for “' + escH(coll.name) + '”</div>'
+      + '<div class="ask-body" dir="auto">'
+      + (pool.length
+          ? 'Keep one of the photos from the recipes you just collected, or add a new one.'
+          : 'None of those recipes had a photo. You can add one now.')
+      + '</div>'
+      + '<div class="coll-photo-grid" id="collPhotoGrid"></div>'
+      + '<div class="ask-actions">'
+      + '<button class="ask-btn ghost" id="collPhotoSkip">No photo for now</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+
+    function done() {
+      ov.remove();
+      document.removeEventListener('keydown', onKey, true);
+      resolve();
+    }
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(); } }
+
+    var grid = ov.querySelector('#collPhotoGrid');
+    // Built as nodes rather than markup: a photo is an inline base64 data URL
+    // tens of kilobytes long, and concatenating several of those into an HTML
+    // string is a lot of copying for no gain.
+    pool.forEach(function(p, i) {
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'coll-photo-card';
+      card.setAttribute('data-i', String(i));
+      var img = document.createElement('img');
+      img.alt = ''; img.loading = 'lazy'; img.src = p.photo;
+      var cap = document.createElement('span');
+      cap.setAttribute('dir', 'auto');
+      cap.textContent = p.name;
+      card.appendChild(img); card.appendChild(cap);
+      card.onclick = function() {
+        coll.photo = p.photo;
+        if (p.credit) coll.photoCredit = p.credit; else delete coll.photoCredit;
+        coll.updatedAt = Date.now();
+        done();
+        renderGrid(); saveData();
+        toast('🖼️ “' + coll.name + '” now uses ' + p.name + '’s photo');
+      };
+      grid.appendChild(card);
+    });
+
+    var mk = document.createElement('button');
+    mk.type = 'button';
+    mk.className = 'coll-photo-card coll-photo-new';
+    mk.id = 'collPhotoNew';
+    mk.innerHTML = '<span class="coll-photo-plus">➕</span><span>Create new</span>';
+    mk.onclick = function() {
+      done();
+      showPhotoSourcePicker(coll.id, coll.name);
+    };
+    grid.appendChild(mk);
+
+    ov.querySelector('#collPhotoSkip').onclick = done;
+    ov.onclick = function(e){ if (e.target === ov) done(); };
+    document.addEventListener('keydown', onKey, true);
+  });
+}
+window.chooseCollectionPhoto = chooseCollectionPhoto;
 // Which collection to add to. Built from what actually exists, so it cannot
 // offer one that was deleted on another device.
 async function addSelectedToCollection() {
@@ -26711,13 +27021,22 @@ window.mobileClipToggle   = mobileClipToggle;
 window.mobileResetFilters = mobileResetFilters;
 window.updateMobileButtons = updateMobileButtons;
 
+// Both filter bars are `position:sticky` but a sticky element with no `top` is
+// just a relative one — it never sticks. The top has to be the header's live
+// height, which changes when the header's buttons wrap, so this runs on resize
+// as well as on render. The phone bar was left out until v36.10, which is why
+// the Select button now in it would otherwise have scrolled away.
 function updateFilterBarTop() {
   var header = document.querySelector('.header');
-  var filterBar = document.getElementById('filterBar');
-  if (header && filterBar) {
-    filterBar.style.top = header.offsetHeight + 'px';
-  }
+  if (!header) return;
+  var top = header.offsetHeight + 'px';
+  ['filterBar', 'mobileFilterBar'].forEach(function(id) {
+    var bar = document.getElementById(id);
+    if (bar) bar.style.top = top;
+  });
 }
+window.addEventListener('resize', updateFilterBarTop);
+window.updateFilterBarTop = updateFilterBarTop;
 
 (function initApp() {
   var hasLocal = loadLocal();
