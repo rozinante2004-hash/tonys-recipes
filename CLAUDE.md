@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.6: 223 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.7: 223 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -959,6 +959,24 @@ found only because a test was written first and disagreed with the code.
     has no styling and position is the only thing carrying the structure.
   - RTL verified by measurement, not by eye: `padding-inline-start` resolves to
     `padding-right: 22px` / `padding-left: 0` under `direction: rtl`.
+
+- **Sub-sub-headers (v36.7).** A heading that is ITSELF indented is the second
+  level: "Brine option #1" with "how to prepare it" nested under it. **No new
+  line type and no new flag** — the one that already means "shifted right" does
+  the job, so every consumer that already handles indentation handles this.
+  - **It broke the heading-drop rule.** v36.4 dropped "two headings in a row" as
+    noise, and a sub-sub-header is precisely a heading directly under another
+    heading, so nesting anything deleted its parent. `dropEmptyHeadings` scans
+    backwards and keeps a heading when any CONTENT follows it, which is what
+    that rule always meant.
+  - **I wrote the same specificity bug again** — `.line-sub-indent` at (0,1,0),
+    losing to `.ingredients-list li` at (0,1,1). The measuring test caught it
+    within a minute. That is the argument for measuring rendering rather than
+    asserting a class is present.
+  - **A guarded assertion proves nothing.** The first nested-heading check was
+    wrapped in `if (nestedEl)`, so a mutation that stopped emitting the class
+    made the check SKIP and pass. If the fixture guarantees a thing exists,
+    assert that it exists.
 
 ## Outstanding
 

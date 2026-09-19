@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.6 -->
+<!-- Tony's Recipes Collection v36.7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8531,9 +8531,30 @@ const SELF_TESTS = [
       if(j.ingredients.some(isSubLine))
         throw new Error('an empty or trailing heading survived: '+JSON.stringify(j.ingredients));
       if(j.steps.length) throw new Error('a heading with no steps under it survived');
+      // Two headings in a row IS legitimate now — that is what nesting looks
+      // like — so long as content follows. What must still go is a heading with
+      // nothing under it anywhere.
       var d = normalizeRecipe({ ingredients:[ {sub:'A'}, {sub:'B'}, {a:'1',n:'x'} ] });
-      if(d.ingredients.filter(isSubLine).length!==1)
-        throw new Error('two headings in a row both survived');
+      if(d.ingredients.filter(isSubLine).length!==2)
+        throw new Error('a heading directly above another was dropped — that is what nesting is');
+      var tail = normalizeRecipe({ ingredients:[ {a:'1',n:'x'}, {sub:'A'}, {sub:'B'} ] });
+      if(tail.ingredients.filter(isSubLine).length)
+        throw new Error('trailing headings with nothing under them survived');
+
+      // v36.7 — a SUB-SUB-HEADER is a heading that is itself indented: an option
+      // with its own preparation note nested under it. No new line type; the
+      // flag that already means "shifted right" does the job, so everything
+      // that handles indentation already handles this.
+      var two = normalizeRecipe({ ingredients:[
+        {sub:'Brine option #1'}, {sub:'How to prepare it', ind:1},
+        {a:'1 litre', n:'water', ind:1}, {a:'2 tbsp', n:'salt', ind:1} ] });
+      var heads = two.ingredients.filter(isSubLine);
+      if(heads.length!==2) throw new Error('a nested heading was dropped: '+JSON.stringify(two.ingredients));
+      if(lineIndented(heads[0])) throw new Error('the outer heading was indented');
+      if(!lineIndented(heads[1])) throw new Error('the nested heading lost its indent, so both levels look the same');
+      // It is still not an ingredient, at either level.
+      if(allIngredients(two).length!==2)
+        throw new Error('a nested heading was counted as an ingredient: '+allIngredients(two).length);
     } },
 
   { id:'sub_editor_round_trip', group:'UI', name:'Sub-titles and indents survive the editor (v36.4)',
@@ -8541,16 +8562,32 @@ const SELF_TESTS = [
       // The model can hold it; what matters is whether the EDITOR gives it back
       // unchanged. This is the round trip a real edit makes.
       var ings = [ { a:'1 Kg', n:'chicken breast' }, { sub:'Brine option #1' },
+                   { sub:'How to prepare it', ind:1 },
                    { a:'1 litre', n:'water', ind:1 }, { a:'0.5 Kg', n:'pork chops' } ];
       loadIngsTable(ings);
       var rows = document.querySelectorAll('#ingsRows .ing-row');
-      if(rows.length!==4) throw new Error('loaded '+rows.length+' rows for 4 lines');
+      if(rows.length!==5) throw new Error('loaded '+rows.length+' rows for 5 lines');
+      // A sub-sub-header must come back nested, not flattened to a plain heading.
+      if(!rows[2].classList.contains('ing-row-sub'))
+        throw new Error('the nested heading did not load as a heading row');
+      if(!rows[2].classList.contains('ing-row-indent'))
+        throw new Error('a sub-sub-header loaded as an ordinary sub-title — the nesting was lost');
       if(!rows[1].classList.contains('ing-row-sub')) throw new Error('the heading did not load as a heading row');
       if(rows[1].querySelectorAll('input').length!==1)
         throw new Error('a heading row has an Amount field - a heading is not a quantity of anything');
-      if(!rows[2].classList.contains('ing-row-indent')) throw new Error('the indented row lost its indent');
-      if(rows[3].classList.contains('ing-row-indent')) throw new Error('the row after it was indented too');
+      if(!rows[3].classList.contains('ing-row-indent')) throw new Error('the indented row lost its indent');
+      if(rows[4].classList.contains('ing-row-indent')) throw new Error('the row after it was indented too');
       if(!rows[0].querySelector('.ing-indent-btn')) throw new Error('no indent toggle on an ordinary row');
+      // A heading needs the toggle too, or a sub-sub-header cannot be made.
+      if(!rows[1].querySelector('.ing-indent-btn'))
+        throw new Error('no indent toggle on a sub-title row — a sub-sub-header cannot be created');
+      var subBtn = rows[1].querySelector('.ing-indent-btn');
+      subBtn.onclick();
+      var nested = readIngsTable()[1];
+      if(!isSubLine(nested) || !nested.ind)
+        throw new Error('indenting a sub-title did not make it a sub-sub-header: '+JSON.stringify(nested));
+      subBtn.onclick();
+      if(readIngsTable()[1].ind) throw new Error('a sub-sub-header could not be turned back');
 
       var back = readIngsTable();
       if(JSON.stringify(back)!==JSON.stringify(ings))
@@ -8579,7 +8616,7 @@ const SELF_TESTS = [
         document.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
       };
       var plainBefore = ord();
-      dragRow(3, 0);
+      dragRow(4, 0);
       if(ord()===plainBefore)
         throw new Error('an ordinary ingredient row is no longer draggable — order stayed '+plainBefore);
       loadIngsTable(ings);
@@ -8665,6 +8702,7 @@ const SELF_TESTS = [
       var r = normalizeRecipe({ id:testId, uid:'sub-consumers', bg:'#fff', name:'Brined chicken',
         category:'Dinner', prep:'10 min', servings:'4',
         ingredients:[ {a:'1 Kg',n:'chicken breast'}, {sub:'Brine option #1'},
+                      {sub:'How to prepare it',ind:1},
                       {a:'1 litre',n:'water',ind:1}, {a:'2 tbsp',n:'salt',ind:1} ],
         steps:[ 'Trim it', {sub:'If brining'}, {t:'Submerge overnight',ind:1}, 'Roast' ] });
       recipes.unshift(r);
@@ -8683,7 +8721,7 @@ const SELF_TESTS = [
         viewId=testId; drawView();
         var modal=document.getElementById('viewModal');
         var subs=modal.querySelectorAll('.line-sub');
-        if(subs.length!==2) throw new Error('drew '+subs.length+' headings, expected 2');
+        if(subs.length!==3) throw new Error('drew '+subs.length+' headings, expected 3');
         if(modal.querySelector('.line-sub[data-line]')) throw new Error('a heading is tickable');
         var nums=Array.prototype.slice.call(modal.querySelectorAll('.step-num')).map(function(e){return e.textContent;});
         if(nums.join(',')!=='1,2,3')
@@ -8704,6 +8742,19 @@ const SELF_TESTS = [
         var ingFlat = padOf('.ingredients-list li:not(.line-indent):not(.line-sub)');
         if(!(ingInd > ingFlat + 8))
           throw new Error('an indented INGREDIENT is not actually indented: '+ingInd+'px vs '+ingFlat+'px');
+        // A sub-sub-header must be visibly nested under its parent heading, not
+        // drawn identically — measure it, do not trust the class.
+        // NOT guarded by `if (found)`: the fixture has both levels, so a missing
+        // one is the failure. A mutation that stopped emitting the nested class
+        // slipped past the guarded version, because the check simply skipped.
+        var subFlatEl = modal.querySelector('.ingredients-list li.line-sub:not(.line-sub-indent)');
+        if(!subFlatEl) throw new Error('the outer heading is not in the view');
+        var nestedEl = modal.querySelector('.ingredients-list li.line-sub-indent');
+        if(!nestedEl) throw new Error('the sub-sub-header is not marked as nested in the view');
+        var a1 = parseFloat(getComputedStyle(subFlatEl).paddingInlineStart)||0;
+        var a2 = parseFloat(getComputedStyle(nestedEl).paddingInlineStart)||0;
+        if(!(a2 > a1 + 8))
+          throw new Error('a sub-sub-header is drawn at the same depth as its parent: '+a2+'px vs '+a1+'px');
         var stepInd = padOf('.steps-list li.line-indent');
         var stepFlat = padOf('.steps-list li:not(.line-indent):not(.line-sub)');
         if(!(stepInd > stepFlat + 8))
@@ -8720,11 +8771,25 @@ const SELF_TESTS = [
         if(hi===-1) throw new Error('the ingredient heading is not on a line of its own: '+txt);
         if(tl[hi-1].trim()!=='') throw new Error('no blank line before the heading, so it runs into the list');
         if(/^[\s]*\u2022/.test(tl[hi])) throw new Error('the heading was given a bullet, so it reads as an ingredient');
-        if(!/^  \u2022 /.test(tl[hi+1])) throw new Error('the line under the heading is not indented: '+JSON.stringify(tl[hi+1]));
+        // The first BULLET after the heading, not merely the next line: a
+        // sub-sub-header can sit between them.
+        var firstBullet = tl.slice(hi+1).filter(function(l){ return /\u2022/.test(l); })[0];
+        if(!/^  \u2022 /.test(firstBullet||''))
+          throw new Error('the line under the heading is not indented: '+JSON.stringify(firstBullet));
         if(txt.indexOf('Brine option #1')===-1) throw new Error('shared text dropped the ingredient heading');
         if(txt.indexOf('If brining')===-1) throw new Error('shared text dropped the method heading');
         if(/\[object Object\]/.test(txt)) throw new Error('shared text printed a raw object');
         if(!/3\. Roast/.test(txt)) throw new Error('shared text numbered the heading: '+txt);
+        // The second level has to be visible where there is no styling at all.
+        var nestedR = normalizeRecipe({ id:979102, uid:'nst', bg:'#fff', name:'Nested',
+          ingredients:[ {sub:'Option 1'}, {sub:'How to prepare', ind:1}, {a:'1',n:'water',ind:1} ],
+          steps:['go'] });
+        var nt = rText(nestedR).split('\n');
+        var oi = nt.indexOf('Option 1'), ni = nt.indexOf('  How to prepare');
+        if(oi===-1) throw new Error('the outer heading is missing from shared text');
+        if(ni===-1) throw new Error('a sub-sub-header is not indented in shared text: '+JSON.stringify(nt));
+        if(ni<oi) throw new Error('the nested heading came out above its parent');
+
         var ph=buildPrintHtml([r]);
         if(ph.indexOf('Brine option #1')===-1) throw new Error('the printout dropped the heading');
         if(/\[object Object\]/.test(ph)) throw new Error('the printout has a raw object in it');
@@ -11015,7 +11080,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.6';
+var APP_VERSION = 'v36.7';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12172,6 +12237,14 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .ingredients-list li.line-indent,
 .steps-list li.line-indent,
 li.line-indent { padding-inline-start: 22px; }
+/* A sub-sub-header: a heading nested under the heading above it. Needs the same
+   `li` in the selector as .line-indent does — `.ingredients-list li` sets a
+   padding shorthand at (0,1,1) and a bare class at (0,1,0) loses to it. I wrote
+   this rule the low-specificity way first and the measuring test caught it
+   within a minute, which is the whole argument for measuring. */
+.ingredients-list li.line-sub-indent,
+.steps-list li.line-sub-indent,
+li.line-sub-indent { padding-inline-start: 22px; }
 /* A faint rule makes the grouping readable rather than merely present, and
    inline-start keeps it on the correct side in Hebrew. */
 .ingredients-list li.line-indent, .steps-list li.line-indent {
@@ -13078,17 +13151,16 @@ body.banner-shown .header {
 /* v36.4 - a sub-title row spans where the amount and name would be, because a
    heading has no amount. It reads as a heading in the editor too, so what you
    are editing looks like what you will get. */
-.ing-row-sub { grid-template-columns: 24px 1fr 28px; background: rgba(193,68,14,0.04); }
+.ing-row-sub { grid-template-columns: 24px 1fr 28px 28px; background: rgba(193,68,14,0.04); }
+.ing-row-sub.ing-row-indent .ing-sub-input { padding-inline-start: 34px; }
 .ing-row-sub .ing-sub-input {
   font-weight: 700; color: var(--terracotta); font-size: 12.5px; letter-spacing: 0.3px;
 }
 .ing-row-indent input[placeholder="Ingredient name"] { padding-inline-start: 34px; }
-/* A thin rule under the indent makes the grouping readable at a glance in
-   the editor; the toggle button showing its pressed state is the other half. */
-.ing-row-indent input[placeholder="Ingredient name"] {
-  background-image: linear-gradient(to right, var(--border) 0 1px, transparent 1px);
-  background-repeat: no-repeat; background-size: 1px 60%; background-position: 20px center;
-}
+/* A real border rather than a painted gradient: cheaper, and one less thing in
+   a scrolling container that can composite badly. */
+.ing-row-indent input[placeholder="Ingredient name"],
+.ing-row-sub.ing-row-indent .ing-sub-input { box-shadow: inset 20px 0 0 -19px var(--border); }
 .ing-indent-btn {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 13px; padding: 0; display: flex; align-items: center;
@@ -13374,7 +13446,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.6</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.7</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13970,7 +14042,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.6</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.7</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15940,7 +16012,8 @@ window.conflictBannerHtml = conflictBannerHtml;
 // array, so they stay stable whether or not headings are present.
 function ingredientLinesHtml(lines, pfx, awkOut) {
   return (lines || []).map(function(i, ii) {
-    if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escH(i.sub) + '</li>';
+    if (isSubLine(i)) return '<li class="line-sub' + (lineIndented(i) ? ' line-sub-indent' : '')
+      + '" dir="auto">' + escH(i.sub) + '</li>';
     var cv = cvtIng(i.a, viewUnit), sc = scaleAmt(cv, viewMult);
     if (awkOut && awkwardCount(i.n, sc)) awkOut.push(i.n);
     var key = pfx + '-' + ii;
@@ -15956,7 +16029,8 @@ function ingredientLinesHtml(lines, pfx, awkOut) {
 function stepLinesHtml(lines, pfx, timerPfx) {
   var num = 0;
   return (lines || []).map(function(s, si) {
-    if (isSubLine(s)) return '<li class="line-sub" dir="auto">' + escH(s.sub) + '</li>';
+    if (isSubLine(s)) return '<li class="line-sub' + (lineIndented(s) ? ' line-sub-indent' : '')
+      + '" dir="auto">' + escH(s.sub) + '</li>';
     num++;
     var txt = stepText(s);
     var isHeb = /[֐-׿]/.test(txt);
@@ -16644,11 +16718,14 @@ function rText(r){
   // v36.4 - shared text is for a PERSON to read, so it carries the headings and
   // the indentation. allIngredients/allSteps would silently drop them: they
   // answer "what can I cook with", which is a different question.
+  // A sub-sub-header is indented like the lines under it, so the two levels
+  // stay distinguishable in plain text where nothing else can carry them.
+  var _h = function(x){ return (lineIndented(x) ? '\n  ' : '\n') + x.sub; };
   t+=`INGREDIENTS:\n${ingredientLines(r).map(i =>
-      isSubLine(i) ? `\n${i.sub}` : `${lineIndented(i)?'  ':''}• ${i.a} ${i.n}`).join('\n')}\n\n`;
+      isSubLine(i) ? _h(i) : `${lineIndented(i)?'  ':''}• ${i.a} ${i.n}`).join('\n')}\n\n`;
   var _sn = 0;
   t+=`METHOD:\n${stepLines(r).map(s =>
-      isSubLine(s) ? `\n${s.sub}` : `${lineIndented(s)?'  ':''}${++_sn}. ${stepText(s)}`).join('\n')}`;
+      isSubLine(s) ? _h(s) : `${lineIndented(s)?'  ':''}${++_sn}. ${stepText(s)}`).join('\n')}`;
   if(r.notes&&r.notes.trim()) t+=`\n\nNOTES:\n${r.notes.trim()}`;
   if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
@@ -16864,7 +16941,7 @@ function makeDocxBlob(recipeList){
       var IND = `<w:ind w:start="360" w:left="360"/>`;
       (part.ingredients||[]).forEach(i=>{
         if (isSubLine(i)) {
-          bodyXml+=`<w:p><w:pPr>${pBidi(i.sub)}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(i.sub)}</w:rPr>`
+          bodyXml+=`<w:p><w:pPr>${pBidi(i.sub)}${lineIndented(i)?IND:''}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(i.sub)}</w:rPr>`
             + `<w:t>${esc(i.sub)}</w:t></w:r></w:p>`;
           return;
         }
@@ -16878,7 +16955,7 @@ function makeDocxBlob(recipeList){
       var wn = 0;
       (part.steps||[]).forEach(s=>{
         if (isSubLine(s)) {
-          bodyXml+=`<w:p><w:pPr>${pBidi(s.sub)}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(s.sub)}</w:rPr>`
+          bodyXml+=`<w:p><w:pPr>${pBidi(s.sub)}${lineIndented(s)?IND:''}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(s.sub)}</w:rPr>`
             + `<w:t>${esc(s.sub)}</w:t></w:r></w:p>`;
           return;
         }
@@ -19895,7 +19972,15 @@ function isSubLine(x) {
 function normalizeIngredientLines(list) {
   var out = [], lastG = null;
   (Array.isArray(list) ? list : []).forEach(function(i) {
-    if (isSubLine(i)) { out.push({ sub: String(i.sub).trim() }); lastG = null; return; }
+    if (isSubLine(i)) {
+      // v36.7 — a heading that is ITSELF indented is a sub-sub-header: "Brine
+      // option #1" with "how to prepare it" under it. No new line type and no
+      // new flag; the one that already means "shifted right" does the job, so
+      // everything that already handles indentation keeps working.
+      var h = { sub: String(i.sub).trim() };
+      if (i.ind) h.ind = 1;
+      out.push(h); lastG = null; return;
+    }
     if (typeof i === 'string') {
       var m = i.match(/^\s*([\d./]+\s*[A-Za-z"']*)\s+(.*)$/);
       out.push(m ? { a: m[1].trim(), n: m[2].trim() } : { a: '', n: i.trim() });
@@ -19911,20 +19996,30 @@ function normalizeIngredientLines(list) {
     if (i.ind || g) item.ind = 1;          // an item that had a `g` was always shown under it
     out.push(item);
   });
-  // A heading with nothing after it, or two in a row, is noise rather than
-  // structure — and an empty one would render as a blank bold line.
-  return out.filter(function(x, k) {
-    if (isSubLine(x)) {
-      if (!x.sub) return false;
-      var next = out[k + 1];
-      return !!next && !isSubLine(next);
-    }
-    return x.a || x.n;
-  });
+  return dropEmptyHeadings(out, function(x){ return x.a || x.n; });
 }
+// A heading with NOTHING under it is noise and would render as a blank bold
+// line. "Two in a row" is not the test though — v36.4 used that, and v36.7's
+// sub-sub-header is precisely a heading directly under another heading, so the
+// outer one was being deleted the moment you nested anything. The real rule is
+// whether any CONTENT follows it at all, so scan backwards once.
+function dropEmptyHeadings(list, hasContent) {
+  var keep = new Array(list.length), seen = false;
+  for (var k = list.length - 1; k >= 0; k--) {
+    var x = list[k];
+    if (isSubLine(x)) { keep[k] = !!x.sub && seen; }
+    else { keep[k] = !!hasContent(x); if (keep[k]) seen = true; }
+  }
+  return list.filter(function(_, k){ return keep[k]; });
+}
+window.dropEmptyHeadings = dropEmptyHeadings;
 function normalizeStepLines(list) {
   var out = (Array.isArray(list) ? list : []).map(function(s) {
-    if (isSubLine(s)) return { sub: String(s.sub).trim() };
+    if (isSubLine(s)) {
+      var hs = { sub: String(s.sub).trim() };
+      if (s.ind) hs.ind = 1;
+      return hs;
+    }
     if (typeof s === 'string') return s;
     if (s && typeof s === 'object') {
       var t = typeof s.t === 'string' ? s.t : String(s.text || s.step || s.description || '');
@@ -19932,14 +20027,7 @@ function normalizeStepLines(list) {
     }
     return String(s == null ? '' : s);
   });
-  return out.filter(function(x, k) {
-    if (isSubLine(x)) {
-      if (!x.sub) return false;
-      var next = out[k + 1];
-      return !!next && !isSubLine(next);
-    }
-    return stepText(x).trim();
-  });
+  return dropEmptyHeadings(out, function(x){ return stepText(x).trim(); });
 }
 window.normalizeIngredientLines = normalizeIngredientLines;
 window.normalizeStepLines = normalizeStepLines;
@@ -22089,14 +22177,16 @@ function buildPrintHtml(list) {
   var body = list.map(function(r) {
     var ings = ingredientLines(r).map(function(i){
       if (isSubLine(i))
-        return '<tr><td class="sub" dir="auto" colspan="2">' + escH(i.sub) + '</td></tr>';
+        return '<tr><td class="sub' + (lineIndented(i) ? ' ind' : '')
+          + '" dir="auto" colspan="2">' + escH(i.sub) + '</td></tr>';
       return '<tr><td dir="auto" style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
         + escH(i.a) + '</td><td dir="auto"' + (lineIndented(i) ? ' class="ind"' : '')
         + ' style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
     }).join('');
     var _pn = 0;
     var steps = stepLines(r).map(function(s){
-      if (isSubLine(s)) return '<div class="sub" dir="auto">' + escH(s.sub) + '</div>';
+      if (isSubLine(s)) return '<div class="sub' + (lineIndented(s) ? ' ind' : '')
+        + '" dir="auto">' + escH(s.sub) + '</div>';
       _pn++;
       return '<div style="display:flex;gap:12px;margin-bottom:10px;"'
         + (lineIndented(s) ? ' class="ind"' : '') + '>'
@@ -22253,7 +22343,7 @@ function readIngsTable() {
     if (row.classList.contains('ing-row-sub')) {
       var st = row.querySelector('input');
       var v = st ? st.value.trim() : '';
-      if (v) out.push({ sub: v });
+      if (v) out.push(row.classList.contains('ing-row-indent') ? { sub: v, ind: 1 } : { sub: v });
       return;
     }
     var inputs = row.querySelectorAll('input');
@@ -22277,17 +22367,19 @@ function loadIngsTable(ingredients) {
   tbody.innerHTML = '';
   if (!ingredients || !ingredients.length) { addIngRow(); return; }
   ingredients.forEach(function(ing) {
-    if (isSubLine(ing)) addIngSubRow(ing.sub);
+    if (isSubLine(ing)) addIngSubRow(ing.sub, null, lineIndented(ing));
     else addIngRow(ing.a || '', ing.n || '', lineIndented(ing));
   });
 }
 
 // A heading row: one field, no amount, and visibly not an ingredient.
-function addIngSubRow(text, before) {
+function addIngSubRow(text, before, indented) {
   var tbody = document.getElementById('ingsRows');
   if (!tbody) return null;
   var row = document.createElement('div');
-  row.className = 'ing-row ing-row-sub';
+  // An INDENTED heading is a sub-sub-header: "Brine option #1" with "how to
+  // prepare it" nested under it. Same flag as any other indented line.
+  row.className = 'ing-row ing-row-sub' + (indented ? ' ing-row-indent' : '');
 
   var handle = document.createElement('div');
   handle.className = 'ing-handle'; handle.innerHTML = '⠿'; handle.title = 'Drag to reorder';
@@ -22300,13 +22392,25 @@ function addIngSubRow(text, before) {
     if (e.key === 'Enter') { e.preventDefault(); addIngRow('', '', true, row); }
   };
 
+  var indBtn = document.createElement('button');
+  indBtn.type = 'button'; indBtn.className = 'ing-indent-btn';
+  indBtn.title = 'Make this a sub-sub-heading under the one above';
+  var paintSub = function(){
+    var on = row.classList.contains('ing-row-indent');
+    indBtn.textContent = on ? '⇤' : '⇥';
+    indBtn.setAttribute('aria-label', on ? 'Outdent this sub-title' : 'Indent this sub-title');
+    indBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+  indBtn.onclick = function(){ row.classList.toggle('ing-row-indent'); paintSub(); };
+  paintSub();
+
   var delBtn = document.createElement('button');
   delBtn.type = 'button'; delBtn.className = 'ing-del'; delBtn.textContent = '✕';
   delBtn.onclick = function() { row.remove(); if (!tbody.children.length) addIngRow(); };
 
   wireIngDrag(row, handle, tbody);
 
-  row.appendChild(handle); row.appendChild(input); row.appendChild(delBtn);
+  row.appendChild(handle); row.appendChild(input); row.appendChild(indBtn); row.appendChild(delBtn);
   if (before && before.parentNode === tbody) tbody.insertBefore(row, before.nextSibling);
   else tbody.appendChild(row);
   input.focus();
@@ -22346,8 +22450,8 @@ function previewStepsHtml(steps) {
   var n = 0;
   return (steps || []).map(function(s) {
     if (isSubLine(s))
-      return '<div class="translate-step" style="font-weight:700;color:var(--terracotta);">'
-        + escH(s.sub) + '</div>';
+      return '<div class="translate-step" style="font-weight:700;color:var(--terracotta);'
+        + (lineIndented(s) ? 'padding-inline-start:18px;' : '') + '">' + escH(s.sub) + '</div>';
     n++;
     return '<div class="translate-step"' + (lineIndented(s) ? ' style="padding-inline-start:18px;"' : '') + '>'
       + '<span class="translate-step-num">' + n + '</span><span>' + escH(stepText(s)) + '</span></div>';
@@ -22356,8 +22460,8 @@ function previewStepsHtml(steps) {
 function previewIngsHtml(ings) {
   return (ings || []).map(function(i) {
     if (isSubLine(i))
-      return '<div class="translate-ing-row" style="font-weight:700;color:var(--terracotta);">'
-        + escH(i.sub) + '</div>';
+      return '<div class="translate-ing-row" style="font-weight:700;color:var(--terracotta);'
+        + (lineIndented(i) ? 'padding-inline-start:18px;' : '') + '">' + escH(i.sub) + '</div>';
     return '<div class="translate-ing-row"' + (lineIndented(i) ? ' style="padding-inline-start:18px;"' : '') + '>'
       + '<span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span>'
       + '<span>' + escH(i.n) + '</span></div>';
@@ -22378,7 +22482,9 @@ function reapplyLineStructure(original, translated) {
     var o = orig[k];
     if (isSubLine(o)) {
       var txt = isSubLine(x) ? x.sub : (typeof x === 'string' ? x : (x && (x.n || stepText(x))) || '');
-      return { sub: String(txt).trim() };
+      var h = { sub: String(txt).trim() };
+      if (lineIndented(o)) h.ind = 1;       // a sub-sub-header stays one
+      return h;
     }
     if (!lineIndented(o)) return x;
     if (typeof x === 'string') return { t: x, ind: 1 };
