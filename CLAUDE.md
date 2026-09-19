@@ -1026,6 +1026,26 @@ found only because a test was written first and disagreed with the code.
     says so instead of opening an empty chooser.
   - `askChoice` joins `askConfirm`/`askPrompt` as the one-of-many chooser.
 
+- **The "white panel" over the ingredient editor is the GINGER browser
+  extension, not this app.** It came back in v36.9 and `elementsFromPoint` named
+  it outright: `GWSW#gws-…` over
+  `DIV.ginger-module-highlighter.ginger-module-highlighter-ghost [absolute]`,
+  sitting on top of an ordinary `INPUT` inside `#ingsRows`. Ginger overlays a
+  "ghost" layer on text fields to draw its underlines, positions it from the
+  field's VIEWPORT rectangle, and the field is inside a scrolling modal — so the
+  offset is recomputed against the wrong coordinate space and accumulates. That
+  is exactly what Tony described: moves with the scroll but at roughly three
+  times the rate, never disappears, eventually slides off the bottom.
+  - **It cannot be reproduced here** — headless Chromium runs no extensions. Two
+    releases were spent theorising about compositing before one `click` handler
+    printing `elementsFromPoint` answered it in a single line. **When something
+    visual cannot be reproduced, ask what is under the cursor before guessing at
+    causes.**
+  - Do not "fix" it in the app without evidence that the fix works: the
+    positioning belongs to the extension. `spellcheck="false"` on the ingredient
+    fields is the only plausible lever and is NOT known to make Ginger skip
+    them.
+
 ## Outstanding
 
 - **5.4 — per-recipe Firestore documents. Complete as of v32.2.** All four steps are
