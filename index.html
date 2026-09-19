@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.7 -->
+<!-- Tony's Recipes Collection v36.8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7263,6 +7263,151 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'part_actions_reach_one_recipe', group:'Features', name:'Each recipe in a collection has its own actions (v36.8)',
+    test: async()=>{
+      // Tony's case: send ONE recipe out of a collection without sending the
+      // other nine. Every per-recipe action takes an id and looks it up in
+      // `recipes`, and a part is not in `recipes` — so the whole feature rests
+      // on findRecipeRef resolving a part reference to that part alone.
+      var realToast=window.toast, realSave=window.saveData, realRender=window.renderGrid;
+      var before=recipes.slice(), beforeId=nextId, prevView=viewId;
+      try{
+        window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
+        var built = buildImportFromParsed({ collectionName:'Three soups', category:'Soup', recipes:[
+          { name:'Onion soup', ingredients:[{a:'3',n:'onions'}], steps:['Fry'] },
+          { name:'Tomato soup', ingredients:[{a:'5',n:'tomatoes'}], steps:['Roast','Blend'] }
+        ]}, 'https://example.com/s');
+        // The collection HAS a photo, so "a part has no photo" is a real
+        // assertion rather than one the fixture makes true by accident.
+        var coll = normalizeRecipe(Object.assign({id:977001, uid:'pa', bg:'#fff',
+          photo:'data:image/jpeg;base64,'+'A'.repeat(64)}, built.recipe));
+        recipes.unshift(coll);
+        if(!coll.photo) throw new Error('setup: the collection needs a photo for this to mean anything');
+        var uid = recipeParts(coll)[1].uid;
+        var ref = partRef(977001, uid);
+
+        // The reference resolves to ONE recipe, not the collection.
+        var one = findRecipeRef(ref);
+        if(!one) throw new Error('a part reference resolved to nothing');
+        if(one.name!=='Tomato soup') throw new Error('it resolved to "'+one.name+'"');
+        if(isCollection(one)) throw new Error('a part resolved to a collection');
+        if(allIngredients(one).length!==1)
+          throw new Error('it carries '+allIngredients(one).length+' ingredients — the whole collection leaked in');
+        if(one.photo!=='') throw new Error('a part was given a photo — parts deliberately have none');
+        // An ordinary id must still work, or every action breaks for normal recipes.
+        if(findRecipeRef(977001)!==coll) throw new Error('an ordinary id no longer resolves');
+        if(findRecipeRef('c999999:nope')) throw new Error('a reference to a missing collection resolved to something');
+        if(findRecipeRef(partRef(977001,'no-such-uid'))) throw new Error('a missing part resolved to something');
+
+        // Share/Word/Print all go through rText or the same lookup: the text
+        // must be THIS recipe, not its neighbours.
+        var txt = rText(findRecipeRef(ref));
+        if(txt.indexOf('Tomato soup')===-1) throw new Error('sharing one recipe did not include it');
+        if(txt.indexOf('Onion soup')!==-1) throw new Error('sharing one recipe sent the whole collection');
+
+        // Cooked and Favourite must write to the PART, not to a copy.
+        markPartCooked(ref); markPartCooked(ref); togglePartFav(ref);
+        var live = recipeParts(recipes.find(function(x){return x.id===977001;}))[1];
+        if(live.cookCount!==2) throw new Error('cooking a part recorded '+live.cookCount+' — it wrote to a copy');
+        if(!live.fav) throw new Error('favouriting a part did not stick');
+        if(!live.lastCooked) throw new Error('no cooked date was recorded');
+        togglePartFav(ref);
+        if(recipeParts(recipes.find(function(x){return x.id===977001;}))[1].fav)
+          throw new Error('favourite does not toggle back off');
+        // The neighbour must be untouched.
+        if(recipeParts(recipes.find(function(x){return x.id===977001;}))[0].cookCount)
+          throw new Error('cooking one recipe counted a cook on another');
+
+        // ...and all of it has to SURVIVE normalising, which runs on every load
+        // and every save. Setting the fields is worthless if the next load
+        // strips them.
+        togglePartFav(ref);
+        var round = normalizeRecipe(JSON.parse(JSON.stringify(
+          recipes.find(function(x){ return x.id===977001; }))));
+        var rp = recipeParts(round)[1];
+        if(rp.cookCount!==2) throw new Error('the cook count did not survive a normalise: '+rp.cookCount);
+        if(!rp.fav) throw new Error('the favourite did not survive a normalise');
+        if(!rp.lastCooked) throw new Error('the cooked date did not survive a normalise');
+        togglePartFav(ref);
+
+        // The buttons have to be rendered, per part, or none of this is reachable.
+        viewId=977001; drawView();
+        var modal=document.getElementById('viewModal');
+        if(modal.querySelectorAll('.part-actions').length!==2)
+          throw new Error('drew '+modal.querySelectorAll('.part-actions').length+' per-recipe action bars, expected 2');
+        var html=modal.innerHTML;
+        ['togglePartFav','editPart','markPartCooked','openTranslate','expOneWord','printRecipe','toggleShare','openBringModal']
+          .forEach(function(fn){
+            if(html.indexOf(fn+'(&quot;c977001:')===-1 && html.indexOf(fn+'("c977001:')===-1)
+              throw new Error(fn+' is not wired to a part reference, so it would act on the wrong thing');
+          });
+        // ...and the collection-level block must be distinguishable from them.
+        if(!modal.querySelector('.collection-actions-label'))
+          throw new Error('no heading separates the collection-level actions from the per-recipe ones');
+        if(modal.querySelector('.collection-actions-label').textContent.indexOf('2 recipes')===-1)
+          throw new Error('the collection-level heading does not say what it applies to');
+      } finally {
+        window.toast=realToast; window.saveData=realSave; window.renderGrid=realRender;
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); });
+        nextId=beforeId; viewId=prevView; closeM('viewOverlay');
+      }
+    } },
+
+  { id:'part_edit_writes_back', group:'Features', name:'Editing one recipe in a collection does not clone it (v36.8)',
+    test: async()=>{
+      // The failure this guards against: the edit form saving a part as a NEW
+      // standalone recipe, leaving the collection unchanged and the library one
+      // recipe longer. Every collection feature so far has had to be stopped
+      // from doing exactly that.
+      var realToast=window.toast, realSave=window.saveData, realRender=window.renderGrid;
+      var before=recipes.slice(), beforeId=nextId, prevView=viewId;
+      try{
+        window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
+        var built = buildImportFromParsed({ collectionName:'Two soups', category:'Soup', recipes:[
+          { name:'Onion soup', ingredients:[{a:'3',n:'onions'}], steps:['Fry'] },
+          { name:'Lentil soup', ingredients:[{a:'1c',n:'lentils'}], steps:['Boil'] }
+        ]}, '');
+        var coll = normalizeRecipe(Object.assign({id:977101, uid:'pe', bg:'#fff'}, built.recipe));
+        recipes.unshift(coll);
+        var countBefore = recipes.length;
+        var ref = partRef(977101, recipeParts(coll)[1].uid);
+
+        editPart(ref);
+        if(document.getElementById('f-name').value!=='Lentil soup')
+          throw new Error('the form did not load the part: "'+document.getElementById('f-name').value+'"');
+        if(editFormIsDirty())
+          throw new Error('a freshly loaded part reads as unsaved changes, so closing would ask to discard it');
+        document.getElementById('f-name').value='Lentil soup (better)';
+        document.getElementById('f-steps').value='Boil\n# Then\n    Season';
+        await saveRecipe();
+
+        var live = recipes.find(function(x){ return x.id===977101; });
+        if(recipes.length!==countBefore)
+          throw new Error('editing a part changed the library size by '+(recipes.length-countBefore)+' — it cloned the recipe');
+        if(recipeParts(live).length!==2) throw new Error('the collection now has '+recipeParts(live).length+' parts');
+        if(recipeParts(live)[1].name!=='Lentil soup (better)')
+          throw new Error('the part was not updated: "'+recipeParts(live)[1].name+'"');
+        if(recipeParts(live)[0].name!=='Onion soup') throw new Error('the wrong part was edited');
+        // Structure typed into the method survives into the part.
+        if(!recipeParts(live)[1].steps.some(isSubLine))
+          throw new Error('a sub-title typed while editing a part was lost');
+        if(editFormIsDirty())
+          throw new Error('after saving, the form still claims unsaved changes');
+        if(_editingPartRef) throw new Error('the part target was left set — the next Add would overwrite it');
+        if(!live.history.length) throw new Error('editing a part left no way back in version history');
+
+        // And a plain Add after that must create a recipe, not touch the part.
+        openAddModal(null);
+        if(_editingPartRef) throw new Error('opening the ordinary form kept the part target');
+      } finally {
+        window.toast=realToast; window.saveData=realSave; window.renderGrid=realRender;
+        _editingPartRef=null; _editFormSnapshot=null;
+        closeM('editOverlay');
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); });
+        nextId=beforeId; viewId=prevView;
+      }
+    } },
+
   { id:'coll_remove_part', group:'Import/Export', name:'A recipe can be dropped from a collection without keeping it (v36.2)',
     test: async()=>{
       var realAsk=window.askConfirm, realToast=window.toast;
@@ -11080,7 +11225,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.7';
+var APP_VERSION = 'v36.8';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12227,6 +12372,16 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .line-sub { list-style: none; font-weight: 700; font-size: 12px; color: var(--terracotta);
             margin: 10px 0 3px; letter-spacing: 0.3px; cursor: default; display: block; }
 .line-sub:first-child { margin-top: 0; }
+/* v36.8 — one recipe's own actions inside a collection. Set apart from the
+   collection-level row at the bottom, because "Share" meaning one recipe and
+   "Share" meaning all ten look identical otherwise. */
+.part-actions { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.part-actions-label { font-size: 10.5px; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+.collection-actions-label { margin: 18px 0 8px; padding-top: 12px; border-top: 2px solid var(--terracotta);
+  font-size: 13px; font-weight: 700; color: var(--warm-brown); }
+.collection-actions-label span { display: block; font-weight: 400; font-size: 11.5px;
+  color: var(--muted); letter-spacing: 0; text-transform: none; margin-top: 2px; }
 /* Specificity, not order: `.ingredients-list li { padding: 5px 0 }` is (0,1,1)
    and `.line-indent` is (0,1,0), so the shorthand won and the ingredient indent
    rendered as ZERO however it was written. The steps list sets no padding, so
@@ -13446,7 +13601,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.7</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.8</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14042,7 +14197,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.7</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.8</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16080,14 +16235,7 @@ function collectionSectionsHtml(r) {
       + escH(p.name) + '</div>'
       + (meta.length ? '<div style="font-size:11.5px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '')
       + '</div>'
-      + '<div style="flex-shrink:0;display:flex;gap:6px;">'
-      + '<button class="action-btn" style="font-size:11.5px;padding:6px 10px;" '
-      + 'onclick="promotePartToRecipe(' + r.id + ',&quot;' + escA(p.uid) + '&quot;)" '
-      + 'title="Make this a recipe of its own">⤴ Make its own</button>'
-      + '<button class="action-btn" style="font-size:11.5px;padding:6px 9px;" '
-      + 'onclick="removePartFromCollection(' + r.id + ',&quot;' + escA(p.uid) + '&quot;)" '
-      + 'title="Remove this recipe from the collection">🗑 Remove</button>'
-      + '</div>'
+      + (p.fav ? '<div style="flex-shrink:0;font-size:15px;" title="Favourite">❤️</div>' : '')
       + '</div>'
       + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + escH(p.notes) + '</div>' : '')
       + '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
@@ -16095,9 +16243,94 @@ function collectionSectionsHtml(r) {
       + '<ul class="ingredients-list">' + ings + '</ul>' + awkNote + '</div>'
       + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div>'
       + '<ol class="steps-list" dir="auto">' + steps + '</ol></div>'
-      + '</div></div>';
+      + '</div>'
+      + partActionsHtml(r, p)
+      + '</div>';
   }).join('');
 }
+
+// The same actions an ordinary recipe has, acting on ONE recipe inside the
+// collection. Tony's case is sending a single recipe to someone without sending
+// the other nine. They take a part REFERENCE rather than an id, which is what
+// makes them reach the right thing — see findRecipeRef.
+function partActionsHtml(coll, p) {
+  var ref = partRef(coll.id, p.uid);
+  var q = '&quot;' + escA(ref) + '&quot;';
+  var cooked = p.cookCount
+    ? '<span class="cooked-pill" style="font-size:11px;">🍳 ' + p.cookCount + '</span>' : '';
+  return '<div class="part-actions">'
+    + '<div class="part-actions-label">This recipe only</div>'
+    + '<div class="recipe-actions" style="margin-top:0;">'
+    + '<button class="action-btn" onclick="togglePartFav(' + q + ')" '
+    + 'title="Favourite this recipe">' + (p.fav ? '❤️' : '🤍') + ' Favourite</button>'
+    + '<button class="action-btn" onclick="editPart(' + q + ')">✏️ Edit</button>'
+    + '<button class="action-btn" onclick="markPartCooked(' + q + ')" title="Mark as cooked today">🍳 Cooked!</button>'
+    + '<button class="action-btn" onclick="openTranslate(' + q + ')">🌐 Translate</button>'
+    + '<button class="action-btn" onclick="expOneWord(' + q + ')">📄 Word</button>'
+    + '<button class="action-btn" onclick="printRecipe(' + q + ')">🖨️ Print</button>'
+    + '<button class="action-btn" onclick="toggleShare(' + q + ')">📤 Share</button>'
+    + '<button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" '
+    + 'onclick="openBringModal(' + q + ')">🛒 Bring!</button>'
+    + '<button class="action-btn" onclick="promotePartToRecipe(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)" '
+    + 'title="Make this a recipe of its own">⤴ Make its own</button>'
+    + '<button class="action-btn" style="color:#B03030;border-color:#E8B0B0;" '
+    + 'onclick="removePartFromCollection(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)">🗑 Remove</button>'
+    + cooked
+    + '</div></div>';
+}
+window.partActionsHtml = partActionsHtml;
+
+// ─── WRITING TO ONE RECIPE INSIDE A COLLECTION (v36.8) ───────────────────────
+// Reading a part goes through partAsRecipe, which is a COPY — so anything that
+// changes a part has to write to the real thing. These three do.
+function togglePartFav(ref) {
+  var f = findPart(ref);
+  if (!f) { toast('That recipe is no longer here'); return; }
+  f.part.fav = !f.part.fav;
+  f.coll.updatedAt = Date.now();
+  saveData(); renderGrid();
+  if (viewId === f.coll.id) drawView();
+  toast(f.part.fav ? '❤️ Added to favourites' : '🤍 Removed from favourites');
+}
+function markPartCooked(ref) {
+  var f = findPart(ref);
+  if (!f) { toast('That recipe is no longer here'); return; }
+  f.part.cookCount = (f.part.cookCount || 0) + 1;
+  f.part.lastCooked = Date.now();
+  f.coll.updatedAt = Date.now();
+  saveData(); renderGrid();
+  if (viewId === f.coll.id) drawView();
+  toast('🍳 “' + f.part.name + '” cooked ' + f.part.cookCount + ' time'
+    + (f.part.cookCount === 1 ? '' : 's'));
+  syncLog('save', 'Cooked “' + f.part.name + '” in “' + f.coll.name + '”', { count: f.part.cookCount });
+}
+// Editing a part reuses the ordinary recipe form. `_editingPartRef` is what
+// tells saveRecipe to write back into the collection instead of creating a
+// recipe — without it the form would happily add a duplicate to the library,
+// which is the failure mode the collection work keeps producing.
+function editPart(ref) {
+  var f = findPart(ref);
+  if (!f) { toast('That recipe is no longer here'); return; }
+  openAddModal(null);
+  _editingPartRef = ref;
+  var hdr = document.getElementById('editTitle');
+  if (hdr) hdr.textContent = 'Edit “' + f.part.name + '” in this collection';
+  var btn = document.getElementById('editSubmitBtn');
+  if (btn) btn.textContent = 'Update this recipe';
+  var set = function(id, v){ var e=document.getElementById(id); if(e) e.value = v; };
+  set('f-name', f.part.name);
+  set('f-prep', f.part.prep || '');
+  set('f-srv', f.part.servings || '');
+  set('f-notes', f.part.notes || '');
+  set('f-steps', stepsToText(f.part.steps));
+  loadIngsTable(f.part.ingredients);
+  // openAddModal snapshotted an EMPTY form; everything above is the part being
+  // loaded, not an edit. Re-take it, or closing without touching anything would
+  // claim there are unsaved changes.
+  _editFormSnapshot = editFormState();
+}
+window.togglePartFav = togglePartFav; window.markPartCooked = markPartCooked;
+window.editPart = editPart;
 window.collectionSectionsHtml = collectionSectionsHtml;
 
 // ─── SPLIT AND PROMOTE ───────────────────────────────────────────────────────
@@ -16373,6 +16606,10 @@ function drawView(){
       </div>`}
       <p class="line-mark-hint">Tap a box to tick a line off · tap the line to mark where you are · double-tap to clear <button id="clearTicksBtn" class="voice-btn" style="display:none;" onclick="clearTicks()">Clear ticks</button>${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
       </div>
+      ${isCollection(r) ? `<div class="collection-actions-label">
+        📚 The whole collection — ${recipeParts(r).length} recipes
+        <span>each recipe above has its own buttons</span>
+      </div>` : ''}
       <div class="recipe-actions">
         <button class="action-btn" onclick="openAddModal(${r.id})">✏️ Edit</button>
         <button class="action-btn" onclick="markCooked(${r.id})" title="Mark as cooked today">🍳 Cooked!</button>
@@ -16445,7 +16682,7 @@ window.nudgeServings = nudgeServings; window.servingsInputChanged = servingsInpu
 window.currentServings = currentServings;
 function setUnit(u){viewUnit=u;drawView();}
 function toggleShare(id){
-  var r=recipes.find(function(x){return x.id===id;});
+  var r=findRecipeRef(id);
   if(!r) return;
   document.getElementById('shareModalTitle').textContent = r.name;
   document.getElementById('shareMailBtn').onclick   = function(){
@@ -17172,7 +17409,7 @@ function downloadBlob(blob, filename) {
 }
 
 function expOneWord(id){
-  const r=recipes.find(x=>x.id===id);if(!r)return;
+  const r=findRecipeRef(id);if(!r)return;
   const fname = safeFilename(r.name) + '.docx';
   toast('📄 Preparing: ' + fname + '…', 5000);
   downloadBlob(makeDocxBlob([r]), fname);
@@ -17530,8 +17767,12 @@ function parseWordText(text){
 // found this with two browsers, and it is exactly the lost edit 5.4 exists to
 // prevent, one level up.
 var _editBaseAt = null;
+var _editingPartRef = null;
 function openAddModal(id){
   editingId=id||null;
+  // Any ordinary open clears the part target. editPart sets it AFTER calling
+  // this, so a stale one cannot make the next "Add a Recipe" overwrite a part.
+  _editingPartRef = null;
   const r=id?recipes.find(x=>x.id===id):null;
   _editBaseAt = r ? (r.updatedAt || 0) : null;
   document.getElementById('editTitle').textContent=r?'Edit Recipe':'Add a Recipe';
@@ -17635,6 +17876,38 @@ async function saveRecipe(){
   const ings=readIngsTable().map(function(i){
     return (!i.n && i.a) ? {a:'', n:i.a} : i;   // amount typed with no name reads as the name
   });
+
+  // v36.8 — editing ONE recipe inside a collection. Writes back into the part
+  // and stops here: falling through would add a second, standalone copy to the
+  // library, which is the mistake every collection feature so far has had to be
+  // stopped from making.
+  if (_editingPartRef) {
+    var f = findPart(_editingPartRef);
+    if (!f) { toast('That recipe is no longer in the collection'); closeM('editOverlay'); return; }
+    if (typeof pushHistory === 'function') { try { pushHistory(f.coll); } catch(e) {} }
+    f.part.name = name;
+    f.part.prep = document.getElementById('f-prep').value.trim();
+    f.part.servings = document.getElementById('f-srv').value.trim();
+    f.part.notes = (document.getElementById('f-notes')||{value:''}).value.trim();
+    f.part.ingredients = normalizeIngredientLines(ings);
+    f.part.steps = normalizeStepLines(rawSteps);
+    f.coll.updatedAt = Date.now();
+    normalizeRecipe(f.coll);
+    _editingPartRef = null;
+    // The dirty guard compares the form against the snapshot taken when it
+    // opened. Saving by this path left that snapshot stale, so closing the form
+    // straight after a successful save asked "discard your unsaved changes?"
+    // about changes that had just been saved. Only a browser run showed it —
+    // every assertion about the data itself passed.
+    _editFormSnapshot = null;
+    closeM('editOverlay');
+    saveData(); renderGrid();
+    if (viewId === f.coll.id) drawView();
+    toast('✅ Updated “' + f.part.name + '”');
+    syncLog('save', 'Edited “' + f.part.name + '” inside “' + f.coll.name + '”');
+    return;
+  }
+
   const data={
     name, emoji:selEmoji, photo:pendingPhoto,
     category:document.getElementById('f-category').value,
@@ -18542,7 +18815,7 @@ function openTranslate(id) {
 // exist, so calling it threw. The translate modal now uses the from/to dropdowns.)
 
 async function runTranslate() {
-  const r = recipes.find(x => x.id === translateId);
+  const r = findRecipeRef(translateId);
   if (!r) return;
   const res = document.getElementById('translateResult');
   const fromCode = document.getElementById('translateFrom').value;
@@ -19916,7 +20189,18 @@ function normalizePart(p, idx) {
     by:   typeof p.by === 'string' ? p.by.trim() : '',
     servings: typeof p.servings === 'string' ? p.servings : (p.servings == null ? '' : String(p.servings)),
     prep: typeof p.prep === 'string' ? p.prep : (p.prep == null ? '' : String(p.prep)),
-    notes: typeof p.notes === 'string' ? p.notes : ''
+    notes: typeof p.notes === 'string' ? p.notes : '',
+    // v36.8 — a part is a recipe you cook, so it keeps what a recipe you cook
+    // keeps: whether it is a favourite and what happened when you made it.
+    // Tony's call, over storing that on a separate record: the recipe IS the
+    // place those belong. Deliberately NOT a photo — parts are stored inside
+    // the collection document and photos are the one field big enough to
+    // matter, which is why they live in their own documents for ordinary
+    // recipes and are simply not offered here.
+    fav: !!p.fav,
+    cookCount: (typeof p.cookCount === 'number' && !isNaN(p.cookCount)) ? p.cookCount : 0,
+    lastCooked: (typeof p.lastCooked === 'number') ? p.lastCooked : null,
+    cookLog: Array.isArray(p.cookLog) ? p.cookLog.filter(function(e){ return e && typeof e === 'object'; }) : []
   };
   // The SAME coercion as a flat recipe, not a second subtly different one. The
   // AI returns ingredients as bare strings often enough that this matters, and
@@ -19927,6 +20211,65 @@ function normalizePart(p, idx) {
   out.steps = normalizeStepLines(p.steps);
   return out;
 }
+
+// ─── ADDRESSING ONE RECIPE INSIDE A COLLECTION (v36.8) ───────────────────────
+// Every per-recipe action — Share, Word, Print, Translate, Bring!, Cooked —
+// takes an id and looks it up in `recipes`. A part is not in `recipes`, so
+// rather than rewrite nine call sites a part is addressed by the STRING
+// "c<collectionId>:<partUid>" and resolved into a recipe-shaped view of itself.
+//
+// That view is NEVER put into `recipes`. A temporary entry there is exactly how
+// a test fixture reached Firestore in v36.1, and the same mechanism would sync
+// a phantom recipe for every share.
+function partRef(collId, partUid) { return 'c' + collId + ':' + partUid; }
+function parsePartRef(ref) {
+  var m = /^c(\d+):(.+)$/.exec(String(ref == null ? '' : ref));
+  return m ? { collId: +m[1], partUid: m[2] } : null;
+}
+// A read-only recipe built from a part. It carries the part's OWN id (the ref)
+// so anything that re-looks-it-up finds the same thing, and it inherits from
+// the collection only what a part genuinely has no opinion about.
+function partAsRecipe(coll, part, ref) {
+  return normalizeRecipe({
+    id: ref, uid: part.uid,
+    name: part.name, emoji: coll.emoji, photo: '',
+    category: coll.category, difficulty: coll.difficulty,
+    prep: part.prep || coll.prep || '—',
+    servings: part.servings || '—',
+    bg: coll.bg, fav: !!part.fav,
+    cookCount: part.cookCount || 0, lastCooked: part.lastCooked || null,
+    cookLog: part.cookLog || [],
+    ingredients: part.ingredients, steps: part.steps,
+    notes: [part.by ? ('By ' + part.by) : '', part.notes || ''].filter(Boolean).join('\n'),
+    source: coll.source || '',
+    diets: Array.isArray(coll.diets) ? coll.diets.slice() : [],
+    updatedAt: coll.updatedAt || Date.now(),
+    _partOf: coll.id, _partUid: part.uid
+  });
+}
+// The one lookup every action uses. A number is an ordinary recipe; a
+// "c<id>:<uid>" string is one recipe inside a collection.
+function findRecipeRef(ref) {
+  if (ref == null) return null;
+  var pr = parsePartRef(ref);
+  if (!pr) return recipes.find(function(x){ return x.id === ref; }) || null;
+  var coll = recipes.find(function(x){ return x.id === pr.collId; });
+  if (!coll) return null;
+  var part = recipeParts(coll).find(function(p){ return p.uid === pr.partUid; });
+  return part ? partAsRecipe(coll, part, ref) : null;
+}
+// The live part object, for anything that has to WRITE (cooked, favourite).
+function findPart(ref) {
+  var pr = parsePartRef(ref);
+  if (!pr) return null;
+  var coll = recipes.find(function(x){ return x.id === pr.collId; });
+  if (!coll) return null;
+  var part = recipeParts(coll).find(function(p){ return p.uid === pr.partUid; });
+  return part ? { coll: coll, part: part } : null;
+}
+window.partRef = partRef; window.parsePartRef = parsePartRef;
+window.partAsRecipe = partAsRecipe; window.findRecipeRef = findRecipeRef;
+window.findPart = findPart;
 
 function recipeParts(r) {
   return (r && Array.isArray(r.parts)) ? r.parts : [];
@@ -22224,7 +22567,7 @@ window.buildPrintHtml = buildPrintHtml;
 window.printRecipes   = printRecipes;
 
 function printRecipe(id) {
-  var r = recipes.find(function(x){ return x.id===id; });
+  var r = findRecipeRef(id);
   if (!r) return;
   printRecipes([r]);
 }
@@ -25740,7 +26083,7 @@ var _bringScaledAmounts = []; // amounts actually sent — matches the recipe vi
 
 function openBringModal(recipeId) {
   _bringRecipeId = recipeId;
-  var r = recipes.find(function(x){ return x.id===recipeId; });
+  var r = findRecipeRef(recipeId);
   if (!r) return;
   // Use the scale (×N) and unit (metric/imperial) currently set in the recipe view —
   // Send to Bring! is only reachable from there, so they describe this exact recipe.
@@ -25782,7 +26125,7 @@ function bringToggleAll() {
 }
 
 function bringConfirmSend() {
-  var r = recipes.find(function(x){ return x.id===_bringRecipeId; });
+  var r = findRecipeRef(_bringRecipeId);
   if (!r) return;
   var checked = document.querySelectorAll('.bring-ing-cb:checked');
   if (!checked.length) { toast('Select at least one ingredient'); return; }

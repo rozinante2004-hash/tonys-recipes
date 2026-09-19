@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.7: 223 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.8: 225 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -977,6 +977,34 @@ found only because a test was written first and disagreed with the code.
     wrapped in `if (nestedEl)`, so a mutation that stopped emitting the class
     made the check SKIP and pass. If the fixture guarantees a thing exists,
     assert that it exists.
+
+- **Each recipe in a collection has its own actions (v36.8).** Tony's case:
+  sending ONE recipe out of a collection instead of all ten. Every per-recipe
+  action — Share, Word, Print, Translate, Bring!, Cooked — takes an id and looks
+  it up in `recipes`, and a part is not in `recipes`.
+  - **A part is addressed as the string `c<collectionId>:<partUid>`** and
+    `findRecipeRef` resolves it into a recipe-shaped view of that part alone, so
+    nine call sites changed by one line each instead of being rewritten. **That
+    view is never inserted into `recipes`** — a temporary entry there is exactly
+    how a test fixture reached Firestore in v36.1, and this one would sync a
+    phantom recipe on every share.
+  - **Parts carry `fav`, `cookCount`, `lastCooked`, `cookLog` — and no photo.**
+    Tony's decision, over keeping a separate record of what a recipe used to be:
+    a part is a recipe you cook, so it keeps what a recipe you cook keeps. The
+    photo is left off on purpose; parts live inside the collection document and
+    photos are the one field big enough to matter.
+  - **`_editingPartRef` is what stops the edit form cloning a part** into a
+    second standalone recipe — the mistake every collection feature so far has
+    had to be stopped from making. `openAddModal` clears it, `editPart` sets it
+    afterwards, and `saveRecipe` returns early once it has written back.
+  - **Two bugs only a browser run found**, both invisible to assertions about
+    the data: saving a part left the dirty-guard snapshot stale, so closing the
+    form asked to discard changes that had just been saved; and loading a part
+    read as unsaved changes immediately, because `openAddModal` snapshots an
+    empty form and `editPart` fills it afterwards.
+  - The collection-level buttons sit under **"📚 The whole collection — N
+    recipes"**, because a Share meaning one recipe and a Share meaning ten look
+    identical otherwise.
 
 ## Outstanding
 
