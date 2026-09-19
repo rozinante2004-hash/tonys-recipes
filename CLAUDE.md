@@ -911,6 +911,32 @@ found only because a test was written first and disagreed with the code.
   there is something to clear, re-renders the grid, and keeps focus so typing can
   continue. Escape does the same.
 
+- **Two v36.5 fixes, both from Tony using it.**
+  - **The fixture guard made ThumbTest and MarkTest UNDELETABLE.** v36.2's
+    `queueCloudDelete` refused to queue a delete for a fixture id, on the premise
+    that *"a fixture was never written to the cloud"*. False for exactly the two
+    that already were, written on v36.1 before the write guard existed. So
+    deleting them locally queued nothing, the cloud copies survived, and the next
+    load brought them back. Tony deleted them twice. **Deleting a document that
+    is not there is not an error in Firestore, so there was nothing to protect
+    against in the first place** — and a guard whose premise is false about
+    exactly the cases it fires on is worse than no guard. Now: the delete is
+    queued, a fixture arriving FROM the cloud is dropped on read (and its cloud
+    copy queued for removal, so it cleans itself up once), and only the
+    *reporting* of a denied fixture delete stays suppressed, which is where the
+    original noise concern actually belonged.
+  - **A sub-title row had a drag handle and no listeners.** The drag wiring lived
+    inline in `addIngRow`, so v36.4's new `addIngSubRow` got the handle — which
+    looks draggable — and none of the behaviour. Tony hit it the first time he
+    made one. `wireIngDrag` is shared by both now. **A handle that looks present
+    and does nothing is the worst version of a missing feature.**
+  - **A "wired" flag is not the behaviour.** The first version of that test
+    checked `handle.__ingDragWired`, and a mutation that set the flag while
+    wiring nothing passed happily. Both tests drive real mousedown/mousemove/
+    mouseup and assert the row MOVED. Ordinary rows had been draggable for many
+    releases with no test at all, which is how extracting the wiring could have
+    broken the old feature while fixing the new one.
+
 ## Outstanding
 
 - **5.4 — per-recipe Firestore documents. Complete as of v32.2.** All four steps are

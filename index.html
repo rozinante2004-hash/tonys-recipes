@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.4 -->
+<!-- Tony's Recipes Collection v36.5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6965,17 +6965,59 @@ const SELF_TESTS = [
       if(isTestFixture({})||isTestFixture(null)||isTestFixture({id:'888911'}))
         throw new Error('a missing or non-numeric id was treated as a fixture');
 
-      // Deleting a fixture must not queue a cloud delete either: it was never
-      // there, so the only possible outcome is a DELETE_NOT_PERMITTED box about
-      // a recipe nobody has.
+      // Deleting a fixture MUST queue a cloud delete. v36.2 refused to, on the
+      // premise that a fixture was never in the cloud — false for the two that
+      // already were, written on v36.1 before the write guard existed. The
+      // refusal made exactly those two undeletable: the cloud copy survived
+      // every local delete and came back on the next load. Tony deleted them
+      // twice before it was spotted.
       var before = Object.keys(_pendingCloudDeletes).length;
       queueCloudDelete(888911);
-      if(Object.keys(_pendingCloudDeletes).length!==before)
-        throw new Error('deleting a fixture queued a cloud delete');
+      if(Object.keys(_pendingCloudDeletes).length===before)
+        throw new Error('deleting a leftover fixture queues nothing, so the cloud copy can never be removed');
+      unqueueCloudDelete(888911);
       queueCloudDelete(7);
       var queued = Object.keys(_pendingCloudDeletes).length!==before;
       unqueueCloudDelete(7);
       if(!queued) throw new Error('deleting a REAL recipe no longer queues a cloud delete');
+
+      // ...and a fixture arriving FROM the cloud is dropped on read. This is
+      // what actually stops it coming back: one device's delete cannot help the
+      // others until it syncs, and any device loading first would resurrect it.
+      var keptBase = _cloudRecipeBase, keptStamp = _cloudRecipeStamp, keptIds = _cloudRecipeIds;
+      var pend = Object.assign({}, _pendingCloudDeletes);
+      try{
+        var got = parseCloudRecipeDocs([
+          { id:'recipe_7',      data:{ r: JSON.stringify({id:7,name:'A real recipe'}), updatedAt: 1 } },
+          { id:'recipe_888911', data:{ r: JSON.stringify({id:888911,name:'ThumbTest'}), updatedAt: 1 } },
+          { id:'recipe_888913', data:{ r: JSON.stringify({id:888913,name:'MarkTest'}), updatedAt: 1 } }
+        ]);
+        var names = got.map(function(x){ return x.name; });
+        if(names.indexOf('ThumbTest')!==-1 || names.indexOf('MarkTest')!==-1)
+          throw new Error('a leftover fixture came back from the cloud: '+names.join(', '));
+        if(names.indexOf('A real recipe')===-1) throw new Error('a real recipe was dropped as a fixture');
+        if(!_pendingCloudDeletes[888911])
+          throw new Error('the leftover cloud copy was not queued for removal, so it stays there for ever');
+      } finally {
+        _cloudRecipeBase = keptBase; _cloudRecipeStamp = keptStamp; _cloudRecipeIds = keptIds;
+        _pendingCloudDeletes = pend;
+      }
+
+      // A family member without the admin role cannot delete from the shared
+      // collection. For one of THEIR recipes that is worth saying; for leftover
+      // test junk it is a box about a recipe they have never seen.
+      var pend2 = Object.assign({}, _pendingCloudDeletes);
+      try{
+        _pendingCloudDeletes = {};
+        queueCloudDelete(888911); queueCloudDelete(11);
+        var denier = { collection: function(){ return { doc: function(){ return {
+          delete: function(){ var e = new Error('nope'); e.code = 'permission-denied'; return Promise.reject(e); } }; } }; } };
+        var res = await flushCloudDeletes(denier);
+        if(res.denied.indexOf('888911')!==-1 || res.denied.indexOf(888911)!==-1)
+          throw new Error('a refused fixture delete is reported to the user');
+        if(res.denied.indexOf('11')===-1 && res.denied.indexOf(11)===-1)
+          throw new Error('a refused delete of a REAL recipe is no longer reported: '+JSON.stringify(res.denied));
+      } finally { _pendingCloudDeletes = pend2; }
 
       // And the line has to be where the suite actually works. Every fixture id
       // in this file must be above it, or the guard protects nothing.
@@ -8513,6 +8555,49 @@ const SELF_TESTS = [
       var back = readIngsTable();
       if(JSON.stringify(back)!==JSON.stringify(ings))
         throw new Error('the editor changed the list: in '+JSON.stringify(ings)+' out '+JSON.stringify(back));
+
+      // A sub-title must be DRAGGABLE like any other row. v36.4 gave it a handle
+      // and no listeners, which looks present and does nothing — Tony hit it the
+      // first time he made one. Driving the real events is the only way to know:
+      // the handle existing proves nothing.
+      // Ordinary rows have been draggable since long before sub-titles and
+      // nothing tested it, so extracting the drag wiring could have broken the
+      // original feature while fixing the new one, silently.
+      //
+      // Drive a REAL drag. Checking a "wired" flag proves nothing: a mutation
+      // that set the flag and wired no listeners passed happily.
+      var host0 = document.getElementById('ingsRows');
+      var ord = function(){ return Array.prototype.map.call(host0.querySelectorAll('.ing-row'), function(x){
+        return x.classList.contains('ing-row-sub') ? 'SUB' : (x.querySelectorAll('input')[1]||{}).value; }).join('|'); };
+      var dragRow = function(idx, toIdx){
+        var rs = host0.querySelectorAll('.ing-row');
+        var h = rs[idx].querySelector('.ing-handle');
+        if(!h) throw new Error('row '+idx+' has no drag handle');
+        h.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, clientY: rs[idx].getBoundingClientRect().top+5}));
+        document.dispatchEvent(new MouseEvent('mousemove', {bubbles:true,
+          clientY: host0.querySelectorAll('.ing-row')[toIdx].getBoundingClientRect().top+1}));
+        document.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
+      };
+      var plainBefore = ord();
+      dragRow(3, 0);
+      if(ord()===plainBefore)
+        throw new Error('an ordinary ingredient row is no longer draggable — order stayed '+plainBefore);
+      loadIngsTable(ings);
+
+      var subRow = document.querySelectorAll('#ingsRows .ing-row')[1];
+      var subHandle = subRow.querySelector('.ing-handle');
+      if(!subHandle) throw new Error('a sub-title row has no drag handle');
+      if(!subHandle.__ingDragWired)
+        throw new Error('the sub-title row\'s handle has no drag listeners — it looks draggable and is not');
+      var beforeOrder = ord();
+      dragRow(1, 0);
+      if(ord()===beforeOrder)
+        throw new Error('dragging a sub-title row did nothing — order stayed '+beforeOrder);
+      if(ord().indexOf('SUB')!==0)
+        throw new Error('the sub-title did not land where it was dropped: '+ord());
+      // Put it back so the round-trip check below still means something.
+      loadIngsTable(ings);
+      rows = document.querySelectorAll('#ingsRows .ing-row');
 
       // The toggle is a toggle, both ways.
       var btn = rows[0].querySelector('.ing-indent-btn');
@@ -10877,7 +10962,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.4';
+var APP_VERSION = 'v36.5';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13222,7 +13307,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.4</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.5</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13818,7 +13903,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.4</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.5</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -20571,10 +20656,17 @@ function savePendingCloudDeletes() {
 }
 // Survives a reload: a delete made offline still has to reach the cloud later.
 function queueCloudDelete(id) {
-  // A fixture was never written to the cloud, so asking to delete it can only
-  // produce a DELETE_NOT_PERMITTED box about a recipe nobody has — and for a
-  // family member without the admin role, that is exactly what it did.
-  if (isTestFixture({ id: id })) return;
+  // v36.2 refused to queue a delete for a test fixture, on the premise that a
+  // fixture was never written to the cloud. That premise was FALSE for the two
+  // that already were: ThumbTest and MarkTest reached Firestore on v36.1,
+  // before the write guard existed. So deleting them locally queued nothing,
+  // the cloud copies survived, and the next load brought them straight back —
+  // the guard made exactly those two recipes undeletable. Tony deleted them
+  // twice.
+  //
+  // Deleting a document that is not there is not an error in Firestore, so
+  // there was never anything to protect against. The noise this was aimed at
+  // is handled where it actually happens, in flushCloudDeletes.
   _pendingCloudDeletes[id] = true;
   savePendingCloudDeletes();
 }
@@ -20854,7 +20946,11 @@ async function flushCloudDeletes(db) {
       await db.collection('shared').doc(recipeDocId(id)).delete();
       await db.collection('shared').doc(photoDocId(id)).delete();
     } catch(e) {
-      if (e && e.code === 'permission-denied') denied.push(id);
+      // A fixture's delete being refused is not worth telling anyone about: it
+      // is leftover test junk, not one of their recipes. Reporting it would put
+      // a DELETE_NOT_PERMITTED box in front of a family member about a recipe
+      // they have never seen.
+      if (e && e.code === 'permission-denied' && !isTestFixture({ id: parseInt(id, 10) })) denied.push(id);
       // anything else: the document is already gone, or will be retried next save
     }
     delete _pendingCloudDeletes[id];
@@ -20921,6 +21017,16 @@ function parseCloudRecipeDocs(docs) {
       continue;   // it still must not blank the collection
     }
     delete _cloudUnreadable[r.id];
+    // v36.5 — a fixture id arriving FROM the cloud is leftover test junk from
+    // before the v36.2 write guard. Dropping it on read is what actually stops
+    // it coming back: a device that deletes it locally cannot help the others
+    // until its delete syncs, and any device loading first would resurrect it.
+    // Queue the cloud copy for removal too, so this cleans itself up once.
+    if (isTestFixture(r)) {
+      try { queueCloudDelete(r.id); } catch(e) {}
+      syncLog('load', 'Ignored leftover test recipe "' + (r.name || r.id) + '" from the cloud', { id: r.id });
+      continue;
+    }
     list.push(r);
     _cloudRecipeBase[r.id]  = d.updatedAt === undefined ? null : d.updatedAt;
     _cloudRecipeStamp[r.id] = hashStr(d.r || '');
@@ -21969,6 +22075,38 @@ function printRecipe(id) {
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
 
 // ─── INGREDIENT TABLE ────────────────────────────────────────────────────────
+// Drag to reorder, wired the same way for EVERY row. This lived inline in
+// addIngRow, so when v36.4 added sub-title rows they got a drag handle that did
+// nothing — the handle was there, it just had no listeners, which is the worst
+// version of a missing feature because it looks present. Tony hit it
+// immediately: a sub-title he could create but could not move.
+function wireIngDrag(row, handle, tbody) {
+  var dragState = null;
+  function startDrag(clientY) { dragState={startY:clientY,row:row}; row.classList.add('dragging'); document.body.style.userSelect='none'; }
+  function moveDrag(clientY) {
+    if (!dragState) return;
+    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
+    var target = null;
+    rows.forEach(function(r) { if (r===row) return; var rect=r.getBoundingClientRect(); r.classList.remove('drag-over'); if (clientY<rect.top+rect.height/2 && !target) target=r; });
+    if (target) target.classList.add('drag-over');
+    dragState.target = target;
+  }
+  function endDrag() {
+    if (!dragState) return;
+    row.classList.remove('dragging'); document.body.style.userSelect='';
+    Array.from(tbody.querySelectorAll('.ing-row')).forEach(function(r){ r.classList.remove('drag-over'); });
+    if (dragState.target) tbody.insertBefore(row, dragState.target); else tbody.appendChild(row);
+    dragState=null; syncIngsTextarea();
+  }
+  handle.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(e.clientY); document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU); });
+  function onMM(e){ moveDrag(e.clientY); } function onMU(e){ endDrag(); document.removeEventListener('mousemove',onMM); document.removeEventListener('mouseup',onMU); }
+  handle.addEventListener('touchstart', function(e){ e.preventDefault(); startDrag(e.touches[0].clientY); },{passive:false});
+  handle.addEventListener('touchmove', function(e){ e.preventDefault(); moveDrag(e.touches[0].clientY); },{passive:false});
+  handle.addEventListener('touchend', function(e){ e.preventDefault(); endDrag(); },{passive:false});
+  handle.__ingDragWired = true;
+}
+window.wireIngDrag = wireIngDrag;
+
 function addIngRow(amount, name, indented, before) {
   var tbody = document.getElementById('ingsRows');
   if (!tbody) return;
@@ -22023,29 +22161,7 @@ function addIngRow(amount, name, indented, before) {
   delBtn.type='button'; delBtn.className='ing-del'; delBtn.textContent='✕';
   delBtn.onclick = function() { row.remove(); syncIngsTextarea(); if (!tbody.children.length) addIngRow(); };
 
-  // Drag to reorder
-  var dragState = null;
-  function startDrag(clientY) { dragState={startY:clientY,row:row}; row.classList.add('dragging'); document.body.style.userSelect='none'; }
-  function moveDrag(clientY) {
-    if (!dragState) return;
-    var rows = Array.from(tbody.querySelectorAll('.ing-row'));
-    var target = null;
-    rows.forEach(function(r) { if (r===row) return; var rect=r.getBoundingClientRect(); r.classList.remove('drag-over'); if (clientY<rect.top+rect.height/2 && !target) target=r; });
-    if (target) target.classList.add('drag-over');
-    dragState.target = target;
-  }
-  function endDrag() {
-    if (!dragState) return;
-    row.classList.remove('dragging'); document.body.style.userSelect='';
-    Array.from(tbody.querySelectorAll('.ing-row')).forEach(function(r){ r.classList.remove('drag-over'); });
-    if (dragState.target) tbody.insertBefore(row, dragState.target); else tbody.appendChild(row);
-    dragState=null; syncIngsTextarea();
-  }
-  handle.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(e.clientY); document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU); });
-  function onMM(e){ moveDrag(e.clientY); } function onMU(e){ endDrag(); document.removeEventListener('mousemove',onMM); document.removeEventListener('mouseup',onMU); }
-  handle.addEventListener('touchstart', function(e){ e.preventDefault(); startDrag(e.touches[0].clientY); },{passive:false});
-  handle.addEventListener('touchmove', function(e){ e.preventDefault(); moveDrag(e.touches[0].clientY); },{passive:false});
-  handle.addEventListener('touchend', function(e){ e.preventDefault(); endDrag(); },{passive:false});
+  wireIngDrag(row, handle, tbody);
 
   row.appendChild(handle); row.appendChild(amtInput); row.appendChild(nameInput);
   row.appendChild(indBtn); row.appendChild(delBtn);
@@ -22120,6 +22236,8 @@ function addIngSubRow(text, before) {
   var delBtn = document.createElement('button');
   delBtn.type = 'button'; delBtn.className = 'ing-del'; delBtn.textContent = '✕';
   delBtn.onclick = function() { row.remove(); if (!tbody.children.length) addIngRow(); };
+
+  wireIngDrag(row, handle, tbody);
 
   row.appendChild(handle); row.appendChild(input); row.appendChild(delBtn);
   if (before && before.parentNode === tbody) tbody.insertBefore(row, before.nextSibling);
