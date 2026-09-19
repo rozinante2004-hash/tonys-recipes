@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.8 -->
+<!-- Tony's Recipes Collection v36.9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7263,6 +7263,153 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'collect_into_collection', group:'Features', name:'Selected recipes can be gathered into a collection (v36.9)',
+    test: async()=>{
+      // The reverse of splitCollection. The thing that must not happen is a
+      // recipe existing BOTH standalone and inside the collection — and the
+      // thing that must not be silently lost is anything except the photo.
+      var realToast=window.toast, realSave=window.saveData, realGrid=window.renderGrid,
+          realFilters=window.renderFilters, realConfirm=window.askConfirm,
+          realPrompt=window.askPrompt, realChoice=window.askChoice, realCancel=window.cancelSelectMode;
+      var before=recipes.slice(), beforeId=nextId, beforeSel=selectedIds;
+      var pend=Object.assign({}, _pendingCloudDeletes);
+      try{
+        window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
+        window.renderFilters=function(){}; window.cancelSelectMode=function(){};
+        var dialog='';
+        window.askConfirm=function(o){ dialog=(o&&o.message)||''; return Promise.resolve(true); };
+        window.askPrompt=function(){ return Promise.resolve('Winter soups'); };
+
+        recipes.unshift(normalizeRecipe({ id:978001, uid:'g1', name:'Onion soup', category:'Soup', bg:'#fff',
+          photo:'data:image/jpeg;base64,'+'A'.repeat(40),
+          ingredients:[{a:'3',n:'onions'}], steps:['Fry'] }));
+        recipes.unshift(normalizeRecipe({ id:978002, uid:'g2', name:'Tomato soup', category:'Soup', bg:'#fff',
+          fav:true, cookCount:4, lastCooked:1700000000000,
+          ingredients:[{a:'5',n:'tomatoes'}], steps:['Roast'] }));
+        var total=recipes.length;
+        selectedIds=new Set([978001,978002]);
+        await collectSelectedInto(null);
+
+        var coll=recipes.find(function(r){ return isCollection(r) && r.name==='Winter soups'; });
+        if(!coll) throw new Error('no collection was created');
+        if(recipeParts(coll).length!==2) throw new Error('it holds '+recipeParts(coll).length+' recipes, not 2');
+        // Neither original may remain in the list.
+        if(recipes.some(function(r){ return r.id===978001 || r.id===978002; }))
+          throw new Error('a recipe is now BOTH standalone and inside the collection');
+        if(recipes.length!==total-1)
+          throw new Error('the library changed by '+(recipes.length-total)+', expected -1 (two out, one collection in)');
+        // ...and the cloud copies must go, or the next load brings them back
+        // alongside the collection that already contains them.
+        if(!_pendingCloudDeletes[978001] || !_pendingCloudDeletes[978002])
+          throw new Error('the standalone cloud copies were not queued for deletion');
+
+        // Everything a part can carry comes along; only the photo does not.
+        var parts=recipeParts(coll);
+        var tom=parts.filter(function(x){ return x.name==='Tomato soup'; })[0];
+        if(!tom) throw new Error('a selected recipe did not arrive');
+        if(!tom.fav) throw new Error('the favourite was lost on the way in');
+        if(tom.cookCount!==4) throw new Error('the cook count was lost: '+tom.cookCount);
+        if(!tom.lastCooked) throw new Error('the cooked date was lost');
+        if(parts.some(function(x){ return x.photo; })) throw new Error('a part kept a photo');
+        // The uid travels, so lifting it back out later is the SAME recipe
+        // rather than a duplicate — the rule that makes promoting safe.
+        if(parts.filter(function(x){ return x.uid==='g1'; }).length!==1)
+          throw new Error('a recipe lost its identity on the way into the collection');
+        // And the user was told about the photo BEFORE it happened.
+        if(!/photo will be lost/i.test(dialog))
+          throw new Error('the confirmation did not mention losing the photo: '+dialog);
+
+        // Adding to an EXISTING collection appends and keeps a way back.
+        recipes.unshift(normalizeRecipe({ id:978003, uid:'g3', name:'Barley soup', category:'Soup',
+          bg:'#fff', ingredients:[{a:'1',n:'barley'}], steps:['Boil'] }));
+        selectedIds=new Set([978003]);
+        window.askChoice=function(){ return Promise.resolve(coll.id); };
+        await addSelectedToCollection();
+        var after=recipes.find(function(r){ return r.id===coll.id; });
+        if(recipeParts(after).length!==3) throw new Error('adding gave '+recipeParts(after).length+' parts, not 3');
+        if(recipeParts(after)[2].name!=='Barley soup') throw new Error('it was not appended at the end');
+        if(recipes.some(function(r){ return r.id===978003; })) throw new Error('the added recipe is still standalone');
+        if(!(after.history||[]).length) throw new Error('adding to a collection left no way back');
+
+        // A collection cannot be added to itself.
+        selectedIds=new Set([coll.id]);
+        var n=recipeParts(after).length;
+        await collectSelectedInto(coll.id);
+        if(recipeParts(recipes.find(function(r){return r.id===coll.id;})).length!==n)
+          throw new Error('a collection was added to itself');
+
+        // An empty or whitespace name must be refused, not quietly replaced with
+        // something generic — a collection called "Collection" is worse than
+        // being asked again.
+        recipes.unshift(normalizeRecipe({ id:978004, uid:'g4', name:'Pea soup', category:'Soup',
+          bg:'#fff', ingredients:[{a:'1',n:'peas'}], steps:['Boil'] }));
+        selectedIds=new Set([978004]);
+        var countNow=recipes.length, told='';
+        window.toast=function(m){ told=String(m||''); };
+        window.askPrompt=function(){ return Promise.resolve('   '); };
+        await collectSelectedInto(null);
+        if(recipes.length!==countNow) throw new Error('a collection was created from a blank name');
+        if(!/name/i.test(told)) throw new Error('it did not say a name is needed: "'+told+'"');
+        // Cancelling the name prompt must do nothing at all.
+        window.askPrompt=function(){ return Promise.resolve(null); };
+        await collectSelectedInto(null);
+        if(recipes.length!==countNow) throw new Error('cancelling the name prompt still created something');
+        if(!recipes.some(function(r){ return r.id===978004; }))
+          throw new Error('cancelling removed the recipe anyway');
+        window.toast=function(){};
+        window.askPrompt=function(){ return Promise.resolve('Winter soups'); };
+
+        // Selecting a COLLECTION contributes its recipes rather than nesting.
+        var flat = selectionAsParts([after]);
+        if(flat.length!==3) throw new Error('a selected collection did not contribute its '+3+' recipes: '+flat.length);
+        if(flat.some(isSubLine)) throw new Error('something that is not a recipe was contributed');
+      } finally {
+        window.toast=realToast; window.saveData=realSave; window.renderGrid=realGrid;
+        window.renderFilters=realFilters; window.askConfirm=realConfirm;
+        window.askPrompt=realPrompt; window.askChoice=realChoice; window.cancelSelectMode=realCancel;
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); });
+        nextId=beforeId; selectedIds=beforeSel; _pendingCloudDeletes=pend;
+      }
+    } },
+
+  { id:'collect_bar_and_guards', group:'UI', name:'The select bar offers both collection routes (v36.9)',
+    test: async()=>{
+      var bar=document.getElementById('selectBar');
+      if(!bar) throw new Error('the select bar is gone');
+      var html=bar.innerHTML;
+      if(html.indexOf('collectSelectedInto(null)')===-1)
+        throw new Error('no "New collection" button in the select bar');
+      if(html.indexOf('addSelectedToCollection()')===-1)
+        throw new Error('no "Add to collection" button in the select bar');
+      if(typeof askChoice!=='function') throw new Error('askChoice not defined');
+
+      // Nothing selected must not create an empty collection.
+      var realToast=window.toast, realConfirm=window.askConfirm, realPrompt=window.askPrompt;
+      var before=recipes.slice(), beforeSel=selectedIds, said='';
+      try{
+        window.toast=function(m){ said=String(m||''); };
+        window.askConfirm=function(){ throw new Error('it asked to confirm with nothing selected'); };
+        window.askPrompt=function(){ throw new Error('it asked for a name with nothing selected'); };
+        selectedIds=new Set();
+        await collectSelectedInto(null);
+        if(recipes.length!==before.length) throw new Error('an empty collection was created');
+        if(!/select/i.test(said)) throw new Error('it did not say why nothing happened: "'+said+'"');
+        // ...and with no collections at all, "Add to" must say so rather than
+        // opening an empty chooser.
+        said='';
+        recipes.length=0;
+        recipes.push(normalizeRecipe({id:978101,uid:'x',name:'Lonely',bg:'#fff',
+          ingredients:[{a:'1',n:'x'}],steps:['s']}));
+        selectedIds=new Set([978101]);
+        await addSelectedToCollection();
+        if(!/no collections/i.test(said))
+          throw new Error('with no collections it did not explain: "'+said+'"');
+      } finally {
+        window.toast=realToast; window.askConfirm=realConfirm; window.askPrompt=realPrompt;
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); }); selectedIds=beforeSel;
+      }
+    } },
+
   { id:'part_actions_reach_one_recipe', group:'Features', name:'Each recipe in a collection has its own actions (v36.8)',
     test: async()=>{
       // Tony's case: send ONE recipe out of a collection without sending the
@@ -11225,7 +11372,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.8';
+var APP_VERSION = 'v36.9';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13601,7 +13748,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.8</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.9</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13796,6 +13943,8 @@ body.banner-shown .header {
     <button class="del-bar-btn del-bar-action" onclick="exportSelWord()">📄 Word</button>
     <button class="del-bar-btn del-bar-action" onclick="shareSelected()">📤 Share</button>
     <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
+    <button class="del-bar-btn del-bar-action" onclick="collectSelectedInto(null)">📚 New collection</button>
+    <button class="del-bar-btn del-bar-action" onclick="addSelectedToCollection()">📚 Add to collection</button>
     <button class="del-bar-btn del-bar-delete" onclick="deleteSelected()">🗑️ Delete</button>
     <button class="del-bar-btn" onclick="cancelSelectMode()" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);">✕ Cancel</button>
   </div>
@@ -14197,7 +14346,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.8</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.9</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16329,6 +16478,159 @@ function editPart(ref) {
   // claim there are unsaved changes.
   _editFormSnapshot = editFormState();
 }
+// ─── GATHERING RECIPES INTO A COLLECTION (v36.9) ─────────────────────────────
+// The reverse of splitCollection: take recipes you already have and make them
+// one collection. Tony's route is Select mode, which is where you already pick
+// several recipes to act on.
+//
+// A recipe becomes a part KEEPING ITS UID, so "⤴ Make its own" later produces
+// the same recipe identity rather than a duplicate — the same rule that makes
+// promoting the same part on two devices safe.
+function recipeToPart(r) {
+  return normalizePart({
+    uid: r.uid,
+    name: r.name,
+    by: '',
+    servings: (r.servings && r.servings !== '—') ? r.servings : '',
+    prep: (r.prep && r.prep !== '—') ? r.prep : '',
+    notes: r.notes || '',
+    ingredients: r.ingredients,
+    steps: r.steps,
+    // Everything a part can carry, so nothing is lost on the way in except the
+    // photo — which a part deliberately has no room for.
+    fav: r.fav, cookCount: r.cookCount, lastCooked: r.lastCooked, cookLog: r.cookLog
+  }, 0);
+}
+// A selected COLLECTION contributes its recipes rather than becoming a part of
+// a part. Nesting collections would need a second level everything else would
+// then have to understand.
+function selectionAsParts(list) {
+  var out = [];
+  list.forEach(function(r) {
+    if (isCollection(r)) recipeParts(r).forEach(function(p){ out.push(p); });
+    else out.push(recipeToPart(r));
+  });
+  return out;
+}
+window.recipeToPart = recipeToPart; window.selectionAsParts = selectionAsParts;
+
+async function collectSelectedInto(targetId) {
+  var ids = Array.from(selectedIds || []);
+  var chosen = ids.map(function(id){ return recipes.find(function(x){ return x.id === id; }); })
+                  .filter(Boolean);
+  if (chosen.length < 1) { toast('Select some recipes first'); return; }
+
+  var target = targetId ? recipes.find(function(x){ return x.id === targetId; }) : null;
+  if (targetId && !target) { toast('That collection is no longer here'); return; }
+  if (target && chosen.some(function(r){ return r.id === target.id; })) {
+    toast('A collection cannot be added to itself'); return;
+  }
+
+  var incoming = selectionAsParts(chosen);
+  if (!incoming.length) { toast('Nothing in those recipes to collect'); return; }
+  var withPhotos = chosen.filter(function(r){ return r.photo; }).length;
+
+  var name = target ? target.name : '';
+  if (!target) {
+    name = await askPrompt('What should the collection be called?', '',
+      { icon:'📚', title:'New collection', placeholder:'e.g. Winter soups', okLabel:'Create it' });
+    if (name === null) return;
+    name = String(name).trim();
+    if (!name) { toast('A collection needs a name'); return; }
+  }
+
+  // Say what is lost BEFORE doing it. A photo cannot be got back from here.
+  if (!await askConfirm({ icon:'📚',
+      title: target ? ('Add to “' + target.name + '”?') : ('Create “' + name + '”?'),
+      message: incoming.length + ' recipe' + (incoming.length === 1 ? '' : 's') + ' will move into '
+        + (target ? 'this collection' : 'the new collection')
+        + ', and will no longer appear on their own in the list.\n\n'
+        + 'Favourites and cooking history come along. '
+        + (withPhotos
+            ? (withPhotos === 1 ? 'One photo will be lost' : withPhotos + ' photos will be lost')
+              + ' — recipes inside a collection do not have their own photo.'
+            : 'None of them has a photo, so nothing is lost.')
+        + '\n\nEach one can be lifted back out later with “⤴ Make its own”.',
+      okLabel: target ? 'Add them' : 'Create it' })) return;
+
+  var coll;
+  if (target) {
+    if (typeof pushHistory === 'function') { try { pushHistory(target); } catch(e) {} }
+    target.parts = recipeParts(target).concat(incoming);
+    coll = target;
+  } else {
+    coll = normalizeRecipe({
+      id: nextId++, uid: newUid(), name: name, emoji: '📚', photo: '',
+      category: chosen[0].category, difficulty: chosen[0].difficulty,
+      bg: rndBg(), fav: false, notes: '', source: '',
+      parts: incoming, updatedAt: Date.now()
+    });
+    recipes.unshift(coll);
+  }
+  coll.updatedAt = Date.now();
+  normalizeRecipe(coll);
+
+  // The originals leave the list — and the CLOUD, or the next load brings them
+  // all back alongside the collection that now contains them.
+  var goneIds = chosen.map(function(r){ return r.id; });
+  recipes = recipes.filter(function(r){ return goneIds.indexOf(r.id) === -1 || r.id === coll.id; });
+  goneIds.forEach(function(id){ if (id !== coll.id) queueCloudDelete(id); });
+
+  cancelSelectMode();
+  activeCat = 'All'; renderFilters(); renderGrid(); saveData();
+  toast('📚 ' + incoming.length + ' recipe' + (incoming.length === 1 ? '' : 's') + ' now in “' + coll.name + '”', 5000);
+  syncLog('save', 'Collected ' + incoming.length + ' recipe(s) into “' + coll.name + '”',
+    { id: coll.id, from: goneIds.length });
+}
+// Which collection to add to. Built from what actually exists, so it cannot
+// offer one that was deleted on another device.
+async function addSelectedToCollection() {
+  var colls = recipes.filter(isCollection);
+  if (!colls.length) {
+    toast('There are no collections yet — use “New collection”', 4000);
+    return;
+  }
+  var picked = await askChoice('Which collection?', colls.map(function(c){
+    return { value: c.id, label: c.name + '  (' + recipeParts(c).length + ')' };
+  }), { icon:'📚', title:'Add to a collection' });
+  if (picked == null) return;
+  await collectSelectedInto(picked);
+}
+window.collectSelectedInto = collectSelectedInto;
+window.addSelectedToCollection = addSelectedToCollection;
+
+// A one-of-many chooser, in the same shape as askConfirm/askPrompt.
+function askChoice(message, options, opts) {
+  opts = opts || {};
+  return new Promise(function(resolve) {
+    var prev = document.getElementById('askOverlay');
+    if (prev) prev.remove();
+    var ov = document.createElement('div');
+    ov.id = 'askOverlay'; ov.className = 'modal-overlay';
+    ov.style.cssText = 'display:flex;z-index:1300;';
+    ov.innerHTML = '<div class="ask-card">'
+      + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
+      + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
+      + '<div class="ask-body" dir="auto">' + escH(message || '') + '</div>'
+      + '<div class="ask-actions" id="askChoices">'
+      + options.map(function(o, i) {
+          return '<button class="ask-btn ghost" data-i="' + i + '" dir="auto">' + escH(o.label) + '</button>';
+        }).join('')
+      + '<button class="ask-btn ghost" id="askCancel">Cancel</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+    function done(v) { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); }
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(null); } }
+    ov.querySelectorAll('#askChoices button[data-i]').forEach(function(b) {
+      b.onclick = function(){ done(options[+b.getAttribute('data-i')].value); };
+    });
+    ov.querySelector('#askCancel').onclick = function(){ done(null); };
+    ov.onclick = function(e){ if (e.target === ov) done(null); };
+    document.addEventListener('keydown', onKey, true);
+  });
+}
+window.askChoice = askChoice;
+
 window.togglePartFav = togglePartFav; window.markPartCooked = markPartCooked;
 window.editPart = editPart;
 window.collectionSectionsHtml = collectionSectionsHtml;

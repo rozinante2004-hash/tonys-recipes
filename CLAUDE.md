@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.8: 225 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.9: 227 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -1005,6 +1005,26 @@ found only because a test was written first and disagreed with the code.
   - The collection-level buttons sit under **"📚 The whole collection — N
     recipes"**, because a Share meaning one recipe and a Share meaning ten look
     identical otherwise.
+
+- **Gathering recipes into a collection (v36.9)** — the reverse of
+  `splitCollection`, from Select mode: **📚 New collection** and **📚 Add to
+  collection**.
+  - **The recipe's `uid` travels into the part.** That is what makes "⤴ Make its
+    own" later produce the SAME recipe rather than a duplicate — the same rule
+    that makes promoting the same part on two devices safe.
+  - **The originals are deleted from the cloud, not merely from the list.**
+    Leaving the documents behind means the next load returns every one of them
+    alongside the collection that now contains them.
+  - Favourite and cooking history come along; **the photo does not, and the
+    confirmation says how many will be lost before you commit** — it is the one
+    thing that cannot be recovered from there.
+  - A selected COLLECTION contributes its recipes rather than becoming a part of
+    a part. Nesting would need a second level that ~20 consumers would have to
+    learn. A collection cannot be added to itself, an empty selection cannot
+    create an empty collection, a blank name is refused rather than replaced
+    with something generic, and with no collections yet "Add to collection"
+    says so instead of opening an empty chooser.
+  - `askChoice` joins `askConfirm`/`askPrompt` as the one-of-many chooser.
 
 ## Outstanding
 
