@@ -1106,7 +1106,29 @@ found only because a test was written first and disagreed with the code.
   - The part editor loads and saves Source, the clip box and diets, and refuses
     to save a part down to nothing rather than letting `normalizeRecipe` delete
     the thing being edited.
-  - Still collection-level, deliberately: `category` and `difficulty`.
+  - **`category` and `difficulty` became per-recipe too in v36.12.** On a part,
+    **an empty value means "inherit the collection's"** — which is what every
+    part did before the fields existed, so an existing book of ten desserts
+    keeps reading as ten desserts with no migration, and only a recipe that
+    actually has its own overrides. They are deliberately NOT defaulted to
+    `Dinner`/`Medium` the way a flat recipe's are: a default here would invent
+    a fact. `collectionSectionsHtml` shows them only when the part has its own.
+  - **Per-recipe is meaningless unless the search and the filters can see it.**
+    `recipeSearchText(r)` gathers name/category/difficulty for the recipe AND
+    every part; `recipeCategories(r)` and `recipeDiets(r)` do the same for the
+    two filter frames, so a collection surfaces when one recipe inside it
+    matches. `matchReason` says WHICH recipe inside matched — a card titled
+    "Weeknight" appearing for "onion soup" with no explanation reads as a
+    broken search.
+  - Two search bugs fell out of that. `recipeMatchesQuery` read `r.steps`
+    directly, which is EMPTY for a collection, so no collected recipe's method
+    was searchable; and `String()` on a `{t,ind}` step object is
+    `"[object Object]"`, so indented steps never matched even on a flat recipe.
+    Both now go through `allSteps(r)`. Difficulty was never searched at all.
+  - Still collection-level, deliberately: nothing. `source`, `isClip`, `diets`,
+    `category`, `difficulty`, `fav` and the cook history are all per-recipe; the
+    collection's values are the fallback. The one thing a part still cannot have
+    is a **photo**, which is Tony's own call on storage.
 
 - **The "white panel" over the ingredient editor is the GINGER browser
   extension, not this app.** It came back in v36.9 and `elementsFromPoint` named

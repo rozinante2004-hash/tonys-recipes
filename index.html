@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.11 -->
+<!-- Tony's Recipes Collection v36.12 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7517,6 +7517,85 @@ const SELF_TESTS = [
       if(backClip.source!=='https://youtu.be/abc123') throw new Error('a clip lifted out lost its link');
     } },
 
+  { id:'part_category_and_difficulty', group:'Features', name:'Meal type and difficulty are per-recipe, and searchable (v36.12)',
+    test: async()=>{
+      var dinner = normalizeRecipe({ id:978501, uid:'d1', name:'Roast chicken', category:'Dinner',
+        difficulty:'Hard', bg:'#fff', diets:['Keto'], ingredients:[{a:'1',n:'chicken'}], steps:['Roast it slowly'] });
+      var pud = normalizeRecipe({ id:978502, uid:'d2', name:'Sticky pudding', category:'Dessert',
+        difficulty:'Easy', bg:'#fff', diets:['Vegetarian'], ingredients:[{a:'1',n:'dates'}], steps:['Steam it'] });
+
+      var coll = normalizeRecipe({ id:978503, uid:'cc', name:'Sunday', category:'Dinner',
+        difficulty:'Hard', bg:'#fff', parts:[recipeToPart(dinner), recipeToPart(pud)] });
+      var parts = recipeParts(coll);
+      if(parts[1].category!=='Dessert')
+        throw new Error('the dessert became "'+parts[1].category+'" — both took the first recipe’s meal type');
+      if(parts[1].difficulty!=='Easy')
+        throw new Error('the dessert’s difficulty became "'+parts[1].difficulty+'"');
+
+      // Opened inside the collection, and lifted out of it, each is itself.
+      var view = partAsRecipe(coll, parts[1], partRef(coll.id,'d2'));
+      if(view.category!=='Dessert' || view.difficulty!=='Easy')
+        throw new Error('inside the collection it reads '+view.category+'/'+view.difficulty);
+      var out = recipeFromPart(coll, parts[1]);
+      if(out.category!=='Dessert' || out.difficulty!=='Easy')
+        throw new Error('lifted back out it reads '+out.category+'/'+out.difficulty);
+
+      // A part with none of its own still inherits the collection's, so an
+      // existing book needs no migration.
+      var plain = normalizePart({ uid:'p', name:'Plain', ingredients:[{a:'1',n:'x'}], steps:['s'] }, 0);
+      if(plain.category!=='' || plain.difficulty!=='')
+        throw new Error('a part was given an invented meal type/difficulty: '+plain.category+'/'+plain.difficulty);
+      if(partAsRecipe(coll, plain, 'c:p').category!=='Dinner')
+        throw new Error('a part with no meal type of its own did not inherit the collection’s');
+
+      // SEARCHABLE — the whole point. Each must be findable by the collection.
+      if(!recipeMatchesQuery(coll,'dessert'))
+        throw new Error('searching "dessert" does not find the collection holding one');
+      if(!recipeMatchesQuery(coll,'easy'))
+        throw new Error('searching a difficulty finds nothing — difficulty was never searched at all');
+      if(!recipeMatchesQuery(coll,'sticky pudding'))
+        throw new Error('searching for a recipe INSIDE a collection by name finds nothing');
+      if(!recipeMatchesQuery(coll,'steam'))
+        throw new Error('the method of a recipe inside a collection is not searchable');
+      if(recipeMatchesQuery(coll,'zzznotathing'))
+        throw new Error('the search now matches everything');
+      // A flat recipe gained difficulty search too.
+      if(!recipeMatchesQuery(dinner,'hard'))
+        throw new Error('an ordinary recipe is still not findable by difficulty');
+      // An indented step is a {t,ind} object; String() on it is "[object
+      // Object]", which is why it never matched before.
+      var indented = normalizeRecipe({ id:978504, uid:'i1', name:'Indented', category:'Dinner', bg:'#fff',
+        ingredients:[{a:'1',n:'x'}], steps:[{ sub:'First stage' }, { t:'Whisk the aquafaba', ind:1 }] });
+      if(!recipeMatchesQuery(indented,'aquafaba'))
+        throw new Error('an indented step is not searchable');
+
+      // ...and the card says WHY it matched, rather than showing a collection
+      // name with no connection to what was typed.
+      var why = matchReason(coll, 'sticky pudding');
+      if(why.indexOf('Sticky pudding')===-1)
+        throw new Error('the card does not say which recipe inside it matched: "'+why+'"');
+      if(matchReason(coll,'easy').indexOf('Easy')===-1)
+        throw new Error('a difficulty match is not explained on the card');
+
+      // The meal-type filter must see it too, or per-recipe categories are
+      // invisible to the one control that filters by them.
+      var cats = recipeCategories(coll);
+      if(cats.indexOf('Dessert')===-1)
+        throw new Error('the meal-type filter cannot see the dessert inside: '+cats.join(', '));
+      var dts = recipeDiets(coll);
+      if(dts.indexOf('Vegetarian')===-1 || dts.indexOf('Keto')===-1)
+        throw new Error('the diet filter cannot see the diets inside: '+dts.join(', '));
+
+      // And the collection view shows each recipe's own, without repeating the
+      // collection's under a part that simply inherits it.
+      var html = collectionSectionsHtml(coll);
+      if(html.indexOf('Dessert')===-1) throw new Error('the collection view hides a recipe’s own meal type');
+      var inherits = normalizeRecipe({ id:978505, uid:'cd', name:'Book', category:'Soup', difficulty:'Easy',
+        bg:'#fff', parts:[{ uid:'q', name:'Plain', ingredients:[{a:'1',n:'x'}], steps:['s'] }] });
+      if(collectionSectionsHtml(inherits).indexOf('Soup')!==-1)
+        throw new Error('the collection’s own meal type was repeated under a recipe that merely inherits it');
+    } },
+
   { id:'collect_never_loses_a_recipe', group:'Features', name:'Gathering refuses rather than silently dropping one (v36.11)',
     test: async()=>{
       // The guard that would have saved Tony's clip: the originals are deleted
@@ -11655,7 +11734,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.11';
+var APP_VERSION = 'v36.12';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -14076,7 +14155,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.11</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.12</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14681,7 +14760,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.11</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.12</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15219,11 +15298,43 @@ function recipeMatchesQuery(r, raw) {
   var q = parsed.text;
   if (!q) return true;
   // Defensive: a recipe with a missing field must never break the whole grid.
-  return lc(r.name).includes(q)
-    || lc(r.category).includes(q)
+  return recipeSearchText(r).some(function(t){ return t.includes(q); })
     || recipeIngredientNames(r).some(function(n){ return n.includes(q); })
-    || (Array.isArray(r.steps) && r.steps.some(function(st){ return lc(st).includes(q); }));
+    // allSteps, not r.steps: a collection's flat steps are empty and the text
+    // lives in its parts, so the method of every collected recipe was
+    // unsearchable. It also maps {t,ind} step objects back to their text —
+    // String({t:'…'}) is "[object Object]", so indented steps never matched
+    // either (v36.12).
+    || allSteps(r).some(function(st){ return lc(st).includes(q); });
 }
+// Every short field a search may legitimately hit, the collection's parts
+// included. A recipe inside a collection has its own name, meal type and
+// difficulty, and searching for any of them must find the collection holding
+// it — otherwise "per-recipe" stops at the edge of the collection.
+// Every meal type this card can legitimately be filed under: its own, plus any
+// a recipe inside it carries of its own. A part with no category of its own
+// inherits the collection's, which is already in the list (v36.12).
+function recipeCategories(r) {
+  var out = [r.category];
+  recipeParts(r).forEach(function(p){ if (p.category) out.push(p.category); });
+  return out.filter(Boolean);
+}
+// The same rule for diets, which parts have carried since v36.11.
+function recipeDiets(r) {
+  var out = (r.diets || []).slice();
+  recipeParts(r).forEach(function(p){ (p.diets || []).forEach(function(d){ out.push(d); }); });
+  return out;
+}
+window.recipeCategories = recipeCategories; window.recipeDiets = recipeDiets;
+function recipeSearchText(r) {
+  var lc = function(v){ return String(v == null ? '' : v).toLowerCase(); };
+  var out = [lc(r.name), lc(r.category), lc(r.difficulty)];
+  recipeParts(r).forEach(function(p) {
+    out.push(lc(p.name), lc(p.category || r.category), lc(p.difficulty || r.difficulty));
+  });
+  return out.filter(Boolean);
+}
+window.recipeSearchText = recipeSearchText;
 window.parseSearchQuery = parseSearchQuery; window.recipeMatchesQuery = recipeMatchesQuery;
 
 var sortMode         = 'default'; // default|alpha|prep|difficulty|recent|popular
@@ -16308,6 +16419,14 @@ function matchReason(r, q) {
   if (!q) return '';
   var lc = function(v){ return String(v == null ? '' : v).toLowerCase(); };
   if (lc(r.name).includes(q)) return '';            // the title already shows it
+  // v36.12 — a collection matched by one of the recipes INSIDE it has to say
+  // so. "Onion soup" landing you on a card called "Weeknight" with no
+  // explanation reads as a broken search.
+  var inside = recipeParts(r).filter(function(p){ return lc(p.name).includes(q); });
+  if (inside.length) {
+    return '<div class="match-why" dir="auto">📚 ' + hlMatch(inside.slice(0,2).map(function(p){ return p.name; }).join(', '), q)
+      + (inside.length > 2 ? ' <span style="opacity:.7;">+' + (inside.length - 2) + ' more</span>' : '') + '</div>';
+  }
   var ings = allIngredients(r)
     .filter(function(i){ return lc(i && i.n).includes(q); })
     .map(function(i){ return i.n; });
@@ -16315,13 +16434,18 @@ function matchReason(r, q) {
     return '<div class="match-why" dir="auto">🧂 ' + hlMatch(ings.slice(0,2).join(', '), q)
       + (ings.length > 2 ? ' <span style="opacity:.7;">+' + (ings.length - 2) + ' more</span>' : '') + '</div>';
   }
-  var step = (Array.isArray(r.steps) ? r.steps : []).find(function(s){ return lc(s).includes(q); });
+  var step = allSteps(r).find(function(s){ return lc(s).includes(q); });
   if (step) {
     var i = lc(step).indexOf(q);
     var snippet = (i > 24 ? '…' : '') + step.slice(Math.max(0, i - 24), i + q.length + 34).trim() + '…';
     return '<div class="match-why" dir="auto">📋 ' + hlMatch(snippet, q) + '</div>';
   }
-  if (lc(r.category).includes(q)) return '<div class="match-why">🏷️ ' + hlMatch(r.category, q) + '</div>';
+  // The meal type or difficulty that matched — the collection's own, or one a
+  // recipe inside it carries of its own.
+  var tag = [r.category, r.difficulty]
+    .concat(recipeParts(r).reduce(function(a, p){ return a.concat([p.category, p.difficulty]); }, []))
+    .filter(function(v){ return v && lc(v).includes(q); })[0];
+  if (tag) return '<div class="match-why">🏷️ ' + hlMatch(tag, q) + '</div>';
   return '';
 }
 // Escapes first, then wraps the matched run — never the other way round.
@@ -16370,15 +16494,19 @@ function renderGrid() {
       var recentIds = []; try { recentIds = JSON.parse(localStorage.getItem('recent_views')||'[]'); } catch(e){}
       if (!recentIds.includes(r.id)) return false;
     }
-    // Frame 2: Category filter (any selected category matches)
-    if (activeCategories.size > 0 && !activeCategories.has(r.category)) return false;
+    // Frame 2: Category filter (any selected category matches). v36.12 — a
+    // collection matches when the collection's own meal type matches OR any
+    // recipe inside it has one of its own that does. Without this, per-recipe
+    // categories would be invisible to the one control that filters by them.
+    if (activeCategories.size > 0 && !recipeCategories(r).some(function(c){ return activeCategories.has(c); }))
+      return false;
     // Frame 3: Diet filter
     if (activeDiets.size > 0) {
       // Omnivore matches everything — no filtering needed
       if (!activeDiets.has('Omnivore')) {
-        // Recipe must have at least one of the selected diets tagged
-        var rDiets = r.diets || [];
-        var dietMatch = rDiets.some(function(d) { return activeDiets.has(d); });
+        // Recipe must have at least one of the selected diets tagged — its own,
+        // or one carried by a recipe inside it.
+        var dietMatch = recipeDiets(r).some(function(d) { return activeDiets.has(d); });
         if (!dietMatch) return false;
       }
     }
@@ -16717,6 +16845,12 @@ function collectionSectionsHtml(r) {
 
     var meta = [];
     if (p.by) meta.push(escH(p.by));
+    // v36.12 — shown only when the recipe has its OWN, because an empty value
+    // means "same as the collection" and repeating that under all ten recipes
+    // of a dessert book is noise, not information.
+    if (p.category) meta.push(escH(p.category));
+    if (p.difficulty) meta.push('<span class="difficulty ' + escA(p.difficulty.toLowerCase())
+      + '" style="padding:1px 6px;">' + escH(p.difficulty) + '</span>');
     if (p.servings) meta.push('serves ' + escH(p.servings));
     if (p.prep) meta.push(escH(p.prep));
 
@@ -16838,6 +16972,11 @@ function editPart(ref) {
   set('f-srv', f.part.servings || '');
   set('f-notes', f.part.notes || '');
   set('f-source', f.part.source || '');
+  // v36.12 — empty means "same as the collection", so the form is seeded with
+  // the collection's value. Saving then makes that inheritance explicit, which
+  // is the honest reading of "I looked at it and left it alone".
+  set('f-category', f.part.category || f.coll.category);
+  set('f-diff', f.part.difficulty || f.coll.difficulty);
   set('f-steps', stepsToText(f.part.steps));
   // v36.11 — a part has its own source and clip flag now, so the form that
   // edits one has to show them. Without this the field rendered blank and
@@ -16873,7 +17012,10 @@ function recipeToPart(r) {
     // photo — which a part deliberately has no room for.
     fav: r.fav, cookCount: r.cookCount, lastCooked: r.lastCooked, cookLog: r.cookLog,
     // v36.11 — and where it came from. For a clip this is the entire recipe.
-    source: r.source, isClip: r.isClip, diets: r.diets
+    source: r.source, isClip: r.isClip, diets: r.diets,
+    // v36.12 — a Dinner and a Dessert gathered together stay a Dinner and a
+    // Dessert, rather than both becoming whatever the first one was.
+    category: r.category, difficulty: r.difficulty
   }, 0);
 }
 // A selected COLLECTION contributes its recipes rather than becoming a part of
@@ -17135,8 +17277,8 @@ function recipeFromPart(coll, part) {
     uid: part.uid,                    // the identity it has carried since import
     name: part.name,
     emoji: rndEmoji(),
-    category: coll.category,
-    difficulty: coll.difficulty,
+    category: part.category || coll.category,
+    difficulty: part.difficulty || coll.difficulty,
     prep: part.prep || coll.prep || '—',
     servings: part.servings || '—',
     bg: rndBg(), photo: '', originalPhoto: '',
@@ -18703,6 +18845,8 @@ async function saveRecipe(){
     f.part.source = partSrc;
     f.part.isClip = partClip;
     f.part.diets = getSelectedDiets();
+    f.part.category = (document.getElementById('f-category')||{value:''}).value;
+    f.part.difficulty = (document.getElementById('f-diff')||{value:''}).value;
     f.part.ingredients = normalizeIngredientLines(ings);
     f.part.steps = normalizeStepLines(rawSteps);
     f.coll.updatedAt = Date.now();
@@ -21023,6 +21167,14 @@ function normalizePart(p, idx) {
     // the floor too. A part is a recipe; a recipe knows where it came from.
     source: typeof p.source === 'string' ? p.source.trim() : '',
     isClip: !!p.isClip,
+    // v36.12 — its own meal type and difficulty. EMPTY MEANS INHERIT the
+    // collection's, which is what every part did before this existed: an
+    // existing book of ten desserts keeps reading as ten desserts without a
+    // migration, and only a recipe that actually has its own overrides. That
+    // is also why these are not defaulted to 'Dinner'/'Medium' the way a flat
+    // recipe's are — a default here would invent a fact.
+    category: (typeof p.category === 'string' && CATS.indexOf(p.category) > -1) ? p.category : '',
+    difficulty: (['Easy','Medium','Hard'].indexOf(p.difficulty) > -1) ? p.difficulty : '',
     // Diets are per-recipe, not per-collection: one dish in a book can be keto
     // and the next not. Reading them off the collection, as promoting used to,
     // gives every recipe the same tags and they are wrong for most of them.
@@ -21059,7 +21211,8 @@ function partAsRecipe(coll, part, ref) {
   return normalizeRecipe({
     id: ref, uid: part.uid,
     name: part.name, emoji: coll.emoji, photo: '',
-    category: coll.category, difficulty: coll.difficulty,
+    category: part.category || coll.category,
+    difficulty: part.difficulty || coll.difficulty,
     prep: part.prep || coll.prep || '—',
     servings: part.servings || '—',
     bg: coll.bg, fav: !!part.fav,
