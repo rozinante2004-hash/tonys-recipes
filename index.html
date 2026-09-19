@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.3 -->
+<!-- Tony's Recipes Collection v36.4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6892,10 +6892,21 @@ const SELF_TESTS = [
       if(allIngredients(r).length!==4) throw new Error('allIngredients returned '+allIngredients(r).length+', expected 4');
       if(allSteps(r).length!==4) throw new Error('allSteps returned '+allSteps(r).length+', expected 4');
 
-      // Sub-headings inside one recipe are real cooking information.
-      var withG = allIngredients(r).filter(function(i){ return i.g; });
-      if(withG.length!==2) throw new Error('ingredient sub-headings were dropped: '+withG.length+' of 2 kept');
-      if(withG[0].g!=='for the gnocchi') throw new Error('the wrong sub-heading survived: '+withG[0].g);
+      // Sub-headings inside one recipe are real cooking information. v36.4 turns
+      // the article's own `g` into a HEADING LINE rather than a property on each
+      // ingredient, so there is one grouping mechanism instead of two.
+      var lines = ingredientLines(r);
+      var heads = lines.filter(isSubLine).map(function(x){ return x.sub; });
+      if(heads.indexOf('for the gnocchi')===-1)
+        throw new Error('the article sub-heading was dropped: '+JSON.stringify(heads));
+      if(lines.some(function(x){ return x && x.g; }))
+        throw new Error('`g` survived alongside the heading line — two mechanisms for one thing');
+      // And a heading is NOT an ingredient: the count must not have moved.
+      if(allIngredients(r).length!==4)
+        throw new Error('headings were counted as ingredients: '+allIngredients(r).length);
+      // The items under it are indented; the ones before it are not.
+      var gi = lines.findIndex(function(x){ return isSubLine(x) && x.sub==='for the gnocchi'; });
+      if(!lineIndented(lines[gi+1])) throw new Error('the item under a sub-heading is not indented');
       if(recipeParts(r)[0].by!=='Itai') throw new Error('the per-recipe byline was dropped');
       if(recipeParts(r)[1].servings!=='10') throw new Error('per-recipe servings were dropped');
 
@@ -7716,8 +7727,11 @@ const SELF_TESTS = [
         var modal=document.getElementById('viewModal');
         if(modal.querySelectorAll('.collection-part').length!==2)
           throw new Error('expected 2 recipe sections, got '+modal.querySelectorAll('.collection-part').length);
-        if(!modal.querySelectorAll('.ing-group').length)
+        if(!modal.querySelectorAll('.line-sub').length)
           throw new Error('the ingredient sub-heading is not rendered');
+        // A heading is not tickable — it is not a line you can be "on".
+        if(modal.querySelector('.line-sub[data-line]'))
+          throw new Error('a sub-heading was given a tick key, so tapping it marks a line that is not there');
 
         // Ticking the first recipe's onion must not tick the second's rice, so
         // the keys have to be namespaced per part.
@@ -8433,6 +8447,206 @@ const SELF_TESTS = [
       var inp=document.getElementById('searchInput');
       if((inp.getAttribute('oninput')||'').indexOf('onSearchInput')===-1) throw new Error('search box still re-renders on every keystroke — typing lags on large collections');
     } },
+  { id:'sub_model_and_accessors', group:'Core', name:'A sub-title is neither an ingredient nor a step (v36.4)',
+    test: async()=>{
+      var r = normalizeRecipe({ id:979001, name:'Brined chicken', ingredients:[
+        { a:'1 Kg', n:'chicken breast' },
+        { sub:'Brine option #1' },
+        { a:'1 litre', n:'water', ind:1 },
+        { a:'2 tbsp', n:'salt', ind:1 },
+        { sub:'Brine option #2' },
+        { a:'1 litre', n:'milk', ind:1 },
+        { a:'0.5 Kg', n:'pork chops' }
+      ], steps:[ 'Trim the chicken', { sub:'If brining' }, { t:'Submerge overnight', ind:1 }, 'Roast at 200' ]});
+
+      // The whole point: a heading is not something you can cook with.
+      if(allIngredients(r).length!==5)
+        throw new Error('allIngredients counted headings: '+allIngredients(r).length+', expected 5');
+      if(allSteps(r).length!==3) throw new Error('allSteps counted headings: '+allSteps(r).length);
+      if(allIngredients(r).some(isSubLine)) throw new Error('a heading leaked into allIngredients');
+      if(allSteps(r).some(function(s){ return typeof s!=='string'; }))
+        throw new Error('allSteps returned something that is not a plain string');
+      if(allSteps(r)[1]!=='Submerge overnight')
+        throw new Error('an indented step lost its text: '+allSteps(r)[1]);
+
+      // ...but the lines accessor sees everything, in order.
+      if(ingredientLines(r).length!==7) throw new Error('ingredientLines dropped lines');
+      if(stepLines(r).length!==4) throw new Error('stepLines dropped lines');
+      if(ingredientLines(r)[1].sub!=='Brine option #1') throw new Error('the heading text was mangled');
+
+      // Indentation is per LINE. "0.5 Kg pork chops" comes after an indented
+      // run and must NOT be indented - that is the case "everything until the
+      // next heading" would get wrong.
+      var lines = ingredientLines(r);
+      if(!lineIndented(lines[2])) throw new Error('an item marked indented is not');
+      if(lineIndented(lines[0])) throw new Error('the first item was indented without being asked');
+      if(lineIndented(lines[6]))
+        throw new Error('the line after an indented run was indented too - indentation is per line, not until the next heading');
+
+      // Junk in, nothing out: an empty heading, and a heading with nothing
+      // under it, are noise rather than structure.
+      var j = normalizeRecipe({ ingredients:[ {sub:''}, {a:'1',n:'egg'}, {sub:'Trailing'} ], steps:[ {sub:'Also trailing'} ] });
+      if(j.ingredients.some(isSubLine))
+        throw new Error('an empty or trailing heading survived: '+JSON.stringify(j.ingredients));
+      if(j.steps.length) throw new Error('a heading with no steps under it survived');
+      var d = normalizeRecipe({ ingredients:[ {sub:'A'}, {sub:'B'}, {a:'1',n:'x'} ] });
+      if(d.ingredients.filter(isSubLine).length!==1)
+        throw new Error('two headings in a row both survived');
+    } },
+
+  { id:'sub_editor_round_trip', group:'UI', name:'Sub-titles and indents survive the editor (v36.4)',
+    test: async()=>{
+      // The model can hold it; what matters is whether the EDITOR gives it back
+      // unchanged. This is the round trip a real edit makes.
+      var ings = [ { a:'1 Kg', n:'chicken breast' }, { sub:'Brine option #1' },
+                   { a:'1 litre', n:'water', ind:1 }, { a:'0.5 Kg', n:'pork chops' } ];
+      loadIngsTable(ings);
+      var rows = document.querySelectorAll('#ingsRows .ing-row');
+      if(rows.length!==4) throw new Error('loaded '+rows.length+' rows for 4 lines');
+      if(!rows[1].classList.contains('ing-row-sub')) throw new Error('the heading did not load as a heading row');
+      if(rows[1].querySelectorAll('input').length!==1)
+        throw new Error('a heading row has an Amount field - a heading is not a quantity of anything');
+      if(!rows[2].classList.contains('ing-row-indent')) throw new Error('the indented row lost its indent');
+      if(rows[3].classList.contains('ing-row-indent')) throw new Error('the row after it was indented too');
+      if(!rows[0].querySelector('.ing-indent-btn')) throw new Error('no indent toggle on an ordinary row');
+
+      var back = readIngsTable();
+      if(JSON.stringify(back)!==JSON.stringify(ings))
+        throw new Error('the editor changed the list: in '+JSON.stringify(ings)+' out '+JSON.stringify(back));
+
+      // The toggle is a toggle, both ways.
+      var btn = rows[0].querySelector('.ing-indent-btn');
+      btn.onclick(); if(!readIngsTable()[0].ind) throw new Error('the indent button did not indent');
+      btn.onclick(); if(readIngsTable()[0].ind) throw new Error('the indent button did not outdent again');
+
+      // And the method, which is a textarea: the buttons write the markers so
+      // nothing has to be remembered, but the text form still round-trips.
+      var steps = [ 'Trim the chicken', { sub:'If brining' }, { t:'Submerge overnight', ind:1 }, 'Roast at 200' ];
+      var txt = stepsToText(steps);
+      if(txt.split('\n')[1]!=='# If brining') throw new Error('a heading is not written as a marker line: '+txt.split('\n')[1]);
+      if(!/^ {4}Submerge/.test(txt.split('\n')[2])) throw new Error('an indented step is not indented in the text');
+      if(JSON.stringify(textToSteps(txt))!==JSON.stringify(steps))
+        throw new Error('the method text did not round-trip: '+JSON.stringify(textToSteps(txt)));
+
+      // The toolbar acts on the line the cursor is in, and toggles back.
+      var ta = document.getElementById('f-steps'); var old = ta.value;
+      try{
+        ta.value = 'Boil water\nAdd salt\nServe';
+        ta.selectionStart = ta.selectionEnd = ta.value.indexOf('Add salt') + 2;
+        stepToolSub();
+        if(ta.value.split('\n')[1]!=='# Add salt') throw new Error('sub-title button gave: '+ta.value.split('\n')[1]);
+        stepToolSub();
+        if(ta.value.split('\n')[1]!=='Add salt') throw new Error('the sub-title button does not undo itself');
+        stepToolIndent(1);
+        if(ta.value.split('\n')[1]!=='    Add salt') throw new Error('indent gave: "'+ta.value.split('\n')[1]+'"');
+        stepToolIndent(-1);
+        if(ta.value.split('\n')[1]!=='Add salt') throw new Error('outdent gave: "'+ta.value.split('\n')[1]+'"');
+        // A heading is never indented - it is the thing being indented under.
+        stepToolSub(); stepToolIndent(1);
+        if(ta.value.split('\n')[1]!=='# Add salt') throw new Error('a heading was indented');
+      } finally { ta.value = old; loadIngsTable([]); }
+    } },
+
+  { id:'sub_every_consumer', group:'Import/Export', name:'Nothing downstream mistakes a sub-title for content (v36.4)',
+    test: async()=>{
+      // Twenty things read these lists. Each one either wants the content or
+      // wants to draw the headings, and getting that backwards is silent:
+      // Bring! would put "Brine option #1" on the shopping list.
+      var testId=979101;
+      var r = normalizeRecipe({ id:testId, uid:'sub-consumers', bg:'#fff', name:'Brined chicken',
+        category:'Dinner', prep:'10 min', servings:'4',
+        ingredients:[ {a:'1 Kg',n:'chicken breast'}, {sub:'Brine option #1'},
+                      {a:'1 litre',n:'water',ind:1}, {a:'2 tbsp',n:'salt',ind:1} ],
+        steps:[ 'Trim it', {sub:'If brining'}, {t:'Submerge overnight',ind:1}, 'Roast' ] });
+      recipes.unshift(r);
+      try{
+        // Search / pantry / one-away read ingredient NAMES.
+        var names = recipeIngredientNames(r);
+        if(names.some(function(n){ return /brine option/i.test(n); }))
+          throw new Error('a sub-title is being treated as an ingredient name by search');
+        if(!names.some(function(n){ return /chicken breast/i.test(n); }))
+          throw new Error('real ingredients stopped being searchable');
+
+        // The card's own summary count.
+        if(allIngredients(r).length!==3) throw new Error('the recipe claims '+allIngredients(r).length+' ingredients, not 3');
+
+        // The recipe view: headings drawn, not tickable, numbering unaffected.
+        viewId=testId; drawView();
+        var modal=document.getElementById('viewModal');
+        var subs=modal.querySelectorAll('.line-sub');
+        if(subs.length!==2) throw new Error('drew '+subs.length+' headings, expected 2');
+        if(modal.querySelector('.line-sub[data-line]')) throw new Error('a heading is tickable');
+        var nums=Array.prototype.slice.call(modal.querySelectorAll('.step-num')).map(function(e){return e.textContent;});
+        if(nums.join(',')!=='1,2,3')
+          throw new Error('a heading took a step number - got '+nums.join(',')+', expected 1,2,3');
+        if(!modal.querySelectorAll('.line-indent').length) throw new Error('nothing was drawn indented');
+
+        // Shared text and print are read by PEOPLE, so they keep the headings.
+        var txt=rText(r);
+        if(txt.indexOf('Brine option #1')===-1) throw new Error('shared text dropped the ingredient heading');
+        if(txt.indexOf('If brining')===-1) throw new Error('shared text dropped the method heading');
+        if(/\[object Object\]/.test(txt)) throw new Error('shared text printed a raw object');
+        if(!/3\. Roast/.test(txt)) throw new Error('shared text numbered the heading: '+txt);
+        var ph=buildPrintHtml([r]);
+        if(ph.indexOf('Brine option #1')===-1) throw new Error('the printout dropped the heading');
+        if(/\[object Object\]/.test(ph)) throw new Error('the printout has a raw object in it');
+
+        // Word: it must still build, with the heading in it.
+        var blob=makeDocxBlob([r]);
+        if(!blob || blob.size<2000) throw new Error('the Word export produced nothing usable');
+
+        // The previews used by import and translate.
+        if(/\[object Object\]/.test(previewStepsHtml(r.steps)))
+          throw new Error('the import preview prints a raw object for a sub-title');
+        if(/\[object Object\]/.test(previewIngsHtml(r.ingredients)))
+          throw new Error('the ingredient preview prints a raw object');
+
+        // Translation must not lose the structure. The model answers with flat
+        // lines in the same order; the shape is put back by position.
+        var flat=['trim','if brining','submerge','roast'];
+        var back=reapplyLineStructure(r.steps, flat);
+        if(!isSubLine(back[1])) throw new Error('the heading came back as an ordinary step after translation');
+        if(back[1].sub!=='if brining') throw new Error('the heading text was lost: '+back[1].sub);
+        if(!lineIndented(back[2])) throw new Error('the indent was lost in translation');
+        // A mismatch must DROP the structure, never stamp it on the wrong line.
+        var wrong=reapplyLineStructure(r.steps, ['a','b']);
+        if(wrong.some(isSubLine)) throw new Error('a heading was stamped onto a line that may not be one');
+      } finally {
+        recipes=recipes.filter(function(x){ return x.id!==testId; });
+        viewId=null; closeM('viewOverlay');
+      }
+    } },
+
+  { id:'feat_search_clear', group:'UI', name:'The search box can be cleared with one tap (v36.4)',
+    test: async()=>{
+      var inp=document.getElementById('searchInput'), btn=document.getElementById('searchClear');
+      if(!btn) throw new Error('no clear button in the search box');
+      if(typeof clearSearch!=='function') throw new Error('clearSearch not defined');
+      var old=inp.value;
+      try{
+        // Nothing to clear, nothing to show: a permanent ✕ on an empty box is a
+        // button that does nothing, on the narrowest control in the app.
+        inp.value=''; syncSearchClear();
+        if(btn.style.display!=='none') throw new Error('the ✕ is shown on an empty search box');
+        inp.value='chicken'; syncSearchClear();
+        if(btn.style.display==='none') throw new Error('the ✕ is hidden while there is something to clear');
+        if(!btn.getAttribute('aria-label')) throw new Error('the ✕ has no accessible name');
+
+        // It must clear AND re-render. Clearing the box but leaving the filtered
+        // grid up reads as "these are all the recipes you have".
+        var drew=0, realRender=window.renderGrid;
+        window.renderGrid=function(){ drew++; };
+        try { clearSearch(); } finally { window.renderGrid=realRender; }
+        if(inp.value!=='') throw new Error('the box still holds "'+inp.value+'"');
+        if(!drew) throw new Error('clearing did not re-render the grid');
+        if(btn.style.display!=='none') throw new Error('the ✕ stayed visible after clearing');
+        if(document.activeElement!==inp) throw new Error('focus left the box, so you cannot carry on typing');
+        // Escape does the same thing, for anyone on a keyboard.
+        if((inp.getAttribute('onkeydown')||'').indexOf('clearSearch')===-1)
+          throw new Error('Escape does not clear the search box');
+      } finally { inp.value=old; syncSearchClear(); }
+    } },
+
   { id:'feat_refresh_foreground', group:'Cloud Sync', name:'Cloud re-checks when app returns to foreground',
     test: async()=>{
       if(typeof _lastVisibleRefresh==='undefined') throw new Error('_lastVisibleRefresh not defined — foreground refresh not wired up');
@@ -10663,7 +10877,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.3';
+var APP_VERSION = 'v36.4';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11803,6 +12017,14 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .steps-list li.step-rtl { text-align: right; }
 .step-num { min-width: 22px; height: 22px; background: var(--terracotta); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; flex-shrink: 0; margin-top: 2px; }
 .step-text { flex: 1; }
+/* v36.4 — a sub-title inside either list. It is not an ingredient and not a
+   step: no tick box, no amount, no number, and no pointer, because tapping it
+   must not mark a line that is not there. padding-inline-start keeps the indent
+   on the correct side in Hebrew without needing a second rule. */
+.line-sub { list-style: none; font-weight: 700; font-size: 12px; color: var(--terracotta);
+            margin: 10px 0 3px; letter-spacing: 0.3px; cursor: default; display: block; }
+.line-sub:first-child { margin-top: 0; }
+.line-indent { padding-inline-start: 20px; }
 
 /* Recipe action bar */
 .recipe-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
@@ -12695,12 +12917,38 @@ body.banner-shown .header {
 /* ── INGREDIENT TABLE ── */
 .ing-row {
   display: grid;
-  grid-template-columns: 24px 1fr 2fr 28px;
+  grid-template-columns: 24px 1fr 2fr 28px 28px;
   gap: 0;
   border-bottom: 1px solid var(--border);
   align-items: center;
   min-height: 40px;
 }
+/* v36.4 - a sub-title row spans where the amount and name would be, because a
+   heading has no amount. It reads as a heading in the editor too, so what you
+   are editing looks like what you will get. */
+.ing-row-sub { grid-template-columns: 24px 1fr 28px; background: rgba(193,68,14,0.04); }
+.ing-row-sub .ing-sub-input {
+  font-weight: 700; color: var(--terracotta); font-size: 12.5px; letter-spacing: 0.3px;
+}
+.ing-row-indent input[placeholder="Ingredient name"] { padding-inline-start: 34px; }
+/* A thin rule under the indent makes the grouping readable at a glance in
+   the editor; the toggle button showing its pressed state is the other half. */
+.ing-row-indent input[placeholder="Ingredient name"] {
+  background-image: linear-gradient(to right, var(--border) 0 1px, transparent 1px);
+  background-repeat: no-repeat; background-size: 1px 60%; background-position: 20px center;
+}
+.ing-indent-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 13px; padding: 0; display: flex; align-items: center;
+  justify-content: center; height: 100%; width: 28px;
+}
+.ing-indent-btn:hover, .ing-indent-btn[aria-pressed="true"] { color: var(--terracotta); }
+.step-tool-btn {
+  font-size: 12px; color: var(--muted); background: none;
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px;
+  cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif;
+}
+.step-tool-btn:hover { color: var(--terracotta); border-color: var(--terracotta); }
 .ing-row:first-child { border-radius: 8px 8px 0 0; }
 .ing-row:last-child { border-bottom: none; border-radius: 0 0 8px 8px; }
 .ing-row input {
@@ -12974,7 +13222,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.3</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.4</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13016,7 +13264,11 @@ body.banner-shown .header {
     <div style="flex:1;min-width:180px;position:relative;">
       <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.45);font-size:13px;pointer-events:none;">🔍</span>
       <label for="searchInput" class="sr-only">Search recipes and ingredients</label>
-      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" aria-label="Search recipes and ingredients" oninput="onSearchInput()" style="width:100%;padding:8px 12px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
+      <input type="text" placeholder="Search recipes, ingredients…" id="searchInput" aria-label="Search recipes and ingredients" oninput="onSearchInput()" onkeydown="if(event.key==='Escape'){event.preventDefault();clearSearch();}" style="width:100%;padding:8px 32px 8px 32px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:white;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;box-sizing:border-box;outline:none;height:36px;" onfocus="this.style.background='rgba(255,255,255,0.2)'" onblur="this.style.background='rgba(255,255,255,0.12)'">
+      <button type="button" id="searchClear" onclick="clearSearch()" aria-label="Clear search" title="Clear search (Esc)"
+        style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;
+               padding:0;line-height:1;border:none;border-radius:50%;cursor:pointer;
+               background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.85);font-size:13px;">✕</button>
     </div>
     <div class="header-actions">
       <div class="drop-group">
@@ -13236,19 +13488,29 @@ body.banner-shown .header {
       <div class="form-group">
         <label class="form-label">Ingredients</label>
         <div id="ingsTable" style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:4px;">
-          <div style="display:grid;grid-template-columns:24px 1fr 2fr 28px;background:var(--bg);padding:6px 10px;border-bottom:1px solid var(--border);">
+          <div style="display:grid;grid-template-columns:24px 1fr 2fr 28px 28px;background:var(--bg);padding:6px 10px;border-bottom:1px solid var(--border);">
             <div></div>
             <div style="font-size:11px;font-weight:600;color:var(--muted);">AMOUNT</div>
             <div style="font-size:11px;font-weight:600;color:var(--muted);">INGREDIENT</div>
             <div></div>
+            <div></div>
           </div>
           <div id="ingsRows"></div>
         </div>
-        <button type="button" onclick="addIngRow()" style="font-size:13px;color:var(--terracotta);background:none;border:1.5px dashed var(--terracotta);border-radius:8px;padding:6px 14px;cursor:pointer;width:100%;font-family:'DM Sans','Heebo',sans-serif;">+ Add ingredient</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="addIngRow()" style="flex:2;font-size:13px;color:var(--terracotta);background:none;border:1.5px dashed var(--terracotta);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">+ Add ingredient</button>
+          <button type="button" onclick="addIngSubRow('')" title="A heading that groups the lines below it, e.g. Brine option #1" style="flex:1;font-size:13px;color:var(--muted);background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">&#9656; Sub-title</button>
+        </div>
         <!-- Hidden textarea for backward compatibility with saveRecipe parser -->
       </div>
       <div class="form-group">
         <label class="form-label">Steps — one per line</label>
+        <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="step-tool-btn" onclick="stepToolSub()" title="Make this line a sub-title (no step number)">&#9656; Sub-title</button>
+          <button type="button" class="step-tool-btn" onclick="stepToolIndent(1)" aria-label="Indent this line" title="Indent this line">&#8677;</button>
+          <button type="button" class="step-tool-btn" onclick="stepToolIndent(-1)" aria-label="Outdent this line" title="Outdent this line">&#8676;</button>
+          <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in</span>
+        </div>
         <textarea class="form-textarea" id="f-steps" dir="auto" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
       <div class="form-group">
@@ -13556,7 +13818,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.3</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.4</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15139,10 +15401,34 @@ function prunePhotoUrlCache() {
 // so we render once the user pauses instead of once per character.
 var _searchTimer = null;
 function onSearchInput() {
+  syncSearchClear();
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(function(){ renderGrid(); }, 180);
 }
 window.onSearchInput = onSearchInput;
+
+// The ✕ only exists while there is something to clear — a permanent one on an
+// empty box is a button that does nothing, and the search box is narrow enough
+// on a phone that the space matters.
+function syncSearchClear() {
+  var inp = document.getElementById('searchInput');
+  var btn = document.getElementById('searchClear');
+  if (!inp || !btn) return;
+  btn.style.display = inp.value ? 'block' : 'none';
+}
+// Clearing has to re-render, or the grid keeps showing the filtered set against
+// an empty box — which reads as "these are all the recipes you have".
+function clearSearch() {
+  var inp = document.getElementById('searchInput');
+  if (!inp) return;
+  inp.value = '';
+  syncSearchClear();
+  clearTimeout(_searchTimer);
+  renderGrid();
+  inp.focus();          // carry on typing rather than having to click back in
+}
+window.clearSearch = clearSearch;
+window.syncSearchClear = syncSearchClear;
 
 // 4.2 — when a search matched something the card doesn't otherwise show
 // (an ingredient, a step), say so. Otherwise the results look arbitrary.
@@ -15492,42 +15778,62 @@ window.conflictBannerHtml = conflictBannerHtml;
 // than "ing-3" so ticking the soup's onion does not also tick the risotto's —
 // markLine() and toggleTick() already take arbitrary keys, so nothing else had
 // to change for that.
+// ONE implementation of a recipe's two lists, used by the ordinary view AND by
+// each section of a collection. A sub-title has to look and behave the same
+// wherever the list lives, and before v36.4 these were two near-copies that had
+// already drifted — only the collection one drew headings at all.
+//
+// `pfx` is the tick namespace ('ing' or 'ing-p0'), which is what stops ticking
+// the soup's onion from ticking the risotto's. Keys are the index in the LINES
+// array, so they stay stable whether or not headings are present.
+function ingredientLinesHtml(lines, pfx, awkOut) {
+  return (lines || []).map(function(i, ii) {
+    if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escH(i.sub) + '</li>';
+    var cv = cvtIng(i.a, viewUnit), sc = scaleAmt(cv, viewMult);
+    if (awkOut && awkwardCount(i.n, sc)) awkOut.push(i.n);
+    var key = pfx + '-' + ii;
+    return '<li dir="auto"' + (lineIndented(i) ? ' class="line-indent"' : '')
+      + ' data-line="' + key + '" onclick="markLine(\'' + pfx + '\',' + ii + ')">'
+      + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ' + escA(i.n) + ' as added" '
+      + 'onclick="toggleTick(\'' + key + '\',event)"></button>'
+      + '<span class="line-text">' + escH(i.n) + '</span><span class="ing-amount">' + escH(sc) + '</span></li>';
+  }).join('');
+}
+// The step number counts REAL steps only — a heading takes no number, so
+// "Brine option #1" sitting between steps 3 and 4 must not make the next one 5.
+function stepLinesHtml(lines, pfx, timerPfx) {
+  var num = 0;
+  return (lines || []).map(function(s, si) {
+    if (isSubLine(s)) return '<li class="line-sub" dir="auto">' + escH(s.sub) + '</li>';
+    num++;
+    var txt = stepText(s);
+    var isHeb = /[֐-׿]/.test(txt);
+    var key = pfx + '-' + si;
+    var cls = [];
+    if (isHeb) cls.push('step-rtl');
+    if (lineIndented(s)) cls.push('line-indent');
+    var timers = findStepTimers(txt).map(function(t, ti) {
+      var tid = timerPfx + si + '-' + ti;
+      return '<button class="cook-timer-btn" id="cookTimer-' + tid + '" '
+        + 'onclick="event.stopPropagation();startCookTimer(\'' + tid + '\',' + t.secs + ')">⏱ '
+        + fmtClock(t.secs) + '</button>';
+    }).join('');
+    return '<li dir="' + (isHeb ? 'rtl' : 'ltr') + '"' + (cls.length ? ' class="' + cls.join(' ') + '"' : '')
+      + ' data-line="' + key + '" onclick="markLine(\'' + pfx + '\',' + si + ')">'
+      + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ' + num + ' as done" '
+      + 'onclick="toggleTick(\'' + key + '\',event)"></button>'
+      + '<span class="step-num">' + num + '</span>'
+      + '<span class="step-text">' + escH(txt) + (timers ? '<br>' + timers : '') + '</span></li>';
+  }).join('');
+}
+window.ingredientLinesHtml = ingredientLinesHtml; window.stepLinesHtml = stepLinesHtml;
+
 function collectionSectionsHtml(r) {
   var parts = recipeParts(r);
   return parts.map(function(p, pi) {
     var awk = [];
-    var lastGroup = null;
-    var ings = p.ingredients.map(function(i, ii) {
-      var cv = cvtIng(i.a, viewUnit), sc = scaleAmt(cv, viewMult);
-      if (awkwardCount(i.n, sc)) awk.push(i.n);
-      // Sub-headings a real article uses inside one recipe ("for the sauce").
-      var head = '';
-      if ((i.g || '') !== (lastGroup === null ? null : lastGroup)) {
-        lastGroup = i.g || '';
-        if (lastGroup) head = '<li class="ing-group" dir="auto" style="list-style:none;font-weight:700;'
-          + 'font-size:12px;color:var(--terracotta);margin:8px 0 2px;text-transform:none;">'
-          + escH(lastGroup) + '</li>';
-      }
-      return head + '<li dir="auto" data-line="ing-p' + pi + '-' + ii + '" onclick="markLine(\'ing-p' + pi + '\',' + ii + ')">'
-        + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ' + escA(i.n) + ' as added" '
-        + 'onclick="toggleTick(\'ing-p' + pi + '-' + ii + '\',event)"></button>'
-        + '<span class="line-text">' + escH(i.n) + '</span><span class="ing-amount">' + escH(sc) + '</span></li>';
-    }).join('');
-
-    var steps = p.steps.map(function(st, si) {
-      var isHeb = /[֐-׿]/.test(st);
-      var timers = findStepTimers(st).map(function(t, ti) {
-        return '<button class="cook-timer-btn" id="cookTimer-p' + pi + '-' + si + '-' + ti + '" '
-          + 'onclick="event.stopPropagation();startCookTimer(\'p' + pi + '-' + si + '-' + ti + '\',' + t.secs + ')">⏱ '
-          + fmtClock(t.secs) + '</button>';
-      }).join('');
-      return '<li dir="' + (isHeb ? 'rtl' : 'ltr') + '"' + (isHeb ? ' class="step-rtl"' : '')
-        + ' data-line="step-p' + pi + '-' + si + '" onclick="markLine(\'step-p' + pi + '\',' + si + ')">'
-        + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ' + (si+1) + ' as done" '
-        + 'onclick="toggleTick(\'step-p' + pi + '-' + si + '\',event)"></button>'
-        + '<span class="step-num">' + (si+1) + '</span>'
-        + '<span class="step-text">' + escH(st) + (timers ? '<br>' + timers : '') + '</span></li>';
-    }).join('');
+    var ings  = ingredientLinesHtml(p.ingredients, 'ing-p' + pi, awk);
+    var steps = stepLinesHtml(p.steps, 'step-p' + pi, 'p' + pi + '-');
 
     var awkNote = awk.length
       ? '<div class="scale-warning" dir="auto">⚠️ ' + escH(awk.slice(0,3).join(', '))
@@ -15715,13 +16021,7 @@ window.splitCollection = splitCollection;
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
   var _awkward = [];
-  const ings=r.ingredients.map((i,_ii)=>{
-    const cv=cvtIng(i.a,viewUnit); const sc=scaleAmt(cv,viewMult);
-    if (awkwardCount(i.n, sc)) _awkward.push(i.n);
-    return `<li dir="auto" data-line="ing-${_ii}" onclick="markLine('ing',${_ii})">`
-      + `<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ${escA(i.n)} as added" onclick="toggleTick('ing-${_ii}',event)"></button>`
-      + `<span class="line-text">${escH(i.n)}</span><span class="ing-amount">${escH(sc)}</span></li>`;
-  }).join('');
+  const ings = ingredientLinesHtml(r.ingredients, 'ing', _awkward);
   // 3.3 — don't pretend "1.5 eggs" is a measurement; say what to do about it.
   const awkwardNote = _awkward.length
     ? `<div class="scale-warning" dir="auto">⚠️ ${escH(_awkward.slice(0,3).join(', '))}`
@@ -15842,22 +16142,7 @@ function drawView(){
       </div>
       <div class="recipe-col-steps">
       <div class="modal-section-title">Method</div>
-      <ol class="steps-list" dir="auto">${r.steps.map((s,i)=>{
-        const isHebrew = /[\u0590-\u05FF]/.test(s);
-        const num = `<span class="step-num">${i+1}</span>`;
-        // Durations in the step become tappable countdowns (they used to live in
-        // Cook Mode; the step is where they actually belong).
-        const timers = findStepTimers(s).map((t,ti)=>
-          `<button class="cook-timer-btn" id="cookTimer-${i}-${ti}" onclick="event.stopPropagation();startCookTimer('${i}-${ti}',${t.secs})">⏱ ${fmtClock(t.secs)}</button>`
-        ).join('');
-        const txt = `<span class="step-text">${escH(s)}${timers?`<br>${timers}`:''}</span>`;
-        const box = `<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ${i+1} as done" onclick="toggleTick('step-${i}',event)"></button>`;
-        const attrs = `data-line="step-${i}" onclick="markLine('step',${i})"`;
-        if (isHebrew) {
-          return `<li dir="rtl" class="step-rtl" ${attrs}>${box}${num}${txt}</li>`;
-        }
-        return `<li dir="ltr" ${attrs}>${box}${num}${txt}</li>`;
-      }).join('')}</ol>
+      <ol class="steps-list" dir="auto">${stepLinesHtml(r.steps, 'step', '')}</ol>
       </div>
       </div>`}
       <p class="line-mark-hint">Tap a box to tick a line off · tap the line to mark where you are · double-tap to clear <button id="clearTicksBtn" class="voice-btn" style="display:none;" onclick="clearTicks()">Clear ticks</button>${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
@@ -16204,8 +16489,14 @@ function rText(r){
   let t=`🍴 ${r.name}\n`;
   t+=`Category: ${r.category} | Difficulty: ${r.difficulty} | Prep: ${r.prep} | Servings: ${r.servings}\n\n`;
   if(r.diets&&r.diets.length) t+=`Diet: ${r.diets.join(', ')}\n\n`;
-  t+=`INGREDIENTS:\n${allIngredients(r).map(i=>`• ${i.a} ${i.n}`).join('\n')}\n\n`;
-  t+=`METHOD:\n${allSteps(r).map((s,i)=>`${i+1}. ${s}`).join('\n')}`;
+  // v36.4 - shared text is for a PERSON to read, so it carries the headings and
+  // the indentation. allIngredients/allSteps would silently drop them: they
+  // answer "what can I cook with", which is a different question.
+  t+=`INGREDIENTS:\n${ingredientLines(r).map(i =>
+      isSubLine(i) ? `\n${i.sub}` : `${lineIndented(i)?'  ':''}• ${i.a} ${i.n}`).join('\n')}\n\n`;
+  var _sn = 0;
+  t+=`METHOD:\n${stepLines(r).map(s =>
+      isSubLine(s) ? `\n${s.sub}` : `${lineIndented(s)?'  ':''}${++_sn}. ${stepText(s)}`).join('\n')}`;
   if(r.notes&&r.notes.trim()) t+=`\n\nNOTES:\n${r.notes.trim()}`;
   if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
@@ -16415,25 +16706,35 @@ function makeDocxBlob(recipeList){
           + `<w:t>${esc(sub)}</w:t></w:r></w:p>`;
       }
       bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Ingredients</w:t></w:r></w:p>`;
-      var lastG = null;
+      // v36.4 - a sub-title is its own paragraph with no amount and no number,
+      // and an indented line gets a real Word indent (w:ind) rather than
+      // spaces, so it survives reflow and a different page width.
+      var IND = `<w:ind w:start="360" w:left="360"/>`;
       (part.ingredients||[]).forEach(i=>{
-        // The article's own sub-heading inside one recipe ("for the sauce").
-        if ((i.g||'') !== (lastG === null ? null : lastG)) {
-          lastG = i.g || '';
-          if (lastG) bodyXml+=`<w:p><w:pPr>${pBidi(lastG)}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(lastG)}</w:rPr>`
-            + `<w:t>${esc(lastG)}</w:t></w:r></w:p>`;
+        if (isSubLine(i)) {
+          bodyXml+=`<w:p><w:pPr>${pBidi(i.sub)}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(i.sub)}</w:rPr>`
+            + `<w:t>${esc(i.sub)}</w:t></w:r></w:p>`;
+          return;
         }
-        bodyXml+=`<w:p><w:pPr>${pBidi(i.n)}</w:pPr>`
+        bodyXml+=`<w:p><w:pPr>${pBidi(i.n)}${lineIndented(i)?IND:''}</w:pPr>`
           + `<w:r><w:rPr><w:b/>${rRtl(i.n)}</w:rPr><w:t xml:space="preserve">${esc(i.a)}  </w:t></w:r>`
           + `<w:r><w:rPr>${rRtl(i.n)}</w:rPr><w:t>${esc(i.n)}</w:t></w:r></w:p>`;
       });
       bodyXml+=`<w:p></w:p>`;
 
       bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Method</w:t></w:r></w:p>`;
-      (part.steps||[]).forEach((s,si)=>{
-        bodyXml+=`<w:p><w:pPr>${pBidi(s)}</w:pPr>`
-          + `<w:r><w:rPr><w:b/>${rRtl(s)}</w:rPr><w:t xml:space="preserve">${si+1}. </w:t></w:r>`
-          + `<w:r><w:rPr>${rRtl(s)}</w:rPr><w:t>${esc(s)}</w:t></w:r></w:p>`;
+      var wn = 0;
+      (part.steps||[]).forEach(s=>{
+        if (isSubLine(s)) {
+          bodyXml+=`<w:p><w:pPr>${pBidi(s.sub)}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(s.sub)}</w:rPr>`
+            + `<w:t>${esc(s.sub)}</w:t></w:r></w:p>`;
+          return;
+        }
+        wn++;
+        var st = stepText(s);
+        bodyXml+=`<w:p><w:pPr>${pBidi(st)}${lineIndented(s)?IND:''}</w:pPr>`
+          + `<w:r><w:rPr><w:b/>${rRtl(st)}</w:rPr><w:t xml:space="preserve">${wn}. </w:t></w:r>`
+          + `<w:r><w:rPr>${rRtl(st)}</w:rPr><w:t>${esc(st)}</w:t></w:r></w:p>`;
       });
     });
 
@@ -17025,7 +17326,7 @@ function openAddModal(id){
   document.getElementById('f-srv').value=r?r.servings:'';
   loadIngsTable(r ? r.ingredients : []);
   renderDietButtons(r ? (r.diets || []) : []);
-  document.getElementById('f-steps').value = r ? r.steps.join('\n') : '';
+  document.getElementById('f-steps').value = r ? stepsToText(r.steps) : '';
   if(document.getElementById('f-source'))document.getElementById('f-source').value=r?(r.source||''):'';
   if(document.getElementById('f-notes'))document.getElementById('f-notes').value=r?(r.notes||''):'';
   // Auto-set isClip if recipe has no ingredients and no steps
@@ -17097,7 +17398,10 @@ async function saveRecipe(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){toast('Please enter a recipe name');return;}
 
-  const rawSteps=document.getElementById('f-steps').value.trim().split('\n').filter(Boolean);
+  // v36.4 — the text carries the structure: "# " is a sub-title, leading
+  // spaces indent. The buttons above the box write those, so nothing has to be
+  // remembered, but a pasted recipe using them still works.
+  const rawSteps=textToSteps(document.getElementById('f-steps').value);
   // 2.2 — straight from the table, no flatten-and-reparse round trip.
   const ings=readIngsTable().map(function(i){
     return (!i.n && i.a) ? {a:'', n:i.a} : i;   // amount typed with no name reads as the name
@@ -18030,7 +18334,10 @@ async function runTranslate() {
   res.innerHTML = `<div class="explore-loading"><div class="ai-spinner"></div><br>Translating to ${toLang}…</div>`;
 
   const ingsText = r.ingredients.map(i => `${i.a}|${i.n}`).join('\n');
-  const stepsText = r.steps.map((s,i) => `${i+1}. ${s}`).join('\n');
+  // v36.4 - send every line's TEXT, headings included: a heading left
+  // untranslated in a translated recipe is worse than not having one. The
+  // structure is re-applied by position when the answer comes back.
+  const stepsText = stepLines(r).map((s,i) => `${i+1}. ${isSubLine(s)?s.sub:stepText(s)}`).join('\n');
 
   const prompt = `You are a professional culinary translator. Translate the following recipe from ${fromLang} to ${toLang}. If the source language is "auto-detect", detect it automatically.
 Return ONLY valid JSON with this exact structure, no markdown fences:
@@ -18060,13 +18367,17 @@ ${stepsText}`;
   try {
     const raw = await aiCall(prompt, 1500);
     const parsed = extractJSON(raw);
+    // v36.4 - re-apply the original structure by POSITION. The translator is
+    // sent one line per line and returns them in order, so a heading comes back
+    // translated but as a plain string; without this it would become an
+    // ordinary numbered step and the grouping would be lost on every
+    // translation. If the counts disagree the answer is not comparable, so the
+    // structure is dropped rather than guessed onto the wrong lines.
+    parsed.steps = reapplyLineStructure(stepLines(r), parsed.steps);
+    parsed.ingredients = reapplyLineStructure(ingredientLines(r), parsed.ingredients);
     const dir = isToHebrew ? 'rtl' : 'ltr';
-    const ingsHtml = parsed.ingredients.map(i =>
-      `<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">${escH(i.a)}</span><span>${escH(i.n)}</span></div>`
-    ).join('');
-    const stepsHtml = parsed.steps.map((s,i) =>
-      `<div class="translate-step"><span class="translate-step-num">${i+1}</span><span>${escH(s)}</span></div>`
-    ).join('');
+    const ingsHtml = previewIngsHtml(parsed.ingredients);
+    const stepsHtml = previewStepsHtml(parsed.steps);
 
     res.innerHTML = `
       <div class="translate-block" dir="${dir}">
@@ -18153,7 +18464,7 @@ function applyParsedToForm(parsed, mode) {
   var stepsNow = val('f-steps');
   var haveSteps = !!stepsNow && stepsNow !== 'Enjoy!';
   if (norm.steps.length && (mode === 'replace' || !haveSteps)) {
-    set('f-steps', norm.steps.join('\n')); changed.push(norm.steps.length + ' steps');
+    set('f-steps', stepsToText(norm.steps)); changed.push(norm.steps.length + ' steps');
   }
   ['prep', 'srv'].forEach(function(f, i) {
     var v = i === 0 ? parsed.prep : parsed.servings;
@@ -18187,9 +18498,7 @@ function applyParsedToFormPreview(parsed, resultDivId) {
   var ings = parsed.ingredients.map(function(i){
     return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
   }).join('');
-  var steps = parsed.steps.map(function(s, i){
-    return '<div class="translate-step"><span class="translate-step-num">' + (i+1) + '</span><span>' + escH(s) + '</span></div>';
-  }).join('');
+  var steps = previewStepsHtml(parsed.steps);
   document.getElementById(resultDivId).innerHTML =
     '<div class="translate-block" style="margin-top:12px;">'
     + '<div class="translate-block-title">' + escH(parsed.name || 'Untitled') + '</div>'
@@ -18627,9 +18936,7 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   var ingsHtml = (parsed.ingredients||[]).map(function(i) {
     return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
   }).join('');
-  var stepsHtml = (parsed.steps||[]).map(function(s,i) {
-    return '<div class="translate-step"><span class="translate-step-num">' + (i+1) + '</span><span>' + escH(s) + '</span></div>';
-  }).join('');
+  var stepsHtml = previewStepsHtml(parsed.steps);
   if (originalPhoto) parsed._originalPhoto = originalPhoto;
   var encodedParsed = JSON.stringify(parsed).replace(/"/g,'&quot;');
   var origPhotoHtml = originalPhoto
@@ -19382,16 +19689,13 @@ function normalizePart(p, idx) {
     prep: typeof p.prep === 'string' ? p.prep : (p.prep == null ? '' : String(p.prep)),
     notes: typeof p.notes === 'string' ? p.notes : ''
   };
-  // Reuse normalizeRecipe's coercion for the two list fields rather than
-  // writing a second, subtly different one — the AI returns ingredients as bare
-  // strings often enough that this matters.
-  var n = normalizeRecipe({ ingredients: p.ingredients, steps: p.steps });
-  out.ingredients = n.ingredients.map(function(i, k) {
-    var src = Array.isArray(p.ingredients) ? p.ingredients[k] : null;
-    var g = (src && typeof src === 'object' && typeof src.g === 'string') ? src.g.trim() : '';
-    return g ? { a: i.a, n: i.n, g: g } : { a: i.a, n: i.n };
-  });
-  out.steps = n.steps;
+  // The SAME coercion as a flat recipe, not a second subtly different one. The
+  // AI returns ingredients as bare strings often enough that this matters, and
+  // since v36.4 it is also what turns the article's own `g` sub-headings into
+  // heading lines — a part and a plain recipe must group identically or the
+  // same list would render two ways depending on where it lives.
+  out.ingredients = normalizeIngredientLines(p.ingredients);
+  out.steps = normalizeStepLines(p.steps);
   return out;
 }
 
@@ -19406,7 +19710,97 @@ function isCollection(r) {
 // Every ingredient in the recipe, whether it has parts or not. Read-only
 // consumers (search, export, Bring!, nutrition, "one item away") call this so a
 // collection is never silently half-searched.
-function allIngredients(r) {
+// ─── SUB-TITLES (v36.4) ──────────────────────────────────────────────────────
+// A recipe can carry heading lines among its ingredients and its method —
+// "Brine option #1" — with the lines under them indented. A heading is NOT an
+// ingredient and NOT a step: it has no amount and takes no step number.
+//
+// THE IMPORTANT DECISION IS WHICH ACCESSOR MEANS WHAT.
+//   allIngredients / allSteps  →  the things you can actually cook with.
+//   ingredientLines / stepLines →  those PLUS the headings, in order.
+// Keeping the old names meaning the old thing is deliberate: twenty consumers
+// call them — search, pantry, one-away, nutrition, Bring!, scaling, Word,
+// print, share — and every one of them wants content, not headings. If the
+// default included headings, Bring! would put "Brine option #1" on the shopping
+// list and the recipe card would claim two more ingredients than it has. Only
+// the renderers and the editor ask for lines, and they ask by name.
+//
+// Indentation is a property of the LINE, not of the heading above it. Tony was
+// explicit: a few steps belong under a sub-title and then the method returns to
+// the main flow, so "everything until the next heading" would be wrong.
+function isSubLine(x) {
+  return !!(x && typeof x === 'object' && typeof x.sub === 'string' && x.sub !== '');
+}
+
+// Coerce anything into the three legal ingredient shapes.
+//
+// It also folds the OLD `g` sub-heading into the new one. v36.0 gave each
+// ingredient a `g` carrying the article's own heading ("for the sauce"), and
+// the collection view drew a heading whenever `g` changed. Keeping both would
+// be two mechanisms for one visual thing, drifting apart — the exact trap the
+// parts/flat rule in CLAUDE.md exists to avoid. A run of items sharing a `g`
+// becomes a heading line followed by indented items, and `g` is gone.
+function normalizeIngredientLines(list) {
+  var out = [], lastG = null;
+  (Array.isArray(list) ? list : []).forEach(function(i) {
+    if (isSubLine(i)) { out.push({ sub: String(i.sub).trim() }); lastG = null; return; }
+    if (typeof i === 'string') {
+      var m = i.match(/^\s*([\d./]+\s*[A-Za-z"']*)\s+(.*)$/);
+      out.push(m ? { a: m[1].trim(), n: m[2].trim() } : { a: '', n: i.trim() });
+      lastG = null;
+      return;
+    }
+    if (!i || typeof i !== 'object') { out.push({ a: '', n: String(i == null ? '' : i) }); return; }
+    var g = typeof i.g === 'string' ? i.g.trim() : '';
+    if (g && g !== lastG) { out.push({ sub: g }); lastG = g; }
+    else if (!g) lastG = null;
+    var item = { a: typeof i.a === 'string' ? i.a : (i.a == null ? '' : String(i.a)),
+                 n: typeof i.n === 'string' ? i.n : (i.n == null ? '' : String(i.n)) };
+    if (i.ind || g) item.ind = 1;          // an item that had a `g` was always shown under it
+    out.push(item);
+  });
+  // A heading with nothing after it, or two in a row, is noise rather than
+  // structure — and an empty one would render as a blank bold line.
+  return out.filter(function(x, k) {
+    if (isSubLine(x)) {
+      if (!x.sub) return false;
+      var next = out[k + 1];
+      return !!next && !isSubLine(next);
+    }
+    return x.a || x.n;
+  });
+}
+function normalizeStepLines(list) {
+  var out = (Array.isArray(list) ? list : []).map(function(s) {
+    if (isSubLine(s)) return { sub: String(s.sub).trim() };
+    if (typeof s === 'string') return s;
+    if (s && typeof s === 'object') {
+      var t = typeof s.t === 'string' ? s.t : String(s.text || s.step || s.description || '');
+      return s.ind ? { t: t, ind: 1 } : t;
+    }
+    return String(s == null ? '' : s);
+  });
+  return out.filter(function(x, k) {
+    if (isSubLine(x)) {
+      if (!x.sub) return false;
+      var next = out[k + 1];
+      return !!next && !isSubLine(next);
+    }
+    return stepText(x).trim();
+  });
+}
+window.normalizeIngredientLines = normalizeIngredientLines;
+window.normalizeStepLines = normalizeStepLines;
+function stepText(s) {
+  if (typeof s === 'string') return s;
+  if (s && typeof s === 'object') return typeof s.t === 'string' ? s.t : '';
+  return '';
+}
+function lineIndented(x) { return !!(x && typeof x === 'object' && x.ind); }
+window.isSubLine = isSubLine; window.stepText = stepText; window.lineIndented = lineIndented;
+
+// Every line, headings included — for anything that DRAWS the recipe.
+function ingredientLines(r) {
   if (!r) return [];
   if (!isCollection(r)) return Array.isArray(r.ingredients) ? r.ingredients : [];
   var out = [];
@@ -19415,7 +19809,7 @@ function allIngredients(r) {
   });
   return out;
 }
-function allSteps(r) {
+function stepLines(r) {
   if (!r) return [];
   if (!isCollection(r)) return Array.isArray(r.steps) ? r.steps : [];
   var out = [];
@@ -19424,8 +19818,16 @@ function allSteps(r) {
   });
   return out;
 }
+// The cookable content. Same meaning these two have always had.
+function allIngredients(r) {
+  return ingredientLines(r).filter(function(i){ return !isSubLine(i); });
+}
+function allSteps(r) {
+  return stepLines(r).filter(function(s){ return !isSubLine(s); }).map(stepText);
+}
 window.recipeParts = recipeParts;   window.isCollection = isCollection;
 window.allIngredients = allIngredients; window.allSteps = allSteps;
+window.ingredientLines = ingredientLines; window.stepLines = stepLines;
 window.normalizePart = normalizePart;
 
 function normalizeRecipe(r) {
@@ -19456,26 +19858,16 @@ function normalizeRecipe(r) {
   if (typeof r.photo !== 'string') r.photo = '';
   r.fav = !!r.fav;
 
-  // Ingredients → always an array of {a:String, n:String}
+  // Ingredients → {a,n,ind?} for content, {sub} for a heading. Nothing else.
   if (!Array.isArray(r.ingredients)) r.ingredients = [];
-  r.ingredients = r.ingredients.map(function(i) {
-    if (typeof i === 'string') {
-      // "200g flour" → split leading amount from name; fall back to all-name
-      var m = i.match(/^\s*([\d./]+\s*[A-Za-z"']*)\s+(.*)$/);
-      return m ? { a: m[1].trim(), n: m[2].trim() } : { a: '', n: i.trim() };
-    }
-    if (!i || typeof i !== 'object') return { a: '', n: String(i == null ? '' : i) };
-    return { a: typeof i.a === 'string' ? i.a : (i.a == null ? '' : String(i.a)),
-             n: typeof i.n === 'string' ? i.n : (i.n == null ? '' : String(i.n)) };
-  }).filter(function(i) { return i.a || i.n; });
+  r.ingredients = normalizeIngredientLines(r.ingredients);
 
-  // Steps → always an array of non-empty strings
+  // Steps → a plain string, or {t,ind} when indented, or {sub} for a heading.
+  // Plain strings stay plain: they are the overwhelming majority and every
+  // stored recipe already holds them, so turning them all into objects would
+  // rewrite the cloud copy of the entire collection for no gain.
   if (!Array.isArray(r.steps)) r.steps = [];
-  r.steps = r.steps.map(function(s) {
-    if (typeof s === 'string') return s;
-    if (s && typeof s === 'object') return String(s.text || s.step || s.description || '');
-    return String(s == null ? '' : s);
-  }).filter(function(s) { return s.trim(); });
+  r.steps = normalizeStepLines(r.steps);
 
   if (!Array.isArray(r.diets)) r.diets = [];
   if (typeof r.cookCount !== 'number' || isNaN(r.cookCount)) r.cookCount = 0;
@@ -21514,17 +21906,29 @@ function buildPrintHtml(list) {
     + '.source{font-size:12px;color:#888;margin-top:12px;}'
     + '.notes{background:#FFF8E8;border-left:3px solid #D4A843;padding:10px 14px;margin-top:16px;font-size:14px;}'
     + '.recipe + .recipe{page-break-before:always;margin-top:48px;}'
+    + '.sub{font-weight:700;color:#C1440E;font-size:13px;padding-top:10px;}'
+    + '.ind{padding-inline-start:18px;}'
     + '@media print{button{display:none;}}';
 
+  // v36.4 - a printout is read by a person, so it keeps the headings and the
+  // indentation. allIngredients/allSteps answer "what can I cook with" and
+  // would drop them silently.
   var body = list.map(function(r) {
-    var ings = allIngredients(r).map(function(i){
+    var ings = ingredientLines(r).map(function(i){
+      if (isSubLine(i))
+        return '<tr><td class="sub" dir="auto" colspan="2">' + escH(i.sub) + '</td></tr>';
       return '<tr><td dir="auto" style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
-        + escH(i.a) + '</td><td dir="auto" style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
+        + escH(i.a) + '</td><td dir="auto"' + (lineIndented(i) ? ' class="ind"' : '')
+        + ' style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
     }).join('');
-    var steps = allSteps(r).map(function(s,si){
-      return '<div style="display:flex;gap:12px;margin-bottom:10px;">'
-        + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + (si+1) + '</span>'
-        + '<span dir="auto">' + escH(s) + '</span></div>';
+    var _pn = 0;
+    var steps = stepLines(r).map(function(s){
+      if (isSubLine(s)) return '<div class="sub" dir="auto">' + escH(s.sub) + '</div>';
+      _pn++;
+      return '<div style="display:flex;gap:12px;margin-bottom:10px;"'
+        + (lineIndented(s) ? ' class="ind"' : '') + '>'
+        + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + _pn + '</span>'
+        + '<span dir="auto">' + escH(stepText(s)) + '</span></div>';
     }).join('');
     return '<div class="recipe">'
       + '<h1 dir="auto">' + escH(r.emoji) + ' ' + escH(r.name) + '</h1>'
@@ -21565,11 +21969,11 @@ function printRecipe(id) {
 // ── PAGE LOAD INIT ──────────────────────────────────────────────────────────
 
 // ─── INGREDIENT TABLE ────────────────────────────────────────────────────────
-function addIngRow(amount, name) {
+function addIngRow(amount, name, indented, before) {
   var tbody = document.getElementById('ingsRows');
   if (!tbody) return;
   var row = document.createElement('div');
-  row.className = 'ing-row';
+  row.className = 'ing-row' + (indented ? ' ing-row-indent' : '');
 
   var handle = document.createElement('div');
   handle.className = 'ing-handle';
@@ -21599,6 +22003,22 @@ function addIngRow(amount, name) {
     if (e.key==='Enter') { e.preventDefault(); addIngRow(); }
   };
 
+  // v36.4 — indentation is per LINE, not "everything under the last heading".
+  // Tony was explicit: a few items belong under a sub-title and then the list
+  // returns to the main flow. So it is a toggle on the row, not a consequence
+  // of position.
+  var indBtn = document.createElement('button');
+  indBtn.type='button'; indBtn.className='ing-indent-btn';
+  indBtn.title='Indent or outdent this line';
+  var paintInd = function(){
+    var on = row.classList.contains('ing-row-indent');
+    indBtn.textContent = on ? '⇤' : '⇥';
+    indBtn.setAttribute('aria-label', on ? 'Outdent this ingredient' : 'Indent this ingredient');
+    indBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+  indBtn.onclick = function(){ row.classList.toggle('ing-row-indent'); paintInd(); };
+  paintInd();
+
   var delBtn = document.createElement('button');
   delBtn.type='button'; delBtn.className='ing-del'; delBtn.textContent='✕';
   delBtn.onclick = function() { row.remove(); syncIngsTextarea(); if (!tbody.children.length) addIngRow(); };
@@ -21627,10 +22047,13 @@ function addIngRow(amount, name) {
   handle.addEventListener('touchmove', function(e){ e.preventDefault(); moveDrag(e.touches[0].clientY); },{passive:false});
   handle.addEventListener('touchend', function(e){ e.preventDefault(); endDrag(); },{passive:false});
 
-  row.appendChild(handle); row.appendChild(amtInput); row.appendChild(nameInput); row.appendChild(delBtn);
-  tbody.appendChild(row);
+  row.appendChild(handle); row.appendChild(amtInput); row.appendChild(nameInput);
+  row.appendChild(indBtn); row.appendChild(delBtn);
+  if (before && before.parentNode === tbody) tbody.insertBefore(row, before.nextSibling);
+  else tbody.appendChild(row);
   syncIngsTextarea();
   if (amount) nameInput.focus();
+  else if (before) amtInput.focus();
   return row;
 }
 
@@ -21642,10 +22065,22 @@ function addIngRow(amount, name) {
 function readIngsTable() {
   var out = [];
   document.querySelectorAll('#ingsRows .ing-row').forEach(function(row) {
+    // v36.4 — a sub-title row has ONE input and no amount, because a heading is
+    // not a quantity of anything.
+    if (row.classList.contains('ing-row-sub')) {
+      var st = row.querySelector('input');
+      var v = st ? st.value.trim() : '';
+      if (v) out.push({ sub: v });
+      return;
+    }
     var inputs = row.querySelectorAll('input');
     var a = inputs[0] ? inputs[0].value.trim() : '';
     var n = inputs[1] ? inputs[1].value.trim() : '';
-    if (a || n) out.push({ a: a, n: n });
+    if (a || n) {
+      var item = { a: a, n: n };
+      if (row.classList.contains('ing-row-indent')) item.ind = 1;
+      out.push(item);
+    }
   });
   return out;
 }
@@ -21658,8 +22093,148 @@ function loadIngsTable(ingredients) {
   if (!tbody) return;
   tbody.innerHTML = '';
   if (!ingredients || !ingredients.length) { addIngRow(); return; }
-  ingredients.forEach(function(ing) { addIngRow(ing.a||'', ing.n||''); });
+  ingredients.forEach(function(ing) {
+    if (isSubLine(ing)) addIngSubRow(ing.sub);
+    else addIngRow(ing.a || '', ing.n || '', lineIndented(ing));
+  });
 }
+
+// A heading row: one field, no amount, and visibly not an ingredient.
+function addIngSubRow(text, before) {
+  var tbody = document.getElementById('ingsRows');
+  if (!tbody) return null;
+  var row = document.createElement('div');
+  row.className = 'ing-row ing-row-sub';
+
+  var handle = document.createElement('div');
+  handle.className = 'ing-handle'; handle.innerHTML = '⠿'; handle.title = 'Drag to reorder';
+
+  var input = document.createElement('input');
+  input.type = 'text'; input.placeholder = 'Sub-title, e.g. Brine option #1';
+  input.value = text || ''; input.setAttribute('dir', 'auto');
+  input.className = 'ing-sub-input';
+  input.onkeydown = function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addIngRow('', '', true, row); }
+  };
+
+  var delBtn = document.createElement('button');
+  delBtn.type = 'button'; delBtn.className = 'ing-del'; delBtn.textContent = '✕';
+  delBtn.onclick = function() { row.remove(); if (!tbody.children.length) addIngRow(); };
+
+  row.appendChild(handle); row.appendChild(input); row.appendChild(delBtn);
+  if (before && before.parentNode === tbody) tbody.insertBefore(row, before.nextSibling);
+  else tbody.appendChild(row);
+  input.focus();
+  return row;
+}
+window.addIngSubRow = addIngSubRow;
+
+// ─── THE METHOD BOX (v36.4) ──────────────────────────────────────────────────
+// The method stays a textarea: it is the fastest thing to type into and the
+// only one you can paste a whole recipe into. So structure is carried in the
+// TEXT — "# " starts a sub-title, leading spaces indent — and the buttons above
+// the box write those markers for you. Tony's point was that having to remember
+// a marker is not intuitive; needing one in a plain text field is unavoidable,
+// but having to type it is not.
+function stepsToText(lines) {
+  return (lines || []).map(function(s) {
+    if (isSubLine(s)) return '# ' + s.sub;
+    return (lineIndented(s) ? '    ' : '') + stepText(s);
+  }).join('\n');
+}
+function textToSteps(text) {
+  return String(text == null ? '' : text).split('\n').map(function(raw) {
+    if (!raw.trim()) return '';
+    var m = raw.match(/^\s*#\s*(.*)$/);
+    if (m) return { sub: m[1].trim() };
+    var indented = /^[ \t]/.test(raw);
+    var t = raw.trim();
+    return indented ? { t: t, ind: 1 } : t;
+  }).filter(function(x) { return isSubLine(x) ? x.sub : stepText(x).trim(); });
+}
+window.stepsToText = stepsToText; window.textToSteps = textToSteps;
+
+// The three import/translate PREVIEWS all drew steps the same way, and all
+// three would have printed "[object Object]" for a sub-title or an indented
+// step. One function, so there is one thing to get right.
+function previewStepsHtml(steps) {
+  var n = 0;
+  return (steps || []).map(function(s) {
+    if (isSubLine(s))
+      return '<div class="translate-step" style="font-weight:700;color:var(--terracotta);">'
+        + escH(s.sub) + '</div>';
+    n++;
+    return '<div class="translate-step"' + (lineIndented(s) ? ' style="padding-inline-start:18px;"' : '') + '>'
+      + '<span class="translate-step-num">' + n + '</span><span>' + escH(stepText(s)) + '</span></div>';
+  }).join('');
+}
+function previewIngsHtml(ings) {
+  return (ings || []).map(function(i) {
+    if (isSubLine(i))
+      return '<div class="translate-ing-row" style="font-weight:700;color:var(--terracotta);">'
+        + escH(i.sub) + '</div>';
+    return '<div class="translate-ing-row"' + (lineIndented(i) ? ' style="padding-inline-start:18px;"' : '') + '>'
+      + '<span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span>'
+      + '<span>' + escH(i.n) + '</span></div>';
+  }).join('');
+}
+window.previewStepsHtml = previewStepsHtml; window.previewIngsHtml = previewIngsHtml;
+
+// Put the sub-title / indent structure of `original` back onto `translated`,
+// which came back as flat lines in the same order. Only safe when the two line
+// up one-to-one — a mismatch means the model merged or split something, and
+// stamping "this one is a heading" onto the wrong line is worse than losing the
+// heading, because it silently turns an instruction into a title.
+function reapplyLineStructure(original, translated) {
+  var orig = Array.isArray(original) ? original : [];
+  var out  = Array.isArray(translated) ? translated : [];
+  if (!orig.length || orig.length !== out.length) return out;
+  return out.map(function(x, k) {
+    var o = orig[k];
+    if (isSubLine(o)) {
+      var txt = isSubLine(x) ? x.sub : (typeof x === 'string' ? x : (x && (x.n || stepText(x))) || '');
+      return { sub: String(txt).trim() };
+    }
+    if (!lineIndented(o)) return x;
+    if (typeof x === 'string') return { t: x, ind: 1 };
+    if (x && typeof x === 'object') { var c = Object.assign({}, x); c.ind = 1; return c; }
+    return x;
+  });
+}
+window.reapplyLineStructure = reapplyLineStructure;
+
+// Which line the cursor is in, as [start, end) offsets into the textarea.
+function stepLineRange(ta) {
+  var v = ta.value, pos = ta.selectionStart == null ? v.length : ta.selectionStart;
+  var start = v.lastIndexOf('\n', pos - 1) + 1;
+  var end = v.indexOf('\n', pos);
+  if (end === -1) end = v.length;
+  return [start, end];
+}
+function replaceStepLine(ta, line) {
+  var r = stepLineRange(ta), v = ta.value;
+  ta.value = v.slice(0, r[0]) + line + v.slice(r[1]);
+  var caret = r[0] + line.length;
+  ta.focus();
+  try { ta.setSelectionRange(caret, caret); } catch (e) {}
+}
+// Toggle, not "set": pressing it on a line that is already a sub-title turns it
+// back into an ordinary step, so the button can undo itself.
+function stepToolSub() {
+  var ta = document.getElementById('f-steps'); if (!ta) return;
+  var r = stepLineRange(ta), line = ta.value.slice(r[0], r[1]);
+  var m = line.match(/^\s*#\s*(.*)$/);
+  replaceStepLine(ta, m ? m[1] : ('# ' + line.trim()));
+}
+function stepToolIndent(dir) {
+  var ta = document.getElementById('f-steps'); if (!ta) return;
+  var r = stepLineRange(ta), line = ta.value.slice(r[0], r[1]);
+  if (/^\s*#/.test(line)) return;          // a heading is never indented
+  replaceStepLine(ta, dir > 0 ? ('    ' + line.replace(/^[ \t]+/, ''))
+                              : line.replace(/^[ \t]+/, ''));
+}
+window.stepToolSub = stepToolSub; window.stepToolIndent = stepToolIndent;
+window.stepLineRange = stepLineRange;
 
 // ─── PHOTO SEARCH ─────────────────────────────────────────────────────────────
 var _photoSearchSelected = null;

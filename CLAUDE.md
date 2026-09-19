@@ -65,7 +65,7 @@ That runner is in the repo and is what CI runs (`.github/workflows/self-tests.ym
 5.6). It exits non-zero on a failure **and** on a test that closes the suite or
 strands a dialog.
 
-**As of v36.3: 219 checks, all passing, 6 skipped.** The skips are `net_*` and
+**As of v36.4: 223 checks, all passing, 6 skipped.** The skips are `net_*` and
 `stor_firebase` — they need real network and a signed-in Firebase session and
 cannot run in a sandbox. Any failure at all is a real regression. Note the runner
 skips by **id prefix `net_`**, not by group: naming a test `net_…` silently
@@ -869,6 +869,47 @@ found only because a test was written first and disagreed with the code.
   - A test that needs a GENUINE problem in the log must write it unmarked —
     `log_nudge_is_quiet_and_per_device` builds its fixtures with `writeSyncLog`
     rather than `syncLog` for exactly that reason.
+
+- **Sub-titles in both lists (v36.4).** A recipe can carry heading lines among its
+  ingredients and its method — "Brine option #1" — with lines under them indented.
+  A heading is **not** an ingredient and **not** a step: no amount, no tick box,
+  no step number.
+  - **The load-bearing decision is which accessor means what.** `allIngredients` /
+    `allSteps` still mean *the things you can cook with*, unchanged, because
+    twenty consumers call them — search, pantry, one-away, nutrition, **Bring!**,
+    scaling, Word, print, share. `ingredientLines` / `stepLines` add the headings
+    and are asked for **by name**, only by things that DRAW the recipe. Had the
+    default included headings, Bring! would have put "Brine option #1" on the
+    shopping list and every card would have over-counted its ingredients. When
+    adding a line type, make the old name keep the old meaning.
+  - **Indentation is a property of the LINE, not of the heading above it.** Tony
+    was explicit: a few lines belong under a sub-title and then the list returns
+    to the main flow ("0.5 Kg pork chops" after two brine options). "Everything
+    until the next heading" would get that wrong, so it is a per-row toggle.
+  - **The old `g` is gone, folded into this.** v36.0 carried the article's own
+    sub-heading as a property on each ingredient and drew a heading when it
+    changed. Two mechanisms for one visual thing would have drifted — the same
+    trap the parts/flat rule exists to avoid — so `normalizeIngredientLines`
+    converts a run sharing a `g` into a heading line plus indented items.
+  - **Entry is by icon, not by marker.** Tony's point: if indentation has a
+    button, a sub-title should too. Ingredients get a `▸ Sub-title` button and a
+    per-row `⇥`/`⇤`. The method is still a textarea (fast to type, pasteable), so
+    its structure lives in the text — `# ` starts a heading, leading spaces
+    indent — and a toolbar above the box writes those for you. **The marker has
+    to exist in a plain text field; having to type it does not.**
+  - **What nearly shipped broken.** Four preview renderers (import, translate ×3)
+    would have printed `[object Object]`, and translation would have flattened
+    every heading into a numbered step — silent data loss on a feature you would
+    only notice weeks later. `previewStepsHtml`/`previewIngsHtml` are one
+    implementation now, and `reapplyLineStructure` puts the shape back by
+    position, **dropping it entirely when the counts disagree** rather than
+    stamping "this is a heading" onto the wrong line.
+  - The recipe view and a collection's sections were two near-copies that had
+    already drifted (only the collection drew headings). They are one pair of
+    functions now: `ingredientLinesHtml` / `stepLinesHtml`.
+- **The search box clears in one tap (v36.4).** `#searchClear` appears only when
+  there is something to clear, re-renders the grid, and keeps focus so typing can
+  continue. Escape does the same.
 
 ## Outstanding
 
