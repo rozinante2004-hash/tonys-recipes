@@ -1073,6 +1073,41 @@ found only because a test was written first and disagreed with the code.
     scrolling horizontally underneath it — would have hidden Meal and Diet
     behind a swipe, which is worse.
 
+- **A part is a recipe, and keeps what a recipe keeps (v36.11).** `normalizePart`
+  carries `source`, `isClip` and `diets` alongside the v36.8 fav/cook fields.
+  **The bug that forced this lost a whole recipe, not a field.** Tony gathered a
+  video clip into a collection and it vanished, because `normalizeRecipe`'s
+  parts filter was `p.ingredients.length || p.steps.length` — and a clip has
+  neither by definition; its entire content is the link. The part was binned,
+  and three lines later the standalone original was deleted from the list and
+  from the cloud. The filter is now
+  `p.ingredients.length || p.steps.length || (p.isClip && p.source)`; an
+  AI-invented heading is still refused, because `isClip` is only ever set from a
+  real recipe.
+  - **`collectSelectedInto` counts the parts that arrived** and, if even one did
+    not, restores everything — no collection, no deleted originals, no queued
+    cloud deletes — and says so. The originals are destroyed immediately after
+    the parts are built, so anything dropped in between is gone for good. Never
+    let that step be silent again.
+  - **The round trip was lossy in the other direction too.** `recipeFromPart`
+    rebuilt the promoted recipe from the COLLECTION and hardcoded `fav: false`,
+    so the favourite, cook count, last-cooked date and cook log — all carried IN
+    since v36.8 — were thrown away on the way OUT. Gathering and splitting are
+    one feature; test them as a round trip, not as two functions.
+  - Source resolution is `part.source || coll.source`: right for a book of
+    recipes off one page, and right for a round-up whose entries each point
+    somewhere different. **`extractRecipesFromLinks` had been setting a correct
+    per-recipe source since v36.2 and `normalizePart` was discarding it** — the
+    ynet-style imports lost every recipe's own page link and nobody noticed,
+    because the collection's own source looked plausible in its place.
+  - `collectionSectionsHtml` shows each part's source as a link with a 🎬 badge,
+    and draws no Ingredients/Method columns for a contentless clip — two empty
+    headings read as a broken recipe.
+  - The part editor loads and saves Source, the clip box and diets, and refuses
+    to save a part down to nothing rather than letting `normalizeRecipe` delete
+    the thing being edited.
+  - Still collection-level, deliberately: `category` and `difficulty`.
+
 - **The "white panel" over the ingredient editor is the GINGER browser
   extension, not this app.** It came back in v36.9 and `elementsFromPoint` named
   it outright: `GWSW#gws-…` over

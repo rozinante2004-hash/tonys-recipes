@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.10 -->
+<!-- Tony's Recipes Collection v36.11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7445,6 +7445,133 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'part_keeps_its_own_source', group:'Features', name:'A recipe keeps its source in and out of a collection (v36.11)',
+    test: async()=>{
+      // Tony's loss: a video clip's whole content is its Source. Gathering it
+      // into a collection dropped the field AND then normalizeRecipe binned the
+      // part entirely, because a clip has no ingredients and no steps.
+      var clip = normalizeRecipe({ id:978301, uid:'clip1', name:'Pasta clip', category:'Dinner',
+        bg:'#fff', isClip:true, source:'https://youtu.be/abc123',
+        ingredients:[], steps:[] });
+      if(!clip.isClip) throw new Error('the fixture is not a clip');
+
+      var part = recipeToPart(clip);
+      if(part.source!=='https://youtu.be/abc123')
+        throw new Error('the source did not survive becoming a part: "'+part.source+'"');
+      if(!part.isClip) throw new Error('the clip flag did not survive becoming a part');
+
+      // ...and a collection built from it must still CONTAIN it.
+      var coll = normalizeRecipe({ id:978302, uid:'c1', name:'Clips', category:'Dinner', bg:'#fff',
+        source:'https://example.com/the-collection', parts:[part] });
+      if(recipeParts(coll).length!==1)
+        throw new Error('the clip was dropped from the collection — the whole recipe, not just its source');
+      if(recipeParts(coll)[0].source!=='https://youtu.be/abc123')
+        throw new Error('the stored part lost its source');
+
+      // A heading the AI invented is still refused: no content, and no clip
+      // flag to excuse it. That is what the filter is for.
+      var junk = normalizeRecipe({ id:978303, uid:'c2', name:'Book', category:'Dinner', bg:'#fff',
+        parts:[{ uid:'h', name:'For the sauce', ingredients:[], steps:[] },
+               { uid:'r', name:'Real', ingredients:[{a:'1',n:'x'}], steps:[] }] });
+      if(recipeParts(junk).length!==1)
+        throw new Error('an empty non-clip part was kept: '+recipeParts(junk).length+' parts');
+
+      // Viewed inside the collection, it points at ITS page, not the collection's.
+      var view = partAsRecipe(coll, recipeParts(coll)[0], partRef(coll.id, 'clip1'));
+      if(view.source!=='https://youtu.be/abc123')
+        throw new Error('opened inside the collection it shows "'+view.source+'"');
+      if(!view.isClip) throw new Error('it stopped being a clip inside the collection');
+      // A part with no source of its own still inherits the collection's.
+      var borrowed = partAsRecipe(coll, normalizePart({ uid:'n', name:'No source',
+        ingredients:[{a:'1',n:'x'}], steps:['s'] }, 0), 'c1:n');
+      if(borrowed.source!=='https://example.com/the-collection')
+        throw new Error('a part with no source of its own did not fall back to the collection');
+
+      // And the collection view SHOWS it — a link, not just a stored field.
+      var html = collectionSectionsHtml(coll);
+      if(html.indexOf('https://youtu.be/abc123')===-1)
+        throw new Error('the collection view does not show the recipe’s source at all');
+      if(!/<a [^>]*href="https:\/\/youtu\.be\/abc123"/.test(html))
+        throw new Error('the source is shown as text rather than as a link you can follow');
+      if(html.indexOf('Ingredients')!==-1)
+        throw new Error('a clip was drawn with an empty Ingredients column, which reads as broken');
+
+      // Lifting it back out must cost nothing at all.
+      var rich = normalizePart({ uid:'g', name:'Cooked one', ingredients:[{a:'1',n:'x'}], steps:['s'],
+        source:'https://example.com/one', fav:true, cookCount:4, lastCooked:1700000000000,
+        cookLog:[{id:'a',at:1,rating:5,note:''}], diets:['Keto'] }, 0);
+      var coll2 = normalizeRecipe({ id:978304, uid:'c3', name:'Book', category:'Soup', bg:'#fff',
+        diets:['Vegan'], parts:[rich] });
+      var back = recipeFromPart(coll2, recipeParts(coll2)[0]);
+      if(back.source!=='https://example.com/one')
+        throw new Error('promoting gave it the COLLECTION’s source: "'+back.source+'"');
+      if(!back.fav) throw new Error('promoting dropped the favourite');
+      if(back.cookCount!==4) throw new Error('promoting dropped the cook count: '+back.cookCount);
+      if(!back.lastCooked) throw new Error('promoting dropped the cooked date');
+      if(!(back.cookLog||[]).length) throw new Error('promoting dropped the cook log');
+      if((back.diets||[]).indexOf('Keto')===-1)
+        throw new Error('promoting gave it the collection’s diets instead of its own: '+JSON.stringify(back.diets));
+      // A clip promoted back out is still a clip.
+      var backClip = recipeFromPart(coll, recipeParts(coll)[0]);
+      if(!backClip.isClip) throw new Error('a clip lifted out of a collection stopped being a clip');
+      if(backClip.source!=='https://youtu.be/abc123') throw new Error('a clip lifted out lost its link');
+    } },
+
+  { id:'collect_never_loses_a_recipe', group:'Features', name:'Gathering refuses rather than silently dropping one (v36.11)',
+    test: async()=>{
+      // The guard that would have saved Tony's clip: the originals are deleted
+      // from the list AND the cloud immediately afterwards, so a part quietly
+      // discarded on the way in is a recipe gone for good.
+      var realToast=window.toast, realSave=window.saveData, realGrid=window.renderGrid,
+          realFilters=window.renderFilters, realConfirm=window.askConfirm, realPrompt=window.askPrompt,
+          realCancel=window.cancelSelectMode, realPhoto=window.chooseCollectionPhoto,
+          realNorm=window.normalizePart;
+      var before=recipes.slice(), beforeId=nextId, beforeSel=selectedIds;
+      var pend=Object.assign({}, _pendingCloudDeletes);
+      var said='';
+      try{
+        window.saveData=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
+        window.cancelSelectMode=function(){}; window.chooseCollectionPhoto=function(){ return Promise.resolve(); };
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        window.askPrompt=function(){ return Promise.resolve('Doomed'); };
+        window.toast=function(m){ said=String(m||''); };
+
+        recipes.unshift(normalizeRecipe({ id:978401, uid:'k1', name:'Keeper', category:'Soup',
+          bg:'#fff', ingredients:[{a:'1',n:'x'}], steps:['s'] }));
+        recipes.unshift(normalizeRecipe({ id:978402, uid:'k2', name:'Also keeper', category:'Soup',
+          bg:'#fff', ingredients:[{a:'2',n:'y'}], steps:['s'] }));
+        var n=recipes.length;
+        selectedIds=new Set([978401,978402]);
+        // Force the exact failure: a normalizePart that strips one part's
+        // content, so the collection silently comes out one recipe short.
+        window.normalizePart=function(p, i){
+          var out=realNorm(p, i);
+          if(out.name==='Also keeper'){ out.ingredients=[]; out.steps=[]; out.isClip=false; out.source=''; }
+          return out;
+        };
+        await collectSelectedInto(null);
+
+        if(recipes.some(isCollection))
+          throw new Error('a short collection was created and kept');
+        if(recipes.length!==n)
+          throw new Error('the library changed by '+(recipes.length-n)+' — something was created or destroyed');
+        if(!recipes.some(function(r){ return r.id===978401; }) ||
+           !recipes.some(function(r){ return r.id===978402; }))
+          throw new Error('an original was deleted even though the collection was refused');
+        if(_pendingCloudDeletes[978401] || _pendingCloudDeletes[978402])
+          throw new Error('a cloud copy was queued for deletion after the collection was refused');
+        if(!/could not be stored/i.test(said))
+          throw new Error('it did not say why nothing happened: "'+said+'"');
+      } finally {
+        window.normalizePart=realNorm;
+        window.toast=realToast; window.saveData=realSave; window.renderGrid=realGrid;
+        window.renderFilters=realFilters; window.askConfirm=realConfirm; window.askPrompt=realPrompt;
+        window.cancelSelectMode=realCancel; window.chooseCollectionPhoto=realPhoto;
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); });
+        nextId=beforeId; selectedIds=beforeSel; _pendingCloudDeletes=pend;
+      }
+    } },
+
   { id:'collection_photo_cards', group:'Features', name:'A new collection is offered its recipes’ photos (v36.10)',
     test: async()=>{
       if(typeof chooseCollectionPhoto!=='function') throw new Error('chooseCollectionPhoto not defined');
@@ -11528,7 +11655,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.10';
+var APP_VERSION = 'v36.11';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13949,7 +14076,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.10</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.11</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14554,7 +14681,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.10</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.11</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16593,23 +16720,45 @@ function collectionSectionsHtml(r) {
     if (p.servings) meta.push('serves ' + escH(p.servings));
     if (p.prep) meta.push(escH(p.prep));
 
+    // v36.11 — each recipe's OWN source, shown per recipe rather than once for
+    // the whole collection. A round-up's entries each point at a different
+    // page, and a clip has nothing else at all.
+    var href = typeof safeUrl === 'function' ? safeUrl(p.source) : (/^https?:\/\//i.test(p.source) ? p.source : '');
+    var srcLine = p.source
+      ? '<div style="font-size:11.5px;margin-top:3px;word-break:break-all;">'
+        + '<span style="color:var(--muted);">Source: </span>'
+        + (href
+            ? '<a href="' + escA(href) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">' + escH(p.source) + '</a>'
+            : '<span style="color:var(--muted);">' + escH(p.source) + '</span>')
+        + '</div>'
+      : '';
+    // A clip IS its link. Drawing two empty columns headed Ingredients and
+    // Method under it says the recipe is broken; it is not, it is a video.
+    var body = (p.isClip && !p.ingredients.length && !p.steps.length)
+      ? ''
+      : '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
+        + '<div class="recipe-col-ings"><div class="modal-section-title">Ingredients</div>'
+        + '<ul class="ingredients-list">' + ings + '</ul>' + awkNote + '</div>'
+        + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div>'
+        + '<ol class="steps-list" dir="auto">' + steps + '</ol></div>'
+        + '</div>';
+
     return '<div class="collection-part" style="border:1px solid var(--border);border-radius:12px;'
       + 'padding:14px 16px;margin-bottom:14px;background:var(--card);">'
       + '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">'
       + '<div style="flex:1;min-width:0;">'
       + '<div dir="auto" style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--warm-brown);">'
+      // .clip-badge is display:flex, which on its own would push the title onto
+      // the next line — inline-flex keeps it beside the name.
+      + (p.isClip ? '<span class="clip-badge clip-badge-sm" style="display:inline-flex;vertical-align:middle;margin-inline-end:6px;">🎬</span>' : '')
       + escH(p.name) + '</div>'
       + (meta.length ? '<div style="font-size:11.5px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '')
+      + srcLine
       + '</div>'
       + (p.fav ? '<div style="flex-shrink:0;font-size:15px;" title="Favourite">❤️</div>' : '')
       + '</div>'
       + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + escH(p.notes) + '</div>' : '')
-      + '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
-      + '<div class="recipe-col-ings"><div class="modal-section-title">Ingredients</div>'
-      + '<ul class="ingredients-list">' + ings + '</ul>' + awkNote + '</div>'
-      + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div>'
-      + '<ol class="steps-list" dir="auto">' + steps + '</ol></div>'
-      + '</div>'
+      + body
       + partActionsHtml(r, p)
       + '</div>';
   }).join('');
@@ -16688,7 +16837,14 @@ function editPart(ref) {
   set('f-prep', f.part.prep || '');
   set('f-srv', f.part.servings || '');
   set('f-notes', f.part.notes || '');
+  set('f-source', f.part.source || '');
   set('f-steps', stepsToText(f.part.steps));
+  // v36.11 — a part has its own source and clip flag now, so the form that
+  // edits one has to show them. Without this the field rendered blank and
+  // saving wrote that blank straight back over a real URL.
+  var clipBox = document.getElementById('f-isclip');
+  if (clipBox) clipBox.checked = !!f.part.isClip;
+  if (typeof renderDietButtons === 'function') { try { renderDietButtons(f.part.diets || []); } catch(e) {} }
   loadIngsTable(f.part.ingredients);
   // openAddModal snapshotted an EMPTY form; everything above is the part being
   // loaded, not an edit. Re-take it, or closing without touching anything would
@@ -16715,7 +16871,9 @@ function recipeToPart(r) {
     steps: r.steps,
     // Everything a part can carry, so nothing is lost on the way in except the
     // photo — which a part deliberately has no room for.
-    fav: r.fav, cookCount: r.cookCount, lastCooked: r.lastCooked, cookLog: r.cookLog
+    fav: r.fav, cookCount: r.cookCount, lastCooked: r.lastCooked, cookLog: r.cookLog,
+    // v36.11 — and where it came from. For a clip this is the entire recipe.
+    source: r.source, isClip: r.isClip, diets: r.diets
   }, 0);
 }
 // A selected COLLECTION contributes its recipes rather than becoming a part of
@@ -16779,6 +16937,7 @@ async function collectSelectedInto(targetId) {
       okLabel: target ? 'Add them' : 'Create it' })) return;
 
   var coll;
+  var prevParts = target ? recipeParts(target).slice() : null;
   if (target) {
     if (typeof pushHistory === 'function') { try { pushHistory(target); } catch(e) {} }
     target.parts = recipeParts(target).concat(incoming);
@@ -16794,6 +16953,25 @@ async function collectSelectedInto(targetId) {
   }
   coll.updatedAt = Date.now();
   normalizeRecipe(coll);
+
+  // NOTHING may be traded for a deleted original. normalizeRecipe drops a part
+  // it does not consider a recipe, and the next three lines delete the
+  // standalone copies from the list and from the cloud — so a part quietly
+  // discarded here is a recipe gone for good. That is exactly what happened to
+  // Tony's video clip in v36.10: it has no ingredients and no steps, the filter
+  // binned it, and the original was deleted a moment later. Count them, and if
+  // even one did not arrive, put everything back and say so (v36.11).
+  var arrived = recipeParts(coll).length - (prevParts ? prevParts.length : 0);
+  if (arrived !== incoming.length) {
+    if (target) { target.parts = prevParts; normalizeRecipe(target); }
+    else { recipes = recipes.filter(function(r){ return r.id !== coll.id; }); nextId--; }
+    var lost = incoming.length - arrived;
+    toast('Nothing was changed — ' + lost + ' of the ' + incoming.length
+        + ' recipes could not be stored inside a collection.', 8000);
+    syncLog('save', 'Refused to collect: ' + lost + ' of ' + incoming.length + ' part(s) would have been dropped',
+      { name: coll.name });
+    return;
+  }
 
   // The originals leave the list — and the CLOUD, or the next load brings them
   // all back alongside the collection that now contains them.
@@ -16961,15 +17139,27 @@ function recipeFromPart(coll, part) {
     difficulty: coll.difficulty,
     prep: part.prep || coll.prep || '—',
     servings: part.servings || '—',
-    bg: rndBg(), fav: false, photo: '', originalPhoto: '',
+    bg: rndBg(), photo: '', originalPhoto: '',
     ingredients: part.ingredients,
     steps: part.steps,
+    // v36.11 — a round trip must not cost anything. A part has carried the
+    // favourite and the cooking history since v36.8 and its own source since
+    // v36.11, and gathering carries them IN — but lifting one back out rebuilt
+    // it from the COLLECTION and hardcoded fav:false, so everything
+    // recipe-specific was quietly dropped on the way out.
+    fav: !!part.fav,
+    cookCount: part.cookCount || 0,
+    lastCooked: part.lastCooked || null,
+    cookLog: Array.isArray(part.cookLog) ? part.cookLog.slice() : [],
+    isClip: !!part.isClip,
     // Where it came from, in both senses: the original page, and the collection
     // it was lifted out of.
     notes: [part.by ? ('By ' + part.by) : '', part.notes || '',
             'From “' + coll.name + '”'].filter(Boolean).join('\n'),
-    source: coll.source || '',
-    diets: Array.isArray(coll.diets) ? coll.diets.slice() : [],
+    source: part.source || coll.source || '',
+    diets: (part.diets && part.diets.length)
+      ? part.diets.slice()
+      : (Array.isArray(coll.diets) ? coll.diets.slice() : []),
     updatedAt: Date.now()
   });
 }
@@ -18496,11 +18686,23 @@ async function saveRecipe(){
   if (_editingPartRef) {
     var f = findPart(_editingPartRef);
     if (!f) { toast('That recipe is no longer in the collection'); closeM('editOverlay'); return; }
+    var partSrc = document.getElementById('f-source') ? document.getElementById('f-source').value.trim() : '';
+    var partClip = !!(document.getElementById('f-isclip')||{}).checked;
+    // normalizeRecipe below drops a part it does not consider a recipe, and
+    // that delete is silent and permanent. Refuse up front rather than let an
+    // edit erase the thing being edited (v36.11).
+    if (!ings.length && !rawSteps.length && !(partClip && partSrc)) {
+      toast('A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.', 7000);
+      return;
+    }
     if (typeof pushHistory === 'function') { try { pushHistory(f.coll); } catch(e) {} }
     f.part.name = name;
     f.part.prep = document.getElementById('f-prep').value.trim();
     f.part.servings = document.getElementById('f-srv').value.trim();
     f.part.notes = (document.getElementById('f-notes')||{value:''}).value.trim();
+    f.part.source = partSrc;
+    f.part.isClip = partClip;
+    f.part.diets = getSelectedDiets();
     f.part.ingredients = normalizeIngredientLines(ings);
     f.part.steps = normalizeStepLines(rawSteps);
     f.coll.updatedAt = Date.now();
@@ -20812,7 +21014,19 @@ function normalizePart(p, idx) {
     fav: !!p.fav,
     cookCount: (typeof p.cookCount === 'number' && !isNaN(p.cookCount)) ? p.cookCount : 0,
     lastCooked: (typeof p.lastCooked === 'number') ? p.lastCooked : null,
-    cookLog: Array.isArray(p.cookLog) ? p.cookLog.filter(function(e){ return e && typeof e === 'object'; }) : []
+    cookLog: Array.isArray(p.cookLog) ? p.cookLog.filter(function(e){ return e && typeof e === 'object'; }) : [],
+    // v36.11 — where this ONE recipe came from, and whether it is a clip.
+    // These were missing, and for a clip the source IS the recipe: merging one
+    // into a collection threw away the only thing it had. They are also what
+    // the link-following import already produces per recipe (each entry in a
+    // round-up points at its own page), and normalizePart was dropping that on
+    // the floor too. A part is a recipe; a recipe knows where it came from.
+    source: typeof p.source === 'string' ? p.source.trim() : '',
+    isClip: !!p.isClip,
+    // Diets are per-recipe, not per-collection: one dish in a book can be keto
+    // and the next not. Reading them off the collection, as promoting used to,
+    // gives every recipe the same tags and they are wrong for most of them.
+    diets: Array.isArray(p.diets) ? p.diets.filter(function(d){ return typeof d === 'string' && d; }) : []
   };
   // The SAME coercion as a flat recipe, not a second subtly different one. The
   // AI returns ingredients as bare strings often enough that this matters, and
@@ -20853,8 +21067,14 @@ function partAsRecipe(coll, part, ref) {
     cookLog: part.cookLog || [],
     ingredients: part.ingredients, steps: part.steps,
     notes: [part.by ? ('By ' + part.by) : '', part.notes || ''].filter(Boolean).join('\n'),
-    source: coll.source || '',
-    diets: Array.isArray(coll.diets) ? coll.diets.slice() : [],
+    // Its OWN page, falling back to the collection's only when it has none —
+    // which is right for a book of recipes off one page and right for a
+    // round-up whose entries each point somewhere different (v36.11).
+    source: part.source || coll.source || '',
+    isClip: !!part.isClip,
+    diets: (part.diets && part.diets.length)
+      ? part.diets.slice()
+      : (Array.isArray(coll.diets) ? coll.diets.slice() : []),
     updatedAt: coll.updatedAt || Date.now(),
     _partOf: coll.id, _partUid: part.uid
   });
@@ -21097,8 +21317,13 @@ function normalizeRecipe(r) {
   if (Array.isArray(r.parts) && r.parts.length) {
     r.parts = r.parts.map(normalizePart).filter(function(p) {
       // A part with neither ingredients nor steps is not a recipe, it is a
-      // heading the AI mistook for one.
-      return p.ingredients.length || p.steps.length;
+      // heading the AI mistook for one — UNLESS it is a clip, whose whole
+      // content is the link. This filter silently ate Tony's video clip the
+      // moment it was gathered into a collection: not just its source, the
+      // entire recipe, because a clip has no ingredients and no steps by
+      // definition. `isClip` is only ever set from a real recipe, so an
+      // invented heading cannot slip through this way (v36.11).
+      return p.ingredients.length || p.steps.length || (p.isClip && p.source);
     });
   } else {
     delete r.parts;
