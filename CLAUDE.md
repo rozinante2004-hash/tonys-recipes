@@ -261,6 +261,19 @@ found only because a test was written first and disagreed with the code.
   site, sending Tony to debug something that was working. A test now extracts the
   proxy hosts from `runUrlImport` itself and fails if any is missing from the CSP,
   so adding a fourth proxy cannot repeat it.
+- **A relay never sees a URL without the user's consent (v36.18).** Those three
+  proxies are not ours: they see every address imported through them and they
+  choose what text comes back. v36.17 made the HTML they return inert, but a bad
+  relay can still feed doctored TEXT to the AI and produce a recipe that is
+  quietly wrong — a judgement only the person importing can make. `proxyConsent()`
+  asks before the first relay fetch, and remembers the answer **only** when the
+  "Never show this message again" box is ticked (`tonys_proxy_consent`, per
+  device, also settable from ⚙️ Settings → Logging & debugging). A decline is a
+  one-off no and is never stored. The preview then says which relay supplied the
+  text. These helpers live at script top level, next to `importFailureCausedByUs`
+  — **not inside `runUrlImport`**: declared in there they are function-scoped, and
+  `renderLoggingPanel()` (a different script block) cannot see them. That is
+  exactly how the first cut of v36.18 broke.
 - **The CSP must stay in step with the script hosts.** `script-src` lists the CDN
   hosts `loadScriptOnce()` uses; adding a lazily loaded library without adding its
   host makes it fail silently. `frame-src` needs `'self'` for the email preview's

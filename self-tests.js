@@ -6361,6 +6361,66 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'sec_proxy_needs_consent', group:'Network', name:'A relay never sees a URL without consent (v36.18)',
+    test: async()=>{
+      ['proxyConsent','proxyConsentState','setProxyConsent'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var prev = proxyConsentState();
+      var realAsk = window.askConfirm;
+      try{
+        // Default is ASK, not allow. A fresh device must not silently relay.
+        setProxyConsent('ask');
+        if(proxyConsentState()!=='ask') throw new Error('the default is not "ask"');
+
+        // Declining means no.
+        var shown = null;
+        window.askConfirm = function(o){ shown = o; return Promise.resolve({ ok:false, checked:false }); };
+        if(await proxyConsent('https://example.com/a-recipe'))
+          throw new Error('declining still allowed the relay');
+        if(!shown) throw new Error('nothing was asked at all');
+        if(!shown.checkbox) throw new Error('the dialog offered no "never ask again" tick');
+        if((shown.message||'').indexOf('example.com')===-1)
+          throw new Error('the dialog does not name the site being imported');
+        if(!/not ours|relay/i.test(shown.message||''))
+          throw new Error('the dialog does not explain what a relay is');
+        // Declining must NOT be remembered — it is a one-off no.
+        if(proxyConsentState()!=='ask') throw new Error('a decline was remembered as a permanent answer');
+
+        // Allowing once, without the tick, does not persist.
+        window.askConfirm = function(){ return Promise.resolve({ ok:true, checked:false }); };
+        if(!await proxyConsent('https://example.com/x')) throw new Error('allowing did not allow');
+        if(proxyConsentState()!=='ask')
+          throw new Error('allowing once was remembered even though the box was not ticked');
+
+        // Allowing WITH the tick persists, and stops asking.
+        window.askConfirm = function(){ return Promise.resolve({ ok:true, checked:true }); };
+        if(!await proxyConsent('https://example.com/y')) throw new Error('allowing with the tick did not allow');
+        if(proxyConsentState()!=='always') throw new Error('the tick was not remembered');
+        var askedAgain = false;
+        window.askConfirm = function(){ askedAgain = true; return Promise.resolve({ ok:false, checked:false }); };
+        if(!await proxyConsent('https://example.com/z'))
+          throw new Error('a remembered "always" did not allow');
+        if(askedAgain) throw new Error('it asked again after "never show this message again"');
+
+        // ...and the setting can be taken back.
+        setProxyConsent('ask');
+        if(proxyConsentState()!=='ask') throw new Error('the choice cannot be reset');
+      } finally {
+        window.askConfirm = realAsk;
+        setProxyConsent(prev === 'always' ? 'always' : 'ask');
+      }
+
+      // The importer must actually call the gate before any relay fetch.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var i = src.indexOf('Fall back to browser CORS proxies');
+      var block = src.slice(i, src.indexOf('Extract recipe from page text'));
+      if(!block) throw new Error('could not find the relay fallback to check');
+      if(block.indexOf('proxyConsent(')===-1)
+        throw new Error('the relay fallback does not ask for consent — URLs would leave silently');
+      if(block.indexOf('proxyConsent(') > block.indexOf('fetch(makeProxy'))
+        throw new Error('consent is asked AFTER the first relay fetch — too late');
+    } },
+
   { id:'sec_remote_html_is_inert', group:'Network', name:'Remote HTML never executes (v36.17)',
     test: async()=>{
       // A URL import can fall back to a third-party CORS proxy, and whatever it

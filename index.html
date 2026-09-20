@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.17 -->
+<!-- Tony's Recipes Collection v36.18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -748,6 +748,21 @@ function renderLoggingPanel() {
      + 'Off by default. The self-test suite is a separate <strong>~590 KB</strong> download, so a phone that '
      + 'will never run it does not carry it. Switching this on shows 🧪 Self Test in ⚙️ Settings and fetches '
      + 'the file the first time you open it. <strong>This setting is per device.</strong></div></div>';
+
+  // 1a2 — the relay consent, per device (v36.18)
+  var _pc = proxyConsentState();
+  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
+     + '<input type="checkbox" id="proxyAlwaysBox"' + (_pc === 'always' ? ' checked' : '')
+     + ' onchange="setProxyConsent(this.checked ? \'always\' : \'ask\');renderLoggingPanel();" style="width:18px;height:18px;">'
+     + 'Always allow relay services for imports</label>'
+     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+     + 'When a page cannot be fetched by your own server, the import can go through a public relay. '
+     + 'Those relays see the address you are importing and choose what text comes back. '
+     + (_pc === 'always'
+        ? 'You chose not to be asked again — untick this to be asked each time.'
+        : 'You are asked each time.')
+     + ' <strong>This setting is per device.</strong></div></div>';
 
   // 1b — the nudge, per device
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;'
@@ -3090,7 +3105,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.17';
+var APP_VERSION = 'v36.18';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4233,6 +4248,9 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .ask-actions { display: flex; flex-direction: column; gap: 8px; }
 .ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta-fill); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
 .ask-btn.danger { background: #C62828; }
+.ask-check { display:flex; align-items:center; gap:9px; margin:2px 0 12px; cursor:pointer;
+  font-size:13px; color:var(--muted); text-align:start; }
+.ask-check input { width:17px; height:17px; flex-shrink:0; accent-color:var(--terracotta); cursor:pointer; }
 .ask-btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; font-weight: 500; padding: 10px; }
 .voice-btn.voice-on { background: var(--terracotta); color: #fff; border-color: var(--terracotta); animation: syncPulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { #lineMarker { transition: opacity 0.18s ease; } }
@@ -5570,7 +5588,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.17</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.18</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6175,7 +6193,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.17</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.18</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11059,25 +11077,37 @@ function askConfirm(opts) {
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
             + ' placeholder="' + escA(opts.placeholder || '') + '">'
           : '')
+      // v36.18 — an optional "don't ask again" tick. Only a caller that passes
+      // `checkbox` gets the {ok, checked} return shape; everyone else still
+      // gets a plain true/false, so no existing caller changes.
+      + (opts.checkbox
+          ? '<label class="ask-check"><input type="checkbox" id="askCheck">'
+            + '<span>' + escH(opts.checkbox) + '</span></label>'
+          : '')
       + '<div class="ask-actions">'
       + '<button class="ask-btn' + (danger ? ' danger' : '') + '" id="askOk">' + escH(opts.okLabel || 'OK') + '</button>'
       + '<button class="ask-btn ghost" id="askCancel">' + escH(opts.cancelLabel || 'Cancel') + '</button>'
       + '</div></div>';
     document.body.appendChild(ov);
     var input = ov.querySelector('#askInput');
+    var check = ov.querySelector('#askCheck');
+    function refused() { return input ? null : (check ? { ok:false, checked:false } : false); }
     function done(v) {
       ov.remove();
       document.removeEventListener('keydown', onKey, true);
       resolve(v);
     }
-    function accept() { done(input ? input.value : true); }
+    function accept() {
+      if (input) { done(input.value); return; }
+      done(check ? { ok:true, checked:check.checked } : true);
+    }
     function onKey(e) {
-      if (e.key === 'Escape') { e.stopPropagation(); done(input ? null : false); }
+      if (e.key === 'Escape') { e.stopPropagation(); done(refused()); }
       else if (e.key === 'Enter' && input) { e.preventDefault(); accept(); }
     }
     ov.querySelector('#askOk').onclick = accept;
-    ov.querySelector('#askCancel').onclick = function(){ done(input ? null : false); };
-    ov.onclick = function(e){ if (e.target === ov) done(input ? null : false); };
+    ov.querySelector('#askCancel').onclick = function(){ done(refused()); };
+    ov.onclick = function(e){ if (e.target === ov) done(refused()); };
     document.addEventListener('keydown', onKey, true);
     setTimeout(function(){ (input || ov.querySelector('#askOk')).focus(); if (input) input.select(); }, 60);
   });
@@ -11579,6 +11609,49 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
 window.linkPickPrompt = linkPickPrompt;
 window.extractRecipesFromLinks = extractRecipesFromLinks;
 
+// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.18) ──────────────────
+// When our own Worker cannot fetch a page, the import can fall back to three
+// public CORS proxies. They are not ours: they see every URL imported through
+// them, and they choose what HTML comes back. v36.17 made that HTML inert, so
+// it can no longer run code here — but a hostile or compromised proxy can still
+// feed doctored TEXT to the AI and produce a recipe that is quietly wrong.
+//
+// That is a judgement only the person importing can make, so ask. The answer is
+// remembered per device only when they tick the box.
+var _pageViaProxy = '';      // which relay supplied the text, if any
+var _lastProxyHost = '';
+var PROXY_CONSENT_KEY = 'tonys_proxy_consent';
+function proxyConsentState() {
+  try { return localStorage.getItem(PROXY_CONSENT_KEY) || 'ask'; } catch(e) { return 'ask'; }
+}
+function setProxyConsent(v) {
+  try {
+    if (v === 'ask') localStorage.removeItem(PROXY_CONSENT_KEY);
+    else localStorage.setItem(PROXY_CONSENT_KEY, v);
+  } catch(e) {}
+}
+async function proxyConsent(url) {
+  if (proxyConsentState() === 'always') return true;
+  var host = '';
+  try { host = new URL(url).host; } catch(e) { host = 'that site'; }
+  var res = await askConfirm({
+    icon: '🛡️',
+    title: 'Use a third-party proxy?',
+    message: 'This page could not be fetched by your own server, so the import would go '
+      + 'through a public relay service instead.\n\n'
+      + 'Those relays are not ours. They would see that you are importing from ' + host
+      + ', and they choose what text comes back — so a bad one could return a recipe '
+      + 'that is subtly wrong.\n\n'
+      + 'They cannot run code in the app or reach your saved recipes.',
+    okLabel: 'Use a relay',
+    cancelLabel: 'No, skip it',
+    checkbox: 'Never show this message again — always allow'
+  });
+  var ok = !!(res && res.ok);
+  if (ok && res.checked) setProxyConsent('always');
+  return ok;
+}
+
 // Split out so it can be tested by what it PRODUCES. Only claim the SITE blocked
 // us if an attempt actually said so — our Worker refusing the call, a proxy
 // blocked by our own CSP or a network failure are all our end, and saying
@@ -11696,6 +11769,7 @@ async function runUrlImport() {
   res.innerHTML = spinner('Fetching page via server…');
   let pageText = '';
   _pageWasTruncated = false;
+  _pageViaProxy = ''; _lastProxyHost = '';
   _pageLinks = [];
   // Why each attempt failed, so the message at the end can be true. Blaming the
   // recipe site for our own Worker refusing us, or for our own CSP blocking the
@@ -11729,7 +11803,11 @@ async function runUrlImport() {
 
   // ── Step 2: Fall back to browser CORS proxies if Worker fetch failed ───────
   if (!pageText || pageText.length < 100) {
-    res.innerHTML = spinner('Trying CORS proxies…');
+    // Ask BEFORE any URL leaves for a relay, not after.
+    if (!await proxyConsent(url)) {
+      attempts.push('relays: declined — the page was not sent to a third-party proxy');
+    } else {
+    res.innerHTML = spinner('Trying relay services…');
     const proxies = [
       u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
       u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
@@ -11737,6 +11815,7 @@ async function runUrlImport() {
     ];
     for (const makeProxy of proxies) {
       try {
+        try { _lastProxyHost = new URL(makeProxy('http://x')).host; } catch(e3) { _lastProxyHost = ''; }
         const r = await fetch(makeProxy(url), { signal: AbortSignal.timeout(10000) });
         if (!r.ok) continue;
         let html = '';
@@ -11773,6 +11852,12 @@ async function runUrlImport() {
         attempts.push('proxy ' + (new URL(makeProxy('http://x')).host) + ': '
           + (e && e.name === 'TypeError' ? 'blocked or unreachable' : (e && e.message ? e.message : 'failed')));
       }
+    }
+    // Say WHICH relay supplied the text, so an odd import has an explanation.
+    if (pageText && pageText.length > 100) {
+      _pageViaProxy = _lastProxyHost || 'a relay service';
+      syncLog('import', 'Page fetched via relay ' + _pageViaProxy, { url: url });
+    }
     }
   }
 
@@ -11814,6 +11899,7 @@ async function runUrlImport() {
     }
     if (built.kind === 'none') throw (typeof textErr !== 'undefined' && textErr) || new Error('no recipe found');
     if (_pageWasTruncated) built.recipe._truncated = true;
+    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.18 — say where this came from
     // Just the count: the preview's own sentence supplies "of these", so
     // passing "1 of 3" here read "1 of 3 of these could not be read".
     if (parsed._partial) built.recipe._partial = parsed._partial;
@@ -11913,6 +11999,14 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
   // A long article is extracted one recipe at a time (v36.1). If some of those
   // calls failed, the list is short by exactly that many — and a list of 8 that
   // should have been 10 looks identical to a list of 8. Say the number.
+  // v36.18 — this text did not come from our own server. Not a warning, a fact
+  // worth knowing if the recipe reads oddly.
+  var relay = parsed._viaProxy
+    ? '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:#3451CC;line-height:1.5;margin-top:10px;">🛡️ Fetched through the relay '
+      + '<strong>' + escH(String(parsed._viaProxy)) + '</strong>, not your own server. If anything below '
+      + 'looks wrong, that is the first thing to suspect.</div>'
+    : '';
   var missed = parsed._partial
     ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
       + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">⚠️ <strong>'
@@ -11936,7 +12030,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
     + (parsed.notes ? '<div dir="auto" style="font-size:12px;color:var(--muted);margin-bottom:8px;'
         + 'line-height:1.5;">' + escH(parsed.notes) + '</div>' : '')
     + '<div style="margin-top:8px;">' + rows + '</div>'
-    + cut + missed + warn
+    + relay + cut + missed + warn
     + '</div>'
     + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encoded + ',&quot;' + overlayId + '&quot;)">'
     + '&#10003; Add all ' + parts.length + ' as one collection</button>';
