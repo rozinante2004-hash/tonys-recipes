@@ -22,7 +22,21 @@
 // compositing up the ancestor chain, then the WCAG contrast ratio. Asserts what
 // rendered — a hardcoded `background: white` under `color: var(--ink)` is
 // invisible to any check that only reads the stylesheet.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+// Same resolution order as run-self-tests.js: CI installs playwright into the
+// workspace, this sandbox has it under /opt. Hardcoding the /opt path is what
+// made the first CI run of this step fail.
+function loadPlaywright() {
+  for (const m of ['playwright', '/opt/node22/lib/node_modules/playwright']) {
+    try { return require(m); } catch (e) { /* try the next one */ }
+  }
+  console.error('Could not require("playwright").');
+  process.exit(2);
+}
+const { chromium } = loadPlaywright();
+const PORT = (function () {
+  const i = process.argv.indexOf('--port');
+  return (i > -1 && process.argv[i + 1]) ? process.argv[i + 1] : '8137';
+})();
 
 const SCAN = `(() => {
   function parse(c) {
@@ -106,7 +120,7 @@ const SCAN = `(() => {
   const b = await chromium.launch();
   const p = await (await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('http://127.0.0.1:8137/index.html?t=' + (process.env.THEME || 'dark'), { waitUntil: 'domcontentloaded' });
+  await p.goto('http://127.0.0.1:' + PORT + '/index.html?t=' + (process.env.THEME || 'dark'), { waitUntil: 'domcontentloaded' });
   await p.waitForFunction(() => typeof window.renderGrid === 'function', null, { timeout: 20000 });
   await p.waitForTimeout(1200);
   const off = p.locator('text=Continue offline').first();
