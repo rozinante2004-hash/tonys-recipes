@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.21 -->
+<!-- Tony's Recipes Collection v36.22 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1077,6 +1077,73 @@ function undoDelete() {
   toast('↩︎ Restored ' + n + ' recipe' + (n!==1?'s':''));
 }
 window.undoDelete = undoDelete;
+
+// ─── UNDO FOR THE BULK, STRUCTURAL OPERATIONS (v36.22, audit F4) ─────────────
+// Deleting has had Undo since 1.4. Splitting a collection, merging recipes into
+// one, and importing a round-up did not — and `splitCollection` said so out
+// loud: "This cannot be undone from here." Each of those rearranges a lot of
+// the list at once, on a judgement about someone else's recipes, and the only
+// route back was a backup file.
+//
+// The snapshot is the ARRAY, not the recipes: `recipes.slice()` keeps the same
+// objects and restores membership and order exactly, for the cost of one list
+// of references. Every operation this covers creates new records and drops old
+// ones rather than editing them in place, so that is enough — and a deep copy
+// would mean duplicating every inlined photo, which is tens of megabytes.
+//
+// The one thing a list snapshot cannot cover is a record edited IN PLACE. Two
+// operations do that: adding to a collection that already exists appends to its
+// own `parts`, and "update the existing one" on an import rewrites a recipe
+// where it stands. The list holds a reference to the very same object, so
+// neither would come back. `inPlace` is the list of live records to deep-copy
+// as well — one copy each, only for records an operation is about to edit.
+var _pendingBulkUndo = null;
+function stashBulkUndo(label, inPlace) {
+  _pendingBulkUndo = {
+    label: label, list: recipes.slice(), nextId: nextId, at: Date.now(),
+    inPlace: (inPlace || []).filter(Boolean).map(function(r){
+      return { r: r, was: JSON.parse(JSON.stringify(r)) };
+    })
+  };
+}
+function clearBulkUndo() { _pendingBulkUndo = null; }
+function undoBulk() {
+  if (!_pendingBulkUndo) { toast('Nothing to undo'); return; }
+  var snap = _pendingBulkUndo;
+  var before = {}; snap.list.forEach(function(r){ before[r.id] = true; });
+  var now    = {}; recipes.forEach(function(r){ now[r.id] = true; });
+
+  // What the operation CREATED has to leave the cloud too, or the next load
+  // brings it straight back alongside the recipes it was made from.
+  recipes.forEach(function(r){
+    if (!before[r.id] && typeof queueCloudDelete === 'function') { try { queueCloudDelete(r.id); } catch(e) {} }
+  });
+  // What it removed is wanted again — take those deletions back off the queue.
+  snap.list.forEach(function(r){
+    if (!now[r.id] && typeof unqueueCloudDelete === 'function') { try { unqueueCloudDelete(r.id); } catch(e) {} }
+  });
+
+  // Put each edited record back to exactly what it was. The object identity has
+  // to survive — `recipes`, `viewId` and the cloud all refer to it by id, and
+  // swapping in a new object would leave the old one referenced elsewhere.
+  (snap.inPlace || []).forEach(function(e){
+    if (!e.r) return;
+    Object.keys(e.r).forEach(function(k){ if (!(k in e.was)) delete e.r[k]; });
+    Object.keys(e.was).forEach(function(k){ e.r[k] = e.was[k]; });
+    e.r.updatedAt = Date.now();          // it changed twice; the cloud must hear about it
+    try { normalizeRecipe(e.r); } catch(err) {}
+  });
+
+  recipes = snap.list;
+  // Deliberately NOT snap.nextId. An id handed out during the operation may
+  // still own a photo document in the cloud; winding the counter back would
+  // hand that same number to a different recipe later.
+  nextId = Math.max(nextId, snap.nextId);
+  _pendingBulkUndo = null;
+  saveData(); renderFilters(); renderGrid();
+  toast('↩︎ Undid ' + snap.label);
+}
+window.stashBulkUndo = stashBulkUndo; window.undoBulk = undoBulk; window.clearBulkUndo = clearBulkUndo;
 
 
 // 5c.4 — log a cook without opening the recipe. Deliberately placed in select
@@ -3105,7 +3172,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.21';
+var APP_VERSION = 'v36.22';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5588,7 +5655,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.21</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.22</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6194,7 +6261,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.21</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.22</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8513,8 +8580,12 @@ async function collectSelectedInto(targetId) {
         + '\n\nEach one can be lifted back out later with “⤴ Make its own”.',
       okLabel: target ? 'Add them' : 'Create it' })) return;
 
-  var coll;
   var prevParts = target ? recipeParts(target).slice() : null;
+  // v36.22 — the target collection is edited in place, so its parts have to be
+  // stashed separately; the list snapshot holds the same object.
+  stashBulkUndo(target ? ('adding to “' + target.name + '”') : ('the collection “' + name + '”'),
+                target ? [target] : null);
+  var coll;
   if (target) {
     if (typeof pushHistory === 'function') { try { pushHistory(target); } catch(e) {} }
     target.parts = recipeParts(target).concat(incoming);
@@ -8543,6 +8614,7 @@ async function collectSelectedInto(targetId) {
     if (target) { target.parts = prevParts; normalizeRecipe(target); }
     else { recipes = recipes.filter(function(r){ return r.id !== coll.id; }); nextId--; }
     var lost = incoming.length - arrived;
+    clearBulkUndo();     // v36.22 — nothing happened, so there is nothing to undo
     toast('Nothing was changed — ' + lost + ' of the ' + incoming.length
         + ' recipes could not be stored inside a collection.', 8000);
     syncLog('save', 'Refused to collect: ' + lost + ' of ' + incoming.length + ' part(s) would have been dropped',
@@ -8558,7 +8630,8 @@ async function collectSelectedInto(targetId) {
 
   cancelSelectMode();
   activeCat = 'All'; renderFilters(); renderGrid(); saveData();
-  toast('📚 ' + incoming.length + ' recipe' + (incoming.length === 1 ? '' : 's') + ' now in “' + coll.name + '”', 5000);
+  toastAction('📚 ' + incoming.length + ' recipe' + (incoming.length === 1 ? '' : 's')
+    + ' now in “' + coll.name + '”', '↩︎ Undo', undoBulk, 12000);
   syncLog('save', 'Collected ' + incoming.length + ' recipe(s) into “' + coll.name + '”',
     { id: coll.id, from: goneIds.length });
 
@@ -8840,10 +8913,11 @@ async function splitCollection(collId) {
 
   if (!await askConfirm({ icon:'✂️', title:'Split into ' + parts.length + ' separate recipes?',
       message:'Each becomes a normal recipe of its own, and the collection “' + coll.name
-            + '” is removed.\n\nThis cannot be undone from here, though nothing is lost — '
-            + 'every recipe survives as its own card.',
-      okLabel:'Split into ' + parts.length, danger:true })) return;
+            + '” is removed.\n\nYou can undo this straight afterwards, and nothing is lost either '
+            + 'way — every recipe survives as its own card.',
+      okLabel:'Split into ' + parts.length })) return;
 
+  stashBulkUndo('the split of “' + coll.name + '”');      // v36.22
   var made = parts.map(function(p){ return recipeFromPart(coll, p); });
   // Insert in the order they appeared on the page, newest-first grid and all.
   made.slice().reverse().forEach(function(rec){ recipes.unshift(rec); });
@@ -8851,7 +8925,7 @@ async function splitCollection(collId) {
   recipes = recipes.filter(function(x){ return x.id !== collId; });
   if (viewId === collId) closeM('viewOverlay');
   saveData(); renderGrid(); renderFilters();
-  toast('✂️ Split into ' + made.length + ' recipes', 5000);
+  toastAction('✂️ Split into ' + made.length + ' recipes', '↩︎ Undo', undoBulk, 12000);
   syncLog('save', 'Split “' + coll.name + '” into ' + made.length + ' recipes');
 }
 window.splitCollection = splitCollection;
@@ -12229,7 +12303,13 @@ async function confirmImportChecked(parsed, overlayId, dup) {
   var action = await askDuplicateAction(dup, parsed);
   if (action === 'replace') {
     var r = dup.recipe;
+    // v36.22 (audit F4) — this is the destructive import. It rewrites a recipe
+    // where it stands, and version history was the only way back: per-recipe,
+    // several taps deep, and not where anyone looks in the ten seconds after
+    // realising they picked the wrong one.
+    stashBulkUndo('the update to “' + r.name + '”', [r]);
     if (!applyParsedOntoRecipe(r, parsed)) {
+      clearBulkUndo();                  // nothing was written, so nothing to undo
       // Nothing usable to replace it with. Importing it as a new recipe is the
       // one outcome that cannot lose it, and the overlay stays honest about why.
       toast('⚠️ Nothing in this could replace “' + r.name + '” — adding it separately', 5000);
@@ -12241,7 +12321,8 @@ async function confirmImportChecked(parsed, overlayId, dup) {
     if (typeof _waQueue === 'object') _waQueue.imported = true;
     closeM(overlayId);
     activeCat = 'All'; renderFilters(); renderGrid(); saveData();
-    toast('✅ Updated “' + r.name + '” — its photo and history were kept');
+    toastAction('✅ Updated “' + r.name + '” — its photo and history were kept',
+      '↩︎ Undo', undoBulk, 12000);
     return;
   }
   importParsedNow(parsed, overlayId);
@@ -12273,6 +12354,13 @@ async function confirmImportCollection(parsed, overlayId) {
     cancelLabel: 'Keep both copies' });
 
   if (!ok) { importParsedNow(parsed, overlayId); return; }
+
+  // v36.22 (audit F4) — same destructive update, several recipes at once. Every
+  // record about to be rewritten is deep-copied first, so one Undo takes the
+  // whole batch back rather than leaving version history to be walked per
+  // recipe.
+  stashBulkUndo('the update to ' + dups.parts.length + ' recipe'
+    + (dups.parts.length === 1 ? '' : 's'), dups.parts.map(function(d){ return d.recipe; }));
 
   var updated = [], failed = [], skip = {};
   dups.parts.forEach(function(d) {
@@ -12308,8 +12396,9 @@ async function confirmImportCollection(parsed, overlayId) {
   activeCat = 'All'; renderFilters(); renderGrid(); saveData();
   syncLog('import', 'Collection import updated ' + updated.length + ' existing recipe(s), '
     + 'imported ' + rest.length, updated.join('; ').slice(0, 200));
-  if (updated.length) toast('✅ Updated ' + updated.length + ' existing recipe(s)'
-    + (rest.length ? ' and imported ' + rest.length + ' more' : ''), 5000);
+  if (updated.length) toastAction('✅ Updated ' + updated.length + ' existing recipe(s)'
+    + (rest.length ? ' and imported ' + rest.length + ' more' : ''), '↩︎ Undo', undoBulk, 12000);
+  else clearBulkUndo();            // nothing was rewritten, so nothing to undo
   if (failed.length) toast('⚠️ ' + failed.length + ' could not replace anything and were imported instead', 5000);
 }
 window.confirmImportCollection = confirmImportCollection;

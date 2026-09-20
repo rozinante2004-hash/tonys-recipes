@@ -340,6 +340,30 @@ found only because a test was written first and disagreed with the code.
     whatever now holds that number, including its cloud photo document.
   - `askConfirm` grew `altLabel`/`altDanger` for the third answer (resolves
     `'alt'`). Only a caller that passes `altLabel` sees it, so nothing else moved.
+- **The bulk, structural operations have Undo now (v36.22, audit F4).** Deleting
+  has had it since 1.4. Splitting a collection, merging into one, and "update
+  the existing one" on an import did not — and `splitCollection` said so out
+  loud: *"This cannot be undone from here."* Each rearranges a lot of the list
+  at once, and the only route back was a backup file.
+  - **The snapshot is the ARRAY, not the recipes.** `recipes.slice()` keeps the
+    same objects and restores membership and order for the cost of one list of
+    references. A deep copy would duplicate every inlined photo — tens of MB.
+  - **`inPlace` is the exception that makes it correct.** A record edited where
+    it stands (a collection gaining parts; a recipe overwritten by an import)
+    is the same object the list snapshot points at, so it is deep-copied
+    separately. Restoring puts the keys back **on the original object** —
+    `recipes`, `viewId` and the cloud all refer to it by identity, and swapping
+    in a new object would strand the old one. Keys the operation *added* are
+    deleted, or half the overwrite survives the undo.
+  - **The cloud has to be told both ways.** What the operation created must be
+    queued for deletion, or the next load brings it back beside the recipes it
+    was made from; what it removed must be *un*queued.
+  - **`nextId` is never wound back** (`Math.max`). An id handed out during the
+    operation may already own a photo document in the cloud, and reusing it
+    hands that document to a different recipe.
+  - Undo is one-shot — a second press must say "Nothing to undo", not rewind
+    something unrelated — and `clearBulkUndo()` is called on every path that
+    decides not to change anything after all.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

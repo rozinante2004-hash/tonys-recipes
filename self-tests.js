@@ -1067,6 +1067,93 @@ window.SELF_TESTS = [
       } finally { window.askConfirm = realAsk; }
     } },
 
+  { id:'safety_bulk_undo', group:'Backup', name:'Splitting, merging and a destructive import can be undone (v36.22)',
+    test: async()=>{
+      ['stashBulkUndo','undoBulk','clearBulkUndo'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var snapshot = recipes.slice(), snapId = nextId;
+      var realSave=window.saveData, realGrid=window.renderGrid, realF=window.renderFilters,
+          realToast=window.toast, realQ=window.queueCloudDelete, realU=window.unqueueCloudDelete;
+      var queued=[], unqueued=[];
+      try{
+        window.saveData=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
+        window.toast=function(){};
+        window.queueCloudDelete=function(id){ queued.push(id); };
+        window.unqueueCloudDelete=function(id){ unqueued.push(id); };
+
+        // (1) A split: the collection goes, three recipes appear. Undo puts the
+        // collection back, removes the three, and cleans up after itself in the
+        // cloud both ways.
+        recipes = [ normalizeRecipe({ id:8001, name:'Sunday Roast', ingredients:[], steps:[], parts:[
+            { uid:'a', name:'Gravy',    ingredients:[{a:'1',n:'stock'}], steps:['stir'] },
+            { uid:'b', name:'Potatoes', ingredients:[{a:'1kg',n:'spuds'}], steps:['roast'] } ] }) ];
+        nextId = 8100;
+        stashBulkUndo('the split');
+        var made = recipeParts(recipes[0]).map(function(p){ return recipeFromPart(recipes[0], p); });
+        made.slice().reverse().forEach(function(r){ recipes.unshift(r); });
+        queueCloudDelete(8001);
+        recipes = recipes.filter(function(r){ return r.id !== 8001; });
+        if(recipes.length!==2) throw new Error('the fixture split did not behave as the app does');
+        var idsMade = made.map(function(r){ return r.id; });
+
+        queued.length=0; unqueued.length=0;
+        undoBulk();
+        if(recipes.length!==1 || recipes[0].id!==8001)
+          throw new Error('undo did not put the collection back: '+JSON.stringify(recipes.map(function(r){return r.id;})));
+        if(recipeParts(recipes[0]).length!==2) throw new Error('the collection came back without its parts');
+        idsMade.forEach(function(id){
+          if(queued.indexOf(id)===-1)
+            throw new Error('recipe '+id+' was created by the split and left in the cloud — the next load brings it back');
+        });
+        if(unqueued.indexOf(8001)===-1)
+          throw new Error('the collection is still queued for cloud deletion, so undo is undone on the next sync');
+        if(nextId < 8100+idsMade.length)
+          throw new Error('nextId was wound back to '+nextId+' — an id that already owns a cloud photo document would be handed out again');
+
+        // (2) A record edited IN PLACE. The list snapshot holds the same object,
+        // so this is the case a naive undo silently misses.
+        recipes = [ normalizeRecipe({ id:8201, name:'Borscht', ingredients:[{a:'1',n:'beet'}], steps:['boil'], notes:'gran’s' }) ];
+        var live = recipes[0];
+        stashBulkUndo('the update', [live]);
+        live.ingredients = [{a:'99',n:'turnip'}];
+        live.steps = ['ruin it'];
+        live.notes = '';
+        live.somethingNew = 'added by the import';
+        undoBulk();
+        if(recipes[0] !== live) throw new Error('undo replaced the object instead of restoring it — everything holding a reference now points at a ghost');
+        if(live.ingredients.length!==1 || live.ingredients[0].n!=='beet')
+          throw new Error('the overwritten ingredients did not come back');
+        if(live.steps[0]!=='boil') throw new Error('the overwritten method did not come back');
+        if(live.notes!=='gran’s') throw new Error('a field cleared by the import stayed cleared');
+        if('somethingNew' in live) throw new Error('a field the import ADDED survived the undo');
+
+        // (3) Undo is one-shot, and a cleared stash offers nothing.
+        var said=[]; window.toast=function(t){ said.push(String(t)); };
+        undoBulk();
+        if(!said.some(function(t){ return /Nothing to undo/.test(t); }))
+          throw new Error('undo ran twice — the second one would rewind an unrelated change');
+        stashBulkUndo('x'); clearBulkUndo(); said.length=0; undoBulk();
+        if(!said.some(function(t){ return /Nothing to undo/.test(t); }))
+          throw new Error('clearBulkUndo did not clear the stash');
+      } finally {
+        recipes = snapshot; nextId = snapId;
+        window.saveData=realSave; window.renderGrid=realGrid; window.renderFilters=realF;
+        window.toast=realToast; window.queueCloudDelete=realQ; window.unqueueCloudDelete=realU;
+      }
+
+      // (4) Every operation that rearranges the list offers it, and none of them
+      // still claims it cannot be undone.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var offers = (src.match(/'↩︎ Undo', undoBulk/g) || []).length;
+      if(offers < 4) throw new Error('only '+offers+' operations offer Undo — expected split, collect, and both import updates');
+      // Comments quote the old wording on purpose — the point is what the app
+      // SAYS, so scan the code with the commentary taken out.
+      var code = src.replace(/^\s*\/\/.*$/gm, '');
+      if(/This cannot be undone from here/.test(code))
+        throw new Error('something still tells the user it cannot be undone');
+    } },
+
   { id:'safety_orphan_sweep', group:'Cloud Sync', name:'Orphaned photo documents can be swept (5d.2)',
     test: async()=>{
       if(typeof sweepOrphanPhotos!=='function') throw new Error('sweepOrphanPhotos not defined');
