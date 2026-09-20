@@ -364,6 +364,44 @@ found only because a test was written first and disagreed with the code.
   - Undo is one-shot — a second press must say "Nothing to undo", not rewind
     something unrelated — and `clearBulkUndo()` is called on every path that
     decides not to change anything after all.
+- **The header stands down once you are scrolling (v36.23, audit U1).** 34% of a
+  390×844 phone was fixed chrome before a single recipe: 198px of header plus an
+  85px filter bar. Scrolling now hides the brand row and the status line —
+  measured 198 → 112px, so 283 → 197px of chrome, 33.5% → 23.3%. Search, the
+  filters and **+ Add Recipe** stay; ⚙️ Settings goes, and comes back with one
+  flick to the top.
+  - **Two thresholds, not one** (collapse at 90, expand at 40). One threshold
+    flickers: collapsing shortens the page, which can scroll you back above the
+    line, which expands it again.
+  - **Position, not direction.** A show-on-scroll-up header is the fashionable
+    pattern and also the one that keeps appearing over what you are reading.
+  - **The filter bar must be re-pinned** — its `top` is an explicit pixel value
+    from `header.offsetHeight`, so `applyHeaderCollapse` calls
+    `updateFilterBarTop()`. Without it the bar floats in a brown gap or sits on
+    the first row of recipes.
+  - **Phone-only, by CSS media query**, with the class toggled everywhere. A
+    desktop has the room, and taking Settings off a scrolled desktop is a loss
+    for no gain.
+  - **`tests/phone-chrome.js` is why this is actually checked.** Same lesson as
+    the contrast scan: the behaviour only exists below 700px and the self-test
+    suite runs at the headless default width, so the phone assertions inside it
+    pass vacuously. The CI step drives a real 390×844 viewport and holds the
+    chrome to a **budget** — a new header row fails the build and says by how much.
+- **The "one item away" count is memoised, and a stale one is a chip that lies
+  (v36.23, audit P2).** `missingFromPantry` walks every ingredient of every
+  recipe against the whole pantry, on every filter toggle; measured at 1,000
+  recipes it was 9.1ms and `renderFilters` 8.1ms, now 0.01ms and 0.9ms. Two
+  independent guards, neither trusted alone: a fingerprint (`filterCountKey` —
+  recipe count, sum of ingredient counts, sum of `updatedAt`, plus the pantry)
+  that is one property read per recipe against a computation that is O(ingredients
+  × pantry) per recipe; and an explicit `invalidateFilterCounts()` from
+  `saveLocal` and `setPantry` for the paths that mutate and re-render *before*
+  saving (`collectSelectedInto` does exactly that). The escape hatch has its own
+  test — an ingredient **renamed in place** is the one mutation the fingerprint
+  cannot see, and an untested escape hatch is one that has quietly stopped
+  working. The no-photo count beside it is deliberately **not** cached: `!r.photo`
+  is one read per recipe, so a cache would cost more than it saves and add a
+  second thing that can go stale.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

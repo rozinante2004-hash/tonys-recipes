@@ -122,3 +122,11 @@ jobs:
         run: |
           THEME=dark  node tests/contrast-scan.js --port 8137
           THEME=light node tests/contrast-scan.js --port 8137
+
+      # v36.23 — same reason as the contrast scan: the header collapse only
+      # happens below 700px, and the self-test suite runs at the headless
+      # default width, so every assertion about the phone would pass vacuously.
+      # This drives a real 390x844 viewport and holds the fixed chrome to a
+      # budget, so a new header row fails the build and says by how much.
+      - name: Phone chrome budget (390x844)
+        run: node tests/phone-chrome.js --port 8137

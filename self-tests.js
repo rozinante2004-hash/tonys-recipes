@@ -6973,6 +6973,140 @@ window.SELF_TESTS = [
         throw new Error('the Worker’s per-minute refusal is marked retryable');
     } },
 
+  { id:'ui_header_stands_down', group:'UI', name:'The header gives the phone its screen back when scrolling (v36.23)',
+    test: async()=>{
+      if(typeof applyHeaderCollapse!=='function') throw new Error('applyHeaderCollapse not defined');
+      var header=document.querySelector('.header');
+      if(!header) throw new Error('no .header');
+      if(!header.querySelector('.header-top')) throw new Error('the brand row has no .header-top to hide');
+      if(!header.querySelector('.header-status')) throw new Error('the status row has no .header-status to hide');
+
+      // Measure what RENDERS. Whether the class is present says nothing about
+      // whether any pixels were actually given back.
+      var pad=document.createElement('div');
+      pad.style.height='3000px'; pad.id='__scrollPad';
+      document.body.appendChild(pad);
+      var wasY=window.scrollY, wasCollapsed=header.classList.contains('collapsed');
+      try{
+        window.scrollTo(0,0); applyHeaderCollapse();
+        var tall=header.getBoundingClientRect().height;
+        if(header.classList.contains('collapsed')) throw new Error('the header is collapsed at the top of the page');
+
+        window.scrollTo(0,400); applyHeaderCollapse();
+        if(!header.classList.contains('collapsed')) throw new Error('scrolling did not collapse the header');
+        var short=header.getBoundingClientRect().height;
+
+        var phone = window.innerWidth <= 700;
+        if(phone){
+          if(short >= tall) throw new Error('the header is still '+short+'px after collapsing (was '+tall+') — nothing was given back');
+          if(tall - short < 60) throw new Error('only '+(tall-short)+'px was reclaimed; the point of this was ~100');
+          // What a phone is FOR must survive. Settings may go — it is one flick away.
+          if(!document.getElementById('searchInput').offsetWidth)
+            throw new Error('search disappeared with the header');
+          var add=Array.prototype.slice.call(document.querySelectorAll('.btn-primary'))
+            .filter(function(b){ return /Add Recipe/.test(b.textContent) && b.offsetWidth; });
+          if(!add.length) throw new Error('+ Add Recipe disappeared with the header');
+        } else {
+          if(short !== tall)
+            throw new Error('a desktop header changed height ('+tall+' -> '+short+') — this is meant to be phone-only');
+        }
+
+        // The filter bar is pinned by an explicit top, so it has to follow.
+        // If it does not, it either floats in a brown gap or covers the recipes.
+        var bar=document.getElementById(phone ? 'mobileFilterBar' : 'filterBar');
+        var gap=Math.round(bar.getBoundingClientRect().top - header.getBoundingClientRect().bottom);
+        if(Math.abs(gap) > 2)
+          throw new Error('the filter bar sits '+gap+'px from the collapsed header instead of against it');
+
+        // Hysteresis: between the two thresholds it must not flap.
+        window.scrollTo(0,60); applyHeaderCollapse();
+        if(!header.classList.contains('collapsed'))
+          throw new Error('the header expanded again at 60px — the thresholds are the same, so it will flicker');
+        window.scrollTo(0,0); applyHeaderCollapse();
+        if(header.classList.contains('collapsed')) throw new Error('it never comes back at the top');
+      } finally {
+        pad.remove(); window.scrollTo(0,wasY);
+        header.classList.toggle('collapsed', wasCollapsed);
+        if(typeof updateFilterBarTop==='function') updateFilterBarTop();
+      }
+    } },
+
+  { id:'perf_filter_counts_memoised', group:'UI', name:'The filter-bar counts are not recomputed on every toggle (v36.23)',
+    test: async()=>{
+      ['oneAwayCount','filterCountKey','invalidateFilterCounts'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var snap=recipes.slice(), snapPantry=getPantry(), realSave=window.saveLocal;
+      try{
+        window.saveLocal=function(){};
+        // 400 recipes, each one ingredient short of cookable.
+        var made=[];
+        for(var i=0;i<400;i++){
+          var ings=[]; for(var j=0;j<10;j++) ings.push({a:'1',n:'ing'+j});
+          ings.push({a:'1',n:'nowhere near the pantry'});
+          made.push(normalizeRecipe({ id:770000+i, name:'Perf '+i, updatedAt:1000+i, ingredients:ings, steps:['x'] }));
+        }
+        recipes=made;
+        var pantry=[]; for(var k=0;k<10;k++) pantry.push('ing'+k);
+        setPantry(pantry);
+
+        if(oneAwayCount()!==400) throw new Error('the fixture is wrong: '+oneAwayCount()+' of 400 are one away');
+
+        // The second guard, and the only case that can reach it. The
+        // fingerprint cannot see an ingredient RENAMED in place: the recipe
+        // count is the same, the ingredient count is the same, and a direct
+        // mutation never touches updatedAt. That is exactly what the explicit
+        // invalidation from saveData/setPantry is for — and an escape hatch
+        // nobody exercises is an escape hatch that has quietly stopped working.
+        var wasName = recipes[1].ingredients[10].n;
+        recipes[1].ingredients[10].n = 'ing0';          // now fully in the pantry
+        if(oneAwayCount()!==400)
+          throw new Error('the fingerprint noticed a rename it cannot see — the test fixture is wrong, not the code');
+        invalidateFilterCounts();
+        if(oneAwayCount()!==399)
+          throw new Error('invalidateFilterCounts() did not clear the cache, so a mutation the fingerprint '
+            + 'misses would leave a wrong number on the chip for good');
+        recipes[1].ingredients[10].n = wasName;
+        invalidateFilterCounts();
+        if(oneAwayCount()!==400) throw new Error('putting it back did not restore the count');
+
+        // It must be FASTER, measured, not merely cached-looking.
+        function ms(fn, n){ var t=performance.now(); for(var i=0;i<n;i++) fn(); return (performance.now()-t)/n; }
+        var cold=ms(function(){ invalidateFilterCounts(); oneAwayCount(); }, 5);
+        var warm=ms(function(){ oneAwayCount(); }, 200);
+        if(!(warm < cold/5))
+          throw new Error('a repeat call costs '+warm.toFixed(3)+'ms against a cold '+cold.toFixed(3)+'ms — it is not being reused');
+
+        // And it must never be WRONG, which is the whole risk of caching a
+        // number that decides whether a chip exists.
+        recipes[0].ingredients=[{a:'1',n:'ing0'}]; recipes[0].updatedAt=Date.now();
+        if(oneAwayCount()!==399) throw new Error('an edited recipe did not change the count ('+oneAwayCount()+')');
+        recipes.push(normalizeRecipe({ id:779999, name:'Extra', updatedAt:1,
+          ingredients:[{a:'1',n:'ing0'},{a:'1',n:'nowhere near the pantry'}], steps:['x'] }));
+        if(oneAwayCount()!==400) throw new Error('an added recipe did not change the count ('+oneAwayCount()+')');
+        recipes.pop();
+        if(oneAwayCount()!==399) throw new Error('a removed recipe did not change the count ('+oneAwayCount()+')');
+        // A pantry of one irrelevant item leaves every 11-ingredient recipe far
+        // from cookable — except recipes[0], edited above down to a single
+        // ingredient, which is now exactly one item away. 1, not 0.
+        setPantry(['nothing whatsoever']);
+        if(oneAwayCount()!==1) throw new Error('changing the pantry did not change the count ('+oneAwayCount()+', expected 1)');
+        setPantry([]);
+        if(oneAwayCount()!==0) throw new Error('an empty pantry must answer 0, not a cached number');
+
+        // The key must be cheap relative to what it guards, or the cache is a
+        // second way to be wrong for no gain.
+        setPantry(pantry);
+        invalidateFilterCounts();
+        var keyCost=ms(function(){ filterCountKey(); }, 200);
+        var fullCost=ms(function(){ invalidateFilterCounts(); oneAwayCount(); }, 5);
+        if(!(keyCost < fullCost/3))
+          throw new Error('the cache key costs '+keyCost.toFixed(3)+'ms against '+fullCost.toFixed(3)+'ms to just do the work');
+      } finally {
+        recipes=snap; setPantry(snapPantry); window.saveLocal=realSave; invalidateFilterCounts();
+      }
+    } },
+
   { id:'ui_dark_contrast', group:'UI', name:'No panel is light-on-light in dark mode (v36.14)',
     test: async()=>{
       // Tony's report: the Meal menu was #F2EDE6 text on a hard-coded white

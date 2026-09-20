@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.22 -->
+<!-- Tony's Recipes Collection v36.23 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3172,7 +3172,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.22';
+var APP_VERSION = 'v36.23';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4035,6 +4035,17 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 
 /* HEADER */
 .header { background: var(--warm-brown); position: sticky; top: 0; z-index: 200; }
+/* v36.23 (audit U1) — 34% of a 390×844 phone was fixed chrome before a single
+   recipe: 198px of header plus an 85px filter bar. Once you have started
+   scrolling, the logo, the version badge and the "Sign in to sync" line are not
+   what you are looking at, so they stand down and give the list 106px back.
+   Search, the filters and + Add Recipe stay — those are what a phone is FOR.
+   Phone only: a desktop has the room, and taking the Settings menu away from a
+   scrolled desktop would be a loss for no gain. */
+@media (max-width: 700px) {
+  .header.collapsed > .header-top,
+  .header.collapsed > .header-status { display: none; }
+}
 .header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; }
 .logo { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 19px; color: #FAF7F2; white-space: nowrap; }
 .logo span { color: var(--gold); font-style: italic; }
@@ -5642,8 +5653,8 @@ body.banner-shown .header {
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-row">
-    <div style="display:flex;align-items:center;gap:8px;">
+  <div class="header-row header-top">
+    <div class="header-brand" style="display:flex;align-items:center;gap:8px;">
       <svg width="32" height="32" viewBox="0 0 80 80">
         <circle cx="40" cy="40" r="38" fill="#5C3D2E"/>
         <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" stroke-width="1.5"/>
@@ -5655,7 +5666,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.22</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.23</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5751,7 +5762,7 @@ body.banner-shown .header {
       </div>
     </div>
   </div>
-  <div style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
+  <div class="header-status" style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
     <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
     <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.72);flex:1;">Sign in to sync across devices</span>
     <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.62);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans','Heebo',sans-serif;">Reset</button>
@@ -6261,7 +6272,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.22</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.23</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7353,6 +7364,9 @@ function getPantry() {
 }
 function setPantry(list) {
   try { localStorage.setItem(PANTRY_KEY, JSON.stringify(list)); } catch(e) {}
+  // v36.23 — the "one item away" count is derived from this. The fingerprint
+  // already covers it; this is the second guard.
+  if (typeof invalidateFilterCounts === 'function') invalidateFilterCounts();
 }
 function haveIngredient(name, pantry) {
   var n = String(name||'').toLowerCase();
@@ -7385,11 +7399,47 @@ function missingFromPantry(r) {
   if (!ings.length) return [];
   return missingFor(r, getPantry());
 }
+// v36.23 (audit P2) — renderFilters() was the slow half of a re-render, 170ms
+// against 88ms for the grid at 1,000 recipes, and it runs on every filter
+// toggle. Nearly all of that is here: missingFromPantry walks every ingredient
+// of every recipe against the whole pantry, and the answer is a number on a
+// chip that has not changed since the last toggle.
+//
+// So it is memoised — carefully, because a stale count is a chip that lies, or
+// worse, one that vanishes. Two independent guards:
+//
+//  1. A fingerprint that is cheap RELATIVE TO THE THING IT GUARDS: the recipe
+//     count, the sum of ingredient counts and the sum of updatedAt stamps, at
+//     one property read per recipe, against a computation that is O(ingredients
+//     × pantry) per recipe. Any add, delete, or edit through the form moves it.
+//  2. An explicit invalidation from saveData/saveLocal and from setPantry, for
+//     the paths that mutate and re-render before saving. Neither guard is
+//     trusted on its own.
+//
+// The no-photo count next to it is deliberately NOT cached: `!r.photo` is one
+// read per recipe, so a cache would cost more than it saves and add a second
+// thing that can go stale.
+var _oneAwayCache = { key: null, n: 0 };
+function filterCountKey() {
+  var n = 0, ings = 0, stamp = 0, list = recipes || [];
+  for (var i = 0; i < list.length; i++) {
+    n++;
+    ings += (list[i].ingredients && list[i].ingredients.length) || 0;
+    stamp += list[i].updatedAt || 0;
+  }
+  return n + ':' + ings + ':' + stamp + ':' + getPantry().join('\u0001');
+}
+function invalidateFilterCounts() { _oneAwayCache.key = null; }
 function oneAwayCount() {
   if (!getPantry().length) return 0;      // no pantry, no meaningful answer
-  return (recipes || []).filter(function(r){ return missingFromPantry(r).length === 1; }).length;
+  var key = filterCountKey();
+  if (_oneAwayCache.key === key) return _oneAwayCache.n;
+  var n = (recipes || []).filter(function(r){ return missingFromPantry(r).length === 1; }).length;
+  _oneAwayCache = { key: key, n: n };
+  return n;
 }
 window.missingFromPantry = missingFromPantry; window.oneAwayCount = oneAwayCount;
+window.invalidateFilterCounts = invalidateFilterCounts; window.filterCountKey = filterCountKey;
 
 // ─── PANTRY UI (3.2) ──────────────────────────────────────────────────────────
 function openPantry() {
@@ -12802,6 +12852,9 @@ function saveLocal() {
     if (e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''))) handleLocalQuotaError();
   }
   if (_idbAvailable) savePhotosToIDB();
+  // v36.23 — every path that changes the library passes through here, so this
+  // is the one place that catches a mutation the fingerprint could miss.
+  if (typeof invalidateFilterCounts === 'function') invalidateFilterCounts();
 }
 
 // Coerce one recipe into the shape the rest of the app assumes. Rendering reads
@@ -19529,6 +19582,38 @@ function updateFilterBarTop() {
 }
 window.addEventListener('resize', updateFilterBarTop);
 window.updateFilterBarTop = updateFilterBarTop;
+
+// ─── THE HEADER STANDS DOWN ONCE YOU ARE SCROLLING (v36.23, audit U1) ────────
+// Two thresholds, not one. A single threshold flickers: the header collapsing
+// shortens the page, which can scroll you back above the line, which expands it
+// again. Collapse at 90, expand at 40, and the gap between them is what makes
+// it stable.
+//
+// Position, not direction. A show-on-scroll-up header is the fashionable
+// pattern and it is also the one that keeps appearing over what you are reading
+// because your thumb drifted. This one is where you left it.
+var HEADER_COLLAPSE_AT = 90, HEADER_EXPAND_AT = 40, _headerCollapsed = false, _headerTick = false;
+function applyHeaderCollapse() {
+  var header = document.querySelector('.header');
+  if (!header) return;
+  var y = window.scrollY || document.documentElement.scrollTop || 0;
+  var want = _headerCollapsed ? (y > HEADER_EXPAND_AT) : (y > HEADER_COLLAPSE_AT);
+  if (want === _headerCollapsed) return;
+  _headerCollapsed = want;
+  header.classList.toggle('collapsed', want);
+  // The filter bar is pinned BELOW the header by an explicit top, so it has to
+  // be told. Without this it stays where the tall header used to end and leaves
+  // a brown gap — or worse, covers the first row of recipes.
+  updateFilterBarTop();
+}
+function onHeaderScroll() {
+  if (_headerTick) return;
+  _headerTick = true;
+  requestAnimationFrame(function(){ _headerTick = false; applyHeaderCollapse(); });
+}
+window.addEventListener('scroll', onHeaderScroll, { passive: true });
+window.addEventListener('resize', applyHeaderCollapse);
+window.applyHeaderCollapse = applyHeaderCollapse; window.onHeaderScroll = onHeaderScroll;
 
 (function initApp() {
   var hasLocal = loadLocal();
