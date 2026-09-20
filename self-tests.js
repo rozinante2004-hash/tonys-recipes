@@ -7041,6 +7041,13 @@ window.SELF_TESTS = [
       // because that one genuinely clears; only our Worker sets `rateLimited`.
       var realFetch=window.fetch, calls=0, prevCache=null;
       try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      // The retry path backs off 2s, 4s, 8s, 16s. Driving it for real cost this
+      // suite THIRTY SECONDS of doing nothing, on every run, on every device —
+      // measured at 30,004ms, twenty times the next slowest test. The waiting is
+      // not what is under test; the number of attempts is. So sleep is stubbed
+      // out and the same assertions hold in a few milliseconds.
+      var realSleep=window.sleep;
+      window.sleep=function(){ return Promise.resolve(); };
       function resp(body){
         var text=JSON.stringify(body);
         var r={ ok:false, status:429, headers:{ get:function(){ return null; } },
@@ -7060,14 +7067,25 @@ window.SELF_TESTS = [
         if(msg.indexOf('SPEND_CAP')===-1)
           throw new Error('the Worker’s own explanation was replaced with a generic one: '+msg);
 
-        // Anthropic's: still worth waiting out, so it must still be retried.
+        // Anthropic's: still worth waiting out, so it must still be retried, to
+        // exhaustion, and end in the GENERIC rate-limit message.
+        //
+        // Counting the calls is not enough on its own. A version that
+        // short-circuits every 429 still gets retried here, because the body it
+        // throws is Anthropic's error OBJECT, which stringifies to
+        // "[object Object]" and looks to aiRetryable like a bare network
+        // failure. The count was identical and the test passed while the
+        // behaviour was wrong — so the MESSAGE is asserted too.
         calls=0;
         window.fetch=function(){ calls++; return Promise.resolve(resp({
           type:'error', error:{ type:'rate_limit_error', message:'overloaded' } })); };
-        try{ await aiCall('busy probe '+Date.now(), 50); } catch(e){}
-        if(calls<2) throw new Error('an Anthropic 429 is no longer retried at all ('+calls+' call)');
+        var busyMsg='';
+        try{ await aiCall('busy probe '+Date.now(), 50); } catch(e){ busyMsg=(e&&e.message)||''; }
+        if(calls<5) throw new Error('an Anthropic 429 was retried '+calls+' times, expected 5');
+        if(!/Rate limit reached/.test(busyMsg))
+          throw new Error('an Anthropic 429 did not end in the generic rate-limit message: "'+busyMsg+'"');
       } finally {
-        window.fetch=realFetch;
+        window.fetch=realFetch; window.sleep=realSleep;
         try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
       }
       if(aiRetryable(new Error('SPEND_CAP: daily ceiling')))

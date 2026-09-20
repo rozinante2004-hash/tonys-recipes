@@ -456,6 +456,18 @@ found only because a test was written first and disagreed with the code.
   (9999)** — the default 200 would open it behind the screen that links to it.
   Note the same trap applies to `askConfirm` (1300): a confirm raised from the
   login screen would be invisible.
+- **A test must not WAIT for a backoff it is not testing (v36.26).**
+  `ai_our_own_refusal_is_final` drove the real retry path, whose backoff is
+  2 + 4 + 8 + 16 seconds — so it sat there for **30,004ms**, twenty times the next
+  slowest test, on every run and every device. The waiting was never what was
+  under test; the number of attempts was. Stubbing `window.sleep` holds the same
+  assertions in milliseconds and took the whole suite from 55s back to 25s.
+  Its sibling lesson: the Anthropic-429 half of that test **passed for the wrong
+  reason**. Counting attempts alone was satisfied by a version that
+  short-circuits every 429, because the body it throws is Anthropic's error
+  *object*, which stringifies to `"[object Object]"` and looks to `aiRetryable`
+  like a bare network failure — identical count, wrong behaviour. The message is
+  asserted too now. If a mutation survives, the mutation is not the problem.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy
