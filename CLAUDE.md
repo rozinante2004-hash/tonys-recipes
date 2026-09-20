@@ -1125,6 +1125,27 @@ found only because a test was written first and disagreed with the code.
     was searchable; and `String()` on a `{t,ind}` step object is
     `"[object Object]"`, so indented steps never matched even on a flat recipe.
     Both now go through `allSteps(r)`. Difficulty was never searched at all.
+  - **Sharing one recipe out of a collection was broken on four routes of five
+    (found in v36.13, present since v36.8).** `toggleShare(ref)` resolves the
+    recipe correctly, but wired its buttons to `doWhatsApp(ref)`,
+    `doCopy(ref)`, `showEmailModal(ref)` and `shareAsPage(ref)` — every one of
+    which did its OWN `recipes.find(x => x.id === id)`. A part reference is
+    never in `recipes`. WhatsApp and Copy threw on `undefined`; Email and
+    Save-as-page hit `if (!r) return` and did nothing at all. Only "Share via…"
+    worked, because it reused the recipe `toggleShare` had already resolved —
+    **which is exactly why it went unnoticed: the one route that worked is the
+    one used on a phone.**
+    - The lesson is the one this codebase keeps relearning: **an id that can be
+      a part reference must be resolved with `findRecipeRef`, once, and the
+      resolved recipe passed down.** Re-looking-up the id in a second function
+      is how it breaks. When adding any new per-recipe action, grep for
+      `recipes.find` on the path before assuming it works.
+    - Resolving through `findRecipeRef` is also what settles an inherited meal
+      type or difficulty, because `partAsRecipe` applies
+      `part.category || coll.category` before any builder sees the recipe. All
+      five output builders (`rText`, `rHtml`, `buildRecipePage`,
+      `buildPrintHtml`, `makeDocxBlob`) print Category and Difficulty, so a
+      shared recipe carries real values rather than blanks.
   - Still collection-level, deliberately: nothing. `source`, `isClip`, `diets`,
     `category`, `difficulty`, `fav` and the cook history are all per-recipe; the
     collection's values are the fallback. The one thing a part still cannot have

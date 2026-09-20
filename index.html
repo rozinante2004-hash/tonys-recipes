@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.12 -->
+<!-- Tony's Recipes Collection v36.13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7517,6 +7517,84 @@ const SELF_TESTS = [
       if(backClip.source!=='https://youtu.be/abc123') throw new Error('a clip lifted out lost its link');
     } },
 
+  { id:'share_one_recipe_from_a_collection', group:'Features', name:'Every Share route reaches a recipe inside a collection (v36.13)',
+    test: async()=>{
+      // Four of the five buttons in the Share sheet looked the id up in
+      // `recipes`, and a part reference is never in there: WhatsApp and Copy
+      // threw on undefined, Email and Save-as-page returned silently. Only
+      // "Share via…" worked, because it reused the recipe toggleShare had
+      // already resolved — which is why this survived three releases.
+      var realToast=window.toast, realOpen=window.open, realPage=window.buildRecipePage,
+          realBlobUrl=window.URL.createObjectURL,
+          realClip=(navigator.clipboard||{}).writeText;
+      var before=recipes.slice();
+      try{
+        window.toast=function(){};
+        recipes.length=0;
+        // The part has NO meal type or difficulty of its own — it inherits.
+        recipes.push(normalizeRecipe({ id:978601, uid:'sc', name:'Weeknight', category:'Soup',
+          difficulty:'Hard', bg:'#fff', source:'https://example.com/book',
+          parts:[{ uid:'inh', name:'Onion soup', ingredients:[{a:'3',n:'onions'}], steps:['Fry them'] }] }));
+        var ref = partRef(978601, 'inh');
+        if(!findRecipeRef(ref)) throw new Error('the part reference does not resolve at all');
+
+        // What gets SHARED must carry real values, not blanks: partAsRecipe
+        // settles the inheritance before any builder sees the recipe.
+        var txt = rText(findRecipeRef(ref));
+        if(txt.indexOf('Category: Soup')===-1 || txt.indexOf('Difficulty: Hard')===-1)
+          throw new Error('the shared text does not carry the inherited meal type/difficulty: '+txt.split('\n')[1]);
+        if(txt.indexOf('Onion soup')===-1) throw new Error('the shared text is not the recipe inside');
+        if(buildPrintHtml([findRecipeRef(ref)]).indexOf('Soup | Hard')===-1)
+          throw new Error('the printed copy lost the inherited meal type/difficulty');
+
+        // Now the buttons themselves, called exactly as toggleShare wires them.
+        var opened=null;
+        window.open=function(u){ opened=u; return null; };
+        doWhatsApp(ref);
+        if(!opened) throw new Error('WhatsApp did nothing for a recipe inside a collection');
+        if(decodeURIComponent(opened).indexOf('Onion soup')===-1)
+          throw new Error('WhatsApp sent something that is not this recipe: '+String(opened).slice(0,60));
+
+        var copied=null;
+        if(navigator.clipboard){
+          try{ navigator.clipboard.writeText=function(t){ copied=t; return Promise.resolve(); }; }catch(e){}
+          doCopy(ref);
+          await Promise.resolve();
+          if(copied===null) throw new Error('Copy did nothing for a recipe inside a collection');
+          if(copied.indexOf('Category: Soup')===-1)
+            throw new Error('the copied text lost the inherited meal type');
+        }
+
+        showEmailModal(ref);
+        var em=document.getElementById('emailModalOverlay');
+        if(!em) throw new Error('Email did nothing for a recipe inside a collection');
+        if((em.textContent||'').indexOf('Onion soup')===-1)
+          throw new Error('the email is not about this recipe');
+        em.remove();
+
+        // Save-as-page: prove it gets PAST the lookup, without downloading
+        // anything into Tony's browser when he runs the suite there.
+        var handed=null;
+        window.buildRecipePage=function(r){ handed=r; return '<html></html>'; };
+        window.URL.createObjectURL=function(){ throw new Error('no download during a test'); };
+        shareAsPage(ref);
+        if(!handed) throw new Error('Save-as-page did nothing for a recipe inside a collection');
+        if(handed.name!=='Onion soup') throw new Error('Save-as-page was handed "'+handed.name+'"');
+        if(handed.category!=='Soup') throw new Error('Save-as-page lost the inherited meal type');
+
+        // An id that resolves to nothing must be handled, not thrown on.
+        opened=null;
+        doWhatsApp('c999999:nope');
+        if(opened) throw new Error('a dead reference still opened a share');
+      } finally {
+        window.toast=realToast; window.open=realOpen; window.buildRecipePage=realPage;
+        window.URL.createObjectURL=realBlobUrl;
+        if(navigator.clipboard && realClip){ try{ navigator.clipboard.writeText=realClip; }catch(e){} }
+        var stray=document.getElementById('emailModalOverlay'); if(stray) stray.remove();
+        recipes.length=0; before.forEach(function(x){ recipes.push(x); });
+      }
+    } },
+
   { id:'part_category_and_difficulty', group:'Features', name:'Meal type and difficulty are per-recipe, and searchable (v36.12)',
     test: async()=>{
       var dinner = normalizeRecipe({ id:978501, uid:'d1', name:'Roast chicken', category:'Dinner',
@@ -11734,7 +11812,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.12';
+var APP_VERSION = 'v36.13';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12015,7 +12093,9 @@ function rHtml(r) {
 }
 
 function showEmailModal(id) {
-  var r = recipes.find(function(x){ return x.id===id; });
+  // findRecipeRef — see doWhatsApp. `id` may be a part reference, and this
+  // returned silently for every one of them (v36.13).
+  var r = findRecipeRef(id);
   if(!r) return;
   var htmlBody = rHtml(r);
   var plainText = rText(r);
@@ -14155,7 +14235,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.12</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.13</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14760,7 +14840,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.12</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.13</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15755,7 +15835,8 @@ function buildRecipePage(r) {
     + '</div><div class="foot">Shared from Tony\'s Recipes Collection</div></div></body></html>';
 }
 function shareAsPage(id) {
-  var r = recipes.find(function(x){ return x.id===id; });
+  // findRecipeRef — see doWhatsApp (v36.13).
+  var r = findRecipeRef(id);
   if (!r) return;
   var html = buildRecipePage(r);
   try {
@@ -17911,14 +17992,36 @@ function rText(r){
   if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
 }
+// v36.13 — findRecipeRef, not recipes.find. These four take whatever id
+// toggleShare was opened with, and since v36.8 that can be a part reference
+// ("c<collId>:<partUid>") for one recipe inside a collection — which is not in
+// `recipes` and never will be. WhatsApp and Copy threw on undefined, Email and
+// Save-as-page returned silently: from a collection, four of the five buttons
+// in the Share sheet did nothing. Only "Share via…" worked, because it was the
+// one that used the recipe toggleShare had already resolved.
+//
+// Resolving through findRecipeRef is also what fills in a recipe's meal type
+// and difficulty when it inherits them from its collection: partAsRecipe
+// settles `part.category || coll.category` before any of this runs, so the
+// shared text carries real values rather than blanks.
 function doEmail(id){
-  var r=recipes.find(x=>x.id===id);
+  var r=findRecipeRef(id);
   if(!r) return;
   // Always show the email modal — it has Gmail compose + copy options
   showEmailModal(id);
 }
-function doWhatsApp(id){const r=recipes.find(x=>x.id===id);window.open(`https://wa.me/?text=${encodeURIComponent(rText(r))}`);}
-function doCopy(id){navigator.clipboard.writeText(rText(recipes.find(x=>x.id===id))).then(()=>toast('📋 Copied!'));}
+function doWhatsApp(id){
+  var r=findRecipeRef(id);
+  if(!r){ toast('That recipe is no longer here'); return; }
+  window.open(`https://wa.me/?text=${encodeURIComponent(rText(r))}`);
+}
+function doCopy(id){
+  var r=findRecipeRef(id);
+  if(!r){ toast('That recipe is no longer here'); return; }
+  navigator.clipboard.writeText(rText(r))
+    .then(()=>toast('📋 Copied!'))
+    .catch(function(e){ toast('Could not copy: '+e.message); });
+}
 
 
 function safeFilename(name) {
