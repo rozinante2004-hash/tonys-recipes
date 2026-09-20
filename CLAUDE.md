@@ -431,6 +431,31 @@ found only because a test was written first and disagreed with the code.
     response — so the KV file download has been served as JSON since v36, and
     `photo-fetch` would have returned an "image" no browser would decode.
     `jsonResp` sets its own type, so nothing lost one.
+- **`<html lang="en">` is right; the recipes are the problem (v36.25, audit U2).**
+  The interface IS English, so the document language is correct — what was
+  missing is that roughly half the recipes are Hebrew, and a screen reader then
+  reads Hebrew with an English voice, which is not "accented" but
+  unintelligible. Every element holding recipe text already carries `dir="auto"`
+  for bidi alignment (5b.1), so that is the ready-made list of "content, not
+  chrome": `applyContentLang()` walks it after each render and sets `lang` from
+  what is actually in each element. One walk instead of sixty template edits,
+  and it stays right when a recipe is translated. Two traps: a `<textarea>` or
+  `<input>` keeps its text in **`.value`**, not `textContent` — read the wrong
+  one and every Hebrew recipe being typed is marked English; and the generated
+  HTML (print, email, the share page) has no live DOM to walk, so those carry
+  `langAttr()` inline.
+- **The app says what leaves this device (v36.25).** The login screen used to
+  end "Tony's Recipes never stores your data on our servers" — true, and on its
+  own readable as more than it said, because an AI feature sends that recipe's
+  text to Anthropic and an import passes through the Worker. ⚙️ → 🔒 lists every
+  third party, and two rules keep it honest: each entry says what is **sent**,
+  not what the service is; and each is marked "always" or "only if you ask",
+  because lumping those together is how a privacy note stops being read. The
+  relay entry reads the live `proxyConsentState()`, so it cannot go stale the
+  moment someone ticks "never ask again". Its z-index is **above `#loginScreen`
+  (9999)** — the default 200 would open it behind the screen that links to it.
+  Note the same trap applies to `askConfirm` (1300): a confirm raised from the
+  login screen would be invisible.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

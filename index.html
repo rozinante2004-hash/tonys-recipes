@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.24 -->
+<!-- Tony's Recipes Collection v36.25 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3222,7 +3222,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.24';
+var APP_VERSION = 'v36.25';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -3427,7 +3427,7 @@ function rHtml(r) {
 
   var ingredients = allIngredients(r).map(function(i){
     return '<tr><td dir="auto" style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.a||'') + '</td>' +
-           '<td dir="auto" style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.n||'') + '</td></tr>';
+           '<td dir="auto"' + langAttr(i.n||'') + ' style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.n||'') + '</td></tr>';
   }).join('');
 
   var steps = allSteps(r).map(function(s, i){
@@ -3442,7 +3442,7 @@ function rHtml(r) {
 
   var notesBlock = r.notes ? '<div style="margin:24px 0 0;padding:16px;background:#FFFBEB;border-left:4px solid #D4A843;border-radius:0 8px 8px 0;">' +
     '<div style="font-size:12px;font-weight:700;color:#8B6914;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Notes</div>' +
-    '<div dir="auto" style="font-size:14px;color:#1C1A18;line-height:1.6;unicode-bidi:plaintext;">' + escH(r.notes) + '</div></div>' : '';
+    '<div dir="auto"' + langAttr(r.notes) + ' style="font-size:14px;color:#1C1A18;line-height:1.6;unicode-bidi:plaintext;">' + escH(r.notes) + '</div></div>' : '';
 
   var srcHref = safeUrl(r.source);
   var sourceBlock = r.source
@@ -3467,7 +3467,7 @@ function rHtml(r) {
 
     // Header band
     '<div style="background:#5C3D2E;padding:24px 32px;">',
-    '<div dir="auto" style="font-size:28px;font-weight:700;color:#FFFFFF;font-family:Georgia,serif;line-height:1.3;unicode-bidi:plaintext;">' + escH(r.name) + '</div>',
+    '<div dir="auto"' + langAttr(r.name) + ' style="font-size:28px;font-weight:700;color:#FFFFFF;font-family:Georgia,serif;line-height:1.3;unicode-bidi:plaintext;">' + escH(r.name) + '</div>',
     dietTags ? '<div style="margin-top:10px;">' + dietTags + '</div>' : '',
     '</div>',
 
@@ -5716,7 +5716,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.24</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.25</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5737,6 +5737,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
           <button class="drop-item" id="selfTestMenuItem" style="display:none;" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
@@ -6322,7 +6323,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.24</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.25</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6350,7 +6351,15 @@ body.banner-shown .header {
           <input type="checkbox" id="rememberMe" checked style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">
           <label for="rememberMe" style="cursor:pointer;">Remember me on this device</label>
         </div>
-        <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google account (Firebase cloud).<br>Tony's Recipes never stores your data on our servers.</div>
+        <!-- v36.25 — this used to end "Tony's Recipes never stores your data on
+             our servers". True, and on its own misleading: using an AI feature
+             sends that recipe's text to Anthropic, and a photo or a URL import
+             passes through the app's own Cloudflare Worker. Nothing is KEPT
+             there, which is the claim that survives — and the full list of what
+             goes where is now one tap away. -->
+        <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google account (Firebase cloud).<br>
+          Nothing is kept on this app's servers — though some features do send a recipe through them.
+          <a href="#" onclick="event.preventDefault();showPrivacyPanel();return false;" style="color:var(--terracotta);text-decoration:underline;">What leaves this device</a>.</div>
   </div>
 </div>
 
@@ -7307,12 +7316,12 @@ function buildRecipePage(r) {
     + '.foot{color:#A79E93;font-size:11px;text-align:center;padding:18px;}'
     + '@media print{body{background:#fff}.wrap{box-shadow:none}}'
     + '</style></head><body dir="auto"><div class="wrap">' + img + '<div class="pad">'
-    + '<h1 dir="auto">' + escH(r.name) + '</h1>'
+    + '<h1 dir="auto"' + langAttr(r.name) + '>' + escH(r.name) + '</h1>'
     + '<div class="meta">' + escH(r.category) + ' &middot; ' + escH(r.difficulty)
     + ' &middot; ' + escH(r.prep) + ' &middot; ' + escH(r.servings) + ' servings</div>'
     + '<h2>Ingredients</h2><ul>' + ings + '</ul>'
     + '<h2>Method</h2><ol>' + steps + '</ol>'
-    + (r.notes ? '<div class="notes" dir="auto">' + escH(r.notes) + '</div>' : '')
+    + (r.notes ? '<div class="notes" dir="auto"' + langAttr(r.notes) + '>' + escH(r.notes) + '</div>' : '')
     + (r.source ? '<div class="meta" style="margin-top:18px;">Source: ' + escH(r.source) + '</div>' : '')
     + '</div><div class="foot">Shared from Tony\'s Recipes Collection</div></div></body></html>';
 }
@@ -7758,6 +7767,37 @@ function labelIconButtons(root) {
   return n;
 }
 window.labelIconButtons = labelIconButtons;
+
+// ─── A HEBREW RECIPE IS MARKED AS HEBREW (v36.25, audit U2) ──────────────────
+// <html lang="en"> is correct — the interface IS English — but roughly half the
+// recipes are Hebrew, and nothing said so. A screen reader then reads Hebrew
+// with an English voice, which is not "accented", it is unintelligible; and the
+// browser hyphenates and picks quotation marks by the wrong rules.
+//
+// Every element holding recipe text already carries dir="auto" for the bidi
+// alignment (5b.1), so that is the ready-made list of "this is content, not
+// chrome". Setting `lang` from what is actually in each one is a walk over that
+// list rather than sixty-odd edits at the template sites — and it stays right
+// when a recipe is translated, which a hardcoded attribute would not.
+var HEBREW_LETTERS = /[֐-׿יִ-ﭏ]/;
+function textLang(s) { return HEBREW_LETTERS.test(String(s == null ? '' : s)) ? 'he' : 'en'; }
+function langAttr(s) { return ' lang="' + textLang(s) + '"'; }
+function applyContentLang(root) {
+  var scope = root || document;
+  if (!scope.querySelectorAll) return 0;
+  var els = scope.querySelectorAll('[dir="auto"]'), n = 0;
+  for (var i = 0; i < els.length; i++) {
+    // A textarea or input holds its text in .value, not .textContent, and those
+    // are exactly the fields someone types a Hebrew recipe into.
+    var el = els[i];
+    var txt = (el.value !== undefined && el.value !== null && el.tagName !== 'BUTTON')
+      ? el.value : (el.textContent || '');
+    var want = textLang(txt);
+    if (el.getAttribute('lang') !== want) { el.setAttribute('lang', want); n++; }
+  }
+  return n;
+}
+window.textLang = textLang; window.langAttr = langAttr; window.applyContentLang = applyContentLang;
 
 function trapFocus(overlayId) {
   var el = document.getElementById(overlayId);
@@ -8205,6 +8245,7 @@ function renderGrid() {
   }
   prunePhotoUrlCache(); // release blob URLs for recipes that are gone
   applyAriaLabels(g);   // label the freshly rendered ❤/🤍 buttons
+  applyContentLang(g);  // v36.25 — say which of these names are Hebrew
 }
 
 // ── 5c.1 — keyboard activation ────────────────────────────────────────────────
@@ -9184,6 +9225,7 @@ function drawView(){
   // Re-measure rather than re-animate, so your place never jumps or is lost.
   clearCookTimers();
   applyTicks();   // ticks survive a re-render (scaling, units) within the session
+  applyContentLang(document.getElementById('viewModal'));   // v36.25 — Hebrew is marked as Hebrew
   requestAnimationFrame(function(){ positionLineMarker(false); });
 }
 
@@ -18794,6 +18836,77 @@ async function autoBackupIfDue() {
     return 'failed';
   }
 }
+// ─── WHAT LEAVES THIS DEVICE (v36.25) ────────────────────────────────────────
+// The audit listed "a privacy note covering the CORS proxies and what the AI
+// sees" as a public-release blocker. It is worth having now: the list is already
+// long enough that nobody could reconstruct it from the menus, and the login
+// screen's "never stores your data on our servers" was true in a way that could
+// be read as more than it said.
+//
+// Two rules for what goes in here. Every entry says what is SENT, not what the
+// service is; and each one is marked by whether it happens on its own or only
+// when you press something — "always" and "only if you ask" are different
+// promises and lumping them together is how a privacy note stops being read.
+// The state is live, so a service that is not configured says so rather than
+// implying it is in use.
+function privacyEntries() {
+  var signedIn = !!(window._fbUser);
+  var relay = (typeof proxyConsentState === 'function') ? proxyConsentState() : 'ask';
+  return [
+    { who: 'Google Firebase', when: signedIn ? 'always, while signed in' : 'not in use — you are signed out',
+      on: signedIn,
+      sends: 'Every recipe, its photos, and the family member list. This is YOUR Firebase project: '
+           + 'the data sits in a Google account you own, and the access rules are yours to publish.' },
+    { who: 'Google Sign-in', when: signedIn ? 'always, while signed in' : 'only when you sign in', on: true,
+      sends: 'Your email address, so the access rules can tell family from strangers. Nothing else.' },
+    { who: 'Anthropic (Claude)', when: 'only when you use an AI feature', on: true,
+      sends: 'The text of whatever you asked about — a recipe to translate, a page to import, your '
+           + 'question to the help assistant, a pantry list. It goes through this app’s Cloudflare '
+           + 'Worker, which adds the API key and keeps no copy. Photos are never sent.' },
+    { who: 'This app’s Cloudflare Worker', when: 'when you import, search for a photo, or use AI', on: true,
+      sends: 'The address you are importing, the words you search photos for, and the AI request above. '
+           + 'It holds the API keys so your browser never has to, and stores nothing except a request '
+           + 'count used to cap the bill.' },
+    { who: 'Photo services (Pixabay, Pexels, Unsplash, Openverse)', when: 'only when you search for a photo', on: true,
+      sends: 'The search words. Not your recipes, and not who you are.' },
+    { who: 'Public relay services', when: relay === 'always' ? 'whenever a page cannot be fetched — you chose not to be asked'
+                                                             : 'only after you agree, each time', on: true,
+      sends: 'The address of a page you are importing, when this app’s own server cannot fetch it. '
+           + 'These relays are not ours, and they choose what text comes back — which is why you are '
+           + 'asked first. You can change that in ⚙️ → Logging & debugging.' },
+    { who: 'Bring! and Gmail', when: 'only if you have connected them, and only when you send something', on: true,
+      sends: 'To Bring!: an ingredient list you chose to send. To Gmail: a recipe you chose to email, '
+           + 'to the address you typed.' }
+  ];
+}
+function showPrivacyPanel() {
+  var host = document.getElementById('privacyBody');
+  if (host) {
+    var h = '<div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px;">'
+      + 'Your recipes live on this device and in your own Firebase project. Everything below is a '
+      + 'service this app can send something to, and exactly what it sends. Nothing here keeps a copy '
+      + 'of your collection.</div>';
+    privacyEntries().forEach(function(e) {
+      h += '<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:9px;'
+         + (e.on ? '' : 'opacity:0.6;') + '">'
+         + '<div style="font-size:14px;font-weight:600;">' + escH(e.who) + '</div>'
+         + '<div style="font-size:11px;color:var(--terracotta);font-weight:600;margin-top:2px;">' + escH(e.when) + '</div>'
+         + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.55;">' + escH(e.sends) + '</div>'
+         + '</div>';
+    });
+    h += '<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:12px;">'
+       + '<strong>Nothing is sold, shared or used for advertising</strong>, and no analytics of any kind '
+       + 'are collected. The sync log in ⚙️ → Logging & debugging stays on this device and is '
+       + 'never uploaded, not even into a backup.</div>';
+    host.innerHTML = h;
+  }
+  // Deliberately does NOT close the login screen behind it: someone reading
+  // this before signing in should come back to where they were, not be dropped
+  // into an app they have not signed into.
+  document.getElementById('privacyOverlay').classList.add('open');
+}
+window.privacyEntries = privacyEntries; window.showPrivacyPanel = showPrivacyPanel;
+
 // ─── THE BACKUPS PANEL (v36.20) ──────────────────────────────────────────────
 // It has to answer one question before anything else: when did a backup last
 // happen, and where did it go? Two buttons at the bottom of a dropdown could
@@ -19822,6 +19935,28 @@ window.applyHeaderCollapse = applyHeaderCollapse; window.onHeaderScroll = onHead
     </div>
     <div class="modal-body" style="padding:0 16px 20px;">
       <div id="loggingBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- v36.25 (audit F, the privacy note) — every third party this app can reach,
+     what reaches them, and what does not. Written for Tony's family now rather
+     than as boilerplate for a launch that has not happened: the list is already
+     long enough that nobody could reconstruct it from the menus. -->
+<!-- z-index above #loginScreen (9999). This panel is reachable FROM the login
+     screen, and .modal-overlay's 200 would put it behind the very screen that
+     linked to it — a link that opens nothing. -->
+<div class="modal-overlay" id="privacyOverlay" style="z-index:10000;" onclick="bgClose(event,'privacyOverlay')">
+  <div class="modal" style="max-width:560px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('privacyOverlay')" aria-label="Close" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">🔒 What leaves this device</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Every service this app can reach, and what reaches it</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 20px;">
+      <div id="privacyBody"></div>
     </div>
   </div>
 </div>

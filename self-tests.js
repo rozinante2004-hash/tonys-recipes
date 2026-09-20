@@ -7076,6 +7076,117 @@ window.SELF_TESTS = [
         throw new Error('the Worker’s per-minute refusal is marked retryable');
     } },
 
+  { id:'ui_content_language', group:'UI', name:'A Hebrew recipe is marked as Hebrew (v36.25)',
+    test: async()=>{
+      ['textLang','langAttr','applyContentLang'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // <html lang="en"> is correct — the INTERFACE is English. What was missing
+      // is that roughly half the recipes are not, and a screen reader then reads
+      // Hebrew with an English voice, which is not "accented" but unintelligible.
+      if(document.documentElement.lang !== 'en')
+        throw new Error('the document language is "'+document.documentElement.lang+'" — the UI is English');
+
+      if(textLang('מרק בצל')!=='he') throw new Error('Hebrew was not recognised');
+      if(textLang('Onion Soup')!=='en') throw new Error('English was marked as Hebrew');
+      if(textLang('עוגת Pavlova')!=='he')
+        throw new Error('a mixed name with Hebrew in it should be marked Hebrew');
+      if(textLang('')!=='en' || textLang(null)!=='en') throw new Error('empty text should not be Hebrew');
+      if(langAttr('שלום').indexOf('lang="he"')===-1) throw new Error('langAttr is not emitting the attribute');
+
+      // Drive the walk over real elements, including the fields a recipe is
+      // typed INTO — a textarea keeps its text in .value, not .textContent, and
+      // getting that wrong marks every Hebrew recipe being written as English.
+      var fix=document.createElement('div');
+      fix.innerHTML='<div dir="auto">מרק בצל</div>'
+                  + '<div dir="auto">Onion Soup</div>'
+                  + '<textarea dir="auto"></textarea>'
+                  + '<div>מרק</div>';          // no dir="auto" — chrome, not content
+      fix.querySelector('textarea').value='קצף בצל';
+      document.body.appendChild(fix);
+      try{
+        applyContentLang(fix);
+        var els=fix.querySelectorAll('div, textarea');
+        if(els[0].getAttribute('lang')!=='he') throw new Error('a Hebrew line was not marked he');
+        if(els[1].getAttribute('lang')!=='en') throw new Error('an English line was not marked en');
+        if(fix.querySelector('textarea').getAttribute('lang')!=='he')
+          throw new Error('a textarea was read by textContent, so anything being typed reads as English');
+        if(els[els.length-1].getAttribute('lang'))
+          throw new Error('an element without dir="auto" was touched — that is chrome, not recipe text');
+
+        // It must be idempotent: re-rendering happens constantly.
+        var changed=applyContentLang(fix);
+        if(changed!==0) throw new Error('a second pass rewrote '+changed+' attributes');
+      } finally { fix.remove(); }
+
+      // The generated HTML has no live DOM to walk, so those carry it inline.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var code = src.replace(/^\s*\/\/.*$/gm, '');
+      var inline = (code.match(/langAttr\(/g) || []).length;
+      if(inline < 5) throw new Error('only '+inline+' generated-HTML sites carry lang — print and email need it too');
+      if(!/applyContentLang\(g\)/.test(code)) throw new Error('the grid is never marked');
+      if(!/applyContentLang\(document\.getElementById\('viewModal'\)\)/.test(code))
+        throw new Error('the open recipe is never marked');
+    } },
+
+  { id:'ui_privacy_note', group:'UI', name:'The app says what leaves this device, accurately (v36.25)',
+    test: async()=>{
+      ['privacyEntries','showPrivacyPanel'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var list=privacyEntries();
+      if(list.length < 6) throw new Error('only '+list.length+' services listed');
+      var blob=JSON.stringify(list);
+      // Every third party the app can actually reach has to be in here. A
+      // privacy note that omits one is worse than none, because it reads as
+      // complete.
+      ['Firebase','Anthropic','Cloudflare','Pixabay','relay','Bring'].forEach(function(who){
+        if(blob.indexOf(who)===-1) throw new Error(who+' is not in the list of what leaves this device');
+      });
+      list.forEach(function(e){
+        if(!e.who || !e.when || !e.sends) throw new Error('an entry is missing who/when/sends: '+JSON.stringify(e));
+        // "what it IS" is not the question; "what is SENT" is.
+        if(e.sends.length < 40) throw new Error('"'+e.who+'" does not actually say what is sent');
+      });
+      // The relay entry has to reflect the real setting, or the note is stale
+      // the moment someone ticks "never ask again".
+      var relayEntry=list.filter(function(e){ return /relay/i.test(e.who); })[0];
+      var prev=proxyConsentState();
+      try{
+        setProxyConsent('always');
+        var whenAlways=privacyEntries().filter(function(e){ return /relay/i.test(e.who); })[0].when;
+        setProxyConsent('ask');
+        var whenAsk=privacyEntries().filter(function(e){ return /relay/i.test(e.who); })[0].when;
+        if(whenAlways===whenAsk)
+          throw new Error('the note says the same thing whether relays are always allowed or not');
+      } finally { setProxyConsent(prev==='always'?'always':'ask'); }
+
+      // It renders, and it is reachable from both places that promise it.
+      showPrivacyPanel();
+      try{
+        var ov=document.getElementById('privacyOverlay');
+        if(!ov || !ov.classList.contains('open')) throw new Error('the panel did not open');
+        var txt=document.getElementById('privacyBody').textContent;
+        if(txt.indexOf('Anthropic')===-1) throw new Error('the panel rendered without its content');
+        if(!/no analytics/i.test(txt)) throw new Error('it does not say whether anything is tracked');
+        // It is linked from the LOGIN screen, whose z-index is 9999 — a panel
+        // at the default 200 would open behind the screen that linked to it.
+        if(parseInt(getComputedStyle(ov).zIndex,10) <= 9999)
+          throw new Error('the privacy panel sits below the login screen that links to it');
+      } finally { closeM('privacyOverlay'); }
+
+      if(!document.querySelector('#settingsDrop button[onclick*="showPrivacyPanel"]'))
+        throw new Error('it is not in the Settings menu');
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      // The comment beside the change quotes the old sentence on purpose. The
+      // question is what the app SAYS, so scan with the commentary taken out.
+      var markup = src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
+      if(markup.indexOf('never stores your data on our servers') !== -1)
+        throw new Error('the login screen still makes the old unqualified claim');
+      if(!/login-privacy[\s\S]{0,500}showPrivacyPanel/.test(markup))
+        throw new Error('the login screen does not link to the note');
+    } },
+
   { id:'ui_header_stands_down', group:'UI', name:'The header gives the phone its screen back when scrolling (v36.23)',
     test: async()=>{
       if(typeof applyHeaderCollapse!=='function') throw new Error('applyHeaderCollapse not defined');
