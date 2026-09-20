@@ -973,6 +973,100 @@ window.SELF_TESTS = [
         throw new Error('Backups is not in the Settings menu');
     } },
 
+  { id:'safety_restore_merge', group:'Backup', name:'Restore can add back only what is missing (v36.21)',
+    test: async()=>{
+      ['backupMergePlan','applyBackupMerge','mergeKeyName','currentRecipeKeys'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // Restore used to be all or nothing, which is why recovering one clip
+      // meant reading the JSON by hand: the only button on offer would have
+      // thrown away everything else to get it back.
+      var snapshot = recipes.slice(), snapId = nextId;
+      var realSave = window.saveLocal, realGrid = window.renderGrid, realFilters = window.renderFilters;
+      try{
+        window.saveLocal=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
+        recipes = [
+          { id: 9001, name: 'Onion Soup',  ingredients:[{a:'2',n:'onions'}], steps:['fry'] },
+          { id: 9002, name: 'Sunday Roast', ingredients:[], steps:[], parts:[
+              { uid:'p1', name:'Gravy',        ingredients:[{a:'1',n:'stock'}], steps:['stir'] },
+              { uid:'p2', name:'Roast Potatoes', ingredients:[{a:'1kg',n:'potatoes'}], steps:['roast'] } ] }
+        ].map(normalizeRecipe);
+        nextId = 9100;
+
+        var incoming = [
+          { id: 9001, name: 'Onion Soup',      ingredients:[], steps:['x'] },   // same id
+          { id: 7,    name: 'onion  SOUP!',    ingredients:[], steps:['x'] },   // same name, different id
+          { id: 8,    name: 'Gravy',           ingredients:[], steps:['x'] },   // now a PART of a collection
+          { id: 9,    name: 'The Lost Clip',   ingredients:[], steps:[], source:'https://x.test/v', isClip:true },
+          { id: 10,   name: 'The Lost Clip',   ingredients:[], steps:[], source:'https://x.test/v', isClip:true }, // twice in the file
+          { id: 11,   name: 'Borscht',         ingredients:[{a:'1',n:'beet'}], steps:['boil'] }
+        ];
+        var plan = backupMergePlan(incoming);
+        var names = plan.add.map(function(r){ return r.name; });
+        if(plan.add.length !== 2)
+          throw new Error('expected 2 recipes to be missing, got '+plan.add.length+': '+names.join(', '));
+        if(names.indexOf('The Lost Clip')===-1 || names.indexOf('Borscht')===-1)
+          throw new Error('the wrong ones were picked: '+names.join(', '));
+        if(plan.already.length !== 4)
+          throw new Error(plan.already.length+' were treated as already here, expected 4');
+        // Each exclusion for its own reason, so one broken rule cannot hide behind another.
+        var skipped = plan.already.map(function(r){ return r.id; });
+        [9001, 7, 8, 10].forEach(function(id){
+          if(skipped.indexOf(id)===-1) throw new Error('recipe '+id+' should have been recognised as already here');
+        });
+
+        // Applying it ADDS and never touches what is here.
+        var before = recipes.map(function(r){ return JSON.stringify(r); });
+        var added = await applyBackupMerge(plan);
+        if(added.length!==2) throw new Error('applied '+added.length+' recipes, expected 2');
+        if(recipes.length!==4) throw new Error('the collection holds '+recipes.length+' recipes, expected 4');
+        before.forEach(function(json, i){
+          if(JSON.stringify(recipes[i])!==json)
+            throw new Error('an existing recipe was modified by a merge that only adds: '+recipes[i].name);
+        });
+        // Fresh ids. Reusing a backup's id silently attaches the restored recipe
+        // to whatever now holds that number — including its cloud photo document.
+        added.forEach(function(r){
+          if(r.id === 9 || r.id === 11) throw new Error('an added recipe kept the backup’s id ('+r.id+')');
+          if(r.id < 9100) throw new Error('an added recipe got id '+r.id+', below nextId');
+        });
+        if(added[0].id === added[1].id) throw new Error('two added recipes share an id');
+        // The clip's whole value is its source — the field the original incident lost.
+        var clip = added.filter(function(r){ return r.name==='The Lost Clip'; })[0];
+        if(!clip || clip.source !== 'https://x.test/v')
+          throw new Error('the clip came back without its source, which is the entire recipe');
+      } finally {
+        recipes = snapshot; nextId = snapId;
+        window.saveLocal=realSave; window.renderGrid=realGrid; window.renderFilters=realFilters;
+      }
+
+      // Name matching has to survive the differences that actually occur.
+      if(mergeKeyName('Onion Soup') !== mergeKeyName('onion  soup!'))
+        throw new Error('case and punctuation defeat the name match');
+      if(mergeKeyName('מרק בצל') !== mergeKeyName('מרק  בצל'))
+        throw new Error('Hebrew names are not matched — the collection is half Hebrew');
+      if(mergeKeyName('Onion Soup') === mergeKeyName('Onion Soup 2'))
+        throw new Error('two different recipes collapse to the same key');
+      if(mergeKeyName('') !== '') throw new Error('an empty name should produce an empty key, never a match-all');
+
+      // The dialog offers three answers, and the SAFE one is the default.
+      var realAsk = window.askConfirm, shown = null;
+      try{
+        window.askConfirm = function(o){ shown = o; return Promise.resolve(false); };
+        var inp = document.getElementById('backupRestoreInput');
+        await backupRestoreFile({ target: { files: [ new File(
+          [JSON.stringify({version:1, recipes:[{id:1,name:'Zzz Test Only',ingredients:[],steps:[]}]})],
+          'b.json', {type:'application/json'}) ], value:'' } });
+        if(!shown) throw new Error('the restore never asked anything');
+        if(!shown.altLabel) throw new Error('there is no third option — it is still replace-or-cancel');
+        if(!/Add what is missing/.test(shown.okLabel||''))
+          throw new Error('the primary button is not the non-destructive one: '+shown.okLabel);
+        if(!/Replace everything/.test(shown.altLabel||''))
+          throw new Error('replace is no longer offered at all: '+shown.altLabel);
+        if(!shown.altDanger) throw new Error('the destructive option is not marked as destructive');
+      } finally { window.askConfirm = realAsk; }
+    } },
+
   { id:'safety_orphan_sweep', group:'Cloud Sync', name:'Orphaned photo documents can be swept (5d.2)',
     test: async()=>{
       if(typeof sweepOrphanPhotos!=='function') throw new Error('sweepOrphanPhotos not defined');

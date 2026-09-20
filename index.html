@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.20 -->
+<!-- Tony's Recipes Collection v36.21 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -749,7 +749,7 @@ function renderLoggingPanel() {
      + 'will never run it does not carry it. Switching this on shows 🧪 Self Test in ⚙️ Settings and fetches '
      + 'the file the first time you open it. <strong>This setting is per device.</strong></div></div>';
 
-  // 1a2 — the relay consent, per device (v36.20)
+  // 1a2 — the relay consent, per device (v36.18)
   var _pc = proxyConsentState();
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
      + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
@@ -3105,7 +3105,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.20';
+var APP_VERSION = 'v36.21';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5588,7 +5588,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.20</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.21</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6194,7 +6194,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.20</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.21</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10718,7 +10718,7 @@ function aiCacheKey(prompt, maxTokens, model, system){
   // FNV-1a — a short stable digest, so the cache holds keys not whole prompts.
   // The MODEL is part of the key: since v36.15 two models are in play, and a
   // Haiku answer must never be served for a Sonnet request. So is the SYSTEM
-  // prompt (v36.20) — the same question under different standing instructions
+  // prompt (v36.19) — the same question under different standing instructions
   // is a different question, and leaving it out would serve one answer for both.
   var s = (model || AI_MODEL) + '|' + maxTokens + '|' + (system || '') + '|' + prompt, h = 2166136261;
   for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -10756,7 +10756,7 @@ function clearAiCache(){
 window.aiCacheKey = aiCacheKey; window.aiCacheGet = aiCacheGet;
 window.aiCachePut = aiCachePut; window.clearAiCache = clearAiCache;
 
-// `system` (v36.20) is standing instructions — who the model is and what it may
+// `system` (v36.19) is standing instructions — who the model is and what it may
 // do — and belongs in its own block, not spliced into the user's turn. The old
 // shape was literally 'System: ' + INSTRUCTIONS + '\n\nUser: ' + question, which
 // means a question (or a page of imported text) containing the word "System:"
@@ -10806,7 +10806,7 @@ function aiRetryable(e) {
   // mistake this function exists to prevent, reintroduced by its own new guard.
   if (m.indexOf('TRUNCATED:') === 0) return false;
   if (m.indexOf('BILLING:') === 0 || m.indexOf('API_KEY:') === 0) return false;
-  // v36.20 — our own Worker's refusals. A ceiling on the bill and a per-minute
+  // v36.19 — our own Worker's refusals. A ceiling on the bill and a per-minute
   // cap are both decisions, not outages: retrying either just spends 30 seconds
   // arriving at the same answer. Anthropic's own 429 is handled separately and
   // IS retried, because that one genuinely clears.
@@ -10858,7 +10858,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
       });
 
       if (r.status === 429 || r.status === 529) {
-        // v36.20 — tell OUR Worker's refusal apart from Anthropic's.
+        // v36.19 — tell OUR Worker's refusal apart from Anthropic's.
         // Anthropic being busy is worth waiting out. Our own Worker saying
         // "that is the daily ceiling on the bill" is not: retrying it is four
         // more rounds of exponential backoff behind the same spinner, and the
@@ -11110,7 +11110,7 @@ function askConfirm(opts) {
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
             + ' placeholder="' + escA(opts.placeholder || '') + '">'
           : '')
-      // v36.20 — an optional "don't ask again" tick. Only a caller that passes
+      // v36.18 — an optional "don't ask again" tick. Only a caller that passes
       // `checkbox` gets the {ok, checked} return shape; everyone else still
       // gets a plain true/false, so no existing caller changes.
       + (opts.checkbox
@@ -11119,11 +11119,22 @@ function askConfirm(opts) {
           : '')
       + '<div class="ask-actions">'
       + '<button class="ask-btn' + (danger ? ' danger' : '') + '" id="askOk">' + escH(opts.okLabel || 'OK') + '</button>'
+      // v36.21 — an optional third answer, resolving 'alt'. Restore needed one:
+      // "replace everything" and "cancel" are not the only two sensible things
+      // to do with a backup file, and forcing that choice is what made
+      // recovering one recipe a hand-edit of the JSON. Only a caller that passes
+      // `altLabel` ever sees it.
+      + (opts.altLabel
+          ? '<button class="ask-btn ' + (opts.altDanger ? 'danger' : 'ghost') + '" id="askAlt">'
+            + escH(opts.altLabel) + '</button>'
+          : '')
       + '<button class="ask-btn ghost" id="askCancel">' + escH(opts.cancelLabel || 'Cancel') + '</button>'
       + '</div></div>';
     document.body.appendChild(ov);
     var input = ov.querySelector('#askInput');
     var check = ov.querySelector('#askCheck');
+    var alt   = ov.querySelector('#askAlt');
+    if (alt) alt.onclick = function(){ done('alt'); };
     function refused() { return input ? null : (check ? { ok:false, checked:false } : false); }
     function done(v) {
       ov.remove();
@@ -11642,7 +11653,7 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
 window.linkPickPrompt = linkPickPrompt;
 window.extractRecipesFromLinks = extractRecipesFromLinks;
 
-// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.20) ──────────────────
+// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.18) ──────────────────
 // When our own Worker cannot fetch a page, the import can fall back to three
 // public CORS proxies. They are not ours: they see every URL imported through
 // them, and they choose what HTML comes back. v36.17 made that HTML inert, so
@@ -11932,7 +11943,7 @@ async function runUrlImport() {
     }
     if (built.kind === 'none') throw (typeof textErr !== 'undefined' && textErr) || new Error('no recipe found');
     if (_pageWasTruncated) built.recipe._truncated = true;
-    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.20 — say where this came from
+    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.18 — say where this came from
     // Just the count: the preview's own sentence supplies "of these", so
     // passing "1 of 3" here read "1 of 3 of these could not be read".
     if (parsed._partial) built.recipe._partial = parsed._partial;
@@ -12032,7 +12043,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
   // A long article is extracted one recipe at a time (v36.1). If some of those
   // calls failed, the list is short by exactly that many — and a list of 8 that
   // should have been 10 looks identical to a list of 8. Say the number.
-  // v36.20 — this text did not come from our own server. Not a warning, a fact
+  // v36.18 — this text did not come from our own server. Not a warning, a fact
   // worth knowing if the recipe reads oddly.
   var relay = parsed._viaProxy
     ? '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
@@ -18806,12 +18817,83 @@ async function backupSave() {
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
 }
 
+// v36.21 — the first dialog no longer promises what the second one will do.
+// It used to say "this REPLACES every recipe", which was a commitment made
+// before the file had even been read; the real choice is now offered once the
+// backup is open and the numbers are known.
 async function backupRestore() {
-  if(!await askConfirm({ icon:'📂', title:'Restore from backup?',
-      message:'This REPLACES every recipe currently on this device with the contents of the backup file. It cannot be undone.',
-      okLabel:'Replace everything', danger:true })) return;
+  if(!await askConfirm({ icon:'📂', title:'Restore from a backup file?',
+      message:'Pick the backup file. Nothing changes yet — once it is open you can choose '
+        + 'whether to replace everything or only add back the recipes that are missing.',
+      okLabel:'Choose a file…' })) return;
   document.getElementById('backupRestoreInput').click();
 }
+
+// ─── RESTORE ONLY WHAT IS MISSING (v36.21, audit F3) ─────────────────────────
+// Restore was all or nothing: it replaced the entire collection, here and on
+// every other device. That is the right tool for "this device is wrong" and
+// completely the wrong tool for "one recipe went missing" — which is the case
+// that actually happened. Recovering the clip meant opening the JSON and reading
+// it by hand, because the only button on offer would have thrown away three
+// weeks of work to get one recipe back.
+//
+// So there is a second mode. It never overwrites, never deletes and never
+// touches a recipe already here; it only adds back the ones that are gone, and
+// it counts them before anything happens.
+
+// Two recipes are "the same one" if they share an id, or if their names match
+// once case, spacing and punctuation are set aside. Name matching is what makes
+// this work across a re-import or an id reshuffle; it is also exactly why the
+// mode only ever ADDS. A false match that skipped a recipe leaves one you can
+// still add by hand; a false match that overwrote one is data gone.
+function mergeKeyName(s) {
+  return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+// A recipe that now lives INSIDE a collection is still here. Without this, a
+// backup from before a merge would add every part back as a loose duplicate —
+// precisely the mess the merge was tidying up.
+function currentRecipeKeys() {
+  var ids = {}, names = {};
+  (recipes || []).forEach(function(r) {
+    ids[String(r.id)] = true;
+    var k = mergeKeyName(r.name); if (k) names[k] = true;
+    recipeParts(r).forEach(function(p) {
+      var pk = mergeKeyName(p.name); if (pk) names[pk] = true;
+    });
+  });
+  return { ids: ids, names: names };
+}
+function backupMergePlan(incoming) {
+  var have = currentRecipeKeys();
+  var add = [], already = [];
+  (incoming || []).forEach(function(r) {
+    var k = mergeKeyName(r.name);
+    if (have.ids[String(r.id)] || (k && have.names[k])) { already.push(r); return; }
+    add.push(r);
+    // Claim it, so a backup that holds the same recipe twice adds it once.
+    if (k) have.names[k] = true;
+    have.ids[String(r.id)] = true;
+  });
+  return { add: add, already: already };
+}
+// Apply the plan. Every added recipe gets a FRESH id: the ids in a backup were
+// allocated against a different collection, and reusing one would silently
+// attach the restored recipe to whatever now holds that number — including its
+// photo document in the cloud.
+async function applyBackupMerge(plan) {
+  var added = [];
+  plan.add.forEach(function(r) {
+    var rec = JSON.parse(JSON.stringify(r));
+    rec.id = nextId++;
+    rec.updatedAt = Date.now();
+    added.push(rec);
+  });
+  recipes = migrateRecipes(recipes.concat(added));
+  saveLocal(); renderFilters(); renderGrid();
+  return added;
+}
+window.mergeKeyName = mergeKeyName; window.backupMergePlan = backupMergePlan;
+window.currentRecipeKeys = currentRecipeKeys; window.applyBackupMerge = applyBackupMerge;
 
 // Restore is the most destructive action in the app: it replaces the whole
 // collection and pushes that over every other device. It used to do all of that
@@ -18839,14 +18921,52 @@ async function backupRestoreFile(event) {
 
   var when=backupDateLabel(backup.exportedAt);
   var goesToCloud=!!(window._driveMode&&window._fbUser);
-  var ok=await askConfirm({
-    icon:'\u26a0\ufe0f', title:'Replace all '+recipes.length+' recipes?',
-    message:'The backup holds '+restored.length+' recipe'+(restored.length===1?'':'s')+(when?', saved '+when:'')+'.\n\n'
-      +'Everything currently in the app is replaced \u2014 this is not a merge, and there is no undo.'
-      +(goesToCloud?'\n\nIt will also be pushed to the cloud, so every other signed-in device is replaced too.':'\n\nYou are signed out, so only this device changes.'),
-    okLabel:'Replace everything', danger:true });
-  if(!ok) { toast('Restore cancelled \u2014 nothing changed'); return; }
 
+  // v36.21 \u2014 offer the non-destructive mode, and SAY what each one would do to
+  // this particular file. "N missing" is the number that decides it, and it can
+  // only be known after the file is read, which is why the choice is here and
+  // not in the button that opened the picker.
+  var plan = backupMergePlan(restored);
+  var answer = await askConfirm({
+    icon:'\u{1F4C2}', title:'What should this backup do?',
+    message:'The backup holds '+restored.length+' recipe'+(restored.length===1?'':'s')
+      +(when?', saved '+when:'')+'. You have '+recipes.length+' here now.\n\n'
+      +'\u2022 Add what is missing \u2014 puts back the '+plan.add.length+' recipe'
+      +(plan.add.length===1?'':'s')+' in the backup that '+(plan.add.length===1?'is':'are')
+      +' not here any more. Nothing already in the app is changed, overwritten or removed.\n\n'
+      +'\u2022 Replace everything \u2014 the '+recipes.length+' recipe'+(recipes.length===1?'':'s')
+      +' here now '+(recipes.length===1?'is':'are')+' thrown away and the backup takes '
+      +(recipes.length===1?'its':'their')+' place. There is no undo.'
+      +(goesToCloud?'\n\nEither way the result is pushed to the cloud, so your other devices follow.'
+                   :'\n\nYou are signed out, so only this device changes.'),
+    okLabel:'Add what is missing ('+plan.add.length+')',
+    altLabel:'Replace everything', altDanger:true,
+    cancelLabel:'Cancel' });
+
+  if(answer !== true && answer !== 'alt') { toast('Restore cancelled \u2014 nothing changed'); return; }
+
+  // \u2500\u2500 the non-destructive mode \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  if(answer === true) {
+    if(!plan.add.length) {
+      toast('Nothing to add \u2014 every recipe in that backup is already here', 7000);
+      return;
+    }
+    var added;
+    try { added = await applyBackupMerge(plan); }
+    catch(err){ toast('\u274c Could not add them: '+err.message); return; }
+    toast('\u2705 Added '+added.length+' recipe'+(added.length===1?'':'s')+' back'
+      +(plan.already.length?' \u2014 the other '+plan.already.length
+        +(plan.already.length===1?' was':' were')+' already here':''), 8000);
+    if(goesToCloud){
+      try { await saveToFirestore(); toast('\u2705 Other devices updated'); }
+      catch(err){ showServiceError('The recipes were added on this device, but they could NOT be sent '
+        + 'to the cloud:\n\n' + (err && err.message ? err.message : String(err))
+        + '\n\nUse \u2699\ufe0f \u2192 Sync now once the connection is back.'); }
+    }
+    return;
+  }
+
+  // \u2500\u2500 the destructive one, unchanged except for how it was reached \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   try {
     recipes=migrateRecipes(restored);
     // Math.max.apply on an empty list yields -Infinity, and on a very large one

@@ -317,6 +317,35 @@ found only because a test was written first and disagreed with the code.
   The nudge now escalates: toast at 30 days, a toast that stays at 60, a dialog
   at 90 — and the dialog asks at most once a day, because a dialog on every
   reload trains the reader to dismiss it without looking.
+- **Restore has two modes, and the safe one is the default (v36.21, audit F3).**
+  Restore used to be all or nothing: it replaced the whole collection here and
+  on every other device. That is the right tool for "this device is wrong" and
+  the wrong one for "a recipe went missing" — which is the case that actually
+  happened, and why recovering the clip meant reading the JSON by hand. "Add
+  what is missing" never overwrites, never deletes and never touches a recipe
+  already here; it only adds back what is gone, and it counts them first.
+  - **The choice is offered AFTER the file is read**, because "N missing" is the
+    number that decides it. The button that opens the picker no longer promises
+    what will happen.
+  - **A recipe now inside a collection is still here.** `currentRecipeKeys`
+    walks `recipeParts` too — without that, a backup from before a merge adds
+    every part back as a loose duplicate, which is the mess the merge was
+    tidying up.
+  - **Matching is by id OR normalised name**, and this is exactly why the mode
+    only ever ADDS. A false match that skipped a recipe leaves one you can add
+    by hand; a false match that overwrote one is data gone. `mergeKeyName` uses
+    `\p{L}\p{N}` so Hebrew names match — half the collection is Hebrew.
+  - **Added recipes get FRESH ids.** The ids in a backup were allocated against
+    a different collection; reusing one silently attaches the restored recipe to
+    whatever now holds that number, including its cloud photo document.
+  - `askConfirm` grew `altLabel`/`altDanger` for the third answer (resolves
+    `'alt'`). Only a caller that passes `altLabel` sees it, so nothing else moved.
+- **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
+  `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
+  records *when* something landed, so the file starts claiming that the proxy
+  consent gate and the backup folder both shipped in the current release. Only
+  four strings are the version: the HTML comment on line 1, `APP_VERSION`, and
+  the two badges. Everything else matching `v36.x` is history — leave it.
 - **The CSP must stay in step with the script hosts.** `script-src` lists the CDN
   hosts `loadScriptOnce()` uses; adding a lazily loaded library without adding its
   host makes it fail silently. `frame-src` needs `'self'` for the email preview's
