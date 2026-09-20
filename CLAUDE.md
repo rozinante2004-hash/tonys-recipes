@@ -1146,6 +1146,34 @@ found only because a test was written first and disagreed with the code.
       five output builders (`rText`, `rHtml`, `buildRecipePage`,
       `buildPrintHtml`, `makeDocxBlob`) print Category and Difficulty, so a
       shared recipe carries real values rather than blanks.
+  - **Dark mode: run the scan at PHONE WIDTH (v36.14).** Tony's Meal menu was
+    `#F2EDE6` text on a hard-coded `background: white` panel — **1.16:1**,
+    effectively invisible. It is the nutrition-panel bug (v32.5) for the third
+    time, and it survived every previous dark-mode pass for one reason: the
+    mobile dropdown panels **do not exist above 700px**, so a desktop check
+    never opens them. `tests/contrast-scan.js` opens every menu, panel and
+    modal at 390px in both themes, composites the effective background up the
+    ancestor chain and measures the real ratio; it runs in CI and the
+    `ui_dark_contrast` self-test guards the same surfaces in the browser.
+    - The scan found **58 unique low-contrast elements**, of which 33 were a
+      light surface surviving into dark mode. Both themes are now clean.
+    - **An inline style beats any class rule**, so four surfaces
+      (`.tint-box`, `.inline-code`, `.access-badge-full`, `.action-btn-bring`)
+      had to have their colours moved out of `style="…"` into classes before a
+      theme could reach them at all.
+    - **`--terracotta` is lifted in dark mode (#FF7A45) so it reads as TEXT,
+      and that same lift drops WHITE text on a terracotta FILL to 2.6:1.** One
+      variable cannot do both jobs: `--terracotta-fill` stays at #C1440E in
+      both themes, where white is 5.3:1. Colouring the button text dark instead
+      was tried first and was wrong — not every `.btn-submit` is
+      terracotta-filled, and it turned two dark-backed buttons dark-on-dark.
+    - `--muted` was `#8A8279`: **3.78:1 on white**, under AA, and it is the
+      secondary text colour on nearly every surface. Now `#6F6A60`.
+    - **A self-test must not measure whatever the previous 200 tests left in
+      the DOM.** The first version of `ui_dark_contrast` read a stale
+      `#viewModal` button and reported a failure that could not be reproduced
+      anywhere in the real app or in the standalone scan. It builds its own
+      throwaway fixtures now, so the result cannot depend on test order.
   - Still collection-level, deliberately: nothing. `source`, `isClip`, `diets`,
     `category`, `difficulty`, `fav` and the cook history are all per-recipe; the
     collection's values are the fallback. The one thing a part still cannot have

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.13 -->
+<!-- Tony's Recipes Collection v36.14 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -675,7 +675,7 @@ function showLogNudge(bad) {
   row.style.cssText = 'display:flex;gap:8px;';
 
   var copy = document.createElement('button');
-  copy.style.cssText = 'flex:1;padding:9px;background:var(--terracotta);color:#fff;border:none;'
+  copy.style.cssText = 'flex:1;padding:9px;background:var(--terracotta-fill);color:#fff;border:none;'
     + 'border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   copy.textContent = '📋 Copy report';
   copy.onclick = function(){ copySyncLogReport(); dismissLogNudge(); };
@@ -786,7 +786,7 @@ function renderLoggingPanel() {
     if (k !== 'all' && !n) return;                       // don't offer an empty filter
     h += '<button onclick="setLogFilter(&quot;' + k + '&quot;)" style="padding:5px 10px;border-radius:999px;font-size:11.5px;'
        + 'font-family:inherit;cursor:pointer;border:1px solid var(--border);'
-       + (_logFilter === k ? 'background:var(--terracotta);color:#fff;font-weight:700;' : 'background:var(--card);color:var(--warm-brown);')
+       + (_logFilter === k ? 'background:var(--terracotta-fill);color:#fff;font-weight:700;' : 'background:var(--card);color:var(--warm-brown);')
        + '">' + k + ' (' + n + ')</button>';
   });
   h += '</div>';
@@ -810,7 +810,7 @@ function renderLoggingPanel() {
 
   // 5 — the buttons
   h += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
-     + '<button onclick="copySyncLogReport()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Copy report</button>'
+     + '<button onclick="copySyncLogReport()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Copy report</button>'
      + '<button onclick="purgeSyncLogUI()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--card-bg);color:#B03030;border:1px solid #F0B4B4;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🗑 Purge logs</button>'
      + '</div>'
      + '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;">'
@@ -7792,6 +7792,101 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'ui_dark_contrast', group:'UI', name:'No panel is light-on-light in dark mode (v36.14)',
+    test: async()=>{
+      // Tony's report: the Meal menu was #F2EDE6 text on a hard-coded white
+      // panel — 1.16:1, effectively invisible. It is MOBILE ONLY, which is why
+      // it survived every previous dark-mode pass: the panel does not exist
+      // above 700px, so a desktop check never opens it. Assert the RENDERED
+      // colours, because the stylesheet looks perfectly reasonable either way.
+      function parse(c){ var m=/rgba?\(([^)]+)\)/.exec(c||''); if(!m) return null;
+        var p=m[1].split(',').map(parseFloat);
+        return {r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1}; }
+      function over(f,b){ var a=f.a; return {r:f.r*a+b.r*(1-a),g:f.g*a+b.g*(1-a),b:f.b*a+b.b*(1-a),a:1}; }
+      function lum(c){ var f=[c.r,c.g,c.b].map(function(v){ v/=255;
+        return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
+        return 0.2126*f[0]+0.7152*f[1]+0.0722*f[2]; }
+      function ratio(a,b){ var l1=lum(a),l2=lum(b);
+        return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05); }
+      function bgOf(el){
+        var stack=[], n=el;
+        while(n && n.nodeType===1){
+          var c=parse(getComputedStyle(n).backgroundColor);
+          if(c && c.a>0){ stack.push(c); if(c.a>=0.999) break; }
+          n=n.parentElement;
+        }
+        if(!stack.length) return {r:255,g:255,b:255,a:1};
+        var base=stack[stack.length-1];
+        if(base.a<0.999) base=over(base,{r:255,g:255,b:255,a:1});
+        for(var i=stack.length-2;i>=0;i--) base=over(stack[i],base);
+        return base;
+      }
+      var prev = getTheme();
+      // FRESH fixtures, not whatever the previous 200 tests left lying in the
+      // DOM. Measuring leftovers makes the result depend on test ORDER — this
+      // check read a stale #viewModal button and reported a failure that could
+      // not be reproduced anywhere in the real app.
+      var host = document.createElement('div');
+      host.id = '_contrastFixtures';
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:320px;';
+      try{
+        setTheme('dark');
+        [['meal panel',
+          '<div class="mobile-dropdown-panel open"><div class="panel-title">Meal type</div>'
+          + '<label class="mobile-check-item">Breakfast</label></div>'],
+         ['share url',    '<div class="share-app-url">https://example.com</div>'],
+         ['calc result',  '<div class="calc-result-box"><span class="calc-result-unit">grams</span></div>'],
+         ['tint box',     '<div class="tint-box">How to refresh:</div>'],
+         ['inline code',  '<code class="inline-code">copy(x)</code>'],
+         ['paid badge',   '<span class="payment-badge paid">Pro Plan</span>'],
+         ['free badge',   '<span class="payment-badge free">Free</span>'],
+         ['info badge',   '<span class="payment-badge info">API Credits</span>'],
+         ['diet tag',     '<span class="recipe-diet-tag">Keto</span>'],
+         ['access badge', '<div class="access-badge access-badge-full">Full access</div>'],
+         ['bring cancel', '<button class="bring-cancel-btn">Cancel</button>'],
+         ['bring action', '<button class="action-btn action-btn-bring">Send to Bring!</button>']
+        ].forEach(function(pair){
+          var d=document.createElement('div'); d.setAttribute('data-label', pair[0]);
+          d.innerHTML = pair[1]; host.appendChild(d);
+        });
+        document.body.appendChild(host);
+
+        var worst=null, checked=0;
+        host.querySelectorAll('.mobile-check-item,.panel-title,.share-app-url,.calc-result-box,'
+          + '.calc-result-unit,.tint-box,.inline-code,.payment-badge,.recipe-diet-tag,'
+          + '.access-badge-full,.bring-cancel-btn,.action-btn-bring').forEach(function(el){
+          var box=el.closest('[data-label]');
+          var label=(box ? box.getAttribute('data-label') : '') + ' (' + el.className + ')';
+          var cs=getComputedStyle(el);
+          var bg=bgOf(el);
+          // A LIGHT surface while the page is dark IS the bug: the text on it
+          // is themed and will have gone light too.
+          if(lum(bg)>0.5)
+            throw new Error(label+' still has a light background in dark mode (rgb '
+              + [bg.r,bg.g,bg.b].map(Math.round).join(',') + ') — themed text on it is invisible');
+          var fg=parse(cs.color); if(!fg) return;
+          if(fg.a<0.999) fg=over(fg,bg);
+          checked++;
+          var got=ratio(fg,bg);
+          if(worst===null || got<worst.got) worst={sel:label,got:got};
+        });
+        if(checked<10) throw new Error('only '+checked+' surfaces rendered — the check proved almost nothing');
+        if(worst.got<4.5)
+          throw new Error(worst.sel+' is only '+worst.got.toFixed(2)+':1 in dark mode, under the 4.5 minimum');
+        // ...and the brand fill must NOT be the lifted accent, or white on it
+        // drops to 2.6:1.
+        var cs=getComputedStyle(document.documentElement);
+        var fill=cs.getPropertyValue('--terracotta-fill').trim();
+        var accent=cs.getPropertyValue('--terracotta').trim();
+        if(!fill) throw new Error('--terracotta-fill is not defined');
+        if(fill===accent)
+          throw new Error('--terracotta-fill equals --terracotta in dark mode; white text on it is only 2.6:1');
+      } finally {
+        if(host.parentNode) host.parentNode.removeChild(host);
+        setTheme(prev);
+      }
+    } },
+
   { id:'ui_select_lives_in_filter_bar', group:'UI', name:'☑ Select rides the pinned filter bar (v36.10)',
     test: async()=>{
       // It used to sit in the grid heading, which scrolls away — so on a long
@@ -11812,7 +11907,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.13';
+var APP_VERSION = 'v36.14';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12394,9 +12489,11 @@ window.addEventListener('unhandledrejection', function(e) {
   --cream:      #FAF7F2;
   --warm-brown: #5C3D2E;
   --terracotta: #C1440E;
-  --gold:       #D4A843;
+  --terracotta-fill: #C1440E;  /* terracotta as a BACKGROUND behind white text */
+  --danger:     #B03030;       /* destructive TEXT; lifted in dark mode */
+  --gold:       #DDB354;   /* 4.89:1 on --warm-brown; #D4A843 was 4.39 */
   --ink:        #1C1A18;
-  --muted:      #8A8279;
+  --muted:      #6F6A60;   /* 5.40:1 on white, 4.81 on the cream tiles; #8A8279 was 3.78 */
   --border:     #E8E0D5;
   --card-bg:    #FFFFFF;
   --bg:         #FAF7F2;
@@ -12419,6 +12516,8 @@ window.addEventListener('unhandledrejection', function(e) {
   --cream:      #17140F;
   --warm-brown: #2A211A;   /* header / bars */
   --terracotta: #FF7A45;   /* lifted for readable contrast on dark */
+  --terracotta-fill: #C1440E;  /* NOT lifted: white text has to stay legible on it */
+  --danger:     #F08A8A;       /* #B03030 is only 2.6:1 on the dark page */
   --gold:       #E3BC63;
   --ink:        #F2EDE6;   /* primary text */
   --muted:      #A79E93;
@@ -12512,6 +12611,56 @@ window.addEventListener('unhandledrejection', function(e) {
 :root[data-theme="dark"] .nutrition-value { color: #F5C77E; }
 :root[data-theme="dark"] .nutrition-loading { color: #B9AFA3; }
 :root[data-theme="dark"] .filter-btn:hover { background: #33291F; color: var(--ink); border-color: #55372A; }
+
+/* v36.14 — these four carried their colours inline, where no dark-mode rule
+   could reach them: an inline style beats any class selector. The colours moved
+   here so the theme can override them. */
+.tint-box { background: #fff8f0; border: 1px solid #f0d9b5; }
+.inline-code { background: #f5f0ea; }
+.access-badge-full { background: #FFF0C0; color: #74560F; }
+.action-btn-bring { background: #fff; border: 1.5px solid #E8630A; color: #E8630A; }
+
+/* v36.14 — the same bug as the nutrition panel, found by a real contrast scan
+   rather than by eye: a hard-coded light background with themed text on top.
+   The Meal and Diet panels were the worst of them at 1.16:1 — #F2EDE6 text on
+   white — and they are MOBILE ONLY, which is why every previous pass missed
+   them: the panels do not exist above 700px, so a desktop check never opens
+   them. Run the scan at phone width, in dark mode, or this class of bug stays
+   invisible. See tests/contrast-scan.js and the ui_dark_contrast self-test. */
+:root[data-theme="dark"] .mobile-dropdown-panel {
+  background: var(--card-bg); border-color: #3A2F26;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+:root[data-theme="dark"] .mobile-filter-toggle,
+:root[data-theme="dark"] .mobile-dropdown-btn { background: #241D18; border-color: #3D332B; color: #D8CFC4; }
+:root[data-theme="dark"] .share-app-url,
+:root[data-theme="dark"] .calc-result-box,
+:root[data-theme="dark"] .tint-box,
+:root[data-theme="dark"] .inline-code { background: #241D18; border-color: #3A2F26; color: var(--ink); }
+:root[data-theme="dark"] .bring-cancel-btn { background: #241D18; color: var(--ink); border-color: var(--border); }
+/* Pastel badges: the tint goes dark, the ink goes light. Changing only one of
+   the two is what leaves a badge unreadable. */
+:root[data-theme="dark"] .recipe-diet-tag { background: #1E3A20; color: #9BD79F; }
+:root[data-theme="dark"] .payment-badge.free { background: #1E3A20; color: #9BD79F; }
+:root[data-theme="dark"] .payment-badge.paid { background: #3A241A; color: #FFB48C; }
+:root[data-theme="dark"] .payment-badge.info { background: #1C2540; color: #A9BCF5; }
+:root[data-theme="dark"] .access-badge-full { background: #3B2E14; color: #E8C888; }
+:root[data-theme="dark"] .access-role-opt:has(input:checked) { background: #3A241A; color: #FFB48C; }
+:root[data-theme="dark"] .action-btn-bring { background: #241D18; color: #FFB48C; border-color: #7A3D10; }
+
+:root[data-theme="dark"] .conv-opt { color: #B9B1A6; }
+/* Accent colours picked for a cream page: on the dark one they sit under 4.5:1.
+   Lifted here rather than changed globally, so light mode is untouched. */
+:root[data-theme="dark"] .diet-tag-btn:hover { border-color: #9BD79F; color: #9BD79F; }
+:root[data-theme="dark"] .del-bar-delete { color: var(--danger); }
+:root[data-theme="dark"] #appVersionBadge { color: rgba(255,255,255,0.62) !important; }
+
+/* --terracotta is LIFTED in dark mode (#FF7A45) so it reads as TEXT on a dark
+   page — but that same lift drops WHITE text on a terracotta fill to 2.6:1.
+   One variable cannot do both jobs, so the fill is its own variable and stays
+   at the light-mode #C1440E, where white is 5.3:1. Colouring the text dark
+   instead was tried first and was wrong: not every .btn-submit is
+   terracotta-filled, and it turned two dark-backed buttons dark-on-dark. */
 
 /* 4.2 — "why did this match?" line under a card's title */
 .match-why {
@@ -12633,7 +12782,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
   .header-actions .drop-group { flex-shrink: 0; }
 }
 .btn { border: none; padding: 8px 13px; border-radius: 6px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; box-sizing: border-box; }
-.btn-primary { background: var(--terracotta); color: white; border: 1px solid transparent; }
+.btn-primary { background: var(--terracotta-fill); color: white; border: 1px solid transparent; }
 .btn-primary:hover { background: #a83a0c; }
 .btn-secondary { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
 .btn-secondary:hover { background: rgba(255,255,255,0.25); }
@@ -12783,7 +12932,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    let the keyboard rule come last. */
 .skip-link {
   position: absolute; left: 50%; transform: translateX(-50%) translateY(-120%);
-  top: 6px; z-index: 3000; background: var(--terracotta); color: #fff;
+  top: 6px; z-index: 3000; background: var(--terracotta-fill); color: #fff;
   padding: 12px 20px; border-radius: 0 0 10px 10px; font-family: 'DM Sans','Heebo',sans-serif;
   font-size: 15px; font-weight: 600; text-decoration: none; transition: transform 0.15s;
 }
@@ -12798,14 +12947,14 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .recipe-card:focus-visible { transform: translateY(-3px); }
 .card-image { width: 100%; height: 148px; display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; overflow: hidden; }
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
-.card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.55); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.72); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-body { padding: 11px 13px 13px; flex: 1 1 auto; }
 .card-category { font-size: 10px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 3px; }
 .card-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3; text-align: start; unicode-bidi: plaintext; }
 .card-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
 .card-footer { padding: 8px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .difficulty { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
-.easy { background: #EAF5E9; color: #3A7D44; } .medium { background: #FFF3E0; color: #B05E00; } .hard { background: #FEECEC; color: #B03030; }
+.easy { background: #EAF5E9; color: #35703D; } .medium { background: #FFF3E0; color: #9A5100; } .hard { background: #FEECEC; color: #A32B2B; }
 .fav-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px; transition: transform 0.15s; }
 .fav-btn:hover { transform: scale(1.2); }
 
@@ -12899,7 +13048,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .ask-body { font-size: 13px; color: var(--muted); line-height: 1.65; text-align: center; margin-bottom: 16px; white-space: pre-wrap; unicode-bidi: plaintext; }
 .ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
 .ask-actions { display: flex; flex-direction: column; gap: 8px; }
-.ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+.ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta-fill); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
 .ask-btn.danger { background: #C62828; }
 .ask-btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; font-weight: 500; padding: 10px; }
 .voice-btn.voice-on { background: var(--terracotta); color: #fff; border-color: var(--terracotta); animation: syncPulse 1.4s ease-in-out infinite; }
@@ -12958,7 +13107,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .steps-list { list-style: none; }
 .steps-list li { display: flex; gap: 9px; margin-bottom: 9px; font-size: 13px; line-height: 1.6; align-items: flex-start; }
 .steps-list li.step-rtl { text-align: right; }
-.step-num { min-width: 22px; height: 22px; background: var(--terracotta); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; flex-shrink: 0; margin-top: 2px; }
+.step-num { min-width: 22px; height: 22px; background: var(--terracotta-fill); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; flex-shrink: 0; margin-top: 2px; }
 .step-text { flex: 1; }
 /* v36.4 — a sub-title inside either list. It is not an ingredient and not a
    step: no tick box, no amount, no number, and no pointer, because tapping it
@@ -13048,7 +13197,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .mult-btn:hover, .mult-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; }
 .conv-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .conv-toggle { display: flex; background: var(--border); border-radius: 6px; overflow: hidden; }
-.conv-opt { padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; color: var(--muted); border: none; background: none; transition: all 0.15s; }
+.conv-opt { padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; color: #5C574F; border: none; background: none; transition: all 0.15s; }
 .conv-opt.active { background: var(--warm-brown); color: white; }
 
 /* Share */
@@ -13080,9 +13229,9 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .photo-zone input { display: none; }
 .photo-zone-hint { color: var(--muted); font-size: 13px; }
 .photo-zone-preview { width: 100%; max-height: 130px; object-fit: cover; border-radius: 6px; display: none; }
-.photo-remove { position: absolute; top: 6px; right: 6px; background: var(--terracotta); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 13px; display: none; align-items: center; justify-content: center; font-weight: bold; }
+.photo-remove { position: absolute; top: 6px; right: 6px; background: var(--terracotta-fill); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 13px; display: none; align-items: center; justify-content: center; font-weight: bold; }
 
-.btn-submit { width: 100%; margin-top: 0.9rem; padding: 11px; background: var(--terracotta); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.btn-submit { width: 100%; margin-top: 0.9rem; padding: 11px; background: var(--terracotta-fill); color: white; border: none; border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
 .btn-submit:hover { background: #a83a0c; }
 
 /* EXPLORE MODAL */
@@ -13092,7 +13241,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .ai-spinner { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--border); border-top-color: var(--terracotta); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .chip { display: inline-block; background: #FFF0E8; color: var(--terracotta); border: 1px solid #f0c8b0; border-radius: 14px; padding: 3px 10px; font-size: 12px; margin: 2px; cursor: pointer; }
-.chip:hover { background: var(--terracotta); color: white; }
+.chip:hover { background: var(--terracotta-fill); color: white; }
 
 /* Diet multi-select */
 .diet-select-wrap { position: relative; }
@@ -13107,7 +13256,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .diet-check-item:hover { background: #FFF0E8; }
 .diet-check-item input { accent-color: var(--terracotta); width: 15px; height: 15px; cursor: pointer; }
 .diet-selected-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; min-height: 4px; }
-.diet-pill { background: var(--terracotta); color: white; border-radius: 12px; padding: 3px 10px; font-size: 11px; font-weight: 500; }
+.diet-pill { background: var(--terracotta-fill); color: white; border-radius: 12px; padding: 3px 10px; font-size: 11px; font-weight: 500; }
 
 /* Tag input */
 .tag-wrap { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px; border: 1.5px solid var(--border); border-radius: 7px; background: white; min-height: 38px; cursor: text; }
@@ -13130,7 +13279,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .sug-card-meta { font-size: 11px; color: var(--terracotta); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .sug-card-body { font-size: 13px; color: var(--ink); line-height: 1.65; }
 .sug-card-footer { display: flex; justify-content: flex-end; margin-top: 10px; }
-.sug-add-btn { background: var(--terracotta); color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+.sug-add-btn { background: var(--terracotta-fill); color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-family: 'DM Sans', 'Heebo', sans-serif; font-weight: 500; cursor: pointer; transition: background 0.15s; }
 .sug-add-btn:hover { background: #a83a0c; }
 .sug-add-btn.added { background: #7A8C6E; cursor: default; }
 
@@ -13148,7 +13297,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .translate-ing-row:last-child { border: none; }
 .translate-ing-row[dir=rtl] { flex-direction: row-reverse; }
 .translate-step { display: flex; gap: 8px; margin-bottom: 7px; font-size: 13px; line-height: 1.6; }
-.translate-step-num { min-width: 22px; height: 22px; background: var(--terracotta); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
+.translate-step-num { min-width: 22px; height: 22px; background: var(--terracotta-fill); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
 .save-translation-btn { margin-top: 14px; width: 100%; padding: 10px; background: #7A8C6E; color: white; border: none; border-radius: 8px; font-family: "DM Sans", sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
 .save-translation-btn:hover { background: #5e6e54; }
 
@@ -13377,7 +13526,9 @@ li.line-sub-indent { padding-inline-start: 22px; }
 
 /* Drive status bar */
 #driveStatus {
-  font-size: 11px; color: var(--muted);
+  /* This sits on the brown header, not on the page, so --muted (tuned for the
+     cream background) is only 2.6:1 here — v36.14. */
+  font-size: 11px; color: rgba(255,255,255,0.78);
   display: flex; align-items: center; gap: 5px;
 }
 #driveStatus .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
@@ -13404,7 +13555,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 }
 .share-app-btn:hover  { transform: translateY(-1px); box-shadow: 0 4px 0 rgba(0,0,0,0.22), 0 5px 8px rgba(0,0,0,0.15); }
 .share-app-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
-.share-whatsapp-app { background: #25D366; color: white; }
+.share-whatsapp-app { background: #0F7A41; color: white; }
 .share-copy-link    { background: var(--warm-brown); color: white; }
 .share-qr-wrap { text-align: center; margin-top: 14px; }
 .share-qr-wrap canvas { border-radius: 8px; border: 1px solid var(--border); }
@@ -13747,7 +13898,7 @@ body.banner-shown .header {
 }
 .bring-send-btn {
   flex: 1; padding: 12px;
-  background: #E8630A; color: white;
+  background: var(--terracotta-fill); color: white;
   border: none; border-radius: 10px;
   font-family: 'DM Sans', 'Heebo', sans-serif;
   font-size: 15px; font-weight: 600;
@@ -13874,7 +14025,7 @@ body.banner-shown .header {
 .help-input:focus { outline: none; border-color: var(--terracotta); }
 .help-btn {
   padding: 10px 16px;
-  background: var(--terracotta); color: white;
+  background: var(--terracotta-fill); color: white;
   border: none; border-radius: 10px;
   font-size: 14px; font-weight: 600;
   cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif;
@@ -14023,7 +14174,7 @@ body.banner-shown .header {
 .recipe-diet-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .recipe-diet-tag {
   font-size: 11px; padding: 2px 8px; border-radius: 10px;
-  background: #EAF5E9; color: #3A7D44; font-weight: 500;
+  background: #EAF5E9; color: #35703D; font-weight: 500;
 }
 
 
@@ -14101,7 +14252,7 @@ body.banner-shown .header {
 }
 .mobile-panel-done {
   width: 100%; margin-top: 12px; padding: 10px;
-  background: var(--terracotta); color: white; border: none;
+  background: var(--terracotta-fill); color: white; border: none;
   border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif;
   font-size: 14px; font-weight: 600; cursor: pointer;
 }
@@ -14152,8 +14303,9 @@ body.banner-shown .header {
 .payment-cost.free { color: var(--green); }
 .payment-divider { color: var(--border); }
 .payment-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.3px; }
-.payment-badge.paid { background: #FFE8E8; color: var(--terracotta); }
+.payment-badge.paid { background: #FFE8E8; color: #A83A0C; }
 .payment-badge.free { background: #EAF5E9; color: var(--green); }
+.payment-badge.info { background: #E8F0FF; color: #2B43A8; }
 .payment-link {
   flex-shrink: 0; padding: 6px 12px; border-radius: 7px; font-size: 12px;
   font-weight: 600; font-family: 'DM Sans', 'Heebo', sans-serif; text-decoration: none;
@@ -14235,7 +14387,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.45);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.13</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.14</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14332,8 +14484,8 @@ body.banner-shown .header {
   </div>
   <div style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
     <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
-    <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.55);flex:1;">Sign in to sync across devices</span>
-    <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.25);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans','Heebo',sans-serif;">Reset</button>
+    <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.72);flex:1;">Sign in to sync across devices</span>
+    <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.62);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans','Heebo',sans-serif;">Reset</button>
   </div>
 </div>
 
@@ -14421,7 +14573,7 @@ body.banner-shown .header {
   </div>
   <div id="noPhotoPrompt" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#FFF8E8;border:1px solid #E8D9A8;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
     <span style="flex:1;min-width:180px;font-size:13px;color:#7A5C00;"></span>
-    <button onclick="autoFetchMissingPhotos()" style="padding:9px 16px;border-radius:9px;border:none;background:var(--terracotta);color:#fff;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📸 Auto-fetch photos</button>
+    <button onclick="autoFetchMissingPhotos()" style="padding:9px 16px;border-radius:9px;border:none;background:var(--terracotta-fill);color:#fff;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📸 Auto-fetch photos</button>
   </div>
   <div id="recipeGrid"></div>
 </div>
@@ -14840,7 +14992,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.13</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.14</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14969,7 +15121,7 @@ body.banner-shown .header {
     <div style="font-size:36px;text-align:center;margin-bottom:12px;">⏰</div>
     <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:18px;color:var(--heading);margin-bottom:8px;text-align:center;">Bring! Token Expired</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center;line-height:1.6;">Your Bring! connection needs refreshing. This takes 2 clicks and happens automatically after.</p>
-    <div style="background:#fff8f0;border:1px solid #f0d9b5;border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+    <div class="tint-box" style="border-radius:10px;padding:12px 14px;margin-bottom:16px;">
       <div style="font-size:12px;font-weight:600;color:var(--heading);margin-bottom:6px;">How to refresh:</div>
       <div style="font-size:12px;color:var(--ink);line-height:1.8;">
         <div>1️⃣ Click <strong>"Open Bring!"</strong> below</div>
@@ -14977,7 +15129,7 @@ body.banner-shown .header {
         <div>3️⃣ Ingredients will send automatically ✅</div>
       </div>
     </div>
-    <button onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       🌐 Open Bring! to Refresh
     </button>
     <div id="bringTokenExpiredStatus" style="text-align:center;font-size:12px;color:var(--muted);min-height:20px;margin-bottom:8px;"></div>
@@ -15106,7 +15258,7 @@ body.banner-shown .header {
     <div class="control-label">Note for next time</div>
     <textarea id="cookLogNote" dir="auto" rows="3" placeholder="e.g. too salty — halve the soy next time"
       style="unicode-bidi:plaintext;text-align:start;width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:14px;"></textarea>
-    <button onclick="saveCookLog()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button onclick="saveCookLog()" style="width:100%;padding:13px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       ✅ Save
     </button>
     <button onclick="skipCookLog()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;cursor:pointer;">
@@ -15128,7 +15280,7 @@ body.banner-shown .header {
     </p>
     <textarea id="pantryInput" dir="auto" rows="10" placeholder="olive oil&#10;flour&#10;eggs&#10;salt&#10;שמן זית"
       style="unicode-bidi:plaintext;text-align:start;width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:12px;"></textarea>
-    <button onclick="savePantry()" style="width:100%;padding:12px;background:var(--terracotta);color:#fff;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Save pantry</button>
+    <button onclick="savePantry()" style="width:100%;padding:12px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Save pantry</button>
   </div>
 </div>
 
@@ -15152,10 +15304,10 @@ body.banner-shown .header {
       You have unsaved changes to <span id="unsavedName" dir="auto" style="unicode-bidi:plaintext;color:var(--ink);font-weight:600;">this recipe</span>.
       What would you like to do?
     </p>
-    <button onclick="unsavedSave()" style="width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button onclick="unsavedSave()" style="width:100%;padding:13px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       💾 Save changes
     </button>
-    <button onclick="unsavedDiscard()" style="width:100%;padding:11px;background:transparent;color:#c62828;border:1px solid #E0BDBD;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;cursor:pointer;margin-bottom:8px;">
+    <button onclick="unsavedDiscard()" style="width:100%;padding:11px;background:transparent;color:var(--danger);border:1px solid #E0BDBD;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;cursor:pointer;margin-bottom:8px;">
       🗑️ Discard changes
     </button>
     <button onclick="unsavedKeepEditing()" style="width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;cursor:pointer;">
@@ -15181,7 +15333,7 @@ body.banner-shown .header {
       <button id="photoSearchMoreBtn" onclick="photoSearchMore()" style="padding:9px 18px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;">🔄 See more →</button>
     </div>
     <div id="photoSearchUseBtn" style="display:none;margin-top:12px;">
-      <button onclick="useSelectedSearchPhoto()" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Use This Photo</button>
+      <button onclick="useSelectedSearchPhoto()" style="width:100%;padding:12px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Use This Photo</button>
     </div>
   </div>
 </div>
@@ -15234,14 +15386,14 @@ body.banner-shown .header {
           autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"
           class="masked-secret" placeholder="paste the secret"
           style="flex:1;min-width:0;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace;box-sizing:border-box;">
-        <button onclick="saveBringSecret()" style="flex-shrink:0;padding:8px 14px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
+        <button onclick="saveBringSecret()" style="flex-shrink:0;padding:8px 14px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
       </div>
       <div id="bringSecretStatus" style="font-size:12px;color:var(--muted);min-height:16px;margin-top:6px;"></div>
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Step 1: Copy the bookmarklet code</div>
     <div style="position:relative;margin-bottom:12px;">
       <textarea id="bringBookmarkletCode" readonly style="width:100%;height:60px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;background:#f5f0ea;box-sizing:border-box;"></textarea>
-      <button onclick="copyBookmarklet()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 8px;background:var(--terracotta);color:white;border:none;border-radius:5px;cursor:pointer;">Copy</button>
+      <button onclick="copyBookmarklet()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 8px;background:var(--terracotta-fill);color:white;border:none;border-radius:5px;cursor:pointer;">Copy</button>
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;">Step 2: Create a bookmark</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">In Chrome: Bookmarks menu → Add page → paste the code as the URL.<br>Name it "Refresh Bring! Token".</p>
@@ -15253,7 +15405,7 @@ body.banner-shown .header {
       <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;">No bookmark? Paste the token instead</div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">
         On <strong>web.getbring.com</strong> press <kbd>F12</kbd> → Console, run
-        <code style="background:#f5f0ea;padding:1px 4px;border-radius:4px;font-size:11px;">copy(localStorage.accessToken)</code>,
+        <code class="inline-code" style="padding:1px 4px;border-radius:4px;font-size:11px;">copy(localStorage.accessToken)</code>,
         then paste it here.
       </p>
       <textarea id="bringManualToken" placeholder="eyJhbGciOi…" style="width:100%;height:52px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;box-sizing:border-box;"></textarea>
@@ -15261,7 +15413,7 @@ body.banner-shown .header {
       <button onclick="submitManualBringToken()" style="width:100%;padding:10px;background:var(--gold);color:var(--warm-brown);border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🔑 Save this token</button>
     </div>
 
-    <button onclick="closeM('bringBookmarkletOverlay')" style="width:100%;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Got it!</button>
+    <button onclick="closeM('bringBookmarkletOverlay')" style="width:100%;padding:12px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Got it!</button>
   </div>
 </div>
 
@@ -16623,7 +16775,7 @@ function renderGrid() {
     var emptyIcon = showFavOnly ? '\u2764\ufe0f' : q ? '\ud83d\udd0d' : '\ud83c\udf7d\ufe0f';
     var emptyTitle = showFavOnly ? 'No favourites yet' : q ? 'No recipes found' : 'No recipes yet';
     var emptySub = showFavOnly ? 'Tap the heart on any recipe to save it here.' : q ? 'Try a different search term.' : 'Add your first recipe or import one from a website.';
-    var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
+    var emptyBtn = (!q && activeCat !== 'Favourites') ? '<button onclick="openAddModal(null)" style="background:var(--terracotta-fill);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;margin-top:4px;">+ Add Recipe</button>' : '';
     g.innerHTML = '<div class="empty-state">'
       + '<div style="width:72px;height:72px;border-radius:50%;background:#FFF0E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">' + emptyIcon + '</div>'
       + '<div style="font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:18px;font-weight:700;color:var(--heading);margin-bottom:8px;">' + emptyTitle + '</div>'
@@ -16845,7 +16997,7 @@ function conflictBannerHtml(r){
     + 'This recipe was edited somewhere else after this device last synced, so your changes to it '
     + 'have not been saved to the cloud and will keep being refused.'
     + '<button onclick="refreshRecipeFromCloudUI(' + r.id + ')" '
-    + 'style="margin-top:10px;width:100%;padding:10px;background:var(--terracotta);color:#fff;'
+    + 'style="margin-top:10px;width:100%;padding:10px;background:var(--terracotta-fill);color:#fff;'
     + 'border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;'
     + 'font-weight:700;cursor:pointer;">↻ Take the other device’s version</button>'
     + '<div style="font-size:11px;opacity:0.85;margin-top:6px;">Your version is kept in '
@@ -16999,11 +17151,11 @@ function partActionsHtml(coll, p) {
     + '<button class="action-btn" onclick="expOneWord(' + q + ')">📄 Word</button>'
     + '<button class="action-btn" onclick="printRecipe(' + q + ')">🖨️ Print</button>'
     + '<button class="action-btn" onclick="toggleShare(' + q + ')">📤 Share</button>'
-    + '<button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" '
+    + '<button class="action-btn action-btn-bring" '
     + 'onclick="openBringModal(' + q + ')">🛒 Bring!</button>'
     + '<button class="action-btn" onclick="promotePartToRecipe(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)" '
     + 'title="Make this a recipe of its own">⤴ Make its own</button>'
-    + '<button class="action-btn" style="color:#B03030;border-color:#E8B0B0;" '
+    + '<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" '
     + 'onclick="removePartFromCollection(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)">🗑 Remove</button>'
     + cooked
     + '</div></div>';
@@ -17532,7 +17684,7 @@ function drawView(){
         <span>⏱ ${escH(r.prep)}</span><span>🍽 ${escH(r.servings)} servings</span>
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -17643,10 +17795,10 @@ function drawView(){
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
         <button class="action-btn" onclick="duplicateRecipe(${r.id})" title="Create an editable copy">⧉ Duplicate</button>
-        <button class="action-btn" style="color:#B03030;border-color:#E8B0B0;" onclick="deleteRecipe(${r.id})">🗑️ Delete</button>
-        <button class="action-btn" style="background:#fff;border:1.5px solid #E8630A;color:#E8630A;" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
+        <button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" onclick="deleteRecipe(${r.id})">🗑️ Delete</button>
+        <button class="action-btn action-btn-bring" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
         ${r.originalPhoto ? `<button class="action-btn" id="origPhotoBtn-${r.id}" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
-        ${r.originalPhoto ? `<button class="action-btn" style="color:#B03030;" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
+        ${r.originalPhoto ? `<button class="action-btn" style="color:var(--danger);" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
       ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;letter-spacing:0.5px;">ORIGINAL SCAN</div><img src="${escA(r.originalPhoto)}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
       
@@ -17773,7 +17925,7 @@ function showPhotoSourcePicker(id, recipeName) {
   title.textContent = 'Add Photo';
 
   var uploadBtn = document.createElement('button');
-  uploadBtn.style.cssText = 'width:100%;padding:13px;background:var(--terracotta);color:white;border:none;border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
+  uploadBtn.style.cssText = 'width:100%;padding:13px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;display:block;';
   uploadBtn.textContent = '📷 Upload from device';
   uploadBtn.onclick = function() {
     picker.remove();
@@ -19586,7 +19738,7 @@ function showServiceError(message, actions) {
     b.textContent = a.label;
     b.style.cssText = 'width:100%;padding:12px;border:none;border-radius:10px;'
       + 'font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:12px;'
-      + (a.primary ? 'background:var(--terracotta);color:white;'
+      + (a.primary ? 'background:var(--terracotta-fill);color:white;'
                    : 'background:var(--card);color:var(--warm-brown);border:1.5px solid var(--border);');
     b.onclick = function() { overlay.remove(); a.onClick(); };
     inner.appendChild(b);
@@ -19800,7 +19952,7 @@ function toastAction(msg, actionLabel, onAction, duration){
   span.textContent = msg;
   var btn = document.createElement('button');
   btn.textContent = actionLabel;
-  btn.style.cssText = 'margin-left:4px;padding:5px 12px;border-radius:8px;border:none;background:var(--terracotta);color:#fff;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;';
+  btn.style.cssText = 'margin-left:4px;padding:5px 12px;border-radius:8px;border:none;background:var(--terracotta-fill);color:#fff;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;';
   btn.onclick = function(e){
     e.stopPropagation();
     clearTimeout(t._tid);
@@ -19955,7 +20107,7 @@ ${stepsText}`;
         💾 Save as new recipe in collection
       </button>`;
   } catch(err) {
-    res.innerHTML = `<div class="explore-result" style="color:#B03030;">Translation error: ${err.message}</div>`;
+    res.innerHTML = `<div class="explore-result" style="color:var(--danger);">Translation error: ${err.message}</div>`;
   }
 }
 
@@ -20104,7 +20256,7 @@ async function runFreehandImport() {
     }
     else applyParsedRecipe(built.recipe, 'freehandResult', 'freehandOverlay');
   } catch(err) {
-    res.innerHTML = `<div class="explore-result" style="color:#B03030;">Could not parse recipe: ${err.message}<br>Try adding more recipe details to your text.</div>`;
+    res.innerHTML = `<div class="explore-result" style="color:var(--danger);">Could not parse recipe: ${err.message}<br>Try adding more recipe details to your text.</div>`;
   }
 }
 
@@ -20249,7 +20401,7 @@ function importFailureHtml(url, attempts) {
   var why = ourEnd
     ? 'The recipe site is probably fine. What actually happened:'
     : 'Nothing readable came back. This is usually a site that blocks automated access, but here is what each attempt reported:';
-  return '<div class="explore-result" style="color:#B03030;">'
+  return '<div class="explore-result" style="color:var(--danger);">'
     + '<strong>&#10060; ' + escH(headline) + '</strong><br><br>'
     + escH(why) + '<br>'
     + '<ul style="margin:8px 0 0;padding-inline-start:20px;font-size:12px;">'
@@ -20266,7 +20418,7 @@ function importFailureHtml(url, attempts) {
     // recipe still records where it came from.
     + '<div style="margin-top:12px;">'
     + '<button onclick="waFreehandFromFailedUrl(' + escA(JSON.stringify(url)) + ')" '
-    + 'style="padding:9px 14px;border:none;border-radius:8px;background:var(--terracotta);color:#fff;'
+    + 'style="padding:9px 14px;border:none;border-radius:8px;background:var(--terracotta-fill);color:#fff;'
     + 'font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">'
     + '\u270D\uFE0F Paste the text instead</button></div>'
     + '</div>';
@@ -20469,7 +20621,7 @@ async function runUrlImport() {
     if (/no recipe found|not a recipe/i.test(msg)) {
       showSaveAsVideoBookmark(url, '', '🎥');
     } else {
-      res.innerHTML = '<div class="explore-result" style="color:#B03030;">'
+      res.innerHTML = '<div class="explore-result" style="color:var(--danger);">'
         + 'Could not import this page: ' + escH(msg) + '</div>'
         + '<button class="save-translation-btn" style="margin-top:10px;" '
         + 'onclick="runUrlImport()">&#8635; Try again</button>';
@@ -23558,10 +23710,10 @@ async function processCameraImage(event) {
       const d2 = await step2.json();
       const recipeText = (d2.content||[]).map(function(b){ return b.text||''; }).join('\n');
       const parsed = extractJSON(recipeText);
-      if (parsed.error) { res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>No recipe found.</strong></div>'; return; }
+      if (parsed.error) { res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>No recipe found.</strong></div>'; return; }
       applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay', e.target.result);
     } catch(err) {
-      res.innerHTML = '<div class="explore-result" style="color:#B03030;"><strong>Error:</strong> ' + escH(err.message) + '</div>';
+      res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>Error:</strong> ' + escH(err.message) + '</div>';
     }
   };
   reader.readAsDataURL(file);
@@ -27322,7 +27474,7 @@ function showInstagramCaptionFallback(url, igData) {
     + 'The post was reachable' + (known ? ' (' + known + ')' : '') + ', but Instagram\'s public API returns the embed and the author, not the caption text — and the recipe is in the caption.'
     + '<div style="margin-top:10px;font-size:13px;">The quickest way in: open the post, copy the caption, and paste it here.</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-    + '<button onclick="closeAllModalsThenFreehand()" style="padding:11px 16px;min-height:44px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Paste the caption</button>'
+    + '<button onclick="closeAllModalsThenFreehand()" style="padding:11px 16px;min-height:44px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Paste the caption</button>'
     + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="padding:11px 16px;min-height:44px;display:inline-flex;align-items:center;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;font-family:\'DM Sans\',\'Heebo\',sans-serif;">↗ Open the post</a>'
     + '<button onclick="showSaveAsVideoBookmark(' + JSON.stringify(url).replace(/"/g, '&quot;') + ', \'Instagram post\', \'📸\')" style="padding:11px 16px;min-height:44px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🔖 Just bookmark it</button>'
     + '</div>'
@@ -27346,7 +27498,7 @@ function showSaveAsVideoBookmark(url, suggestedName, emoji) {
     + '<input id="bookmarkNameInput" class="form-input" value="' + escH(name) + '" style="width:100%;box-sizing:border-box;">'
     + '</div>'
     + '<div style="display:flex;gap:8px;">'
-    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escH(url) + '" data-emoji="' + (emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
+    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escH(url) + '" data-emoji="' + (emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
     + (emoji||'🎥') + ' Save as bookmark</button>'
     + '<button onclick="clearUrlImportResult()" style="padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>'
     + '</div>'
@@ -27594,7 +27746,7 @@ window.updateFilterBarTop = updateFilterBarTop;
       <div id="selfTestSummary" style="display:none;padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);"></div>
       <!-- Footer -->
       <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
-        <button id="selfTestRunBtn" onclick="runSelfTests()" style="flex:1;min-width:150px;padding:11px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">▶ Execute Selected</button>
+        <button id="selfTestRunBtn" onclick="runSelfTests()" style="flex:1;min-width:150px;padding:11px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">▶ Execute Selected</button>
         <button id="selfTestCopyBtn" onclick="copySelfTestReport()" style="display:none;padding:11px 14px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;font-weight:600;cursor:pointer;" title="Copies versions, environment, every failure with its stack, recent JS errors and sync health — everything needed to diagnose without another round of questions.">📋 Copy report</button>
         <button onclick="closeM('selfTestOverlay')" style="padding:11px 16px;border:1px solid var(--border);background:var(--card-bg);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>
       </div>
@@ -27615,7 +27767,7 @@ window.updateFilterBarTop = updateFilterBarTop;
     <div style="font-size:12px;color:var(--muted);">Add to your home screen for quick access — works offline too.</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-    <button onclick="pwaInstall()" style="padding:8px 16px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Install</button>
+    <button onclick="pwaInstall()" style="padding:8px 16px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Install</button>
     <button onclick="pwaDismiss()" style="padding:6px 16px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;">Not now</button>
   </div>
 </div>
@@ -27649,7 +27801,7 @@ window.updateFilterBarTop = updateFilterBarTop;
       <div id="syncHealthBody"></div>
       <div style="display:flex;gap:8px;margin-top:14px;">
         <button onclick="renderSyncHealth()" style="flex:1;padding:11px 18px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">↻ Refresh</button>
-        <button onclick="copySyncHealth()" style="flex:1;padding:11px 18px;background:var(--terracotta);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy</button>
+        <button onclick="copySyncHealth()" style="flex:1;padding:11px 18px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy</button>
       </div>
     </div>
   </div>
@@ -27703,7 +27855,7 @@ window.updateFilterBarTop = updateFilterBarTop;
       <div class="payment-card">
         <div class="payment-icon" style="background:#EEF2FF;">💳</div>
         <div class="payment-body">
-          <div class="payment-name">Anthropic <span class="payment-badge" style="background:#E8F0FF;color:#3451CC;">API Credits</span></div>
+          <div class="payment-name">Anthropic <span class="payment-badge info">API Credits</span></div>
           <div class="payment-desc">Pay-as-you-go credits for direct API usage. When credits run out, all AI features stop working — translation, import, suggest, explore, and nutrition all depend on this. Top up with as little as $5.</div>
           <div class="payment-meta">
             <span class="payment-cost" style="color:var(--ink);">As needed</span>
@@ -27951,13 +28103,13 @@ window.updateFilterBarTop = updateFilterBarTop;
       <div id="shareModalTitle" style="font-size:13px;color:var(--muted);margin-top:3px;"></div>
     </div>
     <div class="modal-body" style="padding:8px 16px 20px;display:flex;flex-direction:column;gap:10px;">
-      <button id="shareNativeBtn" style="display:none;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
+      <button id="shareNativeBtn" style="display:none;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">📲</span> Share via…
       </button>
-      <button id="shareWaBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#25D366;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
+      <button id="shareWaBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#0F7A41;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">💬</span> Share on WhatsApp
       </button>
-      <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#4A90D9;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
+      <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2A6099;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">✉️</span> Send by Email
         <span style="font-size:11px;opacity:0.8;">(copy & paste)</span>
       </button>
@@ -27998,7 +28150,7 @@ window.updateFilterBarTop = updateFilterBarTop;
             <div class="access-name">Tony Schvekher</div>
             <div class="access-email" id="ownerEmail">—</div>
           </div>
-          <div class="access-badge" style="background:#FFF0C0;color:#8B6914;">Full access</div>
+          <div class="access-badge access-badge-full">Full access</div>
         </div>
       </div>
 
@@ -28018,7 +28170,7 @@ window.updateFilterBarTop = updateFilterBarTop;
           <label class="access-role-opt"><input type="radio" name="newRole" value="write"> ✏️ Read + Write</label>
           <label class="access-role-opt"><input type="radio" name="newRole" value="admin"> 🛡 Full (incl. delete)</label>
         </div>
-        <button onclick="addAccessMember()" style="width:100%;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">Add Member</button>
+        <button onclick="addAccessMember()" style="width:100%;padding:10px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">Add Member</button>
       </div>
 
       <!-- How it works note -->
@@ -28041,7 +28193,7 @@ window.updateFilterBarTop = updateFilterBarTop;
         <div id="accessRulesPanel" style="display:none;margin-top:10px;">
           <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>
           <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
-          <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy Rules</button>
+          <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy Rules</button>
         </div>
       </div>
 
@@ -28067,7 +28219,7 @@ window.updateFilterBarTop = updateFilterBarTop;
   </div>
   <div style="display:flex;gap:8px;">
     <button onclick="swUpdateNow()"
-      style="flex:1;padding:10px;background:var(--terracotta);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">
+      style="flex:1;padding:10px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">
       🔄 Update now
     </button>
     <button onclick="document.getElementById('swUpdateBanner').style.display='none'"

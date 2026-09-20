@@ -110,3 +110,12 @@ jobs:
       # that suite only ever loaded index.html. This drives the Worker directly.
       - name: Worker checks (CORS, origin, app key)
         run: node tests/worker-cors.mjs
+
+      # v36.14 — Tony's Meal menu rendered #F2EDE6 text on a hard-coded white
+      # panel (1.16:1) and nothing in the suite could see it, because the panel
+      # is MOBILE ONLY and every check ran at desktop width. This opens every
+      # menu, panel and modal at phone width and measures what rendered.
+      - name: Contrast scan (phone width, both themes)
+        run: |
+          THEME=dark  node tests/contrast-scan.js --port 8137
+          THEME=light node tests/contrast-scan.js --port 8137
