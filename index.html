@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.23 -->
+<!-- Tony's Recipes Collection v36.24 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1548,6 +1548,57 @@ function workerErrorText(status, data) {
 window.WORKER_ENDPOINT = WORKER_ENDPOINT; window.workerHeaders = workerHeaders;
 window.workerErrorText = workerErrorText;
 
+// ─── A PHOTO'S BYTES COME THROUGH THE WORKER (v36.24, audit S2) ──────────────
+// Applying a chosen photo downloads its bytes, and the host is whatever the
+// photo source returned. Openverse alone federates Flickr, Wikimedia, NASA and
+// museum collections, so that set cannot be listed — which is exactly why the
+// CSP carries a bare `https:` in connect-src, and why the careful allowlist
+// after it is decorative. Routing the bytes through our own Worker turns
+// "anywhere" into one named host.
+//
+// It falls back to a direct fetch, and that is not belt-and-braces — it is what
+// makes this shippable TODAY. The Worker half is v40 and has to be pasted into
+// Cloudflare by hand; until that happens every photo-fetch call comes back 4xx,
+// and without the fallback choosing a photo would be broken for as long as the
+// deploy took. `https:` stays in the CSP until the Worker is confirmed live,
+// because removing it is what turns the fallback from a safety net into a
+// blocked request. That removal is a one-line change, and the note in CLAUDE.md
+// says so.
+//
+// The fallback is also the answer to a 429: the Worker allows 600 of these a
+// minute, and "auto-fetch missing photos" across a big library can still pass
+// that in a burst.
+var _photoViaWorker = 0, _photoViaDirect = 0;
+async function fetchPhotoBlob(url) {
+  try {
+    var r = await fetch(WORKER_ENDPOINT, {
+      method: 'POST',
+      headers: workerHeaders(),
+      body: workerBody({ action: 'photo-fetch', url: url }),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (r.ok) {
+      var ct = (r.headers.get('content-type') || '').toLowerCase();
+      // The Worker answers with the image, or with JSON explaining why not.
+      // Treating an error document as an image would hand the compressor a
+      // page of text to turn into a recipe photo.
+      if (ct.indexOf('image/') === 0) {
+        var blob = await r.blob();
+        if (blob && blob.size) { _photoViaWorker++; return blob; }
+      }
+    }
+    dlog('[photo] worker fetch declined (' + r.status + ') — going direct');
+  } catch (e) {
+    dlog('[photo] worker fetch failed — going direct', e && e.message);
+  }
+  var direct = await fetch(url, { signal: AbortSignal.timeout(20000) });
+  if (!direct.ok) throw new Error('Could not download: ' + direct.status);
+  var b = await direct.blob();
+  _photoViaDirect++;
+  return b;
+}
+window.fetchPhotoBlob = fetchPhotoBlob;
+
 // The self-test suite lives in self-tests.js and is fetched ON DEMAND (v36.15).
 // It is ~590 KB — 36% of what index.html used to make every device download, on
 // every update, for a developer tool. `var`, not `const`: the external file
@@ -2610,8 +2661,7 @@ async function autoFetchMissingPhotos() {
     }
     if (!images.length) { noResults.push(r.name + ' → "' + term + '"'); continue; }
     try {
-      var imgResp = await fetch(images[0].url);
-      var blob = await imgResp.blob();
+      var blob = await fetchPhotoBlob(images[0].url);      // v36.24 — via the Worker
       var file = new File([blob], 'auto-photo.jpg', { type: blob.type || 'image/jpeg' });
       var photoUrl = await compressPhotoToDataUrl(file, r.id);
       // Last line of defence. Hydration or a cloud attach can land DURING the
@@ -3172,7 +3222,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.23';
+var APP_VERSION = 'v36.24';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5666,7 +5716,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.23</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.24</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6272,7 +6322,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.23</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.24</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15847,8 +15897,8 @@ async function useSelectedSearchPhoto() {
   var img = _photoSearchResults[_photoSearchSelected]; if (!img) return;
   closeM('photoSearchOverlay'); toast('Downloading photo...');
   try {
-    var resp=await fetch(img.url); if(!resp.ok) throw new Error('Could not download: '+resp.status);
-    var blob=await resp.blob(); var file=new File([blob],'web-photo.jpg',{type:blob.type||'image/jpeg'});
+    var blob=await fetchPhotoBlob(img.url);      // v36.24 — via the Worker
+    var file=new File([blob],'web-photo.jpg',{type:blob.type||'image/jpeg'});
     photoUploadInProgress=true;
     var photoUrl=await compressPhotoToDataUrl(file,heroPhotoTargetId);
     photoUploadInProgress=false;

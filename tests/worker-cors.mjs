@@ -385,6 +385,91 @@ console.log('\nSpend guard rails (v39):');
   }
 }
 
+console.log('\nEvery response says what it actually is (v40):');
+{
+  // corsFor() carried 'Content-Type: application/json', and the fetch wrapper
+  // stamps corsFor()'s result on EVERY response — so the binary paths were
+  // labelled as JSON. The KV file download has been served that way since v36,
+  // and it would have handed photo-fetch's caller an "image" the browser
+  // refuses to decode.
+  const json = await worker.fetch(post({ action: 'health' }), env);
+  expect('a JSON answer is still application/json',
+    (json.headers.get('Content-Type') || '').includes('application/json'),
+    `got ${json.headers.get('Content-Type')}`);
+}
+
+console.log('\nphoto-fetch (v40):');
+{
+  // A fetch-anything primitive with Tony's name on the bandwidth bill, so the
+  // assertions are about what it REFUSES as much as what it returns.
+  const realFetch = globalThis.fetch;
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]);
+  const env2 = { APP_SHARED_KEY: 'secret-k' };
+  const ask = (url) => worker.fetch(post({ action: 'photo-fetch', url, appKey: 'secret-k' }), env2);
+  let asked = null;
+  const serve = (body, headers, status = 200) => {
+    globalThis.fetch = async (u) => { asked = String(u); return new Response(body, { status, headers }); };
+  };
+  try {
+    serve(png, { 'Content-Type': 'image/png', 'Content-Length': String(png.length) });
+    const ok = await ask('https://live.staticflickr.com/1/2_3_b.jpg');
+    expect('an image comes back as an image', ok.status === 200
+      && (ok.headers.get('Content-Type') || '').startsWith('image/'),
+      `status ${ok.status}, type ${ok.headers.get('Content-Type')}`);
+    expect('the bytes are passed through unchanged',
+      new Uint8Array(await ok.arrayBuffer()).length === png.length, 'the body was altered');
+    check('it carries CORS like everything else', ok);
+    expect('it fetched the URL it was given', asked === 'https://live.staticflickr.com/1/2_3_b.jpg', `got ${asked}`);
+
+    // Not an image. Handing the app an HTML error page to compress into a
+    // recipe photo is the failure this check exists for.
+    serve('<html>not found</html>', { 'Content-Type': 'text/html' });
+    const html = await ask('https://example.com/oops');
+    expect('an HTML page is refused, not relayed', html.status === 415, `got ${html.status}`);
+    expect('and says what came back instead', /not an image/.test((await html.json()).error || ''), 'unclear message');
+
+    // Size. A Worker that will stream an arbitrary file of any size on request
+    // is a bandwidth amplifier.
+    serve(png, { 'Content-Type': 'image/png', 'Content-Length': String(99 * 1024 * 1024) });
+    expect('an oversized image is refused on its declared length', (await ask('https://e.com/huge.png')).status === 413,
+      'the declared content-length was ignored');
+    // …and content-length is a claim, not a promise.
+    serve(new Uint8Array(13 * 1024 * 1024), { 'Content-Type': 'image/png' });
+    expect('…and on its actual length when it lies', (await ask('https://e.com/liar.png')).status === 413,
+      'a body bigger than the cap was relayed anyway');
+
+    // Only http(s). Without this the Worker would follow file: and data: URLs.
+    globalThis.fetch = async () => { throw new Error('photo-fetch must not fetch a non-http scheme'); };
+    for (const bad of ['file:///etc/passwd', 'data:image/png;base64,AAAA', 'ftp://e.com/a.png']) {
+      const r = await ask(bad);
+      expect(`${bad.split(':')[0]}: is refused`, r.status === 400, `got ${r.status}`);
+    }
+    expect('a missing URL is refused', (await ask('')).status === 400, 'it accepted an empty url');
+
+    // The same gate as everything else: no app key, no fetch.
+    globalThis.fetch = async () => { throw new Error('photo-fetch ran without an app key'); };
+    const nokey = await worker.fetch(post({ action: 'photo-fetch', url: 'https://e.com/a.png' }), env2);
+    expect('no app key, no fetch', nokey.status === 403, `got ${nokey.status}`);
+
+    // Its own ceiling: 600/min, because one auto-fetch is 300 in a burst.
+    {
+      const kv = { store: new Map(), writes: 0,
+        async get(k) { return this.store.get(k) ?? null; },
+        async put(k, v) { this.writes++; this.store.set(k, v); } };
+      serve(png, { 'Content-Type': 'image/png' });
+      const e3 = { BRING_KV: kv, APP_SHARED_KEY: 'secret-k' };
+      let refused = 0;
+      for (let i = 0; i < 300; i++) {
+        const r = await worker.fetch(post({ action: 'photo-fetch', url: 'https://e.com/a.png', appKey: 'secret-k' }), e3);
+        if (r.status === 429) refused++;
+      }
+      expect('300 photo downloads in a burst are all allowed', refused === 0,
+        `${refused} were refused — "auto-fetch missing photos" over a big library would half-fail`);
+      expect('…and cost few KV writes', kv.writes < 45, `${kv.writes} writes`);
+    }
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,

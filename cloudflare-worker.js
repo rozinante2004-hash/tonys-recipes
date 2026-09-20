@@ -1,4 +1,16 @@
-// Tony's Recipes — Cloudflare Worker v39
+// Tony's Recipes — Cloudflare Worker v40
+// v40: `photo-fetch` — download an image's BYTES through here instead of
+//      straight from the browser. Applying a chosen photo fetches from whatever
+//      host the photo source returned, and Openverse federates Flickr,
+//      Wikimedia, NASA and museum collections, so that set is unbounded. It is
+//      the sole reason the app's CSP carries a bare `https:` in connect-src,
+//      which makes the careful allowlist after it decorative (audit S2). One
+//      named host instead of "anywhere" is what lets that come out. It also
+//      fixes image hosts that send no CORS headers of their own. It is a
+//      fetch-anything primitive, so: origin + app key + rate limit as usual,
+//      plus http(s) only, must actually be an image, and capped at 12 MB.
+//      Its own 600/min ceiling, because one "auto-fetch missing photos" over
+//      300 recipes is 300 of these in a burst.
 // v39: spend guard rails. Two separate problems in one function.
 //      (a) rateLimited() wrote to KV on EVERY allowed request, against a free
 //      allowance of 1,000 writes/day. One "auto-fetch missing photos" over 300
@@ -71,7 +83,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v39';
+const WORKER_VERSION = 'v40';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -129,8 +141,12 @@ function originAllowed(request, env) {
 }
 function corsFor(request, env) {
   const o = originAllowed(request, env);
+  // v40 — no Content-Type here. This object is stamped on EVERY response by the
+  // fetch wrapper, so declaring JSON in it relabelled the binary paths as
+  // application/json: the KV file download has been served that way since v36,
+  // and photo-fetch would have handed the app an "image" the browser refuses to
+  // decode. jsonResp sets its own Content-Type, so nothing loses one.
   return {
-    'Content-Type': 'application/json',
     // Never echo an origin we did not allow, and never fall back to '*'.
     'Access-Control-Allow-Origin': (typeof o === 'string' && o) ? o : 'null',
     'Vary': 'Origin',
@@ -219,11 +235,19 @@ async function rateLimited(request, env, action) {
 
   const now = Date.now();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const limit = parseInt(env.RATE_LIMIT || '', 10) || (costly ? 40 : 150);
+  // photo-fetch (v40) gets its own, much higher ceiling. "Auto-fetch missing
+  // photos" across 300 recipes is 300 of these in a burst, and 150/min would
+  // refuse half of them — the request costs bandwidth and nothing else, so the
+  // limit only needs to bound a runaway, not to ration ordinary use.
+  const photoBytes = action === 'photo-fetch';
+  const limit = parseInt(env.RATE_LIMIT || '', 10)
+    || (photoBytes ? 600 : costly ? 40 : 150);
   const windowSec = 60;
   const bucket = Math.floor(now / 1000 / windowSec);
   const key = 'rl:' + ip + ':' + bucket + (costly ? ':ai' : ':x');
-  const sample = costly ? 1 : KV_SAMPLE_CHEAP;
+  // A 600/min ceiling counted 1-in-5 would still be 120 writes a minute, so the
+  // burstiest path is sampled the hardest.
+  const sample = costly ? 1 : (photoBytes ? KV_SAMPLE_MONTH : KV_SAMPLE_CHEAP);
 
   // If writes are already known to be failing in this isolate we cannot meter,
   // and unmeterable spend is the thing these ceilings exist to stop.
@@ -770,6 +794,59 @@ async function handleRequest(request, env) {
     // A source with no key set returns { notConfigured:true } so the app can skip it.
     // Per-source failures return HTTP 200 with an { error } field so one bad source
     // never breaks the others.
+    // ── photo-fetch (v40) ────────────────────────────────────────────────────
+    // Applying a chosen photo downloads its BYTES, and the host is whatever the
+    // photo source returned — Openverse federates Flickr, Wikimedia, NASA and
+    // museum collections, so the set is genuinely unbounded. That is the whole
+    // reason the app's CSP carries a bare `https:` in connect-src, which makes
+    // the careful allowlist after it decorative (audit S2). Routing the bytes
+    // through here is what allows that to be removed: one named host instead of
+    // "anywhere". It also fixes image hosts that send no CORS headers of their
+    // own, which the browser refuses outright.
+    //
+    // This is a fetch-anything primitive and is treated as one. It is behind the
+    // same origin check, app key and rate limit as everything else, and on top
+    // of that: http(s) only, the answer must actually BE an image, and it is
+    // capped — a Worker that will stream an arbitrary file of any size on
+    // request is a bandwidth amplifier with someone else's name on it.
+    if (body.action === 'photo-fetch') {
+      const raw = String(body.url || '');
+      let target;
+      try { target = new URL(raw); } catch (e) { return jsonResp({ error: 'PHOTO_FETCH: not a URL' }, 400); }
+      if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+        return jsonResp({ error: 'PHOTO_FETCH: only http(s) can be fetched' }, 400);
+      }
+      const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
+      let r;
+      try {
+        r = await fetch(target.toString(), {
+          headers: { 'Accept': 'image/*', 'User-Agent': 'TonysRecipes/1.0' },
+          signal: AbortSignal.timeout(15000),
+        });
+      } catch (e) {
+        return jsonResp({ error: 'PHOTO_FETCH: the image host could not be reached ('
+          + (e && e.message ? e.message : 'network error') + ')' }, 502);
+      }
+      if (!r.ok) return jsonResp({ error: 'PHOTO_FETCH: the image host answered ' + r.status }, 502);
+      const ct = (r.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
+      if (ct.indexOf('image/') !== 0) {
+        // Not an image. Saying so beats handing the app an HTML error page to
+        // compress into a recipe photo.
+        return jsonResp({ error: 'PHOTO_FETCH: that address returned "' + (ct || 'nothing') + '", not an image' }, 415);
+      }
+      const declared = parseInt(r.headers.get('content-length') || '0', 10);
+      if (declared && declared > MAX_PHOTO_BYTES) {
+        return jsonResp({ error: 'PHOTO_FETCH: that image is ' + Math.round(declared / 1048576) + ' MB, over the limit' }, 413);
+      }
+      const bytes = await r.arrayBuffer();
+      // Checked again after the fact: content-length is a claim, not a promise.
+      if (bytes.byteLength > MAX_PHOTO_BYTES) {
+        return jsonResp({ error: 'PHOTO_FETCH: that image is over the size limit' }, 413);
+      }
+      // CORS is stamped centrally by the fetch wrapper.
+      return new Response(bytes, { status: 200, headers: { 'Content-Type': ct, 'Cache-Control': 'no-store' } });
+    }
+
     if (body.action === 'photo-search') {
       const query = body.query;
       if (!query) return jsonResp({ error: 'No query' }, 400);

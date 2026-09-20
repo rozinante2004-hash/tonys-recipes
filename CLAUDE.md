@@ -402,6 +402,35 @@ found only because a test was written first and disagreed with the code.
   working. The no-photo count beside it is deliberately **not** cached: `!r.photo`
   is one read per recipe, so a cache would cost more than it saves and add a
   second thing that can go stale.
+- **A photo's bytes come through the Worker now (v36.24 / Worker v40, audit S2).**
+  `connect-src` carries a bare `https:` that makes the careful allowlist after it
+  decorative. The reason was real: applying a chosen photo downloads its bytes
+  with `fetch()`, and Openverse alone federates Flickr, Wikimedia, NASA and
+  museum collections, so the host set cannot be listed. `fetchPhotoBlob()` asks
+  the Worker's `photo-fetch` first, which turns "anywhere" into one named host —
+  and also fixes image hosts that send no CORS headers of their own.
+  - **The direct fallback is what makes it shippable.** Worker v40 has to be
+    pasted into Cloudflare by hand; until it is, every `photo-fetch` comes back
+    4xx and without the retry choosing a photo would simply be broken. It also
+    answers a 429 on a big auto-fetch burst.
+  - **`https:` stays in `connect-src` until Tony confirms the Worker is live.**
+    Removing it turns the fallback from a safety net into a blocked request.
+    `sec_photo_bytes_via_worker` asserts *both directions*: with a fallback in
+    the code, `https:` must be present; once the fallback is gone, it must not
+    be. They move together or not at all.
+  - **A 200 that is not `image/*` is not the photo.** The Worker answers with
+    JSON when it refuses; compressing an error document into a recipe photo is
+    the failure that check exists for. Same rule server-side: non-image content
+    types are refused with 415 rather than relayed.
+  - `photo-fetch` is a fetch-anything primitive, so it is http(s)-only, capped
+    at 12 MB (checked against the body, not just the claimed `content-length`),
+    and behind the origin check, the app key and its own 600/min ceiling —
+    600 because one "auto-fetch missing photos" is 300 in a burst.
+  - **Fixed on the way past: `corsFor()` declared `Content-Type:
+    application/json`,** and the fetch wrapper stamps that object on *every*
+    response — so the KV file download has been served as JSON since v36, and
+    `photo-fetch` would have returned an "image" no browser would decode.
+    `jsonResp` sets its own type, so nothing lost one.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

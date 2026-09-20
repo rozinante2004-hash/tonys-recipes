@@ -3437,7 +3437,13 @@ window.SELF_TESTS = [
         window.askConfirm=function(){ return Promise.resolve(true); };
         window.photoSearchTerms=function(){ return Promise.resolve({ 0:'beef' }); };
         window.photoSearchOnce=function(){ return Promise.resolve([{ url:'https://x/p.jpg', credit:'C' }]); };
-        window.fetch=function(){ return Promise.resolve({ blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
+        // v36.24 — the bytes now come through the Worker, so the stub has to
+          // answer like a real fetch: ok, a status, and an image content type.
+          // A thinner stub sends fetchPhotoBlob down its fallback and then makes
+          // the whole iteration throw, which would leave this test proving nothing.
+          window.fetch=function(){ return Promise.resolve({ ok:true, status:200,
+            headers:{ get:function(k){ return /content-type/i.test(k) ? 'image/jpeg' : null; } },
+            blob:function(){ return Promise.resolve(new Blob(['x'],{type:'image/jpeg'})); } }); };
         window.compressPhotoToDataUrl=function(){ return Promise.resolve('data:image/jpeg;base64,FETCHED'); };
         recipes=[{ id:31, name:'blank one', photo:'' }];
         await autoFetchMissingPhotos();
@@ -3547,7 +3553,13 @@ window.SELF_TESTS = [
           window.askConfirm=function(){ return Promise.resolve(true); };
           window.photoSearchTerms=function(){ return Promise.resolve({ 0:'late arrival' }); };
           window.photoSearchOnce=function(){ return Promise.resolve([{ url:'https://x/p.jpg', credit:'A' }]); };
-          window.fetch=function(){ return Promise.resolve({ blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
+          // v36.24 — the bytes now come through the Worker, so the stub has to
+          // answer like a real fetch: ok, a status, and an image content type.
+          // A thinner stub sends fetchPhotoBlob down its fallback and then makes
+          // the whole iteration throw, which would leave this test proving nothing.
+          window.fetch=function(){ return Promise.resolve({ ok:true, status:200,
+            headers:{ get:function(k){ return /content-type/i.test(k) ? 'image/jpeg' : null; } },
+            blob:function(){ return Promise.resolve(new Blob(['x'],{type:'image/jpeg'})); } }); };
           // The photo lands DURING the fetch — exactly the race the guard exists for.
           window.compressPhotoToDataUrl=function(){
             recipes[0].photo='data:image/jpeg;base64,ARRIVED';
@@ -5715,7 +5727,9 @@ window.SELF_TESTS = [
           pcSave=window.saveData, pcGrid=window.renderGrid, pcToast=window.toast;
       try{
         window.toast=function(){}; window.saveData=function(){}; window.renderGrid=function(){};
-        window.fetch=function(){ return Promise.resolve({ ok:true, blob:function(){ return Promise.resolve(new Blob(['x'])); } }); };
+        window.fetch=function(){ return Promise.resolve({ ok:true, status:200,
+          headers:{ get:function(k){ return /content-type/i.test(k) ? 'image/jpeg' : null; } },
+          blob:function(){ return Promise.resolve(new Blob(['x'],{type:'image/jpeg'})); } }); };
         window.compressPhotoToDataUrl=function(){ return Promise.resolve('data:image/jpeg;base64,PICKED'); };
         recipes=[normalizeRecipe({ id:9301, name:'Credit target', ingredients:[], steps:['x'] })];
         heroPhotoTargetId=9301;
@@ -6876,6 +6890,95 @@ window.SELF_TESTS = [
       // The cache is big enough to be worth having.
       if(AI_CACHE_MAX < 200) throw new Error('the AI cache holds only '+AI_CACHE_MAX+' entries');
       if(AI_CACHE_TTL < 14*24*60*60*1000) throw new Error('the AI cache expires after under a fortnight');
+    } },
+
+  { id:'sec_photo_bytes_via_worker', group:'Network', name:'A photo’s bytes come through the Worker, with a way through if it cannot (v36.24)',
+    test: async()=>{
+      if(typeof fetchPhotoBlob!=='function') throw new Error('fetchPhotoBlob not defined');
+      var realFetch=window.fetch;
+      function imgResp(){
+        return { ok:true, status:200, headers:{ get:function(k){ return /content-type/i.test(k) ? 'image/png' : null; } },
+          blob:function(){ return Promise.resolve(new Blob([new Uint8Array([137,80,78,71])],{type:'image/png'})); } };
+      }
+      try{
+        // (1) The Worker is asked FIRST, with the app key, and the photo host is
+        // never touched directly. That is the whole point: one named host in
+        // connect-src instead of "anywhere on https".
+        var hits=[];
+        window.fetch=function(u, opts){
+          hits.push({ u:String(u), body:(opts&&opts.body)||'' });
+          if(String(u).indexOf(WORKER_ENDPOINT)===0) return Promise.resolve(imgResp());
+          return Promise.reject(new Error('the photo host was fetched directly'));
+        };
+        var blob=await fetchPhotoBlob('https://live.staticflickr.com/1/2_3_b.jpg');
+        if(!blob || !blob.size) throw new Error('no bytes came back');
+        if(hits.length!==1) throw new Error('expected one request, saw '+hits.length);
+        if(hits[0].u.indexOf(WORKER_ENDPOINT)!==0) throw new Error('it did not go through the Worker');
+        var sent={}; try{ sent=JSON.parse(hits[0].body); }catch(e){}
+        if(sent.action!=='photo-fetch') throw new Error('wrong action: '+sent.action);
+        if(sent.url!=='https://live.staticflickr.com/1/2_3_b.jpg') throw new Error('the url was not passed on');
+        if(!sent.appKey) throw new Error('the app key was left off, so the Worker would refuse it');
+
+        // (2) The fallback. Until the v40 Worker is actually deployed, every one
+        // of these comes back 4xx — without a direct retry, choosing a photo
+        // would simply be broken for as long as that took.
+        hits.length=0;
+        window.fetch=function(u){
+          hits.push(String(u));
+          if(String(u).indexOf(WORKER_ENDPOINT)===0)
+            return Promise.resolve({ ok:false, status:400, headers:{get:function(){return 'application/json';}},
+              json:function(){ return Promise.resolve({error:'no such action'}); } });
+          return Promise.resolve(imgResp());
+        };
+        var b2=await fetchPhotoBlob('https://e.test/a.png');
+        if(!b2 || !b2.size) throw new Error('the fallback did not produce any bytes');
+        if(hits.length!==2 || hits[1]!=='https://e.test/a.png')
+          throw new Error('it did not fall back to the photo host: '+JSON.stringify(hits));
+
+        // (3) A 200 that is NOT an image must not be treated as one. The Worker
+        // answers with JSON when it refuses, and compressing an error document
+        // into a recipe photo is the failure this guards.
+        hits.length=0;
+        window.fetch=function(u){
+          hits.push(String(u));
+          if(String(u).indexOf(WORKER_ENDPOINT)===0)
+            return Promise.resolve({ ok:true, status:200,
+              headers:{get:function(){return 'application/json';}},
+              blob:function(){ return Promise.resolve(new Blob(['{"error":"nope"}'],{type:'application/json'})); } });
+          return Promise.resolve(imgResp());
+        };
+        var b3=await fetchPhotoBlob('https://e.test/b.png');
+        if(b3.type!=='image/png') throw new Error('a JSON answer was passed off as the photo');
+        if(hits.length!==2) throw new Error('it did not retry directly after a non-image answer');
+
+        // (4) A genuine failure still fails, rather than returning an empty blob
+        // that silently becomes a blank photo.
+        window.fetch=function(){ return Promise.resolve({ ok:false, status:404,
+          headers:{get:function(){return null;}}, json:function(){ return Promise.resolve({}); } }); };
+        var threw=false;
+        try{ await fetchPhotoBlob('https://e.test/gone.png'); }catch(e){ threw=true; }
+        if(!threw) throw new Error('a dead photo URL returned quietly instead of failing');
+      } finally { window.fetch=realFetch; }
+
+      // (5) Both photo paths must use it. One left on a bare fetch() is one that
+      // still needs `https:` in the CSP.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var code = src.replace(/^\s*\/\/.*$/gm, '');
+      var uses = (code.match(/fetchPhotoBlob\(/g) || []).length;
+      if(uses < 3) throw new Error('only '+(uses-1)+' call site uses fetchPhotoBlob — expected the auto-fetch and the picker');
+      if(/var\s+imgResp\s*=\s*await\s+fetch\(/.test(code) || /resp\s*=\s*await\s+fetch\(img\.url\)/.test(code))
+        throw new Error('a photo is still downloaded with a bare fetch()');
+
+      // (6) And the CSP still has to allow the fallback for as long as there IS
+      // one. Removing `https:` while a direct retry remains turns the safety net
+      // into a blocked request — they move together or not at all.
+      var csp = (src.match(/Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+      var connect = (csp.match(/connect-src ([^;]+)/) || [])[1] || '';
+      var hasFallback = /var direct = await fetch\(url/.test(code);
+      if(hasFallback && !/(^|\s)https:(\s|$)/.test(connect))
+        throw new Error('connect-src no longer allows the direct fallback that fetchPhotoBlob still performs');
+      if(!hasFallback && /(^|\s)https:(\s|$)/.test(connect))
+        throw new Error('the fallback is gone, so the bare `https:` in connect-src can come out too');
     } },
 
   { id:'ai_system_is_its_own_block', group:'Network', name:'Standing instructions are a system block, not part of the question (v36.19)',
