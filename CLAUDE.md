@@ -274,6 +274,25 @@ found only because a test was written first and disagreed with the code.
   — **not inside `runUrlImport`**: declared in there they are function-scoped, and
   `renderLoggingPanel()` (a different script block) cannot see them. That is
   exactly how the first cut of v36.18 broke.
+- **The Worker meters the bill, and one KV write is not free (v39, audit C5/S4).**
+  Cloudflare's free tier allows **1,000 KV writes a day**; reads are 100,000, so
+  writing is the constraint. v38 wrote once per allowed request, so a single
+  "auto-fetch missing photos" across 300 recipes was 300 writes in a burst — and
+  past the allowance the `put` threw, an empty `catch` swallowed it, and **the
+  limiter silently stopped limiting for the rest of the day**. The guard rail
+  failed exactly when it was being leaned on. Now: the cheap, high-volume paths
+  are sampled (count 1 request in 5, credit 5), the Anthropic path is still
+  counted exactly because it is rare and is the only one that spends money, and
+  a failed write trips an isolate-scoped breaker that pauses AI until a write
+  succeeds again. There are also **daily and monthly ceilings** on the Anthropic
+  path across all callers (`AI_DAILY_MAX` / `AI_MONTHLY_MAX`, defaults 300 and
+  3000) — a per-minute limit alone allows ~57,000 calls a day on Tony's credits
+  if the app key ever leaks. `aiSpend` is deliberately narrower than `costly`:
+  `instagram-fetch` is slow and rate-limited but spends no Anthropic credits, so
+  it must never eat the AI ceiling. A ceiling refusal says **whose** ceiling it
+  is — "RATE_LIMIT" with no owner sends the reader to Anthropic's status page to
+  debug a limit set in this file — and the client does not retry it, because
+  four rounds of backoff cannot change the answer.
 - **The CSP must stay in step with the script hosts.** `script-src` lists the CDN
   hosts `loadScriptOnce()` uses; adding a lazily loaded library without adding its
   host makes it fail silently. `frame-src` needs `'self'` for the email preview's
@@ -830,6 +849,9 @@ found only because a test was written first and disagreed with the code.
     fragments, no duplicates, no self-link, capped at 80. It must never become a
     way to make the Worker fetch anywhere on anyone's behalf. **Needs Tony to
     paste `cloudflare-worker.js` into Cloudflare — v38.**
+    (Superseded: the file in the repo is now **v39**, and that is the version
+    Tony needs to paste. It carries v38's `links[]` plus the v39 spend guard
+    rails. One paste covers both.)
   - Several links point at the same recipe (its rating, its prep time, its "to
     the recipe" button), so picks are de-duplicated by href before anything is
     opened; the real ynet page has twelve links for six recipes.

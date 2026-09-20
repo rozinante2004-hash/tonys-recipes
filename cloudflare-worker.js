@@ -1,4 +1,20 @@
-// Tony's Recipes — Cloudflare Worker v38
+// Tony's Recipes — Cloudflare Worker v39
+// v39: spend guard rails. Two separate problems in one function.
+//      (a) rateLimited() wrote to KV on EVERY allowed request, against a free
+//      allowance of 1,000 writes/day. One "auto-fetch missing photos" over 300
+//      recipes was 300 writes in a burst; past the allowance the put threw, the
+//      empty catch swallowed it, and the limiter silently stopped limiting — the
+//      guard rail failed exactly when it was being leaned on. The cheap,
+//      high-volume paths are now sampled (count 1 in 5, credit 5); the AI path,
+//      which is rare and is the only one that spends money, is still counted
+//      exactly, because that is where a write is worth it.
+//      (b) There was only a per-minute ceiling. 40/min sustained is ~57,000 AI
+//      calls a day on someone else's credits. There are now daily and monthly
+//      ceilings on the Anthropic path (AI_DAILY_MAX / AI_MONTHLY_MAX), and that
+//      path fails CLOSED when KV is bound but not answering: spend that cannot
+//      be metered is the thing a ceiling exists to stop. The cheap paths still
+//      fail open, and an unbound KV still allows everything — that is a
+//      deployment fact rather than an attack, and `health` reports it.
 // v38: fetch-url also returns `links[]`. Some round-ups contain no recipes at
 //      all — ten names, ten ratings and ten links reading "to the recipe" — and
 //      the text extraction turns every <a> into its label and discards the href,
@@ -46,8 +62,16 @@
 // Nothing Bring!-related is hard-coded here any more, so this file is safe to
 // commit publicly. The token that used to be hard-coded here is still in git
 // history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
+//
+// ── SPEND CEILINGS (v39, optional) ───────────────────────────────────────────
+// Both have working defaults, so neither has to be set:
+//   AI_DAILY_MAX    – Anthropic calls allowed per UTC day, all callers (300)
+//   AI_MONTHLY_MAX  – …and per UTC calendar month (3000)
+// They are the ceiling on the API bill if the app key ever leaks. Raise them if
+// a real day's use gets close; `health` reports the current counts to a caller
+// that presents the app key.
 
-const WORKER_VERSION = 'v38';
+const WORKER_VERSION = 'v39';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -125,28 +149,147 @@ function appKeyOk(request, env, body) {
   return supplied === expected;
 }
 
-// KV-backed sliding window, keyed on the caller's IP. KV is eventually
-// consistent, so this is approximate — which is fine: the job is to bound a
-// runaway, not to meter precisely. Fails OPEN if no KV is bound, because
-// breaking the family's app to punish a hypothetical abuser is the wrong trade.
+// ─── SPEND GUARD RAILS (v39) ─────────────────────────────────────────────────
+// Cloudflare's free tier allows 1,000 KV WRITES a day (reads are 100,000, so
+// reading is not the constraint — writing is). v38 wrote once per allowed
+// request. The cheap paths are the high-volume ones, so those are the writes
+// that ran the allowance down, and the failure was silent in the worst possible
+// way: the put threw, an empty catch swallowed it, and the limiter kept saying
+// "not limited" for the rest of the day.
+//
+// So: sample the cheap path, count the expensive one exactly. Photo browsing is
+// counted 1 request in 5 and credited 5, which is accurate enough to bound a
+// runaway and costs a fifth of the writes. The Anthropic path is rare — a few
+// dozen calls on a busy day — and is the only one that spends real money, so it
+// still gets an exact count. Worst case at the daily ceiling is ~700 writes,
+// inside the allowance, and ordinary family use is a tenth of that.
+const KV_SAMPLE_CHEAP = 5;    // count 1 request in 5 on the non-AI paths
+const KV_SAMPLE_MONTH = 10;   // the monthly total is a coarse guard rail
+const AI_DAILY_DEFAULT = 300;     // Anthropic calls per day, all callers
+const AI_MONTHLY_DEFAULT = 3000;  // …and per calendar month
+
+// Isolate-scoped circuit breaker. A Worker isolate is short-lived and there are
+// many of them, so this is not a global truth — it does not need to be. Its job
+// is that once writes start failing in THIS isolate, the money-spending path
+// stops immediately instead of running unmetered until the isolate is recycled.
+let _kvWritesFailing = false;
+
+function utcDayKey(now)   { return new Date(now).toISOString().slice(0, 10); }  // YYYY-MM-DD
+function utcMonthKey(now) { return new Date(now).toISOString().slice(0, 7); }   // YYYY-MM
+
+function ceilingResp(what, used, cap) {
+  // Say whose ceiling this is. "Rate limited" with no owner sends the reader to
+  // Anthropic's status page to debug a limit that was set in this file.
+  return jsonResp({
+    error: 'SPEND_CAP: this Worker\'s own ' + what + ' ceiling for AI calls has been reached ('
+      + used + '/' + cap + '). Nothing is wrong with the app or with Anthropic — this is the '
+      + 'guard rail on the API bill. Raise ' + (what === 'daily' ? 'AI_DAILY_MAX' : 'AI_MONTHLY_MAX')
+      + ' in the Worker\'s variables, or wait for it to reset.',
+    rateLimited: true, spendCap: what
+  }, 429);
+}
+
+// Read a counter, decide, then credit it. Returns the value it read.
+async function kvCount(kv, key, ttlSec, sample) {
+  const used = parseInt(await kv.get(key) || '0', 10) || 0;
+  return { used, credit: async () => {
+    if (sample > 1 && Math.random() >= 1 / sample) return;   // sampled out — no write
+    try {
+      await kv.put(key, String(used + sample), { expirationTtl: ttlSec });
+      _kvWritesFailing = false;   // writes work again — let the AI path back in
+    } catch (e) { _kvWritesFailing = true; }
+  } };
+}
+
+// KV is eventually consistent, so all of this is approximate — which is fine:
+// the job is to bound a runaway, not to meter precisely.
 async function rateLimited(request, env, action) {
   const kv = env.BRING_KV;
-  if (!kv) return null;
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   // The AI path (no action) is the expensive one; browsing photos is cheap.
   const costly = !action || action === 'ai' || action === 'instagram-fetch';
+  // Narrower than `costly`: instagram-fetch is slow but it does not spend
+  // Anthropic credits, so it must not eat into the AI ceilings.
+  const aiSpend = !action || action === 'ai';
+
+  // No KV bound at all is a DEPLOYMENT fact, not an attack — there is nothing
+  // to read and nothing to write, and breaking the family's app to punish a
+  // hypothetical abuser is the wrong trade. `health` reports rateLimiting:false
+  // so it is visible rather than silent.
+  if (!kv) return null;
+
+  const now = Date.now();
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const limit = parseInt(env.RATE_LIMIT || '', 10) || (costly ? 40 : 150);
   const windowSec = 60;
-  const bucket = Math.floor(Date.now() / 1000 / windowSec);
+  const bucket = Math.floor(now / 1000 / windowSec);
   const key = 'rl:' + ip + ':' + bucket + (costly ? ':ai' : ':x');
-  let used = 0;
-  try { used = parseInt(await kv.get(key) || '0', 10) || 0; } catch (e) { return null; }
-  if (used >= limit) {
-    return jsonResp({ error: 'RATE_LIMIT: too many requests in the last minute (' + used + '/' + limit
+  const sample = costly ? 1 : KV_SAMPLE_CHEAP;
+
+  // If writes are already known to be failing in this isolate we cannot meter,
+  // and unmeterable spend is the thing these ceilings exist to stop.
+  if (aiSpend && _kvWritesFailing) {
+    return jsonResp({ error: 'RATE_LIMIT: the spend guard rail cannot record this call, so AI '
+      + 'requests are paused. This usually means the Worker\'s KV write allowance is used up for '
+      + 'today. Everything that does not call the AI still works.', rateLimited: true }, 429);
+  }
+
+  let minute;
+  try { minute = await kvCount(kv, key, windowSec * 2, sample); }
+  catch (e) {
+    // KV is bound but not answering. Carry on for the cheap paths; refuse the
+    // one that spends money.
+    if (!aiSpend) return null;
+    return jsonResp({ error: 'RATE_LIMIT: the spend guard rail is not answering, so AI requests '
+      + 'are paused rather than run unmetered. Everything that does not call the AI still works.',
+      rateLimited: true }, 429);
+  }
+  if (minute.used >= limit) {
+    return jsonResp({ error: 'RATE_LIMIT: too many requests in the last minute (' + minute.used + '/' + limit
       + '). Wait a minute and try again.', rateLimited: true, retryAfter: windowSec }, 429);
   }
-  try { await kv.put(key, String(used + 1), { expirationTtl: windowSec * 2 }); } catch (e) {}
+
+  // Daily and monthly ceilings, on the Anthropic path only and across ALL
+  // callers — an IP is free to change, an API bill is not. A per-minute limit
+  // alone allows ~57,000 calls a day on Tony's credits.
+  if (aiSpend) {
+    const dayMax = parseInt(env.AI_DAILY_MAX || '', 10) || AI_DAILY_DEFAULT;
+    const monMax = parseInt(env.AI_MONTHLY_MAX || '', 10) || AI_MONTHLY_DEFAULT;
+    let day, mon;
+    try {
+      day = await kvCount(kv, 'rl:day:' + utcDayKey(now), 60 * 60 * 48, 1);
+      mon = await kvCount(kv, 'rl:mon:' + utcMonthKey(now), 60 * 60 * 24 * 40, KV_SAMPLE_MONTH);
+    } catch (e) {
+      return jsonResp({ error: 'RATE_LIMIT: the spend guard rail is not answering, so AI requests '
+        + 'are paused rather than run unmetered. Everything that does not call the AI still works.',
+        rateLimited: true }, 429);
+    }
+    if (day.used >= dayMax) return ceilingResp('daily', day.used, dayMax);
+    if (mon.used >= monMax) return ceilingResp('monthly', mon.used, monMax);
+    await day.credit();
+    await mon.credit();
+  }
+
+  await minute.credit();
   return null;
+}
+
+// What the ceilings currently read. Only shown to a caller that presented the
+// app key — `health` itself is open on purpose, and the counts are none of an
+// anonymous caller's business.
+async function spendStatus(env) {
+  const kv = env.BRING_KV;
+  const out = {
+    dailyMax:   parseInt(env.AI_DAILY_MAX || '', 10) || AI_DAILY_DEFAULT,
+    monthlyMax: parseInt(env.AI_MONTHLY_MAX || '', 10) || AI_MONTHLY_DEFAULT,
+    dailyUsed: null, monthlyUsed: null
+  };
+  if (!kv) return out;
+  const now = Date.now();
+  try {
+    out.dailyUsed   = parseInt(await kv.get('rl:day:' + utcDayKey(now)) || '0', 10) || 0;
+    out.monthlyUsed = parseInt(await kv.get('rl:mon:' + utcMonthKey(now)) || '0', 10) || 0;
+  } catch (e) {}
+  return out;
 }
 
 function jsonResp(data, status = 200, cors) {
@@ -285,15 +428,20 @@ async function handleRequest(request, env) {
     // me" look identical from the app, which is the kind of dead end this
     // project treats as a bug.
     if (body.action === 'health') {
+      // v39 — the ceilings are only reported to a caller that presented the app
+      // key. health stays open so "down" and "refusing me" can be told apart;
+      // what the bill is doing is not an anonymous caller's business.
+      const keyed = appKeyOk(request, env, body);
       return jsonResp({
         ok: true,
+        spend: keyed ? await spendStatus(env) : undefined,
         // Keep in step with the header at the top of this file. It said v34 on a
         // v36 Worker, which made `health` — the one endpoint whose entire job is
         // to report the truth about this Worker — quietly wrong about it.
         version: WORKER_VERSION,
         originAllowed: origin !== false,
         appKeyRequired: !!env.APP_SHARED_KEY,
-        appKeyAccepted: appKeyOk(request, env, body),
+        appKeyAccepted: keyed,
         rateLimiting: !!env.BRING_KV,
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,

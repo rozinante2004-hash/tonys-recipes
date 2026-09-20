@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.18 -->
+<!-- Tony's Recipes Collection v36.19 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -749,7 +749,7 @@ function renderLoggingPanel() {
      + 'will never run it does not carry it. Switching this on shows 🧪 Self Test in ⚙️ Settings and fetches '
      + 'the file the first time you open it. <strong>This setting is per device.</strong></div></div>';
 
-  // 1a2 — the relay consent, per device (v36.18)
+  // 1a2 — the relay consent, per device (v36.19)
   var _pc = proxyConsentState();
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
      + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
@@ -3105,7 +3105,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.18';
+var APP_VERSION = 'v36.19';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5588,7 +5588,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.18</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.19</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6193,7 +6193,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.18</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.19</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10713,11 +10713,13 @@ var AI_CACHE_MAX = 300;                    // entries (v36.15 — was 40)
 var AI_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days (v36.15 — was 7)
 var _aiCacheHits = 0, _aiCacheMisses = 0;
 
-function aiCacheKey(prompt, maxTokens, model){
+function aiCacheKey(prompt, maxTokens, model, system){
   // FNV-1a — a short stable digest, so the cache holds keys not whole prompts.
   // The MODEL is part of the key: since v36.15 two models are in play, and a
-  // Haiku answer must never be served for a Sonnet request.
-  var s = (model || AI_MODEL) + '|' + maxTokens + '|' + prompt, h = 2166136261;
+  // Haiku answer must never be served for a Sonnet request. So is the SYSTEM
+  // prompt (v36.19) — the same question under different standing instructions
+  // is a different question, and leaving it out would serve one answer for both.
+  var s = (model || AI_MODEL) + '|' + maxTokens + '|' + (system || '') + '|' + prompt, h = 2166136261;
   for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36) + '-' + s.length;
 }
@@ -10753,9 +10755,16 @@ function clearAiCache(){
 window.aiCacheKey = aiCacheKey; window.aiCacheGet = aiCacheGet;
 window.aiCachePut = aiCachePut; window.clearAiCache = clearAiCache;
 
-async function aiCall(prompt, maxTokens=2000, tools=null, model=null) {
+// `system` (v36.19) is standing instructions — who the model is and what it may
+// do — and belongs in its own block, not spliced into the user's turn. The old
+// shape was literally 'System: ' + INSTRUCTIONS + '\n\nUser: ' + question, which
+// means a question (or a page of imported text) containing the word "System:"
+// sat at exactly the same level as the real instructions. It is also the only
+// shape prompt caching can work in, because a cached prefix has to be
+// byte-identical across calls and a concatenated question never is.
+async function aiCall(prompt, maxTokens=2000, tools=null, model=null, system=null) {
   // Cache lookup — skipped for tool calls, whose answers depend on live data.
-  var _ck = tools ? null : aiCacheKey(prompt, maxTokens, model);
+  var _ck = tools ? null : aiCacheKey(prompt, maxTokens, model, system);
   if (_ck) {
     var cached = aiCacheGet(_ck);
     if (cached !== null) {
@@ -10765,7 +10774,7 @@ async function aiCall(prompt, maxTokens=2000, tools=null, model=null) {
     }
     _aiCacheMisses++;
   }
-  return _aiCallUncached(prompt, maxTokens, tools, _ck, model);
+  return _aiCallUncached(prompt, maxTokens, tools, _ck, model, system);
 }
 // How long one AI call may wait before we stop waiting. Nothing streams through
 // the Worker — it does `await r.json()` on the whole answer — so a request that
@@ -10796,6 +10805,11 @@ function aiRetryable(e) {
   // mistake this function exists to prevent, reintroduced by its own new guard.
   if (m.indexOf('TRUNCATED:') === 0) return false;
   if (m.indexOf('BILLING:') === 0 || m.indexOf('API_KEY:') === 0) return false;
+  // v36.19 — our own Worker's refusals. A ceiling on the bill and a per-minute
+  // cap are both decisions, not outages: retrying either just spends 30 seconds
+  // arriving at the same answer. Anthropic's own 429 is handled separately and
+  // IS retried, because that one genuinely clears.
+  if (m.indexOf('SPEND_CAP:') === 0 || m.indexOf('RATE_LIMIT:') === 0) return false;
   if (m.indexOf('Rate limit') !== -1) return false;
   var code = m.match(/^API error (\d{3})/);
   if (code) {
@@ -10806,7 +10820,7 @@ function aiRetryable(e) {
 }
 window.aiTimeoutMs = aiTimeoutMs; window.aiRetryable = aiRetryable;
 
-async function _aiCallUncached(prompt, maxTokens, tools, _ck, model) {
+async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
   const WORKER_URL = WORKER_ENDPOINT;
@@ -10826,6 +10840,14 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model) {
         messages: [{ role: 'user', content: prompt }]
       };
       if (tools) body.tools = tools;
+      if (system) {
+        // A cache breakpoint on the standing instructions. Whether it actually
+        // engages depends on the model's minimum cacheable prefix — 1,024 tokens
+        // on Sonnet, 2,048 on Haiku 4.5 — and under that Anthropic simply
+        // ignores the marker rather than erroring. So this is free to leave in:
+        // it costs nothing today and turns itself on if the prompt grows.
+        body.system = [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }];
+      }
 
       const r = await fetch(WORKER_URL, {
         method: 'POST',
@@ -10835,6 +10857,16 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model) {
       });
 
       if (r.status === 429 || r.status === 529) {
+        // v36.19 — tell OUR Worker's refusal apart from Anthropic's.
+        // Anthropic being busy is worth waiting out. Our own Worker saying
+        // "that is the daily ceiling on the bill" is not: retrying it is four
+        // more rounds of exponential backoff behind the same spinner, and the
+        // answer cannot change. Only the Worker sets `rateLimited: true`.
+        var ours = null;
+        try { ours = await r.clone().json(); } catch(e) {}
+        if (ours && ours.rateLimited && ours.error) {
+          throw new Error(ours.error);
+        }
         const retryAfter = r.headers.get('retry-after');
         const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : delay;
         if (attempt < MAX_RETRIES) { await sleep(waitMs); delay *= 2; continue; }
@@ -11077,7 +11109,7 @@ function askConfirm(opts) {
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
             + ' placeholder="' + escA(opts.placeholder || '') + '">'
           : '')
-      // v36.18 — an optional "don't ask again" tick. Only a caller that passes
+      // v36.19 — an optional "don't ask again" tick. Only a caller that passes
       // `checkbox` gets the {ok, checked} return shape; everyone else still
       // gets a plain true/false, so no existing caller changes.
       + (opts.checkbox
@@ -11609,7 +11641,7 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
 window.linkPickPrompt = linkPickPrompt;
 window.extractRecipesFromLinks = extractRecipesFromLinks;
 
-// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.18) ──────────────────
+// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.19) ──────────────────
 // When our own Worker cannot fetch a page, the import can fall back to three
 // public CORS proxies. They are not ours: they see every URL imported through
 // them, and they choose what HTML comes back. v36.17 made that HTML inert, so
@@ -11899,7 +11931,7 @@ async function runUrlImport() {
     }
     if (built.kind === 'none') throw (typeof textErr !== 'undefined' && textErr) || new Error('no recipe found');
     if (_pageWasTruncated) built.recipe._truncated = true;
-    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.18 — say where this came from
+    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.19 — say where this came from
     // Just the count: the preview's own sentence supplies "of these", so
     // passing "1 of 3" here read "1 of 3 of these could not be read".
     if (parsed._partial) built.recipe._partial = parsed._partial;
@@ -11999,7 +12031,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
   // A long article is extracted one recipe at a time (v36.1). If some of those
   // calls failed, the list is short by exactly that many — and a list of 8 that
   // should have been 10 looks identical to a list of 8. Say the number.
-  // v36.18 — this text did not come from our own server. Not a warning, a fact
+  // v36.19 — this text did not come from our own server. Not a warning, a fact
   // worth knowing if the recipe reads oddly.
   var relay = parsed._viaProxy
     ? '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
@@ -15823,7 +15855,7 @@ async function askHelp() {
   var answerEl=document.getElementById('helpAnswer'); var loadingEl=document.getElementById('helpLoading');
   answerEl.style.display='none'; loadingEl.style.display='block';
   try {
-    var answer=await aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nUser: '+q+'\n\nBe concise.',400,null,AI_MODEL_SMALL);
+    var answer=await aiCall(q+'\n\nBe concise.',400,null,AI_MODEL_SMALL,HELP_SYSTEM_PROMPT);
     answer=answer.trim(); answerEl.innerHTML='';
     var lines=answer.split('\n');
     lines.forEach(function(line) {
@@ -15865,7 +15897,7 @@ function showHelpDetail(topic, context) {
   card.appendChild(header); card.appendChild(body); overlay.appendChild(card);
   overlay.onclick=function(e){ if(e.target===overlay) overlay.remove(); };
   document.body.appendChild(overlay);
-  aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nThe user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',500,null,AI_MODEL_SMALL)
+  aiCall('The user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',500,null,AI_MODEL_SMALL,HELP_SYSTEM_PROMPT)
     .then(function(d){ body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;'; body.textContent=d.trim(); })
     .catch(function(e){ body.textContent='Error: '+e.message; });
 }

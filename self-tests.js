@@ -6552,6 +6552,101 @@ window.SELF_TESTS = [
       if(AI_CACHE_TTL < 14*24*60*60*1000) throw new Error('the AI cache expires after under a fortnight');
     } },
 
+  { id:'ai_system_is_its_own_block', group:'Network', name:'Standing instructions are a system block, not part of the question (v36.19)',
+    test: async()=>{
+      // Until v36.19 the help assistant sent
+      //   'System: ' + HELP_SYSTEM_PROMPT + '\n\nUser: ' + question
+      // as ONE user turn. A question — or a page of imported text — containing
+      // the word "System:" therefore sat at exactly the same level as the real
+      // instructions. It is also the only shape prompt caching can work in.
+      var realFetch=window.fetch, sent=[], prevCache=null;
+      try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      try{
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          sent.push(b);
+          return Promise.resolve({ ok:true, status:200, json:function(){
+            return Promise.resolve({ content:[{ text:'ok' }] }); } });
+        };
+        await aiCall('what does the star do?'+Date.now(), 50, null, null, 'YOU ARE THE HELP. Answer briefly.');
+        var b=sent[0];
+        if(!b) throw new Error('nothing was sent');
+        if(!Array.isArray(b.system)) throw new Error('system was not sent as its own block: '+JSON.stringify(b.system));
+        if(b.system[0].text.indexOf('YOU ARE THE HELP')===-1)
+          throw new Error('the instructions did not reach the system block');
+        if(String(b.messages[0].content).indexOf('YOU ARE THE HELP')!==-1)
+          throw new Error('the instructions are ALSO in the user turn — they are being sent twice, and paid for twice');
+        if(!b.system[0].cache_control)
+          throw new Error('no cache breakpoint on the standing instructions');
+
+        // A call with no system argument must not grow an empty one — an empty
+        // system block is a 400 from the API.
+        sent.length=0;
+        await aiCall('plain call '+Date.now(), 50);
+        if('system' in sent[0]) throw new Error('a call with no instructions still sent a system field');
+      } finally {
+        window.fetch=realFetch;
+        try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
+      }
+
+      // The cache must tell two different sets of instructions apart.
+      if(aiCacheKey('q', 50, null, 'you are a chef') === aiCacheKey('q', 50, null, 'you are a doctor'))
+        throw new Error('the cache key ignores the system prompt — one set of instructions would answer for the other');
+      if(aiCacheKey('q', 50, null, 'x') === aiCacheKey('q', 50, null, null))
+        throw new Error('the cache key cannot tell "with instructions" from "without"');
+
+      // And the help assistant must actually use it.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      if(src.indexOf("'System: '+HELP_SYSTEM_PROMPT") !== -1 || src.indexOf('"System: "+HELP_SYSTEM_PROMPT') !== -1)
+        throw new Error('the help assistant still splices its instructions into the user turn');
+      var uses = (src.match(/AI_MODEL_SMALL,\s*HELP_SYSTEM_PROMPT/g) || []).length;
+      if(uses < 2) throw new Error('only '+uses+' help call site passes the instructions as a system block — expected 2');
+    } },
+
+  { id:'ai_our_own_refusal_is_final', group:'Network', name:'A Worker spend ceiling is not retried five times (v36.19)',
+    test: async()=>{
+      // The Worker now has daily and monthly ceilings on the AI bill. Those come
+      // back as 429, and the 429 branch retried FOUR times with exponential
+      // backoff before giving up — half a minute of spinner to arrive at an
+      // answer that could not change. Anthropic's own 429 still IS retried,
+      // because that one genuinely clears; only our Worker sets `rateLimited`.
+      var realFetch=window.fetch, calls=0, prevCache=null;
+      try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      function resp(body){
+        var text=JSON.stringify(body);
+        var r={ ok:false, status:429, headers:{ get:function(){ return null; } },
+          json:function(){ return Promise.resolve(JSON.parse(text)); },
+          text:function(){ return Promise.resolve(text); } };
+        r.clone=function(){ return r; };
+        return r;
+      }
+      try{
+        // Ours: refuse once, immediately, in the Worker's own words.
+        window.fetch=function(){ calls++; return Promise.resolve(resp({
+          error:"SPEND_CAP: this Worker's own daily ceiling for AI calls has been reached (300/300).",
+          rateLimited:true, spendCap:'daily' })); };
+        var msg='';
+        try{ await aiCall('cap probe '+Date.now(), 50); } catch(e){ msg=e.message||''; }
+        if(calls!==1) throw new Error('our own ceiling was retried '+calls+' times');
+        if(msg.indexOf('SPEND_CAP')===-1)
+          throw new Error('the Worker’s own explanation was replaced with a generic one: '+msg);
+
+        // Anthropic's: still worth waiting out, so it must still be retried.
+        calls=0;
+        window.fetch=function(){ calls++; return Promise.resolve(resp({
+          type:'error', error:{ type:'rate_limit_error', message:'overloaded' } })); };
+        try{ await aiCall('busy probe '+Date.now(), 50); } catch(e){}
+        if(calls<2) throw new Error('an Anthropic 429 is no longer retried at all ('+calls+' call)');
+      } finally {
+        window.fetch=realFetch;
+        try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
+      }
+      if(aiRetryable(new Error('SPEND_CAP: daily ceiling')))
+        throw new Error('a spend ceiling is marked retryable');
+      if(aiRetryable(new Error('RATE_LIMIT: too many requests in the last minute')))
+        throw new Error('the Worker’s per-minute refusal is marked retryable');
+    } },
+
   { id:'ui_dark_contrast', group:'UI', name:'No panel is light-on-light in dark mode (v36.14)',
     test: async()=>{
       // Tony's report: the Meal menu was #F2EDE6 text on a hard-coded white
