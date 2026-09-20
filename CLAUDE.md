@@ -293,6 +293,30 @@ found only because a test was written first and disagreed with the code.
   is — "RATE_LIMIT" with no owner sends the reader to Anthropic's status page to
   debug a limit set in this file — and the client does not retry it, because
   four rounds of backoff cannot change the answer.
+- **A backup folder is a HANDLE, not a path (v36.20, audit F2).** Tony asked for
+  a backup location he could set. A web page cannot be handed `/home/…` — no API
+  takes a filesystem path, and one that did would be a hole rather than a
+  feature. What it can have is `showDirectoryPicker()`: the person chooses a
+  folder once, the `FileSystemDirectoryHandle` lives in IndexedDB (store
+  `handles`, db **v3** — a handle is structured-cloneable, so localStorage would
+  turn it into `"[object Object]"`), and the app writes dated snapshots into it.
+  Three things that are easy to get wrong:
+  - **Permission lapses independently of the handle.** The browser keeps the
+    handle but may drop write permission, and `requestPermission()` needs a user
+    gesture. So `backupDirPermission(handle, interactive)` has two modes, and the
+    automatic path passes `false` — it must never ask from a page load. The test
+    asserts `requestPermission` was *not called*, not merely that nothing was
+    written: a version that asks and is refused would pass the weaker check.
+  - **Pruning deletes files in someone's own folder.** It matches only the exact
+    name shape the app writes (`tonys-recipes-backup-YYYY-MM-DD.json`), keeps the
+    newest `BACKUP_KEEP`, and is tested against a folder holding a tax return.
+  - **Falling back must be audible.** If the folder write fails, `backupSave`
+    downloads instead and says so — a file appearing somewhere the person was not
+    expecting, silently, is the failure this item exists to remove. Browsers
+    without the API (Firefox, everything on iOS) simply always download.
+  The nudge now escalates: toast at 30 days, a toast that stays at 60, a dialog
+  at 90 — and the dialog asks at most once a day, because a dialog on every
+  reload trains the reader to dismiss it without looking.
 - **The CSP must stay in step with the script hosts.** `script-src` lists the CDN
   hosts `loadScriptOnce()` uses; adding a lazily loaded library without adding its
   host makes it fail silently. `frame-src` needs `'self'` for the email preview's

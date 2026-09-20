@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.19 -->
+<!-- Tony's Recipes Collection v36.20 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -749,7 +749,7 @@ function renderLoggingPanel() {
      + 'will never run it does not carry it. Switching this on shows 🧪 Self Test in ⚙️ Settings and fetches '
      + 'the file the first time you open it. <strong>This setting is per device.</strong></div></div>';
 
-  // 1a2 — the relay consent, per device (v36.19)
+  // 1a2 — the relay consent, per device (v36.20)
   var _pc = proxyConsentState();
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
      + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
@@ -3105,7 +3105,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.19';
+var APP_VERSION = 'v36.20';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5588,7 +5588,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.19</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.20</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5608,6 +5608,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
           <button class="drop-item" id="selfTestMenuItem" style="display:none;" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
@@ -6193,7 +6194,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.19</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.20</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10717,7 +10718,7 @@ function aiCacheKey(prompt, maxTokens, model, system){
   // FNV-1a — a short stable digest, so the cache holds keys not whole prompts.
   // The MODEL is part of the key: since v36.15 two models are in play, and a
   // Haiku answer must never be served for a Sonnet request. So is the SYSTEM
-  // prompt (v36.19) — the same question under different standing instructions
+  // prompt (v36.20) — the same question under different standing instructions
   // is a different question, and leaving it out would serve one answer for both.
   var s = (model || AI_MODEL) + '|' + maxTokens + '|' + (system || '') + '|' + prompt, h = 2166136261;
   for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -10755,7 +10756,7 @@ function clearAiCache(){
 window.aiCacheKey = aiCacheKey; window.aiCacheGet = aiCacheGet;
 window.aiCachePut = aiCachePut; window.clearAiCache = clearAiCache;
 
-// `system` (v36.19) is standing instructions — who the model is and what it may
+// `system` (v36.20) is standing instructions — who the model is and what it may
 // do — and belongs in its own block, not spliced into the user's turn. The old
 // shape was literally 'System: ' + INSTRUCTIONS + '\n\nUser: ' + question, which
 // means a question (or a page of imported text) containing the word "System:"
@@ -10805,7 +10806,7 @@ function aiRetryable(e) {
   // mistake this function exists to prevent, reintroduced by its own new guard.
   if (m.indexOf('TRUNCATED:') === 0) return false;
   if (m.indexOf('BILLING:') === 0 || m.indexOf('API_KEY:') === 0) return false;
-  // v36.19 — our own Worker's refusals. A ceiling on the bill and a per-minute
+  // v36.20 — our own Worker's refusals. A ceiling on the bill and a per-minute
   // cap are both decisions, not outages: retrying either just spends 30 seconds
   // arriving at the same answer. Anthropic's own 429 is handled separately and
   // IS retried, because that one genuinely clears.
@@ -10857,7 +10858,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
       });
 
       if (r.status === 429 || r.status === 529) {
-        // v36.19 — tell OUR Worker's refusal apart from Anthropic's.
+        // v36.20 — tell OUR Worker's refusal apart from Anthropic's.
         // Anthropic being busy is worth waiting out. Our own Worker saying
         // "that is the daily ceiling on the bill" is not: retrying it is four
         // more rounds of exponential backoff behind the same spinner, and the
@@ -11109,7 +11110,7 @@ function askConfirm(opts) {
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
             + ' placeholder="' + escA(opts.placeholder || '') + '">'
           : '')
-      // v36.19 — an optional "don't ask again" tick. Only a caller that passes
+      // v36.20 — an optional "don't ask again" tick. Only a caller that passes
       // `checkbox` gets the {ok, checked} return shape; everyone else still
       // gets a plain true/false, so no existing caller changes.
       + (opts.checkbox
@@ -11641,7 +11642,7 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
 window.linkPickPrompt = linkPickPrompt;
 window.extractRecipesFromLinks = extractRecipesFromLinks;
 
-// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.19) ──────────────────
+// ─── CONSENT BEFORE A THIRD-PARTY PROXY SEES A URL (v36.20) ──────────────────
 // When our own Worker cannot fetch a page, the import can fall back to three
 // public CORS proxies. They are not ours: they see every URL imported through
 // them, and they choose what HTML comes back. v36.17 made that HTML inert, so
@@ -11931,7 +11932,7 @@ async function runUrlImport() {
     }
     if (built.kind === 'none') throw (typeof textErr !== 'undefined' && textErr) || new Error('no recipe found');
     if (_pageWasTruncated) built.recipe._truncated = true;
-    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.19 — say where this came from
+    if (_pageViaProxy) built.recipe._viaProxy = _pageViaProxy;   // v36.20 — say where this came from
     // Just the count: the preview's own sentence supplies "of these", so
     // passing "1 of 3" here read "1 of 3 of these could not be read".
     if (parsed._partial) built.recipe._partial = parsed._partial;
@@ -12031,7 +12032,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
   // A long article is extracted one recipe at a time (v36.1). If some of those
   // calls failed, the list is short by exactly that many — and a list of 8 that
   // should have been 10 looks identical to a list of 8. Say the number.
-  // v36.19 — this text did not come from our own server. Not a warning, a fact
+  // v36.20 — this text did not come from our own server. Not a warning, a fact
   // worth knowing if the recipe reads oddly.
   var relay = parsed._viaProxy
     ? '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
@@ -12571,7 +12572,8 @@ const NEXTID_KEY  = 'tonys_nextId_v1';
 // Photos stay inline in the in-memory `recipes` array, so rendering / backup / export
 // are unchanged. If IndexedDB is unavailable (e.g. private mode) we fall back to the
 // old inline-in-localStorage behaviour.
-var IDB_NAME = 'tonys_recipes_db', IDB_STORE = 'photos', IDB_WA_STORE = 'wachats', IDB_VERSION = 2, _idbReadyPromise = null;
+var IDB_NAME = 'tonys_recipes_db', IDB_STORE = 'photos', IDB_WA_STORE = 'wachats',
+    IDB_HANDLE_STORE = 'handles', IDB_VERSION = 3, _idbReadyPromise = null;
 var _idbAvailable = (typeof indexedDB !== 'undefined' && indexedDB !== null);
 var _idbPhotoStamps = {}; // id -> signature of last-written photos (skip unchanged writes)
 
@@ -12589,6 +12591,10 @@ function idbOpen() {
         // v2: WhatsApp chat exports (3.9). Kept out of Firestore/localStorage —
         // a year of group chat is megabytes and belongs nowhere near the 1 MiB doc.
         if (!db.objectStoreNames.contains(IDB_WA_STORE)) db.createObjectStore(IDB_WA_STORE, { keyPath: 'id' });
+        // v3 (v36.20): FileSystemDirectoryHandle for the backup folder. A handle
+        // is structured-cloneable, so IndexedDB is the only place it can live —
+        // localStorage holds strings and would turn it into "[object Object]".
+        if (!db.objectStoreNames.contains(IDB_HANDLE_STORE)) db.createObjectStore(IDB_HANDLE_STORE, { keyPath: 'id' });
       };
       req.onsuccess = function(e) { resolve(e.target.result); };
       req.onerror   = function() { _idbAvailable = false; reject(req.error); };
@@ -18429,6 +18435,243 @@ window.waSearch = waSearch; window.waBuildContext = waBuildContext; window.waInd
 // it is a nudge with a button, not a modal, and never claims a backup happened.
 var BACKUP_AT_KEY  = 'tonys_last_backup_at';
 var BACKUP_MAX_AGE = 30 * 24 * 60 * 60 * 1000;   // 30 days
+
+// ─── A BACKUP FOLDER, AND DATED SNAPSHOTS IN IT (v36.20) ─────────────────────
+// Audit item F2. Until now a backup happened only when someone remembered to
+// press a button, and it landed in the browser's download folder under a name
+// the next one would collide with. The clip incident is what that costs: a
+// recipe gone from the list AND from the cloud, with the only recovery a file
+// somebody had thought to keep.
+//
+// Tony asked for a backup LOCATION he could set. A web page cannot be handed a
+// filesystem path — there is no API that takes '/home/rozinante/…' and writes
+// there, and one that did would be a hole rather than a feature. What it can
+// have is a folder the person picks once: the File System Access API returns a
+// handle, the handle survives in IndexedDB, and from then on the app writes into
+// that folder directly, with no download bar and no overwriting.
+//
+// Chrome and Edge on the desktop have it. Firefox and every browser on iOS do
+// not, and there Backup — Save still saves through the download folder exactly
+// as before. The feature is an upgrade where it exists, never a dead end where
+// it does not.
+var BACKUP_DIR_ID   = 'backupDir';               // record id in the handles store
+var BACKUP_AUTO_KEY = 'tonys_backup_auto_at';    // when the folder last received one
+var BACKUP_EVERY_MS = 7 * 24 * 60 * 60 * 1000;   // a week
+var BACKUP_KEEP     = 12;                        // dated snapshots kept in the folder
+
+function backupFolderSupported() { return typeof window.showDirectoryPicker === 'function'; }
+function idbHandleStore(mode) {
+  return idbOpen().then(function(db) { return db.transaction(IDB_HANDLE_STORE, mode).objectStore(IDB_HANDLE_STORE); });
+}
+function backupDirSave(handle) {
+  return idbHandleStore('readwrite').then(function(s) { return new Promise(function(res, rej) {
+    var r = s.put({ id: BACKUP_DIR_ID, handle: handle, name: handle ? handle.name : '' });
+    r.onsuccess = function(){ res(); }; r.onerror = function(){ rej(r.error); }; }); });
+}
+function backupDirLoad() {
+  if (!_idbAvailable) return Promise.resolve(null);
+  return idbHandleStore('readonly').then(function(s) { return new Promise(function(res) {
+    var r = s.get(BACKUP_DIR_ID);
+    r.onsuccess = function(){ res(r.result || null); };
+    r.onerror   = function(){ res(null); }; }); })
+    .catch(function(){ return null; });
+}
+function backupDirForget() {
+  return idbHandleStore('readwrite').then(function(s) { return new Promise(function(res) {
+    var r = s.delete(BACKUP_DIR_ID); r.onsuccess = function(){ res(); }; r.onerror = function(){ res(); }; }); })
+    .catch(function(){});
+}
+
+// A handle stored yesterday is not automatically usable today: the browser keeps
+// the handle but may have dropped the PERMISSION, and asking for it back needs a
+// user gesture. Hence two modes. `interactive` may prompt and is only ever
+// reached from a button. The silent form is what the automatic backup uses, and
+// it gives up quietly rather than throwing a permission prompt at someone who
+// was only opening their recipes.
+async function backupDirPermission(handle, interactive) {
+  if (!handle) return 'denied';
+  if (!handle.queryPermission) return 'granted';          // older shape: assume usable
+  try {
+    var st = await handle.queryPermission({ mode: 'readwrite' });
+    if (st === 'granted') return 'granted';
+    if (!interactive) return st;
+    return await handle.requestPermission({ mode: 'readwrite' });
+  } catch(e) { return 'denied'; }
+}
+
+async function chooseBackupFolder() {
+  if (!backupFolderSupported()) {
+    await askConfirm({ icon: '\u{1F4C1}', title: 'Not available in this browser',
+      message: 'Choosing a backup folder needs the File System Access API, which this browser does '
+        + 'not have. Chrome and Edge on a computer do.\n\nBackup — Save still works here: it '
+        + 'saves through the normal download folder.',
+      okLabel: 'I see', cancelLabel: 'Close' });
+    return false;
+  }
+  var dir;
+  try { dir = await window.showDirectoryPicker({ id: 'tonysRecipesBackups', mode: 'readwrite' }); }
+  catch(e) { return false; }                     // the picker was dismissed — not an error
+  if (await backupDirPermission(dir, true) !== 'granted') {
+    toast('❌ Without permission to write there, that folder cannot be used');
+    return false;
+  }
+  try { await backupDirSave(dir); }
+  catch(e) { toast('❌ Could not remember that folder: ' + e.message); return false; }
+  toast('✅ Backups will be written to "' + dir.name + '"');
+  renderBackupPanel();
+  return true;
+}
+async function forgetBackupFolder() {
+  await backupDirForget();
+  toast('Backup folder cleared — Backup — Save will use the download folder again');
+  renderBackupPanel();
+}
+
+// Write one dated snapshot into the folder and prune the old ones. Returns the
+// filename written, or throws — a caller that cannot say what happened is how a
+// backup comes to be trusted without existing.
+async function writeBackupToFolder(handle, json) {
+  var name = 'tonys-recipes-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  var fh = await handle.getFileHandle(name, { create: true });
+  var w  = await fh.createWritable();
+  await w.write(json);
+  await w.close();
+  await pruneBackupFolder(handle);
+  return name;
+}
+// Dated snapshots are the point — one file per day, so a mistake noticed a week
+// later can still be undone. They cannot grow without limit, so the oldest go
+// once there are more than BACKUP_KEEP. Only this app's own files are ever
+// touched, matched on the exact name shape it writes: the folder is the
+// person's, and deleting anything else in it would be unforgivable.
+async function pruneBackupFolder(handle) {
+  if (!handle.entries) return [];
+  var mine = [];
+  try {
+    for await (var ent of handle.entries()) {
+      if (/^tonys-recipes-backup-\d{4}-\d{2}-\d{2}\.json$/.test(ent[0])) mine.push(ent[0]);
+    }
+  } catch(e) { return []; }
+  mine.sort();                                   // the name sorts by date
+  var drop = mine.slice(0, Math.max(0, mine.length - BACKUP_KEEP));
+  for (var i = 0; i < drop.length; i++) { try { await handle.removeEntry(drop[i]); } catch(e) {} }
+  return drop;
+}
+
+function lastAutoBackupAt() {
+  try { var v = parseInt(localStorage.getItem(BACKUP_AUTO_KEY), 10); return isNaN(v) ? null : v; } catch(e) { return null; }
+}
+function markAutoBackup() { try { localStorage.setItem(BACKUP_AUTO_KEY, String(Date.now())); } catch(e) {} }
+
+// The automatic one. Deliberately quiet: it runs only when a folder is already
+// connected AND still permitted, it never prompts, and it reports in a toast
+// rather than a modal. If anything is missing it does nothing at all and leaves
+// the overdue nudge to do its job. Returns a reason string, so a test can tell
+// the several kinds of "did nothing" apart.
+async function autoBackupIfDue() {
+  var rec = await backupDirLoad();
+  if (!rec || !rec.handle) return 'no folder connected';
+  // The bar here is "anything at all", not the `> 5` that governs the NUDGE.
+  // That threshold exists so seed data does not nag; this writes a file into a
+  // folder nobody is looking at, which is not an interruption, and four recipes
+  // are still four recipes.
+  if (!recipes || !recipes.length) return 'nothing to back up';
+  var at = lastAutoBackupAt();
+  if (at !== null && (Date.now() - at) < BACKUP_EVERY_MS) return 'not due yet';
+  if (await backupDirPermission(rec.handle, false) !== 'granted') return 'permission needs a click';
+  try {
+    var name = await writeBackupToFolder(rec.handle, backupJson());
+    markAutoBackup(); markBackupTaken();
+    toast('\u{1F4BE} Backed up to "' + rec.name + '/' + name + '"', 6000);
+    return 'written';
+  } catch(e) {
+    // A failed automatic backup must be audible. Silence here is the exact
+    // failure this whole item exists to remove.
+    toast('⚠️ Automatic backup failed: ' + (e && e.message ? e.message : String(e)), 9000);
+    return 'failed';
+  }
+}
+// ─── THE BACKUPS PANEL (v36.20) ──────────────────────────────────────────────
+// It has to answer one question before anything else: when did a backup last
+// happen, and where did it go? Two buttons at the bottom of a dropdown could
+// not, and a safety net nobody can check the state of is a safety net nobody
+// trusts.
+async function showBackupPanel() {
+  await renderBackupPanel();
+  document.getElementById('backupOverlay').classList.add('open');
+}
+async function renderBackupPanel() {
+  var host = document.getElementById('backupBody');
+  if (!host) return;
+  var rec = null;
+  try { rec = await backupDirLoad(); } catch(e) {}
+  var perm = rec && rec.handle ? await backupDirPermission(rec.handle, false) : 'denied';
+  var days = backupAgeDays();
+  var supported = backupFolderSupported();
+
+  var ageText, ageColour;
+  if (days === null)      { ageText = 'No backup has been taken on this device'; ageColour = 'var(--danger)'; }
+  else if (days === 0)    { ageText = 'Last backup: today'; ageColour = 'var(--muted)'; }
+  else if (days === 1)    { ageText = 'Last backup: yesterday'; ageColour = 'var(--muted)'; }
+  else                    { ageText = 'Last backup: ' + days + ' days ago';
+                            ageColour = days >= BACKUP_NAG_STICKY_DAYS ? 'var(--danger)' : 'var(--muted)'; }
+
+  var h = '';
+  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+     + '<div style="font-size:14px;font-weight:600;color:' + ageColour + ';">' + escH(ageText) + '</div>'
+     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+     + escH(String(recipes ? recipes.length : 0)) + ' recipes would be written. A backup holds every '
+     + 'photo inside it, so restoring it years from now depends on nothing.</div></div>';
+
+  // The folder.
+  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+     + '<div style="font-size:14px;font-weight:600;">Backup folder</div>';
+  if (!supported) {
+    h += '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+       + 'This browser cannot be given a folder to write into — that needs the File System Access '
+       + 'API, which Chrome and Edge on a computer have. Backup — Save here goes to your normal '
+       + 'download folder, which works fine; it just will not happen by itself.</div>';
+  } else if (rec && rec.handle) {
+    h += '<div style="font-size:13px;margin-top:6px;">\u{1F4C1} <strong>' + escH(rec.name || '(folder)') + '</strong></div>'
+       + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+       + (perm === 'granted'
+          ? 'A dated snapshot is written here automatically, at most once a week, and the newest '
+            + BACKUP_KEEP + ' are kept.'
+          : '⚠️ This browser has forgotten permission to write there. Press <strong>Back up '
+            + 'now</strong> once and it will ask for it back — until then nothing is written '
+            + 'automatically.')
+       + '</div>'
+       + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
+       + '<button class="ask-btn ghost" style="flex:0 0 auto;" onclick="chooseBackupFolder()">Change folder…</button>'
+       + '<button class="ask-btn ghost" style="flex:0 0 auto;" onclick="forgetBackupFolder()">Forget it</button>'
+       + '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+       + 'Not set. Choose one and the app writes a dated snapshot into it automatically, at most '
+       + 'once a week — no download bar, and yesterday’s file stays yesterday’s file.'
+       + '</div>'
+       + '<div style="margin-top:10px;">'
+       + '<button class="ask-btn" style="flex:0 0 auto;" onclick="chooseBackupFolder()">Choose a folder…</button>'
+       + '</div>';
+  }
+  h += '</div>';
+
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+     + '<button class="ask-btn" onclick="backupSave().then(renderBackupPanel)">\u{1F4BE} Back up now</button>'
+     + '<button class="ask-btn ghost" onclick="backupRestore()">\u{1F4C2} Restore from a file…</button>'
+     + '</div>';
+  host.innerHTML = h;
+}
+window.showBackupPanel = showBackupPanel; window.renderBackupPanel = renderBackupPanel;
+
+window.backupFolderSupported = backupFolderSupported;
+window.chooseBackupFolder = chooseBackupFolder;
+window.forgetBackupFolder = forgetBackupFolder;
+window.backupDirLoad = backupDirLoad;
+window.autoBackupIfDue = autoBackupIfDue;
+window.pruneBackupFolder = pruneBackupFolder;
+window.writeBackupToFolder = writeBackupToFolder;
+window.lastAutoBackupAt = lastAutoBackupAt;
 function getLastBackupAt() {
   try { var v = parseInt(localStorage.getItem(BACKUP_AT_KEY), 10); return isNaN(v) ? null : v; } catch(e) { return null; }
 }
@@ -18442,17 +18685,61 @@ function backupIsOverdue() {
   var at = getLastBackupAt();
   return at === null || (Date.now() - at) > BACKUP_MAX_AGE;
 }
-function checkBackupOverdue() {
+// v36.20 — the nudge escalates. A toast is gone in twelve seconds and is easy to
+// be busy during, and the audit's point (F2) is that the reminder should get
+// harder to ignore the longer it has been, because that is exactly when it
+// matters most. Three steps, and never more than one interruption per start:
+//   30 days   a toast with a button, as before
+//   60 days   a toast that stays until it is dismissed
+//   90 days   a dialog — three months with no backup is a real risk
+// A device with a backup folder connected has already been backed up
+// automatically by the time this runs, so none of it fires there.
+var BACKUP_NAG_STICKY_DAYS = 60;
+var BACKUP_NAG_MODAL_DAYS  = 90;
+function backupNagLevel(days) {
+  if (days === null) return 'toast';          // never backed up here — start gently
+  if (days >= BACKUP_NAG_MODAL_DAYS)  return 'modal';
+  if (days >= BACKUP_NAG_STICKY_DAYS) return 'sticky';
+  return 'toast';
+}
+async function checkBackupOverdue() {
+  // Try the automatic one first. If it writes, there is nothing left to nag about.
+  try { if (await autoBackupIfDue() === 'written') return; } catch(e) {}
   if (!backupIsOverdue()) return;
   var days = backupAgeDays();
   var msg = days === null
     ? '\u{1F4BE} No backup taken on this device yet'
     : '\u{1F4BE} Last backup was ' + days + ' days ago';
-  toastAction(msg, 'Back up now', function(){ backupSave(); }, 12000);
+  var level = backupNagLevel(days);
+  if (level === 'modal' && backupNaggedToday()) level = 'sticky';
+  if (level === 'modal') {
+    var ok = await askConfirm({
+      icon: '\u{1F4BE}', title: 'It has been ' + days + ' days since a backup',
+      message: 'Your recipes are in the cloud, so a lost phone is not the risk. The risk is a '
+        + 'deletion — something removed from the list is removed from the cloud too, and then '
+        + 'the only way back is a backup file.\n\nThis takes a couple of seconds.',
+      okLabel: 'Back up now', cancelLabel: 'Not now' });
+    if (ok) backupSave();
+    else markBackupNagged();          // asked and answered; do not ask again today
+    return;
+  }
+  toastAction(msg, 'Back up now', function(){ backupSave(); }, level === 'sticky' ? 0 : 12000);
+}
+// The modal asks once a day at most. Without this, "Not now" on a 200-day-old
+// backup means a dialog on every single reload, which trains the reader to
+// dismiss it without looking — the opposite of what escalating is for.
+var BACKUP_NAG_KEY = 'tonys_backup_nagged_at';
+function markBackupNagged() { try { localStorage.setItem(BACKUP_NAG_KEY, String(Date.now())); } catch(e) {} }
+function backupNaggedToday() {
+  try {
+    var v = parseInt(localStorage.getItem(BACKUP_NAG_KEY), 10);
+    return !isNaN(v) && (Date.now() - v) < 24*60*60*1000;
+  } catch(e) { return false; }
 }
 window.getLastBackupAt = getLastBackupAt;
 window.backupIsOverdue = backupIsOverdue;
 window.backupAgeDays   = backupAgeDays;
+window.backupNagLevel  = backupNagLevel;
 
 // A backup must stay SELF-CONTAINED. Once photos live in Firebase Storage,
 // `r.photo` is an https URL, and a backup holding URLs would silently depend on
@@ -18466,25 +18753,56 @@ window.backupAgeDays   = backupAgeDays;
 // (`inlinePhotosForBackup` / `_backup_photo` / `clearBackupInlines`). With the
 // Storage path gone a photo is only ever '' or a data: URL, and the round trip
 // with it. If a remote photo shape is ever reintroduced, this has to come back.
+// v36.20 \u2014 split out of backupSave so the automatic backup and the button write
+// byte-identical files. Two code paths each producing "a backup" is how one of
+// them quietly comes to produce a different, worse one.
+function backupPayload() {
+  var photoMap={}; var photoIndex=0;
+  var exportRecipes=recipes.map(function(r){
+    var rec=JSON.parse(JSON.stringify(r));
+    if(rec.photo&&rec.photo.startsWith('data:')){ if(photoMap[rec.photo]!==undefined){rec.photo='__photo__'+photoMap[rec.photo];}else{var k=photoIndex++;photoMap[rec.photo]=k;rec.photo='__photo__'+k;} }
+    if(rec.originalPhoto&&rec.originalPhoto.startsWith('data:')){ if(photoMap[rec.originalPhoto]!==undefined){rec.originalPhoto='__photo__'+photoMap[rec.originalPhoto];}else{var k2=photoIndex++;photoMap[rec.originalPhoto]=k2;rec.originalPhoto='__photo__'+k2;} }
+    return rec;
+  });
+  var photos={}; Object.keys(photoMap).forEach(function(b64){ photos[String(photoMap[b64])]=b64; });
+  return {version:1,exportedAt:new Date().toISOString(),nextId:nextId,recipes:exportRecipes,photos:photos,settings:{viewMode:viewMode}};
+}
+function backupJson() { return JSON.stringify(backupPayload(), null, 2); }
+window.backupPayload = backupPayload; window.backupJson = backupJson;
+
 async function backupSave() {
   try {
-    var photoMap={}; var photoIndex=0;
-    var exportRecipes=recipes.map(function(r){
-      var rec=JSON.parse(JSON.stringify(r));
-      if(rec.photo&&rec.photo.startsWith('data:')){ if(photoMap[rec.photo]!==undefined){rec.photo='__photo__'+photoMap[rec.photo];}else{var k=photoIndex++;photoMap[rec.photo]=k;rec.photo='__photo__'+k;} }
-      if(rec.originalPhoto&&rec.originalPhoto.startsWith('data:')){ if(photoMap[rec.originalPhoto]!==undefined){rec.originalPhoto='__photo__'+photoMap[rec.originalPhoto];}else{var k2=photoIndex++;photoMap[rec.originalPhoto]=k2;rec.originalPhoto='__photo__'+k2;} }
-      return rec;
-    });
-    var photos={}; Object.keys(photoMap).forEach(function(b64){ photos[String(photoMap[b64])]=b64; });
-    var backup={version:1,exportedAt:new Date().toISOString(),nextId:nextId,recipes:exportRecipes,photos:photos,settings:{viewMode:viewMode}};
+    var payload = backupPayload();
+    var json = JSON.stringify(payload, null, 2);
+    var nPhotos = Object.keys(payload.photos).length;
+
+    // v36.20 \u2014 if a folder has been chosen, write there. It keeps dated
+    // snapshots, so yesterday's file is still yesterday's file, and nothing
+    // lands in the download bar. Falling back to the download is not a failure
+    // state: it is what every browser without the File System Access API does.
+    var rec = await backupDirLoad();
+    if (rec && rec.handle && await backupDirPermission(rec.handle, true) === 'granted') {
+      try {
+        var name = await writeBackupToFolder(rec.handle, json);
+        markBackupTaken(); markAutoBackup();
+        toast('\u2705 Backup saved to "' + rec.name + '/' + name + '" \u2014 '
+          + recipes.length + ' recipes, ' + nPhotos + ' photos', 7000);
+        return;
+      } catch(e) {
+        // Say which one failed and that the download is a fallback, rather than
+        // letting a file appear somewhere the person was not expecting.
+        toast('\u26a0\ufe0f Could not write to "' + rec.name + '" (' + e.message
+          + ') \u2014 saving to your downloads instead', 9000);
+      }
+    }
+
     markBackupTaken();
-    var json=JSON.stringify(backup,null,2);
     var blob=new Blob([json],{type:'application/json'});
     var url=URL.createObjectURL(blob); var a=document.createElement('a');
     var date=new Date().toISOString().slice(0,10);
     a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    toast('\u2705 Backup saved! '+recipes.length+' recipes, '+(Object.keys(photos).length)+' photos');
+    toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos');
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
 }
 
@@ -19015,7 +19333,16 @@ window.updateFilterBarTop = updateFilterBarTop;
   labelIconButtons();          // a11y: give the ✕ / heart buttons an accessible name
   applySelfTestVisibility();   // v36.15 — 🧪 Self Test only where this device asked for it
   ensureSignInReachable();     // v31.5 — never leave "sign in" as unclickable text
-  setTimeout(checkBackupOverdue, 6000);   // 5d.1 — after the app has settled
+  // 5d.1 — after the app has settled. v36.20: this is now async (it may write an
+  // automatic backup first), so its rejection has to go somewhere. An unhandled
+  // one in a setTimeout is invisible, and a backup that failed invisibly is the
+  // whole problem this item exists to fix.
+  setTimeout(function(){
+    Promise.resolve().then(checkBackupOverdue).catch(function(e){
+      dlog('[backup] overdue check failed', e);
+      syncLog('error', 'Backup check failed', (e && e.message) || String(e));
+    });
+  }, 6000);
   // If we have local data, show it immediately and hide login screen
   // Firebase auth will update this state asynchronously
   if (hasLocal) {
@@ -19151,6 +19478,24 @@ window.updateFilterBarTop = updateFilterBarTop;
     </div>
     <div class="modal-body" style="padding:0 16px 20px;">
       <div id="loggingBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- v36.20 — backups get their own screen. They were two items buried at the
+     bottom of the Import/Export dropdown, which is where a safety net goes to be
+     forgotten, and there was nowhere to say when the last one happened. -->
+<div class="modal-overlay" id="backupOverlay" onclick="bgClose(event,'backupOverlay')">
+  <div class="modal" style="max-width:520px;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      <button onclick="closeM('backupOverlay')" aria-label="Close" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
+    </div>
+    <div class="modal-header" style="margin-top:-8px;">
+      <div class="modal-header-title">💾 Backups</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">A file you hold, independent of the cloud</div>
+    </div>
+    <div class="modal-body" style="padding:0 16px 20px;">
+      <div id="backupBody"></div>
     </div>
   </div>
 </div>

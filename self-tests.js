@@ -828,6 +828,151 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'safety_backup_folder', group:'Backup', name:'A chosen folder gets dated snapshots, and only ours are pruned (v36.20)',
+    test: async()=>{
+      ['chooseBackupFolder','forgetBackupFolder','backupDirLoad','autoBackupIfDue',
+       'writeBackupToFolder','pruneBackupFolder','backupJson','backupNagLevel'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // A fake directory handle. The File System Access API is not available in
+      // every browser this suite runs in, and even where it is, a real picker
+      // needs a click — so drive the shape the code actually uses.
+      function fakeDir(names){
+        var files = {};
+        (names||[]).forEach(function(n){ files[n] = ''; });
+        return {
+          name:'Backups', files: files, removed: [], wrote: null,
+          async queryPermission(){ return 'granted'; },
+          async getFileHandle(n){ var self=this; return { async createWritable(){ return {
+            async write(d){ self.wrote = { name:n, data:d }; },
+            async close(){ self.files[n] = self.wrote ? self.wrote.data : ''; } }; } }; },
+          async removeEntry(n){ this.removed.push(n); delete this.files[n]; },
+          entries: function(){
+            var ks = Object.keys(files), i = 0;
+            return { [Symbol.asyncIterator]: function(){ return { next: async function(){
+              return i < ks.length ? { value:[ks[i++], {}], done:false } : { value:undefined, done:true };
+            } }; } };
+          }
+        };
+      }
+
+      // (1) A write lands under today's date and holds the real backup.
+      var d = fakeDir([]);
+      var name = await writeBackupToFolder(d, backupJson());
+      var today = new Date().toISOString().slice(0,10);
+      if(name !== 'tonys-recipes-backup-'+today+'.json')
+        throw new Error('the snapshot is not named for today: '+name);
+      var parsed = JSON.parse(d.files[name] || '{}');
+      if(!Array.isArray(parsed.recipes) || parsed.recipes.length !== recipes.length)
+        throw new Error('the file written is not a real backup ('+(parsed.recipes||[]).length+' recipes)');
+      if(!parsed.version) throw new Error('the written backup has no version field, so restore would refuse it');
+
+      // (2) Pruning keeps the newest and touches NOTHING else. The folder is the
+      // person's; deleting anything in it that is not ours would be unforgivable.
+      var old = [];
+      for(var i=1; i<=BACKUP_KEEP+4; i++)
+        old.push('tonys-recipes-backup-2020-01-' + String(i).padStart(2,'0') + '.json');
+      var mixed = old.concat(['my-tax-return.json','tonys-recipes-backup-notadate.json','holiday.jpg']);
+      var d2 = fakeDir(mixed);
+      var dropped = await pruneBackupFolder(d2);
+      if(dropped.length !== 4) throw new Error('expected 4 old snapshots to go, got '+dropped.length);
+      if(dropped.join()!==old.slice(0,4).join()) throw new Error('the wrong ones were dropped: '+dropped.join());
+      ['my-tax-return.json','tonys-recipes-backup-notadate.json','holiday.jpg'].forEach(function(f){
+        if(d2.removed.indexOf(f)!==-1) throw new Error('pruning deleted "'+f+'", which is not ours');
+      });
+      if(Object.keys(d2.files).length !== BACKUP_KEEP + 3)
+        throw new Error('after pruning the folder holds '+Object.keys(d2.files).length+' files, expected '+(BACKUP_KEEP+3));
+      // The newest must survive — pruning that eats the backup it just wrote is
+      // worse than no pruning at all.
+      var newest = old[old.length-1];
+      if(d2.removed.indexOf(newest)!==-1) throw new Error('pruning deleted the newest snapshot');
+      var d2b = fakeDir(old.slice(0, BACKUP_KEEP));
+      var justWrote = await writeBackupToFolder(d2b, backupJson());
+      if(!d2b.files[justWrote]) throw new Error('the snapshot it had just written was pruned away');
+
+      // (3) The automatic one never writes without a folder, and never twice in
+      // a week. Both were the point: it must be quiet, not eager.
+      var prevAuto=null; try{ prevAuto=localStorage.getItem(BACKUP_AUTO_KEY); }catch(e){}
+      var realLoad = window.backupDirLoad, realToast = window.toast;
+      try{
+        window.toast=function(){};
+        window.backupDirLoad = function(){ return Promise.resolve(null); };
+        try{ localStorage.removeItem(BACKUP_AUTO_KEY); }catch(e){}
+        if(await autoBackupIfDue() !== 'no folder connected')
+          throw new Error('with no folder connected the automatic backup did something');
+
+        var d3 = fakeDir([]);
+        window.backupDirLoad = function(){ return Promise.resolve({ handle:d3, name:'Backups' }); };
+        if(await autoBackupIfDue() !== 'written') throw new Error('a connected folder did not receive a backup');
+        if(!Object.keys(d3.files).length) throw new Error('it reported success without writing a file');
+        if(await autoBackupIfDue() !== 'not due yet')
+          throw new Error('it backed up twice in a row — it would write on every single app start');
+
+        // A folder whose permission has lapsed must NOT prompt from a page load.
+        // The prompt must not even be ASKED for: requestPermission outside a
+        // user gesture is rejected by the browser anyway, and a permission
+        // dialog thrown at someone who was only opening their recipes is the
+        // behaviour this silent path exists to avoid. So the assertion is that
+        // it was never called, not merely that nothing was written — a version
+        // that asks and is refused would pass the weaker check.
+        var d4 = fakeDir([]), asked = false;
+        d4.queryPermission = async function(){ return 'prompt'; };
+        d4.requestPermission = async function(){ asked = true; return 'granted'; };
+        window.backupDirLoad = function(){ return Promise.resolve({ handle:d4, name:'Backups' }); };
+        try{ localStorage.removeItem(BACKUP_AUTO_KEY); }catch(e){}
+        var why = await autoBackupIfDue();
+        if(asked) throw new Error('the automatic backup asked for permission from a page load');
+        if(why !== 'permission needs a click')
+          throw new Error('a lapsed permission did not stop the silent backup (got "'+why+'")');
+        if(Object.keys(d4.files).length) throw new Error('it wrote without permission');
+      } finally {
+        window.backupDirLoad = realLoad; window.toast = realToast;
+        try{ if(prevAuto===null) localStorage.removeItem(BACKUP_AUTO_KEY); else localStorage.setItem(BACKUP_AUTO_KEY, prevAuto); }catch(e){}
+      }
+
+      // (3b) The BUTTON must use the folder too. If only the automatic path did,
+      // pressing Back up now would quietly keep filling the download folder
+      // while the panel claimed a folder was connected.
+      var realLoad2 = window.backupDirLoad, realToast2 = window.toast, realCreate = document.createElement.bind(document);
+      var seen = [], clicks = 0;
+      try{
+        window.toast = function(t){ seen.push(String(t)); };
+        document.createElement = function(t){ var el = realCreate(t); if(t === 'a') el.click = function(){ clicks++; }; return el; };
+        var got = null;
+        var healthy = fakeDir([]);
+        healthy.getFileHandle = async function(n){ return { async createWritable(){ return {
+          async write(d){ got = { name:n, len:d.length }; }, async close(){} }; } }; };
+        window.backupDirLoad = function(){ return Promise.resolve({ handle:healthy, name:'Backups' }); };
+        await backupSave();
+        if(!got) throw new Error('Back up now did not write into the connected folder');
+        if(clicks !== 0) throw new Error('it wrote to the folder AND started a download');
+        if(!seen.some(function(t){ return /Backup saved to "Backups\//.test(t); }))
+          throw new Error('it did not say where the file went: ' + seen.join(' | '));
+
+        // A folder that cannot be written falls back to the download AND says so.
+        seen.length = 0; clicks = 0;
+        var broken = fakeDir([]);
+        broken.getFileHandle = async function(){ throw new Error('disk is full'); };
+        window.backupDirLoad = function(){ return Promise.resolve({ handle:broken, name:'Backups' }); };
+        await backupSave();
+        if(clicks !== 1) throw new Error('a failed folder write did not fall back to a download');
+        if(!seen.some(function(t){ return /Could not write to "Backups"/.test(t) && /downloads instead/.test(t); }))
+          throw new Error('the fallback was silent — a file appeared somewhere unexpected: ' + seen.join(' | '));
+      } finally {
+        window.backupDirLoad = realLoad2; window.toast = realToast2; document.createElement = realCreate;
+        try{ if(prevAuto===null) localStorage.removeItem(BACKUP_AUTO_KEY); else localStorage.setItem(BACKUP_AUTO_KEY, prevAuto); }catch(e){}
+      }
+
+      // (4) The nudge escalates rather than staying a 12-second toast forever.
+      if(backupNagLevel(31)!=='toast')  throw new Error('a month overdue should still be a toast');
+      if(backupNagLevel(61)!=='sticky') throw new Error('two months overdue is still a disappearing toast');
+      if(backupNagLevel(120)!=='modal') throw new Error('four months overdue never interrupts');
+
+      // (5) It is reachable. A safety net behind no menu item is no safety net.
+      if(!document.querySelector('#settingsDrop button[onclick*="showBackupPanel"]'))
+        throw new Error('Backups is not in the Settings menu');
+    } },
+
   { id:'safety_orphan_sweep', group:'Cloud Sync', name:'Orphaned photo documents can be swept (5d.2)',
     test: async()=>{
       if(typeof sweepOrphanPhotos!=='function') throw new Error('sweepOrphanPhotos not defined');
