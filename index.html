@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.14 -->
+<!-- Tony's Recipes Collection v36.15 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1167,7 +1167,7 @@ async function calcNutrition(id) {
     + '. Servings: ' + (r.servings||'4') + '. '
     + 'Return ONLY JSON: {"calories":0,"protein":0,"carbs":0,"fat":0} (numbers only, per serving).';
   try {
-    var raw = await aiCall(prompt, 200);
+    var raw = await aiCall(prompt, 200, null, AI_MODEL_SMALL);   // v36.15 — a number, not judgement
     var data = extractJSON(raw);
     if (data.calories !== undefined) {
       r.nutrition = { calories: data.calories, protein: data.protein, carbs: data.carbs, fat: data.fat };
@@ -7792,6 +7792,51 @@ const SELF_TESTS = [
       }
     } },
 
+  { id:'ai_model_routing', group:'Network', name:'The right model is asked, and cached per model (v36.15)',
+    test: async()=>{
+      // Two things this pins. First, the model actually SENT — the pin was two
+      // generations old and dearer than the current one, and nothing noticed
+      // because no test ever read the request body. Second, that the cache keys
+      // on the model: a Haiku answer served for a Sonnet request would be
+      // invisible and wrong.
+      if(typeof AI_MODEL!=='string' || !AI_MODEL) throw new Error('AI_MODEL not set');
+      if(typeof AI_MODEL_SMALL!=='string' || !AI_MODEL_SMALL) throw new Error('AI_MODEL_SMALL not set');
+      if(AI_MODEL===AI_MODEL_SMALL)
+        throw new Error('the small-job model is the same as the main one — the routing saves nothing');
+      if(/sonnet-4-5|claude-3|-2024|-2025/.test(AI_MODEL))
+        throw new Error('AI_MODEL is pinned to a superseded model: '+AI_MODEL);
+
+      // The cache must not confuse the two.
+      var k1=aiCacheKey('same prompt', 100, AI_MODEL);
+      var k2=aiCacheKey('same prompt', 100, AI_MODEL_SMALL);
+      if(k1===k2) throw new Error('the cache key ignores the model — one model’s answer would be served for the other');
+
+      // Drive a real aiCall and read the body that would go to the Worker.
+      var realFetch=window.fetch, sent=[];
+      var prevCache=null;
+      try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      try{
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          sent.push(b.model);
+          return Promise.resolve({ ok:true, status:200, json:function(){
+            return Promise.resolve({ content:[{ text:'ok' }] }); } });
+        };
+        await aiCall('routing probe A '+Date.now(), 50);
+        await aiCall('routing probe B '+Date.now(), 50, null, AI_MODEL_SMALL);
+        if(sent.length!==2) throw new Error('expected 2 calls, saw '+sent.length);
+        if(sent[0]!==AI_MODEL) throw new Error('the default call asked for "'+sent[0]+'", not '+AI_MODEL);
+        if(sent[1]!==AI_MODEL_SMALL) throw new Error('the routed call asked for "'+sent[1]+'", not '+AI_MODEL_SMALL);
+      } finally {
+        window.fetch=realFetch;
+        try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
+      }
+
+      // The cache is big enough to be worth having.
+      if(AI_CACHE_MAX < 200) throw new Error('the AI cache holds only '+AI_CACHE_MAX+' entries');
+      if(AI_CACHE_TTL < 14*24*60*60*1000) throw new Error('the AI cache expires after under a fortnight');
+    } },
+
   { id:'ui_dark_contrast', group:'UI', name:'No panel is light-on-light in dark mode (v36.14)',
     test: async()=>{
       // Tony's report: the Meal menu was #F2EDE6 text on a hard-coded white
@@ -10199,13 +10244,13 @@ const SELF_TESTS = [
         if(aiCacheGet(k1)!=='the answer') throw new Error('a stored answer was not returned');
         // Expiry is honoured.
         var o=JSON.parse(localStorage.getItem('tonys_ai_cache'));
-        o[k1].at=Date.now()-(8*24*60*60*1000);
+        o[k1].at=Date.now()-(AI_CACHE_TTL+60000);   // just past it, whatever it is
         localStorage.setItem('tonys_ai_cache',JSON.stringify(o));
         if(aiCacheGet(k1)!==null) throw new Error('an entry older than the TTL must not be served');
         // The cache is capped so it can never crowd out the recipes.
-        for(var i=0;i<50;i++) aiCachePut(aiCacheKey('p'+i,2000),'v'+i);
+        for(var i=0;i<AI_CACHE_MAX+10;i++) aiCachePut(aiCacheKey('p'+i,2000),'v'+i);
         var n=Object.keys(JSON.parse(localStorage.getItem('tonys_ai_cache'))).length;
-        if(n>40) throw new Error('the cache grew past its cap: '+n+' entries');
+        if(n>AI_CACHE_MAX) throw new Error('the cache grew past its cap: '+n+' entries, max '+AI_CACHE_MAX);
       } finally {
         try{ if(saved===null) localStorage.removeItem('tonys_ai_cache'); else localStorage.setItem('tonys_ai_cache',saved); }catch(e){}
       }
@@ -11079,7 +11124,7 @@ async function photoSearchTerms(names) {
     + 'Reply with ONLY a JSON array of strings, in the same order, same length.\n\n'
     + need.map(function(n, k){ return (k + 1) + '. ' + n.text; }).join('\n');
   try {
-    var raw = await aiCall(prompt, Math.min(1000, 60 + need.length * 14));
+    var raw = await aiCall(prompt, Math.min(1000, 60 + need.length * 14), null, AI_MODEL_SMALL);
     var arr = extractJSON(raw);
     if (Array.isArray(arr)) {
       need.forEach(function(n, k){
@@ -11907,7 +11952,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.14';
+var APP_VERSION = 'v36.15';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -14387,7 +14432,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.14</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.15</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14992,7 +15037,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.14</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.15</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -19489,8 +19534,16 @@ var CDN_MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.
 // Single source of truth for the AI model. Several call sites (PDF import, the self
 // test) previously hard-coded a different id than aiCall used, so they could fail
 // independently of the rest of the app. Change it here and every path follows.
-var AI_MODEL = 'claude-sonnet-4-5-20250929';
-window.AI_MODEL = AI_MODEL;
+// v36.15 — moved off claude-sonnet-4-5-20250929, which was two generations old
+// AND more expensive: Sonnet 4.5 was $3/$15 per million tokens, Sonnet 5 is
+// $2/$10. Newer model, ~33% less per call, one line.
+var AI_MODEL = 'claude-sonnet-5';
+// The small, well-defined jobs — diet tags, a nutrition estimate, a shopping
+// name, a help answer — do not need a mid-tier model. Haiku 4.5 is $1/$5, half
+// of Sonnet 5. Anything that reads a photo, a PDF or a whole web page stays on
+// AI_MODEL: those are the calls where the difference would show.
+var AI_MODEL_SMALL = 'claude-haiku-4-5';
+window.AI_MODEL = AI_MODEL; window.AI_MODEL_SMALL = AI_MODEL_SMALL;
 
 // ─── AI RESPONSE CACHE (5.7) ─────────────────────────────────────────────────
 // Re-importing the same URL, re-translating the same recipe or re-running a
@@ -19500,13 +19553,15 @@ window.AI_MODEL = AI_MODEL;
 // and anything that failed. Entries live in localStorage under one key, capped
 // by both age and count so it can never grow into the recipe data's way.
 var AI_CACHE_KEY = 'tonys_ai_cache';
-var AI_CACHE_MAX = 40;                    // entries
-var AI_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;  // 7 days
+var AI_CACHE_MAX = 300;                    // entries (v36.15 — was 40)
+var AI_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days (v36.15 — was 7)
 var _aiCacheHits = 0, _aiCacheMisses = 0;
 
-function aiCacheKey(prompt, maxTokens){
+function aiCacheKey(prompt, maxTokens, model){
   // FNV-1a — a short stable digest, so the cache holds keys not whole prompts.
-  var s = AI_MODEL + '|' + maxTokens + '|' + prompt, h = 2166136261;
+  // The MODEL is part of the key: since v36.15 two models are in play, and a
+  // Haiku answer must never be served for a Sonnet request.
+  var s = (model || AI_MODEL) + '|' + maxTokens + '|' + prompt, h = 2166136261;
   for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36) + '-' + s.length;
 }
@@ -19542,9 +19597,9 @@ function clearAiCache(){
 window.aiCacheKey = aiCacheKey; window.aiCacheGet = aiCacheGet;
 window.aiCachePut = aiCachePut; window.clearAiCache = clearAiCache;
 
-async function aiCall(prompt, maxTokens=2000, tools=null) {
+async function aiCall(prompt, maxTokens=2000, tools=null, model=null) {
   // Cache lookup — skipped for tool calls, whose answers depend on live data.
-  var _ck = tools ? null : aiCacheKey(prompt, maxTokens);
+  var _ck = tools ? null : aiCacheKey(prompt, maxTokens, model);
   if (_ck) {
     var cached = aiCacheGet(_ck);
     if (cached !== null) {
@@ -19554,7 +19609,7 @@ async function aiCall(prompt, maxTokens=2000, tools=null) {
     }
     _aiCacheMisses++;
   }
-  return _aiCallUncached(prompt, maxTokens, tools, _ck);
+  return _aiCallUncached(prompt, maxTokens, tools, _ck, model);
 }
 // How long one AI call may wait before we stop waiting. Nothing streams through
 // the Worker — it does `await r.json()` on the whole answer — so a request that
@@ -19595,7 +19650,7 @@ function aiRetryable(e) {
 }
 window.aiTimeoutMs = aiTimeoutMs; window.aiRetryable = aiRetryable;
 
-async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
+async function _aiCallUncached(prompt, maxTokens, tools, _ck, model) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
   const WORKER_URL = WORKER_ENDPOINT;
@@ -19610,7 +19665,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const body = {
-        model: AI_MODEL,
+        model: model || AI_MODEL,
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }]
       };
@@ -24522,7 +24577,7 @@ async function askHelp() {
   var answerEl=document.getElementById('helpAnswer'); var loadingEl=document.getElementById('helpLoading');
   answerEl.style.display='none'; loadingEl.style.display='block';
   try {
-    var answer=await aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nUser: '+q+'\n\nBe concise.',400);
+    var answer=await aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nUser: '+q+'\n\nBe concise.',400,null,AI_MODEL_SMALL);
     answer=answer.trim(); answerEl.innerHTML='';
     var lines=answer.split('\n');
     lines.forEach(function(line) {
@@ -24564,7 +24619,7 @@ function showHelpDetail(topic, context) {
   card.appendChild(header); card.appendChild(body); overlay.appendChild(card);
   overlay.onclick=function(e){ if(e.target===overlay) overlay.remove(); };
   document.body.appendChild(overlay);
-  aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nThe user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',500)
+  aiCall('System: '+HELP_SYSTEM_PROMPT+'\n\nThe user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',500,null,AI_MODEL_SMALL)
     .then(function(d){ body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;'; body.textContent=d.trim(); })
     .catch(function(e){ body.textContent='Error: '+e.message; });
 }
@@ -27387,7 +27442,6 @@ function bringConfirmSend() {
 // ─── TRANSLATE ───────────────────────────────────────────────────────────────
 
 window.openBringModal  = openBringModal;
-window.sendToBring     = openBringModal; // alias for backward compat
 window.bringToggleAll  = bringToggleAll;
 window.bringConfirmSend = bringConfirmSend;
 window.openTranslate   = openTranslate;
@@ -27440,7 +27494,7 @@ async function aiTagAllDiets() {
         + 'Rules: Omnivore=no restrictions. Vegetarian=no meat/fish. Vegan=no animal products. Carnivore=meat-focused,minimal carbs. Keto=low carb,high fat.\n'
         + 'Recipe: ' + r.name + '\nIngredients: ' + r.ingredients.map(function(i){ return (i.a?i.a+' ':'')+i.n; }).join(', ') + '\n'
         + 'Respond ONLY with a JSON array e.g. ["Vegetarian","Keto"]';
-      var result = await aiCall(prompt, 80);
+      var result = await aiCall(prompt, 80, null, AI_MODEL_SMALL);   // v36.15 — a tag list
       var clean = result.replace(/```json|```/g,'').trim();
       var diets = JSON.parse(clean);
       if (Array.isArray(diets)) { r.diets = diets; tagged++; toast('Tagged ' + tagged + '/' + untagged.length + ': ' + r.name.slice(0,20)); }
