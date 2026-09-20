@@ -6361,6 +6361,48 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'sec_remote_html_is_inert', group:'Network', name:'Remote HTML never executes (v36.17)',
+    test: async()=>{
+      // A URL import can fall back to a third-party CORS proxy, and whatever it
+      // relays was parsed with `div.innerHTML`. A DETACHED div is NOT safe:
+      // measured in a browser, <img onerror> and <video onerror> both fire from
+      // a node never added to the document. That was arbitrary script in this
+      // origin — the Firestore session, the Worker app key, every recipe.
+      //
+      // Drive the payloads, do not reason about them.
+      var fired = [];
+      window.__inertProbe = function(tag){ fired.push(tag); };
+      var hostile = '<img src="x" onerror="window.__inertProbe(\'img\')">'
+        + '<video src="x" onerror="window.__inertProbe(\'video\')"></video>'
+        + '<svg onload="window.__inertProbe(\'svg\')"></svg>'
+        + '<iframe srcdoc="&lt;script&gt;parent.__inertProbe(\'iframe\')&lt;/script&gt;"></iframe>'
+        + '<p>Fry the onions slowly.</p>';
+      try{
+        var doc = new DOMParser().parseFromString(hostile, 'text/html');
+        doc.querySelectorAll('script,style,nav,footer,header,aside,iframe,noscript')
+           .forEach(function(el){ el.remove(); });
+        var text = ((doc.body && doc.body.textContent) || '').trim();
+        // Give any handler a chance to fire before concluding it did not.
+        await new Promise(function(r){ setTimeout(r, 400); });
+        if(fired.length)
+          throw new Error('remote HTML executed: ' + fired.join(', ') + ' — this is script in our origin');
+        if(text.indexOf('Fry the onions slowly')===-1)
+          throw new Error('the inert parse also lost the recipe text, so it is not a usable replacement');
+
+        // ...and the importer must not have gone back to innerHTML.
+        var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+        var proxyBlock = src.slice(src.indexOf('Fall back to browser CORS proxies'),
+                                   src.indexOf('Extract recipe from page text'));
+        if(!proxyBlock) throw new Error('could not find the CORS-proxy fallback to check');
+        // Only the FETCHED html matters here; `res.innerHTML = spinner(...)` in
+        // the same block is the app's own markup and is fine.
+        if(/\.innerHTML\s*=\s*(html|raw|body|text)\b/.test(proxyBlock))
+          throw new Error('the CORS-proxy fallback assigns fetched HTML to innerHTML again — it would execute');
+        if(proxyBlock.indexOf('DOMParser')===-1)
+          throw new Error('the CORS-proxy fallback no longer parses inertly');
+      } finally { try{ delete window.__inertProbe; }catch(e){} }
+    } },
+
   { id:'selftests_are_a_separate_download', group:'Storage', name:'The suite is not inside index.html (v36.15)',
     test: async()=>{
       // The whole point of the split: 590 KB of developer tool must not ship to

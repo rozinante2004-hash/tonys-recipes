@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.16 -->
+<!-- Tony's Recipes Collection v36.17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3090,7 +3090,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.16';
+var APP_VERSION = 'v36.17';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5570,7 +5570,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.16</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.17</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6175,7 +6175,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.16</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.17</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11748,10 +11748,24 @@ async function runUrlImport() {
           html = await r.text();
         }
         if (!html || html.length < 300) continue;
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        tmp.querySelectorAll('script,style,nav,footer,header,aside,iframe,noscript').forEach(el => el.remove());
-        pageText = (tmp.innerText || tmp.textContent || '').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim().slice(0,8000);
+        // v36.17 — DOMParser, NOT innerHTML.
+        //
+        // This is the least trustworthy input the app handles: HTML relayed by
+        // a third-party CORS proxy, from a page we did not choose. It used to
+        // go through `div.innerHTML`, and a DETACHED div is not safe — measured
+        // in a real browser, `<img src=x onerror=...>` and `<video src=x
+        // onerror=...>` both FIRE from a node that was never added to the
+        // document. That was arbitrary script in this origin, with the
+        // signed-in Firestore session, the Worker app key and every recipe
+        // behind it. The tag-stripping below ran AFTER the damage.
+        //
+        // A DOMParser document is inert: no resource loads, no handlers. Proven
+        // with the same payloads that fired through innerHTML. Same pattern the
+        // .html file importer already uses.
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        doc.querySelectorAll('script,style,nav,footer,header,aside,iframe,noscript').forEach(el => el.remove());
+        // textContent, not innerText: an inert document has no layout.
+        pageText = ((doc.body && doc.body.textContent) || '').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim().slice(0,8000);
         if (pageText.length > 100) break;
       } catch(e) {
         // A CSP violation surfaces here as a TypeError with no useful text, so
