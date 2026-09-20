@@ -67,7 +67,10 @@ jobs:
               catch (e) { bad++; console.error('inline script #' + i + ': ' + e.message); }
             }
             if (!i) { console.error('no inline scripts found at all — the matcher is broken'); process.exit(1); }
-            console.log(bad ? 'FAILED' : 'all ' + i + ' inline scripts parse');
+            // v36.15 — the suite is its own file now, and nothing else parses it.
+            try { new Function(fs.readFileSync('self-tests.js', 'utf8')); }
+            catch (e) { bad++; console.error('self-tests.js: ' + e.message); }
+            console.log(bad ? 'FAILED' : 'all ' + i + ' inline scripts parse, and self-tests.js');
             process.exit(bad ? 1 : 0);
           "
 

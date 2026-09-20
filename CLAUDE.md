@@ -1179,6 +1179,34 @@ found only because a test was written first and disagreed with the code.
     collection's values are the fallback. The one thing a part still cannot have
     is a **photo**, which is Tony's own call on storage.
 
+- **The self-test suite is a SEPARATE FILE, fetched on demand (v36.15/36.16).**
+  `self-tests.js` holds `window.SELF_TESTS`; `index.html` declares
+  `var SELF_TESTS = []` and a `loadSelfTests()` that injects the script once.
+  It was 590 KB — **36% of everything every device downloaded on every update**,
+  for a developer tool only Tony runs. Cold transfer went 1,633 KB → 1,058 KB.
+  - **`var`, not `const`.** Only a `var` global is the same binding as
+    `window.SELF_TESTS`, so the external file's assignment reaches the app's
+    references. The old code used `const` and exported it explicitly; that
+    cannot work across two scripts.
+  - **Nothing had to be exported for the split.** Both are classic scripts, so
+    they share the global scope: `var`/function declarations are window
+    properties, and top-level `let`/`const` (`CATS`, `recipes`, …) live in the
+    shared global lexical environment and are reachable by name from the suite.
+  - **Per-device setting, default OFF** (`tonys_selftests_enabled`), in
+    ⚙️ → 🪵 Logging & debugging. It hides the ⚙️ → 🧪 Self Test entry; it does not
+    forbid the feature — `openSelfTest()` offers the download to anyone who
+    reaches it another way, so the setting is never a dead end.
+  - **`tests/run-self-tests.js` must call `loadSelfTests()` first.** The app
+    deliberately never loads the suite on its own, so a runner that just reads
+    `window.SELF_TESTS` finds nothing.
+  - **A test that reads the suite's own source must fetch `self-tests.js`, not
+    `index.html`.** `test_fixtures_stay_local` scans for fixture ids and found
+    zero after the move; it failed loudly only because of its `< 20` floor —
+    which is the argument for putting a floor on every "I found N things" scan.
+  - `selftests_are_a_separate_download` guards the whole arrangement: the suite
+    is not inlined, `index.html` still references the file, the page stays under
+    1,200 KB, the setting defaults to off, and the menu entry follows it.
+
 - **The "white panel" over the ingredient editor is the GINGER browser
   extension, not this app.** It came back in v36.9 and `elementsFromPoint` named
   it outright: `GWSW#gws-…` over

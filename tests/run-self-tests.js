@@ -71,11 +71,23 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
   }
   await page.waitForTimeout(2500);
 
-  const ready = await page.evaluate(() => typeof window.SELF_TESTS !== 'undefined');
+  // v36.15 — the suite is a separate file, fetched on demand. CI has to ask for
+  // it; the app deliberately does not load it on its own.
+  try {
+    await page.evaluate(() => window.loadSelfTests());
+    await page.waitForFunction(() => window._selfTestsLoaded === true, null, { timeout: 20000 });
+  } catch (e) {
+    console.error('Could not load self-tests.js: ' + e.message);
+    console.error('It must sit next to index.html and be served by the same server.');
+    await browser.close();
+    process.exit(2);
+  }
+
+  const ready = await page.evaluate(() => Array.isArray(window.SELF_TESTS) && window.SELF_TESTS.length > 0);
   if (!ready) {
     // A single-file app fails silently and completely on a syntax error, so this
     // is the most likely reason and worth saying out loud.
-    console.error('SELF_TESTS is not defined — index.html probably threw before defining it.');
+    console.error('SELF_TESTS is empty — self-tests.js loaded but defined nothing, or index.html threw first.');
     pageErrors.slice(0, 5).forEach(e => console.error('  ' + e));
     await browser.close();
     process.exit(2);
