@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.33 -->
+<!-- Tony's Recipes Collection v36.34 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3305,7 +3305,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.33';
+var APP_VERSION = 'v36.34';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5918,7 +5918,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.33</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.34</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6540,7 +6540,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.33</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.34</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8644,7 +8644,11 @@ function renderLangMenu() {
     return '<button class="drop-item" onclick="closeDrop(\'langMenu\');pickLanguage(\'' + code + '\')"'
       + ' style="display:flex;align-items:center;gap:8px;' + (on ? 'font-weight:700;' : '') + '">'
       + '<span style="width:14px;flex-shrink:0;">' + (on ? '✓' : '') + '</span>'
-      + '<span>' + escH(label) + '</span>'
+      // A language's own name is not translated INTO that language, or any
+      // other — "עברית — Hebrew" is how you find Hebrew, and it is the same
+      // string on every device. Without this they would also each land in the
+      // catalogue and be counted as untranslated for ever.
+      + '<span data-no-i18n>' + escH(label) + '</span>'
       + (note ? '<span style="margin-inline-start:auto;font-size:10px;color:var(--muted);">' + escH(note) + '</span>' : '')
       + '</button>';
   }
