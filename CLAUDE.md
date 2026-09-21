@@ -537,6 +537,20 @@ found only because a test was written first and disagreed with the code.
     notes every key the dictionary could not answer; the 🌐 menu shows the count
     and offers "Finish translating", which translates only the gap. The app
     converges on complete by being used.
+- **The translation can be corrected by hand (v36.33).** `#i18nOverlay`: English
+  left, translation right, a search that matches **either** side, untranslated
+  rows first, and a per-row 💡 that asks for three alternatives and changes
+  nothing until one is clicked. Gated on `i18nCanEdit()` — Save rewrites a file
+  every device reads.
+  - **The editor is never translated.** `i18nSkip()` stops at `#i18nOverlay`. If
+    it were translated the left-hand column would not be English, which is the
+    one thing the whole table is matched against.
+  - **Orphans are shown, not hidden.** A key the dictionary holds that no part of
+    the app shows any more means the English was reworded. That old translation
+    is usually most of the new one, so it is listed with an `orphan` badge rather
+    than silently dropped.
+  - Only `I18N_ED_PAGE` (120) rows are drawn at once. 600 live `<textarea>`s is a
+    tax a phone pays on every keystroke.
 - **The self-test suite runs in ENGLISH (v36.32).** Two hundred and fifty tests
   find a button by the words on it. Tony's first run with the interface in
   Hebrew reported eight failures, five of which were the suite reading its own

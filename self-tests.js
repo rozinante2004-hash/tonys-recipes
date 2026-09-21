@@ -7410,6 +7410,109 @@ window.SELF_TESTS = [
       } finally { window.aiCall=realAI; }
     } },
 
+  { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
+    test: async()=>{
+      ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('i18nOverlay'))
+        throw new Error('#i18nOverlay is not in the page — the ✏️ Edit translations menu item goes nowhere');
+
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang(), prevUser=window._fbUser;
+      var prevDb=window._fbDb, realToast=window.toast, realAI=window.aiCall, said='';
+      try{
+        window.toast=function(m){ said=String(m||''); };
+        // Not everyone may edit: Save rewrites a file every device reads.
+        window._fbUser=null;
+        openI18nEditor();
+        if(document.getElementById('i18nOverlay').classList.contains('open'))
+          throw new Error('the editor opened for somebody with no access at all');
+        if(!/full access/i.test(said)) throw new Error('it did not say why: "'+said+'"');
+
+        window._fbUser={ email:'rozinante2004@gmail.com' };
+        var cat=i18nCatalogue();
+        if(cat.indexOf('Clips')===-1) throw new Error('the catalogue has no Clips button to edit');
+        var dict={}; cat.forEach(function(s,i){ if(i%3) dict[s]='«'+s+'»'; });
+        // One key that is definitely TRANSLATED, to search the right-hand
+        // column with, and one that is definitely not, to correct by hand.
+        var someKey=cat.filter(function(s){ return /Collections/.test(s); })[0];
+        if(!someKey) throw new Error('no Collections string in the catalogue to search for');
+        dict[someKey]='«'+someKey+'»';
+        delete dict['Clips'];
+        i18nInstall('he', dict); i18nApply(document.body);
+
+        openI18nEditor();
+        if(!document.getElementById('i18nOverlay').classList.contains('open'))
+          throw new Error('the editor did not open for an owner');
+        // The editor shows ENGLISH on the left, even with the interface in
+        // Hebrew — i18nSkip stops at #i18nOverlay. If this is ever translated,
+        // the left column stops being the thing you match against.
+        if(document.getElementById('i18nEdTitle').textContent.indexOf('«')!==-1)
+          throw new Error('the editor translated itself — the English column is no longer English');
+
+        var rows=function(){ return document.querySelectorAll('#i18nEdRows .i18n-ed-row'); };
+        if(!rows().length) throw new Error('the editor drew no rows');
+        // The work comes first.
+        if(rows()[0].querySelector('.i18n-ed-to').value)
+          throw new Error('a translated row is listed above untranslated ones — the gaps are the work');
+
+        var search=document.getElementById('i18nEdSearch');
+        var names=function(){ return Array.prototype.map.call(rows(), function(r){
+          return r.querySelector('.i18n-ed-en').textContent.replace(/orphan$/,'').trim(); }); };
+
+        // Search must accept EITHER language. Finding the English is the whole
+        // difficulty: you spotted the wrong word on a Hebrew button.
+        var hits=function(){ return names().filter(function(n){ return /Collections/.test(n); }); };
+        search.value='Collections'; i18nEdRender();
+        if(!hits().length)
+          throw new Error('searching the English found nothing: '+JSON.stringify(names().slice(0,5)));
+        search.value='«'+someKey+'»'; i18nEdRender();
+        if(!hits().length)
+          throw new Error('searching the TRANSLATION found nothing — half the point of the search');
+
+        document.getElementById('i18nEdOnlyGaps').checked=true;
+        search.value=''; i18nEdRender();
+        if(!rows().length) throw new Error('"only untranslated" hid everything, including the gaps');
+        if(Array.prototype.some.call(rows(), function(r){ return !!r.querySelector('.i18n-ed-to').value; }))
+          throw new Error('"only untranslated" is showing rows that are translated');
+        document.getElementById('i18nEdOnlyGaps').checked=false;
+
+        // Recommend offers, it does not replace. Nothing changes until a chip
+        // is clicked — a button that silently overwrote the line you were
+        // reading would be unusable.
+        search.value='Clips'; i18nEdRender();
+        var row=Array.prototype.filter.call(rows(), function(r){
+          return r.querySelector('.i18n-ed-en').textContent.trim()==='Clips'; })[0];
+        if(!row) throw new Error('the untranslated Clips button is not in the editor');
+        var ta=row.querySelector('.i18n-ed-to');
+        window.aiCall=function(){ return Promise.resolve('{"options":["קליפים","סרטונים","וידאו"]}'); };
+        await i18nEdRecommend(row.querySelector('.i18n-ed-rec'));
+        var opts=row.querySelectorAll('.i18n-ed-opt');
+        if(opts.length!==3) throw new Error('it offered '+opts.length+' alternatives, not 3');
+        if(ta.value) throw new Error('Recommend overwrote the line instead of offering');
+        opts[1].click();
+        if(ta.value!=='סרטונים') throw new Error('clicking an alternative did not take it: '+JSON.stringify(ta.value));
+        if(row.querySelector('.i18n-ed-opt')) throw new Error('the alternatives stayed on screen after one was chosen');
+
+        // Saving changes the LIVE interface, which is why the editor is worth
+        // having — and must not eat the button's icon on the way.
+        window._fbDb=null;                     // no cloud here: it falls back to the device
+        said='';
+        await i18nEdSave();
+        var live=document.getElementById('mobileClipBtn');
+        if(live.textContent.trim()!=='סרטונים')
+          throw new Error('the app still shows '+JSON.stringify(live.textContent.trim())+' after saving');
+        if(!live.querySelector('svg')) throw new Error('saving the translation ate the button’s icon');
+        if(i18nMissingList().indexOf('Clips')!==-1)
+          throw new Error('a string that has just been translated by hand is still counted as missing');
+      } finally {
+        window.aiCall=realAI; window.toast=realToast;
+        window._fbUser=prevUser; window._fbDb=prevDb;
+        try{ document.getElementById('i18nOverlay').classList.remove('open'); }catch(e){}
+        try{ i18nRevertAll(); }catch(e){}
+        i18nInstall(prevLang, prevDict);
+      }
+    } },
+
   { id:'i18n_never_touches_a_recipe', group:'UI', name:'Translating the interface never touches a recipe (v36.31)',
     test: async()=>{
       ['i18nCatalogue','i18nApply','i18nRevertAll','i18nUnits','i18nTranslatable'].forEach(function(f){

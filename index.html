@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.32 -->
+<!-- Tony's Recipes Collection v36.33 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3305,7 +3305,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.32';
+var APP_VERSION = 'v36.33';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4688,6 +4688,59 @@ li.line-sub-indent { padding-inline-start: 22px; }
    was holding them was the modal, not themselves. The one exception is the
    ingredient grid, whose NAME column is given more of the extra room than the
    amount column: an amount is "500 ml" at any width. */
+/* v36.33 — the translation editor. Three columns on a desktop: the English, the
+   translation, and the Recommend button. On a phone the two languages stack,
+   because two 45-character columns side by side on a 390px screen is two
+   columns of one word each. */
+.i18n-ed-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 34px;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.i18n-ed-en {
+  font-size: 13px; color: var(--ink); line-height: 1.5;
+  padding-top: 7px; word-break: break-word;
+  /* The English column is English whatever the interface is doing around it. */
+  direction: ltr; text-align: left;
+}
+.i18n-ed-orphan {
+  display: inline-block; margin-inline-start: 6px; padding: 1px 6px; border-radius: 6px;
+  background: #FDF0E6; color: #A1481A; font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+}
+.i18n-ed-to {
+  width: 100%; min-height: 34px; resize: vertical;
+  padding: 7px 9px; font-size: 13px; line-height: 1.45;
+  font-family: 'DM Sans', 'Heebo', sans-serif;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card-bg); color: var(--ink);
+}
+/* An untranslated row is tinted, so the gaps are findable by eye rather than
+   only by the filter. The tint is a hard-coded cream, so it needs the same
+   dark-mode override every other warm tint in this file has — or the box goes
+   light-on-light exactly where the text you have to read is. */
+.i18n-ed-to:placeholder-shown { background: #FFF8E8; border-color: #E0C888; }
+:root[data-theme="dark"] .i18n-ed-to:placeholder-shown { background: #3A2E1A; border-color: #5A4726; }
+.i18n-ed-rec {
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card-bg); cursor: pointer; font-size: 14px; line-height: 1;
+}
+.i18n-ed-rec:disabled { opacity: 0.5; cursor: default; }
+.i18n-ed-opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 4px; }
+.i18n-ed-opt {
+  padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--terracotta); background: transparent; color: var(--terracotta);
+  font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 12px;
+}
+.i18n-ed-opt:hover { background: var(--terracotta); color: #fff; }
+@media (max-width: 700px) {
+  .i18n-ed-row { grid-template-columns: 1fr 34px; }
+  .i18n-ed-en { grid-column: 1 / -1; padding-top: 0; font-weight: 600; }
+}
+
 .modal.add-modal.wide { max-width: calc(100vw - 24px); }
 .modal.add-modal.wide .ing-row { grid-template-columns: 24px minmax(90px, 1fr) 4fr 28px 28px; }
 .modal.add-modal.wide .ing-row-sub { grid-template-columns: 24px 1fr 28px 28px; }
@@ -5865,7 +5918,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.32</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.33</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6487,7 +6540,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.32</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.33</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6613,6 +6666,33 @@ body.banner-shown .header {
       </div>
       <div class="calc-common-row" id="calcQuickRow"></div>
     </div>
+  </div>
+</div>
+
+<!-- TRANSLATION EDITOR (v36.33) ──────────────────────────────────────────────
+     Everything inside #i18nOverlay is deliberately left in English: i18nSkip()
+     stops at this id. Translating the tool you use to fix translations is a
+     hall of mirrors, and it would also mean the English column was not in
+     English. -->
+<div class="modal-overlay" id="i18nOverlay" onclick="bgClose(event,'i18nOverlay')" style="z-index:940;">
+  <div class="modal" style="max-width:min(980px,calc(100vw - 24px));width:100%;display:flex;flex-direction:column;max-height:92vh;">
+    <div class="modal-header" style="flex-shrink:0;">
+      <div class="modal-title" id="i18nEdTitle">Edit translations</div>
+      <button class="modal-close" onclick="closeM('i18nOverlay')" aria-label="Close">✕</button>
+    </div>
+    <div style="flex-shrink:0;padding:0 20px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <input id="i18nEdSearch" class="form-input" dir="auto" style="flex:1;min-width:170px;"
+             placeholder="Search in English or in the translation…" oninput="i18nEdRender()">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap;">
+        <input type="checkbox" id="i18nEdOnlyGaps" onchange="i18nEdRender()"> Only untranslated
+      </label>
+      <!-- btn-primary, not btn-secondary: the secondary style is white on
+           translucent white, which is legible on the brown header and 1.06:1 on
+           a cream modal. The contrast scan caught it the same hour. -->
+      <button class="btn-primary" style="padding:8px 14px;font-size:12px;" onclick="i18nEdSave()">💾 Save</button>
+    </div>
+    <div id="i18nEdCount" style="flex-shrink:0;padding:0 20px 8px;font-size:11px;color:var(--muted);"></div>
+    <div id="i18nEdRows" style="overflow-y:auto;padding:0 20px 20px;flex:1;"></div>
   </div>
 </div>
 
@@ -8736,6 +8816,206 @@ function i18nInstall(lang, dict) {
 function i18nCurrentDict() { return _i18nDict; }
 window.i18nInstall = i18nInstall; window.i18nCurrentDict = i18nCurrentDict;
 window.i18nPlaceholderChild = i18nPlaceholderChild; window.i18nEdges = i18nEdges;
+
+// ─── THE TRANSLATION EDITOR (v36.33) ─────────────────────────────────────────
+// Tony's requirement, and the reason the whole feature is trustworthy: a
+// machine translation nobody can correct is a machine translation you have to
+// live with. English on the left, the translation on the right, a search that
+// accepts either, and a Recommend button per row for when you know the word is
+// wrong but not what the right one is.
+//
+// Gated on i18nCanEdit() — "full access" — because Save rewrites a file every
+// device in the family reads.
+var _i18nEdLang = 'en';       // the language being edited
+var _i18nEdDraft = null;      // { english: translation }, unsaved
+var _i18nEdDirty = false;
+var I18N_ED_PAGE = 120;       // rows drawn at once; 600 live inputs is a phone tax
+
+function openI18nEditor() {
+  if (!i18nCanEdit()) {
+    toast('Editing the shared translations needs full access.', 5000);
+    return;
+  }
+  var lang = _i18nLang;
+  if (lang === 'en') {
+    toast('English is the original. Switch the interface to the language you want to correct, then edit it.', 7000);
+    return;
+  }
+  _i18nEdLang = lang;
+  _i18nEdDraft = {};
+  Object.keys(_i18nDict || {}).forEach(function(k){ _i18nEdDraft[k] = _i18nDict[k]; });
+  _i18nEdDirty = false;
+  var t = document.getElementById('i18nEdTitle');
+  if (t) t.textContent = 'Edit the ' + i18nLangName(lang) + ' translation';
+  var s = document.getElementById('i18nEdSearch'); if (s) s.value = '';
+  var g = document.getElementById('i18nEdOnlyGaps'); if (g) g.checked = false;
+  document.getElementById('i18nOverlay').classList.add('open');
+  i18nEdRender();
+}
+window.openI18nEditor = openI18nEditor;
+
+// Everything the editor can show: the app's own catalogue, plus every key the
+// dictionary already holds. The second half is what surfaces ORPHANS — a
+// translation whose English was reworded in the markup and now matches nothing.
+// They are shown rather than hidden, because an orphan is the only clue that a
+// string was renamed, and its old translation is usually most of the new one.
+function i18nEdKeys() {
+  var seen = Object.create(null);
+  i18nCatalogue().forEach(function(k){ seen[k] = 1; });
+  i18nMissingList().forEach(function(k){ seen[k] = 1; });
+  var live = Object.keys(seen);
+  Object.keys(_i18nEdDraft || {}).forEach(function(k){ if (!seen[k]) seen[k] = 2; });
+  return { all: Object.keys(seen).sort(), orphan: function(k){ return seen[k] === 2; }, live: live.length };
+}
+
+function i18nEdRender() {
+  var host = document.getElementById('i18nEdRows');
+  if (!host || !_i18nEdDraft) return;
+  var q = (document.getElementById('i18nEdSearch') || {}).value || '';
+  q = String(q).trim().toLowerCase();
+  var onlyGaps = !!(document.getElementById('i18nEdOnlyGaps') || {}).checked;
+
+  var info = i18nEdKeys();
+  var rows = info.all.filter(function(k) {
+    var t = _i18nEdDraft[k] || '';
+    if (onlyGaps && t) return false;
+    if (!q) return true;
+    // The search accepts EITHER side, which is the only way it is usable: you
+    // spot the wrong word on a Hebrew button, and the English is the thing you
+    // do not have.
+    return k.toLowerCase().indexOf(q) !== -1 || String(t).toLowerCase().indexOf(q) !== -1;
+  });
+  // Untranslated first — they are the work.
+  rows.sort(function(a, b) {
+    var ga = _i18nEdDraft[a] ? 1 : 0, gb = _i18nEdDraft[b] ? 1 : 0;
+    if (ga !== gb) return ga - gb;
+    return a.localeCompare(b);
+  });
+
+  var missing = info.all.filter(function(k){ return !_i18nEdDraft[k]; }).length;
+  var cnt = document.getElementById('i18nEdCount');
+  if (cnt) {
+    cnt.textContent = rows.length + ' of ' + info.all.length + ' shown · '
+      + (info.all.length - missing) + ' translated, ' + missing + ' not'
+      + (rows.length > I18N_ED_PAGE ? ' · showing the first ' + I18N_ED_PAGE + ' — search to narrow it' : '')
+      + (_i18nEdDirty ? ' · UNSAVED CHANGES' : '');
+    cnt.style.color = _i18nEdDirty ? 'var(--terracotta)' : 'var(--muted)';
+  }
+
+  if (!rows.length) {
+    host.innerHTML = '<div style="padding:24px 0;text-align:center;color:var(--muted);font-size:13px;">'
+      + (q ? 'Nothing matches “' + escH(q) + '”.' : 'Nothing to show.') + '</div>';
+    return;
+  }
+
+  var rtl = i18nIsRTL();
+  var h = '';
+  rows.slice(0, I18N_ED_PAGE).forEach(function(k, i) {
+    var t = _i18nEdDraft[k] || '';
+    var id = 'i18ned_' + i;
+    h += '<div class="i18n-ed-row" data-key="' + escA(k) + '">'
+       + '<div class="i18n-ed-en">' + escH(k)
+       + (info.orphan(k) ? '<span class="i18n-ed-orphan" title="No part of the app shows this any more — '
+            + 'the English was probably reworded">orphan</span>' : '')
+       + '</div>'
+       + '<textarea class="i18n-ed-to" id="' + id + '" rows="1" dir="' + (rtl ? 'rtl' : 'auto') + '"'
+       + ' placeholder="not translated" oninput="i18nEdEdit(this)">' + escH(t) + '</textarea>'
+       + '<button class="i18n-ed-rec" onclick="i18nEdRecommend(this)" title="Ask for alternatives">💡</button>'
+       + '</div>';
+  });
+  host.innerHTML = h;
+}
+window.i18nEdRender = i18nEdRender;
+
+function i18nEdEdit(el) {
+  var row = el.closest('.i18n-ed-row');
+  if (!row) return;
+  var k = row.getAttribute('data-key');
+  var v = String(el.value || '').trim();
+  if (v) _i18nEdDraft[k] = v; else delete _i18nEdDraft[k];
+  if (!_i18nEdDirty) { _i18nEdDirty = true; }
+  var cnt = document.getElementById('i18nEdCount');
+  if (cnt && cnt.textContent.indexOf('UNSAVED') === -1) {
+    cnt.textContent += ' · UNSAVED CHANGES';
+    cnt.style.color = 'var(--terracotta)';
+  }
+}
+window.i18nEdEdit = i18nEdEdit;
+
+// Alternatives, not a replacement: three options shown as chips, and nothing
+// changes until one is clicked. The English and the current translation both go
+// in the prompt, because "give me another word for X" without knowing what was
+// wrong with the last one produces another one just like it.
+async function i18nEdRecommend(btn) {
+  var row = btn.closest('.i18n-ed-row');
+  if (!row) return;
+  var k = row.getAttribute('data-key');
+  var ta = row.querySelector('.i18n-ed-to');
+  var cur = ta ? ta.value : '';
+  var name = i18nLangName(_i18nEdLang);
+  var old = btn.textContent;
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    var raw = await aiCall(
+      'An app\'s interface is being translated from English into ' + name + '. Give THREE alternative '
+      + 'translations for one string, best first.\n\n'
+      + 'English: ' + JSON.stringify(k) + '\n'
+      + 'Current ' + name + ': ' + JSON.stringify(cur || '(none yet)') + '\n\n'
+      + 'It is a button, menu item or label in a family recipe app. Keep it SHORT enough to fit on a '
+      + 'phone, keep every emoji exactly as it is, keep any {1} {2} placeholders, and use the wording '
+      + name + ' apps conventionally use. Offer genuinely DIFFERENT options, not three wordings of the '
+      + 'same one.\n\nReturn ONLY: {"options":["…","…","…"]}',
+      400, null, AI_MODEL_SMALL);
+    var o = extractJSON(raw) || {};
+    var opts = (o.options || []).filter(function(x){ return typeof x === 'string' && x.trim(); }).slice(0, 3);
+    var box = row.querySelector('.i18n-ed-opts');
+    if (box) box.remove();
+    if (!opts.length) { toast('No alternatives came back.'); return; }
+    box = document.createElement('div');
+    box.className = 'i18n-ed-opts';
+    box.innerHTML = opts.map(function(x) {
+      return '<button class="i18n-ed-opt" onclick="i18nEdTake(this)" data-v="' + escA(x) + '">'
+        + escH(x) + '</button>';
+    }).join('');
+    row.appendChild(box);
+  } catch(e) {
+    showServiceError('Could not get alternatives:\n\n' + ((e && e.message) || String(e)));
+  } finally { btn.textContent = old; btn.disabled = false; }
+}
+window.i18nEdRecommend = i18nEdRecommend;
+
+function i18nEdTake(btn) {
+  var row = btn.closest('.i18n-ed-row');
+  var ta = row && row.querySelector('.i18n-ed-to');
+  if (!ta) return;
+  ta.value = btn.getAttribute('data-v') || '';
+  i18nEdEdit(ta);
+  var box = row.querySelector('.i18n-ed-opts'); if (box) box.remove();
+}
+window.i18nEdTake = i18nEdTake;
+
+async function i18nEdSave() {
+  if (!_i18nEdDraft) return;
+  if (!_i18nEdDirty) { toast('Nothing has been changed.'); return; }
+  var lang = _i18nEdLang, name = i18nLangName(lang);
+  var doc = { lang: lang, strings: _i18nEdDraft, count: Object.keys(_i18nEdDraft).length,
+              updatedAt: Date.now(), by: (window._fbUser && window._fbUser.email) || '', edited: true };
+  var where = await i18nWriteCloud(lang, doc);
+  // The live interface follows immediately — the point of an editor you can see
+  // the result in is that you can see the result.
+  if (_i18nLang === lang) {
+    _i18nDict = _i18nEdDraft;
+    i18nClearMissing(Object.keys(_i18nEdDraft));
+    i18nApply(document.body);
+  }
+  _i18nEdDirty = false;
+  i18nEdRender();
+  renderLangMenu();
+  toast(where === 'cloud'
+    ? '✅ ' + name + ' saved and shared with everyone'
+    : '✅ ' + name + ' saved on this device — it could not be shared', 6000);
+}
+window.i18nEdSave = i18nEdSave;
 
 async function pickLanguage(code) {
   try { await i18nSetLanguage(code); }
