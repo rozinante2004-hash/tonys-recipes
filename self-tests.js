@@ -7205,58 +7205,102 @@ window.SELF_TESTS = [
         throw new Error('the login screen does not link to the note');
     } },
 
-  { id:'ui_header_slides_out', group:'UI', name:'The header slides out at the pace of the scroll (v36.27)',
+  { id:'ui_header_follows_the_thumb', group:'UI', name:'The header follows the scroll, both ways (v36.28)',
     test: async()=>{
-      if(typeof applyHeaderGeometry!=='function') throw new Error('applyHeaderGeometry not defined');
-      if(typeof headerSlidePx!=='function') throw new Error('headerSlidePx not defined');
+      ['applyHeaderGeometry','headerSlidePx','onHeaderScroll'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       var header=document.querySelector('.header');
       if(!header) throw new Error('no .header');
-      var brand=header.querySelector('.header-top');
-      if(!brand) throw new Error('the brand row has no .header-top, so nothing can slide');
+      var brandEl=header.querySelector('.header-top');
+      if(!brandEl) throw new Error('the brand row has no .header-top, so nothing can move');
 
-      // v36.23 hid the brand row at a scroll threshold, which made the page
-      // jump. v36.27 gives .header a NEGATIVE sticky top instead, so the browser
-      // scrolls it away at exactly the pace of the page. The whole mechanism is
-      // those two numbers agreeing, so that is what is asserted — the smoothness
-      // itself needs a real phone viewport and lives in tests/phone-chrome.js.
-      applyHeaderGeometry();
+      // The travel is width-gated; the ARITHMETIC that moves the header is not.
+      // The first version of this test wrapped everything in `if (phone)` and so
+      // asserted nothing at all at the headless default width — four separate
+      // mutations passed it while tests/phone-chrome.js caught them. So the
+      // travel is stubbed and the arithmetic is driven at whatever width the
+      // suite happens to be running at.
       var phone = window.innerWidth <= 700;
-      var slide = headerSlidePx();
-      var top = parseFloat(getComputedStyle(header).top) || 0;
-
+      var realSlide = headerSlidePx();
       if(phone){
-        if(slide <= 0) throw new Error('headerSlidePx() reports '+slide+' on a phone — nothing would move');
-        if(Math.abs(slide - brand.offsetHeight) > 1)
-          throw new Error('the slide is '+slide+'px but the brand row is '+brand.offsetHeight
+        if(realSlide <= 0) throw new Error('headerSlidePx() reports '+realSlide+' on a phone — nothing would move');
+        if(Math.abs(realSlide - brandEl.offsetHeight) > 1)
+          throw new Error('the travel is '+realSlide+'px but the brand row is '+brandEl.offsetHeight
             +'px — a mismatch leaves a brown gap or clips the search field');
-        if(Math.abs(top + slide) > 1)
-          throw new Error('.header top is '+top+'px, expected '+(-slide)+' — without a negative sticky top it cannot slide at all');
-      } else {
-        if(slide !== 0) throw new Error('a desktop header would slide by '+slide+'px; this is meant to be phone-only');
-        if(top !== 0) throw new Error('.header top is '+top+'px on a desktop');
+      } else if(realSlide !== 0) {
+        throw new Error('a desktop header would move '+realSlide+'px; this is meant to be phone-only');
       }
 
-      // The filter bar has to land exactly where the header stops. Out by any
-      // amount and it either floats in a brown gap or sits on the recipes.
+      var SLIDE = 80;
+      var realSlideFn = window.headerSlidePx, realScrollY = window.scrollY;
+      var prevTop = header.style.top, faked = 0;
+      window.headerSlidePx = function(){ return SLIDE; };
+      Object.defineProperty(window, 'scrollY', { configurable:true, get:function(){ return faked; } });
+      try{
+        function at(y){ faked = y; onHeaderScroll(); return -(parseFloat(header.style.top) || 0); }
+        at(0);
+        if(at(0) !== 0) throw new Error('the header is not whole at the top of the page');
+
+        // Down: proportional to the DELTA, then clamped at the brand row.
+        if(at(10) !== 10) throw new Error('10px down moved the header '+at(10)+'px');
+        if(at(30) !== 30) throw new Error('30px down did not move it 30px');
+        var deep = at(5000);
+        if(deep !== SLIDE)
+          throw new Error('far down the page the header hid '+deep+'px, expected '+SLIDE
+            +' — without the clamp the search row scrolls away too');
+
+        // Up, FROM DEEP IN THE PAGE. The position-based v36.27 could not do this
+        // at all: it only gave the header back near the top of the document.
+        if(at(4980) !== SLIDE - 20)
+          throw new Error('20px up deep in the page gave back '+(SLIDE - at(4980))+'px, expected 20');
+        if(at(4960) !== SLIDE - 40)
+          throw new Error('it does not keep giving it back as you keep scrolling up');
+        var upPast = at(5000 - SLIDE - 40);
+        if(upPast !== 0) throw new Error('scrolling up past the full travel left '+upPast+'px hidden, mid-page');
+
+        // …and reversing again hides it again, from the same spot. A version
+        // that restores the header once and leaves it passes everything above.
+        var reY = 5000 - SLIDE - 40;
+        if(at(reY + 15) !== 15) throw new Error('reversing down mid-page did not hide it again');
+        if(at(reY + 15) === SLIDE) throw new Error('reversing down hid it in one jump');
+
+        // Back at the very top the header must be whole, and that has to hold
+        // WITHOUT a negative delta doing the work: an iOS rubber-band, or a
+        // resize, can land on y=0 with no movement to report. Setting _hdrLastY
+        // to 0 as well is what isolates the guard — leave it stale and the delta
+        // alone zeroes the offset, and the guard could be deleted unnoticed.
+        faked = 0; _hdrLastY = 0; _hdrHidden = 40;
+        if(at(0) !== 0)
+          throw new Error('at the top of the page the header is still '+at(0)+'px out of frame, '
+            + 'with no scrolling left to bring it back');
+      } finally {
+        window.headerSlidePx = realSlideFn;
+        delete window.scrollY;
+        header.style.top = prevTop;
+        _hdrHidden = 0; _hdrLastY = window.scrollY || 0;
+        applyHeaderGeometry();
+      }
+
+      // The filter bar has to land exactly under whatever is showing.
       var barId = phone ? 'mobileFilterBar' : 'filterBar';
       var bar = document.getElementById(barId);
-      var want = Math.max(0, header.offsetHeight - slide);
       var got = parseFloat(bar.style.top) || 0;
-      if(Math.abs(got - want) > 1)
-        throw new Error('#'+barId+' sticks at '+got+'px but the header will stop at '+want+'px');
+      if(Math.abs(got - header.offsetHeight) > 1)
+        throw new Error('#'+barId+' sticks at '+got+'px but the header ends at '+header.offsetHeight+'px');
 
-      // It is measured, not hardcoded: the brand row wraps at narrow widths, and
-      // a constant would be wrong on any phone that wraps it differently.
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       var code = src.replace(/^\s*\/\/.*$/gm, '');
-      if(!/\.header-top'\)[\s\S]{0,120}offsetHeight/.test(code))
-        throw new Error('the slide distance is not measured from the brand row');
-      // And the old threshold machinery is gone, not merely unused — a leftover
-      // scroll handler toggling a class would fight the sticky top.
+      if(!/\.header-top'\)[\s\S]{0,140}offsetHeight/.test(code))
+        throw new Error('the travel is not measured from the brand row');
       if(/HEADER_COLLAPSE_AT|classList\.toggle\('collapsed'/.test(code))
-        throw new Error('the v36.23 threshold collapse is still in the file alongside the slide');
-      if(/addEventListener\('scroll', onHeaderScroll/.test(code))
-        throw new Error('a per-scroll handler survives; the slide needs none');
+        throw new Error('the v36.23 threshold collapse is still in the file');
+      // Direction-based means a scroll listener, and the LISTENER must be the
+      // throttled one — checking merely that a throttled function exists is
+      // satisfied by one nothing calls.
+      var m = code.match(/addEventListener\('scroll',\s*([A-Za-z_$][\w$]*)/);
+      if(!m) throw new Error('nothing listens for scroll, so the header cannot follow it');
+      if(!new RegExp('function '+m[1]+'\\([\\s\\S]{0,200}requestAnimationFrame').test(code))
+        throw new Error('the scroll listener ('+m[1]+') is not rAF-throttled');
     } },
 
   { id:'perf_filter_counts_memoised', group:'UI', name:'The filter-bar counts are not recomputed on every toggle (v36.23)',

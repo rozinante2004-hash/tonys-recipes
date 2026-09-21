@@ -82,6 +82,10 @@ function expect(name, cond, detail) {
     };
   });
   const scrollTo = async y => { await page.evaluate(v => window.scrollTo(0, v), y); await page.waitForTimeout(120); };
+  // How far the header can move, from the app itself. Inferring it by comparing
+  // two samples breaks the moment the behaviour is direction-based, because
+  // reaching the second sample can itself move the header.
+  const slideMax = await page.evaluate(() => window.headerSlidePx());
 
   console.log('Phone chrome at 390x844:');
   await scrollTo(0);
@@ -92,6 +96,25 @@ function expect(name, cond, detail) {
   expect('the header is whole at the top', top.slide <= 0, `${top.slide}px of it is already gone`);
   expect(`fixed chrome at the top is under ${(MAX_CHROME_AT_TOP * 100).toFixed(0)}%`,
     topShare <= MAX_CHROME_AT_TOP, `${(topShare * 100).toFixed(1)}% — something new is living in the header`);
+
+  // It moves AT THE PACE OF THE SCROLL rather than vanishing at a threshold.
+  // Measured on the way DOWN, monotonically from the top — since v36.28 the
+  // header follows the thumb, so scrolling up to reach a sample point would
+  // bring it back and make this read as a jump.
+  {
+    let prev = top, travelled = 0;
+    for (const step of [Math.round(slideMax / 4), Math.round(slideMax / 4), Math.round(slideMax / 4)]) {
+      travelled += step;
+      await scrollTo(travelled);
+      const mid = await read();
+      expect(`at ${travelled}px scrolled the header has moved ${travelled}px`,
+        Math.abs((top.header - mid.header) - travelled) <= 2,
+        `it moved ${top.header - mid.header}px — the header is jumping, not sliding`);
+      expect(`…and the filter bar is still against it at ${travelled}px`, Math.abs(mid.gap) <= 2,
+        `a ${mid.gap}px gap opened mid-slide`);
+      prev = mid;
+    }
+  }
 
   await scrollTo(400);
   const scrolled = await read();
@@ -117,43 +140,44 @@ function expect(name, cond, detail) {
     `it sits ${scrolled.gap}px from the header`);
   expect('the filter bar does not cover the recipes', !scrolled.barCovered, 'it overlaps the header');
 
-  // The point of v36.27: it moves AT THE PACE OF THE SCROLL rather than
-  // vanishing at a threshold. Halfway through the slide the header must have
-  // moved by exactly the distance scrolled — that is the difference between
-  // "slides out under your thumb" and "disappears", and a threshold-based
-  // version passes every other assertion in this file.
-  const slideMax = top.header - scrolled.header;
-  for (const y of [Math.round(slideMax * 0.25), Math.round(slideMax * 0.5), Math.round(slideMax * 0.75)]) {
-    await scrollTo(y);
-    const mid = await read();
-    expect(`at ${y}px scrolled the header has moved ${y}px`, Math.abs((top.header - mid.header) - y) <= 2,
-      `it moved ${top.header - mid.header}px — the header is jumping, not sliding`);
-    expect(`…and the filter bar is still against it at ${y}px`, Math.abs(mid.gap) <= 2,
-      `a ${mid.gap}px gap opened mid-slide`);
-  }
-
-  // Coming BACK has to be just as paced. A version that restores the header the
-  // moment you scroll up, or restores it in one step, passes everything above —
-  // this is the only place the upward direction is checked, and it is checked
-  // from deep in the page so the return is a real return and not a wobble.
-  await scrollTo(900);
+  // Coming BACK. Since v36.28 the header is DIRECTION-based: it follows the
+  // thumb, so scrolling up anywhere in the page brings it back at the same pace
+  // — not only near the top. This is measured from deep in the list, because
+  // that is the exact case the position-based version could not do and the one
+  // a regression would silently reintroduce.
+  await scrollTo(1500);
   const deep = await read();
-  expect('deep in the page the header is still just the pinned part', deep.header === scrolled.header,
+  expect('deep in the page the header is just the pinned part', deep.header === scrolled.header,
     `${deep.header}px against ${scrolled.header}px`);
-  let prev = deep;
-  for (const y of [Math.round(slideMax * 0.75), Math.round(slideMax * 0.5), Math.round(slideMax * 0.25), 0]) {
+
+  const stepPx = Math.max(8, Math.round(slideMax / 4));
+  let y = 1500, prev = deep;
+  for (let n = 1; n <= 3; n++) {
+    y -= stepPx;
     await scrollTo(y);
     const up = await read();
-    const grew = up.header - prev.header;
-    const moved = Math.abs(prev.y === undefined ? 0 : 0);   // distances come from the scroll targets
-    expect(`scrolling up to ${y}px gives the header back gradually`,
-      grew >= 0 && up.header === top.header - y,
-      `the header is ${up.header}px at y=${y}; expected ${top.header - y} — it is reappearing in a jump`);
-    expect(`…and the filter bar stays against it at ${y}px`, Math.abs(up.gap) <= 2,
+    expect(`scrolling up ${stepPx}px mid-page gives back ${stepPx}px`,
+      Math.abs((up.header - prev.header) - stepPx) <= 2,
+      `the header grew ${up.header - prev.header}px — it is not following the scroll upwards`);
+    expect(`…and the filter bar stays against it (up, step ${n})`, Math.abs(up.gap) <= 2,
       `a ${up.gap}px gap opened on the way back`);
     prev = up;
   }
+  expect('it is still mid-page, not near the top', y > 1000, `y=${y}`);
 
+  // …and reversing again hides it again, from the same spot. A version that
+  // simply restores the header once and leaves it would pass everything above.
+  for (let n = 1; n <= 2; n++) {
+    y += stepPx;
+    await scrollTo(y);
+    const down = await read();
+    expect(`scrolling back down ${stepPx}px takes ${stepPx}px away again`,
+      Math.abs((prev.header - down.header) - stepPx) <= 2,
+      `the header shrank ${prev.header - down.header}px — it only moves one way`);
+    prev = down;
+  }
+
+  await scrollTo(0);
   const back = await read();
   expect('it comes back whole at the top', back.header === top.header,
     `${back.header}px against ${top.header}px`);

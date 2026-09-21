@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.27 -->
+<!-- Tony's Recipes Collection v36.28 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3222,7 +3222,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.27';
+var APP_VERSION = 'v36.28';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4092,14 +4092,10 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    stay — those are what a phone is FOR. Phone only: a desktop has the room, and
    taking the Settings menu off a scrolled desktop is a loss for no gain.
 
-   v36.27 — it now SLIDES out under your thumb instead of vanishing. There is no
-   scroll handler and no class: `.header` is sticky with a NEGATIVE top equal to
-   the brand row's height, so the browser lets it scroll away at exactly the
-   pace of the page and pins it the moment the brand row has gone. The filter
-   bar's own sticky top is set to the height that will be left, so it catches
-   the header at precisely the instant the slide finishes — no gap, no overlap,
-   and nothing recomputed per frame. Both numbers come from
-   applyHeaderGeometry(), which measures rather than assumes.
+   v36.27 made it SLIDE rather than vanish; v36.28 made it follow the thumb in
+   both directions. There is no `collapsed` class either way — the sticky `top`
+   is driven from JS (see applyHeaderGeometry), so the browser does the actual
+   moving and the CSS here only has to not fight it.
 
    The `.header-status` row was in this rule and never hid: it carries an inline
    `display:flex`, which beats any class selector. It also could not slide, being
@@ -5725,7 +5721,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.27</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.28</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6332,7 +6328,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.27</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.28</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -19743,25 +19739,35 @@ window.updateMobileButtons = updateMobileButtons;
 // height, which changes when the header's buttons wrap, so this runs on resize
 // as well as on render. The phone bar was left out until v36.10, which is why
 // the Select button now in it would otherwise have scrolled away.
-// ─── THE HEADER SLIDES OUT FROM UNDER YOUR THUMB (v36.23, rewritten v36.27) ──
+// ─── THE HEADER FOLLOWS YOUR THUMB (v36.23, rewritten v36.27 and v36.28) ────
 // A third of a 390x844 phone was fixed chrome before a single recipe. The logo
 // and the version badge are not what you are looking at once you have started
 // scrolling, so they go — and the list gets 86px back.
 //
-// v36.23 did it by hiding them at a scroll threshold, which meant the page
-// jumped. This does not: `.header` is sticky with a NEGATIVE top equal to the
-// brand row's height, so the browser lets the header scroll away at exactly the
-// pace of the page and pins it the instant the brand row has gone. The filter
-// bar's own sticky top is set to the height that will be LEFT, so it catches the
-// header at precisely the moment the slide ends — no gap, no overlap.
+// Three versions, and the difference between them is the whole point:
+//   v36.23  hid the brand row at a scroll threshold. The page JUMPED.
+//   v36.27  gave .header a negative sticky top, so it slid away at the pace of
+//           the scroll — smooth, no handler at all, but POSITION-based: from
+//           deep in a long list the header only came back near the top.
+//   v36.28  direction-based, at Tony's request. It follows the thumb: scroll
+//           down and it goes, scroll up and it comes back, wherever you are.
 //
-// The consequence worth knowing: there is no scroll handler and no class any
-// more. Both numbers are pure geometry, set once here and on resize, and the
-// browser does the rest — which is also why it cannot stutter under load.
+// How it works. `_hdrHidden` is how much of the brand row is currently out of
+// frame, moved by the SCROLL DELTA rather than the scroll position, and clamped
+// to [0, slide]. It is written to the sticky `top`, and the browser's own
+// stickiness does the rest: at `top: -_hdrHidden` the header renders at
+// max(naturalTop, -_hdrHidden), which is exactly "wherever the page has put it,
+// but never more than _hdrHidden out of frame".
+//
+// The cost, stated honestly: this needs a scroll listener, which v36.27 did not.
+// It is rAF-throttled and does two style writes, so it is cheap — but it is no
+// longer free, and a direction-based header is the kind that can appear over
+// what you are reading if your thumb drifts. That is the trade Tony chose.
 //
 // Phone only. A desktop has the room, and taking the Settings menu off a
 // scrolled desktop is a loss for no gain, so the slide is zero above 700px.
 var HEADER_SLIDE_MAX_W = 700;
+var _hdrHidden = 0, _hdrLastY = 0, _hdrTick = false;
 function headerSlidePx() {
   if (window.innerWidth > HEADER_SLIDE_MAX_W) return 0;
   var top = document.querySelector('.header-top');
@@ -19773,16 +19779,41 @@ function applyHeaderGeometry() {
   var header = document.querySelector('.header');
   if (!header) return;
   var slide = headerSlidePx();
-  header.style.top = slide ? (-slide + 'px') : '';
-  // What is left of the header once the slide has finished. The filter bar
-  // sticks there, so it meets the header exactly rather than floating in a brown
-  // gap or sitting on top of the first row of recipes.
-  var top = Math.max(0, header.offsetHeight - slide) + 'px';
+  if (_hdrHidden > slide) _hdrHidden = slide;     // a resize can shrink the room
+  header.style.top = _hdrHidden ? (-_hdrHidden + 'px') : '';
+  // Where the filter bar should stick: directly under whatever is left showing.
+  // Out by any amount and it either floats in a brown gap or covers the first
+  // row of recipes, so it moves in the same frame, never a frame later.
+  var top = Math.max(0, header.offsetHeight - _hdrHidden) + 'px';
   ['filterBar', 'mobileFilterBar'].forEach(function(id) {
     var bar = document.getElementById(id);
     if (bar) bar.style.top = top;
   });
 }
+function onHeaderScroll() {
+  // NOT `window.scrollY || documentElement.scrollTop`. scrollY is a number in
+  // every browser this runs in, and a legitimate 0 — being at the top of the
+  // page, which is exactly when the header must be whole — is falsy, so that
+  // chain silently fell through to a different element's scroll position. A
+  // stale value there makes the very next delta enormous and the wrong sign.
+  var y = (typeof window.scrollY === 'number')
+    ? window.scrollY
+    : (document.documentElement.scrollTop || document.body.scrollTop || 0);
+  if (y < 0) y = 0;                               // iOS rubber-banding
+  var dy = y - _hdrLastY;
+  _hdrLastY = y;
+  var slide = headerSlidePx();
+  // At the very top the header is always whole, whatever the deltas did on the
+  // way — a bounce must never leave it half out of frame with nowhere to scroll.
+  _hdrHidden = (y <= 0) ? 0 : Math.max(0, Math.min(slide, _hdrHidden + dy));
+  applyHeaderGeometry();
+}
+function onHeaderScrollThrottled() {
+  if (_hdrTick) return;
+  _hdrTick = true;
+  requestAnimationFrame(function(){ _hdrTick = false; onHeaderScroll(); });
+}
+window.addEventListener('scroll', onHeaderScrollThrottled, { passive: true });
 // Kept under its old name: renderFilters() and several other places call it
 // after a re-render, and the job it does is the same one. A function
 // declaration rather than `var x = ...`, so it is hoisted whole — a var alias
@@ -19792,6 +19823,7 @@ function updateFilterBarTop() { return applyHeaderGeometry(); }
 window.addEventListener('resize', applyHeaderGeometry);
 window.updateFilterBarTop = updateFilterBarTop;
 window.applyHeaderGeometry = applyHeaderGeometry; window.headerSlidePx = headerSlidePx;
+window.onHeaderScroll = onHeaderScroll;
 
 (function initApp() {
   var hasLocal = loadLocal();

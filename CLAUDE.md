@@ -364,38 +364,46 @@ found only because a test was written first and disagreed with the code.
   - Undo is one-shot — a second press must say "Nothing to undo", not rewind
     something unrelated — and `clearBulkUndo()` is called on every path that
     decides not to change anything after all.
-- **The header SLIDES out from under your thumb (v36.23, rewritten v36.27, audit U1).**
-  34% of a 390×844 phone was fixed chrome before a single recipe. Scrolling now
-  takes the brand row away — measured 206 → 112px of header, 34.5% → 23.3% of
-  the screen. Search, the filters and **+ Add Recipe** stay; ⚙️ Settings goes,
-  and comes back on the way to the top.
-  - **There is no scroll handler and no class.** `.header` is sticky with a
-    **negative `top`** equal to the brand row's height, so the browser scrolls
-    it away at exactly the pace of the page and pins it the instant the brand
-    row has gone. The filter bar's sticky `top` is set to the height that will
-    be *left*, so it catches the header precisely when the slide ends. Two
-    numbers, set once by `applyHeaderGeometry()` and on resize; nothing is
-    recomputed per frame, so it cannot stutter under load.
-  - **It is symmetric by construction.** Coming back up, the header returns 1:1
-    with the scroll over the last N pixels — never a snap. v36.23's threshold
-    version jumped in both directions; that is what this replaced.
-  - **Position, not direction.** A header that springs back the moment you
-    scroll up is the fashionable pattern and also the one that keeps appearing
-    over what you are reading. The cost, stated plainly: from deep in a long
-    list the header does not return until you are near the top.
-  - **The slide distance is measured, never a constant** — the brand row *wraps*
+- **The header FOLLOWS YOUR THUMB (v36.23, rewritten v36.27 and v36.28, audit U1).**
+  34% of a 390×844 phone was fixed chrome before a single recipe. Scrolling takes
+  the brand row away — 206 → 112px of header, 34.5% → 23.3% of the screen.
+  Search, the filters and **+ Add Recipe** stay; ⚙️ Settings goes.
+  Three versions, and the differences are the whole story:
+  - **v36.23** hid the brand row at a scroll *threshold*. The page jumped.
+  - **v36.27** gave `.header` a negative sticky `top`, so it slid at the pace of
+    the scroll — smooth, and with no scroll handler at all — but **position**-based:
+    from deep in a long list the header only returned near the top.
+  - **v36.28** is **direction**-based, at Tony's request. `_hdrHidden` moves by
+    the scroll **delta**, not the position, clamped to `[0, slide]`, and is
+    written to the sticky `top`; the browser renders at
+    `max(naturalTop, -_hdrHidden)`, which is exactly "wherever the page put it,
+    but never more than `_hdrHidden` out of frame". The cost is a scroll
+    listener (rAF-throttled, two style writes) that v36.27 did not need.
+  - **`y = window.scrollY || documentElement.scrollTop` is a bug**, and it was in
+    here. `scrollY` is a number in every browser this runs in, and a legitimate
+    **0** — the top of the page, exactly when the header must be whole — is
+    falsy, so the chain fell through to a different element's scroll position.
+    A stale value there makes the next delta enormous and the wrong sign.
+  - **The `y <= 0` reset is not redundant.** A rubber-band or a resize can land
+    on y=0 with no movement to report, and without it the header stays part-way
+    out of frame with no scrolling left to bring it back. Its test sets
+    `_hdrLastY = 0` too — otherwise the delta alone does the work and the guard
+    could be deleted unnoticed.
+  - **The travel is measured from the brand row, never a constant** — it *wraps*
     at narrow widths, and a hardcoded 86 leaves a brown gap on a phone that
     wraps it differently.
   - **v36.23 had a dead half.** It also tried to hide `.header-status`, which
     never happened: that row carries an inline `display:flex`, and **an inline
-    style beats any class rule**. It could not have slid either, being at the
-    bottom of the header. The rule is gone rather than "fixed".
-  - **`tests/phone-chrome.js` is why this is checked at all.** Same lesson as the
-    contrast scan: the behaviour only exists below 700px and the self-test suite
-    runs at the headless default width, so phone assertions inside it pass
-    vacuously. It drives a real 390×844 viewport, holds the chrome to a
-    **budget**, and asserts the *pacing* in both directions — a threshold
-    version passes every other check in the file.
+    style beats any class rule**. Deleted rather than "fixed".
+  - **`tests/phone-chrome.js` is why any of this is checked.** The behaviour only
+    exists below 700px and the suite runs at the headless default width. Note
+    the trap it caught: the first cut of the self-test wrapped everything in
+    `if (phone)` and **asserted nothing at all** at desktop width — four
+    mutations sailed through it. The suite now stubs `headerSlidePx()` so the
+    delta arithmetic is exercised at any width, and phone-chrome.js measures the
+    pacing in both directions against a real 390×844 viewport, scrolling
+    *monotonically* (reaching a sample point by scrolling up now moves the
+    header, which would read as a jump).
 - **The "one item away" count is memoised, and a stale one is a chip that lies
   (v36.23, audit P2).** `missingFromPantry` walks every ingredient of every
   recipe against the whole pantry, on every filter toggle; measured at 1,000
