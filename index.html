@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.28 -->
+<!-- Tony's Recipes Collection v36.29 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2904,6 +2904,21 @@ function renderSyncHealth() {
   out += healthRow('Network', h.online ? 'online' : 'offline', h.online ? 'good' : 'bad');
   out += healthRow('Last successful sync', fmtAgo(h.lastSyncOkAt), h.lastSyncOkAt ? '' : 'warn');
   out += healthRow('Last successful save', fmtAgo(h.lastSaveOkAt), h.lastSaveOkAt ? '' : '');
+  // v36.29 — WHICH Worker is actually live. It is deployed by hand, separately
+  // from the app, and three releases running have needed a paste that only Tony
+  // can do — with no way to tell from inside the app whether it had happened.
+  // "I pasted it" and "it deployed" are different facts, and the second is the
+  // one that matters before anything here stops carrying a fallback.
+  out += healthRow('Worker',
+    _workerHealth === null ? 'checking…'
+      : _workerHealth === false ? 'could not be reached'
+      : (_workerHealth.version || 'reachable, version unknown'),
+    _workerHealth === false ? 'bad' : (_workerHealth && _workerHealth.version ? 'good' : ''),
+    (_workerHealth && _workerHealth.appKeyRequired && !_workerHealth.appKeyAccepted)
+      ? 'it is refusing this app’s key — check APP_SHARED_KEY on the Worker'
+      : (_workerHealth && _workerHealth.spend
+          ? ('AI calls today: ' + _workerHealth.spend.dailyUsed + ' of ' + _workerHealth.spend.dailyMax)
+          : ''));
 
   out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Pending</div>';
   out += healthRow('Unsent local edits', h.offlineQueued ? 'yes — will retry' : 'none', h.offlineQueued ? 'warn' : 'good');
@@ -3027,10 +3042,29 @@ function checkPhotoCloudDiff() {
 }
 window.checkPhotoCloudDiff = checkPhotoCloudDiff;
 
+// null = not asked yet, false = could not be reached, else the health object.
+// Held for the session rather than re-fetched per render: the panel re-renders
+// several times while it is open, and a version string does not change under you.
+var _workerHealth = null;
+function checkWorkerHealth() {
+  if (_workerHealth !== null) { renderSyncHealth(); return Promise.resolve(_workerHealth); }
+  return fetch(WORKER_ENDPOINT, {
+      method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'health' }),
+      signal: AbortSignal.timeout(10000)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ _workerHealth = (d && d.ok) ? d : false; return _workerHealth; })
+    .catch(function(){ _workerHealth = false; return false; })
+    .then(function(v){ renderSyncHealth(); return v; });
+}
+window.checkWorkerHealth = checkWorkerHealth;
+
 function openSyncHealth() {
   renderSyncHealth();
   refreshAutoFetchUndoItem().catch(function(){});
   checkPhotoCloudDiff();          // answer it, do not just ask it
+  checkWorkerHealth().catch(function(){});   // v36.29 — and which Worker is live
   document.getElementById('syncHealthOverlay').classList.add('open');
 }
 window.openSyncHealth   = openSyncHealth;
@@ -3222,7 +3256,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.28';
+var APP_VERSION = 'v36.29';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5721,7 +5755,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.28</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.29</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6328,7 +6362,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.28</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.29</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

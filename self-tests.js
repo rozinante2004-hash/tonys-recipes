@@ -7205,6 +7205,54 @@ window.SELF_TESTS = [
         throw new Error('the login screen does not link to the note');
     } },
 
+  { id:'ui_worker_version_is_visible', group:'UI', name:'Sync Health says which Worker is live (v36.29)',
+    test: async()=>{
+      if(typeof checkWorkerHealth!=='function') throw new Error('checkWorkerHealth not defined');
+      if(!document.getElementById('syncHealthBody')) throw new Error('no #syncHealthBody');
+
+      // The Worker is deployed BY HAND, separately from the app. Three releases
+      // running needed a paste only Tony could do, and nothing in the app could
+      // say whether it had landed — "I pasted it" and "it deployed" are
+      // different facts. This is the second one, on screen.
+      var realFetch=window.fetch, realHealth=_workerHealth;
+      function body(){ return document.getElementById('syncHealthBody').textContent; }
+      try{
+        window.fetch=function(){ return Promise.resolve({ json:function(){ return Promise.resolve({
+          ok:true, version:'v40', appKeyRequired:true, appKeyAccepted:true,
+          spend:{ dailyUsed:7, dailyMax:300 } }); } }); };
+        _workerHealth=null; await checkWorkerHealth();
+        if(body().indexOf('v40')===-1) throw new Error('the live Worker version is not shown');
+        if(body().indexOf('7 of 300')===-1)
+          throw new Error('the AI ceiling is not shown, so there is no way to see the bill approaching it');
+
+        // Unreachable must READ as unreachable, not as an empty row that looks
+        // like everything is fine.
+        window.fetch=function(){ return Promise.reject(new Error('down')); };
+        _workerHealth=null; await checkWorkerHealth();
+        if(!/could not be reached/.test(body()))
+          throw new Error('an unreachable Worker does not say so');
+
+        // A refused app key is the other failure that looks like nothing.
+        window.fetch=function(){ return Promise.resolve({ json:function(){ return Promise.resolve({
+          ok:true, version:'v40', appKeyRequired:true, appKeyAccepted:false }); } }); };
+        _workerHealth=null; await checkWorkerHealth();
+        if(!/refusing this app/.test(body()))
+          throw new Error('a rejected app key is not reported');
+
+        // It must not re-ask on every render — the panel re-renders repeatedly
+        // while it is open, and this is a network call.
+        var calls=0;
+        window.fetch=function(){ calls++; return Promise.resolve({ json:function(){
+          return Promise.resolve({ ok:true, version:'v40' }); } }); };
+        _workerHealth=null; await checkWorkerHealth();
+        await checkWorkerHealth(); await checkWorkerHealth();
+        if(calls!==1) throw new Error('it pinged the Worker '+calls+' times for three renders');
+      } finally { window.fetch=realFetch; _workerHealth=realHealth; }
+
+      if(!document.querySelector('#settingsDrop button[onclick*="openSyncHealth"]'))
+        throw new Error('Sync Health is not reachable from Settings');
+    } },
+
   { id:'ui_header_follows_the_thumb', group:'UI', name:'The header follows the scroll, both ways (v36.28)',
     test: async()=>{
       ['applyHeaderGeometry','headerSlidePx','onHeaderScroll'].forEach(function(f){
