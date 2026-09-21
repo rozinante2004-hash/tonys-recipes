@@ -5186,9 +5186,17 @@ window.SELF_TESTS = [
       // v31.9 — applying a chosen photo fetches its BYTES from whatever host the
       // source returned. img-src only governs rendering, which is why search
       // results appeared while "Use this Photo" silently failed. Openverse
-      // federates Flickr, Wikimedia and museums, so the hosts cannot be listed.
-      if(!/connect-src[^;]*\bhttps:(\s|;)/.test(c))
-        throw new Error('connect-src does not permit fetching a photo from an arbitrary host, so "Use this Photo" is blocked by our own CSP');
+      // federates Flickr, Wikimedia and museums, so those hosts cannot be
+      // listed — which is why connect-src used to carry a bare `https:`.
+      //
+      // v36.30 — it does not any more. The bytes go through our own Worker, so
+      // the ONE host that has to be allowed is the Worker's. Asserting that is
+      // the same protection this check always gave, against a list that now
+      // means something.
+      if(/connect-src[^;]*\bhttps:(\s|;)/.test(c))
+        throw new Error('connect-src has a bare `https:` again — it allows every origin and makes the list after it decorative');
+      if(c.indexOf('lively-bread-273a.rozinante2004.workers.dev')===-1)
+        throw new Error('the Worker is not in connect-src, so every photo, import and AI call is blocked by our own CSP');
       // A failed apply must raise a REAL error dialog. A three-second toast on a
       // failure that leaves the old photo in place reads as "nothing happened" —
       // which is exactly what Tony reported. Driven: grepping the function for
@@ -6892,7 +6900,7 @@ window.SELF_TESTS = [
       if(AI_CACHE_TTL < 14*24*60*60*1000) throw new Error('the AI cache expires after under a fortnight');
     } },
 
-  { id:'sec_photo_bytes_via_worker', group:'Network', name:'A photo’s bytes come through the Worker, with a way through if it cannot (v36.24)',
+  { id:'sec_photo_bytes_via_worker', group:'Network', name:'A photo\u2019s bytes come through the Worker, and only the Worker (v36.30)',
     test: async()=>{
       if(typeof fetchPhotoBlob!=='function') throw new Error('fetchPhotoBlob not defined');
       var realFetch=window.fetch;
@@ -6900,9 +6908,15 @@ window.SELF_TESTS = [
         return { ok:true, status:200, headers:{ get:function(k){ return /content-type/i.test(k) ? 'image/png' : null; } },
           blob:function(){ return Promise.resolve(new Blob([new Uint8Array([137,80,78,71])],{type:'image/png'})); } };
       }
+      function jsonResp(status, obj){
+        var r={ ok:status<400, status:status, headers:{get:function(){return 'application/json';}},
+          json:function(){ return Promise.resolve(obj); },
+          blob:function(){ return Promise.resolve(new Blob([JSON.stringify(obj)],{type:'application/json'})); } };
+        r.clone=function(){ return r; }; return r;
+      }
       try{
-        // (1) The Worker is asked FIRST, with the app key, and the photo host is
-        // never touched directly. That is the whole point: one named host in
+        // (1) The Worker is asked, with the app key, and the photo host is never
+        // touched directly. That is the whole point: one named host in
         // connect-src instead of "anywhere on https".
         var hits=[];
         window.fetch=function(u, opts){
@@ -6919,49 +6933,42 @@ window.SELF_TESTS = [
         if(sent.url!=='https://live.staticflickr.com/1/2_3_b.jpg') throw new Error('the url was not passed on');
         if(!sent.appKey) throw new Error('the app key was left off, so the Worker would refuse it');
 
-        // (2) The fallback. Until the v40 Worker is actually deployed, every one
-        // of these comes back 4xx — without a direct retry, choosing a photo
-        // would simply be broken for as long as that took.
+        // (2) v36.30 — there is NO direct retry any more. With the bare `https:`
+        // gone from connect-src a direct fetch is a blocked request, not a
+        // rescue, so a refusal must fail loudly rather than reach for the photo
+        // host and produce a console error nobody reads.
         hits.length=0;
         window.fetch=function(u){
           hits.push(String(u));
-          if(String(u).indexOf(WORKER_ENDPOINT)===0)
-            return Promise.resolve({ ok:false, status:400, headers:{get:function(){return 'application/json';}},
-              json:function(){ return Promise.resolve({error:'no such action'}); } });
+          if(String(u).indexOf(WORKER_ENDPOINT)===0) return Promise.resolve(jsonResp(429, {error:'RATE_LIMIT: too many'}));
           return Promise.resolve(imgResp());
         };
-        var b2=await fetchPhotoBlob('https://e.test/a.png');
-        if(!b2 || !b2.size) throw new Error('the fallback did not produce any bytes');
-        if(hits.length!==2 || hits[1]!=='https://e.test/a.png')
-          throw new Error('it did not fall back to the photo host: '+JSON.stringify(hits));
+        var threw=false, msg='';
+        try{ await fetchPhotoBlob('https://e.test/a.png'); }catch(e){ threw=true; msg=e.message||''; }
+        if(!threw) throw new Error('a refused photo-fetch did not fail');
+        if(hits.length!==1 || hits[0].indexOf(WORKER_ENDPOINT)!==0)
+          throw new Error('it still tries the photo host directly: '+JSON.stringify(hits));
+        if(msg.indexOf('RATE_LIMIT')===-1)
+          throw new Error('the Worker\u2019s own explanation was thrown away: "'+msg+'"');
 
-        // (3) A 200 that is NOT an image must not be treated as one. The Worker
-        // answers with JSON when it refuses, and compressing an error document
-        // into a recipe photo is the failure this guards.
-        hits.length=0;
-        window.fetch=function(u){
-          hits.push(String(u));
-          if(String(u).indexOf(WORKER_ENDPOINT)===0)
-            return Promise.resolve({ ok:true, status:200,
-              headers:{get:function(){return 'application/json';}},
-              blob:function(){ return Promise.resolve(new Blob(['{"error":"nope"}'],{type:'application/json'})); } });
-          return Promise.resolve(imgResp());
-        };
-        var b3=await fetchPhotoBlob('https://e.test/b.png');
-        if(b3.type!=='image/png') throw new Error('a JSON answer was passed off as the photo');
-        if(hits.length!==2) throw new Error('it did not retry directly after a non-image answer');
+        // …and when the Worker gives no explanation, the message must still
+        // point somewhere useful rather than blaming the photo site.
+        window.fetch=function(){ return Promise.resolve(jsonResp(502, {})); };
+        msg='';
+        try{ await fetchPhotoBlob('https://e.test/b.png'); }catch(e){ msg=e.message||''; }
+        if(!/Sync Health/.test(msg))
+          throw new Error('a bare failure does not say where to look: "'+msg+'"');
 
-        // (4) A genuine failure still fails, rather than returning an empty blob
-        // that silently becomes a blank photo.
-        window.fetch=function(){ return Promise.resolve({ ok:false, status:404,
-          headers:{get:function(){return null;}}, json:function(){ return Promise.resolve({}); } }); };
-        var threw=false;
-        try{ await fetchPhotoBlob('https://e.test/gone.png'); }catch(e){ threw=true; }
-        if(!threw) throw new Error('a dead photo URL returned quietly instead of failing');
+        // (3) A 200 that is NOT an image must not be treated as one. Compressing
+        // an error document into a recipe photo is the failure this guards.
+        window.fetch=function(){ return Promise.resolve(jsonResp(200, {error:'nope'})); };
+        threw=false;
+        try{ await fetchPhotoBlob('https://e.test/c.png'); }catch(e){ threw=true; }
+        if(!threw) throw new Error('a JSON answer was passed off as the photo');
       } finally { window.fetch=realFetch; }
 
-      // (5) Both photo paths must use it. One left on a bare fetch() is one that
-      // still needs `https:` in the CSP.
+      // (4) Both photo paths must use it. One left on a bare fetch() is one that
+      // the CSP now blocks outright.
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       var code = src.replace(/^\s*\/\/.*$/gm, '');
       var uses = (code.match(/fetchPhotoBlob\(/g) || []).length;
@@ -6969,15 +6976,17 @@ window.SELF_TESTS = [
       if(/var\s+imgResp\s*=\s*await\s+fetch\(/.test(code) || /resp\s*=\s*await\s+fetch\(img\.url\)/.test(code))
         throw new Error('a photo is still downloaded with a bare fetch()');
 
-      // (6) And the CSP still has to allow the fallback for as long as there IS
-      // one. Removing `https:` while a direct retry remains turns the safety net
-      // into a blocked request — they move together or not at all.
+      // (5) The fallback and the CSP move TOGETHER. A direct retry with `https:`
+      // removed is a blocked request; a bare `https:` with no fallback is an
+      // open door for nothing. Either half alone is a bug, so both are asserted
+      // against each other rather than separately.
       var csp = (src.match(/Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
       var connect = (csp.match(/connect-src ([^;]+)/) || [])[1] || '';
       var hasFallback = /var direct = await fetch\(url/.test(code);
-      if(hasFallback && !/(^|\s)https:(\s|$)/.test(connect))
+      var hasWildcard = /(^|\s)https:(\s|$)/.test(connect);
+      if(hasFallback && !hasWildcard)
         throw new Error('connect-src no longer allows the direct fallback that fetchPhotoBlob still performs');
-      if(!hasFallback && /(^|\s)https:(\s|$)/.test(connect))
+      if(!hasFallback && hasWildcard)
         throw new Error('the fallback is gone, so the bare `https:` in connect-src can come out too');
     } },
 
@@ -7253,6 +7262,121 @@ window.SELF_TESTS = [
         throw new Error('Sync Health is not reachable from Settings');
     } },
 
+  { id:'ui_hebrew_recipe_reads_right', group:'UI', name:'A Hebrew recipe\u2019s labels sit on the right too (v36.30)',
+    test: async()=>{
+      if(typeof recipeIsRTL!=='function') throw new Error('recipeIsRTL not defined');
+      if(recipeIsRTL({name:'Onion Soup',ingredients:[{n:'onions'}],steps:['fry']}))
+        throw new Error('an English recipe was judged RTL');
+      if(!recipeIsRTL({name:'\u05de\u05e8\u05e7 \u05d1\u05e6\u05dc',ingredients:[{n:'\u05d1\u05e6\u05dc'}],steps:['\u05dc\u05d7\u05ea\u05d5\u05da']}))
+        throw new Error('a Hebrew recipe was not judged RTL');
+
+      // Until v36.30 only the CONTENT of a Hebrew recipe was right-aligned.
+      // Every label around it — SOUP, NOTES, Method, Ingredients — sat on the
+      // left, so the page had the recipe pinned to one margin and its English
+      // scaffolding pinned to the other. Assert what RENDERS: the stylesheet
+      // looks perfectly reasonable either way.
+      var snapshot=recipes.slice(), snapId=nextId, prevView=viewId;
+      var realSave=window.saveData, realLocal=window.saveLocal;
+      try{
+        window.saveData=function(){}; window.saveLocal=function(){};
+        recipes=[normalizeRecipe({ id:884001, name:'\u05de\u05e8\u05e7 \u05d1\u05e6\u05dc', category:'Soup',
+          ingredients:[{a:'2',n:'\u05d1\u05e6\u05dc\u05d9\u05dd'}], steps:['\u05dc\u05d7\u05ea\u05d5\u05da'],
+          notes:'\u05d4\u05e2\u05e8\u05d4', updatedAt:Date.now() })];
+        nextId=884100;
+        openView(884001); await wait(80);
+        var content=document.querySelector('#viewModal .modal-content');
+        if(!content) throw new Error('no .modal-content');
+        if(!content.classList.contains('rtl-recipe'))
+          throw new Error('a Hebrew recipe did not get the rtl-recipe class');
+        if(getComputedStyle(content).direction!=='rtl')
+          throw new Error('.modal-content still renders left-to-right for a Hebrew recipe');
+        // The column headings are the ones that stayed behind: they sit inside
+        // .recipe-columns, whose children are reset to ltr so the two-column
+        // ORDER can flip without dragging each column's internals along.
+        var head=document.querySelector('#viewModal .recipe-col-ings .modal-section-title');
+        if(head && getComputedStyle(head).direction!=='rtl')
+          throw new Error('the Ingredients heading still reads left-to-right while its list reads right-to-left');
+        // The control strips stay LTR on purpose — x0.5 x1 x2 and Metric /
+        // Imperial mean the same in any script and are learned by position.
+        var mult=document.querySelector('#viewModal .multiplier-row');
+        if(mult && getComputedStyle(mult).direction!=='ltr')
+          throw new Error('the scale buttons were reversed; they are a numeric control strip, not a line of reading');
+
+        // An English recipe must be untouched.
+        recipes=[normalizeRecipe({ id:884002, name:'Onion Soup', category:'Soup',
+          ingredients:[{a:'2',n:'onions'}], steps:['fry'], updatedAt:Date.now() })];
+        openView(884002); await wait(80);
+        var c2=document.querySelector('#viewModal .modal-content');
+        if(c2.classList.contains('rtl-recipe')) throw new Error('an English recipe was flipped to RTL');
+        if(getComputedStyle(c2).direction!=='ltr') throw new Error('an English recipe no longer reads left-to-right');
+      } finally {
+        closeM('viewOverlay'); viewId=prevView;
+        recipes=snapshot; nextId=snapId;
+        window.saveData=realSave; window.saveLocal=realLocal;
+      }
+    } },
+
+  { id:'ui_edit_modal_can_use_the_window', group:'UI', name:'The Edit modal can be stretched to the window (v36.30)',
+    test: async()=>{
+      ['editWideEnabled','applyEditWide','toggleEditWide'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var modal=document.querySelector('#editOverlay .add-modal');
+      var btn=document.getElementById('editWideBtn');
+      if(!modal) throw new Error('no #editOverlay .add-modal');
+      if(!btn) throw new Error('there is no widen button');
+
+      // 600px is the right cap for a dialog you read and the wrong one for a
+      // form you work in. Measure what RENDERS — a class that widens nothing is
+      // exactly the failure this is for.
+      var prev=null; try{ prev=localStorage.getItem(EDIT_WIDE_KEY); }catch(e){}
+      var prevOpen=document.getElementById('editOverlay').classList.contains('open');
+      try{
+        document.getElementById('editOverlay').classList.add('open');
+        try{ localStorage.removeItem(EDIT_WIDE_KEY); }catch(e){}
+        applyEditWide();
+        var narrow=modal.getBoundingClientRect().width;
+        if(modal.classList.contains('wide')) throw new Error('it starts wide; the default should be the normal width');
+
+        toggleEditWide();
+        var wide=modal.getBoundingClientRect().width;
+        var roomToGive = window.innerWidth > 700;
+        if(roomToGive){
+          if(!(wide > narrow + 100))
+            throw new Error('widening gained only '+(wide-narrow)+'px — the class is set but nothing stretched');
+          if(wide > window.innerWidth) throw new Error('it is wider than the window ('+wide+' of '+window.innerWidth+')');
+          if(!btn.offsetWidth) throw new Error('the button is hidden on a screen with room to give');
+          // The FIELDS have to come with it. That is the half Tony asked for:
+          // a wider dialog with the same 340px name box is no use.
+          var name=document.getElementById('f-name');
+          if(name && name.getBoundingClientRect().width < wide - 120)
+            throw new Error('the modal widened but the name field stayed at '+Math.round(name.getBoundingClientRect().width)+'px');
+        } else {
+          if(btn.offsetWidth) throw new Error('the widen button shows on a phone, which has no width to give');
+          if(modal.classList.contains('wide')) throw new Error('a phone modal was widened');
+        }
+
+        // Remembered per device, and reversible.
+        if(roomToGive && !editWideEnabled()) throw new Error('the choice was not remembered');
+        applyEditWide();
+        if(roomToGive && Math.abs(modal.getBoundingClientRect().width - wide) > 1)
+          throw new Error('re-applying the saved preference changed the width');
+        toggleEditWide();
+        if(Math.abs(modal.getBoundingClientRect().width - narrow) > 1)
+          throw new Error('it does not go back to the normal width');
+      } finally {
+        try{ if(prev===null) localStorage.removeItem(EDIT_WIDE_KEY); else localStorage.setItem(EDIT_WIDE_KEY, prev); }catch(e){}
+        applyEditWide();
+        if(!prevOpen) document.getElementById('editOverlay').classList.remove('open');
+      }
+
+      // It must be applied when the modal OPENS, or the remembered width only
+      // takes effect after the first resize.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var code = src.replace(/^\s*\/\/.*$/gm, '');
+      if(!/applyEditWide\(\);[\s\S]{0,200}editOverlay'\)\.classList\.add\('open'\)/.test(code))
+        throw new Error('openAddModal does not apply the remembered width before showing the modal');
+    } },
+
   { id:'ui_header_follows_the_thumb', group:'UI', name:'The header follows the scroll, both ways (v36.28)',
     test: async()=>{
       ['applyHeaderGeometry','headerSlidePx','onHeaderScroll'].forEach(function(f){
@@ -7272,12 +7396,20 @@ window.SELF_TESTS = [
       var realSlide = headerSlidePx();
       if(phone){
         if(realSlide <= 0) throw new Error('headerSlidePx() reports '+realSlide+' on a phone — nothing would move');
-        if(Math.abs(realSlide - brandEl.offsetHeight) > 1)
-          throw new Error('the travel is '+realSlide+'px but the brand row is '+brandEl.offsetHeight
-            +'px — a mismatch leaves a brown gap or clips the search field');
+        // v36.30 — the WHOLE header travels, less the status-bar inset. Leave
+        // that inset out and a notched iPhone puts the filter bar's chips under
+        // the clock, because the page is viewport-fit=cover.
+        var want = header.offsetHeight - safeAreaTopPx();
+        if(Math.abs(realSlide - want) > 1)
+          throw new Error('the travel is '+realSlide+'px but the header is '+header.offsetHeight
+            +'px less a '+safeAreaTopPx()+'px inset — a mismatch leaves a brown gap or hides the status bar');
+        if(realSlide <= brandEl.offsetHeight)
+          throw new Error('only the brand row travels ('+realSlide+'px); the whole header should');
       } else if(realSlide !== 0) {
         throw new Error('a desktop header would move '+realSlide+'px; this is meant to be phone-only');
       }
+      if(typeof safeAreaTopPx!=='function') throw new Error('safeAreaTopPx not defined');
+      if(safeAreaTopPx() < 0) throw new Error('the safe-area probe reports a negative inset');
 
       var SLIDE = 80;
       var realSlideFn = window.headerSlidePx, realScrollY = window.scrollY;
@@ -7338,8 +7470,8 @@ window.SELF_TESTS = [
 
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       var code = src.replace(/^\s*\/\/.*$/gm, '');
-      if(!/\.header-top'\)[\s\S]{0,140}offsetHeight/.test(code))
-        throw new Error('the travel is not measured from the brand row');
+      if(!/header\.offsetHeight - safeAreaTopPx\(\)/.test(code))
+        throw new Error('the travel is not measured from the header less the safe-area inset');
       if(/HEADER_COLLAPSE_AT|classList\.toggle\('collapsed'/.test(code))
         throw new Error('the v36.23 threshold collapse is still in the file');
       // Direction-based means a scroll listener, and the LISTENER must be the
@@ -9784,9 +9916,29 @@ window.SELF_TESTS = [
         openView(testId); await wait(60);
         setServings(8);
         if(Math.abs(viewMult-2)>0.001) throw new Error('8 servings from a base of 4 should be ×2, got '+viewMult);
-        // The ×N buttons must still be there — this is an addition, not a replacement.
-        if(document.querySelectorAll('#viewModal .mult-btn').length!==6) throw new Error('the ×1–×6 buttons were removed; 3.3 was meant to add an option, not replace them');
+        // The ×N buttons must still be there — this is an addition, not a
+        // replacement. v36.30 added ×0.5 at the front, so the count is 7 and
+        // halving is asserted by name: a bare count would pass if ×0.5 were
+        // swapped for a ×7 nobody asked for.
+        var multBtns = Array.prototype.map.call(
+          document.querySelectorAll('#viewModal .mult-btn'), function(b){ return b.textContent.trim(); });
+        if(multBtns.length!==7)
+          throw new Error('expected ×0.5 plus ×1–×6, got '+multBtns.length+': '+multBtns.join(' '));
+        ['×0.5','×1','×2','×3','×4','×5','×6'].forEach(function(want){
+          if(multBtns.indexOf(want)===-1) throw new Error(want+' is missing: '+multBtns.join(' '));
+        });
+        if(multBtns[0]!=='×0.5') throw new Error('×0.5 should come first, before ×1: '+multBtns.join(' '));
         if(!document.querySelector('#viewModal .serv-input')) throw new Error('the servings control is missing');
+        // Halving has to produce halved amounts, not just a pressed button.
+        setMult(0.5);
+        if(Math.abs(viewMult-0.5)>0.001) throw new Error('×0.5 did not take, viewMult is '+viewMult);
+        var halved=Array.prototype.map.call(document.querySelectorAll('#viewModal .ing-amount'),
+          function(e){return e.textContent;}).join(' ');
+        if(halved.indexOf('100g')===-1)
+          throw new Error('200g at ×0.5 should read 100g, got: '+halved);
+        if(halved.indexOf('1 ')===-1 && halved.indexOf('1') === -1)
+          throw new Error('2 eggs at ×0.5 should read 1, got: '+halved);
+
         setServings(6);   // ×1.5 — the fractional case
         if(Math.abs(viewMult-1.5)>0.001) throw new Error('6 from 4 should be ×1.5, got '+viewMult);
         var amounts=Array.prototype.map.call(document.querySelectorAll('#viewModal .ing-amount'),function(e){return e.textContent;});

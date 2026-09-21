@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.29 -->
+<!-- Tony's Recipes Collection v36.30 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,21 +33,27 @@
      blamed the recipe site. Do not drop them without also removing step 2 of
      runUrlImport.
 
-     connect-src includes a bare `https:` and that is DELIBERATE. Applying a
-     chosen photo downloads its bytes with fetch(), and the host is whatever the
-     photo source returned — Openverse federates Flickr, Wikimedia, NASA and
-     museum collections, so the set is genuinely unbounded and cannot be listed.
-     `img-src https:` only lets a picture RENDER; fetching its bytes is
-     connect-src, which is why the search results appeared but "Use this Photo"
-     failed. The named hosts above are kept because they document intent.
+     connect-src used to carry a bare `https:`, which allowed every https origin
+     and made the careful list after it decorative (audit S2). The reason was
+     real: applying a chosen photo downloads its BYTES with fetch(), and the
+     host is whatever the photo source returned — Openverse federates Flickr,
+     Wikimedia, NASA and museum collections, so the set genuinely cannot be
+     listed. `img-src https:` only lets a picture RENDER; fetching its bytes is
+     connect-src, which is why search results appeared but "Use this Photo"
+     failed.
 
-     What this costs, stated plainly: an injected script could send data to any
-     https host. What still holds: script-src (so getting a script injected is
-     the hard part), object-src, base-uri, form-action and frame-ancestors. The
-     alternative is proxying every image download through the Worker, which is a
-     fair trade to revisit — it would also fix image hosts that send no CORS
-     headers — but it needs a Worker deploy, and this needs to work now. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https: https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+     v36.24 routed those bytes through our own Worker (`photo-fetch`), turning
+     "anywhere" into one named host, and kept a direct fetch as a fallback so the
+     app worked before the Worker was deployed. v36.30 removes both, now that
+     Worker v40 is confirmed live: the fallback is gone and so is `https:`. They
+     had to move together — leaving the fallback with `https:` removed just
+     makes it a blocked request, and sec_photo_bytes_via_worker asserts both
+     directions so neither half can drift.
+
+     If photo selection ever starts failing with a CSP error in the console, the
+     Worker is the thing to check first: ⚙️ → 📡 Sync Health reports its live
+     version. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="/tonys-recipes/manifest.json">
 <link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -1556,18 +1562,15 @@ window.workerErrorText = workerErrorText;
 // after it is decorative. Routing the bytes through our own Worker turns
 // "anywhere" into one named host.
 //
-// It falls back to a direct fetch, and that is not belt-and-braces — it is what
-// makes this shippable TODAY. The Worker half is v40 and has to be pasted into
-// Cloudflare by hand; until that happens every photo-fetch call comes back 4xx,
-// and without the fallback choosing a photo would be broken for as long as the
-// deploy took. `https:` stays in the CSP until the Worker is confirmed live,
-// because removing it is what turns the fallback from a safety net into a
-// blocked request. That removal is a one-line change, and the note in CLAUDE.md
-// says so.
+// v36.30 — the direct fallback is GONE, and so is the bare `https:` in
+// connect-src that existed only to permit it. Worker v40 is deployed and Sync
+// Health reports its version, so the safety net has nothing left to catch: with
+// `https:` removed a direct retry is a blocked request, not a rescue.
 //
-// The fallback is also the answer to a 429: the Worker allows 600 of these a
-// minute, and "auto-fetch missing photos" across a big library can still pass
-// that in a burst.
+// What this costs: if the Worker is down or over its 600/min ceiling, choosing a
+// photo fails instead of quietly going direct. That is the right failure — it is
+// visible, it names the Worker, and it is the same dependency every other
+// server-side feature already has.
 var _photoViaWorker = 0, _photoViaDirect = 0;
 async function fetchPhotoBlob(url) {
   try {
@@ -1587,15 +1590,18 @@ async function fetchPhotoBlob(url) {
         if (blob && blob.size) { _photoViaWorker++; return blob; }
       }
     }
-    dlog('[photo] worker fetch declined (' + r.status + ') — going direct');
+    // Say which end refused, and in the Worker's own words where it gave any:
+    // "could not download" sends the reader to the photo site to debug our
+    // Worker's rate limit.
+    var why = '';
+    try { var d = await r.clone().json(); why = (d && d.error) || ''; } catch(e2) {}
+    throw new Error(why || ('The photo could not be fetched through the app\u2019s server (' + r.status
+      + '). Check \u2699\ufe0f \u2192 Sync Health \u2014 it reports whether the Worker is reachable.'));
   } catch (e) {
-    dlog('[photo] worker fetch failed — going direct', e && e.message);
+    _photoViaDirect++;      // counted as "did not go through the Worker"
+    dlog('[photo] worker fetch failed', e && e.message);
+    throw e;
   }
-  var direct = await fetch(url, { signal: AbortSignal.timeout(20000) });
-  if (!direct.ok) throw new Error('Could not download: ' + direct.status);
-  var b = await direct.blob();
-  _photoViaDirect++;
-  return b;
 }
 window.fetchPhotoBlob = fetchPhotoBlob;
 
@@ -1955,7 +1961,7 @@ var SELF_TEST_FIXES = {
   form_ings_single_source: { fix:'2.2 — the ingredient table is the data. saveRecipe and editFormState must call readIngsTable(); the hidden #f-ings textarea and its flatten-to-"amount — name"/reparse round trip must be gone, since it mangled any name containing a dash.', autofix: null },
   stor_rules_repo: { fix:'5.5 — firestore.rules in the repo is the source of truth. The app must fetch it and substitute {{READ}}/{{WRITE}}/{{ADMIN}}; the built-in fallback must label itself a fallback rather than passing as current.', autofix: null },
   perf_thumbnails: { fix:'5.3/5.2 — the grid must render thumbSrc(r): a ~320px JPEG thumbnail generated once and stored in IndexedDB as a Blob (not base64), falling back to the full photo until it exists. Thumbnails must be dropped when the photo changes and their object URLs revoked when the recipe goes.', autofix: null },
-  feat_scale_servings: { fix:'3.3 — drawView must render a .serv-input servings stepper (setServings/nudgeServings) *in addition to* the ×1–×6 buttons, only when parseServings(r.servings) returns a number, and flag ingredients that scale to a fractional count.', autofix: null },
+  feat_scale_servings: { fix:'3.3 — drawView must render a .serv-input servings stepper (setServings/nudgeServings) *in addition to* the ×0.5–×6 buttons, only when parseServings(r.servings) returns a number, and flag ingredients that scale to a fractional count.', autofix: null },
   feat_amount_rounding: { fix:'fmtAmt must round to values a cook can measure (nearest 5 above 100, whole above 20, half above 2, quarter above 0.5) and awkwardCount() must flag fractional bare counts of countable items like eggs.', autofix: null },
   feat_ai_cache:  { fix:'5.7 — aiCall must consult aiCacheGet() before calling out and aiCachePut() only on a successful non-empty answer. Key on model + max_tokens + prompt; skip tool calls; cap by count and TTL so it never crowds out the recipes.', autofix: null },
   feat_ai_error_states: { fix:'2.5 — AI failures must render aiFailPane()/aiEmptyPane(): plain-language cause, the right link or retry, and always a free-hand paste fallback. Error text must be escaped.', autofix: null },
@@ -2976,6 +2982,17 @@ function syncHealthText() {
   L.push('network: ' + (h.online ? 'online' : 'offline'));
   L.push('last successful sync: ' + fmtAgo(h.lastSyncOkAt));
   L.push('last successful save: ' + fmtAgo(h.lastSaveOkAt));
+  // v36.30 — the dump is what actually gets copied and sent to me, and v36.29
+  // added the Worker row to the PANEL only. Tony copied the dump to answer
+  // "which Worker is live?" and the one line that answered it was missing. Two
+  // renderings of the same panel that disagree about what is in it is a bug in
+  // the reporting tool, which is worse than a bug in a feature.
+  L.push('worker: ' + (_workerHealth === null ? 'not checked'
+    : _workerHealth === false ? 'could not be reached'
+    : (_workerHealth.version || 'reachable, version unknown')
+      + (_workerHealth.appKeyRequired && !_workerHealth.appKeyAccepted ? ' (app key REFUSED)' : '')
+      + (_workerHealth.spend ? ' — AI calls today ' + _workerHealth.spend.dailyUsed
+          + ' of ' + _workerHealth.spend.dailyMax : '')));
   L.push('unsent local edits: ' + (h.offlineQueued ? 'yes' : 'none'));
   L.push('deletions not yet sent: ' + h.pendingDeletes);
   L.push('writes refused this session: ' + h.conflicts);
@@ -3256,7 +3273,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.29';
+var APP_VERSION = 'v36.30';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4075,6 +4092,11 @@ window.addEventListener('unhandledrejection', function(e) {
      language. (Note: `direction: auto` is not a thing — see CLAUDE.md.) */
   .recipe-columns[dir="rtl"] { direction: rtl; }
   .recipe-columns[dir="rtl"] > * { direction: ltr; }
+  /* v36.30 — …except inside a Hebrew recipe, where the reset above left the
+     "Ingredients" and "Method" headings on the left with their own contents on
+     the right. The ltr reset is for an English recipe that merely happens to
+     contain a Hebrew line; this is a recipe that IS Hebrew. */
+  .rtl-recipe .recipe-columns[dir="rtl"] > * { direction: rtl; }
   .recipe-columns[dir="rtl"] .recipe-col-ings,
   .recipe-columns[dir="rtl"] .recipe-col-steps { text-align: start; }
   .recipe-col-ings { position: sticky; top: 0; max-height: 72vh; overflow-y: auto; padding-inline-end: 6px; }
@@ -4525,6 +4547,44 @@ li.line-sub-indent { padding-inline-start: 22px; }
 
 /* Scale & unit */
 .control-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+/* v36.30 — a Hebrew recipe reads right to left, and until now only its CONTENT
+   did. Every label and heading around it — SOUP, NOTES, Method, Ingredients,
+   SCALE INGREDIENTS, the meta row — sat on the left, so the page had a Hebrew
+   recipe pinned to one margin and an English scaffold pinned to the other.
+   recipeIsRTL(r) already existed for the two-column order; this puts the same
+   answer on .modal-content and lets the labels follow the recipe.
+
+   `text-align: start` rather than `right`, with `direction: rtl` on the block:
+   an English word inside a Hebrew heading then still reads correctly, which a
+   blanket `text-align: right` does not guarantee.
+
+   Deliberately NOT flipped: the scale and unit rows. Those are ×0.5 ×1 ×2 and
+   Metric / Imperial — a numeric control strip that means the same in any script
+   and whose order people learn by position. Reversing it would be change for
+   its own sake. */
+.rtl-recipe { direction: rtl; }
+/* An English label in an RTL line: without isolation the colon migrates to the
+   wrong end and "Source:" renders as ":Source". unicode-bidi:isolate keeps the
+   label a self-contained LTR run wherever the surrounding text is going. */
+.rtl-recipe .source-link > span:first-child { unicode-bidi: isolate; }
+.rtl-recipe .modal-section-title,
+.rtl-recipe .modal-category,
+.rtl-recipe .modal-meta,
+.rtl-recipe .control-label,
+.rtl-recipe .line-mark-hint,
+.rtl-recipe .nutrition-title { text-align: start; }
+/* The control strips stay left-to-right, and so does anything that is a row of
+   buttons rather than a line of reading. */
+.rtl-recipe .multiplier-row,
+.rtl-recipe .servings-row,
+.rtl-recipe .conv-row,
+.rtl-recipe .recipe-actions,
+.rtl-recipe .nutrition-grid,
+.rtl-recipe .rating-stars,
+.rtl-recipe .share-panel { direction: ltr; }
+.rtl-recipe .multiplier-row .control-label,
+.rtl-recipe .servings-row .control-label,
+.rtl-recipe .conv-row .control-label { text-align: start; }
 .multiplier-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 /* 3.3 — scale by target servings, sitting under the ×N buttons */
 .servings-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
@@ -4587,6 +4647,24 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--terracotta); }
 .form-textarea { resize: vertical; min-height: 72px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* v36.30 — the Edit modal can use the whole window. The cap of 600px is right
+   for reading a dialog and wrong for editing a recipe: at 1280px it left an
+   ingredient name about 340px of field. The width is a per-device preference,
+   because which screen you are on is the whole of what decides it.
+
+   The fields stretch because they were already width:100% or grid `1fr` — what
+   was holding them was the modal, not themselves. The one exception is the
+   ingredient grid, whose NAME column is given more of the extra room than the
+   amount column: an amount is "500 ml" at any width. */
+.modal.add-modal.wide { max-width: calc(100vw - 24px); }
+.modal.add-modal.wide .ing-row { grid-template-columns: 24px minmax(90px, 1fr) 4fr 28px 28px; }
+.modal.add-modal.wide .ing-row-sub { grid-template-columns: 24px 1fr 28px 28px; }
+.modal.add-modal.wide .form-textarea { min-height: 120px; }
+@media (max-width: 700px) {
+  /* A phone has no width to give away, so the toggle is hidden and the class is
+     inert — see applyEditWide(). */
+  .modal.add-modal.wide { max-width: calc(100vw - 16px); }
+}
 .form-emoji-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
 .emoji-opt { font-size: 21px; padding: 5px 8px; border: 2px solid var(--border); border-radius: 7px; cursor: pointer; background: white; transition: border-color 0.15s; }
 .emoji-opt:hover, .emoji-opt.selected { border-color: var(--terracotta); }
@@ -5755,7 +5833,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.29</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.30</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -5974,7 +6052,14 @@ body.banner-shown .header {
 <!-- ADD / EDIT MODAL -->
 <div class="modal-overlay" id="editOverlay" onclick="bgClose(event,'editOverlay')">
   <div class="modal add-modal">
-    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+    <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;gap:8px;padding:0 8px;z-index:20;pointer-events:none;">
+      <!-- v36.30 — a long ingredient name or a wordy step had ~340px of field to
+           live in on a 1280px screen, because the modal is capped at 600. This
+           widens it to the window. Desktop only: a phone has no width to give,
+           and the button would just be one more thing in the way. -->
+      <button id="editWideBtn" onclick="toggleEditWide()" title="Use the full width of the window"
+        aria-label="Use the full width of the window"
+        style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:15px;color:var(--warm-brown);display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);touch-action:manipulation;flex-shrink:0;">⤢</button>
       <button onclick="closeM('editOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);touch-action:manipulation;-webkit-tap-highlight-color:transparent;flex-shrink:0;">✕</button>
     </div>
     <div class="modal-header" style="margin-top:-8px;"><div class="modal-header-title" id="editTitle">Add a Recipe</div></div>
@@ -6362,7 +6447,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.29</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.30</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9131,7 +9216,7 @@ function drawView(){
       <button class="hero-photo-btn" onclick="event.stopPropagation();changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
     </div>
     ${photoCreditHtml(r)}
-    <div class="modal-content">
+    <div class="modal-content${recipeIsRTL(r) ? ' rtl-recipe' : ''}">
       ${conflictBannerHtml(r)}
       <div class="modal-category">${escH(r.category)}</div>
       <div class="modal-title" dir="auto">${escH(r.name)}</div>
@@ -9140,7 +9225,7 @@ function drawView(){
         <span>⏱ ${escH(r.prep)}</span><span>🍽 ${escH(r.servings)} servings</span>
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;unicode-bidi:isolate;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -9159,7 +9244,7 @@ function drawView(){
 
       <div class="control-label">Scale ingredients</div>
       <div class="multiplier-row">
-        ${[1,2,3,4,5,6].map(m=>`<button class="mult-btn${viewMult===m?' active':''}" onclick="setMult(${m})">×${m}</button>`).join('')}
+        ${[0.5,1,2,3,4,5,6].map(m=>`<button class="mult-btn${viewMult===m?' active':''}" onclick="setMult(${m})">×${m}</button>`).join('')}
       </div>
       ${(function(){
         var base = parseServings(r.servings);
@@ -9205,7 +9290,7 @@ function drawView(){
                   + '</div>';
               }).join('')}</div></details>` : '');
       })()}
-      ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-left:3px solid #D4A843;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
+      ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-inline-start:3px solid #D4A843;border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
       ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (${r.history.length})</summary>
           <div class="cook-log-body">${r.history.map(function(v,vi){
             return '<div class="cook-log-entry">'
@@ -9277,7 +9362,7 @@ function setMult(m){
 }
 
 // ─── SCALE BY SERVINGS (3.3) ─────────────────────────────────────────────────
-// An *addition* to the ×1–×6 buttons, not a replacement: "make it for 6" is how
+// An *addition* to the ×0.5–×6 buttons, not a replacement: "make it for 6" is how
 // you actually think, but ×2 is quicker when that's what you want.
 // Needs a base serving count to divide by; recipes whose servings field is "—"
 // or prose simply don't get the control, rather than getting a broken one.
@@ -10424,6 +10509,42 @@ function parseWordText(text){
 // prevent, one level up.
 var _editBaseAt = null;
 var _editingPartRef = null;
+// ─── THE EDIT MODAL CAN USE THE WHOLE WINDOW (v36.30) ────────────────────────
+// 600px is the right cap for a dialog you read and the wrong one for a form you
+// work in: on a 1280px screen an ingredient name had about 340px of field. The
+// choice is remembered per device, because which screen you are sitting at is
+// the whole of what decides it.
+//
+// Desktop only. A phone has no width to give away, and on one the button would
+// be a third thing in the corner that does nothing useful.
+var EDIT_WIDE_KEY = 'tonys_edit_wide';
+function editWideEnabled() {
+  try { return localStorage.getItem(EDIT_WIDE_KEY) === '1'; } catch(e) { return false; }
+}
+function applyEditWide() {
+  var modal = document.querySelector('#editOverlay .add-modal');
+  var btn = document.getElementById('editWideBtn');
+  if (!modal) return;
+  var roomToGive = window.innerWidth > 700;
+  var on = roomToGive && editWideEnabled();
+  modal.classList.toggle('wide', on);
+  if (btn) {
+    btn.style.display = roomToGive ? 'flex' : 'none';
+    btn.textContent = on ? '\u2921' : '\u2922';
+    var label = on ? 'Back to the normal width' : 'Use the full width of the window';
+    btn.title = label; btn.setAttribute('aria-label', label);
+  }
+}
+function toggleEditWide() {
+  try { localStorage.setItem(EDIT_WIDE_KEY, editWideEnabled() ? '0' : '1'); } catch(e) {}
+  applyEditWide();
+}
+window.editWideEnabled = editWideEnabled; window.applyEditWide = applyEditWide;
+window.toggleEditWide = toggleEditWide;
+// A window resized across the 700px line has to be re-answered: the class is
+// inert on a phone, but the BUTTON would otherwise sit there hidden or stranded.
+window.addEventListener('resize', applyEditWide);
+
 function openAddModal(id){
   editingId=id||null;
   // Any ordinary open clears the part target. editPart sets it AFTER calling
@@ -10458,6 +10579,7 @@ function openAddModal(id){
   // Auto-set isClip if recipe has no ingredients and no steps
   var autoClip = r ? (!r.ingredients||!r.ingredients.length) && (!r.steps||!r.steps.length||r.steps[0]==='Enjoy!') : false;
   if(document.getElementById('f-isclip'))document.getElementById('f-isclip').checked=r?(r.isClip||autoClip):false;
+  applyEditWide();          // v36.30 — honour the remembered width before it is seen
   document.getElementById('editOverlay').classList.add('open');
   _editFormSnapshot = editFormState(); // remember the pristine state (see editFormIsDirty)
 }
@@ -16056,7 +16178,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== VIEWING A RECIPE ===",
   "- Tap any recipe card to open it",
-  "- Scale ingredients: use the ×1–×6 multiplier buttons",
+  "- Scale ingredients: use the ×0.5–×6 multiplier buttons (×0.5 halves a recipe)",
   "- Toggle metric/imperial units",
   "- Hebrew recipes: method steps are right-aligned with step numbers on the right",
   "- Tap the photo to change it (upload from device or search web)",
@@ -19802,12 +19924,34 @@ window.updateMobileButtons = updateMobileButtons;
 // scrolled desktop is a loss for no gain, so the slide is zero above 700px.
 var HEADER_SLIDE_MAX_W = 700;
 var _hdrHidden = 0, _hdrLastY = 0, _hdrTick = false;
+// How far down the screen starts, on a phone with a notch or a dynamic island.
+// The page is `viewport-fit=cover`, so y=0 is UNDER the clock — measured rather
+// than assumed, because env() is not readable from JS any other way.
+function safeAreaTopPx() {
+  var probe = document.getElementById('__safeTopProbe');
+  if (!probe) {
+    probe = document.createElement('div');
+    probe.id = '__safeTopProbe';
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top);'
+      + 'pointer-events:none;visibility:hidden;';
+    document.body.appendChild(probe);
+  }
+  return probe.offsetHeight || 0;
+}
 function headerSlidePx() {
   if (window.innerWidth > HEADER_SLIDE_MAX_W) return 0;
-  var top = document.querySelector('.header-top');
-  // offsetHeight, not a constant: the brand row WRAPS at narrow widths, and a
-  // hardcoded 86 would leave a brown gap on a phone that wrapped it differently.
-  return top ? top.offsetHeight : 0;
+  var header = document.querySelector('.header');
+  if (!header) return 0;
+  // v36.30 — the WHOLE header now, not just the brand row. Search and + Add
+  // Recipe go with it, which Tony asked for: they are a scroll away, and what
+  // is left is the filter bar alone.
+  //
+  // …except for the status-bar strip. Slide the header entirely off a notched
+  // iPhone and the filter bar's chips end up underneath the clock, because the
+  // page is viewport-fit=cover. Leaving exactly the inset behind keeps a band
+  // of brown there, which is the iOS convention anyway. On anything without an
+  // inset this is zero and the header goes completely.
+  return Math.max(0, header.offsetHeight - safeAreaTopPx());
 }
 function applyHeaderGeometry() {
   var header = document.querySelector('.header');

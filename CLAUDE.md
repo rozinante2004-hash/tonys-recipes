@@ -364,46 +364,61 @@ found only because a test was written first and disagreed with the code.
   - Undo is one-shot — a second press must say "Nothing to undo", not rewind
     something unrelated — and `clearBulkUndo()` is called on every path that
     decides not to change anything after all.
-- **The header FOLLOWS YOUR THUMB (v36.23, rewritten v36.27 and v36.28, audit U1).**
-  34% of a 390×844 phone was fixed chrome before a single recipe. Scrolling takes
-  the brand row away — 206 → 112px of header, 34.5% → 23.3% of the screen.
-  Search, the filters and **+ Add Recipe** stay; ⚙️ Settings goes.
-  Three versions, and the differences are the whole story:
+- **The header FOLLOWS YOUR THUMB, and all of it goes (v36.23 → v36.30, audit U1).**
+  34% of a 390×844 phone was fixed chrome before a single recipe. As of v36.30
+  the **whole** brown header travels — search and + Add Recipe with it — leaving
+  the filter bar alone: measured **291 → 85px, 34.5% → 10.1%**.
+  Four versions, and the differences are the story:
   - **v36.23** hid the brand row at a scroll *threshold*. The page jumped.
-  - **v36.27** gave `.header` a negative sticky `top`, so it slid at the pace of
-    the scroll — smooth, and with no scroll handler at all — but **position**-based:
-    from deep in a long list the header only returned near the top.
-  - **v36.28** is **direction**-based, at Tony's request. `_hdrHidden` moves by
-    the scroll **delta**, not the position, clamped to `[0, slide]`, and is
-    written to the sticky `top`; the browser renders at
-    `max(naturalTop, -_hdrHidden)`, which is exactly "wherever the page put it,
-    but never more than `_hdrHidden` out of frame". The cost is a scroll
-    listener (rAF-throttled, two style writes) that v36.27 did not need.
+  - **v36.27** gave `.header` a negative sticky `top` so it slid at the pace of
+    the scroll — but **position**-based: from deep in a list it only came back
+    near the top.
+  - **v36.28** made it **direction**-based. `_hdrHidden` moves by the scroll
+    *delta*, clamped to `[0, slide]`, written to the sticky `top`; the browser
+    renders at `max(naturalTop, -_hdrHidden)`. Costs one rAF-throttled listener.
+  - **v36.30** extended the travel from the brand row to the whole header.
+  - **The status-bar inset is deliberately left behind.** The page is
+    `viewport-fit=cover`, so sliding the header *entirely* off a notched iPhone
+    puts the filter bar's chips under the clock. `headerSlidePx()` is
+    `header.offsetHeight - safeAreaTopPx()`, and `safeAreaTopPx()` measures
+    `env(safe-area-inset-top)` through a hidden probe element — env() cannot be
+    read from JS any other way. On a device with no inset it is 0 and the header
+    goes completely.
   - **`y = window.scrollY || documentElement.scrollTop` is a bug**, and it was in
     here. `scrollY` is a number in every browser this runs in, and a legitimate
     **0** — the top of the page, exactly when the header must be whole — is
     falsy, so the chain fell through to a different element's scroll position.
-    A stale value there makes the next delta enormous and the wrong sign.
   - **The `y <= 0` reset is not redundant.** A rubber-band or a resize can land
-    on y=0 with no movement to report, and without it the header stays part-way
-    out of frame with no scrolling left to bring it back. Its test sets
-    `_hdrLastY = 0` too — otherwise the delta alone does the work and the guard
-    could be deleted unnoticed.
-  - **The travel is measured from the brand row, never a constant** — it *wraps*
-    at narrow widths, and a hardcoded 86 leaves a brown gap on a phone that
-    wraps it differently.
-  - **v36.23 had a dead half.** It also tried to hide `.header-status`, which
-    never happened: that row carries an inline `display:flex`, and **an inline
-    style beats any class rule**. Deleted rather than "fixed".
-  - **`tests/phone-chrome.js` is why any of this is checked.** The behaviour only
-    exists below 700px and the suite runs at the headless default width. Note
-    the trap it caught: the first cut of the self-test wrapped everything in
-    `if (phone)` and **asserted nothing at all** at desktop width — four
-    mutations sailed through it. The suite now stubs `headerSlidePx()` so the
-    delta arithmetic is exercised at any width, and phone-chrome.js measures the
-    pacing in both directions against a real 390×844 viewport, scrolling
+    on y=0 with no movement to report. Its test sets `_hdrLastY = 0` too —
+    otherwise the delta alone does the work and the guard could be deleted
+    unnoticed.
+  - **`tests/phone-chrome.js` is why any of this is checked**, and it holds a
+    *budget*, not a description. Note the trap it caught: the first cut of the
+    self-test wrapped everything in `if (phone)` and **asserted nothing** at
+    desktop width — four mutations sailed through. The suite now stubs
+    `headerSlidePx()` so the delta arithmetic runs at any width; phone-chrome.js
+    measures the pacing in both directions at a real 390×844, scrolling
     *monotonically* (reaching a sample point by scrolling up now moves the
     header, which would read as a jump).
+- **A Hebrew recipe's LABELS read right too (v36.30).** `recipeIsRTL(r)` had been
+  deciding the two-column order since v36.0; v36.30 puts the same answer on
+  `.modal-content` as `.rtl-recipe`, so SOUP, NOTES, Method, Ingredients and the
+  meta row stop sitting on the opposite margin from the recipe.
+  - `.recipe-columns[dir="rtl"] > * { direction: ltr }` exists so the column
+    *order* can flip without dragging each column's internals along — right for
+    an English recipe containing a Hebrew line, wrong for a recipe that **is**
+    Hebrew. `.rtl-recipe` overrides it.
+  - **The control strips stay LTR on purpose**: ×0.5 ×1 ×2 and Metric/Imperial
+    are a numeric strip learned by position, not a line of reading.
+  - An English label inside an RTL line needs **`unicode-bidi: isolate`**, or
+    "Source:" renders as ":Source".
+- **The Edit modal can use the window (v36.30).** 600px is the right cap for a
+  dialog you read and the wrong one for a form you work in — at 1280px an
+  ingredient name had ~340px of field. ⤢ in the corner toggles
+  `max-width: calc(100vw - 24px)`, remembered per device, desktop only. The
+  fields stretch because they were already `width:100%` or grid `1fr`; what held
+  them was the modal. The ingredient grid gives the extra room to the **name**
+  column — an amount is "500 ml" at any width.
 - **The "one item away" count is memoised, and a stale one is a chip that lies
   (v36.23, audit P2).** `missingFromPantry` walks every ingredient of every
   recipe against the whole pantry, on every filter toggle; measured at 1,000
@@ -419,72 +434,40 @@ found only because a test was written first and disagreed with the code.
   working. The no-photo count beside it is deliberately **not** cached: `!r.photo`
   is one read per recipe, so a cache would cost more than it saves and add a
   second thing that can go stale.
-- **A photo's bytes come through the Worker now (v36.24 / Worker v40, audit S2).**
-  `connect-src` carries a bare `https:` that makes the careful allowlist after it
-  decorative. The reason was real: applying a chosen photo downloads its bytes
-  with `fetch()`, and Openverse alone federates Flickr, Wikimedia, NASA and
-  museum collections, so the host set cannot be listed. `fetchPhotoBlob()` asks
-  the Worker's `photo-fetch` first, which turns "anywhere" into one named host —
-  and also fixes image hosts that send no CORS headers of their own.
-  - **The direct fallback is what makes it shippable.** Worker v40 has to be
-    pasted into Cloudflare by hand; until it is, every `photo-fetch` comes back
-    4xx and without the retry choosing a photo would simply be broken. It also
-    answers a 429 on a big auto-fetch burst.
-  - **`https:` stays in `connect-src` until Tony confirms the Worker is live.**
-    Removing it turns the fallback from a safety net into a blocked request.
-    `sec_photo_bytes_via_worker` asserts *both directions*: with a fallback in
-    the code, `https:` must be present; once the fallback is gone, it must not
-    be. They move together or not at all.
+- **A photo's bytes go through the Worker, and ONLY the Worker (v36.24/v36.30,
+  audit S2 — closed).** `connect-src` carried a bare `https:` that allowed every
+  origin and made the allowlist after it decorative. The reason was real:
+  applying a photo downloads its bytes with `fetch()`, and Openverse federates
+  Flickr, Wikimedia, NASA and museums, so the host set cannot be listed.
+  `fetchPhotoBlob()` asks the Worker's `photo-fetch`, which turns "anywhere"
+  into one named host — and also fixes image hosts that send no CORS headers.
+  - **v36.24 shipped with a direct fallback and kept `https:`; v36.30 removed
+    both, once Worker v40 was confirmed live.** They had to move together: a
+    direct retry with `https:` gone is a blocked request, not a rescue.
+    `sec_photo_bytes_via_worker` asserts **both directions** against each other,
+    so neither half can drift alone.
+  - **A refusal now fails loudly, in the Worker's own words.** "Could not
+    download" would send the reader to the photo site to debug our rate limit.
+    Where the Worker gave no reason, the message points at ⚙️ → 📡 Sync Health.
   - **A 200 that is not `image/*` is not the photo.** The Worker answers with
     JSON when it refuses; compressing an error document into a recipe photo is
-    the failure that check exists for. Same rule server-side: non-image content
-    types are refused with 415 rather than relayed.
-  - `photo-fetch` is a fetch-anything primitive, so it is http(s)-only, capped
-    at 12 MB (checked against the body, not just the claimed `content-length`),
-    and behind the origin check, the app key and its own 600/min ceiling —
-    600 because one "auto-fetch missing photos" is 300 in a burst.
+    what that check exists for. Server side, non-image types are 415'd.
+  - `photo-fetch` is a fetch-anything primitive: http(s) only, capped at 12 MB
+    (checked against the body, not the claimed `content-length`), behind the
+    origin check, the app key and its own 600/min ceiling.
   - **Fixed on the way past: `corsFor()` declared `Content-Type:
-    application/json`,** and the fetch wrapper stamps that object on *every*
-    response — so the KV file download has been served as JSON since v36, and
-    `photo-fetch` would have returned an "image" no browser would decode.
-    `jsonResp` sets its own type, so nothing lost one.
-- **`<html lang="en">` is right; the recipes are the problem (v36.25, audit U2).**
-  The interface IS English, so the document language is correct — what was
-  missing is that roughly half the recipes are Hebrew, and a screen reader then
-  reads Hebrew with an English voice, which is not "accented" but
-  unintelligible. Every element holding recipe text already carries `dir="auto"`
-  for bidi alignment (5b.1), so that is the ready-made list of "content, not
-  chrome": `applyContentLang()` walks it after each render and sets `lang` from
-  what is actually in each element. One walk instead of sixty template edits,
-  and it stays right when a recipe is translated. Two traps: a `<textarea>` or
-  `<input>` keeps its text in **`.value`**, not `textContent` — read the wrong
-  one and every Hebrew recipe being typed is marked English; and the generated
-  HTML (print, email, the share page) has no live DOM to walk, so those carry
-  `langAttr()` inline.
-- **The app says what leaves this device (v36.25).** The login screen used to
-  end "Tony's Recipes never stores your data on our servers" — true, and on its
-  own readable as more than it said, because an AI feature sends that recipe's
-  text to Anthropic and an import passes through the Worker. ⚙️ → 🔒 lists every
-  third party, and two rules keep it honest: each entry says what is **sent**,
-  not what the service is; and each is marked "always" or "only if you ask",
-  because lumping those together is how a privacy note stops being read. The
-  relay entry reads the live `proxyConsentState()`, so it cannot go stale the
-  moment someone ticks "never ask again". Its z-index is **above `#loginScreen`
-  (9999)** — the default 200 would open it behind the screen that links to it.
-  Note the same trap applies to `askConfirm` (1300): a confirm raised from the
-  login screen would be invisible.
-- **A test must not WAIT for a backoff it is not testing (v36.26).**
-  `ai_our_own_refusal_is_final` drove the real retry path, whose backoff is
-  2 + 4 + 8 + 16 seconds — so it sat there for **30,004ms**, twenty times the next
-  slowest test, on every run and every device. The waiting was never what was
-  under test; the number of attempts was. Stubbing `window.sleep` holds the same
-  assertions in milliseconds and took the whole suite from 55s back to 25s.
-  Its sibling lesson: the Anthropic-429 half of that test **passed for the wrong
-  reason**. Counting attempts alone was satisfied by a version that
-  short-circuits every 429, because the body it throws is Anthropic's error
-  *object*, which stringifies to `"[object Object]"` and looks to `aiRetryable`
-  like a bare network failure — identical count, wrong behaviour. The message is
-  asserted too now. If a mutation survives, the mutation is not the problem.
+    application/json`,** and the wrapper stamps that on *every* response — so the
+    KV file download was served as JSON from v36 on.
+- **The Worker's live version is on screen (v36.29).** It deploys by hand,
+  separately, and three releases running needed a paste only Tony could do with
+  no way for the app to confirm it landed. ⚙️ → 📡 Sync Health reports the
+  version, the day's AI-call count, and the two failures that otherwise look
+  like nothing: "could not be reached" and "refusing this app's key". Asked once
+  per session. **The copyable dump must carry it too** — v36.29 added the row to
+  the panel only, Tony copied the dump to answer "which Worker is live?", and
+  the one line that answered it was missing (fixed v36.30). Two renderings of
+  the same panel that disagree is a bug in the reporting tool, which is worse
+  than a bug in a feature.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

@@ -32,8 +32,8 @@ const PORT = (function () {
 
 // Budgets, as a share of a 390×844 screen.
 const MAX_CHROME_AT_TOP   = 0.36;   // it was 0.335 — this is headroom, not a target
-const MAX_CHROME_SCROLLED = 0.26;   // measured 0.233 after v36.23
-const MIN_RECLAIMED_PX    = 60;     // measured 86
+const MAX_CHROME_SCROLLED = 0.13;   // measured 0.101 after v36.30 — the bar alone
+const MIN_RECLAIMED_PX    = 150;    // measured 206: the whole header
 
 let failures = [];
 function expect(name, cond, detail) {
@@ -128,10 +128,14 @@ function expect(name, cond, detail) {
   expect(`fixed chrome while scrolling is under ${(MAX_CHROME_SCROLLED * 100).toFixed(0)}%`,
     scrolledShare <= MAX_CHROME_SCROLLED, `${(scrolledShare * 100).toFixed(1)}%`);
 
-  // What a phone is actually for has to survive the collapse. Settings may go —
-  // it is one flick away — but not these.
-  expect('search survives the collapse', scrolled.search, 'the search field went with the header');
-  expect('+ Add Recipe survives the collapse', scrolled.add, 'the primary action went with the header');
+  // v36.30 — the WHOLE header goes now, search and + Add Recipe with it. That
+  // is deliberate: they are one upward scroll away, and what is left is the
+  // filter bar on its own. So the assertion is the opposite of what it was —
+  // and that they come BACK is checked further down, which is the half that
+  // makes this acceptable rather than merely smaller.
+  expect('the whole header goes, not just part of it', scrolled.header <= 2,
+    `${scrolled.header}px of header is still on screen`);
+  expect('the filter bar is what is left', scrolled.bar > 40, `the bar is ${scrolled.bar}px`);
 
   // The filter bar is pinned by an explicit `top`, so it has to be re-pinned
   // when the header shrinks. Getting this wrong is not subtle: it either floats
@@ -176,6 +180,13 @@ function expect(name, cond, detail) {
       `the header shrank ${prev.header - down.header}px — it only moves one way`);
     prev = down;
   }
+
+  // Search and + Add Recipe must be back the moment the header is, or hiding the
+  // whole thing has taken away the two controls a phone is actually for.
+  await scrollTo(y - slideMax - 20);
+  const revealed = await read();
+  expect('scrolling up brings search back', revealed.search, 'search never returned');
+  expect('…and + Add Recipe with it', revealed.add, 'the primary action never returned');
 
   await scrollTo(0);
   const back = await read();
