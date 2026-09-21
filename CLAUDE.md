@@ -500,6 +500,74 @@ found only because a test was written first and disagreed with the code.
     published rules already cover for reading. **A read-only member cannot
     write there**, so a translation they generate works for them and is not
     shared — and the app says so rather than implying it published.
+- **Getting ALL of it translated is a separate problem from translating (v36.32).**
+  Tony's first Hebrew run left the Clips button and every row of the Meal and
+  Diet panels in English. Four distinct causes, all now closed — and the shape
+  of the bug matters more than the four fixes, because the next one will look
+  like this too:
+  - **An icon beside the words made the whole control untranslatable.**
+    `<button><svg/>Clips</button>` and `<label><input type=checkbox>🌅 Breakfast</label>`
+    both hold their text next to a child that is not in the inline list, and the
+    rule "a non-inline child means this is not one sentence" threw the element
+    away entirely. The test is whether the child holds WORDS
+    (`i18nPlaceholderChild`), not what it is called. An empty child is a
+    placeholder; a child with its own text is still a wall.
+  - **The dictionary key is the sentence WITHOUT its bookends.** `i18nEdges()`
+    strips a leading or trailing `{n}` so the icon-prefixed Clips button and the
+    plain one share one key — otherwise the same word gets two translations. The
+    node keeps the whole string, because that is what says where the icon goes
+    back, and an icon does not reorder in Hebrew.
+  - **`i18nUnits(scope)` includes the scope itself.** The observer hands it the
+    node that was just added; before v36.32 that one element was the one thing
+    skipped.
+  - **Text rewritten IN PLACE is not an added node.**
+    `mobileMealBtn.textContent = '🍽 Meal ▾'` in `updateFilterChips()` reverted
+    the label to English on every filter change, and no `childList` record about
+    added nodes ever mentioned it. The observer now watches `characterData` and
+    re-applies to any target carrying `data-i18n-src`. **That makes `i18nApply`
+    idempotence load-bearing** — an unconditional rebuild is now a mutation that
+    wakes the observer that performs the rebuild, forever. Hence `i18nPlan` /
+    `i18nMatchesPlan`.
+  - **A batch can answer with fewer strings than it was asked for** and nothing
+    in the response says so. `i18nTranslateAll` diffs what came back against
+    what went out, retries only the shortfall, and returns `missing`.
+  - **What cannot be catalogued in advance is recorded at the moment it is
+    asked.** A dialog's wording lives inside the function that asks it, so it is
+    not in the DOM when a language is generated and never could be. `i18nApply`
+    notes every key the dictionary could not answer; the 🌐 menu shows the count
+    and offers "Finish translating", which translates only the gap. The app
+    converges on complete by being used.
+- **The self-test suite runs in ENGLISH (v36.32).** Two hundred and fifty tests
+  find a button by the words on it. Tony's first run with the interface in
+  Hebrew reported eight failures, five of which were the suite reading its own
+  feature's output — `a11y_basics` counted every Hebrew-labelled button as
+  "icon-only" because its regex only knew `[A-Za-z0-9]`. `runSelfTests` puts the
+  interface back to English for the duration and restores it in a `finally`.
+  Translating the expectations instead would be a suite that tests the
+  dictionary and goes stale the day a translation is edited.
+- **A test that passes in CI and fails on Tony's devices is usually the test.**
+  Three did, in v36.32, and none of them was the app:
+  - `collect_never_loses_a_recipe` asserted `!recipes.some(isCollection)` over
+    the WHOLE library. Tony owns collections. Assert what the action *added*.
+  - `sub_editor_round_trip` drives a real mouse drag but never opened
+    `#editOverlay`. In a closed modal every rect is 0×0, no drop target is ever
+    found, and the row is appended to the end it was already at — which reads
+    exactly like "drag is broken". It now opens the editor and checks the rows
+    have height before blaming the drag.
+  - `photo_one_shape_no_storage` stubs `URL.createObjectURL` to catch the
+    backup file. Since v36.20 a chosen backup folder is written to directly and
+    no blob is ever made, so on the PC — where Tony has a folder — it said "the
+    backup produced no file" about a file on his disk. Stub `backupDirLoad`.
+  - And one that was Safari, not the test's logic: `localStorage.setItem = fn`
+    **does not shadow the method** there. The Storage object's setter stores a
+    KEY named `setItem` holding the function's source, and the real method keeps
+    working. Stub `Storage.prototype.setItem`.
+- **A Hebrew note was left-aligned because of its own English caption.** The
+  view modal's notes block was one `dir="auto"` div beginning with the word
+  `NOTES`, so the first strong character the browser found was Latin and the
+  whole block resolved left-to-right. A caption and the content it labels are
+  two different languages: give each its own element (v36.32). The same bug was
+  in `buildPrintHtml`, with `<strong>Notes:</strong>` inline.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

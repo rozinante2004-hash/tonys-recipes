@@ -2824,12 +2824,18 @@ window.SELF_TESTS = [
           throw new Error('syncLog threw after finding a corrupt log');
 
         // An unwritable store must not break the caller either.
-        var realSet=localStorage.setItem;
+        // v36.32 — stubbed on Storage.prototype, not on the localStorage object.
+        // In Safari `localStorage.setItem = fn` does not shadow the method: the
+        // Storage object's setter stores a KEY called "setItem" holding the
+        // function's source, and the real method keeps working. So on Tony's
+        // iPhone this test watched syncLog succeed and reported that syncLog
+        // ignores a full disk, while quietly leaving a junk entry behind.
+        var realSet=Storage.prototype.setItem;
         try{
-          localStorage.setItem=function(){ throw new Error('QuotaExceededError'); };
+          Storage.prototype.setItem=function(){ throw new Error('QuotaExceededError'); };
           var res=syncLog('save','while full');
           if(res!==false) throw new Error('syncLog reported success when storage refused the write');
-        } finally { localStorage.setItem=realSet; }
+        } finally { Storage.prototype.setItem=realSet; localStorage.removeItem('setItem'); }
 
         purgeSyncLog();
         if(readSyncLog().length) throw new Error('purge did not empty the log');
@@ -3293,7 +3299,15 @@ window.SELF_TESTS = [
       // but the property is what matters and it must still hold.
       var bR=recipes, bToast=window.toast, bMark=window.markBackupTaken, captured=null;
       var realCreate=URL.createObjectURL, realRevoke=URL.revokeObjectURL, realAppend=document.body.appendChild;
+      // v36.32 — force the DOWNLOAD path. Since v36.20 a chosen backup folder is
+      // written to directly and no blob is ever made, so on Tony's PC — where a
+      // folder is chosen — this said "the backup produced no file" about a
+      // backup that had just been written to his disk. What is under test here
+      // is whether the file is self-contained, not which of the two ways out it
+      // took; the folder path has its own test.
+      var bDir=window.backupDirLoad;
       try{
+        window.backupDirLoad=function(){ return Promise.resolve(null); };
         window.toast=function(){}; window.markBackupTaken=function(){};
         URL.createObjectURL=function(blob){ captured=blob; return 'blob:stub'; };
         URL.revokeObjectURL=function(){};
@@ -3310,6 +3324,7 @@ window.SELF_TESTS = [
           throw new Error('the temporary backup field leaked into the exported file');
       } finally {
         recipes=bR; window.toast=bToast; window.markBackupTaken=bMark;
+        window.backupDirLoad=bDir;
         URL.createObjectURL=realCreate; URL.revokeObjectURL=realRevoke;
         document.body.appendChild=realAppend;
       }
@@ -6615,6 +6630,11 @@ window.SELF_TESTS = [
         recipes.unshift(normalizeRecipe({ id:978402, uid:'k2', name:'Also keeper', category:'Soup',
           bg:'#fff', ingredients:[{a:'2',n:'y'}], steps:['s'] }));
         var n=recipes.length;
+        // v36.32 — what matters is that no NEW collection appears, not that the
+        // library contains none. Tony has made collections; on his library this
+        // test failed on both his devices from the first assertion, and said
+        // "a short collection was created and kept" about one he made in March.
+        var collectionsBefore=recipes.filter(isCollection).map(function(r){ return r.id; });
         selectedIds=new Set([978401,978402]);
         // Force the exact failure: a normalizePart that strips one part's
         // content, so the collection silently comes out one recipe short.
@@ -6625,8 +6645,10 @@ window.SELF_TESTS = [
         };
         await collectSelectedInto(null);
 
-        if(recipes.some(isCollection))
-          throw new Error('a short collection was created and kept');
+        var madeNow=recipes.filter(isCollection)
+          .filter(function(r){ return collectionsBefore.indexOf(r.id)===-1; });
+        if(madeNow.length)
+          throw new Error('a short collection was created and kept: '+JSON.stringify(madeNow[0].name));
         if(recipes.length!==n)
           throw new Error('the library changed by '+(recipes.length-n)+' — something was created or destroyed');
         if(!recipes.some(function(r){ return r.id===978401; }) ||
@@ -7111,6 +7133,13 @@ window.SELF_TESTS = [
       // <html lang="en"> is correct — the INTERFACE is English. What was missing
       // is that roughly half the recipes are not, and a screen reader then reads
       // Hebrew with an English voice, which is not "accented" but unintelligible.
+      //
+      // Since v36.31 the interface itself can be another language and this
+      // attribute follows it, which is right. The literal 'en' below is not a
+      // stale assumption: v36.32 puts the interface back to English for the
+      // duration of a run, so this is 'en' during a run whatever Tony is
+      // reading. Do not "fix" it to i18nLang() — that reads the stored
+      // preference, which is still Hebrew while the DOM is English.
       if(document.documentElement.lang !== 'en')
         throw new Error('the document language is "'+document.documentElement.lang+'" — the UI is English');
 
@@ -7260,6 +7289,125 @@ window.SELF_TESTS = [
 
       if(!document.querySelector('#settingsDrop button[onclick*="openSyncHealth"]'))
         throw new Error('Sync Health is not reachable from Settings');
+    } },
+
+  { id:'i18n_translates_all_of_it', group:'UI', name:'Every button is translated, not just the easy ones (v36.32)',
+    test: async()=>{
+      ['i18nInstall','i18nPlaceholderChild','i18nEdges','i18nMissingList','i18nGapList']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // The exact shapes that were being thrown away. A button whose text sits
+      // next to an <svg> icon, and a checkbox row — the Clips button and every
+      // line of the Meal and Diet panels. The old rule said "a non-inline child
+      // means this is not one sentence" and dropped the whole element, so those
+      // strings were never even offered to the translator. Tony found them by
+      // reading his own app in Hebrew.
+      var host=document.createElement('div');
+      host.innerHTML='<button id="zzIcon"><svg width="4" height="4"><path d="M0 0"/></svg>Clips</button>'
+        + '<label id="zzChk"><input type="checkbox">🌅 Breakfast</label>'
+        + '<div id="zzBlock">Heading<p>a paragraph of its own</p></div>'
+        + '<div id="zzLink">Paste it <a href="#">here</a> and press Go</div>';
+      document.body.appendChild(host);
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang();
+      try{
+        var cat=i18nCatalogue(host);
+        ['Clips','🌅 Breakfast'].forEach(function(s){
+          if(cat.indexOf(s)===-1)
+            throw new Error('"'+s+'" is not in the catalogue — an icon or a checkbox beside the words '
+              + 'is making the whole control untranslatable: '+JSON.stringify(cat));
+        });
+        // …and the key is the words alone. "{1}Clips" would be a second,
+        // separate key from the plain "Clips" button on the desktop filter bar,
+        // so the same word could come back with two different translations.
+        if(cat.some(function(s){ return /^\{\d\}/.test(s) || /\{\d\}$/.test(s); }))
+          throw new Error('a key still carries its icon placeholder: '+JSON.stringify(cat));
+        // A child that holds ITS OWN words is still a wall — otherwise an outer
+        // div would claim the paragraph inside it and translate both as one.
+        if(cat.indexOf('Heading')!==-1)
+          throw new Error('an element wrapping a real block child was treated as one sentence');
+        // An interior placeholder stays, because word order moves it.
+        if(cat.indexOf('Paste it {1} and press Go')===-1)
+          throw new Error('a link inside a sentence lost its placeholder: '+JSON.stringify(cat));
+
+        var dict={}; cat.forEach(function(s){ dict[s]='«'+s+'»'; });
+        delete dict['Clips'];                     // one deliberately not translated
+        i18nInstall('he', dict);
+        i18nApply(host);
+
+        var icon=document.getElementById('zzIcon'), chk=document.getElementById('zzChk');
+        if(!icon.querySelector('svg')) throw new Error('translating a button ate its icon');
+        if(!chk.querySelector('input[type=checkbox]')) throw new Error('translating a row ate its checkbox');
+        if(chk.firstChild.nodeType!==1)
+          throw new Error('the checkbox moved behind the words — an icon is not a word and does not reorder');
+        if(chk.textContent.trim()!=='«🌅 Breakfast»')
+          throw new Error('the checkbox row was not translated: '+JSON.stringify(chk.textContent));
+        if(!/^Clips$/.test(icon.textContent.trim()))
+          throw new Error('an untranslated string was not left alone: '+JSON.stringify(icon.textContent));
+        // The one the dictionary could not answer is REMEMBERED, which is the
+        // whole mechanism behind "Finish translating".
+        if(i18nMissingList().indexOf('Clips')===-1)
+          throw new Error('a string with no translation was not recorded as missing');
+        if(i18nGapList().indexOf('Clips')===-1)
+          throw new Error('the gap list does not contain the string that is visibly still English');
+
+        // Applying twice must change NOTHING. Since v36.32 the observer also
+        // watches elements it has already translated, so an unconditional
+        // rebuild is a mutation that wakes the observer that does the rebuild.
+        var was=document.getElementById('zzLink').innerHTML;
+        i18nApply(host);
+        if(document.getElementById('zzLink').innerHTML!==was)
+          throw new Error('applying twice rewrote the DOM — this loops forever with the observer running');
+
+        // English comes back WITH its checkbox. Checked before anything below
+        // rewrites a label in place, because that is destructive by nature.
+        i18nInstall('en', null); i18nRevertAll();
+        if(!chk.querySelector('input[type=checkbox]'))
+          throw new Error('reverting to English threw the checkbox away');
+        if(chk.textContent.trim()!=='🌅 Breakfast')
+          throw new Error('reverting left: '+JSON.stringify(chk.textContent));
+
+        // Text replaced IN PLACE, the way updateFilterChips() does it, is put
+        // back. Nothing is added or removed, so only a characterData record
+        // ever mentions it.
+        i18nInstall('he', dict); i18nApply(host); i18nStartObserver();
+        var plain=document.getElementById('zzBlock').querySelector('p');
+        plain.textContent='a paragraph of its own';
+        chk.textContent='🌅 Breakfast';          // this one takes the checkbox with it
+        await new Promise(function(r){ setTimeout(r, 260); });
+        if(plain.textContent.trim()!=='«a paragraph of its own»')
+          throw new Error('a label rewritten in place stayed English: the observer only watches added nodes');
+        // …and the icon's placeholder must not be printed now that there is no
+        // icon left for it to stand for.
+        if(/\{\d\}/.test(chk.textContent))
+          throw new Error('a placeholder leaked into the visible label: '+JSON.stringify(chk.textContent));
+      } finally {
+        try{ i18nRevertAll(); }catch(e){}
+        i18nInstall(prevLang, prevDict);
+        host.remove();
+      }
+
+      // A batch that silently returns fewer strings than it was given is the
+      // other half of "not everything was translated". It must be retried, and
+      // whatever still will not come back must be COUNTED rather than dropped.
+      var realAI=window.aiCall, calls=0;
+      try{
+        window.aiCall=function(prompt){
+          calls++;
+          var asked=JSON.parse(prompt.slice(prompt.indexOf('Strings:\n')+9));
+          var out={};
+          // First pass answers all but the last two; the retry answers one more.
+          var give=(calls===1) ? asked.slice(0, Math.max(0, asked.length-2)) : asked.slice(0,1);
+          give.forEach(function(s){ out[s]='x'+s; });
+          return Promise.resolve(JSON.stringify(out));
+        };
+        var res=await i18nTranslateAll('he', ['a','b','c','d','e']);
+        if(calls<2) throw new Error('a batch that came back short was not retried');
+        if(res.missing!==1)
+          throw new Error('it reported '+res.missing+' missing, not the 1 that really never came back');
+        if(!res.missingList || res.missingList.indexOf('e')===-1)
+          throw new Error('the missing string was not named: '+JSON.stringify(res.missingList));
+        if(res.dict['d']!=='xd') throw new Error('the retry’s answer was thrown away');
+      } finally { window.aiCall=realAI; }
     } },
 
   { id:'i18n_never_touches_a_recipe', group:'UI', name:'Translating the interface never touches a recipe (v36.31)',
@@ -9267,6 +9415,20 @@ window.SELF_TESTS = [
 
   { id:'sub_editor_round_trip', group:'UI', name:'Sub-titles and indents survive the editor (v36.4)',
     test: async()=>{
+      // v36.32 — OPEN THE EDITOR FIRST. This test drives a real mouse drag, and
+      // a drag is decided entirely by getBoundingClientRect(). Inside a closed
+      // modal every rect is 0×0 at 0,0, so every row's midpoint is identical,
+      // no drop target is ever found, and the row is appended to the end it was
+      // already at: the order does not change and the test reports that drag is
+      // broken. It was not. It reported that on both of Tony's browsers while
+      // passing in CI, because whether #editOverlay happened to be open came
+      // down to which test ran before it.
+      var overlayWasOpen = false;
+      var ov = document.getElementById('editOverlay');
+      if(!ov) throw new Error('#editOverlay is not in the page, so the ingredient editor cannot be tested');
+      overlayWasOpen = ov.classList.contains('active') || ov.style.display==='flex';
+      if(!overlayWasOpen){ ov.style.display='flex'; ov.classList.add('active'); }
+      try{
       // The model can hold it; what matters is whether the EDITOR gives it back
       // unchanged. This is the round trip a real edit makes.
       var ings = [ { a:'1 Kg', n:'chicken breast' }, { sub:'Brine option #1' },
@@ -9323,6 +9485,11 @@ window.SELF_TESTS = [
           clientY: host0.querySelectorAll('.ing-row')[toIdx].getBoundingClientRect().top+1}));
         document.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
       };
+      // Say so plainly if the rows have no geometry, instead of blaming the drag.
+      var probe = host0.querySelectorAll('.ing-row')[0].getBoundingClientRect();
+      if(!probe.height)
+        throw new Error('the ingredient rows have no height, so a drag cannot be measured — '
+          + 'the editor is not on screen. This is the harness, not the drag.');
       var plainBefore = ord();
       dragRow(4, 0);
       if(ord()===plainBefore)
@@ -9399,6 +9566,9 @@ window.SELF_TESTS = [
         if(ta.value.split('\n')[0]!=='# Boil water')
           throw new Error('the remembered line was lost when focus moved: '+ta.value.split('\n')[0]);
       } finally { ta.value = old; loadIngsTable([]); }
+      } finally {
+        if(!overlayWasOpen){ ov.classList.remove('active'); ov.style.display=''; }
+      }
     } },
 
   { id:'sub_every_consumer', group:'Import/Export', name:'Nothing downstream mistakes a sub-title for content (v36.4)',

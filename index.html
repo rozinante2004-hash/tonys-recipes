@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.31 -->
+<!-- Tony's Recipes Collection v36.32 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1779,6 +1779,29 @@ async function runSelfTests() {
   _selfTestNotRun = SELF_TESTS.filter(t=>!selected.includes(t.id)).map(t=>t.id);
   _selfTestStartedAt = new Date();
 
+  // v36.32 — THE SUITE RUNS IN ENGLISH. Two hundred and fifty of these tests
+  // find a button by the words on it, and after v36.31 those words can be in
+  // Hebrew. Tony's first run with the interface translated reported eight
+  // failures, five of which were the suite reading its own feature's output:
+  // “⚙️ → Send my photos to the cloud” was genuinely in the menu, in Hebrew.
+  //
+  // Translating the expectations instead would be a suite that tests the
+  // dictionary rather than the app, and would go stale the day a translation is
+  // edited. So the interface is put back to English for the duration and
+  // restored afterwards, exactly as the suite already does with `recipes`. The
+  // translated interface gets its own tests, which install a dictionary on
+  // purpose and take it off again.
+  var _langWas = (typeof i18nLang === 'function') ? i18nLang() : 'en';
+  var _dictWas = null;
+  if (_langWas !== 'en' && typeof i18nInstall === 'function') {
+    _dictWas = i18nCurrentDict();
+    i18nInstall('en', null);
+    i18nRevertAll();
+    i18nApplyDirection();
+    await wait(60);
+  }
+  try {
+
   for(let i=0; i<toRun.length; i++) {
     const t = toRun[i];
     const statusEl  = document.getElementById('ststat_'+t.id);
@@ -1809,6 +1832,15 @@ async function runSelfTests() {
     }
 
     await wait(120); // small delay between tests
+  }
+
+  } finally {
+    // Back into the language Tony was reading, whatever happened above.
+    if (_langWas !== 'en' && typeof i18nInstall === 'function' && _dictWas) {
+      i18nInstall(_langWas, _dictWas);
+      i18nApply(document.body);
+      i18nApplyDirection();
+    }
   }
 
   _selfTestRunning = false;
@@ -3273,7 +3305,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.31';
+var APP_VERSION = 'v36.32';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5833,7 +5865,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.31</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.32</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6455,7 +6487,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.31</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.32</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7964,6 +7996,32 @@ function i18nLangName(code) {
 var I18N_INLINE = /^(STRONG|B|EM|I|A|CODE|SPAN|SMALL|U|KBD|MARK|BR)$/;
 var I18N_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|SVG|PATH|CIRCLE|LINE|RECT|G)$/;
 
+// v36.32 — the same is true of an element that carries no words of its own.
+// This is the fix for the class of strings that stayed English:
+//
+//     <button><svg .../>Clips</button>
+//     <label><input type="checkbox">🌅 Breakfast</label>
+//
+// Both hold their text beside a child that is NOT in the inline list, and the
+// old rule — "a non-inline child means this is not one sentence" — threw the
+// whole element away. So the Clips button, and every row of the Meal and Diet
+// panels, was never offered for translation at all. An icon or a checkbox is
+// not a second sentence; it is punctuation with a picture on it. The test that
+// matters is whether the child holds WORDS, not what it is called.
+function i18nPlaceholderChild(c) {
+  if (!c || c.nodeType !== 1) return false;
+  if (I18N_INLINE.test(c.tagName)) return true;
+  return !(c.textContent && c.textContent.trim());
+}
+// "{1}Clips" → { pre:'{1}', core:'Clips', post:'' }. Only the leading and
+// trailing runs: "paste {1} and press {2}" is one sentence with the links
+// inside it, and the model has to be told where they go.
+function i18nEdges(src) {
+  var m = /^((?:\{\d+\}\s*)*)([\s\S]*?)((?:\s*\{\d+\})*)$/.exec(String(src == null ? '' : src));
+  if (!m) return { pre: '', core: String(src || ''), post: '' };
+  return { pre: m[1], core: m[2].trim(), post: m[3] };
+}
+
 function i18nSkip(el) {
   for (var n = el; n && n !== document.body; n = n.parentElement) {
     if (!n.getAttribute) continue;
@@ -8007,16 +8065,29 @@ function i18nUnits(root) {
       for (var i = 0; i < el.childNodes.length; i++) {
         var c = el.childNodes[i];
         if (c.nodeType === 3) { parts.push(c.nodeValue); continue; }
-        if (c.nodeType === 1 && I18N_INLINE.test(c.tagName)) { parts.push('{' + (++n) + '}'); continue; }
-        ok = false; break;                    // a block child: not one sentence
+        if (i18nPlaceholderChild(c)) { parts.push('{' + (++n) + '}'); continue; }
+        ok = false; break;                    // a child holding its OWN words
       }
       if (!ok) return null;
       src = parts.join('').replace(/\s+/g, ' ').trim();
     }
-    return i18nTranslatable(src) ? { el: el, attr: null, src: src } : null;
+    // A placeholder at the very START or END is an icon, not a word — and
+    // "{1}Clips" is a horrible thing to hand a translator, on top of being a
+    // different key from the "Clips" button on the desktop bar, which would get
+    // its own separate and possibly different translation. So the DICTIONARY
+    // KEY is the sentence without its bookends, while the node keeps the whole
+    // thing, because that is what says where the icon goes back.
+    var e = i18nEdges(src);
+    return i18nTranslatable(e.core)
+      ? { el: el, attr: null, src: src, key: e.core, pre: e.pre, post: e.post }
+      : null;
   }
 
-  var all = scope.querySelectorAll('*');
+  // The scope itself, not only its descendants. The observer hands us the node
+  // that was just added — a toast, a dialog body — and until v36.32 the one
+  // element we were actually told about was the one we skipped.
+  var all = Array.prototype.slice.call(scope.querySelectorAll('*'));
+  if (scope.nodeType === 1 && scope !== document.body) all.unshift(scope);
   for (var i = 0; i < all.length; i++) {
     var el = all[i];
     if (I18N_SKIP_TAGS.test(el.tagName) || i18nSkip(el)) continue;
@@ -8031,7 +8102,9 @@ function i18nUnits(root) {
       if (skipAttrs.indexOf(a) !== -1) return;
       var cur = el.getAttribute('data-i18n-' + a);
       if (cur === null) cur = el.getAttribute(a);
-      if (cur !== null && i18nTranslatable(cur)) out.push({ el: el, attr: a, src: cur });
+      if (cur !== null && i18nTranslatable(cur)) {
+        out.push({ el: el, attr: a, src: cur, key: cur, pre: '', post: '' });
+      }
     });
     // …and the element's own words, but only if it is the one that HOLDS them:
     // an outer <div> wrapping a <p> would otherwise claim the paragraph's text.
@@ -8049,9 +8122,62 @@ function i18nUnits(root) {
 // Every distinct English string the interface can currently show.
 function i18nCatalogue(root) {
   var seen = Object.create(null);
-  i18nUnits(root).forEach(function(u){ seen[u.src] = true; });
+  i18nUnits(root).forEach(function(u){ seen[u.key] = true; });
   return Object.keys(seen).sort();
 }
+
+// ─── THE PART THAT CANNOT BE CATALOGUED IN ADVANCE (v36.32) ──────────────────
+// "Every distinct string the interface CAN CURRENTLY SHOW" is the honest limit
+// of the line above, and it is not the same as every string the interface has.
+// A confirmation dialog's wording lives inside the function that asks it. The
+// photo search panel's labels exist only after a search. Half the settings
+// panels are built the first time they are opened. None of that is in the DOM
+// when a language is generated, so none of it could be translated — which is
+// exactly what Tony saw and had no way to fix from the editor, because it was
+// never in the file to edit.
+//
+// The answer is to stop pretending the catalogue is complete and to record what
+// the dictionary could not answer AT THE MOMENT IT IS ASKED. Every screen he
+// opens teaches the app one more thing it is missing, and "Finish translating"
+// fills them in for a few pennies. It converges on the whole app by being used.
+var I18N_MISS_PREFIX = 'tonys_i18n_miss_';
+var _i18nMissing = Object.create(null);
+var _i18nMissDirty = false, _i18nMissTick = false;
+
+function i18nMissKey(lang) { return I18N_MISS_PREFIX + (lang || _i18nLang || 'en'); }
+function i18nLoadMissing(lang) {
+  _i18nMissing = Object.create(null);
+  try {
+    var raw = localStorage.getItem(i18nMissKey(lang));
+    if (raw) JSON.parse(raw).forEach(function(s){ _i18nMissing[s] = 1; });
+  } catch(e) {}
+}
+function i18nMissingList() { return Object.keys(_i18nMissing).sort(); }
+function i18nMissingCount() { return Object.keys(_i18nMissing).length; }
+function i18nNoteMissing(src) {
+  if (!src || _i18nMissing[src]) return;
+  // A string the dictionary answers with the English itself is not missing —
+  // rule 7 of the prompt asks the model to do exactly that for proper nouns.
+  _i18nMissing[src] = 1;
+  _i18nMissDirty = true;
+  if (_i18nMissTick) return;
+  // Written once per frame, not once per string: this fires inside the render
+  // loop, and localStorage is synchronous.
+  _i18nMissTick = true;
+  setTimeout(function() {
+    _i18nMissTick = false;
+    if (!_i18nMissDirty) return;
+    _i18nMissDirty = false;
+    try { localStorage.setItem(i18nMissKey(), JSON.stringify(i18nMissingList())); } catch(e) {}
+    if (typeof renderLangMenu === 'function') renderLangMenu();
+  }, 400);
+}
+function i18nClearMissing(done) {
+  done.forEach(function(s){ delete _i18nMissing[s]; });
+  try { localStorage.setItem(i18nMissKey(), JSON.stringify(i18nMissingList())); } catch(e) {}
+}
+window.i18nMissingList = i18nMissingList; window.i18nMissingCount = i18nMissingCount;
+window.i18nNoteMissing = i18nNoteMissing; window.i18nLoadMissing = i18nLoadMissing;
 
 // ─── APPLYING ────────────────────────────────────────────────────────────────
 // Idempotent, and reversible: the English original is parked on the node the
@@ -8065,7 +8191,12 @@ function i18nApply(root) {
     var units = i18nUnits(root);
     for (var i = 0; i < units.length; i++) {
       var u = units[i];
-      var to = _i18nDict ? _i18nDict[u.src] : null;
+      var to = _i18nDict ? _i18nDict[u.key] : null;
+      // v36.32 — anything the dictionary cannot answer is REMEMBERED rather
+      // than silently left in English. This is the only mechanism that can see
+      // a string which exists solely inside a function that has not run yet,
+      // and it is what "Finish translating" works from.
+      if (!to && _i18nLang !== 'en') i18nNoteMissing(u.key);
       if (u.attr) {
         if (u.el.getAttribute('data-i18n-' + u.attr) === null) u.el.setAttribute('data-i18n-' + u.attr, u.src);
         var vAttr = (to && String(to).trim()) ? to : u.src;
@@ -8073,39 +8204,71 @@ function i18nApply(root) {
         continue;
       }
       if (u.el.getAttribute('data-i18n-src') === null) u.el.setAttribute('data-i18n-src', u.src);
-      var v = (to && String(to).trim()) ? String(to) : u.src;
-      // Put the inline children back where the translation says they belong —
-      // which in Hebrew is frequently not where they started.
+      // The icon goes back on the side it came from. Not the side the
+      // translation would put it on — an icon is not a word, and in Hebrew a
+      // leading icon is still leading.
+      var v = (to && String(to).trim()) ? (u.pre + String(to) + u.post) : u.src;
+      // Put the children back where the translation says they belong — which in
+      // Hebrew is frequently not where they started.
       var kids = [];
       for (var c = 0; c < u.el.childNodes.length; c++) {
-        var ch = u.el.childNodes[c];
-        if (ch.nodeType === 1 && I18N_INLINE.test(ch.tagName)) kids.push(ch);
+        if (i18nPlaceholderChild(u.el.childNodes[c])) kids.push(u.el.childNodes[c]);
       }
       if (!kids.length) {
-        if (u.el.textContent !== v) { u.el.textContent = v; n++; }
+        // A placeholder with nothing left to stand for is dropped, not printed.
+        // Reachable in one way: something rewrote this element's textContent in
+        // place and took the icon with it — which is exactly the case v36.32
+        // taught the observer to heal, so without this the healed label reads
+        // "{1}Clips".
+        var vt = (v.indexOf('{') === -1) ? v : i18nPlan(v, []).join('');
+        if (u.el.textContent !== vt) { u.el.textContent = vt; n++; }
         continue;
       }
+      var plan = i18nPlan(v, kids);
+      // v36.32 — would rebuilding change anything? It has to be asked. Since
+      // this release the observer also watches elements it has already
+      // translated, and an unconditional innerHTML rewrite there is a mutation
+      // that wakes the observer that performs the rewrite: a loop that spins
+      // for as long as the page is open.
+      if (i18nMatchesPlan(u.el, plan)) continue;
       var frag = document.createDocumentFragment();
-      var pieces = v.split(/(\{\d+\})/);
-      var used = {};
-      for (var p = 0; p < pieces.length; p++) {
-        var m = /^\{(\d+)\}$/.exec(pieces[p]);
-        if (m) {
-          var kid = kids[parseInt(m[1], 10) - 1];
-          if (kid && !used[m[1]]) { frag.appendChild(kid); used[m[1]] = 1; }
-        } else if (pieces[p]) {
-          frag.appendChild(document.createTextNode(pieces[p]));
-        }
+      for (var p = 0; p < plan.length; p++) {
+        frag.appendChild(typeof plan[p] === 'string' ? document.createTextNode(plan[p]) : plan[p]);
       }
-      // A translation that dropped a placeholder must not drop the LINK it
-      // stood for. Anything unclaimed goes back on the end rather than vanishing.
-      for (var q = 0; q < kids.length; q++) if (!used[String(q + 1)]) frag.appendChild(kids[q]);
       u.el.innerHTML = '';
       u.el.appendChild(frag);
       n++;
     }
   } finally { _i18nApplying = false; }
   return n;
+}
+
+// The children, in the order the translated sentence asks for, with the text
+// between them. A translation that dropped a placeholder must not drop the LINK
+// or the CHECKBOX it stood for: anything unclaimed goes back on the end rather
+// than vanishing.
+function i18nPlan(text, kids) {
+  var plan = [], used = {};
+  String(text).split(/(\{\d+\})/).forEach(function(piece) {
+    var m = /^\{(\d+)\}$/.exec(piece);
+    if (m) {
+      var kid = kids[parseInt(m[1], 10) - 1];
+      if (kid && !used[m[1]]) { plan.push(kid); used[m[1]] = 1; }
+    } else if (piece) {
+      plan.push(piece);
+    }
+  });
+  for (var q = 0; q < kids.length; q++) if (!used[String(q + 1)]) plan.push(kids[q]);
+  return plan;
+}
+function i18nMatchesPlan(el, plan) {
+  if (el.childNodes.length !== plan.length) return false;
+  for (var i = 0; i < plan.length; i++) {
+    var cur = el.childNodes[i], want = plan[i];
+    if (typeof want === 'string') { if (cur.nodeType !== 3 || cur.nodeValue !== want) return false; }
+    else if (cur !== want) return false;
+  }
+  return true;
 }
 
 // ─── WHERE A TRANSLATION LIVES ───────────────────────────────────────────────
@@ -8199,27 +8362,53 @@ function i18nPrompt(lang, batch) {
 }
 // Translate the catalogue. `onProgress(done, total)` so a 10-batch run is not a
 // spinner that looks identical to a hang.
-async function i18nTranslateAll(lang, catalogue, onProgress) {
-  var dict = {}, failed = 0;
+async function i18nTranslateAll(lang, catalogue, onProgress, into) {
+  var dict = into || {}, failed = 0;
   var batches = [];
   for (var i = 0; i < catalogue.length; i += I18N_BATCH) batches.push(catalogue.slice(i, i + I18N_BATCH));
+
+  async function runBatch(batch) {
+    var raw = await aiCall(i18nPrompt(lang, batch), Math.min(8000, 400 + batch.length * 90));
+    var obj = extractJSON(raw) || {};
+    Object.keys(obj).forEach(function(k){
+      if (typeof obj[k] === 'string' && obj[k].trim()) dict[k] = obj[k].trim();
+    });
+  }
+  // What a batch was ASKED for, minus what it answered. A model handed sixty
+  // strings can return fifty-eight and nothing about the response says so —
+  // which is how a translation ends up looking done while a scattering of
+  // buttons stays English with no explanation. v36.32 counts them.
+  function shortfall(batch) {
+    return batch.filter(function(s){ return !dict[s]; });
+  }
+
+  var leftover = [];
   for (var b = 0; b < batches.length; b++) {
     if (onProgress) onProgress(b, batches.length);
     try {
-      var raw = await aiCall(i18nPrompt(lang, batches[b]), Math.min(8000, 400 + batches[b].length * 90));
-      var obj = extractJSON(raw) || {};
-      Object.keys(obj).forEach(function(k){
-        if (typeof obj[k] === 'string' && obj[k].trim()) dict[k] = obj[k].trim();
-      });
+      await runBatch(batches[b]);
+      var short = shortfall(batches[b]);
+      // One retry, of only the strings it skipped. A second full batch would
+      // cost the whole batch again to recover two lines of it.
+      if (short.length) {
+        try { await runBatch(short); } catch(e) {}
+        leftover = leftover.concat(shortfall(batches[b]));
+      }
     } catch(e) {
       // One batch out of ten is not a reason to lose the other nine — the
       // strings it held simply stay English, and re-running fills them in.
       failed++;
+      leftover = leftover.concat(batches[b]);
       syncLog('error', 'A translation batch failed for ' + lang, String(e && e.message).slice(0, 160));
     }
   }
   if (onProgress) onProgress(batches.length, batches.length);
-  return { dict: dict, failed: failed, batches: batches.length };
+  if (leftover.length) {
+    syncLog('warn', leftover.length + ' string(s) came back untranslated for ' + lang,
+      leftover.slice(0, 8).join(' · '));
+  }
+  return { dict: dict, failed: failed, batches: batches.length,
+           missing: leftover.length, missingList: leftover };
 }
 window.i18nPrompt = i18nPrompt; window.i18nTranslateAll = i18nTranslateAll;
 
@@ -8240,6 +8429,18 @@ function i18nStartObserver() {
     for (var i = 0; i < records.length; i++) {
       var added = records[i].addedNodes;
       for (var j = 0; j < added.length; j++) if (added[j].nodeType === 1) _i18nPending.push(added[j]);
+      // v36.32 — text rewritten IN PLACE on an element we have already
+      // translated. `mobileMealBtn.textContent = '🍽 Meal ▾'` in
+      // updateFilterChips() is the case Tony saw: the button is not replaced,
+      // so nothing is "added" and the old observer never heard about it — the
+      // label simply reverted to English on the next filter change and stayed
+      // there. The English parked on the node is still correct, so re-applying
+      // is all that is needed.
+      var t = records[i].target;
+      if (t && t.nodeType === 3) t = t.parentElement;
+      if (t && t.nodeType === 1 && t.getAttribute && t.getAttribute('data-i18n-src') !== null) {
+        _i18nPending.push(t);
+      }
     }
     if (!_i18nPending.length || _i18nTick) return;
     _i18nTick = true;
@@ -8251,8 +8452,9 @@ function i18nStartObserver() {
       }
     });
   });
-  _i18nObserver.observe(document.body, { childList: true, subtree: true });
+  _i18nObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 }
+window.i18nStartObserver = i18nStartObserver;
 
 // ─── SWITCHING ───────────────────────────────────────────────────────────────
 // Before leaving a language, make sure its file exists — Tony's requirement, and
@@ -8275,6 +8477,7 @@ async function i18nSetLanguage(lang) {
 
   if (lang === 'en') {
     _i18nDict = null; _i18nLang = 'en';
+    _i18nMissing = Object.create(null);
     try { localStorage.setItem(I18N_LANG_KEY, 'en'); } catch(e) {}
     i18nRevertAll();
     i18nApplyDirection();
@@ -8290,6 +8493,10 @@ async function i18nSetLanguage(lang) {
   }
   _i18nDict = dict; _i18nLang = lang;
   try { localStorage.setItem(I18N_LANG_KEY, lang); } catch(e) {}
+  // What this language was missing last time is still missing now, unless the
+  // dictionary that just loaded has since answered it.
+  i18nLoadMissing(lang);
+  i18nClearMissing(i18nMissingList().filter(function(s){ return !!dict[s]; }));
   i18nApply(document.body);
   i18nApplyDirection();
   i18nStartObserver();
@@ -8307,17 +8514,17 @@ function i18nRevertAll() {
       var src = els[i].getAttribute('data-i18n-src');
       var kids = [];
       for (var c = 0; c < els[i].childNodes.length; c++) {
-        var ch = els[i].childNodes[c];
-        if (ch.nodeType === 1 && I18N_INLINE.test(ch.tagName)) kids.push(ch);
+        if (i18nPlaceholderChild(els[i].childNodes[c])) kids.push(els[i].childNodes[c]);
       }
       if (!kids.length) { els[i].textContent = src; continue; }
-      var frag = document.createDocumentFragment(), used = {};
-      src.split(/(\{\d+\})/).forEach(function(piece) {
-        var m = /^\{(\d+)\}$/.exec(piece);
-        if (m) { var k = kids[parseInt(m[1],10)-1]; if (k && !used[m[1]]) { frag.appendChild(k); used[m[1]] = 1; } }
-        else if (piece) frag.appendChild(document.createTextNode(piece));
-      });
-      for (var q = 0; q < kids.length; q++) if (!used[String(q+1)]) frag.appendChild(kids[q]);
+      // The same plan the forward direction uses — and it has to use the same
+      // child rule, or going back to English would throw away the very
+      // checkboxes and icons v36.32 taught it to carry.
+      var plan = i18nPlan(src, kids);
+      var frag = document.createDocumentFragment();
+      for (var p = 0; p < plan.length; p++) {
+        frag.appendChild(typeof plan[p] === 'string' ? document.createTextNode(plan[p]) : plan[p]);
+      }
       els[i].innerHTML = ''; els[i].appendChild(frag);
     }
     ['placeholder','title','aria-label'].forEach(function(a) {
@@ -8368,8 +8575,18 @@ function renderLangMenu() {
     var ready = !!i18nReadCache(code);
     h += row(code, I18N_LANGS[code].label + ' — ' + I18N_LANGS[code].en, ready ? 'ready' : '');
   });
-  h += '<div style="height:1px;background:var(--border);margin:4px 0;"></div>'
-     + '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
+  h += '<div style="height:1px;background:var(--border);margin:4px 0;"></div>';
+  // v36.32 — how complete the current language actually is, said out loud. A
+  // translation that is 96% done looks broken and gives no clue what to do
+  // about it; this says how many and offers the one-click fix.
+  if (cur !== 'en') {
+    var gaps = i18nMissingCount();
+    h += gaps
+      ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nFillGaps()" data-no-i18n>'
+        + '⚠️ ' + gaps + ' phrase' + (gaps === 1 ? '' : 's') + ' still in English — finish it</button>'
+      : '<div class="drop-item" style="cursor:default;opacity:0.75;" data-no-i18n>✓ Fully translated</div>';
+  }
+  h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
      + (i18nCanEdit()
         ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');openI18nEditor()">✏️ Edit translations…</button>'
         : '');
@@ -8429,6 +8646,10 @@ async function i18nGenerate(lang) {
 
   var doc = { lang: lang, strings: res.dict, count: got, updatedAt: Date.now(),
               by: (window._fbUser && window._fbUser.email) || '' };
+  // v36.32 — whatever would not translate is carried forward as a known gap
+  // rather than discarded, so the globe can offer to finish it.
+  i18nLoadMissing(lang);
+  (res.missingList || []).forEach(i18nNoteMissing);
   var where = await i18nWriteCloud(lang, doc);
   if (where === 'refused') {
     // Read-only members cannot write to `shared` under the published rules.
@@ -8438,12 +8659,83 @@ async function i18nGenerate(lang) {
   } else if (where === 'local') {
     toast('🌍 ' + name + ' is ready on this device. Sign in to share it with everyone.', 8000);
   } else {
-    toast('🌍 ' + name + ' is ready, and shared with everyone' + (res.failed ? ' — ' + res.failed
-      + ' batch(es) failed and stayed English' : ''), 8000);
+    toast('🌍 ' + name + ' is ready, and shared with everyone' + (res.missing ? ' — ' + res.missing
+      + ' phrase(s) would not translate; the 🌐 menu can finish them' : ''), 8000);
   }
   return res.dict;
 }
 window.i18nGenerate = i18nGenerate;
+
+// ─── FINISHING A LANGUAGE (v36.32) ───────────────────────────────────────────
+// Everything the app has shown, or can show right now, that the dictionary
+// cannot answer: the strings a batch dropped, the ones that only exist inside a
+// dialog Tony has since opened, and anything added to the app since the
+// language was made. Cheap — it translates the gap, not the app.
+function i18nGapList() {
+  var gaps = Object.create(null);
+  i18nMissingList().forEach(function(s){ gaps[s] = 1; });
+  i18nCatalogue().forEach(function(s){ if (!_i18nDict || !_i18nDict[s]) gaps[s] = 1; });
+  return Object.keys(gaps).sort();
+}
+async function i18nFillGaps(lang) {
+  lang = lang || _i18nLang;
+  if (!lang || lang === 'en') { toast('English is the original — there is nothing to fill in.'); return false; }
+  var gaps = i18nGapList();
+  var name = i18nLangName(lang);
+  if (!gaps.length) { toast('✓ Nothing is missing — every phrase the app has shown is in ' + name + '.', 5000); return true; }
+
+  var ok = await askConfirm({
+    icon: '🧩', title: 'Finish the ' + name + ' translation?',
+    message: gaps.length + ' phrase(s) are still in English. Some are parts of the app that had not been '
+      + 'opened yet when ' + name + ' was made — a dialog\'s wording only exists once it is asked.\n\n'
+      + 'This translates only those, and adds them to the existing file. It does not redo the rest.',
+    okLabel: 'Fill them in' });
+  if (!ok) return false;
+
+  toast('🧩 Translating ' + gaps.length + ' missing phrase(s)…', 4000);
+  var res;
+  try {
+    // `into` a COPY: a failure halfway must not leave the live dictionary in a
+    // state that is neither the old one nor the new one.
+    var merged = {};
+    Object.keys(_i18nDict || {}).forEach(function(k){ merged[k] = _i18nDict[k]; });
+    res = await i18nTranslateAll(lang, gaps, function(done, total) {
+      if (total > 1) toast('🧩 ' + Math.round(done / total * 100) + '%', 2500);
+    }, merged);
+  } catch(e) {
+    showServiceError('The missing phrases could not be translated:\n\n' + ((e && e.message) || String(e)));
+    return false;
+  }
+  var filled = gaps.filter(function(s){ return !!res.dict[s]; });
+  if (!filled.length) { showServiceError('Nothing came back. The interface is unchanged.'); return false; }
+
+  _i18nDict = res.dict;
+  i18nClearMissing(filled);
+  var doc = { lang: lang, strings: res.dict, count: Object.keys(res.dict).length, updatedAt: Date.now(),
+              by: (window._fbUser && window._fbUser.email) || '' };
+  var where = await i18nWriteCloud(lang, doc);
+  i18nApply(document.body);
+  renderLangMenu();
+  toast('🧩 ' + filled.length + ' phrase(s) added to ' + name
+    + (where === 'cloud' ? ', and shared with everyone' : ' on this device')
+    + (res.missing ? ' — ' + res.missing + ' still would not translate' : ''), 8000);
+  return true;
+}
+window.i18nFillGaps = i18nFillGaps; window.i18nGapList = i18nGapList;
+
+// Install a dictionary directly. This exists for the self-test suite, which has
+// to be able to check that a translated interface still works without a paid AI
+// run and without impersonating Firestore — and, just as important, has to be
+// able to put the interface back to English afterwards.
+function i18nInstall(lang, dict) {
+  _i18nDict = dict || null;
+  _i18nLang = dict ? lang : 'en';
+  if (dict) i18nLoadMissing(lang); else _i18nMissing = Object.create(null);
+  return _i18nLang;
+}
+function i18nCurrentDict() { return _i18nDict; }
+window.i18nInstall = i18nInstall; window.i18nCurrentDict = i18nCurrentDict;
+window.i18nPlaceholderChild = i18nPlaceholderChild; window.i18nEdges = i18nEdges;
 
 async function pickLanguage(code) {
   try { await i18nSetLanguage(code); }
@@ -9881,7 +10173,7 @@ function drawView(){
                   + '</div>';
               }).join('')}</div></details>` : '');
       })()}
-      ${r.notes ? `<div dir="auto" style="background:#FFF8E8;border-inline-start:3px solid #D4A843;border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;">NOTES</span>${escH(r.notes)}</div>` : ''}
+      ${r.notes ? `<div style="background:#FFF8E8;border-inline-start:3px solid #D4A843;border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;text-align:start;">NOTES</span><div dir="auto"${langAttr(r.notes)} style="unicode-bidi:plaintext;text-align:start;">${escH(r.notes)}</div></div>` : ''}
       ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (${r.history.length})</summary>
           <div class="cook-log-body">${r.history.map(function(v,vi){
             return '<div class="cook-log-entry">'
@@ -16089,7 +16381,8 @@ function buildPrintHtml(list) {
     + 'h1,.notes,.meta{unicode-bidi:plaintext;text-align:start;}'
     + '.meta{font-size:13px;color:#8A8279;margin-bottom:16px;}'
     + '.source{font-size:12px;color:#888;margin-top:12px;}'
-    + '.notes{background:#FFF8E8;border-left:3px solid #D4A843;padding:10px 14px;margin-top:16px;font-size:14px;}'
+    + '.notes{background:#FFF8E8;border-inline-start:3px solid #D4A843;padding:10px 14px;margin-top:16px;font-size:14px;}'
+    + '.notes > div{unicode-bidi:plaintext;text-align:start;}'
     + '.recipe + .recipe{page-break-before:always;margin-top:48px;}'
     + '.sub{font-weight:700;color:#C1440E;font-size:13px;padding-top:10px;}'
     + '.ind{padding-inline-start:18px;}'
@@ -16122,7 +16415,12 @@ function buildPrintHtml(list) {
       + '<div class="meta">' + escH(r.category) + ' | ' + escH(r.difficulty) + ' | ' + escH(r.prep) + ' | ' + escH(r.servings) + ' servings</div>'
       + '<h2>Ingredients</h2><table>' + ings + '</table>'
       + '<h2>Method</h2>' + steps
-      + (r.notes ? '<div class="notes" dir="auto"><strong>Notes:</strong> ' + escH(r.notes) + '</div>' : '')
+      // v36.32 — the caption goes in its own block. Inside the same one, an
+      // English "Notes:" is the first strong character dir="auto" finds, so the
+      // whole note resolved left-to-right and a Hebrew note sat on the wrong
+      // side of its own box.
+      + (r.notes ? '<div class="notes"><strong style="display:block;">Notes:</strong>'
+          + '<div dir="auto">' + escH(r.notes) + '</div></div>' : '')
       + (r.source ? '<div class="source">Source: ' + escH(r.source) + '</div>' : '')
       + '</div>';
   }).join('');
@@ -20613,9 +20911,11 @@ window.onHeaderScroll = onHeaderScroll;
     renderLangMenu();
     if (want === 'en') { i18nApplyDirection(); return; }
     i18nStartObserver();
+    i18nLoadMissing(want);
     i18nLoadDict(want).then(function(d){
       if (!d) return;                         // never translated here; leave English
       _i18nDict = d; _i18nLang = want;
+      i18nClearMissing(i18nMissingList().filter(function(s){ return !!d[s]; }));
       i18nApply(document.body); i18nApplyDirection(); renderLangMenu();
     }).catch(function(e){ dlog('[i18n] could not restore', e && e.message); });
   })();
