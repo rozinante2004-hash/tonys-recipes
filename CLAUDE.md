@@ -468,6 +468,38 @@ found only because a test was written first and disagreed with the code.
   the one line that answered it was missing (fixed v36.30). Two renderings of
   the same panel that disagree is a bug in the reporting tool, which is worse
   than a bug in a feature.
+- **The interface can be translated; the RECIPES never are (v36.31).** The app
+  has no message keys — 20,000 lines of English written inline — so retrofitting
+  them would be a rewrite. The dictionary is keyed on **the English text
+  itself**. Consequences to know before touching it: editing an English string
+  in the markup orphans its translations (the editor shows orphans rather than
+  hiding them); the same word in two places gets one translation; and nothing
+  needs registering, so a new button is translatable the moment it renders.
+  - **`dir="auto"` is the boundary.** It was already the project's marker for
+    "content, not chrome" (v36.25), and it is reused verbatim: the walk stops at
+    any ancestor carrying it, which is every element holding recipe text.
+  - **An ATTRIBUTE can hold recipe data where `dir="auto"` cannot reach** — the
+    recipe card's `aria-label` is the recipe's name. `data-i18n-skip-attrs`
+    exists for exactly that. Marking the whole card with `data-no-i18n` was the
+    first attempt and it was too blunt: it also froze the category and
+    difficulty badges, which are chrome.
+  - **A sentence split by `<strong>` or `<a>` is ONE unit**, with the inline
+    children replaced by `{1}` `{2}` placeholders and put back wherever the
+    translation says they belong — frequently not where they started, in Hebrew.
+    7% of the catalogue is such fragments; translating them separately produces
+    word salad.
+  - **The English original is parked on the node** (`data-i18n-src`) the first
+    time it is touched. Without it, switching language twice applies the second
+    to the first one's output. Its test asserts the parking **exists** before
+    relying on it — the first version used `querySelector`, which is null when
+    the parking is gone, so the mutation made the check skip itself.
+  - **A MutationObserver re-applies to what changed**, scoped to added nodes.
+    Hooking all thirty-odd render functions would rot on the thirty-first;
+    a full-page pass on every render walks thousands of nodes at 300 recipes.
+  - Storage is one Firestore doc per language in `shared/i18n_<lang>`, which the
+    published rules already cover for reading. **A read-only member cannot
+    write there**, so a translation they generate works for them and is not
+    shared — and the app says so rather than implying it published.
 - **Bumping the version is a targeted edit, not a find-and-replace.** A blanket
   `v36.20` → `v36.21` across `index.html` also rewrites every comment tag that
   records *when* something landed, so the file starts claiming that the proxy

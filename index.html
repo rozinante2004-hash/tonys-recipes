@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.30 -->
+<!-- Tony's Recipes Collection v36.31 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3273,7 +3273,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.30';
+var APP_VERSION = 'v36.31';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5833,13 +5833,21 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.30</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.31</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
         <span class="ds-dot"></span><span id="dsText">Offline mode</span>
         <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;text-decoration:underline;">Sign out</button>
         <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
+      </div>
+      <!-- v36.31 — the interface language. Beside ? and the cog because that is
+           where the app's own settings already live; a globe in the filter bar
+           would read as filtering by language. -->
+      <div class="drop-group">
+        <button class="help-icon-btn" onclick="toggleLangMenu()" title="Interface language"
+                aria-label="Interface language" data-no-i18n>🌐</button>
+        <div class="drop-menu" id="langMenu" style="min-width:230px;right:0;"></div>
       </div>
       <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app">?</button>
       <div class="drop-group">
@@ -6447,7 +6455,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.30</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.31</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7892,6 +7900,589 @@ function labelIconButtons(root) {
 }
 window.labelIconButtons = labelIconButtons;
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERFACE TRANSLATION (v36.31)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The app was not built for this: there are no message keys, just English
+// written inline across 20,000 lines. Retrofitting keys would be a rewrite, so
+// the dictionary is keyed on THE ENGLISH TEXT ITSELF. That has three
+// consequences worth knowing before touching any of it:
+//
+//   1. Editing an English string in the markup orphans its translations. The
+//      editor shows orphans rather than hiding them, so they can be re-matched.
+//   2. The same English word in two places gets the same translation. For UI
+//      chrome that is almost always right and occasionally wrong; the editor is
+//      how you fix the occasional.
+//   3. Nothing has to be registered. A new button is translatable the moment it
+//      renders, which matters in an app where most markup is built by hand.
+//
+// WHAT IS NEVER TRANSLATED: the recipes. Every element holding recipe text
+// already carries dir="auto" — the project's existing marker for "content, not
+// chrome" (v36.25) — so that same attribute is the boundary here. Recipe names,
+// ingredients, steps, notes and the grid are all inside one, and the walk stops
+// at them. Translating a recipe remains what it always was: an explicit,
+// per-recipe action with its own button.
+var I18N_LANGS = {
+  he: { label: 'עברית',      en: 'Hebrew',     rtl: true  },
+  ar: { label: 'العربية',     en: 'Arabic',     rtl: true  },
+  ru: { label: 'Русский',    en: 'Russian',    rtl: false },
+  fr: { label: 'Français',   en: 'French',     rtl: false },
+  es: { label: 'Español',    en: 'Spanish',    rtl: false },
+  de: { label: 'Deutsch',    en: 'German',     rtl: false },
+  it: { label: 'Italiano',   en: 'Italian',    rtl: false },
+  pt: { label: 'Português',  en: 'Portuguese', rtl: false },
+  zh: { label: '中文',        en: 'Chinese (Simplified)', rtl: false },
+  ja: { label: '日本語',      en: 'Japanese',   rtl: false }
+};
+var I18N_LANG_KEY = 'tonys_ui_lang';
+var I18N_CACHE_PREFIX = 'tonys_i18n_';
+var _i18nDict = null;          // { english: translation } for the active language
+var _i18nLang = 'en';
+var _i18nApplying = false;     // guard: applying mutates the DOM, which re-triggers observers
+
+function i18nLang() {
+  try { return localStorage.getItem(I18N_LANG_KEY) || 'en'; } catch(e) { return 'en'; }
+}
+function i18nIsRTL() {
+  var L = I18N_LANGS[_i18nLang];
+  return !!(L && L.rtl);
+}
+function i18nLangName(code) {
+  if (code === 'en') return 'English';
+  return (I18N_LANGS[code] && I18N_LANGS[code].en) || code;
+}
+
+// ─── WHAT COUNTS AS A TRANSLATABLE UNIT ──────────────────────────────────────
+// Not "every text node". A sentence broken across <strong> and <a> arrives as
+// three fragments — ", paste over everything there, then press" is a real one
+// from this app — and translating those separately produces word salad in any
+// language, and unreadable word ORDER in Hebrew. So an element whose text is
+// interrupted by inline markup is ONE unit, with its inline children replaced
+// by {1}, {2} placeholders that are put back afterwards.
+var I18N_INLINE = /^(STRONG|B|EM|I|A|CODE|SPAN|SMALL|U|KBD|MARK|BR)$/;
+var I18N_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|SVG|PATH|CIRCLE|LINE|RECT|G)$/;
+
+function i18nSkip(el) {
+  for (var n = el; n && n !== document.body; n = n.parentElement) {
+    if (!n.getAttribute) continue;
+    // The recipe itself. Same boundary the language marking uses (v36.25).
+    if (n.getAttribute('dir') === 'auto') return true;
+    if (n.hasAttribute('data-no-i18n')) return true;
+    // The translation editor shows English on purpose — translating the thing
+    // you are using to fix translations is a hall of mirrors.
+    if (n.id === 'i18nOverlay') return true;
+  }
+  return false;
+}
+// Worth translating at all? Numbers, emoji and bare punctuation are the same in
+// every language, and sending them to a model invites it to "improve" them.
+function i18nTranslatable(s) {
+  s = String(s == null ? '' : s).trim();
+  if (!s || s.length > 400) return false;
+  if (!/[A-Za-z]/.test(s)) return false;
+  if (/^[\d\s.,:;/%×+-]*$/.test(s)) return false;
+  // A URL is data in every language, and a model asked to translate one will
+  // cheerfully rewrite the path. This is also the recipe's `source` field,
+  // which is content and must never be touched.
+  if (/^(https?:\/\/|www\.)\S+$/i.test(s)) return false;
+  return true;
+}
+
+// Collect the units under `root`. Each is { el, attr, src } where a null attr
+// means the element's own text. Pure: it reads, it never writes.
+function i18nUnits(root) {
+  var out = [];
+  var scope = root || document.body;
+  if (!scope.querySelectorAll) return out;
+
+  function elementUnit(el) {
+    // The source is whatever it was BEFORE any translation — kept on the node,
+    // because reading it back off a translated DOM would translate a
+    // translation, and switching languages twice would compound the damage.
+    var src = el.getAttribute('data-i18n-src');
+    if (src === null) {
+      var parts = [], n = 0, ok = true;
+      for (var i = 0; i < el.childNodes.length; i++) {
+        var c = el.childNodes[i];
+        if (c.nodeType === 3) { parts.push(c.nodeValue); continue; }
+        if (c.nodeType === 1 && I18N_INLINE.test(c.tagName)) { parts.push('{' + (++n) + '}'); continue; }
+        ok = false; break;                    // a block child: not one sentence
+      }
+      if (!ok) return null;
+      src = parts.join('').replace(/\s+/g, ' ').trim();
+    }
+    return i18nTranslatable(src) ? { el: el, attr: null, src: src } : null;
+  }
+
+  var all = scope.querySelectorAll('*');
+  for (var i = 0; i < all.length; i++) {
+    var el = all[i];
+    if (I18N_SKIP_TAGS.test(el.tagName) || i18nSkip(el)) continue;
+    // Attributes people actually read.
+    // `data-i18n-skip-attrs` is for the case dir="auto" cannot reach: an
+    // ATTRIBUTE holding recipe data on an element whose children are chrome.
+    // The recipe card is exactly that — aria-label is the recipe's name, while
+    // the category and difficulty badges inside it are labels like any other.
+    // Marking the whole card would have left those in English for ever.
+    var skipAttrs = el.getAttribute('data-i18n-skip-attrs') || '';
+    ['placeholder', 'title', 'aria-label'].forEach(function(a) {
+      if (skipAttrs.indexOf(a) !== -1) return;
+      var cur = el.getAttribute('data-i18n-' + a);
+      if (cur === null) cur = el.getAttribute(a);
+      if (cur !== null && i18nTranslatable(cur)) out.push({ el: el, attr: a, src: cur });
+    });
+    // …and the element's own words, but only if it is the one that HOLDS them:
+    // an outer <div> wrapping a <p> would otherwise claim the paragraph's text.
+    var holdsText = false;
+    for (var k = 0; k < el.childNodes.length; k++) {
+      if (el.childNodes[k].nodeType === 3 && el.childNodes[k].nodeValue.trim()) { holdsText = true; break; }
+    }
+    if (!holdsText) continue;
+    var u = elementUnit(el);
+    if (u) out.push(u);
+  }
+  return out;
+}
+
+// Every distinct English string the interface can currently show.
+function i18nCatalogue(root) {
+  var seen = Object.create(null);
+  i18nUnits(root).forEach(function(u){ seen[u.src] = true; });
+  return Object.keys(seen).sort();
+}
+
+// ─── APPLYING ────────────────────────────────────────────────────────────────
+// Idempotent, and reversible: the English original is parked on the node the
+// first time it is touched, so the same element can be re-translated into a
+// third language, or put back, without ever reading a translation as a source.
+function i18nApply(root) {
+  if (_i18nApplying) return 0;
+  _i18nApplying = true;
+  var n = 0;
+  try {
+    var units = i18nUnits(root);
+    for (var i = 0; i < units.length; i++) {
+      var u = units[i];
+      var to = _i18nDict ? _i18nDict[u.src] : null;
+      if (u.attr) {
+        if (u.el.getAttribute('data-i18n-' + u.attr) === null) u.el.setAttribute('data-i18n-' + u.attr, u.src);
+        var vAttr = (to && String(to).trim()) ? to : u.src;
+        if (u.el.getAttribute(u.attr) !== vAttr) { u.el.setAttribute(u.attr, vAttr); n++; }
+        continue;
+      }
+      if (u.el.getAttribute('data-i18n-src') === null) u.el.setAttribute('data-i18n-src', u.src);
+      var v = (to && String(to).trim()) ? String(to) : u.src;
+      // Put the inline children back where the translation says they belong —
+      // which in Hebrew is frequently not where they started.
+      var kids = [];
+      for (var c = 0; c < u.el.childNodes.length; c++) {
+        var ch = u.el.childNodes[c];
+        if (ch.nodeType === 1 && I18N_INLINE.test(ch.tagName)) kids.push(ch);
+      }
+      if (!kids.length) {
+        if (u.el.textContent !== v) { u.el.textContent = v; n++; }
+        continue;
+      }
+      var frag = document.createDocumentFragment();
+      var pieces = v.split(/(\{\d+\})/);
+      var used = {};
+      for (var p = 0; p < pieces.length; p++) {
+        var m = /^\{(\d+)\}$/.exec(pieces[p]);
+        if (m) {
+          var kid = kids[parseInt(m[1], 10) - 1];
+          if (kid && !used[m[1]]) { frag.appendChild(kid); used[m[1]] = 1; }
+        } else if (pieces[p]) {
+          frag.appendChild(document.createTextNode(pieces[p]));
+        }
+      }
+      // A translation that dropped a placeholder must not drop the LINK it
+      // stood for. Anything unclaimed goes back on the end rather than vanishing.
+      for (var q = 0; q < kids.length; q++) if (!used[String(q + 1)]) frag.appendChild(kids[q]);
+      u.el.innerHTML = '';
+      u.el.appendChild(frag);
+      n++;
+    }
+  } finally { _i18nApplying = false; }
+  return n;
+}
+
+// ─── WHERE A TRANSLATION LIVES ───────────────────────────────────────────────
+// One Firestore document per language, in the same `shared` collection the
+// recipes use — so the existing rules already cover it and no rules change is
+// needed to READ one. Every signed-in member gets every language somebody has
+// already paid to translate, which is the whole point of putting them there.
+//
+// A copy is kept on the device as well, and that is not just a cache: a
+// signed-out or offline device cannot reach Firestore at all, and the interface
+// should not revert to English because the train went into a tunnel.
+function i18nDocId(lang) { return 'i18n_' + lang; }
+function i18nCacheKey(lang) { return I18N_CACHE_PREFIX + lang; }
+
+function i18nReadCache(lang) {
+  try {
+    var raw = localStorage.getItem(i18nCacheKey(lang));
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    return (o && o.strings && typeof o.strings === 'object') ? o : null;
+  } catch(e) { return null; }
+}
+function i18nWriteCache(lang, doc) {
+  try { localStorage.setItem(i18nCacheKey(lang), JSON.stringify(doc)); } catch(e) {}
+}
+async function i18nReadCloud(lang) {
+  if (!window._fbDb || !window._fbUser) return null;
+  try {
+    var snap = await window._fbDb.collection('shared').doc(i18nDocId(lang)).get();
+    if (!snap.exists) return null;
+    var d = snap.data();
+    return (d && d.strings) ? d : null;
+  } catch(e) { syncLog('error', 'Could not read the ' + lang + ' translation', String(e && e.message).slice(0,160)); return null; }
+}
+// Returns 'cloud' | 'local' | 'refused'. A read-only member cannot write to
+// `shared` under the published rules, and that is not a bug to paper over: the
+// translation still works for them, it simply is not shared, and the caller
+// says so out loud rather than letting them think they published something.
+async function i18nWriteCloud(lang, doc) {
+  i18nWriteCache(lang, doc);
+  if (!window._fbDb || !window._fbUser) return 'local';
+  try {
+    await window._fbDb.collection('shared').doc(i18nDocId(lang)).set(doc);
+    syncLog('save', 'Saved the ' + i18nLangName(lang) + ' translation to the cloud', { count: Object.keys(doc.strings).length });
+    return 'cloud';
+  } catch(e) {
+    syncLog('error', 'The ' + lang + ' translation could not be shared', String(e && e.message).slice(0,160));
+    return 'refused';
+  }
+}
+async function i18nLoadDict(lang) {
+  if (lang === 'en') return {};
+  var cloud = await i18nReadCloud(lang);
+  if (cloud) { i18nWriteCache(lang, cloud); return cloud.strings; }
+  var local = i18nReadCache(lang);
+  return local ? local.strings : null;
+}
+window.i18nReadCache = i18nReadCache; window.i18nLoadDict = i18nLoadDict;
+window.i18nWriteCloud = i18nWriteCloud; window.i18nDocId = i18nDocId;
+
+// ─── ASKING THE MODEL ────────────────────────────────────────────────────────
+// In batches, because one 590-string answer is a single point of failure and a
+// very long generation; a failed batch costs eighty strings, not the language.
+// The instructions are long on purpose — "translate this list" produces a menu
+// nobody can use, with buttons that no longer fit and placeholders eaten.
+var I18N_BATCH = 60;
+function i18nPrompt(lang, batch) {
+  var L = I18N_LANGS[lang] || { en: lang };
+  return 'You are translating the INTERFACE of a personal recipe app from English into '
+    + (L.en || lang) + '. Return ONLY a JSON object mapping each English string to its '
+    + (L.en || lang) + ' translation. No markdown fences, no commentary.\n\n'
+    + 'This is a real app that a family uses daily, not a word list. Rules:\n'
+    + '1. These are BUTTONS, MENU ITEMS, LABELS and HELP TEXT. Translate as an app would '
+    + 'be written in ' + (L.en || lang) + ' — use the conventional wording that language\'s apps '
+    + 'already use for Save, Cancel, Delete, Search, Settings, Share. Do not translate literally '
+    + 'where a convention exists.\n'
+    + '2. Keep a button SHORT. If the natural translation is much longer than the English, '
+    + 'find the shorter idiomatic form — it has to fit on a phone.\n'
+    + '3. Keep every emoji exactly as it is, in the same position.\n'
+    + '4. {1} {2} {3} are placeholders for words that carry a link or bold styling. Keep them '
+    + 'ALL, exactly as written, and move them to wherever the sentence naturally puts them in '
+    + (L.en || lang) + '. Never translate the braces or the digits.\n'
+    + '5. Leave untranslated: brand and product names (Tony\'s Recipes, Bring!, Firebase, '
+    + 'Firestore, Cloudflare, Anthropic, WhatsApp, Gmail, Google, GitHub, Claude, Pixabay, '
+    + 'Pexels, Unsplash, Openverse), file extensions, URLs, and units of measurement.\n'
+    + '6. Keep the register consistent and plain. This app speaks to its user directly and '
+    + 'without ceremony; match that rather than making it formal.\n'
+    + '7. If a string is already a proper noun or has no meaningful translation, return it '
+    + 'unchanged rather than inventing one.\n\n'
+    + 'Strings:\n' + JSON.stringify(batch, null, 0);
+}
+// Translate the catalogue. `onProgress(done, total)` so a 10-batch run is not a
+// spinner that looks identical to a hang.
+async function i18nTranslateAll(lang, catalogue, onProgress) {
+  var dict = {}, failed = 0;
+  var batches = [];
+  for (var i = 0; i < catalogue.length; i += I18N_BATCH) batches.push(catalogue.slice(i, i + I18N_BATCH));
+  for (var b = 0; b < batches.length; b++) {
+    if (onProgress) onProgress(b, batches.length);
+    try {
+      var raw = await aiCall(i18nPrompt(lang, batches[b]), Math.min(8000, 400 + batches[b].length * 90));
+      var obj = extractJSON(raw) || {};
+      Object.keys(obj).forEach(function(k){
+        if (typeof obj[k] === 'string' && obj[k].trim()) dict[k] = obj[k].trim();
+      });
+    } catch(e) {
+      // One batch out of ten is not a reason to lose the other nine — the
+      // strings it held simply stay English, and re-running fills them in.
+      failed++;
+      syncLog('error', 'A translation batch failed for ' + lang, String(e && e.message).slice(0, 160));
+    }
+  }
+  if (onProgress) onProgress(batches.length, batches.length);
+  return { dict: dict, failed: failed, batches: batches.length };
+}
+window.i18nPrompt = i18nPrompt; window.i18nTranslateAll = i18nTranslateAll;
+
+// ─── KEEPING UP WITH THE APP ─────────────────────────────────────────────────
+// Almost every screen here is built by hand and re-rendered whenever anything
+// changes, so translating once at startup would last until the first filter
+// toggle. Hooking all thirty-odd render functions would rot the first time
+// someone adds a thirty-first; an observer cannot.
+//
+// It applies to what ACTUALLY CHANGED rather than the whole page — at 300
+// recipes a full pass walks thousands of nodes, and this runs on every render.
+var _i18nObserver = null, _i18nPending = null, _i18nTick = false;
+function i18nStartObserver() {
+  if (_i18nObserver || typeof MutationObserver === 'undefined') return;
+  _i18nObserver = new MutationObserver(function(records) {
+    if (_i18nApplying || _i18nLang === 'en') return;
+    if (!_i18nPending) _i18nPending = [];
+    for (var i = 0; i < records.length; i++) {
+      var added = records[i].addedNodes;
+      for (var j = 0; j < added.length; j++) if (added[j].nodeType === 1) _i18nPending.push(added[j]);
+    }
+    if (!_i18nPending.length || _i18nTick) return;
+    _i18nTick = true;
+    requestAnimationFrame(function() {
+      _i18nTick = false;
+      var nodes = _i18nPending || []; _i18nPending = null;
+      for (var k = 0; k < nodes.length; k++) {
+        if (nodes[k].isConnected) i18nApply(nodes[k]);
+      }
+    });
+  });
+  _i18nObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+// ─── SWITCHING ───────────────────────────────────────────────────────────────
+// Before leaving a language, make sure its file exists — Tony's requirement, and
+// the right one: English is the SOURCE, so `i18n_en` is the master catalogue the
+// editor lists and the thing that makes "put it back" a lookup rather than a
+// second translation.
+async function i18nEnsureBaseSaved() {
+  var have = i18nReadCache('en');
+  var cat = i18nCatalogue();
+  if (have && have.strings && Object.keys(have.strings).length >= cat.length) return 'already';
+  var strings = {};
+  cat.forEach(function(s){ strings[s] = s; });
+  var doc = { lang: 'en', strings: strings, count: cat.length, updatedAt: Date.now(), source: true };
+  return await i18nWriteCloud('en', doc);
+}
+async function i18nSetLanguage(lang) {
+  if (!lang) lang = 'en';
+  if (lang !== 'en' && !I18N_LANGS[lang]) { toast('Unknown language: ' + lang); return false; }
+  await i18nEnsureBaseSaved();
+
+  if (lang === 'en') {
+    _i18nDict = null; _i18nLang = 'en';
+    try { localStorage.setItem(I18N_LANG_KEY, 'en'); } catch(e) {}
+    i18nRevertAll();
+    i18nApplyDirection();
+    renderLangMenu();
+    toast('Interface language: English');
+    return true;
+  }
+
+  var dict = await i18nLoadDict(lang);
+  if (!dict) {
+    dict = await i18nGenerate(lang);
+    if (!dict) return false;
+  }
+  _i18nDict = dict; _i18nLang = lang;
+  try { localStorage.setItem(I18N_LANG_KEY, lang); } catch(e) {}
+  i18nApply(document.body);
+  i18nApplyDirection();
+  i18nStartObserver();
+  renderLangMenu();
+  return true;
+}
+// Put every touched node back to the English parked on it. Cheaper and far
+// safer than reloading: a reload would lose an unsaved edit, and someone
+// changing language mid-recipe should not be punished for it.
+function i18nRevertAll() {
+  _i18nApplying = true;
+  try {
+    var els = document.querySelectorAll('[data-i18n-src]');
+    for (var i = 0; i < els.length; i++) {
+      var src = els[i].getAttribute('data-i18n-src');
+      var kids = [];
+      for (var c = 0; c < els[i].childNodes.length; c++) {
+        var ch = els[i].childNodes[c];
+        if (ch.nodeType === 1 && I18N_INLINE.test(ch.tagName)) kids.push(ch);
+      }
+      if (!kids.length) { els[i].textContent = src; continue; }
+      var frag = document.createDocumentFragment(), used = {};
+      src.split(/(\{\d+\})/).forEach(function(piece) {
+        var m = /^\{(\d+)\}$/.exec(piece);
+        if (m) { var k = kids[parseInt(m[1],10)-1]; if (k && !used[m[1]]) { frag.appendChild(k); used[m[1]] = 1; } }
+        else if (piece) frag.appendChild(document.createTextNode(piece));
+      });
+      for (var q = 0; q < kids.length; q++) if (!used[String(q+1)]) frag.appendChild(kids[q]);
+      els[i].innerHTML = ''; els[i].appendChild(frag);
+    }
+    ['placeholder','title','aria-label'].forEach(function(a) {
+      var list = document.querySelectorAll('[data-i18n-' + a + ']');
+      for (var j = 0; j < list.length; j++) list[j].setAttribute(a, list[j].getAttribute('data-i18n-' + a));
+    });
+  } finally { _i18nApplying = false; }
+}
+
+// ─── THE RTL FLIP ────────────────────────────────────────────────────────────
+// Hebrew and Arabic want more than translated words: the menus, the filter bar
+// and the panels belong on the other side. `dir="rtl"` on <html> does nearly all
+// of it natively, which is why the app's own CSS has used logical properties
+// (padding-inline-start, border-inline-start) wherever it could.
+//
+// The exception is the RECIPE. A recipe's own direction comes from its own
+// language and is already decided per element by dir="auto" — flipping the
+// interface must not flip an English recipe, so the content keeps its own
+// answer and only the frame turns around.
+function i18nApplyDirection() {
+  var rtl = i18nIsRTL();
+  document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
+  document.documentElement.setAttribute('lang', _i18nLang || 'en');
+  document.body.classList.toggle('ui-rtl', rtl);
+}
+window.i18nApplyDirection = i18nApplyDirection;
+
+// ─── THE GLOBE ───────────────────────────────────────────────────────────────
+function renderLangMenu() {
+  var host = document.getElementById('langMenu');
+  if (!host) return;
+  var cur = _i18nLang || 'en';
+  var h = '<div style="padding:6px 12px 4px;font-size:10px;font-weight:700;color:var(--muted);'
+        + 'letter-spacing:0.6px;text-transform:uppercase;">Interface language</div>';
+  function row(code, label, note) {
+    var on = code === cur;
+    return '<button class="drop-item" onclick="closeDrop(\'langMenu\');pickLanguage(\'' + code + '\')"'
+      + ' style="display:flex;align-items:center;gap:8px;' + (on ? 'font-weight:700;' : '') + '">'
+      + '<span style="width:14px;flex-shrink:0;">' + (on ? '✓' : '') + '</span>'
+      + '<span>' + escH(label) + '</span>'
+      + (note ? '<span style="margin-inline-start:auto;font-size:10px;color:var(--muted);">' + escH(note) + '</span>' : '')
+      + '</button>';
+  }
+  h += row('en', 'English', i18nReadCache('en') ? '' : '');
+  Object.keys(I18N_LANGS).forEach(function(code) {
+    // "ready" means somebody has already translated it and everyone gets it for
+    // free. Without this the menu gives no clue which choice costs a wait.
+    var ready = !!i18nReadCache(code);
+    h += row(code, I18N_LANGS[code].label + ' — ' + I18N_LANGS[code].en, ready ? 'ready' : '');
+  });
+  h += '<div style="height:1px;background:var(--border);margin:4px 0;"></div>'
+     + '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
+     + (i18nCanEdit()
+        ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');openI18nEditor()">✏️ Edit translations…</button>'
+        : '');
+  host.innerHTML = h;
+}
+window.renderLangMenu = renderLangMenu;
+
+// "Full access" is the admin role — the same one the access panel labels
+// 🛡 Full access. Editing a translation rewrites a file every device reads, so
+// it is gated where deletion is.
+function i18nCanEdit() {
+  try {
+    if (!window._fbUser || !window._fbUser.email) return false;
+    var me = String(window._fbUser.email).toLowerCase();
+    if (typeof getAccessMembers !== 'function') return false;
+    var list = getAccessMembers() || [];
+    // The owner is always full access, and is not necessarily in the member
+    // list — locking Tony out of his own translations on an empty list would be
+    // an absurd way to fail.
+    if (me === 'rozinante2004@gmail.com') return true;
+    var mem = list.filter(function(m){ return String(m.email || '').toLowerCase() === me; })[0];
+    return !!(mem && mem.role === 'admin');
+  } catch(e) { return false; }
+}
+window.i18nCanEdit = i18nCanEdit;
+
+function toggleLangMenu() { renderLangMenu(); toggleDrop('langMenu'); }
+window.toggleLangMenu = toggleLangMenu;
+
+// Generate a language nobody has done yet. Deliberately explicit about the cost
+// and the wait before it starts: this is a paid AI run of ten-odd calls.
+async function i18nGenerate(lang) {
+  var cat = i18nCatalogue();
+  var name = i18nLangName(lang);
+  var ok = await askConfirm({
+    icon: '🌍', title: 'Translate the app into ' + name + '?',
+    message: 'Nobody has translated this interface into ' + name + ' yet, so it has to be done now — '
+      + cat.length + ' pieces of text, about half a minute.\n\n'
+      + 'It is saved once and shared, so this happens only ever once: every other device, and '
+      + 'everyone else in the family, gets it instantly from then on.\n\n'
+      + 'Your recipes are not touched — only the buttons, menus and labels.',
+    okLabel: 'Translate it' });
+  if (!ok) return null;
+
+  toast('🌍 Translating into ' + name + '…', 4000);
+  var res;
+  try {
+    res = await i18nTranslateAll(lang, cat, function(done, total) {
+      if (total > 1) toast('🌍 ' + name + ': ' + Math.round(done / total * 100) + '%', 2500);
+    });
+  } catch(e) {
+    showServiceError('The translation could not be completed:\n\n' + ((e && e.message) || String(e)));
+    return null;
+  }
+  var got = Object.keys(res.dict).length;
+  if (!got) { showServiceError('Nothing came back from the translation. The interface is unchanged.'); return null; }
+
+  var doc = { lang: lang, strings: res.dict, count: got, updatedAt: Date.now(),
+              by: (window._fbUser && window._fbUser.email) || '' };
+  var where = await i18nWriteCloud(lang, doc);
+  if (where === 'refused') {
+    // Read-only members cannot write to `shared` under the published rules.
+    // Say that plainly — it works for them, it is simply theirs alone.
+    toast('🌍 ' + name + ' is ready on this device. It could not be shared with the family — '
+      + 'that needs write access.', 9000);
+  } else if (where === 'local') {
+    toast('🌍 ' + name + ' is ready on this device. Sign in to share it with everyone.', 8000);
+  } else {
+    toast('🌍 ' + name + ' is ready, and shared with everyone' + (res.failed ? ' — ' + res.failed
+      + ' batch(es) failed and stayed English' : ''), 8000);
+  }
+  return res.dict;
+}
+window.i18nGenerate = i18nGenerate;
+
+async function pickLanguage(code) {
+  try { await i18nSetLanguage(code); }
+  catch(e) { showServiceError('Could not switch language:\n\n' + ((e && e.message) || String(e))); }
+}
+window.pickLanguage = pickLanguage;
+
+async function addLanguage() {
+  var name = await askPrompt('Which language? Write it in English — for example "Dutch", "Polish" or '
+    + '"Greek".\n\nIt is translated once and then shared with everyone.', '');
+  if (name === null) return;
+  name = String(name).trim();
+  if (!name) return;
+  // A code is needed to file it under. Two letters from the name is not a
+  // standard, so the model is asked for the real ISO code — and the answer is
+  // checked, because a wrong code files a language where nobody will find it.
+  toast('Looking up ' + name + '…');
+  var code = '';
+  try {
+    var raw = await aiCall('Return ONLY a JSON object for this language: '
+      + JSON.stringify(name) + '\n{"code":"<ISO 639-1 two-letter code>","english":"<the language\'s name in English>",'
+      + '"native":"<its name written in itself>","rtl":<true if it is written right-to-left>}\n'
+      + 'If it is not a real language, return {"code":""}.', 200, null, AI_MODEL_SMALL);
+    var o = extractJSON(raw) || {};
+    code = String(o.code || '').toLowerCase().slice(0, 3);
+    if (!/^[a-z]{2,3}$/.test(code)) { toast('“' + name + '” was not recognised as a language'); return; }
+    if (!I18N_LANGS[code] && code !== 'en') {
+      I18N_LANGS[code] = { label: o.native || o.english || name, en: o.english || name, rtl: !!o.rtl };
+    }
+  } catch(e) { showServiceError('Could not look that language up:\n\n' + ((e && e.message) || String(e))); return; }
+  await pickLanguage(code);
+}
+window.addLanguage = addLanguage;
+window.i18nRevertAll = i18nRevertAll; window.i18nSetLanguage = i18nSetLanguage;
+window.i18nEnsureBaseSaved = i18nEnsureBaseSaved;
+window.I18N_LANGS = I18N_LANGS; window.i18nUnits = i18nUnits; window.i18nCatalogue = i18nCatalogue;
+window.i18nApply = i18nApply; window.i18nLang = i18nLang; window.i18nIsRTL = i18nIsRTL;
+window.i18nTranslatable = i18nTranslatable; window.i18nLangName = i18nLangName;
+
 // ─── A HEBREW RECIPE IS MARKED AS HEBREW (v36.25, audit U2) ──────────────────
 // <html lang="en"> is correct — the interface IS English — but roughly half the
 // recipes are Hebrew, and nothing said so. A screen reader then reads Hebrew
@@ -8320,7 +8911,7 @@ function renderGrid() {
   if (viewMode === 'list') {
     g.className = 'recipe-list';
     g.innerHTML = list.map(r => `
-      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-i18n-skip-attrs="aria-label" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
@@ -8335,7 +8926,7 @@ function renderGrid() {
           <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${escH(r.category)}</span>
-            <span>⏱ ${escH(r.prep)}</span>
+            <span data-no-i18n>⏱ ${escH(r.prep)}</span>
             <span>🍽 ${escH(r.servings)} srv</span>
             <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(r.difficulty)}</span>
           </div>
@@ -8348,7 +8939,7 @@ function renderGrid() {
   } else {
     g.className = 'recipe-grid';
     g.innerHTML = list.map(r => `
-      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-i18n-skip-attrs="aria-label" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${escA(r.bg)}">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
@@ -8358,7 +8949,7 @@ function renderGrid() {
         </div>
         <div class="card-body">
           <div class="card-title" dir="auto">${escH(r.name)}</div>
-          <div class="card-meta"><span>⏱ ${escH(r.prep)}</span><div class="card-meta-dot"></div><span>${escH(r.servings)} srv</span></div>
+          <div class="card-meta"><span data-no-i18n>⏱ ${escH(r.prep)}</span><div class="card-meta-dot"></div><span><span data-no-i18n>${escH(r.servings)}</span> srv</span></div>
           ${matchReason(r, q)}
         </div>
         <div class="card-footer">
@@ -9222,7 +9813,7 @@ function drawView(){
       <div class="modal-title" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
         ${isCollection(r) ? `<span>📚 ${recipeParts(r).length} recipes</span>` : `
-        <span>⏱ ${escH(r.prep)}</span><span>🍽 ${escH(r.servings)} servings</span>
+        <span data-no-i18n>⏱ ${escH(r.prep)}</span><span>🍽 <span data-no-i18n>${escH(r.servings)}</span> servings</span>
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
       <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;unicode-bidi:isolate;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
@@ -20014,6 +20605,20 @@ window.onHeaderScroll = onHeaderScroll;
   initPullToRefresh();         // 5c.3
   labelIconButtons();          // a11y: give the ✕ / heart buttons an accessible name
   applyHeaderGeometry();       // v36.27 — set the slide and the filter bar's landing height
+  // v36.31 — restore the chosen interface language. Deliberately not awaited:
+  // the app must paint in English immediately rather than hold the first frame
+  // on a Firestore read, and the observer catches everything rendered meanwhile.
+  (function(){
+    var want = i18nLang();
+    renderLangMenu();
+    if (want === 'en') { i18nApplyDirection(); return; }
+    i18nStartObserver();
+    i18nLoadDict(want).then(function(d){
+      if (!d) return;                         // never translated here; leave English
+      _i18nDict = d; _i18nLang = want;
+      i18nApply(document.body); i18nApplyDirection(); renderLangMenu();
+    }).catch(function(e){ dlog('[i18n] could not restore', e && e.message); });
+  })();
   applySelfTestVisibility();   // v36.15 — 🧪 Self Test only where this device asked for it
   ensureSignInReachable();     // v31.5 — never leave "sign in" as unclickable text
   // 5d.1 — after the app has settled. v36.20: this is now async (it may write an

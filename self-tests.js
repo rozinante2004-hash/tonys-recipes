@@ -7262,6 +7262,120 @@ window.SELF_TESTS = [
         throw new Error('Sync Health is not reachable from Settings');
     } },
 
+  { id:'i18n_never_touches_a_recipe', group:'UI', name:'Translating the interface never touches a recipe (v36.31)',
+    test: async()=>{
+      ['i18nCatalogue','i18nApply','i18nRevertAll','i18nUnits','i18nTranslatable'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // The whole promise of this feature is that it translates the BUTTONS and
+      // leaves the cooking alone. A dictionary keyed on English text could
+      // quietly rewrite a recipe called "Chicken Soup" into another language,
+      // and nobody would notice until the recipe was gone in every sense that
+      // matters. So: a marker string is planted in every field of a real recipe
+      // and the catalogue is searched for it.
+      var MARK='ZQXJ';
+      var snapshot=recipes.slice(), snapId=nextId, prevView=viewId, prevMode=viewMode;
+      var realSave=window.saveData, realLocal=window.saveLocal, realToast=window.toast;
+      var prevDict=_i18nDict, prevLang=_i18nLang;
+      try{
+        window.saveData=function(){}; window.saveLocal=function(){}; window.toast=function(){};
+        recipes=[normalizeRecipe({ id:889001, name:MARK+'Soup', by:MARK+'Gran', prep:MARK+'min',
+          servings:'4', source:'https://'+MARK+'.test/r', category:'Soup', difficulty:'Easy',
+          ingredients:[{a:'2',n:MARK+'onions',g:MARK+'group'}], steps:[MARK+' fry slowly'],
+          notes:MARK+' note', updatedAt:Date.now() })];
+        nextId=889100;
+
+        function leaks(){ return i18nCatalogue().filter(function(x){ return x.indexOf(MARK)!==-1; }); }
+        renderGrid(); renderFilters();
+        var g=leaks(); if(g.length) throw new Error('recipe text reached the grid catalogue: '+JSON.stringify(g));
+        viewMode='list'; renderGrid();
+        var l=leaks(); if(l.length) throw new Error('recipe text reached the list catalogue: '+JSON.stringify(l));
+        viewMode=prevMode; renderGrid();
+        openView(889001); await wait(120);
+        var v=leaks(); if(v.length) throw new Error('recipe text reached the open-recipe catalogue: '+JSON.stringify(v));
+        closeM('viewOverlay');
+
+        // …and prove it by actually translating: every unit gets a visible
+        // prefix, then the recipe is checked for one. A catalogue check alone
+        // would miss a path that translates without cataloguing.
+        var cat=i18nCatalogue();
+        if(cat.length < 200) throw new Error('only '+cat.length+' UI strings found — the walk is not reaching the app');
+        var dict={}; cat.forEach(function(x){ dict[x]='##'+x; });
+        _i18nDict=dict; _i18nLang='he';
+        // Open FIRST, then apply. In the app a MutationObserver catches
+        // anything rendered after a language is chosen; here that would make the
+        // test depend on two animation frames, and a flaky test about recipe
+        // safety is worse than none. The observer's own behaviour is asserted
+        // separately, below.
+        openView(889001); await wait(120);
+        i18nApply(document.body);
+        var vm=document.getElementById('viewModal').textContent;
+        [[MARK+'Soup','the name'],[MARK+'onions','an ingredient'],[MARK+' fry slowly','a step'],
+         [MARK+' note','the notes']].forEach(function(pair){
+          if(vm.indexOf(pair[0])===-1) throw new Error(pair[1]+' vanished from the open recipe');
+          if(vm.indexOf('##'+pair[0])!==-1) throw new Error(pair[1]+' was TRANSLATED — this is someone\u2019s recipe');
+        });
+        if(vm.indexOf('##')===-1) throw new Error('nothing at all was translated, so this proves nothing');
+        closeM('viewOverlay');
+
+        // The observer is what keeps a re-render translated — without it the
+        // interface reverts to English on the first filter toggle.
+        i18nStartObserver();
+        renderFilters();
+        await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+        var allBtn=document.querySelector('#filterBar .all-btn, #mobileAllBtn');
+        if(allBtn && allBtn.textContent.indexOf('##')===-1)
+          throw new Error('a re-render came back in English: the observer is not re-applying');
+
+        // Switching language must translate the SOURCE, never a translation.
+        // The English original is parked on each node the first time it is
+        // touched; without that, the second language is applied to the first
+        // one's output and two switches compound into gibberish.
+        //
+        // Assert the parking EXISTS before relying on it. The first version of
+        // this check used querySelector('[data-i18n-src]'), which is null when
+        // the parking is gone — so removing it made the check skip itself and
+        // the mutation passed. A guard that disappears with the thing it guards
+        // is not a guard.
+        var parked=document.querySelectorAll('[data-i18n-src]');
+        if(parked.length < 50)
+          throw new Error('only '+parked.length+' nodes kept their English original; nothing could be reverted or re-translated');
+        var dict2={}; cat.forEach(function(x){ dict2[x]='@@'+x; });
+        _i18nDict=dict2; _i18nLang='fr'; i18nApply(document.body);
+        var compounded=0, firstBad='';
+        var after=document.querySelectorAll('[data-i18n-src]');
+        for(var ci=0; ci<after.length; ci++){
+          if(after[ci].textContent.indexOf('##')!==-1){
+            compounded++; if(!firstBad) firstBad=after[ci].textContent.trim().slice(0,50);
+          }
+        }
+        if(compounded) throw new Error(compounded+' element(s) had the second language applied on top of the first, e.g. "'+firstBad+'"');
+
+        // And English comes back exactly, not approximately.
+        _i18nDict=null; _i18nLang='en'; i18nRevertAll();
+        var still=document.querySelectorAll('[data-i18n-src]');
+        for(var i=0;i<still.length && i<400;i++){
+          var want=still[i].getAttribute('data-i18n-src');
+          if(want.indexOf('{')!==-1) continue;          // placeholder units carry markup
+          if(still[i].textContent.trim()!==want.trim())
+            throw new Error('reverting left "'+still[i].textContent.trim().slice(0,40)+'" instead of "'+want.slice(0,40)+'"');
+        }
+      } finally {
+        _i18nDict=prevDict; _i18nLang=prevLang;
+        try{ i18nRevertAll(); }catch(e){}
+        closeM('viewOverlay'); viewId=prevView; viewMode=prevMode;
+        recipes=snapshot; nextId=snapId;
+        window.saveData=realSave; window.saveLocal=realLocal; window.toast=realToast;
+        renderGrid(); renderFilters();
+      }
+
+      // A URL is data in every language, and it is also a recipe's source field.
+      if(i18nTranslatable('https://example.com/recipes/4')) throw new Error('a URL is offered for translation');
+      if(i18nTranslatable('42')) throw new Error('a bare number is offered for translation');
+      if(i18nTranslatable('🍲')) throw new Error('an emoji on its own is offered for translation');
+      if(!i18nTranslatable('Add ingredient')) throw new Error('a real label is not translatable');
+    } },
+
   { id:'ui_hebrew_recipe_reads_right', group:'UI', name:'A Hebrew recipe\u2019s labels sit on the right too (v36.30)',
     test: async()=>{
       if(typeof recipeIsRTL!=='function') throw new Error('recipeIsRTL not defined');
