@@ -7205,62 +7205,58 @@ window.SELF_TESTS = [
         throw new Error('the login screen does not link to the note');
     } },
 
-  { id:'ui_header_stands_down', group:'UI', name:'The header gives the phone its screen back when scrolling (v36.23)',
+  { id:'ui_header_slides_out', group:'UI', name:'The header slides out at the pace of the scroll (v36.27)',
     test: async()=>{
-      if(typeof applyHeaderCollapse!=='function') throw new Error('applyHeaderCollapse not defined');
+      if(typeof applyHeaderGeometry!=='function') throw new Error('applyHeaderGeometry not defined');
+      if(typeof headerSlidePx!=='function') throw new Error('headerSlidePx not defined');
       var header=document.querySelector('.header');
       if(!header) throw new Error('no .header');
-      if(!header.querySelector('.header-top')) throw new Error('the brand row has no .header-top to hide');
-      if(!header.querySelector('.header-status')) throw new Error('the status row has no .header-status to hide');
+      var brand=header.querySelector('.header-top');
+      if(!brand) throw new Error('the brand row has no .header-top, so nothing can slide');
 
-      // Measure what RENDERS. Whether the class is present says nothing about
-      // whether any pixels were actually given back.
-      var pad=document.createElement('div');
-      pad.style.height='3000px'; pad.id='__scrollPad';
-      document.body.appendChild(pad);
-      var wasY=window.scrollY, wasCollapsed=header.classList.contains('collapsed');
-      try{
-        window.scrollTo(0,0); applyHeaderCollapse();
-        var tall=header.getBoundingClientRect().height;
-        if(header.classList.contains('collapsed')) throw new Error('the header is collapsed at the top of the page');
+      // v36.23 hid the brand row at a scroll threshold, which made the page
+      // jump. v36.27 gives .header a NEGATIVE sticky top instead, so the browser
+      // scrolls it away at exactly the pace of the page. The whole mechanism is
+      // those two numbers agreeing, so that is what is asserted — the smoothness
+      // itself needs a real phone viewport and lives in tests/phone-chrome.js.
+      applyHeaderGeometry();
+      var phone = window.innerWidth <= 700;
+      var slide = headerSlidePx();
+      var top = parseFloat(getComputedStyle(header).top) || 0;
 
-        window.scrollTo(0,400); applyHeaderCollapse();
-        if(!header.classList.contains('collapsed')) throw new Error('scrolling did not collapse the header');
-        var short=header.getBoundingClientRect().height;
-
-        var phone = window.innerWidth <= 700;
-        if(phone){
-          if(short >= tall) throw new Error('the header is still '+short+'px after collapsing (was '+tall+') — nothing was given back');
-          if(tall - short < 60) throw new Error('only '+(tall-short)+'px was reclaimed; the point of this was ~100');
-          // What a phone is FOR must survive. Settings may go — it is one flick away.
-          if(!document.getElementById('searchInput').offsetWidth)
-            throw new Error('search disappeared with the header');
-          var add=Array.prototype.slice.call(document.querySelectorAll('.btn-primary'))
-            .filter(function(b){ return /Add Recipe/.test(b.textContent) && b.offsetWidth; });
-          if(!add.length) throw new Error('+ Add Recipe disappeared with the header');
-        } else {
-          if(short !== tall)
-            throw new Error('a desktop header changed height ('+tall+' -> '+short+') — this is meant to be phone-only');
-        }
-
-        // The filter bar is pinned by an explicit top, so it has to follow.
-        // If it does not, it either floats in a brown gap or covers the recipes.
-        var bar=document.getElementById(phone ? 'mobileFilterBar' : 'filterBar');
-        var gap=Math.round(bar.getBoundingClientRect().top - header.getBoundingClientRect().bottom);
-        if(Math.abs(gap) > 2)
-          throw new Error('the filter bar sits '+gap+'px from the collapsed header instead of against it');
-
-        // Hysteresis: between the two thresholds it must not flap.
-        window.scrollTo(0,60); applyHeaderCollapse();
-        if(!header.classList.contains('collapsed'))
-          throw new Error('the header expanded again at 60px — the thresholds are the same, so it will flicker');
-        window.scrollTo(0,0); applyHeaderCollapse();
-        if(header.classList.contains('collapsed')) throw new Error('it never comes back at the top');
-      } finally {
-        pad.remove(); window.scrollTo(0,wasY);
-        header.classList.toggle('collapsed', wasCollapsed);
-        if(typeof updateFilterBarTop==='function') updateFilterBarTop();
+      if(phone){
+        if(slide <= 0) throw new Error('headerSlidePx() reports '+slide+' on a phone — nothing would move');
+        if(Math.abs(slide - brand.offsetHeight) > 1)
+          throw new Error('the slide is '+slide+'px but the brand row is '+brand.offsetHeight
+            +'px — a mismatch leaves a brown gap or clips the search field');
+        if(Math.abs(top + slide) > 1)
+          throw new Error('.header top is '+top+'px, expected '+(-slide)+' — without a negative sticky top it cannot slide at all');
+      } else {
+        if(slide !== 0) throw new Error('a desktop header would slide by '+slide+'px; this is meant to be phone-only');
+        if(top !== 0) throw new Error('.header top is '+top+'px on a desktop');
       }
+
+      // The filter bar has to land exactly where the header stops. Out by any
+      // amount and it either floats in a brown gap or sits on the recipes.
+      var barId = phone ? 'mobileFilterBar' : 'filterBar';
+      var bar = document.getElementById(barId);
+      var want = Math.max(0, header.offsetHeight - slide);
+      var got = parseFloat(bar.style.top) || 0;
+      if(Math.abs(got - want) > 1)
+        throw new Error('#'+barId+' sticks at '+got+'px but the header will stop at '+want+'px');
+
+      // It is measured, not hardcoded: the brand row wraps at narrow widths, and
+      // a constant would be wrong on any phone that wraps it differently.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var code = src.replace(/^\s*\/\/.*$/gm, '');
+      if(!/\.header-top'\)[\s\S]{0,120}offsetHeight/.test(code))
+        throw new Error('the slide distance is not measured from the brand row');
+      // And the old threshold machinery is gone, not merely unused — a leftover
+      // scroll handler toggling a class would fight the sticky top.
+      if(/HEADER_COLLAPSE_AT|classList\.toggle\('collapsed'/.test(code))
+        throw new Error('the v36.23 threshold collapse is still in the file alongside the slide');
+      if(/addEventListener\('scroll', onHeaderScroll/.test(code))
+        throw new Error('a per-scroll handler survives; the slide needs none');
     } },
 
   { id:'perf_filter_counts_memoised', group:'UI', name:'The filter-bar counts are not recomputed on every toggle (v36.23)',

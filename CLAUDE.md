@@ -364,29 +364,38 @@ found only because a test was written first and disagreed with the code.
   - Undo is one-shot — a second press must say "Nothing to undo", not rewind
     something unrelated — and `clearBulkUndo()` is called on every path that
     decides not to change anything after all.
-- **The header stands down once you are scrolling (v36.23, audit U1).** 34% of a
-  390×844 phone was fixed chrome before a single recipe: 198px of header plus an
-  85px filter bar. Scrolling now hides the brand row and the status line —
-  measured 198 → 112px, so 283 → 197px of chrome, 33.5% → 23.3%. Search, the
-  filters and **+ Add Recipe** stay; ⚙️ Settings goes, and comes back with one
-  flick to the top.
-  - **Two thresholds, not one** (collapse at 90, expand at 40). One threshold
-    flickers: collapsing shortens the page, which can scroll you back above the
-    line, which expands it again.
-  - **Position, not direction.** A show-on-scroll-up header is the fashionable
-    pattern and also the one that keeps appearing over what you are reading.
-  - **The filter bar must be re-pinned** — its `top` is an explicit pixel value
-    from `header.offsetHeight`, so `applyHeaderCollapse` calls
-    `updateFilterBarTop()`. Without it the bar floats in a brown gap or sits on
-    the first row of recipes.
-  - **Phone-only, by CSS media query**, with the class toggled everywhere. A
-    desktop has the room, and taking Settings off a scrolled desktop is a loss
-    for no gain.
-  - **`tests/phone-chrome.js` is why this is actually checked.** Same lesson as
-    the contrast scan: the behaviour only exists below 700px and the self-test
-    suite runs at the headless default width, so the phone assertions inside it
-    pass vacuously. The CI step drives a real 390×844 viewport and holds the
-    chrome to a **budget** — a new header row fails the build and says by how much.
+- **The header SLIDES out from under your thumb (v36.23, rewritten v36.27, audit U1).**
+  34% of a 390×844 phone was fixed chrome before a single recipe. Scrolling now
+  takes the brand row away — measured 206 → 112px of header, 34.5% → 23.3% of
+  the screen. Search, the filters and **+ Add Recipe** stay; ⚙️ Settings goes,
+  and comes back on the way to the top.
+  - **There is no scroll handler and no class.** `.header` is sticky with a
+    **negative `top`** equal to the brand row's height, so the browser scrolls
+    it away at exactly the pace of the page and pins it the instant the brand
+    row has gone. The filter bar's sticky `top` is set to the height that will
+    be *left*, so it catches the header precisely when the slide ends. Two
+    numbers, set once by `applyHeaderGeometry()` and on resize; nothing is
+    recomputed per frame, so it cannot stutter under load.
+  - **It is symmetric by construction.** Coming back up, the header returns 1:1
+    with the scroll over the last N pixels — never a snap. v36.23's threshold
+    version jumped in both directions; that is what this replaced.
+  - **Position, not direction.** A header that springs back the moment you
+    scroll up is the fashionable pattern and also the one that keeps appearing
+    over what you are reading. The cost, stated plainly: from deep in a long
+    list the header does not return until you are near the top.
+  - **The slide distance is measured, never a constant** — the brand row *wraps*
+    at narrow widths, and a hardcoded 86 leaves a brown gap on a phone that
+    wraps it differently.
+  - **v36.23 had a dead half.** It also tried to hide `.header-status`, which
+    never happened: that row carries an inline `display:flex`, and **an inline
+    style beats any class rule**. It could not have slid either, being at the
+    bottom of the header. The rule is gone rather than "fixed".
+  - **`tests/phone-chrome.js` is why this is checked at all.** Same lesson as the
+    contrast scan: the behaviour only exists below 700px and the self-test suite
+    runs at the headless default width, so phone assertions inside it pass
+    vacuously. It drives a real 390×844 viewport, holds the chrome to a
+    **budget**, and asserts the *pacing* in both directions — a threshold
+    version passes every other check in the file.
 - **The "one item away" count is memoised, and a stale one is a chip that lies
   (v36.23, audit P2).** `missingFromPantry` walks every ingredient of every
   recipe against the whole pantry, on every filter toggle; measured at 1,000
