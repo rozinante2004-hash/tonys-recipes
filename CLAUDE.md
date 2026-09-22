@@ -563,6 +563,33 @@ found only because a test was written first and disagreed with the code.
     a real recipe would only show the parts that apply to it, and Version
     history, the cooking log and the nutrition panel would stay invisible and
     untranslated for ever.
+- **The app READS ITS OWN SOURCE for the messages that have no screen (v36.36).**
+  Drawing every panel still misses the largest category of all: a toast, a
+  confirmation or an error lives inside the function that raises it and is in
+  the DOM for four seconds, possibly years after a language was generated.
+  There are 250 `toast()` sites alone. `i18nScrapeSource()` fetches
+  `location.href` (this file, already in the service worker's cache) and takes
+  only strings that are the **whole** argument — `toast('AI cache cleared')`
+  yes, `toast('Saved ' + n + ' recipes')` no, because what reaches the screen is
+  the composed string and translating half of it changes nothing while still
+  costing money. 152 of 250 toasts qualify; the other 81 are an honest gap.
+  - Read at run time rather than pasted in as a generated list: a pasted list is
+    right on the day it is written and quietly wrong after the next edit.
+  - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
+    `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
+    placeholder and has to stay exactly that.
+- **A PLACEHOLDER is chrome even inside `dir="auto"` (v36.36).** That marking is
+  about the recipe text somebody types INTO the field; the grey hint behind it
+  is "e.g. 20 min" and never was. Until v36.36 the whole ingredient and method
+  editor kept its English hints, because every field carries `dir="auto"`. The
+  exception is exactly that wide: `title` and `aria-label` inside a recipe are
+  still the recipe's own words, and the test asserts it by planting a marker in
+  both.
+- **Never compare against text you have translated.** The measurement
+  converter's `setCalcCat()` did `b.textContent === cat`, so its category
+  buttons stopped highlighting the moment the interface spoke Hebrew. Read a
+  `data-` attribute. There were only two such comparisons in the file — the
+  other is inside `#i18nOverlay`, which is never translated.
 - **A varying count must not be part of the key (v36.35).** "🕘 Version history
   (3)" is a different key from "(1)", so the dictionary is asked for a string it
   can never hold. Park the number in its own `<span data-no-i18n>` — SPAN is

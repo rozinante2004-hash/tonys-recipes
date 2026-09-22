@@ -7462,6 +7462,43 @@ window.SELF_TESTS = [
       if(after.some(function(s){ return /\((?:[1-9]\d*|0)\)$/.test(s) && /history|log|photo|away/i.test(s); }))
         throw new Error('a key still ends in a literal count');
 
+      // The messages that have no screen. A toast or a confirmation lives
+      // inside the function that raises it and is never in the DOM to be found
+      // — 200-odd of them — so the app reads its own source for the ones that
+      // are a whole string rather than a concatenation.
+      if(typeof i18nScrapeSource!=='function') throw new Error('i18nScrapeSource not defined');
+      if(after.indexOf('AI cache cleared')===-1)
+        throw new Error('a plain toast message is not in the catalogue — the source scrape found nothing');
+      if(!after.some(function(x){ return /collection cannot be added to itself/.test(x); }))
+        throw new Error('a confirmation message is not in the catalogue');
+      // …but NOT a fragment of a concatenated one: translating half a message
+      // changes nothing on screen, because what is shown is the joined string.
+      if(after.some(function(x){ return /^Another device saved "$/.test(x); }))
+        throw new Error('a fragment of a concatenated message was catalogued');
+      // …and not an example value that has to stay exactly as written.
+      if(after.indexOf('123456789-abc.apps.googleusercontent.com')!==-1)
+        throw new Error('the Gmail Client ID example was offered for translation');
+
+      // A placeholder is chrome even on a field marked dir="auto" — that
+      // marking is about the recipe text typed INTO it. The whole ingredient
+      // editor kept its English hints until v36.36.
+      if(after.indexOf('Ingredient name')===-1 || after.indexOf('Amount')===-1)
+        throw new Error('the ingredient editor\u2019s placeholders are still not translatable');
+      // The exception is exactly that wide and no wider: a title or an
+      // aria-label inside a recipe is still the recipe's own words.
+      (function(){
+        var probe=document.createElement('div');
+        probe.innerHTML='<div dir="auto"><input placeholder="Amount" title="ZQXJTITLE" '
+          + 'aria-label="ZQXJLABEL"></div>';
+        document.body.appendChild(probe);
+        try{
+          var keys=i18nCatalogue(probe);
+          if(keys.indexOf('Amount')===-1) throw new Error('the placeholder exception stopped working');
+          if(keys.some(function(k){ return /ZQXJ/.test(k); }))
+            throw new Error('the exception leaked past placeholder to '+JSON.stringify(keys.filter(function(k){return /ZQXJ/.test(k);})));
+        } finally { probe.remove(); }
+      })();
+
       // A long help passage is ONE unit and must survive the length cap. The
       // WhatsApp manual is 1,400 characters and was being dropped in silence.
       if(!after.some(function(s){ return s.length>1000; }))

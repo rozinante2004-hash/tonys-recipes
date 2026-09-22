@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.35 -->
+<!-- Tony's Recipes Collection v36.36 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3305,7 +3305,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.35';
+var APP_VERSION = 'v36.36';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5918,7 +5918,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.35</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.36</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6540,7 +6540,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.35</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.36</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8110,11 +8110,17 @@ function i18nEdges(src) {
   return { pre: m[1], core: m[2].trim(), post: m[3] };
 }
 
-function i18nSkip(el) {
+// `attr` is the thing being considered, or null for the element's own words.
+// v36.36 — a PLACEHOLDER is always chrome, even on a field marked dir="auto".
+// That marking is about the value somebody types in, which is a recipe; the
+// grey hint behind it is "e.g. 20 min" and never was. Without this exception
+// the entire ingredient and method editor kept its English hints for ever,
+// because every one of its fields carries dir="auto" for the text it holds.
+function i18nSkip(el, attr) {
   for (var n = el; n && n !== document.body; n = n.parentElement) {
     if (!n.getAttribute) continue;
     // The recipe itself. Same boundary the language marking uses (v36.25).
-    if (n.getAttribute('dir') === 'auto') return true;
+    if (n.getAttribute('dir') === 'auto' && attr !== 'placeholder') return true;
     if (n.hasAttribute('data-no-i18n')) return true;
     // The translation editor shows English on purpose — translating the thing
     // you are using to fix translations is a hall of mirrors.
@@ -8185,7 +8191,10 @@ function i18nUnits(root) {
   if (scope.nodeType === 1 && scope !== document.body) all.unshift(scope);
   for (var i = 0; i < all.length; i++) {
     var el = all[i];
-    if (I18N_SKIP_TAGS.test(el.tagName) || i18nSkip(el)) continue;
+    if (I18N_SKIP_TAGS.test(el.tagName)) continue;
+    var hardSkip = i18nSkip(el, null);
+    // …unless the only thing still worth reading here is a placeholder.
+    if (hardSkip && i18nSkip(el, 'placeholder')) continue;
     // Attributes people actually read.
     // `data-i18n-skip-attrs` is for the case dir="auto" cannot reach: an
     // ATTRIBUTE holding recipe data on an element whose children are chrome.
@@ -8195,12 +8204,14 @@ function i18nUnits(root) {
     var skipAttrs = el.getAttribute('data-i18n-skip-attrs') || '';
     ['placeholder', 'title', 'aria-label'].forEach(function(a) {
       if (skipAttrs.indexOf(a) !== -1) return;
+      if (hardSkip && a !== 'placeholder') return;
       var cur = el.getAttribute('data-i18n-' + a);
       if (cur === null) cur = el.getAttribute(a);
       if (cur !== null && i18nTranslatable(cur)) {
         out.push({ el: el, attr: a, src: cur, key: cur, pre: '', post: '' });
       }
     });
+    if (hardSkip) continue;              // inside a recipe: the words are content
     // …and the element's own words, but only if it is the one that HOLDS them:
     // an outer <div> wrapping a <p> would otherwise claim the paragraph's text.
     var holdsText = false;
@@ -8254,8 +8265,22 @@ var I18N_HARVEST = [
   // nutrition panel would stay invisible and untranslated for ever. Its words
   // are deliberate nonsense and never reach the catalogue — everything holding
   // them carries dir="auto", which i18n_never_touches_a_recipe asserts.
-  ['an open recipe',        function(){ return i18nHarvestView(); }]
+  ['an open recipe',        function(){ return i18nHarvestView(); }],
+  ['the grid-size control', function(){ renderGridColsUI(); }],
+  ['the diet chips',        function(){ renderDietButtons([]); }],
+  // The ingredient editor's own rows: the Amount and Ingredient name
+  // placeholders and the indent/remove buttons live nowhere else.
+  ['the ingredient editor', function(){ loadIngsTable([{ a: '1', n: '·' }, { sub: '·' }]); }],
+  ['the converter',         function(){ i18nHarvestCalc(); }]
 ];
+// openCalcModal() builds the category row and then opens the panel, so the
+// open has to be undone — the same contract every other entry here keeps.
+function i18nHarvestCalc() {
+  var ov = document.getElementById('calcOverlay');
+  var wasOpen = !!(ov && ov.classList.contains('open'));
+  try { openCalcModal(); }
+  finally { if (ov && !wasOpen) ov.classList.remove('open'); }
+}
 // drawView() takes no argument — it looks the recipe up by viewId — so the
 // stand-in has to be in the library for exactly as long as it takes to draw,
 // and out again whatever happens. It is never saved: nothing here writes.
@@ -8324,9 +8349,65 @@ async function i18nHarvest() {
         drawn.push(I18N_HARVEST[i][0]);
       } catch(e) { dlog('[i18n] could not harvest ' + I18N_HARVEST[i][0], e && e.message); }
     }
+    // …and the messages that never have a screen at all.
+    try {
+      var n = await i18nScrapeSource();
+      if (n) drawn.push(n + ' messages from the source');
+    } catch(e) { dlog('[i18n] scrape failed', e && e.message); }
   } finally { window.toast = realToast; }
   return drawn;
 }
+// ─── THE MESSAGES THAT HAVE NO SCREEN (v36.36) ───────────────────────────────
+// Drawing every panel still misses the largest category of all: a toast, a
+// confirmation or an error lives inside the function that raises it and is in
+// the DOM for four seconds, possibly years after a language was generated.
+// There are 217 of them here. No amount of rendering finds them, because there
+// is nothing to render until something happens.
+//
+// So the app reads its own source. `location.href` IS this file, it is already
+// in the service worker's cache, and the patterns below match only a string
+// that is the WHOLE argument — `toast('AI cache cleared')` yes,
+// `toast('Saved ' + n + ' recipes')` no. A fragment would be worse than
+// useless: what reaches the screen is the composed string, so translating half
+// of it changes nothing on screen and spends money doing it.
+//
+// Read at run time rather than pasted in as a generated list, because a pasted
+// list is right on the day it is written and quietly wrong after the next edit
+// — and quietly wrong is the exact failure this release exists to end.
+var I18N_SCRAPE = [
+  /\btoast\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,\s*\d+\s*)?\)/g,
+  /\baskPrompt\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,[^)]*)?\)/g,
+  /\bshowServiceError\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/g,
+  /\b(?:title|message|okLabel|cancelLabel|placeholder|label|hint)\s*:\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,}]/g
+];
+function i18nUnescape(v) {
+  return String(v).replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+                  .replace(/\\(['"\\])/g, '$1').trim();
+}
+async function i18nScrapeSource() {
+  var added = 0;
+  try {
+    var res = await fetch(location.href, { cache: 'force-cache' });
+    if (!res.ok) return 0;
+    var src = await res.text();
+    I18N_SCRAPE.forEach(function(re) {
+      re.lastIndex = 0;
+      var m;
+      while ((m = re.exec(src)) !== null) {
+        var v = i18nUnescape(m[2]);
+        // A single token carrying a dot, a slash or an @ is an example value,
+        // not a sentence — "123456789-abc.apps.googleusercontent.com" is the
+        // placeholder in the Gmail Client ID box and must stay exactly that.
+        if (/^\S+$/.test(v) && /[.@\/]/.test(v)) continue;
+        if (!i18nTranslatable(v) || _i18nHarvested[v]) continue;
+        _i18nHarvested[v] = 1; added++;
+      }
+    });
+  } catch(e) { dlog('[i18n] could not read its own source', e && e.message); }
+  return added;
+}
+window.i18nScrapeSource = i18nScrapeSource;
+
 // Everything the app can show, including the screens that are not showing now.
 // This is what a translation is generated from. i18nCatalogue() stays strictly
 // present-tense, which is what the recipe-safety test needs to mean anything.
@@ -20838,7 +20919,10 @@ function openCalcModal() {
   var catRow = document.getElementById('calcCatRow');
   if (catRow) {
     catRow.innerHTML = Object.keys(CALC_CATS).map(function(c) {
-      return '<button class="calc-cat-btn' + (c===_calcCat?' active':'') + '" onclick="setCalcCat(\''+c+'\')">' + c + '</button>';
+      // data-cat, not the visible words: since v36.31 those words can be in
+      // another language, and setCalcCat() compares against them.
+      return '<button class="calc-cat-btn' + (c===_calcCat?' active':'') + '" data-cat="' + escA(c)
+        + '" onclick="setCalcCat(\''+c+'\')">' + c + '</button>';
     }).join('');
   }
   populateCalcUnits();
@@ -20852,7 +20936,7 @@ function setCalcCat(cat) {
   var catRow = document.getElementById('calcCatRow');
   if (catRow) {
     catRow.querySelectorAll('.calc-cat-btn').forEach(function(b) {
-      b.classList.toggle('active', b.textContent===cat);
+      b.classList.toggle('active', b.getAttribute('data-cat')===cat);
     });
   }
   populateCalcUnits();
