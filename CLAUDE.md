@@ -578,6 +578,29 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **AN ORPHAN IS USUALLY PAID WORK, NOT RUBBISH (v36.45).** Tony's file held
+  1,016 orphans and NONE was junk — the code fragments never became keys,
+  because they were in the batches that failed and so were never translated at
+  all. What was orphaned was real Hebrew under keys built by rules that have
+  since changed (v36.32 stopped putting an icon's placeholder in the key, v36.35
+  took varying counts out, v36.41 changed what reaches the catalogue).
+  `i18nEdOrphanMatches()` re-matches them: **same text once leading and trailing
+  placeholders and whitespace are gone**, which is exactly the set of changes
+  those releases made, and leaves the value usable as it stands.
+  - It must NOT re-match `"🕘 Version history (3)"` onto `"(…{1})"`. The Hebrew
+    for that one has a literal 3 in it, and moving it across would put the wrong
+    number on screen for ever. The test asserts the refusal.
+  - **Re-use is offered BEFORE delete**, because deleting an orphan that would
+    have matched throws away something already paid for and then pays for it
+    again on the next gap-fill.
+- **REMOVING IS UNDOABLE (v36.45).** Every entry was paid for; a thousand
+  deleted on one click with "cannot be undone" as the only protection is not a
+  safe thing to offer. Removals are stashed in `tonys_i18n_bin_<lang>` and the
+  editor shows a way back while it is there.
+- **The editor's key analysis is CACHED.** `i18nEdKeys()` walks the catalogue,
+  which walks the whole DOM, and `i18nEdRender()` runs on every keystroke in the
+  search box — a full page walk plus two thousand comparisons per character.
+  `i18nEdInvalidate()` on anything that changes the draft.
 - **THE LOG'S OWN EVENTS ARE NOT INTERFACE TEXT (v36.44).** They are
   diagnostics, they are what gets pasted to whoever is helping, and there is no
   end to them — every message ever logged would become a dictionary key. The

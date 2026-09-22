@@ -7881,6 +7881,51 @@ window.SELF_TESTS = [
         delete _i18nEdDraft['+ x); if (y) z.push( + w); res.innerHTML = #FFF8E8;'];
         delete _i18nEdDraft['A sentence that was reworded in the markup'];
 
+        // REMOVING IS UNDOABLE. Every entry here was paid for; deleting a
+        // thousand on one click with "cannot be undone" as the only protection
+        // is not a safe thing to offer.
+        var realConfirm2 = window.askConfirm;
+        try {
+          window.askConfirm = function(){ return Promise.resolve(true); };
+          try { localStorage.removeItem('tonys_i18n_bin_he'); } catch(e) {}
+          _i18nEdDraft['A string the app has not shown for a year'] = 'תרגום';
+          i18nEdInvalidate();
+          await i18nEdDropOrphans();
+          if(_i18nEdDraft['A string the app has not shown for a year'])
+            throw new Error('the orphan was not removed');
+          if(Object.keys(i18nEdBin('he')).indexOf('A string the app has not shown for a year') === -1)
+            throw new Error('a removed translation was not kept — there is no way back from the click');
+          await i18nEdRestoreBin();
+          if(_i18nEdDraft['A string the app has not shown for a year'] !== 'תרגום')
+            throw new Error('putting it back did not restore the translation');
+          delete _i18nEdDraft['A string the app has not shown for a year'];
+        } finally { window.askConfirm = realConfirm2; try { localStorage.removeItem('tonys_i18n_bin_he'); } catch(e) {} }
+
+        // …and an orphan that is only an older SPELLING of a live key is
+        // re-used rather than deleted. "{1}Clips" and "Clips" are the same
+        // button: the key rules changed, the Hebrew did not.
+        var liveKey = cat.filter(function(x){ return /Collections/.test(x); })[0];
+        if(!liveKey) throw new Error('no live key to test re-matching against');
+        var oldSpelling = '{1}' + liveKey;      // how the key was written before v36.32
+        _i18nEdDraft[oldSpelling] = 'אוספים';
+        delete _i18nEdDraft[liveKey];
+        i18nEdInvalidate();
+        var pairs = i18nEdOrphanMatches().filter(function(x){ return x.from === oldSpelling; });
+        if(!pairs.length)
+          throw new Error('an orphan differing only by an icon placeholder was not matched to '
+            + JSON.stringify(liveKey));
+        if(pairs[0].to !== liveKey)
+          throw new Error('it matched the wrong key: '+JSON.stringify(pairs[0].to));
+        delete _i18nEdDraft[oldSpelling];
+        // …but a count baked into the key must NEVER be re-used: the Hebrew for
+        // "(3)" has a literal 3 in it, and moving it would show the wrong number.
+        _i18nEdDraft['🕘 Version history (3)'] = 'היסטוריה (3)';
+        i18nEdInvalidate();
+        if(i18nEdOrphanMatches().some(function(x){ return x.from === '🕘 Version history (3)'; }))
+          throw new Error('a translation with a literal count in it was re-used for a different count');
+        delete _i18nEdDraft['🕘 Version history (3)'];
+        i18nEdInvalidate();
+
         // Saving changes the LIVE interface, which is why the editor is worth
         // having — and must not eat the button's icon on the way.
         window._fbDb=null;                     // no cloud here: it falls back to the device

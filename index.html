@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.44 -->
+<!-- Tony's Recipes Collection v36.45 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3312,7 +3312,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.44';
+var APP_VERSION = 'v36.45';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5978,7 +5978,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.44</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.45</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6600,7 +6600,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.44</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.45</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9750,6 +9750,7 @@ async function openI18nEditor() {
   _i18nEdDraft = {};
   Object.keys(_i18nDict || {}).forEach(function(k){ _i18nEdDraft[k] = _i18nDict[k]; });
   _i18nEdDirty = false;
+  i18nEdInvalidate();
   var t = document.getElementById('i18nEdTitle');
   if (t) t.textContent = 'Edit the ' + i18nLangName(lang) + ' translation';
   var s = document.getElementById('i18nEdSearch'); if (s) s.value = '';
@@ -9759,6 +9760,7 @@ async function openI18nEditor() {
   // …and again once the unopened panels have been drawn, so the table lists
   // every string the app has rather than every string it happens to be showing.
   await i18nHarvest();
+  i18nEdInvalidate();          // the harvest changed what counts as live
   i18nEdRender();
 }
 window.openI18nEditor = openI18nEditor;
@@ -9768,6 +9770,18 @@ window.openI18nEditor = openI18nEditor;
 // translation whose English was reworded in the markup and now matches nothing.
 // They are shown rather than hidden, because an orphan is the only clue that a
 // string was renamed, and its old translation is usually most of the new one.
+// Cached. i18nEdKeys() walks the whole catalogue, which walks the whole DOM,
+// and i18nEdRender() runs on every keystroke in the search box. On Tony's file
+// — 2,335 entries, 1,016 of them orphans — that was a full page walk plus two
+// thousand comparisons per character typed.
+var _i18nEdInfo = null;
+function i18nEdInfo() {
+  if (!_i18nEdInfo) _i18nEdInfo = i18nEdKeys();
+  return _i18nEdInfo;
+}
+function i18nEdInvalidate() { _i18nEdInfo = null; }
+window.i18nEdInvalidate = i18nEdInvalidate;
+
 function i18nEdKeys() {
   var seen = Object.create(null);
   i18nFullCatalogue().forEach(function(k){ seen[k] = 1; });
@@ -9799,7 +9813,7 @@ function i18nEdRender() {
   q = String(q).trim().toLowerCase();
   var onlyGaps = !!(document.getElementById('i18nEdOnlyGaps') || {}).checked;
 
-  var info = i18nEdKeys();
+  var info = i18nEdInfo();
   var rows = info.all.filter(function(k) {
     var t = _i18nEdDraft[k] || '';
     if (onlyGaps && t) return false;
@@ -9825,13 +9839,21 @@ function i18nEdRender() {
       + (_i18nEdDirty ? ' · UNSAVED CHANGES' : '');
     var junk  = info.all.filter(info.junk).length;
     var stale = info.all.filter(info.stale).length;
-    if (junk || stale) {
+    if (junk || stale || Object.keys(i18nEdBin(_i18nEdLang)).length) {
       var link = function(fn, label) {
         return ' · <button onclick="' + fn + '" data-no-i18n style="background:none;border:none;'
           + 'color:var(--terracotta);cursor:pointer;font:inherit;text-decoration:underline;padding:0;">'
           + label + '</button>';
       };
+      // Re-using comes FIRST, and is offered before deleting, because deleting
+      // an orphan that would have matched throws away something already paid
+      // for and then pays for it again on the next gap-fill.
+      var reusable = stale ? i18nEdOrphanMatches().length : 0;
+      var binN = Object.keys(i18nEdBin(_i18nEdLang)).length;
       cnt.innerHTML = escH(cnt.textContent)
+        + (binN ? link('i18nEdRestoreBin()', 'put back ' + binN + ' removed') : '')
+        + (reusable ? link('i18nEdAdoptOrphans()', 're-use ' + reusable + ' old translation'
+            + (reusable === 1 ? '' : 's')) : '')
         + (junk  ? link('i18nEdDropJunk()',    'remove ' + junk + ' unusable') : '')
         + (stale ? link('i18nEdDropOrphans()', 'remove ' + stale + ' orphan' + (stale === 1 ? '' : 's')) : '');
     }
@@ -9870,6 +9892,7 @@ function i18nEdEdit(el) {
   var v = String(el.value || '').trim();
   if (v) _i18nEdDraft[k] = v; else delete _i18nEdDraft[k];
   if (!_i18nEdDirty) { _i18nEdDirty = true; }
+  i18nEdInvalidate();
   var cnt = document.getElementById('i18nEdCount');
   if (cnt && cnt.textContent.indexOf('UNSAVED') === -1) {
     cnt.textContent += ' · UNSAVED CHANGES';
@@ -9935,11 +9958,97 @@ window.i18nEdTake = i18nEdTake;
 // most of the new one, which is why they are shown rather than hidden. But a
 // bad scrape can also leave hundreds of them — v36.41 fixed one that put code
 // fragments into Tony's paid Hebrew file — and then they are just weight.
+// ─── RECOVERING TRANSLATIONS PAID FOR UNDER OLDER KEYS (v36.45) ─────────────
+// Tony's file holds 1,016 orphans and NONE of them is junk — the code
+// fragments never became keys, because they were in the batches that failed,
+// so they were never translated at all. What is orphaned is real work, under
+// keys built by rules that have since changed: v36.32 stopped putting an
+// icon's placeholder in the key, v36.35 took varying counts out of it, v36.41
+// changed what reaches the catalogue at all. "{1}Clips" and "Clips" are the
+// same button and the same Hebrew.
+//
+// So match them back before offering to delete anything. The rule is
+// deliberately narrow: same text once leading and trailing placeholders and
+// whitespace are gone. That is exactly the set of changes the key rules made,
+// and it leaves the VALUE usable as it stands — the placeholder was an icon,
+// and the icon is re-attached at display time either way.
+//
+// It will NOT re-match "🕘 Version history (3)" onto "🕘 Version history ({1})",
+// and it must not: the Hebrew for that one has a literal 3 in it, and moving it
+// across would put the wrong number on the screen for ever.
+function i18nEdOrphanMatches() {
+  var info = i18nEdInfo();
+  var live = Object.create(null);
+  info.all.forEach(function(k){ if (!info.orphan(k)) live[i18nEdNorm(k)] = k; });
+  var out = [];
+  info.all.filter(info.stale).forEach(function(orphan) {
+    var target = live[i18nEdNorm(orphan)];
+    if (!target || target === orphan) return;
+    if (_i18nEdDraft[target]) return;              // already has one; leave it alone
+    out.push({ from: orphan, to: target });
+  });
+  return out;
+}
+function i18nEdNorm(k) {
+  return String(k).replace(/\{\d+\}/g, ' ').replace(/\s+/g, ' ').trim();
+}
+async function i18nEdAdoptOrphans() {
+  var pairs = i18nEdOrphanMatches();
+  if (!pairs.length) { toast('No orphan matches a string the app still shows.'); return; }
+  var ok = await askConfirm({ icon: '♻️', title: 'Re-use ' + pairs.length + ' old translation(s)?',
+    message: 'These were translated under a slightly different key — an icon used to be counted as part '
+      + 'of the text, and it no longer is. The words are the same, so the translation still fits.\n\n'
+      + 'Nothing is sent to the AI and nothing is paid for: they are simply moved across.',
+    okLabel: 'Re-use them' });
+  if (!ok) return;
+  pairs.forEach(function(p){ _i18nEdDraft[p.to] = _i18nEdDraft[p.from]; delete _i18nEdDraft[p.from]; });
+  _i18nEdDirty = true; i18nEdInvalidate();
+  i18nEdRender();
+  toast('♻️ ' + pairs.length + ' translation(s) re-used. Press Save to keep them.', 7000);
+}
+window.i18nEdAdoptOrphans = i18nEdAdoptOrphans;
+window.i18nEdOrphanMatches = i18nEdOrphanMatches; window.i18nEdNorm = i18nEdNorm;
+
+// ─── REMOVING IS UNDOABLE (v36.45) ──────────────────────────────────────────
+// Every one of these entries was paid for. Deleting a thousand of them on one
+// click, with "cannot be undone" as the only protection, is not a safe thing to
+// offer — so it is not offered that way any more. What is removed is stashed on
+// the device first, and the editor shows a way back for as long as it is there.
+var I18N_BIN_PREFIX = 'tonys_i18n_bin_';
+function i18nEdStash(lang, removed) {
+  try {
+    var bin = {};
+    try { bin = JSON.parse(localStorage.getItem(I18N_BIN_PREFIX + lang) || '{}') || {}; } catch(e) {}
+    Object.keys(removed).forEach(function(k){ bin[k] = removed[k]; });
+    localStorage.setItem(I18N_BIN_PREFIX + lang, JSON.stringify(bin));
+    return Object.keys(bin).length;
+  } catch(e) { return 0; }        // a full disk must not stop the removal
+}
+function i18nEdBin(lang) {
+  try { return JSON.parse(localStorage.getItem(I18N_BIN_PREFIX + (lang || _i18nEdLang)) || '{}') || {}; }
+  catch(e) { return {}; }
+}
+async function i18nEdRestoreBin() {
+  var bin = i18nEdBin(_i18nEdLang);
+  var keys = Object.keys(bin);
+  if (!keys.length) { toast('There is nothing to put back.'); return; }
+  var ok = await askConfirm({ icon: '↩️', title: 'Put back ' + keys.length + ' removed translation(s)?',
+    message: 'These were removed from this device and have been kept here since. Putting them back does '
+      + 'not send anything to the AI and costs nothing.',
+    okLabel: 'Put them back' });
+  if (!ok) return;
+  keys.forEach(function(k){ if (!_i18nEdDraft[k]) _i18nEdDraft[k] = bin[k]; });
+  try { localStorage.removeItem(I18N_BIN_PREFIX + _i18nEdLang); } catch(e) {}
+  _i18nEdDirty = true; i18nEdInvalidate(); i18nEdRender();
+  toast('↩️ ' + keys.length + ' put back. Press Save to keep them.', 7000);
+}
+window.i18nEdRestoreBin = i18nEdRestoreBin; window.i18nEdBin = i18nEdBin;
+
 // The junk half: entries whose KEY is not something a person would ever read.
 // Nothing is lost by removing them — they cannot match anything on screen,
 // because nothing on screen looks like that.
 async function i18nEdDropJunk() {
-  var info = i18nEdKeys();
+  var info = i18nEdInfo();
   var junk = info.all.filter(info.junk);
   if (!junk.length) { toast('There is nothing unusable to remove.'); return; }
   var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + junk.length + ' unusable entr(ies)?',
@@ -9948,25 +10057,27 @@ async function i18nEdDropJunk() {
       + 'screen, so nothing changes except the size of the file.',
     okLabel: 'Remove them' });
   if (!ok) return;
-  junk.forEach(function(k){ delete _i18nEdDraft[k]; });
-  _i18nEdDirty = true;
+  var binJ = {}; junk.forEach(function(k){ binJ[k] = _i18nEdDraft[k]; delete _i18nEdDraft[k]; });
+  i18nEdStash(_i18nEdLang, binJ);
+  _i18nEdDirty = true; i18nEdInvalidate();
   i18nEdRender();
   toast('🧹 ' + junk.length + ' removed. Press Save to keep the change.', 6000);
 }
 window.i18nEdDropJunk = i18nEdDropJunk;
 
 async function i18nEdDropOrphans() {
-  var info = i18nEdKeys();
+  var info = i18nEdInfo();
   var orphans = info.all.filter(info.stale);
   if (!orphans.length) { toast('There are no orphans to remove.'); return; }
   var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + orphans.length + ' orphaned entr(ies)?',
     message: 'These are translations whose English no longer appears anywhere in the app — either it was '
-      + 'reworded, or it was never really interface text.\n\nRemoving them cannot be undone from here, '
-      + 'but nothing on screen changes: by definition none of them is being used.',
+      + 'reworded, or it was never really interface text.\n\nNothing on screen changes — by definition '
+      + 'none of them is being used — and they are kept on this device, so they can be put back.',
     okLabel: 'Remove them' });
   if (!ok) return;
-  orphans.forEach(function(k){ delete _i18nEdDraft[k]; });
-  _i18nEdDirty = true;
+  var binO = {}; orphans.forEach(function(k){ binO[k] = _i18nEdDraft[k]; delete _i18nEdDraft[k]; });
+  i18nEdStash(_i18nEdLang, binO);
+  _i18nEdDirty = true; i18nEdInvalidate();
   i18nEdRender();
   toast('🧹 ' + orphans.length + ' removed. Press Save to keep the change.', 6000);
 }
