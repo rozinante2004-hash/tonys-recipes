@@ -2848,6 +2848,26 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'log_kinds_are_real', group:'Features', name:'Every syncLog call names a kind that exists (v36.43)',
+    test: async()=>{
+      // syncLog does not reject an unknown kind — it relabels it 'error',
+      // which is the right call for a logger (never lose the event) and a trap
+      // for whoever writes the call. Three of mine used 'warn', which does not
+      // exist, so a tidy-up that had worked was reported as a fault and Tony's
+      // report opened with "[BAD] 60 errors recorded".
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href),
+                                   {cache:'no-store'})).text();
+      var bad = [], re = /\bsyncLog\(\s*(['"])([a-z]+)\1/g, m;
+      while((m = re.exec(src)) !== null) if(LOG_KINDS.indexOf(m[2]) === -1) bad.push(m[2]);
+      if(bad.length)
+        throw new Error(bad.length + ' syncLog call(s) use a kind that does not exist ('
+          + bad.slice(0,4).join(', ') + '). Each one is silently logged as an error and counted '
+          + 'as a fault in the report.');
+      if(LOG_KINDS.indexOf('warn') !== -1)
+        throw new Error('a "warn" kind now exists — this check was written when it did not, '
+          + 'and the calls it was guarding should be revisited rather than left as errors');
+    } },
+
   { id:'log_says_what_it_means', group:'Features', name:'The log viewer draws conclusions and proposes fixes (v35.4)',
     test: async()=>{
       var now=Date.now();

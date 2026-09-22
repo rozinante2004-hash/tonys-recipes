@@ -578,6 +578,17 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **`syncLog` RELABELS AN UNKNOWN KIND AS `error` (v36.43).** That is the right
+  call for a logger — never lose the event — and a trap for whoever writes the
+  call. There is no `'warn'` kind; three housekeeping messages of mine used it,
+  so a tidy-up that had *worked* was counted as a fault and Tony's report opened
+  with "[BAD] 60 errors recorded". Check `LOG_KINDS` before inventing a kind.
+  `log_kinds_are_real` greps every `syncLog(` in the file and fails on any kind
+  that does not exist — the kind of test that catches a whole class rather than
+  the instance that prompted it.
+  - Also: do not log a SUMMARY of failures at `error` when each failure is
+    already logged. "9 string(s) came back untranslated" alongside 9 batch
+    errors turns 9 faults into 18 in the analysis.
 - **THE MISSING LIST IS AN INPUT, NOT A RECORD (v36.42).** `i18nGapList()`
   feeds on it, so a bug fixed on Monday goes on being paid for every week until
   someone clears what it wrote. Tony's device was carrying 400-odd keys like

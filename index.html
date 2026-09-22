@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.42 -->
+<!-- Tony's Recipes Collection v36.43 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -403,7 +403,10 @@ function syncLog(kind, message, data) {
   try {
     var entry = {
       at: Date.now(),
-      k: LOG_KINDS.indexOf(kind) === -1 ? 'error' : kind,
+      // An unknown kind still logs — losing the event would be worse — but it
+      // becomes an ERROR, which is a trap: a routine message logged under a
+      // kind that does not exist is counted as a fault. Say so in debug.
+      k: LOG_KINDS.indexOf(kind) === -1 ? (dlog('[syncLog] unknown kind "' + kind + '"'), 'error') : kind,
       m: String(message == null ? '' : message).slice(0, LOG_MSG_MAX)
     };
     // v36.3 — events the SELF TEST SUITE caused are marked and excluded from the
@@ -3309,7 +3312,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.42';
+var APP_VERSION = 'v36.43';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5975,7 +5978,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.42</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.43</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6597,7 +6600,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.42</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.43</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8964,7 +8967,11 @@ function i18nLoadMissing(lang) {
   // Rewrite it, so the clean-up happens once rather than on every load.
   if (dropped) {
     try { localStorage.setItem(i18nMissKey(lang), JSON.stringify(i18nMissingList())); } catch(e) {}
-    syncLog('warn', dropped + ' unusable entr(ies) dropped from the missing list for ' + lang, '');
+    // 'system', not 'warn' — there is no 'warn' kind, and syncLog quietly
+    // relabels anything it does not know as an ERROR. Three housekeeping
+    // messages of mine were doing that, and the report then opened with
+    // "[BAD] 60 errors recorded" about a tidy-up that had worked.
+    syncLog('system', dropped + ' unusable entr(ies) dropped from the missing list for ' + lang, '');
   }
 }
 window.i18nLooksLikeCode = i18nLooksLikeCode; window.i18nKeepable = i18nKeepable;
@@ -9146,7 +9153,7 @@ function i18nSanitiseDoc(doc) {
   });
   doc.strings = clean;
   doc.count = Object.keys(clean).length;
-  if (dropped) syncLog('warn', dropped + ' translation entr(ies) could not be stored', '');
+  if (dropped) syncLog('save', dropped + ' translation entr(ies) could not be stored', '');
   return dropped;
 }
 async function i18nWriteCloud(lang, doc) {
@@ -9317,7 +9324,9 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
   }
   if (onProgress) onProgress(batches.length, batches.length);
   if (leftover.length) {
-    syncLog('warn', leftover.length + ' string(s) came back untranslated for ' + lang,
+    // 'ai', not an error: every batch that actually failed is already logged
+    // as one, and counting the summary again turned 9 failures into 18.
+    syncLog('ai', leftover.length + ' string(s) came back untranslated for ' + lang,
       leftover.slice(0, 8).join(' · '));
   }
   if (splits) syncLog('ai', splits + ' batch(es) were split after hitting the token ceiling', '');
