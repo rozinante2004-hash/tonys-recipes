@@ -578,6 +578,25 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **RE-KEYING DOES NOT NEED A LIVE TARGET (v36.48).** Most stale keys only
+  render in a state the app is not in — an error it has not had, a sync that has
+  not timed out — which is precisely why they went stale. Requiring the target
+  to be on screen left 720 of Tony's orphans unrecoverable for no reason. An
+  orphan is re-keyed to **what the current rules would make of it**, whether or
+  not that key is currently showing.
+- **AN ORPHAN IS NOT NECESSARILY DEAD.** "{1} min ago" is a perfectly good key
+  that simply is not on screen. The removal dialog says so, because deleting one
+  of those means paying to translate it again later.
+- **`i18nEdSelfKey()` leaves a current-form key alone.** The digits inside
+  `{1}` are not a number: re-deriving `"{1} min ago"` produced `"{{1}} min ago"`
+  and would have re-keyed a good entry to garbage. Mask or skip placeholders
+  before scanning for digits — this is the second time that exact mistake has
+  been made in two releases.
+- **A leftover of a re-use that already happened is dead weight (v36.48).**
+  `"4 min ago"` holding `"לפני {1} דקות"` is skipped for re-use (its target has
+  a translation) and was never offered for removal either, so it sat there for
+  ever. Those are classed as removable now, along with sync-log rows, which
+  since v36.44 can never be keys again.
 - **A NUMBER IS NEVER PART OF A KEY (v36.47).** Tony's 1,016 orphans were
   almost all numbers: "15 errors recorded", "17 errors recorded", "24 errors
   recorded"… "3 tests" through "61 tests", "1 min ago" through "44 min ago".

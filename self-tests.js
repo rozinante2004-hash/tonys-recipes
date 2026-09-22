@@ -7834,6 +7834,47 @@ window.SELF_TESTS = [
           throw new Error('the internal child marker reached the screen');
       } finally { try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict); host.remove(); }
 
+      // RE-KEYING DOES NOT NEED A LIVE TARGET. Most of these strings only
+      // render in a state the app is not in — an error it has not had, a sync
+      // that has not timed out — which is precisely why they went stale.
+      // Requiring the target to be on screen left 720 of Tony's orphans
+      // unrecoverable for no reason.
+      (function(){
+        var prevDict2=i18nCurrentDict(), prevLang2=i18nLang(), prevUser=window._fbUser;
+        try{
+          window._fbUser={ email:'rozinante2004@gmail.com' };
+          var d2={};
+          d2['15 errors recorded']='15 שגיאות נרשמו';      // re-key: no live target
+          d2['{1} min ago']='לפני {1} דקות';               // already correct: leave alone
+          d2['4 min ago']='לפני {1} דקות';                 // leftover of a re-use already done
+          d2['9/18/2026, 10:57:13 PM · import']='x';       // a sync-log row
+          i18nInstall('he', d2);
+          _i18nEdLang='he'; _i18nEdDraft=d2; i18nEdInvalidate();
+          var inf=i18nEdInfo();
+          var reuse=i18nEdOrphanMatches();
+          var got=reuse.filter(function(x){ return x.from==='15 errors recorded'; })[0];
+          if(!got) throw new Error('an orphan with no live target was not re-keyed');
+          if(got.to!=='{1} errors recorded')
+            throw new Error('it was re-keyed to '+JSON.stringify(got.to));
+          if(got.value!=='{1} שגיאות נרשמו')
+            throw new Error('the Hebrew was not ported: '+JSON.stringify(got.value));
+          // A key already written by the current rules is left exactly alone.
+          if(i18nEdSelfKey('{1} min ago')!=='{1} min ago')
+            throw new Error('a current-form key was re-derived into '
+              + JSON.stringify(i18nEdSelfKey('{1} min ago'))+' — the digits inside {1} are not a number');
+          if(reuse.some(function(x){ return x.from==='{1} min ago'; }))
+            throw new Error('a key that is already correct was offered for re-use');
+          // The leftover of a re-use that has already happened is dead weight:
+          // offered for removal, not left to sit there for ever.
+          if(inf.all.filter(inf.junk).indexOf('4 min ago')===-1)
+            throw new Error('a leftover whose work is already safe under the right key was not '
+              + 'offered for removal — it can never be re-used and never be cleaned up');
+          if(inf.all.filter(inf.junk).indexOf('9/18/2026, 10:57:13 PM · import')===-1)
+            throw new Error('a sync-log row was not recognised as removable');
+        } finally { i18nInstall(prevLang2, prevDict2); window._fbUser=prevUser;
+                   _i18nEdDraft=null; i18nEdInvalidate(); }
+      })();
+
       // PORTING AN OLD TRANSLATION. "15 שגיאות נרשמו" is only reusable as
       // "{1} שגיאות נרשמו" — otherwise every count would render as fifteen.
       if(i18nEdPortValue('15 errors recorded','15 שגיאות נרשמו')!=='{1} שגיאות נרשמו')

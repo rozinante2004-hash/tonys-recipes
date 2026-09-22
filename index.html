@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.47 -->
+<!-- Tony's Recipes Collection v36.48 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3312,7 +3312,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.47';
+var APP_VERSION = 'v36.48';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5978,7 +5978,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.47</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.48</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6600,7 +6600,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.47</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.48</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9025,7 +9025,11 @@ var I18N_CODE_CERTAIN = [
   // This project's own audit tags — "(5f.5)", "(v36.31)". They live in
   // comments, never on screen, and a missing list made before the lexer landed
   // is full of them.
-  /\((?:v?\d+[a-z]?\.\d+[a-z]?)\)/i
+  /\((?:v?\d+[a-z]?\.\d+[a-z]?)\)/i,
+  // A sync-log row: "9/18/2026, 10:57:13 PM · save". Since v36.44 those rows
+  // carry data-no-i18n and can never be a key again, so hundreds of them sit in
+  // Tony's file as pure weight. Nothing a person reads starts like this.
+  /^\s*\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}/
 ];
 var I18N_CODE_HINTS = [
   /\)\s*;/, /;\s*if\s*\(/, /\)\s*\{/,
@@ -9866,7 +9870,15 @@ function i18nEdKeys() {
   // first, and those are the ones worth reading before deleting.
   Object.keys(_i18nEdDraft || {}).forEach(function(k) {
     if (seen[k]) return;
-    seen[k] = i18nKeepable(k) ? 2 : 3;      // 2 = reworded English, 3 = junk
+    if (!i18nKeepable(k)) { seen[k] = 3; return; }          // source fragments, log rows
+    // …and an orphan whose content ALREADY lives under the key the current
+    // rules would give it. "4 min ago" holding "לפני {1} דקות" is a leftover
+    // from a re-use that has already happened: the work is safe under
+    // "{1} min ago", and this entry can only ever be dead weight. Without this
+    // it is never offered for re-use — the target has a translation, so it is
+    // skipped — and never offered for removal either, so it stays for ever.
+    var self = i18nEdSelfKey(k);
+    seen[k] = (self && self !== k && _i18nEdDraft[self]) ? 3 : 2;
   });
   return {
     all: Object.keys(seen).sort(),
@@ -10056,6 +10068,16 @@ function i18nEdOrphanMatches() {
   var out = [];
   info.all.filter(info.stale).forEach(function(orphan) {
     var target = live[i18nEdNorm(orphan)];
+    // No live target is NOT a reason to give up. "15 errors recorded" belongs
+    // under "{1} errors recorded" whether or not that finding happens to be on
+    // screen right now — most of these strings only render in a state the app
+    // is not currently in, which is precisely why they went stale. Re-key it to
+    // what the CURRENT rules would have made of it and it is waiting, correct,
+    // for the next time the app needs it.
+    if (!target) {
+      var self = i18nEdSelfKey(orphan);
+      if (self && self !== orphan && !_i18nEdDraft[self]) target = self;
+    }
     if (!target || target === orphan) return;
     if (_i18nEdDraft[target]) return;              // already has one; leave it alone
     var value = i18nEdPortValue(orphan, _i18nEdDraft[orphan]);
@@ -10083,6 +10105,17 @@ function i18nEdNorm(k) {
 // Returns null when it cannot be done safely, and the entry is then left alone
 // rather than guessed at: a number appearing twice, or not at all, means there
 // is no way to know which placeholder it belongs to.
+// What the CURRENT rules would make of this key. A key that already carries
+// {n} placeholders was written by those rules and is returned unchanged — the
+// digits inside "{1} min ago" are not a number, and re-deriving it produced
+// "{{1}} min ago", which would have re-keyed a perfectly good entry to garbage.
+function i18nEdSelfKey(k) {
+  if (/\{\d+\}/.test(String(k))) return k;
+  var d = i18nDeriveKey(k, []);
+  return i18nEdges(d.key, d.slots).core;
+}
+window.i18nEdSelfKey = i18nEdSelfKey;
+
 function i18nEdPortValue(oldKey, value) {
   if (typeof value !== 'string' || !value) return null;
   // The digits inside an existing {1} are not a number. Feeding this to
@@ -10182,9 +10215,10 @@ async function i18nEdDropJunk() {
   var junk = info.all.filter(info.junk);
   if (!junk.length) { toast('There is nothing unusable to remove.'); return; }
   var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + junk.length + ' unusable entr(ies)?',
-    message: 'These are not interface text — they are fragments of the app\u2019s own source that an '
-      + 'earlier version of the string finder recorded by mistake.\n\nThey cannot match anything on '
-      + 'screen, so nothing changes except the size of the file.',
+    message: 'Three kinds: fragments of the app\u2019s own source that an earlier string finder recorded '
+      + 'by mistake, rows copied out of the sync log, and entries whose translation is already saved '
+      + 'under the key the app actually asks for.\n\nNone of them can match anything on screen, so '
+      + 'nothing changes except the size of the file — and they are kept here in case.',
     okLabel: 'Remove them' });
   if (!ok) return;
   var binJ = {}; junk.forEach(function(k){ binJ[k] = _i18nEdDraft[k]; delete _i18nEdDraft[k]; });
@@ -10200,9 +10234,11 @@ async function i18nEdDropOrphans() {
   var orphans = info.all.filter(info.stale);
   if (!orphans.length) { toast('There are no orphans to remove.'); return; }
   var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + orphans.length + ' orphaned entr(ies)?',
-    message: 'These are translations whose English no longer appears anywhere in the app — either it was '
-      + 'reworded, or it was never really interface text.\n\nNothing on screen changes — by definition '
-      + 'none of them is being used — and they are kept on this device, so they can be put back.',
+    message: 'These are translations whose English the app is not showing anywhere at the moment.\n\n'
+      + 'Some were reworded and are genuinely finished with. Others are perfectly good — they belong to '
+      + 'a screen the app only draws in a state it is not in right now, like an error it has not had — '
+      + 'and removing those means paying to translate them again later.\n\nThey are kept on this '
+      + 'device either way, so they can be put back.',
     okLabel: 'Remove them' });
   if (!ok) return;
   var binO = {}; orphans.forEach(function(k){ binO[k] = _i18nEdDraft[k]; delete _i18nEdDraft[k]; });
