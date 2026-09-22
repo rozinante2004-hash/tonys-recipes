@@ -7706,6 +7706,36 @@ window.SELF_TESTS = [
           throw new Error('a toast after a nested template literal reads as string content — '
             + 'the scrape walks straight past it');
       })();
+      // THE SUITE HAS TO BE DOWNLOADED BEFORE IT CAN BE DRAWN (v36.51).
+      // SELF_TESTS is empty until loadSelfTests() runs, so the harvest entry
+      // for the self-test list rendered an empty <div> and none of the 265 test
+      // names or their group headings was ever catalogued. They ARE translated
+      // on screen — the observer looks each one up as it renders — so nothing
+      // looked wrong; only the editor knew, and it called all 270 of them
+      // orphans. That was most of what Tony was staring at.
+      if(after.indexOf('Accessibility basics (labels, Escape, focus)')===-1)
+        throw new Error('a self-test NAME is not in the catalogue — the harvest drew the list '
+          + 'before the suite it lists had been downloaded');
+      if(after.indexOf('CRUD')===-1 || after.indexOf('Cloud Sync')===-1)
+        throw new Error('the self-test GROUP headings are not in the catalogue');
+      // …and the two assertions above cannot tell you WHY, here. By the time
+      // this suite is running, the suite has obviously been downloaded — so the
+      // harvest finds the list populated whether or not it asked for it. In the
+      // app it is not, which is the whole bug. The only honest check available
+      // from inside the thing being tested is that the entry asks.
+      (function(){
+        var entry=(window.I18N_HARVEST||[]).filter(function(e){ return /self-test/i.test(e[0]); })[0];
+        if(!entry) throw new Error('the self-test list is not in I18N_HARVEST at all');
+        if(!/loadSelfTests/.test(String(entry[1])))
+          throw new Error('the harvest draws the self-test list without downloading the suite first; '
+            + 'it renders an empty div in the app and every test name stays an orphan');
+      })();
+      // …and a keycap step from a static panel, which v36.47 had re-keyed to
+      // "{1}️⃣ Click {2} below" and orphaned.
+      if(after.indexOf('1️⃣ Click {1} below')===-1)
+        throw new Error('the Bring! refresh steps are keyed on their keycap digit: '
+          + JSON.stringify(after.filter(function(k){ return /Click \{1\} below/.test(k); })));
+
       // …and the real file's proof: two toasts that sit behind both hazards.
       if(after.indexOf('✅ Installing Tony’s Recipes...')===-1
          && after.indexOf('✅ Installing Tony\'s Recipes...')===-1)
@@ -8048,6 +8078,92 @@ window.SELF_TESTS = [
         throw new Error('a number appearing twice was ported anyway — one of the two would be wrong');
       if(i18nEdPortValue('5 tests','בדיקות')!==null)
         throw new Error('a translation with the number missing was ported anyway');
+      // ALREADY PORTED (v36.51). "4 min ago" holding "לפני {1} דקות" is the
+      // result of a re-use that happened once already: the key kept its 4, the
+      // value grew its {1}. Asking for the 4 inside the Hebrew found nothing
+      // and refused the entry, so it could never be re-used — and its target
+      // has no translation, so it was never dead weight either. It just sat
+      // there. This is why Tony had no re-use button at all.
+      if(i18nEdPortValue('4 min ago','לפני {1} דקות')!=='לפני {1} דקות')
+        throw new Error('a value that had ALREADY been ported was refused: '
+          + JSON.stringify(i18nEdPortValue('4 min ago','לפני {1} דקות')));
+      if(i18nEdPortValue('50 tests','{1} בדיקות')!=='{1} בדיקות')
+        throw new Error('an already-ported value was refused');
+      // …but only when the placeholders it carries are the ones the key needs.
+      if(i18nEdPortValue('11 of 11 batches','{1} מתוך אצוות')!==null)
+        throw new Error('a value with too FEW placeholders was accepted as already ported');
+
+      // A KEYCAP IS AN EMOJI, NOT A NUMBER (v36.51). "1️⃣" is the ASCII digit 1
+      // wearing U+FE0F U+20E3. v36.47's rule read it as a count and turned the
+      // Bring! refresh steps into "{1}️⃣ Click {2} below" — a key that is
+      // nonsense, and that orphaned three lines which were already translated.
+      (function(){
+        var d=i18nDeriveKey('1️⃣ Click 3 times', []);
+        if(d.key!=='1️⃣ Click {1} times')
+          throw new Error('a keycap emoji was read as a number: '+JSON.stringify(d.key));
+        if(d.slots.length!==1 || d.slots[0]!=='3')
+          throw new Error('the keycap took a slot of its own: '+JSON.stringify(d.slots));
+        // The bare digit beside it is still a number, or this cure is worse.
+        if(i18nDeriveKey('Step 2 of 3', []).key!=='Step {1} of {2}')
+          throw new Error('an ordinary number stopped being a placeholder');
+      })();
+    } },
+
+  { id:'i18n_says_how_long', group:'UI', name:'The translate dialog says how long it really takes (v36.51)',
+    test: async()=>{
+      // Tony agreed to "about half a minute" and the progress panel — which
+      // measures the real thing — then told him eight minutes. The panel was
+      // right; the dialog was a sentence somebody typed. A number in a dialog
+      // that the next screen contradicts is worse than no number at all.
+      ['i18nBatchCatalogue','i18nEstimate','i18nDurationWords','i18nMsPerBatch']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      // The estimate must be built from the SAME batching the run uses, or it
+      // is just a different guess.
+      var cat=[]; for(var i=0;i<400;i++) cat.push('String number '+i+' of the interface');
+      var batches=i18nBatchCatalogue(cat);
+      if(!batches.length) throw new Error('no batches at all');
+      var flat=[]; batches.forEach(function(b){ flat=flat.concat(b); });
+      if(flat.length!==cat.length)
+        throw new Error('batching lost or duplicated strings: '+flat.length+' of '+cat.length);
+      if(flat.join('\u0000')!==cat.join('\u0000'))
+        throw new Error('batching reordered the catalogue');
+      batches.forEach(function(b){
+        var chars=b.reduce(function(n,s){ return n+s.length; },0);
+        if(b.length>1 && chars>I18N_BATCH_CHARS+String(b[b.length-1]).length)
+          throw new Error('a batch is over the character budget: '+chars);
+      });
+      if(i18nEstimate(cat).batches!==batches.length)
+        throw new Error('the estimate counts batches differently from the run');
+
+      // A duration, not a countdown — this is said before anything starts.
+      if(!/minute/.test(i18nDurationWords(20000)))
+        throw new Error('20s did not read as a sub-minute duration: '+i18nDurationWords(20000));
+      if(i18nDurationWords(480000)!=='about 8 minutes')
+        throw new Error('8 minutes read as '+JSON.stringify(i18nDurationWords(480000)));
+      if(/left/.test(i18nDurationWords(480000)))
+        throw new Error('the before-you-start estimate is worded as a countdown');
+
+      // The per-batch figure is learned, and clamped so one freak batch on a
+      // dropping connection cannot tell the next person it takes an hour.
+      var prevMs=null;
+      try{ prevMs=localStorage.getItem(I18N_MS_PER_BATCH_KEY); }catch(e){}
+      try{
+        i18nNoteBatchTime(600000, 1);             // 10 minutes for one batch
+        if(i18nMsPerBatch()>60000)
+          throw new Error('an absurd batch time was believed: '+i18nMsPerBatch());
+        i18nNoteBatchTime(1, 1);                  // instant
+        if(i18nMsPerBatch()<1500)
+          throw new Error('an impossible batch time was believed: '+i18nMsPerBatch());
+        i18nNoteBatchTime(80000, 10);             // 8s a batch, twice
+        i18nNoteBatchTime(80000, 10);
+        var learned=i18nMsPerBatch();
+        if(learned<6000 || learned>14000)
+          throw new Error('the learned per-batch time did not converge: '+learned);
+      } finally {
+        try{ if(prevMs===null) localStorage.removeItem(I18N_MS_PER_BATCH_KEY);
+             else localStorage.setItem(I18N_MS_PER_BATCH_KEY,prevMs); }catch(e){}
+      }
     } },
 
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
@@ -9971,6 +10087,81 @@ window.SELF_TESTS = [
       if(!/^\d+ml$/.test(cvtIng('4 fl oz','metric'))) throw new Error('fl oz should convert to a whole ml value');
       // No ugly trailing zeros the other way
       if(cvtIng('500ml','imperial')!=='2 cups') throw new Error('500ml should be "2 cups", got "'+cvtIng('500ml','imperial')+'"');
+
+      // THE AMOUNTS A REAL RECIPE ACTUALLY CONTAINS (v36.51). Everything above
+      // this line is an amount a developer types into a test. Tony reported the
+      // conversion as broken and he was right: his recipes are in Hebrew, and
+      // "200 גרם" had never once been recognised. Nor had a fraction, a range,
+      // or a unit spelled out in words. It did not regress — it had never
+      // worked on the library it was written for, which is the same thing from
+      // where he is sitting.
+      var cvtCases = [
+        // Hebrew units, which is most of his library
+        ['200 גרם','imperial','7.1 oz'], ['1 ק"ג','imperial','2.2 lb'],
+        ['500 מ"ל','imperial','2 cups'], ['2 קילו','imperial','4.41 lb'],
+        ['180 מעלות','imperial','356°F'],
+        // Fractions, mixed numbers and the vulgar-fraction characters
+        ['1/2 kg','imperial','1.1 lb'], ['1 1/2 lb','metric','680g'],
+        ['½ lb','metric','230g'],  ['1½ kg','imperial','3.31 lb'],
+        // Ranges convert BOTH ends, keeping the separator they came with
+        ['200-300 g','imperial','7.1-10.6 oz'], ['2-3 lb','metric','910-1360g'],
+        ['1–2 kg','imperial','2.2–4.41 lb'],
+        // Units written out
+        ['200 grams','imperial','7.1 oz'], ['1 kilo','imperial','2.2 lb'],
+        ['2 pounds','metric','910g'], ['8 ounces','metric','230g'], ['200 gr.','imperial','7.1 oz']
+      ];
+      cvtCases.forEach(function(c){
+        var got = cvtIng(c[0], c[1]);
+        if(got !== c[2])
+          throw new Error(JSON.stringify(c[0])+' → '+c[1]+' gave '+JSON.stringify(got)
+            + ', expected '+JSON.stringify(c[2]));
+      });
+      // …and everything that is NOT a convertible amount is returned untouched.
+      // A matcher this permissive has to be able to say no: "1 large egg" ends
+      // in "g", and reading it as a gram value would rewrite the recipe.
+      ['2 tsp','1 tbsp','1 cup','1 large egg','a pinch','500 mg','2 cloves','3','',
+       'לפי הטעם','1 kg of something'].forEach(function(a){
+        ['metric','imperial'].forEach(function(u){
+          if(cvtIng(a,u)!==a)
+            throw new Error(JSON.stringify(a)+' was rewritten to '+JSON.stringify(cvtIng(a,u))+' in '+u);
+        });
+      });
+      // cvtNum says null, never NaN: null is a decision to leave the amount
+      // alone, NaN is a bug that reaches a recipe.
+      if(cvtNum('half')!==null || cvtNum('')!==null || cvtNum('1/0')!==null)
+        throw new Error('cvtNum returned something other than null for an unreadable number');
+      if(cvtNum('1 1/2')!==1.5 || cvtNum('½')!==0.5 || cvtNum('2.5')!==2.5)
+        throw new Error('cvtNum misread a number a recipe would actually use');
+
+      // THE CHOICE HAS TO STICK. viewUnit reset to metric on every openView
+      // while the scale was remembered per recipe — so pressing Imperial and
+      // opening the next recipe looked exactly like the button doing nothing.
+      if(typeof VIEW_UNIT_KEY!=='string') throw new Error('VIEW_UNIT_KEY not defined');
+      var prevUnitPref=null;
+      try{ prevUnitPref=localStorage.getItem(VIEW_UNIT_KEY); }catch(e){}
+      var prevViewId=viewId, prevUnit=viewUnit;
+      try{
+        var rid=888842;
+        recipes.unshift(normalizeRecipe({id:rid,name:'Unit probe',
+          ingredients:[{a:'200 g',n:'flour'}],steps:['Mix.'],updatedAt:Date.now()}));
+        openView(rid);
+        setUnit('imperial');
+        if(viewUnit!=='imperial') throw new Error('setUnit did not take');
+        closeM('viewOverlay');
+        openView(rid);
+        if(viewUnit!=='imperial')
+          throw new Error('the unit reset to metric on re-open — the button looks broken');
+        setUnit('metric');
+        closeM('viewOverlay');
+        openView(rid);
+        if(viewUnit!=='metric') throw new Error('switching back to metric did not stick either');
+        closeM('viewOverlay');
+      } finally {
+        recipes=recipes.filter(function(x){ return x.id!==888842; });
+        viewId=prevViewId; viewUnit=prevUnit;
+        try{ if(prevUnitPref===null) localStorage.removeItem(VIEW_UNIT_KEY);
+             else localStorage.setItem(VIEW_UNIT_KEY,prevUnitPref); }catch(e){}
+      }
     } },
   { id:'i18n_alignment', group:'UI', name:'Hebrew/English align correctly side by side',
     test: async()=>{

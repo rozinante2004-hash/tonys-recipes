@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.50 -->
+<!-- Tony's Recipes Collection v36.51 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -684,8 +684,15 @@ function showLogNudge(bad) {
   var body = document.createElement('div');
   body.style.cssText = 'font-size:12px;color:rgba(255,255,255,0.85);line-height:1.55;margin-bottom:10px;';
   // Names, not counts alone: "1 problem" tells you nothing about whether to care.
-  body.textContent = bad.slice(0, 3).map(function(f){ return f.title; }).join(' · ')
-    + (bad.length > 3 ? ' · and ' + (bad.length - 3) + ' more' : '');
+  //
+  // Joined, not translated as one string: every combination of findings would
+  // otherwise be its own dictionary key, and there is no end to those. Each
+  // title is a key the app already has, so it is looked up on its own and the
+  // line is marked so the string finder leaves the join alone.
+  var _p = function(s){ return typeof i18nPhrase === 'function' ? i18nPhrase(s) : s; };
+  body.setAttribute('data-no-i18n', '');
+  body.textContent = bad.slice(0, 3).map(function(f){ return _p(f.title); }).join(' · ')
+    + (bad.length > 3 ? ' · ' + _p('and {1} more').replace('{1}', bad.length - 3) : '');
 
   var row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:8px;';
@@ -3324,7 +3331,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.50';
+var APP_VERSION = 'v36.51';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6001,7 +6008,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.50</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.51</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6623,7 +6630,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.50</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.51</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8245,6 +8252,13 @@ function i18nDeriveKey(rawSrc, kids) {
   for (var i = 0; i < segs.length; i++) {
     var txt = segs[i], last = 0, m, re = /\d[\d.,:/]*\d|\d/g;
     while ((m = re.exec(txt)) !== null) {
+      // A KEYCAP IS AN EMOJI, NOT A NUMBER (v36.51). "1️⃣" is the ASCII digit 1
+      // followed by U+FE0F U+20E3, so v36.47's rule read it as a count and made
+      // the Bring! refresh steps into "{1}️⃣ Click {2} below" — a key that is
+      // nonsense and orphaned the three lines that were already translated.
+      // Nothing after the digit is a count if it is wearing a keycap.
+      var tail = txt.slice(m.index + m[0].length);
+      if (/^\uFE0F?\u20E3/.test(tail)) continue;
       parts.push(txt.slice(last, m.index));
       slots.push(m[0]);
       parts.push('{' + slots.length + '}');
@@ -8477,7 +8491,16 @@ var I18N_HARVEST = [
   ['sync health',           function(){ renderSyncHealth(); }],
   ['what leaves this device', function(){ renderPrivacyPanel(); }],
   ['backups',               function(){ return renderBackupPanel(); }],
-  ['the self-test list',    function(){ renderSelfTestList(); }],
+  // THE SUITE HAS TO BE DOWNLOADED BEFORE IT CAN BE DRAWN (v36.51). SELF_TESTS
+  // is empty until loadSelfTests() runs, so this entry rendered an empty <div>
+  // and the 265 test names and their group headings were never catalogued.
+  // They ARE translated on screen — the observer looks them up as they render,
+  // and Tony's Hebrew answers — but the editor, which only knows the catalogue,
+  // called every one of them an orphan. That is about 270 of the 310 he was
+  // looking at: not junk, not stale, just invisible to the harvest.
+  // A failed download is not a reason to fail the harvest — the list is then
+  // exactly as uncatalogued as it was before.
+  ['the self-test list',    async function(){ try { await loadSelfTests(); } catch(e) {} renderSelfTestList(); }],
   ['the WhatsApp sources',  function(){ renderWaSources(); }],
   ['the access list',       function(){ renderAccessMembers(); }],
   ['the Bring! status',     function(){ renderBringTokenStatus(); }],
@@ -9049,6 +9072,9 @@ var I18N_EXTRA = [
   // entry in I18N_HARVEST is read-only by construction. All three are real
   // words on a real screen; none of them could ever be found by looking.
   '+ Add Recipe', '≈ rounded', 'reset to {1}',
+  // The log nudge joins finding titles by hand (see showLogNudge) — this is the
+  // only part of that line that is words rather than a title.
+  'and {1} more',
   // workerErrorText(): four `return` statements inside a ternary. No opener
   // could reach them without also dragging in every AI prompt in this file,
   // and those must never be translated — they are instructions to a model.
@@ -9202,6 +9228,23 @@ function i18nClearMissing(done) {
 }
 window.i18nMissingList = i18nMissingList; window.i18nMissingCount = i18nMissingCount;
 window.i18nNoteMissing = i18nNoteMissing; window.i18nLoadMissing = i18nLoadMissing;
+
+// ─── ONE STRING, BY HAND (v36.51) ────────────────────────────────────────────
+// The same lookup i18nApply does, for the few places that must JOIN translated
+// text rather than hold it. The log nudge lists the findings' titles separated
+// by " · ": translated as one string, every combination of findings is a new
+// key and the dictionary grows without limit — the unbounded class again. So
+// the joined line is marked data-no-i18n and each title is looked up here on
+// its own, which are keys the app already has.
+function i18nPhrase(s) {
+  s = String(s == null ? '' : s);
+  if (!s || _i18nLang === 'en') return s;
+  var to = _i18nDict ? _i18nDict[s] : null;
+  if (!to && s.length < 300) to = i18nMatchPattern(s);
+  if (!to) { i18nNoteMissing(s); return s; }
+  return String(to);
+}
+window.i18nPhrase = i18nPhrase;
 
 // ─── APPLYING ────────────────────────────────────────────────────────────────
 // Idempotent, and reversible: the English original is parked on the node the
@@ -9430,6 +9473,67 @@ function i18nPrompt(lang, batch) {
     + 'Strings:\n'
     + batch.map(function(x, i){ return i + '. ' + x; }).join('\n');
 }
+// ─── HOW LONG THIS WILL ACTUALLY TAKE (v36.51) ───────────────────────────────
+// The confirmation said "about half a minute" because somebody wrote "about
+// half a minute". Tony started Russian, agreed to half a minute, and the
+// progress panel — which measures the real thing — told him eight. The panel
+// was right. A number in a dialog that the next screen contradicts is worse
+// than no number at all, so the estimate now comes from the same batching the
+// run itself uses, multiplied by how long a batch has actually been taking on
+// this device.
+function i18nBatchCatalogue(catalogue) {
+  var batches = [], cur = [], curChars = 0;
+  for (var i = 0; i < catalogue.length; i++) {
+    var len = String(catalogue[i]).length;
+    if (cur.length && (cur.length >= I18N_BATCH || curChars + len > I18N_BATCH_CHARS)) {
+      batches.push(cur); cur = []; curChars = 0;
+    }
+    cur.push(catalogue[i]); curChars += len;
+  }
+  if (cur.length) batches.push(cur);
+  return batches;
+}
+// Seeded from Tony's Russian run — 1,250-odd strings that the panel put at
+// eight minutes — and replaced by the real figure as soon as there is one.
+var I18N_MS_PER_BATCH_KEY = 'tonys_i18n_ms_per_batch';
+var I18N_MS_PER_BATCH_SEED = 11000;
+function i18nMsPerBatch() {
+  try {
+    var v = parseFloat(localStorage.getItem(I18N_MS_PER_BATCH_KEY));
+    // Clamped: one freak batch on a dropping connection must not tell the next
+    // person their translation takes an hour.
+    if (isFinite(v) && v >= 1500 && v <= 60000) return v;
+  } catch(e) {}
+  return I18N_MS_PER_BATCH_SEED;
+}
+function i18nNoteBatchTime(ms, batches) {
+  if (!batches || !isFinite(ms) || ms <= 0) return;
+  var per = ms / batches;
+  if (per < 1500 || per > 60000) return;
+  // Averaged with what we thought, so one fast run does not overwrite the
+  // memory of a slow one and vice versa.
+  try { localStorage.setItem(I18N_MS_PER_BATCH_KEY, String(Math.round(i18nMsPerBatch() * 0.5 + per * 0.5))); }
+  catch(e) {}
+}
+// A plain duration, not a countdown — progEtaWords says "left" and this is said
+// before anything has started.
+function i18nDurationWords(ms) {
+  var s = Math.round(ms / 1000);
+  if (s < 45)  return 'well under a minute';
+  if (s < 90)  return 'about a minute';
+  if (s < 150) return 'a couple of minutes';
+  var mins = Math.round(s / 60);
+  return 'about ' + mins + ' minutes';
+}
+// What to tell someone BEFORE they agree to pay for it.
+function i18nEstimate(catalogue) {
+  var batches = i18nBatchCatalogue(catalogue).length;
+  return { batches: batches, ms: batches * i18nMsPerBatch(),
+           words: i18nDurationWords(batches * i18nMsPerBatch()) };
+}
+window.i18nBatchCatalogue = i18nBatchCatalogue; window.i18nEstimate = i18nEstimate;
+window.i18nDurationWords = i18nDurationWords; window.i18nMsPerBatch = i18nMsPerBatch;
+
 // Translate the catalogue. `onProgress(done, total)` so a 10-batch run is not a
 // spinner that looks identical to a hang.
 async function i18nTranslateAll(lang, catalogue, onProgress, into) {
@@ -9440,15 +9544,8 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
   // longer than the reply is allowed to be. The model then stops mid-JSON and
   // the whole batch is lost — which is exactly the silent shortfall this
   // release is supposed to be closing.
-  var batches = [], cur = [], curChars = 0;
-  for (var i = 0; i < catalogue.length; i++) {
-    var len = String(catalogue[i]).length;
-    if (cur.length && (cur.length >= I18N_BATCH || curChars + len > I18N_BATCH_CHARS)) {
-      batches.push(cur); cur = []; curChars = 0;
-    }
-    cur.push(catalogue[i]); curChars += len;
-  }
-  if (cur.length) batches.push(cur);
+  var batches = i18nBatchCatalogue(catalogue);
+  var _runStarted = Date.now();
 
   async function runBatch(batch) {
     var chars = batch.reduce(function(n, s){ return n + String(s).length; }, 0);
@@ -9534,6 +9631,8 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
       leftover.slice(0, 8).join(' · '));
   }
   if (splits) syncLog('ai', splits + ' batch(es) were split after hitting the token ceiling', '');
+  // What it really cost, so the next dialog can say so instead of guessing.
+  i18nNoteBatchTime(Date.now() - _runStarted, batches.length);
   return { dict: dict, failed: failed, batches: batches.length, splits: splits,
            missing: leftover.length, missingList: leftover };
 }
@@ -9774,10 +9873,13 @@ async function i18nGenerate(lang) {
   await i18nHarvest();
   var cat = i18nFullCatalogue();
   var name = i18nLangName(lang);
+  var est = i18nEstimate(cat);
   var ok = await askConfirm({
     icon: '🌍', title: 'Translate the app into ' + name + '?',
     message: 'Nobody has translated this interface into ' + name + ' yet, so it has to be done now — '
-      + cat.length + ' pieces of text, about half a minute.\n\n'
+      + cat.length + ' pieces of text in ' + est.batches + ' batches, ' + est.words + '.\n\n'
+      + 'Leave the app open while it runs. It can be stopped part-way and what has come back is '
+      + 'kept — the 🌐 menu finishes the rest later.\n\n'
       + 'It is saved once and shared, so this happens only ever once: every other device, and '
       + 'everyone else in the family, gets it instantly from then on.\n\n'
       + 'Your recipes are not touched — only the buttons, menus and labels.',
@@ -9848,11 +9950,13 @@ async function i18nFillGaps(lang) {
   var name = i18nLangName(lang);
   if (!gaps.length) { toast('✓ Nothing is missing — every phrase the app has shown is in ' + name + '.', 5000); return true; }
 
+  var gapEst = i18nEstimate(gaps);
   var ok = await askConfirm({
     icon: '🧩', title: 'Finish the ' + name + ' translation?',
     message: gaps.length + ' phrase(s) are still in English. Some are parts of the app that had not been '
       + 'opened yet when ' + name + ' was made — a dialog\'s wording only exists once it is asked.\n\n'
-      + 'This translates only those, and adds them to the existing file. It does not redo the rest.',
+      + 'This translates only those, and adds them to the existing file. It does not redo the rest — '
+      + gapEst.batches + ' batch(es), ' + gapEst.words + '.',
     okLabel: 'Fill them in' });
   if (!ok) return false;
 
@@ -10257,6 +10361,20 @@ window.i18nEdSelfKey = i18nEdSelfKey;
 
 function i18nEdPortValue(oldKey, value) {
   if (typeof value !== 'string' || !value) return null;
+  // ALREADY PORTED (v36.51). "4 min ago" holding "לפני {1} דקות" is the result
+  // of a re-use that already happened once: the key kept its 4, the value grew
+  // its {1}. Asking for the 4 inside the Hebrew then finds nothing and the
+  // whole entry is refused — so it could never be re-used, and because its
+  // target had no translation it was never dead weight either. It simply sat
+  // there. If the value already carries exactly the placeholders the key needs,
+  // it needs nothing doing to it.
+  var need = (String(oldKey).replace(/\{\d+\}/g, '\u0000').match(/\d[\d.,:/]*\d|\d/g) || []).length;
+  if (need) {
+    var have = (value.match(/\{(\d+)\}/g) || []).map(function(p){ return parseInt(p.slice(1, -1), 10); });
+    var ok = have.length === need;
+    for (var h = 1; ok && h <= need; h++) if (have.indexOf(h) === -1) ok = false;
+    if (ok) return value;
+  }
   // The digits inside an existing {1} are not a number. Feeding this to
   // i18nDeriveKey read the 1 out of "{1}📚 Collections" and then refused the
   // whole entry for not finding a 1 in the Hebrew.
@@ -11045,7 +11163,12 @@ function openView(id){
   viewId=id;
   // Restore saved scaling for this recipe
   try { viewMult = parseFloat(localStorage.getItem('scale_'+id)||'1')||1; } catch(e){ viewMult=1; }
-  viewUnit='metric';
+  // …and the unit, which used to reset to metric on every open. Scaling is a
+  // property of the occasion and is remembered per recipe; which units you can
+  // cook in is a property of YOU, so it is remembered once for the device.
+  // Having to press Imperial again for every recipe reads as "it doesn't work".
+  try { viewUnit = localStorage.getItem(VIEW_UNIT_KEY)==='imperial' ? 'imperial' : 'metric'; }
+  catch(e){ viewUnit='metric'; }
   // Track recently viewed
   try {
     var recent = JSON.parse(localStorage.getItem('recent_views')||'[]');
@@ -11956,7 +12079,12 @@ function servingsInputChanged(el){
 window.parseServings = parseServings; window.setServings = setServings;
 window.nudgeServings = nudgeServings; window.servingsInputChanged = servingsInputChanged;
 window.currentServings = currentServings;
-function setUnit(u){viewUnit=u;drawView();}
+var VIEW_UNIT_KEY = 'tonys_view_unit';
+function setUnit(u){
+  viewUnit = (u==='imperial') ? 'imperial' : 'metric';
+  try { localStorage.setItem(VIEW_UNIT_KEY, viewUnit); } catch(e){}
+  drawView();
+}
 function toggleShare(id){
   var r=findRecipeRef(id);
   if(!r) return;
@@ -12137,9 +12265,11 @@ function heroPhotoChanged(event){
 function trimNum(n, dp){ return String(parseFloat(Number(n).toFixed(dp == null ? 2 : dp))); }
 // Cups are measured in quarters in practice, so snap to the nearest ¼.
 function cupsRound(v){ return trimNum(Math.round(v*4)/4); }
+// Ordered longest-unit-first, because the matcher below tries them in turn and
+// "1 kg" ends in "g" as surely as "200 g" does.
 const M2I={
-  'g': v=>v>=453?`${trimNum(v/453.592,2)} lb`:`${trimNum(v*0.035274,1)} oz`,
   'kg':v=>`${trimNum(v*2.20462,2)} lb`,
+  'g': v=>v>=453?`${trimNum(v/453.592,2)} lb`:`${trimNum(v*0.035274,1)} oz`,
   'ml':v=>v>=240?`${cupsRound(v/240)} cups`:`${trimNum(v*0.033814,1)} fl oz`,
   'l': v=>`${cupsRound(v*4.22675)} cups`,
   '°c':v=>`${((v*9/5)+32).toFixed(0)}°F`,
@@ -12160,14 +12290,108 @@ const I2M={
   'fl oz':v=>`${cookRound(v*29.5735)}ml`,
   '°f':  v=>`${(((v-32)*5/9)).toFixed(0)}°C`,
 };
-function cvtIng(amt,targetUnit){
-  const tbl=targetUnit==='imperial'?M2I:I2M;
-  for(const[unit,fn]of Object.entries(tbl)){
-    const m=amt.trim().match(new RegExp(`^([\\d.]+)\\s*${unit}$`,'i'));
-    if(m)return fn(parseFloat(m[1]));
+// ─── WHAT A REAL AMOUNT ACTUALLY LOOKS LIKE (v36.51) ─────────────────────────
+// The old matcher was `^([\d.]+)\s*<unit>$` against five exact spellings, and it
+// worked perfectly on every amount a developer types into a test. Tony's
+// recipes are written in Hebrew. "200 גרם" is not "200 g", and nothing in this
+// file had ever seen it — nor "1/2 kg", nor "200-300 g", nor "2 pounds". The
+// conversion did not stop working; it never worked on his library, which from
+// where he is sitting is the same thing. He was right to report it as broken.
+//
+// So the unit is matched by NAME, in both languages and with the spellings
+// people use, and the number in front of it is parsed the way a recipe writes
+// one: decimals, "1/2", "1 1/2", "½", "1½", and ranges at both ends.
+var UNIT_ALIASES = {
+  'kg':    ['kg','kgs','kilo','kilos','kilogram','kilograms','ק"ג','ק״ג','קג','קילו','קילוגרם','קילוגרמים'],
+  'g':     ['g','gr','gm','gram','grams','גרם','גרמים','גר'],
+  'ml':    ['ml','mls','cc','milliliter','milliliters','millilitre','millilitres','מ"ל','מ״ל','מל','מיליליטר'],
+  'l':     ['l','lt','ltr','liter','liters','litre','litres','ליטר','ליטרים'],
+  '°c':    ['°c','c°','celsius','centigrade','צלזיוס','מעלות','מעלות צלזיוס'],
+  'lb':    ['lb','lbs','pound','pounds','ליברה','ליברות'],
+  'fl oz': ['fl oz','floz','fl. oz','fl.oz','fluid ounce','fluid ounces'],
+  'oz':    ['oz','ozs','ounce','ounces','אונקיה','אונקיות','אונקיות נוזל'],
+  '°f':    ['°f','f°','fahrenheit','פרנהייט']
+};
+var _cvtUnitRe = null;
+function cvtUnitRe() {
+  if (_cvtUnitRe) return _cvtUnitRe;
+  _cvtUnitRe = {};
+  Object.keys(UNIT_ALIASES).forEach(function(canon) {
+    // Longest alias first inside the group too, so "grams" is not eaten by "gr".
+    var alts = UNIT_ALIASES[canon].slice()
+      .sort(function(a, b){ return b.length - a.length; })
+      .map(function(a){ return a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'); });
+    // The amount is everything before the unit. Lazy, so "1 large egg" cannot
+    // be read as "1 large e" + "gg" — and a trailing full stop is allowed
+    // because "200 gr." is how half the internet writes it.
+    _cvtUnitRe[canon] = new RegExp('^(.+?)\\s*(?:' + alts.join('|') + ')\\.?$', 'i');
+  });
+  return _cvtUnitRe;
+}
+var CVT_VULGAR = { '¼':0.25, '½':0.5, '¾':0.75, '⅓':1/3, '⅔':2/3,
+                   '⅛':0.125, '⅜':0.375, '⅝':0.625, '⅞':0.875,
+                   '⅕':0.2, '⅖':0.4, '⅗':0.6, '⅘':0.8, '⅙':1/6, '⅚':5/6 };
+// Returns null rather than NaN when it cannot read the number, because null is
+// a decision ("leave this amount alone") and NaN is a bug that reaches a recipe.
+function cvtNum(s) {
+  s = String(s == null ? '' : s).trim();
+  if (!s) return null;
+  var total = 0, any = false;
+  s = s.replace(/[¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘⅙⅚]/g,
+                function(ch){ any = true; total += CVT_VULGAR[ch]; return ' '; });
+  s = s.replace(/\s*\/\s*/g, '/').trim();            // "1 / 2" is one fraction
+  if (s) {
+    var parts = s.split(/\s+/);
+    for (var i = 0; i < parts.length; i++) {
+      var fr = /^(\d+)\/(\d+)$/.exec(parts[i]);
+      if (fr) {
+        var den = parseFloat(fr[2]);
+        if (!den) return null;
+        total += parseFloat(fr[1]) / den; any = true; continue;
+      }
+      if (/^\d+(\.\d+)?$/.test(parts[i])) { total += parseFloat(parts[i]); any = true; continue; }
+      return null;                                   // a word: this is not a number
+    }
+  }
+  return (any && isFinite(total)) ? total : null;
+}
+// A range converts BOTH ends or neither. "200-300 g" shown as "7.1 oz" is worse
+// than leaving it in grams, because it looks like an answer.
+function cvtJoinRange(a, b, sep) {
+  // Keep the spacing the unit came out with: cookRound writes "450g" and
+  // trimNum writes "7.1 oz", and a range must not quietly re-space either.
+  var split = /^([\d.\/]+)(\s*)(\S[\s\S]*)$/;
+  var ma = split.exec(a), mb = split.exec(b);
+  if (ma && mb && ma[3] === mb[3]) return ma[1] + sep + mb[1] + mb[2] + mb[3];
+  return a + sep + b;                                // the two ends crossed a unit boundary
+}
+function cvtIng(amt, targetUnit) {
+  amt = (amt == null ? '' : String(amt)).trim();
+  if (!amt) return amt;
+  var tbl = targetUnit === 'imperial' ? M2I : I2M;
+  var res = cvtUnitRe();
+  for (var canon in tbl) {
+    if (!Object.prototype.hasOwnProperty.call(tbl, canon)) continue;
+    var m = res[canon] && res[canon].exec(amt);
+    if (!m) continue;
+    var num = m[1].trim();
+    var rg = /^(.+?)\s*([-–—]|\bto\b)\s*(.+)$/i.exec(num);
+    if (rg) {
+      var lo = cvtNum(rg[1]), hi = cvtNum(rg[3]);
+      // Not a number after all — keep looking, because the unit that matched may
+      // simply be the tail of a longer one ("1 kg" ends in "g").
+      if (lo === null || hi === null) continue;
+      // A dash stays glued ("7.1-10.6 oz"); the word "to" keeps its spaces.
+      var sep = /^[-–—]$/.test(rg[2]) ? rg[2] : ' ' + rg[2].toLowerCase() + ' ';
+      return cvtJoinRange(tbl[canon](lo), tbl[canon](hi), sep);
+    }
+    var v = cvtNum(num);
+    if (v === null) continue;
+    return tbl[canon](v);
   }
   return amt;
 }
+window.cvtNum = cvtNum; window.UNIT_ALIASES = UNIT_ALIASES;
 function parseFraction(s) {
   // Safe fraction parser - no eval() needed
   if (s.includes('/')) {

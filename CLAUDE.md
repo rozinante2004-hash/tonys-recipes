@@ -132,6 +132,34 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **THE UNIT CONVERTER ONLY EVER HANDLED THE AMOUNTS A TEST TYPES (v36.51).**
+  Tony reported Imperial/metric as broken and was right. `cvtIng` was
+  `^([\d.]+)\s*<unit>$` against five exact spellings, so `"200 g"` converted and
+  **"200 גרם" did not** — nor `"1/2 kg"`, `"200-300 g"`, `"½ lb"` or
+  `"2 pounds"`. His recipes are written in Hebrew. Nothing regressed; it had
+  never worked on the library it was written for, which from where he is
+  sitting is the same thing. The matcher now works by unit NAME in both
+  languages with the spellings people use, `cvtNum()` parses decimals,
+  `1/2`, `1 1/2`, `½` and `1½`, and a range converts **both ends or neither**.
+  - `cvtNum()` returns **null, never NaN** — null is a decision to leave the
+    amount alone; NaN is a bug that reaches a recipe.
+  - A permissive matcher must be able to say no. `"1 large egg"` ends in `g`,
+    and reading it as grams would rewrite the recipe. When the number in front
+    does not parse the loop **continues to the next unit** rather than
+    returning, because `"1 kg"` ends in `g` as surely as `"200 g"` does.
+  - **The choice has to stick.** `viewUnit` reset to metric on every `openView`
+    while the scale was remembered per recipe, so pressing Imperial and opening
+    the next recipe looked exactly like the button doing nothing. Scaling is a
+    property of the occasion (per recipe); units are a property of the person
+    (per device, `VIEW_UNIT_KEY`).
+- **A NUMBER IN A DIALOG THE NEXT SCREEN CONTRADICTS (v36.51).** The translate
+  confirmation said "about half a minute" because somebody typed that. Tony
+  agreed to half a minute and the progress panel — which measures the real
+  thing — told him eight. The panel was right. Both dialogs now estimate from
+  `i18nBatchCatalogue()`, the **same** batching the run uses, times a per-batch
+  figure learned from the last runs (`i18nMsPerBatch`, clamped to 1.5–60s so one
+  batch on a dropping connection cannot claim an hour).
+
 - **`--warm-brown` is both a surface and heading text.** Headings use `--heading`.
   Flipping the wrong one breaks dark mode in a way that only shows in one theme.
 - **A focus ring needs `:focus:not(:focus-visible)` for the reset, and the ring
@@ -601,6 +629,38 @@ found only because a test was written first and disagreed with the code.
 - **AN ORPHAN IS NOT NECESSARILY DEAD.** "{1} min ago" is a perfectly good key
   that simply is not on screen. The removal dialog says so, because deleting one
   of those means paying to translate it again later.
+- **THE HARVEST HAS TO DOWNLOAD THE SUITE BEFORE IT CAN DRAW IT (v36.51).**
+  `SELF_TESTS` is empty until `loadSelfTests()` runs, so the `I18N_HARVEST`
+  entry for the self-test list rendered an empty `<div>` and **none of the 265
+  test names or their group headings was ever catalogued**. They are translated
+  on screen — the observer looks each one up as it renders — so nothing looked
+  wrong; only the editor knew, and it called all ~270 of them orphans. That was
+  most of the 310 Tony was staring at. Note the cost: the catalogue went
+  1,254 → 1,533, about 22%, and a new language now takes ~10 minutes rather
+  than ~8. It is not *new* cost — the missing-list mechanism would have
+  collected them the first time the screen was opened — only visible cost.
+  - **This one cannot be tested from inside the suite.** By the time the suite
+    runs, the suite has obviously been downloaded, so the harvest finds the list
+    populated either way. The assertion checks that the entry *asks*, and says
+    in its message why that is the strongest thing available.
+- **A KEYCAP IS AN EMOJI, NOT A NUMBER (v36.51).** `1️⃣` is the ASCII digit 1
+  wearing `U+FE0F U+20E3`, so v36.47's rule read it as a count and turned the
+  Bring! refresh steps into `"{1}️⃣ Click {2} below"` — nonsense as a key, and
+  it orphaned three lines that were already translated. A digit followed by a
+  keycap is skipped; the bare digits beside it are still placeholders.
+- **ALREADY PORTED IS NOT UNPORTABLE (v36.51).** `"4 min ago"` holding
+  `"לפני {1} דקות"` is the result of a re-use that happened once already: the
+  key kept its 4, the value grew its `{1}`. `i18nEdPortValue()` then looked for
+  the 4 inside the Hebrew, found nothing, and refused — so it could never be
+  re-used, and its target had no translation so it was never dead weight
+  either. It just sat there. **This is why Tony had no re-use button at all.**
+  If the value already carries exactly the placeholders the key needs, it needs
+  nothing doing to it.
+- **A JOINED LINE IS AN UNBOUNDED KEY (v36.51).** The log nudge lists finding
+  titles separated by `" · "`. As one string, every combination of findings is a
+  new dictionary entry. The line is `data-no-i18n` and each title is looked up
+  on its own through `i18nPhrase()` — keys the app already has. Use
+  `i18nPhrase()` anywhere code must **join** translated text rather than hold it.
 - **THE SCRAPE READS THE SCRIPTS, NOT THE FILE (v36.50).** `i18nScrapeSource()`
   fetches `location.href`, which is an **HTML document**, and handed it whole
   the JavaScript lexer opened a "string" on the quotation mark in
