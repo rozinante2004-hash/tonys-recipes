@@ -601,6 +601,58 @@ found only because a test was written first and disagreed with the code.
 - **AN ORPHAN IS NOT NECESSARILY DEAD.** "{1} min ago" is a perfectly good key
   that simply is not on screen. The removal dialog says so, because deleting one
   of those means paying to translate it again later.
+- **THE SCRAPE READS THE SCRIPTS, NOT THE FILE (v36.50).** `i18nScrapeSource()`
+  fetches `location.href`, which is an **HTML document**, and handed it whole
+  the JavaScript lexer opened a "string" on the quotation mark in
+  `<html lang="en">` — character 10 — and spent the rest of the file half a step
+  out of phase. It still returned 276 messages, which is why this survived three
+  releases of being looked straight at: *a lexer that is wrong half the time
+  looks like a lexer that works.* `i18nScriptsOnly()` blanks everything outside
+  an inline `<script>` to spaces, newlines kept, so every offset still points
+  where it did. Nothing is lost by it: no inline handler in this file contains a
+  translatable literal, and the markup is catalogued from the DOM anyway.
+- **A TEMPLATE LITERAL IS NOT A STRING WITH BACKTICKS FOR QUOTES (v36.50).**
+  `${…}` is code, and the code inside it usually holds another template —
+  `` `<div>${cond ? `<span>…</span>` : ''}</div>` `` is the house style here.
+  Read as one flat string it closed on the **nested** backtick and desynchronised
+  the next two thousand characters. `i18nLexSource()` now walks a template as its
+  own thing: its text is string, its holes are handed back to the code lexer, and
+  the two nest. Both PWA install toasts sat in Tony's dictionary as orphans
+  because of this, and they were among the ones he said "look legit" — they were.
+- **AN ORPHAN ALREADY TRANSLATED UNDER ANOTHER KEY IS DEAD WEIGHT (v36.50).**
+  v36.48 caught this via `i18nEdSelfKey()`, which returns any key holding `{n}`
+  **unchanged** — so `"⚙️ Worker settings & secrets {1}"` slipped past it, even
+  though the app now catalogues that link as `"⚙️ Worker settings & secrets"` (a
+  trailing element stopped being part of the sentence in v36.39). It could never
+  be re-used — the target already has a translation — and never removed, so it
+  sat in the list looking like work. The test is made on `i18nEdNorm()` now, i.e.
+  on the **words**, not on the exact key.
+- **TYPOGRAPHY IS NOT A RENAME (v36.50).** `i18nEdNorm()` folds `…`/`...`, curly
+  quotes and the dash family **for comparison only**. The day someone tidies
+  `...` into `…` in the markup, the old entry becomes an orphan holding a
+  perfectly good translation, and nothing else would ever match it back.
+- **EVIDENCE IS NOT INTERFACE TEXT (v36.50).** Three of the sync-log findings
+  build their `detail` out of the log — recipe names, whatever was logged, and a
+  `(×3)` on the end. Every distinct combination is a new key, so they are marked
+  `raw` and rendered `data-no-i18n`; the title and the "Try:" line beside them
+  stay translatable. Same unbounded class as the log rows (v36.44) and the counts
+  (v36.47). **A person's name is data too** — the owner row and every member row
+  in 👥 Family Access carry `data-no-i18n`, because nothing translates a name and
+  a model asked to try will transliterate it.
+- **A TEST THAT CANNOT FAIL IS NOT A TEST.** The first version of the check
+  above rendered the findings panel after writing events with `syncLog()` — which
+  stamps everything a test causes with `t`, which the analyser drops. So the
+  panel had no findings in it at all, the assertion found the words in the
+  **event rows** (marked since v36.44), and passed whether the renderer had been
+  fixed or not. It writes with `writeSyncLog()` now, and asserts both findings
+  are on screen before asking anything about them. Every claim in this release
+  was checked by breaking the fix and watching the suite go red.
+- **A SCREEN STATE THE HARVEST CANNOT ENTER GOES IN `I18N_EXTRA` (v36.50).**
+  `+ Add Recipe` only exists for somebody with no recipes and no search;
+  `≈ rounded` and `reset to {1}` only exist once an amount has been scaled, and
+  scaling one would be an **action** while every `I18N_HARVEST` entry is
+  read-only by construction. All three are real words on a real screen that no
+  amount of looking would ever find.
 - **`i18nEdSelfKey()` leaves a current-form key alone.** The digits inside
   `{1}` are not a number: re-deriving `"{1} min ago"` produced `"{{1}} min ago"`
   and would have re-keyed a good entry to garbage. Mask or skip placeholders

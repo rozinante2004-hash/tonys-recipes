@@ -2953,6 +2953,26 @@ window.SELF_TESTS = [
       if(!/timed out/i.test(t.map(function(x){return x.title;}).join(' ')))
         throw new Error('a timeout produced no finding of its own');
 
+      // EVIDENCE IS NOT INTERFACE TEXT (v36.50). Three of these findings quote
+      // the log back — recipe names, whatever was logged, and a (×3) on the end.
+      // Every distinct combination is a different string, so cataloguing them
+      // puts an entry in the dictionary that can never appear a second time.
+      // Tony found two of them sitting among his orphans looking like garbage,
+      // and they were: the same unbounded class as the log rows (v36.44) and the
+      // counts (v36.47). The written prose beside them must stay translatable,
+      // or fixing this would silently take a dozen real sentences out with it.
+      if(!f.filter(function(x){ return /keeps being refused/i.test(x.title); })[0].raw)
+        throw new Error('a finding whose detail quotes recipe names is not marked verbatim');
+      if(!analyseSyncLog([{at:now,k:'error',m:'Cloud read timed out after 45s'}], now)
+            .filter(function(x){ return /error/i.test(x.title); })[0].raw)
+        throw new Error('the error bullets are not marked verbatim — every distinct '
+          + 'log message would become its own dictionary key');
+      if(fine.some(function(x){ return x.raw; }))
+        throw new Error('a finding made entirely of written English was marked verbatim — '
+          + 'that sentence can never be translated now');
+      if(t.filter(function(x){ return /timed out/i.test(x.title); })[0].raw)
+        throw new Error('the timeout finding is written prose and must stay translatable');
+
       // The report is what reaches a human — it must carry both halves.
       var kOn=null,kLog=null;
       try{ kOn=localStorage.getItem('tonys_log_enabled'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
@@ -2976,6 +2996,46 @@ window.SELF_TESTS = [
         if(formatBytes(2048)!=='2 KB') throw new Error('formatBytes(2048) is '+formatBytes(2048));
         if(typeof APP_VERSION==='string' && txt.indexOf(APP_VERSION)===-1)
           throw new Error('the report does not say which version produced it');
+
+        // …and the panel that shows the same findings marks the quoted evidence
+        // so the string finder walks past it. Checked on the rendered DOM, not
+        // on the flag: the flag is only worth having if the renderer reads it.
+        //
+        // Written with writeSyncLog rather than syncLog, and that is the whole
+        // trick. syncLog stamps every event a test causes with `t`, and the
+        // analyser drops those — so the obvious version of this check rendered
+        // a panel with no findings in it at all, found the words in the EVENT
+        // rows (marked since v36.44), and passed whether the renderer had been
+        // fixed or not. An assertion that cannot fail is not an assertion.
+        writeSyncLog([{ at:Date.now(), k:'conflict',
+                        m:'Save refused for "Soup" — changed on another device' },
+                      { at:Date.now()-1000, k:'error', m:'Cloud read timed out after 0s' }]);
+        renderLoggingPanel();
+        var hostL=document.getElementById('loggingBody');
+        if(!hostL) throw new Error('#loggingBody is not in the page');
+        var quoted=Array.prototype.filter.call(hostL.querySelectorAll('div'), function(d){
+          return !d.querySelector('div')
+              && (/^Another device changed "Soup"/.test(d.textContent.trim())
+                  || /^• Cloud read timed out/.test(d.textContent.trim()));
+        });
+        if(quoted.length!==2)
+          throw new Error('expected both quoted-evidence findings on screen, found '+quoted.length
+            + ' — the check would have passed without testing anything');
+        quoted.forEach(function(d){
+          for(var n=d;n&&n!==document.body;n=n.parentElement)
+            if(n.hasAttribute&&n.hasAttribute('data-no-i18n')) return;
+          throw new Error('the quoted log evidence is still catalogued as interface text: '
+            + JSON.stringify(d.textContent.slice(0,60)));
+        });
+        // The written prose beside it is NOT marked, or this fix would have
+        // taken a dozen real sentences out of the dictionary with it.
+        var tryLine=Array.prototype.filter.call(hostL.querySelectorAll('div'), function(d){
+          return /^Try:\s*Open the recipe/.test(d.textContent.trim());
+        })[0];
+        if(!tryLine) throw new Error('the conflict finding lost its proposed fix');
+        for(var nn=tryLine;nn&&nn!==document.body;nn=nn.parentElement)
+          if(nn.hasAttribute&&nn.hasAttribute('data-no-i18n'))
+            throw new Error('the written "Try:" line was marked verbatim and can never be translated');
       } finally {
         try{
           if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
@@ -7617,6 +7677,40 @@ window.SELF_TESTS = [
       if(after.indexOf('123456789-abc.apps.googleusercontent.com')!==-1)
         throw new Error('the Gmail Client ID example was offered for translation');
 
+      // THE SCRAPE READS THE SCRIPTS, NOT THE FILE (v36.50). What it fetches is
+      // an HTML document and what the lexer reads is JavaScript: handed the
+      // whole thing it opened a "string" on the quotation mark in
+      // <html lang="en"> and spent the rest of the file half a step out. And
+      // inside the scripts, a template literal with another template in one of
+      // its ${holes} closed on the nested backtick and did the same again.
+      // Neither failure announced itself — 276 messages still came back — so
+      // the proof has to be a message from the far side of both hazards.
+      ['i18nScriptsOnly','i18nLexSource'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      (function(){
+        var doc='<html lang="en">\n<body onclick="go(\'x\')">\n<script>\n'
+          + 'var h = `<i>${ a ? `<b>${b}</b>` : \'\' }</i>`;\n'
+          + 'toast(\'ZQXJ after a nested template\');\n'
+          + '<\/script>\n</body></html>';
+        var only=i18nScriptsOnly(doc);
+        if(only.length!==doc.length)
+          throw new Error('blanking the markup moved every offset after it');
+        if((only.match(/\n/g)||[]).length!==(doc.match(/\n/g)||[]).length)
+          throw new Error('blanking the markup lost a line');
+        if(/lang="en"/.test(only)) throw new Error('the markup was handed to the JavaScript lexer');
+        if(only.indexOf('ZQXJ after a nested template')===-1)
+          throw new Error('the script body did not survive');
+        var lex=i18nLexSource(only);
+        var at=doc.indexOf('toast(\'ZQXJ');
+        if(lex.inStr[at])
+          throw new Error('a toast after a nested template literal reads as string content — '
+            + 'the scrape walks straight past it');
+      })();
+      // …and the real file's proof: two toasts that sit behind both hazards.
+      if(after.indexOf('✅ Installing Tony’s Recipes...')===-1
+         && after.indexOf('✅ Installing Tony\'s Recipes...')===-1)
+        throw new Error('the PWA install toast is still not in the catalogue');
+
       // A placeholder is chrome even on a field marked dir="auto" — that
       // marking is about the recipe text typed INTO it. The whole ingredient
       // editor kept its English hints until v36.36.
@@ -7898,6 +7992,49 @@ window.SELF_TESTS = [
             throw new Error('a sync-log row was not recognised as removable');
         } finally { i18nInstall(prevLang2, prevDict2); window._fbUser=prevUser;
                    _i18nEdDraft=null; i18nEdInvalidate(); }
+      })();
+
+      // A TRAILING PLACEHOLDER, AND A TIDIED-UP ELLIPSIS (v36.50). Tony looked
+      // at seven orphans and said they looked legitimate — and he was right.
+      // "⚙️ Worker settings & secrets {1}" is a real link with a real grey hint
+      // beside it; what changed is that an element on the EDGE stopped counting
+      // as part of the sentence, so the app now asks for the same words without
+      // the {1}. Both halves of the old test missed it: i18nEdSelfKey returns
+      // any key holding {n} unchanged, and re-use skips a target that already
+      // has a translation. So it could never be re-used, never be removed, and
+      // sat in the list looking like work. Same story for a sentence whose "..."
+      // was tidied into "…" in the markup one day.
+      (function(){
+        var prevDict3=i18nCurrentDict(), prevLang3=i18nLang(), prevUser3=window._fbUser;
+        var host3=document.createElement('div');
+        host3.innerHTML='<a id="zw1">Widget settings &amp; secrets <span>API keys, bindings</span></a>'
+          + '<div id="zw2">Installing this app...</div>';
+        document.body.appendChild(host3);
+        try{
+          window._fbUser={ email:'rozinante2004@gmail.com' };
+          var live3=i18nCatalogue(host3);
+          if(live3.indexOf('Widget settings & secrets')===-1)
+            throw new Error('the trailing hint is still part of the key: '+JSON.stringify(live3));
+          var d3={};
+          d3['Widget settings & secrets']='הגדרות וסודות';        // what the app asks for
+          d3['Widget settings & secrets {1}']='הגדרות וסודות';    // the leftover, with the old hint slot
+          d3['Installing this app...']='מתקין את האפליקציה...';   // what the app asks for
+          d3['Installing this app…']='מתקין את האפליקציה…';       // the leftover, tidied punctuation
+          i18nInstall('he', d3);
+          _i18nEdLang='he'; _i18nEdDraft=d3; i18nEdInvalidate();
+          var inf3=i18nEdInfo(), junk3=inf3.all.filter(inf3.junk);
+          if(junk3.indexOf('Widget settings & secrets {1}')===-1)
+            throw new Error('an orphan differing from a translated live key only by a trailing '
+              + 'placeholder was left standing as work — it can never be re-used or removed');
+          if(junk3.indexOf('Installing this app…')===-1)
+            throw new Error('tidying "..." into "…" orphaned a translation for ever');
+          // …and the key the app actually asks for is untouched by all of this.
+          if(inf3.orphan('Widget settings & secrets'))
+            throw new Error('the LIVE key was classed as an orphan');
+          if(inf3.orphan('Installing this app...'))
+            throw new Error('the LIVE key was classed as an orphan');
+        } finally { i18nInstall(prevLang3, prevDict3); window._fbUser=prevUser3;
+                    _i18nEdDraft=null; i18nEdInvalidate(); host3.remove(); }
       })();
 
       // PORTING AN OLD TRANSLATION. "15 שגיאות נרשמו" is only reusable as

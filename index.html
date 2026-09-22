@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.49 -->
+<!-- Tony's Recipes Collection v36.50 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -493,6 +493,7 @@ function analyseSyncLog(list, now) {
                                                        : 'a recipe')
             + ' after this one last synced, so the write was refused rather than overwriting it. '
             + 'Nothing was lost, but the two versions have to be reconciled.',
+      raw: true,
       fix: 'Open the recipe. The red banner at the top has "↻ Take the other device’s version", which fetches that '
          + 'one recipe on its own — your copy is kept in its 🕘 Version history so you can compare and restore it.' });
   }
@@ -505,6 +506,7 @@ function analyseSyncLog(list, now) {
     out.push({ level:'bad', title:'The same recipe keeps being refused',
       detail: stuck.map(function(n){ return '"'+n+'" ('+repeats[n]+' times)'; }).join(', ')
             + ' — each save is being refused for the same reason, so the two versions were never reconciled.',
+      raw: true,
       fix:'Take the cloud version once, from the banner in the recipe. Repeating the save cannot succeed on its own; '
         + 'the refusal is not a transient error.' });
   }
@@ -528,6 +530,7 @@ function analyseSyncLog(list, now) {
     var top = Object.keys(msgs).sort(function(x,y){ return msgs[y]-msgs[x]; }).slice(0,3);
     out.push({ level:'bad', title: by.error.length + ' error' + (by.error.length===1?'':'s') + ' recorded',
       detail: top.map(function(m){ return '• ' + m + (msgs[m]>1 ? ' (×'+msgs[m]+')' : ''); }).join('\n'),
+      raw: true,
       fix:'Copy this report and send it on. The exact wording is what identifies the cause; a summary usually is not.' });
   }
 
@@ -807,11 +810,19 @@ function renderLoggingPanel() {
 
   // 3 — findings
   h += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 6px;">What this looks like</div>';
+  // `raw` marks the findings whose detail is BUILT OUT OF THE LOG rather than
+  // written: the error bullets are whatever the app happened to log, with a
+  // (×3) on the end, and the two conflict findings quote recipe names. Every
+  // distinct combination of those is a different string, so cataloguing them
+  // adds an entry to the dictionary that can never appear twice — the same
+  // unbounded class the log rows were taken out of in v36.44 and the numbers in
+  // v36.47. The title and the "Try:" line beside them are written English and
+  // stay translatable; it is only the evidence that is left verbatim.
   findings.forEach(function(f) {
     var c = COLOR[f.level] || COLOR.ok;
     h += '<div style="background:' + c[0] + ';border:1px solid ' + c[1] + ';border-radius:10px;padding:11px 13px;margin-bottom:8px;">'
        + '<div style="font-weight:700;font-size:13px;color:' + c[2] + ';margin-bottom:4px;">' + escH(f.title) + '</div>'
-       + '<div style="font-size:12.5px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">' + escH(f.detail) + '</div>'
+       + '<div' + (f.raw ? ' data-no-i18n' : '') + ' style="font-size:12.5px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">' + escH(f.detail) + '</div>'
        + '<div style="font-size:12.5px;color:' + c[2] + ';line-height:1.6;margin-top:6px;"><strong>Try:</strong> ' + escH(f.fix) + '</div>'
        + '</div>';
   });
@@ -3179,8 +3190,9 @@ function renderAccessMembers() {
     var parts = (roleColors[m.role]||'#F5F5F5:#555').split(':');
     return '<div class="access-row">' +
       '<div class="access-avatar">' + (m.email[0].toUpperCase()) + '</div>' +
-      '<div class="access-info"><div class="access-name">' + (m.name||m.email.split('@')[0]) + '</div>' +
-      '<div class="access-email">' + m.email + '</div></div>' +
+      // Same reason as the owner row above: names and addresses are data.
+      '<div class="access-info"><div class="access-name" data-no-i18n>' + (m.name||m.email.split('@')[0]) + '</div>' +
+      '<div class="access-email" data-no-i18n>' + m.email + '</div></div>' +
       '<select class="access-role-btn" onchange="changeAccessRole(' + i + ',this.value)" style="margin-right:4px;">' +
         ['read','write','admin'].map(function(r){ return '<option value="'+r+'"'+(m.role===r?' selected':'')+'>'+roleLabels[r]+'</option>'; }).join('') +
       '</select>' +
@@ -3312,7 +3324,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.49';
+var APP_VERSION = 'v36.50';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5989,7 +6001,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.49</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.50</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6611,7 +6623,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.49</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.50</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8654,62 +8666,109 @@ var I18N_SCRAPE = [
 // counts at a position that is real code.
 function i18nLexSource(src) {
   var n = src.length, clean = new Array(n), inStr = new Uint8Array(n);
-  var i = 0, prev = '';
+  var prev = '';
   function lastCode() { return prev; }
-  while (i < n) {
-    var c = src.charAt(i), c2 = src.charAt(i + 1);
-    if (c === '/' && c2 === '/') {                       // line comment
-      while (i < n && src.charAt(i) !== '\n') { clean[i] = ' '; i++; }
-      continue;
-    }
-    if (c === '/' && c2 === '*') {                       // block comment
-      clean[i] = ' '; clean[i + 1] = ' '; i += 2;
-      while (i < n && !(src.charAt(i) === '*' && src.charAt(i + 1) === '/')) {
-        clean[i] = (src.charAt(i) === '\n') ? '\n' : ' '; i++;
+
+  // A TEMPLATE LITERAL IS NOT A STRING WITH BACKTICKS FOR QUOTES (v36.50).
+  // `${…}` is code, and the code inside it very often holds another template —
+  // this file is full of
+  //
+  //     `<div>${cond ? `<span>…</span>` : ''}</div>`
+  //
+  // and read as one flat string that closes on the NESTED backtick, leaving the
+  // lexer half a quote out of step for the next two thousand characters. Two
+  // real toasts sat in Tony's dictionary as orphans because of it, and he was
+  // the one who said they looked legitimate. So a template is walked as its own
+  // thing: its text is string, its holes are handed back to the code lexer, and
+  // the two can nest as deep as they like.
+  function lexTemplate(i) {
+    clean[i] = '`'; i++;
+    while (i < n) {
+      var d = src.charAt(i);
+      if (d === '\\') {
+        clean[i] = d; inStr[i] = 1;
+        if (i + 1 < n) { clean[i + 1] = src.charAt(i + 1); inStr[i + 1] = 1; }
+        i += 2; continue;
       }
-      if (i < n) { clean[i] = ' '; clean[i + 1] = ' '; i += 2; }
-      continue;
-    }
-    // A regex literal, by the standard heuristic: a `/` where a VALUE is
-    // expected rather than where a division could be. This file is full of
-    // them and several contain quotes.
-    if (c === '/' && /^[(,=:[!&|?{};+\-*%~^<>]$/.test(lastCode() || '{')) {
-      clean[i] = ' '; i++;
-      var cls = false;
-      while (i < n) {
-        var r = src.charAt(i);
-        if (r === '\n') break;                           // not a regex after all
-        clean[i] = ' ';
-        if (r === '\\') { if (i + 1 < n) clean[i + 1] = ' '; i += 2; continue; }
-        if (r === '[') cls = true;
-        else if (r === ']') cls = false;
-        else if (r === '/' && !cls) { i++; break; }
-        i++;
+      if (d === '`') { clean[i] = d; i++; return i; }
+      if (d === '$' && src.charAt(i + 1) === '{') {
+        clean[i] = ' '; clean[i + 1] = ' '; i += 2;      // the hole's walls are not code
+        i = lexCode(i, true);
+        continue;
       }
-      prev = '/';
-      continue;
+      clean[i] = d; inStr[i] = 1; i++;
     }
-    if (c === "'" || c === '"' || c === '`') {           // string literal
-      var q = c;
-      clean[i] = c; i++;
-      while (i < n) {
-        var d = src.charAt(i);
-        if (d === '\\') {
-          clean[i] = d; inStr[i] = 1;
-          if (i + 1 < n) { clean[i + 1] = src.charAt(i + 1); inStr[i + 1] = 1; }
-          i += 2; continue;
-        }
-        clean[i] = d;
-        if (d === q) { i++; break; }
-        inStr[i] = 1; i++;
-      }
-      prev = q;
-      continue;
-    }
-    clean[i] = c;
-    if (!/\s/.test(c)) prev = c;
-    i++;
+    return i;
   }
+
+  // `stopAtBrace` is the template hole: return the moment the `}` that closes
+  // it is reached, which is the one at depth zero.
+  function lexCode(i, stopAtBrace) {
+    var depth = 0;
+    while (i < n) {
+      var c = src.charAt(i), c2 = src.charAt(i + 1);
+      if (c === '{') depth++;
+      else if (c === '}') {
+        if (stopAtBrace && depth === 0) { clean[i] = ' '; return i + 1; }
+        depth--;
+      }
+      if (c === '/' && c2 === '/') {                     // line comment
+        while (i < n && src.charAt(i) !== '\n') { clean[i] = ' '; i++; }
+        continue;
+      }
+      if (c === '/' && c2 === '*') {                     // block comment
+        clean[i] = ' '; clean[i + 1] = ' '; i += 2;
+        while (i < n && !(src.charAt(i) === '*' && src.charAt(i + 1) === '/')) {
+          clean[i] = (src.charAt(i) === '\n') ? '\n' : ' '; i++;
+        }
+        if (i < n) { clean[i] = ' '; clean[i + 1] = ' '; i += 2; }
+        continue;
+      }
+      // A regex literal, by the standard heuristic: a `/` where a VALUE is
+      // expected rather than where a division could be. This file is full of
+      // them and several contain quotes.
+      if (c === '/' && /^[(,=:[!&|?{};+\-*%~^<>]$/.test(lastCode() || '{')) {
+        clean[i] = ' '; i++;
+        var cls = false;
+        while (i < n) {
+          var r = src.charAt(i);
+          if (r === '\n') break;                         // not a regex after all
+          clean[i] = ' ';
+          if (r === '\\') { if (i + 1 < n) clean[i + 1] = ' '; i += 2; continue; }
+          if (r === '[') cls = true;
+          else if (r === ']') cls = false;
+          else if (r === '/' && !cls) { i++; break; }
+          i++;
+        }
+        prev = '/';
+        continue;
+      }
+      if (c === '`') { i = lexTemplate(i); prev = '`'; continue; }
+      if (c === "'" || c === '"') {                      // string literal
+        var q = c;
+        clean[i] = c; i++;
+        while (i < n) {
+          var d2 = src.charAt(i);
+          if (d2 === '\\') {
+            clean[i] = d2; inStr[i] = 1;
+            if (i + 1 < n) { clean[i + 1] = src.charAt(i + 1); inStr[i + 1] = 1; }
+            i += 2; continue;
+          }
+          clean[i] = d2;
+          if (d2 === q) { i++; break; }
+          inStr[i] = 1; i++;
+        }
+        prev = q;
+        continue;
+      }
+      clean[i] = c;
+      if (!/\s/.test(c)) prev = c;
+      i++;
+    }
+    return i;
+  }
+
+  lexCode(0, false);
   for (var k = 0; k < n; k++) if (clean[k] === undefined) clean[k] = ' ';
   return { clean: clean.join(''), inStr: inStr };
 }
@@ -8755,6 +8814,23 @@ function i18nUnescape(v) {
     .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
     .replace(/\\(['"\\])/g, '$1');
 }
+// Everything outside an inline <script> blanked to spaces, with the newlines
+// kept so that every offset the scrape works with still points where it did.
+// A <script src=…> is left blank too: its body is empty here, and its contents
+// are not in this file to read.
+function i18nScriptsOnly(raw) {
+  var blank = function(s){ return s.replace(/[^\n]/g, ' '); };
+  var re = /(<script(?![^>]*\bsrc=)[^>]*>)([\s\S]*?)(<\/script\s*>)/gi;
+  var out = '', at = 0, m;
+  while ((m = re.exec(raw)) !== null) {
+    var bodyStart = m.index + m[1].length;
+    out += blank(raw.slice(at, bodyStart)) + m[2];
+    at = bodyStart + m[2].length;
+  }
+  return out + blank(raw.slice(at));
+}
+window.i18nScriptsOnly = i18nScriptsOnly;
+
 async function i18nScrapeSource() {
   var added = 0;
   try {
@@ -8763,7 +8839,21 @@ async function i18nScrapeSource() {
     var raw = await res.text();
     // Lexed once and shared: comments blanked, regex literals stepped over,
     // and the positions inside string literals marked.
-    var lex = i18nLexSource(raw);
+    //
+    // …of the SCRIPTS, not of the file. What `location.href` returns is an HTML
+    // document, and the lexer reads JavaScript. Handed the whole thing it
+    // opened a "string" on the first quotation mark it met — `<html lang="en">`,
+    // character 10 — and from there every judgement it made about what was code
+    // and what was text was a coin toss that came right about half the time.
+    // It still returned 276 messages, which is exactly why this survived three
+    // releases of looking straight at it. What it did NOT return was
+    //
+    //     toast('✅ Installing Tony’s Recipes...')
+    //
+    // and its sibling, two hundred lines into the file: both sat in Tony's
+    // dictionary as orphans that looked completely legitimate, because they
+    // are. He said so, and he was right.
+    var lex = i18nLexSource(i18nScriptsOnly(raw));
     var src = lex.clean;
     var spans = i18nExcludedSpans(src);
     i18nBuildPatterns(src, lex, spans);
@@ -8952,6 +9042,13 @@ var I18N_EXTRA = [
   'Reading the app’s own messages',
   'Batch {1} of {2} · {3} phrases', '{1} of {2} batches', '{1} phrases to go',
   'Working…', 'Checking…',
+  // A screen state the harvest cannot get into. The empty-library button only
+  // exists for somebody with no recipes and no search, and the two servings
+  // notes only exist once an amount has been scaled — i18nHarvestView() draws
+  // a recipe at its own size, because scaling one would be an ACTION and every
+  // entry in I18N_HARVEST is read-only by construction. All three are real
+  // words on a real screen; none of them could ever be found by looking.
+  '+ Add Recipe', '≈ rounded', 'reset to {1}',
   // workerErrorText(): four `return` statements inside a ternary. No opener
   // could reach them without also dragging in every AI prompt in this file,
   // and those must never be translated — they are instructions to a model.
@@ -9873,6 +9970,12 @@ function i18nEdKeys() {
   i18nFullCatalogue().forEach(function(k){ seen[k] = 1; });
   i18nMissingList().forEach(function(k){ seen[k] = 1; });
   var live = Object.keys(seen);
+  // The live keys indexed by their normalised form, so the "already ported"
+  // test below can be asked about words rather than about punctuation. Built
+  // once: it used to be re-derived per orphan, which on 2,000 entries is two
+  // million string rewrites for a question asked on every keystroke.
+  var liveNorm = Object.create(null);
+  live.forEach(function(k){ if (!(i18nEdNorm(k) in liveNorm)) liveNorm[i18nEdNorm(k)] = k; });
   // Two very different things get called "orphan", and lumping them together
   // makes the useful one unusable. Tony's Hebrew file holds 2,395 entries
   // against a catalogue of 1,231: about 1,150 of them are code fragments the
@@ -9889,7 +9992,23 @@ function i18nEdKeys() {
     // it is never offered for re-use — the target has a translation, so it is
     // skipped — and never offered for removal either, so it stays for ever.
     var self = i18nEdSelfKey(k);
-    seen[k] = (self && self !== k && _i18nEdDraft[self]) ? 3 : 2;
+    if (self && self !== k && _i18nEdDraft[self]) { seen[k] = 3; return; }
+    // The same judgement, made on the words instead of on the exact key —
+    // which is what it took to see through a TRAILING placeholder.
+    // i18nEdSelfKey returns any key that already carries {n} unchanged, so
+    //
+    //     "⚙️ Worker settings & secrets {1}"
+    //
+    // never reached the test above, even though the app now catalogues that
+    // link as "⚙️ Worker settings & secrets" — the {1} was the grey hint
+    // beside it, an element, and an element on the edge stopped being part of
+    // the sentence in v36.39. Tony was looking at seven of these and quite
+    // reasonably said they looked legitimate: they ARE legitimate strings, and
+    // they are also already translated, under the key the app actually asks
+    // for. Classed as dead weight rather than left standing as orphans, they
+    // go out with "remove N unusable" instead of being read one by one.
+    var twin = liveNorm[i18nEdNorm(k)];
+    seen[k] = (twin && twin !== k && _i18nEdDraft[twin]) ? 3 : 2;
   });
   return {
     all: Object.keys(seen).sort(),
@@ -10109,6 +10228,15 @@ function i18nEdNorm(k) {
     .replace(/^(?:\s*\{\d+\})+/, '').replace(/(?:\{\d+\}\s*)+$/, '')
     .replace(/\{\d+\}/g, '\u0000')
     .replace(/\d[\d.,:/]*\d|\d/g, '\u0000')
+    // Typography is not a rename. "Installing Tony's Recipes…" and
+    // "Installing Tony's Recipes..." are the same sentence written by two
+    // different hands, and the day one of them was tidied up in the markup the
+    // other became an orphan holding a perfectly good translation. Folded for
+    // COMPARISON only — the key itself keeps whichever characters it has.
+    .replace(/…/g, '...')
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[‐‑‒–—―]/g, '-')
     .replace(/\s+/g, ' ').trim();
 }
 // The TRANSLATION has to be ported too. "15 שגיאות נרשמו" is only reusable as
@@ -23209,8 +23337,12 @@ window.onHeaderScroll = onHeaderScroll;
         <div class="access-row" style="background:rgba(212,168,67,0.14);border-color:var(--gold);">
           <div class="access-avatar" style="background:var(--gold);">👑</div>
           <div class="access-info">
-            <div class="access-name">Tony Schvekher</div>
-            <div class="access-email" id="ownerEmail">—</div>
+            <!-- A person's name and address are data, not interface text. Without
+                 this the owner's name was catalogued like a button label and sat
+                 in the dictionary as an orphan for ever — nothing translates a
+                 name, and a model asked to try will transliterate it. -->
+            <div class="access-name" data-no-i18n>Tony Schvekher</div>
+            <div class="access-email" id="ownerEmail" data-no-i18n>—</div>
           </div>
           <div class="access-badge access-badge-full">Full access</div>
         </div>
