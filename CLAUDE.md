@@ -578,6 +578,13 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **AN ORPHAN IS ONLY EXPLICABLE BY LOOKING AT IT (v36.46).** Twice now I have
+  reasoned from a COUNT to a conclusion about what those entries are, and been
+  wrong both times — first "they are junk" (they were not; the junk never became
+  keys), then "they are old spellings" (the re-matcher found none). The editor
+  has an **Only orphans** filter and a **Copy 40 orphans** button for exactly
+  this: what an orphan is decides whether it should be re-matched, deleted or
+  left, and that cannot be reasoned out from a number.
 - **AN ORPHAN IS USUALLY PAID WORK, NOT RUBBISH (v36.45).** Tony's file held
   1,016 orphans and NONE was junk — the code fragments never became keys,
   because they were in the batches that failed and so were never translated at
