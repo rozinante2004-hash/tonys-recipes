@@ -7387,6 +7387,31 @@ window.SELF_TESTS = [
         if(document.getElementById('zzLink').innerHTML!==was)
           throw new Error('applying twice rewrote the DOM — this loops forever with the observer running');
 
+        // THE EDITOR IS LTR EVEN WHEN THE APP IS NOT. Its left column is
+        // English, its rows read English-then-translation, and its summary is a
+        // sentence of Latin words and numbers. Under dir="rtl" the bidi
+        // algorithm tore Tony's count off its own noun and parked it at the
+        // end: "remove 720 orphans · of 2060 shown · 1970 translated … 2060".
+        (function(){
+          var htmlDir = document.documentElement.getAttribute('dir');
+          try{
+            document.documentElement.setAttribute('dir','rtl');
+            var ov2 = document.getElementById('i18nOverlay');
+            if(getComputedStyle(ov2).direction !== 'ltr')
+              throw new Error('the editor follows the interface into RTL, which scrambles its own '
+                + 'summary line and puts the English column on the wrong side');
+            if(getComputedStyle(document.getElementById('i18nEdCount')).direction !== 'ltr')
+              throw new Error('the count line is still RTL');
+            // …but the translation column must keep the language's direction.
+            var ta2 = document.querySelector('.i18n-ed-to');
+            if(ta2 && getComputedStyle(ta2).direction !== 'rtl')
+              throw new Error('the Hebrew column lost its direction — that is the one part that needs it');
+          } finally {
+            if(htmlDir) document.documentElement.setAttribute('dir', htmlDir);
+            else document.documentElement.removeAttribute('dir');
+          }
+        })();
+
         // English comes back WITH its checkbox. Checked before anything below
         // rewrites a label in place, because that is destructive by nature.
         i18nInstall('en', null); i18nRevertAll();

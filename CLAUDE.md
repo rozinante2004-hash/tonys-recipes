@@ -578,6 +578,20 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **THE EDITOR IS LTR, whatever the interface is doing (v36.49).** Its left
+  column is English, its rows read English-then-translation, and its summary is
+  a sentence of Latin words and numbers. Under `dir="rtl"` the bidi algorithm
+  tore Tony's count off its own noun and parked it at the end: *"remove 720
+  orphans · of 2060 shown · 1970 translated, 90 not … 2060"*. The translation
+  column keeps the language's direction — that is the one part that needs it.
+- **SPLITTING A BLOCK ORPHANS ITS TRANSLATION.** v36.41 cut the WhatsApp export
+  manual into four `<div>`s to get under the 1,500-byte field-name limit, and
+  that orphaned the Hebrew for the whole block — sixteen placeholders' worth.
+  It cannot be re-matched: the old value is one passage and the new keys are
+  four, and there is no mechanical way to know where the Hebrew divides. **A
+  markup change that alters unit boundaries costs the translation of everything
+  inside it**, in every language. Worth knowing before splitting a block that is
+  already translated.
 - **RE-KEYING DOES NOT NEED A LIVE TARGET (v36.48).** Most stale keys only
   render in a state the app is not in — an error it has not had, a sync that has
   not timed out — which is precisely why they went stale. Requiring the target

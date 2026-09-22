@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.48 -->
+<!-- Tony's Recipes Collection v36.49 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3312,7 +3312,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.48';
+var APP_VERSION = 'v36.49';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4699,6 +4699,17 @@ li.line-sub-indent { padding-inline-start: 22px; }
    translation, and the Recommend button. On a phone the two languages stack,
    because two 45-character columns side by side on a 390px screen is two
    columns of one word each. */
+/* v36.49 — THE EDITOR IS LTR, whatever the interface is doing around it. Its
+   left column is English, its rows read English-then-translation, and its
+   summary line is a sentence of Latin words and numbers. Under dir="rtl" the
+   bidi algorithm reorders that line into nonsense: Tony's read "remove 720
+   orphans · of 2060 shown · 1970 translated, 90 not … 2060", with the count
+   torn off its own noun and parked at the end.
+
+   The translation column keeps its own direction — that is the point of it —
+   which the textarea's dir attribute already sets per language. */
+#i18nOverlay { direction: ltr; }
+#i18nEdCount, #i18nEdRows { text-align: left; }
 .i18n-ed-row {
   display: grid;
   grid-template-columns: 1fr 1fr 34px;
@@ -5978,7 +5989,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.48</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.49</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6600,7 +6611,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.48</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.49</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
