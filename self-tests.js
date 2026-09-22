@@ -7774,6 +7774,79 @@ window.SELF_TESTS = [
         throw new Error('it does not say which origin the browser is sending');
     } },
 
+  { id:'i18n_a_number_is_not_a_key', group:'UI', name:'A number never becomes part of a key (v36.46)',
+    test: async()=>{
+      // Tony's file had 1,016 orphans and almost every one was a number:
+      // "15 errors recorded", "17 errors recorded", "24 errors recorded"…
+      // "3 tests" through "61 tests", "1 min ago" through "44 min ago". Each
+      // distinct value made a NEW key, so the dictionary grew without limit and
+      // he paid to translate "61 tests" having already paid for "47 tests".
+      ['i18nDeriveKey','i18nEdPortValue','i18nEdNorm'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+
+      var host=document.createElement('div');
+      host.innerHTML='<div id="zn1">15 errors recorded</div><div id="zn2">59 errors recorded</div>'
+        + '<div id="zn3">Paste <a href="#" id="znl">here</a> and press 3 times</div>'
+        + '<button id="zn4" title="Average of 2 rated cook(s)">x</button>';
+      document.body.appendChild(host);
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang();
+      try{
+        var keys=i18nCatalogue(host);
+        if(keys.indexOf('{1} errors recorded')===-1)
+          throw new Error('the count is still baked into the key: '+JSON.stringify(keys));
+        if(keys.filter(function(k){ return /errors recorded/.test(k); }).length!==1)
+          throw new Error('two different counts produced two different keys');
+        if(keys.indexOf('Average of {1} rated cook(s)')===-1)
+          throw new Error('an ATTRIBUTE still bakes its number in: '+JSON.stringify(keys));
+        // A child and a number share one {n} series, and the translation may
+        // put them anywhere — in Hebrew it frequently must.
+        if(keys.indexOf('Paste {1} and press {2} times')===-1)
+          throw new Error('a link and a number did not share one placeholder series: '+JSON.stringify(keys));
+
+        i18nInstall('he', { '{1} errors recorded':'נרשמו {1} שגיאות',
+                            'Paste {1} and press {2} times':'הדבק {1} ולחץ {2} פעמים',
+                            'Average of {1} rated cook(s)':'ממוצע של {1} בישולים' });
+        i18nApply(host);
+        if(document.getElementById('zn1').textContent!=='נרשמו 15 שגיאות')
+          throw new Error('zn1 reads '+JSON.stringify(document.getElementById('zn1').textContent));
+        if(document.getElementById('zn2').textContent!=='נרשמו 59 שגיאות')
+          throw new Error('two counts did not both come through one key');
+        if(document.getElementById('zn4').title!=='ממוצע של 2 בישולים')
+          throw new Error('the attribute lost its number: '+document.getElementById('zn4').title);
+        if(!document.getElementById('znl')) throw new Error('the link was destroyed');
+        if(document.getElementById('zn3').textContent!=='הדבק here ולחץ 3 פעמים')
+          throw new Error('zn3 reads '+JSON.stringify(document.getElementById('zn3').textContent));
+
+        // The app rewrites the count. The key does not change; the number does.
+        document.getElementById('zn1').textContent='7 errors recorded';
+        i18nApply(host);
+        if(document.getElementById('zn1').textContent!=='נרשמו 7 שגיאות')
+          throw new Error('a changed count did not follow: '+document.getElementById('zn1').textContent);
+
+        // …and English comes back with the CURRENT number, not the first one.
+        i18nInstall('en', null); i18nRevertAll();
+        if(document.getElementById('zn1').textContent!=='7 errors recorded')
+          throw new Error('reverting gave '+JSON.stringify(document.getElementById('zn1').textContent));
+        if(document.getElementById('zn3').textContent!=='Paste here and press 3 times')
+          throw new Error('reverting a sentence with a link and a number gave '
+            + JSON.stringify(document.getElementById('zn3').textContent));
+        if(/\u0001/.test(host.textContent))
+          throw new Error('the internal child marker reached the screen');
+      } finally { try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict); host.remove(); }
+
+      // PORTING AN OLD TRANSLATION. "15 שגיאות נרשמו" is only reusable as
+      // "{1} שגיאות נרשמו" — otherwise every count would render as fifteen.
+      if(i18nEdPortValue('15 errors recorded','15 שגיאות נרשמו')!=='{1} שגיאות נרשמו')
+        throw new Error('a number was not lifted out of the translation');
+      if(i18nEdPortValue('44 min ago','לפני 44 דקות')!=='לפני {1} דקות')
+        throw new Error('a number the translation had MOVED was not found');
+      // …and it refuses rather than guesses when there is no safe answer.
+      if(i18nEdPortValue('11 of 11 batches','11 מתוך 11 אצוות')!==null)
+        throw new Error('a number appearing twice was ported anyway — one of the two would be wrong');
+      if(i18nEdPortValue('5 tests','בדיקות')!==null)
+        throw new Error('a translation with the number missing was ported anyway');
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']
@@ -7917,12 +7990,21 @@ window.SELF_TESTS = [
         if(pairs[0].to !== liveKey)
           throw new Error('it matched the wrong key: '+JSON.stringify(pairs[0].to));
         delete _i18nEdDraft[oldSpelling];
-        // …but a count baked into the key must NEVER be re-used: the Hebrew for
-        // "(3)" has a literal 3 in it, and moving it would show the wrong number.
+        // A count baked into an OLD key is re-used now, and the Hebrew is
+        // ported with it: "היסטוריה (3)" only becomes reusable as
+        // "היסטוריה ({1})". Until v36.46 there was no way to fix the value, so
+        // this case had to be refused; now refusing it would throw away paid
+        // work for no reason.
         _i18nEdDraft['🕘 Version history (3)'] = 'היסטוריה (3)';
+        delete _i18nEdDraft['🕘 Version history ({1})'];
         i18nEdInvalidate();
-        if(i18nEdOrphanMatches().some(function(x){ return x.from === '🕘 Version history (3)'; }))
-          throw new Error('a translation with a literal count in it was re-used for a different count');
+        var vh = i18nEdOrphanMatches().filter(function(x){ return x.from === '🕘 Version history (3)'; })[0];
+        if(!vh) throw new Error('an old key with a count in it was not re-matched');
+        if(vh.value !== 'היסטוריה ({1})')
+          throw new Error('the count was left literal in the ported translation: '+JSON.stringify(vh.value)
+            + ' — every version history would read (3) for ever');
+        // …but it still refuses where there is no safe answer, which is what
+        // i18n_a_number_is_not_a_key checks in detail.
         delete _i18nEdDraft['🕘 Version history (3)'];
         i18nEdInvalidate();
 
@@ -8040,7 +8122,10 @@ window.SELF_TESTS = [
         var still=document.querySelectorAll('[data-i18n-src]');
         for(var i=0;i<still.length && i<400;i++){
           var want=still[i].getAttribute('data-i18n-src');
-          if(want.indexOf('{')!==-1) continue;          // placeholder units carry markup
+          // v36.46 — the parked English is the RAW form: each child is a single
+          // \u0001 marker, and numbers are literal. A unit carrying children
+          // cannot be compared as flat text, which is what this always meant.
+          if(want.indexOf('\u0001')!==-1 || want.indexOf('{')!==-1) continue;
           if(still[i].textContent.trim()!==want.trim())
             throw new Error('reverting left "'+still[i].textContent.trim().slice(0,40)+'" instead of "'+want.slice(0,40)+'"');
         }

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.46 -->
+<!-- Tony's Recipes Collection v36.47 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3312,7 +3312,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.46';
+var APP_VERSION = 'v36.47';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5978,7 +5978,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.46</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.47</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6600,7 +6600,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.46</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.47</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8212,10 +8212,52 @@ function i18nPlaceholderChild(c) {
 // "{1}Clips" → { pre:'{1}', core:'Clips', post:'' }. Only the leading and
 // trailing runs: "paste {1} and press {2}" is one sentence with the links
 // inside it, and the model has to be told where they go.
-function i18nEdges(src) {
-  var m = /^((?:\{\d+\}\s*)*)([\s\S]*?)((?:\s*\{\d+\})*)$/.exec(String(src == null ? '' : src));
-  if (!m) return { pre: '', core: String(src || ''), post: '' };
-  return { pre: m[1], core: m[2].trim(), post: m[3] };
+// The English, turned into a key: every child becomes a placeholder, and so
+// does every run of digits. "15 errors recorded" and "59 errors recorded" are
+// one key with one number in it, which is the whole point — otherwise every
+// value the app has ever shown is a separate entry in the dictionary and a
+// separate line on the bill.
+function i18nDeriveKey(rawSrc, kids) {
+  var parts = [], slots = [], segs = String(rawSrc == null ? '' : rawSrc).split('\u0001');
+  for (var i = 0; i < segs.length; i++) {
+    var txt = segs[i], last = 0, m, re = /\d[\d.,:/]*\d|\d/g;
+    while ((m = re.exec(txt)) !== null) {
+      parts.push(txt.slice(last, m.index));
+      slots.push(m[0]);
+      parts.push('{' + slots.length + '}');
+      last = m.index + m[0].length;
+    }
+    parts.push(txt.slice(last));
+    if (i < segs.length - 1) {
+      slots.push(kids[i] || null);
+      parts.push('{' + slots.length + '}');
+    }
+  }
+  return { key: parts.join('').replace(/\s+/g, ' ').trim(), slots: slots };
+}
+window.i18nDeriveKey = i18nDeriveKey;
+
+// `slots` says what each placeholder stands for. An ICON at the start or end is
+// not part of the sentence and is stripped; a NUMBER is — "{1} errors recorded"
+// has to keep its {1}, or the key is "errors recorded" and the translator never
+// sees where the count goes. Without slots, everything is treated as an icon,
+// which is right for an attribute (they have no children at all).
+function i18nEdges(src, slots) {
+  src = String(src == null ? '' : src);
+  var m = /^((?:\{\d+\}\s*)*)([\s\S]*?)((?:\s*\{\d+\})*)$/.exec(src);
+  if (!m) return { pre: '', core: src, post: '' };
+  var isIcon = function(run) {
+    if (!slots) return true;
+    var nums = run.match(/\{(\d+)\}/g) || [];
+    for (var i = 0; i < nums.length; i++) {
+      var idx = parseInt(nums[i].slice(1, -1), 10) - 1;
+      if (typeof slots[idx] === 'string') return false;      // a number: keep it
+    }
+    return true;
+  };
+  var pre = isIcon(m[1]) ? m[1] : '', post = isIcon(m[3]) ? m[3] : '';
+  var core = src.slice(pre.length, src.length - post.length).trim();
+  return { pre: pre, core: core, post: post };
 }
 
 // `attr` is the thing being considered, or null for the element's own words.
@@ -8285,18 +8327,32 @@ function i18nUnits(root) {
   if (!scope.querySelectorAll) return out;
 
   function elementUnit(el) {
-    // The source is whatever it was BEFORE any translation — kept on the node,
-    // because reading it back off a translated DOM would translate a
-    // translation, and switching languages twice would compound the damage.
-    var parts = [], n = 0, ok = true;
+    // Two forms of the same text, and both matter.
+    //
+    //   RAW   "15 errors recorded"      — what is on the node, for deciding
+    //                                     whether the app has rewritten it
+    //   KEY   "{1} errors recorded"     — what the dictionary is asked for
+    //
+    // v36.46 — A NUMBER IS NEVER PART OF THE KEY. Tony's file had 1,016
+    // orphans and almost every one was a number: "15 errors recorded", "17
+    // errors recorded", "24 errors recorded"… "3 tests" through "61 tests",
+    // "1 min ago" through "44 min ago". Each distinct value made a NEW key, so
+    // the dictionary grew without limit and he paid to translate "61 tests"
+    // having already paid for "47 tests". v36.35 parked the number outside the
+    // key at six specific sites; that was treating instances of this.
+    //
+    // The numbers become placeholders in the same {n} series the inline
+    // children already use, and are put back by position at display time — so
+    // a translation that moves them is honoured, which in Hebrew it must be.
+    var raw = [], kids = [], ok = true;
     for (var i = 0; i < el.childNodes.length; i++) {
       var c = el.childNodes[i];
-      if (c.nodeType === 3) { parts.push(c.nodeValue); continue; }
-      if (i18nPlaceholderChild(c)) { parts.push('{' + (++n) + '}'); continue; }
-      ok = false; break;                      // a child holding its OWN words
+      if (c.nodeType === 3) { raw.push(c.nodeValue); continue; }
+      if (i18nPlaceholderChild(c)) { raw.push('\u0001'); kids.push(c); continue; }
+      ok = false; break;                          // a child holding its OWN words
     }
     if (!ok) return null;
-    var now = parts.join('').replace(/\s+/g, ' ').trim();
+    var nowRaw = raw.join('').replace(/\s+/g, ' ').trim();
 
     // v36.38 — WHICH English is this element's English? The parked copy is
     // right only while the element still says what it said when we parked it,
@@ -8305,30 +8361,27 @@ function i18nUnits(root) {
     // value is stale. Using it anyway pins the element to whatever it happened
     // to say the first time it was seen: the long-job panel's title stayed
     // "Working…" for ever, however many times the job set its own.
+    //
+    // Compared on the RAW form, because the key deliberately cannot tell "1 min
+    // ago" from "2 min ago" and that is exactly the change we must notice.
     var src = el.getAttribute('data-i18n-src');
     var applied = el.getAttribute('data-i18n-at');
-    if (src === null || (now !== src && now !== applied)) src = now;
-    // A placeholder at the very START or END is an icon, not a word — and
-    // "{1}Clips" is a horrible thing to hand a translator, on top of being a
-    // different key from the "Clips" button on the desktop bar, which would get
-    // its own separate and possibly different translation. So the DICTIONARY
-    // KEY is the sentence without its bookends, while the node keeps the whole
-    // thing, because that is what says where the icon goes back.
-    // v36.44 — i18nKeepable, not i18nTranslatable. Everything else in the app
-    // already refuses to RECORD or SEND a string that reads as source code;
-    // this is the one place that was still happily translating one if it
-    // happened to be on screen. A sync-log entry quoting a code fragment is
-    // exactly that, and paying to translate it is the least of the problem:
-    // every message ever logged would otherwise become a dictionary key.
-    var e = i18nEdges(src);
+    if (src === null || (nowRaw !== src && nowRaw !== applied)) src = nowRaw;
+
+    // The key comes from the ENGLISH, never from what is on screen. Deriving it
+    // from the DOM means that once an element is translated its key becomes the
+    // TRANSLATION, so a second language finds nothing and the first one stays
+    // where it is — 1,366 elements deep, which is how the recipe-safety test
+    // caught this within a minute of my writing it.
+    var d = i18nDeriveKey(src, kids);
+    var nowKey = d.key, slots = d.slots;
+    var e = i18nEdges(nowKey, slots);
     return i18nKeepable(e.core)
-      ? { el: el, attr: null, src: src, key: e.core, pre: e.pre, post: e.post }
+      ? { el: el, attr: null, src: src, key: e.core, pre: e.pre, post: e.post,
+          slots: slots, full: nowKey }
       : null;
   }
 
-  // The scope itself, not only its descendants. The observer hands us the node
-  // that was just added — a toast, a dialog body — and until v36.32 the one
-  // element we were actually told about was the one we skipped.
   var all = Array.prototype.slice.call(scope.querySelectorAll('*'));
   if (scope.nodeType === 1 && scope !== document.body) all.unshift(scope);
   for (var i = 0; i < all.length; i++) {
@@ -8354,7 +8407,11 @@ function i18nUnits(root) {
       if (cur === null) cur = live;
       else if (live !== null && live !== cur && live !== el.getAttribute('data-i18n-at-' + a)) cur = live;
       if (cur !== null && i18nKeepable(cur)) {
-        out.push({ el: el, attr: a, src: cur, key: cur, pre: '', post: '' });
+        // An attribute gets the same treatment as text: a number in it is not
+        // part of the key. title="Average of 2 rated cook(s)" would otherwise
+        // be a different entry for every recipe anybody has ever cooked twice.
+        var da = i18nDeriveKey(cur, []);
+        out.push({ el: el, attr: a, src: cur, key: da.key, slots: da.slots, pre: '', post: '' });
       }
     });
     if (hardSkip) continue;              // inside a recipe: the words are content
@@ -9057,7 +9114,9 @@ function i18nApply(root) {
       if (!to && _i18nLang !== 'en') i18nNoteMissing(u.key);
       if (u.attr) {
         if (u.el.getAttribute('data-i18n-' + u.attr) !== u.src) u.el.setAttribute('data-i18n-' + u.attr, u.src);
-        var vAttr = (to && String(to).trim()) ? to : u.src;
+        var vAttr = (to && String(to).trim())
+          ? i18nPlan(String(to), u.slots || []).join('')     // put the numbers back
+          : u.src;
         if (u.el.getAttribute(u.attr) !== vAttr) { u.el.setAttribute(u.attr, vAttr); n++; }
         u.el.setAttribute('data-i18n-at-' + u.attr, vAttr);
         continue;
@@ -9068,38 +9127,28 @@ function i18nApply(root) {
       // The icon goes back on the side it came from. Not the side the
       // translation would put it on — an icon is not a word, and in Hebrew a
       // leading icon is still leading.
-      var v = (to && String(to).trim()) ? (u.pre + String(to) + u.post) : u.src;
-      // Put the children back where the translation says they belong — which in
-      // Hebrew is frequently not where they started.
-      var kids = [];
-      for (var c = 0; c < u.el.childNodes.length; c++) {
-        if (i18nPlaceholderChild(u.el.childNodes[c])) kids.push(u.el.childNodes[c]);
-      }
-      if (!kids.length) {
-        // A placeholder with nothing left to stand for is dropped, not printed.
-        // Reachable in one way: something rewrote this element's textContent in
-        // place and took the icon with it — which is exactly the case v36.32
-        // taught the observer to heal, so without this the healed label reads
-        // "{1}Clips".
-        var vt = (v.indexOf('{') === -1) ? v : i18nPlan(v, []).join('');
-        if (u.el.textContent !== vt) { u.el.textContent = vt; n++; }
-        u.el.setAttribute('data-i18n-at', vt);
-        continue;
-      }
-      var plan = i18nPlan(v, kids);
+      var v = (to && String(to).trim()) ? (u.pre + String(to) + u.post) : u.full;
+      // The slots, in {n} order: inline children AND the numbers lifted out of
+      // the text. i18nPlan puts each one where the translation asks for it, and
+      // anything the translation dropped goes back on the end rather than
+      // vanishing — which for a number means it is still on screen even if the
+      // model forgot its placeholder.
+      var plan = i18nPlan(v, u.slots || []);
+      var raw = plan.map(function(x){ return (typeof x === 'string') ? x : '\u0001'; }).join('')
+                    .replace(/\s+/g, ' ').trim();
       // v36.32 — would rebuilding change anything? It has to be asked. Since
-      // this release the observer also watches elements it has already
+      // that release the observer also watches elements it has already
       // translated, and an unconditional innerHTML rewrite there is a mutation
       // that wakes the observer that performs the rewrite: a loop that spins
       // for as long as the page is open.
-      if (i18nMatchesPlan(u.el, plan)) continue;
+      if (i18nMatchesPlan(u.el, plan)) { u.el.setAttribute('data-i18n-at', raw); continue; }
       var frag = document.createDocumentFragment();
       for (var p = 0; p < plan.length; p++) {
         frag.appendChild(typeof plan[p] === 'string' ? document.createTextNode(plan[p]) : plan[p]);
       }
       u.el.innerHTML = '';
       u.el.appendChild(frag);
-      u.el.setAttribute('data-i18n-at', v);
+      u.el.setAttribute('data-i18n-at', raw);
       n++;
     }
   } finally { _i18nApplying = false; }
@@ -9122,6 +9171,18 @@ function i18nPlan(text, kids) {
     }
   });
   for (var q = 0; q < kids.length; q++) if (!used[String(q + 1)]) plan.push(kids[q]);
+  return plan;
+}
+// The raw English, with each \u0001 exchanged for the child it stands for.
+// Anything left over goes on the end, the same rule the forward direction uses:
+// a marker lost somewhere must not take a checkbox or a link with it.
+function i18nRawPlan(raw, kids) {
+  var plan = [], parts = String(raw).split('\u0001');
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i]) plan.push(parts[i]);
+    if (i < parts.length - 1 && kids[i]) plan.push(kids[i]);
+  }
+  for (var q = parts.length - 1; q < kids.length; q++) if (kids[q]) plan.push(kids[q]);
   return plan;
 }
 function i18nMatchesPlan(el, plan) {
@@ -9483,11 +9544,12 @@ function i18nRevertAll() {
       for (var c = 0; c < els[i].childNodes.length; c++) {
         if (i18nPlaceholderChild(els[i].childNodes[c])) kids.push(els[i].childNodes[c]);
       }
-      if (!kids.length) { els[i].textContent = src; continue; }
-      // The same plan the forward direction uses — and it has to use the same
-      // child rule, or going back to English would throw away the very
-      // checkboxes and icons v36.32 taught it to carry.
-      var plan = i18nPlan(src, kids);
+      // v36.46 — the parked English is the RAW form, in which each child is a
+      // single \u0001 marker and every number is literal. Writing it out
+      // verbatim put that marker on the screen ("\u0001Clips"), so the markers
+      // are exchanged for the children they stand for, in order.
+      if (!kids.length) { els[i].textContent = src.replace(/\u0001/g, ''); continue; }
+      var plan = i18nRawPlan(src, kids);
       var frag = document.createDocumentFragment();
       for (var p = 0; p < plan.length; p++) {
         frag.appendChild(typeof plan[p] === 'string' ? document.createTextNode(plan[p]) : plan[p]);
@@ -9996,23 +10058,61 @@ function i18nEdOrphanMatches() {
     var target = live[i18nEdNorm(orphan)];
     if (!target || target === orphan) return;
     if (_i18nEdDraft[target]) return;              // already has one; leave it alone
-    out.push({ from: orphan, to: target });
+    var value = i18nEdPortValue(orphan, _i18nEdDraft[orphan]);
+    if (value === null) return;
+    out.push({ from: orphan, to: target, value: value });
   });
   return out;
 }
+// Normalised for comparison: placeholders and numbers alike become a single
+// marker, so "15 errors recorded" and "{1} errors recorded" are recognised as
+// the same string said twice.
 function i18nEdNorm(k) {
-  return String(k).replace(/\{\d+\}/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(k)
+    // An edge placeholder is an icon and was never part of the sentence —
+    // "{1}📚 Collections" and "📚 Collections" are the same key written under
+    // two different rules. Interior ones are positions and must be kept as
+    // markers, or "Paste {1} then {2}" would collide with "Paste then".
+    .replace(/^(?:\s*\{\d+\})+/, '').replace(/(?:\{\d+\}\s*)+$/, '')
+    .replace(/\{\d+\}/g, '\u0000')
+    .replace(/\d[\d.,:/]*\d|\d/g, '\u0000')
+    .replace(/\s+/g, ' ').trim();
 }
+// The TRANSLATION has to be ported too. "15 שגיאות נרשמו" is only reusable as
+// "{1} שגיאות נרשמו" — otherwise every count would render as fifteen for ever.
+// Returns null when it cannot be done safely, and the entry is then left alone
+// rather than guessed at: a number appearing twice, or not at all, means there
+// is no way to know which placeholder it belongs to.
+function i18nEdPortValue(oldKey, value) {
+  if (typeof value !== 'string' || !value) return null;
+  // The digits inside an existing {1} are not a number. Feeding this to
+  // i18nDeriveKey read the 1 out of "{1}📚 Collections" and then refused the
+  // whole entry for not finding a 1 in the Hebrew.
+  var nums = String(oldKey).replace(/\{\d+\}/g, '\u0000').match(/\d[\d.,:/]*\d|\d/g) || [];
+  if (!nums.length) return value;                  // nothing numeric: reuse as-is
+  var ported = value;
+  for (var i = 0; i < nums.length; i++) {
+    var num = String(nums[i]);
+    var at = ported.indexOf(num);
+    if (at === -1) return null;                    // the translator dropped it
+    if (ported.indexOf(num, at + num.length) !== -1) return null;   // twice: ambiguous
+    ported = ported.slice(0, at) + '{' + (i + 1) + '}' + ported.slice(at + num.length);
+  }
+  return ported;
+}
+window.i18nEdPortValue = i18nEdPortValue;
+
 async function i18nEdAdoptOrphans() {
   var pairs = i18nEdOrphanMatches();
   if (!pairs.length) { toast('No orphan matches a string the app still shows.'); return; }
   var ok = await askConfirm({ icon: '♻️', title: 'Re-use ' + pairs.length + ' old translation(s)?',
-    message: 'These were translated under a slightly different key — an icon used to be counted as part '
-      + 'of the text, and it no longer is. The words are the same, so the translation still fits.\n\n'
+    message: 'These were translated under a slightly different key — a number or an icon used to be '
+      + 'counted as part of the text, and no longer is. The words are the same, so the translation still '
+      + 'fits, and any number in it is put back where the translation puts it.\n\n'
       + 'Nothing is sent to the AI and nothing is paid for: they are simply moved across.',
     okLabel: 'Re-use them' });
   if (!ok) return;
-  pairs.forEach(function(p){ _i18nEdDraft[p.to] = _i18nEdDraft[p.from]; delete _i18nEdDraft[p.from]; });
+  pairs.forEach(function(p){ _i18nEdDraft[p.to] = p.value; delete _i18nEdDraft[p.from]; });
   _i18nEdDirty = true; i18nEdInvalidate();
   i18nEdRender();
   toast('♻️ ' + pairs.length + ' translation(s) re-used. Press Save to keep them.', 7000);

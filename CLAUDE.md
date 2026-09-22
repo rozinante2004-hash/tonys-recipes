@@ -578,6 +578,34 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **A NUMBER IS NEVER PART OF A KEY (v36.47).** Tony's 1,016 orphans were
+  almost all numbers: "15 errors recorded", "17 errors recorded", "24 errors
+  recorded"… "3 tests" through "61 tests", "1 min ago" through "44 min ago".
+  Every distinct value made a NEW key, so the dictionary grew without limit and
+  he paid to translate "61 tests" having already paid for "47 tests". v36.35
+  parked the number outside the key at six specific sites; **that was treating
+  instances of this.**
+  - `i18nDeriveKey()` turns every run of digits into a placeholder in the same
+    `{n}` series the inline children use, so a translation that moves them is
+    honoured — which in Hebrew it must be. Attributes get the same treatment:
+    `title="Average of 2 rated cook(s)"` was otherwise a separate entry for
+    every recipe anybody had cooked twice.
+  - **The key comes from the parked ENGLISH, never from what is on screen.**
+    Deriving it from the DOM means that once an element is translated its key
+    becomes the TRANSLATION — 1,366 elements deep, caught within a minute by
+    the recipe-safety test's compounding check.
+  - **Three forms, and they are not interchangeable.** RAW (`"15 errors
+    recorded"`, children as `\u0001`) is what decides whether the app rewrote
+    the text — compare on this, because the key deliberately cannot tell "1 min
+    ago" from "2 min ago" and that is exactly the change to notice. KEY (`"{1}
+    errors recorded"`) is what the dictionary is asked for. PLAN is the rendered
+    sequence of text and nodes.
+  - `i18nEdPortValue()` carries an old translation across: `"15 שגיאות נרשמו"`
+    is only reusable as `"{1} שגיאות נרשמו"`. It **refuses** when the number
+    appears twice or not at all — there is no way to know which placeholder it
+    belongs to, and guessing puts a wrong number on screen for ever.
+  - Mask `{\d+}` before scanning for digits. The `1` inside `{1}` is not a
+    number, and reading it as one refuses whole entries for not finding a 1.
 - **AN ORPHAN IS ONLY EXPLICABLE BY LOOKING AT IT (v36.46).** Twice now I have
   reasoned from a COUNT to a conclusion about what those entries are, and been
   wrong both times — first "they are junk" (they were not; the junk never became
