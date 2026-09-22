@@ -7410,6 +7410,77 @@ window.SELF_TESTS = [
       } finally { window.aiCall=realAI; }
     } },
 
+  { id:'i18n_sees_unopened_screens', group:'UI', name:'Screens nobody has opened are translated too (v36.35)',
+    test: async()=>{
+      if(typeof i18nHarvest!=='function') throw new Error('i18nHarvest not defined');
+      // The catalogue is only ever "what the interface can show RIGHT NOW", and
+      // for most of this app that is a fraction of what it has: eight panels
+      // are built by a render function the first time they are opened. Tony
+      // found all eight still in English and could not fix any of them from the
+      // editor, because none of their words had ever been in the file.
+      var before=i18nFullCatalogue();
+      var prevView=viewId, prevCount=recipes.length;
+      var ov=document.getElementById('viewOverlay');
+      var wasOpen=ov.classList.contains('open');
+      // Which panels were on screen BEFORE. An earlier test in the suite can
+      // leave one open, and "nothing is open afterwards" would then fail for a
+      // reason that has nothing to do with harvesting.
+      var openIds=function(){ return Array.prototype.map.call(
+        document.querySelectorAll('.modal-overlay.open'), function(e){ return e.id; }).sort().join(','); };
+      var openBefore=openIds();
+      var drawn=await i18nHarvest();
+      var after=i18nFullCatalogue();
+
+      if(after.length<=before.length)
+        throw new Error('harvesting found nothing new — every render in the list is failing silently');
+      if(drawn.length<I18N_HARVEST.length)
+        throw new Error('only '+drawn.length+' of '+I18N_HARVEST.length+' screens could be drawn: missing '
+          + I18N_HARVEST.map(function(e){ return e[0]; }).filter(function(n){ return drawn.indexOf(n)===-1; }).join(', '));
+
+      // Name the actual screens Tony reported, so this fails if one of them
+      // stops being reached rather than merely "fewer strings than before".
+      var has=function(re){ return after.some(function(s){ return re.test(s); }); };
+      [[/Tap a box to tick/, 'the tick hint on an open recipe'],
+       [/Version history/,   'Version history'],
+       [/Logging/,           'the logging panel'],
+       [/unsent local edits|Sync Health|last successful sync/i, 'Sync Health'],
+       [/Nothing is sold/,   'What leaves this device'],
+       [/Export chat|Without media/, 'the WhatsApp export manual'],
+       [/Select tests to run/, 'the self-test screen']
+      ].forEach(function(pair){
+        if(!has(pair[0])) throw new Error(pair[1]+' is still not in the catalogue, so it cannot be translated'
+          );
+      });
+
+      // A count that changes with the data must NOT be part of the key, or the
+      // dictionary is asked for "🕘 Version history (3)" and has "(1)".
+      ['🕘 Version history ({1})','📓 Cooking log ({1})','📷 No photo ({1})'].forEach(function(k){
+        if(after.indexOf(k)===-1)
+          throw new Error('"'+k+'" is not a key — a varying number is baked into it and it will never match: '
+            + JSON.stringify(after.filter(function(s){ return s.indexOf(k.split(' (')[0])===0; })));
+      });
+      if(after.some(function(s){ return /\((?:[1-9]\d*|0)\)$/.test(s) && /history|log|photo|away/i.test(s); }))
+        throw new Error('a key still ends in a literal count');
+
+      // A long help passage is ONE unit and must survive the length cap. The
+      // WhatsApp manual is 1,400 characters and was being dropped in silence.
+      if(!after.some(function(s){ return s.length>1000; }))
+        throw new Error('nothing longer than 1000 characters is in the catalogue — the cap is eating whole panels');
+
+      // Harvesting is a READ. It must not open anything, leave a stand-in
+      // recipe in the library, or move which recipe is being viewed.
+      if(recipes.length!==prevCount)
+        throw new Error('harvesting changed the library by '+(recipes.length-prevCount)+' recipe(s)');
+      if(recipes.some(function(r){ return r.uid==='i18n-harvest'; }))
+        throw new Error('the stand-in recipe used to draw the recipe screen was left in the library');
+      if(viewId!==prevView) throw new Error('harvesting changed which recipe is open');
+      if(ov.classList.contains('open')!==wasOpen)
+        throw new Error('harvesting left the recipe screen '+(wasOpen?'closed':'open'));
+      if(openIds()!==openBefore)
+        throw new Error('harvesting changed which panels are on screen: was "'+openBefore
+          +'", now "'+openIds()+'"');
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']

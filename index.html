@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.34 -->
+<!-- Tony's Recipes Collection v36.35 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3305,7 +3305,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.34';
+var APP_VERSION = 'v36.35';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5918,7 +5918,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.34</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.35</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6540,7 +6540,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.34</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.35</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7174,11 +7174,11 @@ function renderFilters() {
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + '<button class="filter-btn collection-btn' + (showCollectionsOnly ? ' active' : '') + '" onclick="toggleCollectionsFilter()">📚 Collections</button>'
     + (function(){ var n = recipes.filter(function(r){ return !r.photo; }).length;
-        return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (' + n + ')</button>' : ''; })()
+        return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (<span data-no-i18n>' + n + '</span>)</button>' : ''; })()
     // 5f.5 — only offered when it can answer: no pantry, or nothing one item
     // away, and the chip would be a dead end rather than a shortcut.
     + (function(){ var n = oneAwayCount();
-        return n ? '<button class="filter-btn' + (showOneAwayOnly ? ' active' : '') + '" onclick="toggleOneAwayFilter()" title="Recipes you could cook if you bought one more thing">🛒 One item away (' + n + ')</button>' : ''; })()
+        return n ? '<button class="filter-btn' + (showOneAwayOnly ? ' active' : '') + '" onclick="toggleOneAwayFilter()" title="Recipes you could cook if you bought one more thing">🛒 One item away (<span data-no-i18n>' + n + '</span>)</button>' : ''; })()
     + '</div>';
 
   // Frame 2: Meal categories (with icons)
@@ -8073,7 +8073,15 @@ function i18nLangName(code) {
 // language, and unreadable word ORDER in Hebrew. So an element whose text is
 // interrupted by inline markup is ONE unit, with its inline children replaced
 // by {1}, {2} placeholders that are put back afterwards.
-var I18N_INLINE = /^(STRONG|B|EM|I|A|CODE|SPAN|SMALL|U|KBD|MARK|BR)$/;
+// BUTTON is here as of v36.35, and it is the one entry that needs justifying:
+// a button is not inline markup, but a control sitting INSIDE a sentence is
+// common in this app — "Tap a box to tick a line off · … [Clear ticks] ·
+// [🎤 Voice]" is one line of help with two controls in it, and treating the
+// buttons as walls dropped the whole hint. It is safe because a unit has to
+// hold its own text to exist at all: a row of nothing but buttons has no text
+// node of its own and is never a unit, while each button is still visited
+// separately and translated on its own.
+var I18N_INLINE = /^(STRONG|B|EM|I|A|CODE|SPAN|SMALL|U|KBD|MARK|BR|BUTTON|LABEL)$/;
 var I18N_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|SVG|PATH|CIRCLE|LINE|RECT|G)$/;
 
 // v36.32 — the same is true of an element that carries no words of its own.
@@ -8116,9 +8124,16 @@ function i18nSkip(el) {
 }
 // Worth translating at all? Numbers, emoji and bare punctuation are the same in
 // every language, and sending them to a model invites it to "improve" them.
+// v36.35 — the cap was 400 and it was silently eating whole help panels. The
+// WhatsApp export manual is one <div> of prose with thirty <strong>s in it,
+// which arrives as a single 1,400-character unit; at 400 it was dropped without
+// a word, and no amount of editing could bring it back because it was never in
+// the file. It is not a fragment to be split — it is one passage, and splitting
+// it at the <br>s would translate "then" and "Save" on their own.
+var I18N_MAX_LEN = 2200;
 function i18nTranslatable(s) {
   s = String(s == null ? '' : s).trim();
-  if (!s || s.length > 400) return false;
+  if (!s || s.length > I18N_MAX_LEN) return false;
   if (!/[A-Za-z]/.test(s)) return false;
   if (/^[\d\s.,:;/%×+-]*$/.test(s)) return false;
   // A URL is data in every language, and a model asked to translate one will
@@ -8205,6 +8220,124 @@ function i18nCatalogue(root) {
   i18nUnits(root).forEach(function(u){ seen[u.key] = true; });
   return Object.keys(seen).sort();
 }
+
+// ─── HARVEST: DRAW THE PANELS NOBODY HAS OPENED YET (v36.35) ─────────────────
+// The catalogue is "every string the interface can currently show", and for
+// most of this app that is a fraction of what it HAS. Logging & debugging, Sync
+// Health, Backups, What leaves this device, the self-test list and the whole
+// recipe view are built by a render function the first time they are opened, so
+// on a fresh page they are empty <div>s. Tony found eight such panels still in
+// English and had no way to fix any of them from the editor, because none of
+// their words had ever been in the file.
+//
+// So before cataloguing, draw them. Every host here is inside a CLOSED overlay,
+// so nothing appears on screen; the walk does not care about visibility. This
+// is read-only by construction — each entry is a render function, never an
+// action — and `toast` is muted because a few of them announce what they found.
+var I18N_HARVEST = [
+  ['the filter bar',        function(){ renderFilters(); }],
+  ['logging & debugging',   function(){ renderLoggingPanel(); }],
+  ['sync health',           function(){ renderSyncHealth(); }],
+  ['what leaves this device', function(){ renderPrivacyPanel(); }],
+  ['backups',               function(){ return renderBackupPanel(); }],
+  ['the self-test list',    function(){ renderSelfTestList(); }],
+  ['the WhatsApp sources',  function(){ renderWaSources(); }],
+  ['the access list',       function(){ renderAccessMembers(); }],
+  ['the Bring! status',     function(){ renderBringTokenStatus(); }],
+  // The open-recipe screen, which is where the tick hint, the scale buttons and
+  // Version history live. Drawn for a real recipe with the overlay shut. The
+  // recipe's own words are inside dir="auto" and are never catalogued — that is
+  // asserted by i18n_never_touches_a_recipe, not assumed here.
+  // The open-recipe screen, drawn for a recipe built to light up every branch
+  // of it: a real one from the library would only ever show the parts that
+  // happen to apply to it, and Version history, the cooking log and the
+  // nutrition panel would stay invisible and untranslated for ever. Its words
+  // are deliberate nonsense and never reach the catalogue — everything holding
+  // them carries dir="auto", which i18n_never_touches_a_recipe asserts.
+  ['an open recipe',        function(){ return i18nHarvestView(); }]
+];
+// drawView() takes no argument — it looks the recipe up by viewId — so the
+// stand-in has to be in the library for exactly as long as it takes to draw,
+// and out again whatever happens. It is never saved: nothing here writes.
+function i18nHarvestView() {
+  var r = i18nHarvestRecipe();
+  var prevId = (typeof viewId !== 'undefined') ? viewId : null;
+  var realWake = window.requestWakeLock;
+  var ov = document.getElementById('viewOverlay');
+  // drawView() ends by OPENING the overlay — it is normally reached only from
+  // openView(). Harvesting must not put a recipe on screen, and must not close
+  // one Tony is already reading either.
+  var wasOpen = !!(ov && ov.classList.contains('open'));
+  recipes.push(r);
+  try {
+    window.requestWakeLock = function(){};   // nor hold the screen awake
+    viewId = r.id;
+    drawView();
+    // Collect NOW: the finally below puts back whatever was on screen, and by
+    // the time the caller looks, none of this markup exists any more.
+    i18nCollect();
+  } finally {
+    window.requestWakeLock = realWake;
+    var at = recipes.indexOf(r);
+    if (at !== -1) recipes.splice(at, 1);
+    viewId = prevId;
+    if (ov && !wasOpen) ov.classList.remove('open');
+    // If he WAS reading something, put it back rather than leaving the
+    // stand-in's nonsense on the screen in front of him.
+    if (wasOpen && prevId !== null) { try { drawView(); } catch(e) {} }
+  }
+}
+function i18nHarvestRecipe() {
+  var now = Date.now();
+  var r = {
+    id: -1, uid: 'i18n-harvest', name: '·', emoji: '🍽', category: 'Dinner', difficulty: 'Easy',
+    prep: '10 min', servings: '4', bg: '#fff', by: '·', source: 'https://example.invalid/r',
+    ingredients: [{ sub: '·' }, { a: '1', n: '·' }, { a: '2', n: '·', ind: 1 }],
+    steps: ['·', { sub: '·' }, { t: '·', ind: 1 }],
+    notes: '·', diets: ['Keto'], fav: true,
+    nutrition: { calories: 1, carbs: 1, fat: 1, protein: 1 },
+    cookCount: 2, lastCooked: now,
+    cookLog: [{ id: 'h1', at: now, rating: 4, note: '·' }, { id: 'h2', at: now, rating: 5, note: '·' }],
+    history: [{ at: now, name: '·', ingredients: [], steps: [] }],
+    updatedAt: now
+  };
+  return (typeof normalizeRecipe === 'function') ? normalizeRecipe(r) : r;
+}
+// Read the catalogue after EACH screen, not once at the end. Several of these
+// are transient by nature — the recipe screen puts back whatever Tony was
+// reading when it is done, and two panels that share a host overwrite each
+// other. Harvesting and then looking at the DOM sees only the last one
+// standing, which is how the recipe screen contributed nothing at all the first
+// time this was written: its markup was gone before anyone looked.
+var _i18nHarvested = Object.create(null);
+function i18nCollect() {
+  i18nCatalogue().forEach(function(k){ _i18nHarvested[k] = 1; });
+}
+async function i18nHarvest() {
+  var realToast = window.toast, drawn = [];
+  window.toast = function(){};
+  try {
+    for (var i = 0; i < I18N_HARVEST.length; i++) {
+      try {
+        await I18N_HARVEST[i][1]();
+        i18nCollect();
+        drawn.push(I18N_HARVEST[i][0]);
+      } catch(e) { dlog('[i18n] could not harvest ' + I18N_HARVEST[i][0], e && e.message); }
+    }
+  } finally { window.toast = realToast; }
+  return drawn;
+}
+// Everything the app can show, including the screens that are not showing now.
+// This is what a translation is generated from. i18nCatalogue() stays strictly
+// present-tense, which is what the recipe-safety test needs to mean anything.
+function i18nFullCatalogue() {
+  var seen = Object.create(null);
+  i18nCatalogue().forEach(function(k){ seen[k] = 1; });
+  Object.keys(_i18nHarvested).forEach(function(k){ seen[k] = 1; });
+  return Object.keys(seen).sort();
+}
+window.i18nHarvest = i18nHarvest; window.I18N_HARVEST = I18N_HARVEST;
+window.i18nFullCatalogue = i18nFullCatalogue;
 
 // ─── THE PART THAT CANNOT BE CATALOGUED IN ADVANCE (v36.32) ──────────────────
 // "Every distinct string the interface CAN CURRENTLY SHOW" is the honest limit
@@ -8415,6 +8548,7 @@ window.i18nWriteCloud = i18nWriteCloud; window.i18nDocId = i18nDocId;
 // The instructions are long on purpose — "translate this list" produces a menu
 // nobody can use, with buttons that no longer fit and placeholders eaten.
 var I18N_BATCH = 60;
+var I18N_BATCH_CHARS = 3500;   // …or this many characters, whichever comes first
 function i18nPrompt(lang, batch) {
   var L = I18N_LANGS[lang] || { en: lang };
   return 'You are translating the INTERFACE of a personal recipe app from English into '
@@ -8444,11 +8578,28 @@ function i18nPrompt(lang, batch) {
 // spinner that looks identical to a hang.
 async function i18nTranslateAll(lang, catalogue, onProgress, into) {
   var dict = into || {}, failed = 0;
-  var batches = [];
-  for (var i = 0; i < catalogue.length; i += I18N_BATCH) batches.push(catalogue.slice(i, i + I18N_BATCH));
+  // v36.35 — batched by LENGTH as well as by count. Sixty strings used to mean
+  // sixty short buttons; since the length cap went up one of them can be a
+  // 2,000-character help passage, and a batch of those asks for an answer far
+  // longer than the reply is allowed to be. The model then stops mid-JSON and
+  // the whole batch is lost — which is exactly the silent shortfall this
+  // release is supposed to be closing.
+  var batches = [], cur = [], curChars = 0;
+  for (var i = 0; i < catalogue.length; i++) {
+    var len = String(catalogue[i]).length;
+    if (cur.length && (cur.length >= I18N_BATCH || curChars + len > I18N_BATCH_CHARS)) {
+      batches.push(cur); cur = []; curChars = 0;
+    }
+    cur.push(catalogue[i]); curChars += len;
+  }
+  if (cur.length) batches.push(cur);
 
   async function runBatch(batch) {
-    var raw = await aiCall(i18nPrompt(lang, batch), Math.min(8000, 400 + batch.length * 90));
+    var chars = batch.reduce(function(n, s){ return n + String(s).length; }, 0);
+    // Room for the answer in a script that may need more characters than the
+    // English did, plus the JSON scaffolding around every entry.
+    var budget = Math.min(8000, 600 + Math.ceil(chars * 1.4) + batch.length * 12);
+    var raw = await aiCall(i18nPrompt(lang, batch), budget);
     var obj = extractJSON(raw) || {};
     Object.keys(obj).forEach(function(k){
       if (typeof obj[k] === 'string' && obj[k].trim()) dict[k] = obj[k].trim();
@@ -8543,7 +8694,7 @@ window.i18nStartObserver = i18nStartObserver;
 // second translation.
 async function i18nEnsureBaseSaved() {
   var have = i18nReadCache('en');
-  var cat = i18nCatalogue();
+  var cat = i18nFullCatalogue();
   if (have && have.strings && Object.keys(have.strings).length >= cat.length) return 'already';
   var strings = {};
   cat.forEach(function(s){ strings[s] = s; });
@@ -8664,11 +8815,16 @@ function renderLangMenu() {
   // translation that is 96% done looks broken and gives no clue what to do
   // about it; this says how many and offers the one-click fix.
   if (cur !== 'en') {
+    // v36.35 — the count is only what has actually been SHOWN, so "✓ fully
+    // translated" would be a claim this menu cannot make: eight panels Tony had
+    // not opened were untranslated while the count sat at zero. The action is
+    // therefore always offered, and it says what it does — it draws every
+    // screen first and then translates whatever is still English.
     var gaps = i18nMissingCount();
-    h += gaps
-      ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nFillGaps()" data-no-i18n>'
-        + '⚠️ ' + gaps + ' phrase' + (gaps === 1 ? '' : 's') + ' still in English — finish it</button>'
-      : '<div class="drop-item" style="cursor:default;opacity:0.75;" data-no-i18n>✓ Fully translated</div>';
+    h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nFillGaps()" data-no-i18n>'
+      + (gaps ? '⚠️ ' + gaps + ' phrase' + (gaps === 1 ? '' : 's') + ' still in English — finish it'
+              : '🧩 Check every screen for missing text')
+      + '</button>';
   }
   h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
      + (i18nCanEdit()
@@ -8703,7 +8859,10 @@ window.toggleLangMenu = toggleLangMenu;
 // Generate a language nobody has done yet. Deliberately explicit about the cost
 // and the wait before it starts: this is a paid AI run of ten-odd calls.
 async function i18nGenerate(lang) {
-  var cat = i18nCatalogue();
+  // v36.35 — draw the unopened panels first, or this catalogues a fraction of
+  // the app and the rest looks broken later for no visible reason.
+  await i18nHarvest();
+  var cat = i18nFullCatalogue();
   var name = i18nLangName(lang);
   var ok = await askConfirm({
     icon: '🌍', title: 'Translate the app into ' + name + '?',
@@ -8758,12 +8917,14 @@ window.i18nGenerate = i18nGenerate;
 function i18nGapList() {
   var gaps = Object.create(null);
   i18nMissingList().forEach(function(s){ gaps[s] = 1; });
-  i18nCatalogue().forEach(function(s){ if (!_i18nDict || !_i18nDict[s]) gaps[s] = 1; });
+  i18nFullCatalogue().forEach(function(s){ if (!_i18nDict || !_i18nDict[s]) gaps[s] = 1; });
   return Object.keys(gaps).sort();
 }
 async function i18nFillGaps(lang) {
   lang = lang || _i18nLang;
   if (!lang || lang === 'en') { toast('English is the original — there is nothing to fill in.'); return false; }
+  toast('Checking every screen…', 2500);
+  await i18nHarvest();
   var gaps = i18nGapList();
   var name = i18nLangName(lang);
   if (!gaps.length) { toast('✓ Nothing is missing — every phrase the app has shown is in ' + name + '.', 5000); return true; }
@@ -8835,7 +8996,7 @@ var _i18nEdDraft = null;      // { english: translation }, unsaved
 var _i18nEdDirty = false;
 var I18N_ED_PAGE = 120;       // rows drawn at once; 600 live inputs is a phone tax
 
-function openI18nEditor() {
+async function openI18nEditor() {
   if (!i18nCanEdit()) {
     toast('Editing the shared translations needs full access.', 5000);
     return;
@@ -8855,6 +9016,10 @@ function openI18nEditor() {
   var g = document.getElementById('i18nEdOnlyGaps'); if (g) g.checked = false;
   document.getElementById('i18nOverlay').classList.add('open');
   i18nEdRender();
+  // …and again once the unopened panels have been drawn, so the table lists
+  // every string the app has rather than every string it happens to be showing.
+  await i18nHarvest();
+  i18nEdRender();
 }
 window.openI18nEditor = openI18nEditor;
 
@@ -8865,7 +9030,7 @@ window.openI18nEditor = openI18nEditor;
 // string was renamed, and its old translation is usually most of the new one.
 function i18nEdKeys() {
   var seen = Object.create(null);
-  i18nCatalogue().forEach(function(k){ seen[k] = 1; });
+  i18nFullCatalogue().forEach(function(k){ seen[k] = 1; });
   i18nMissingList().forEach(function(k){ seen[k] = 1; });
   var live = Object.keys(seen);
   Object.keys(_i18nEdDraft || {}).forEach(function(k){ if (!seen[k]) seen[k] = 2; });
@@ -9503,7 +9668,7 @@ function renderGrid() {
           <div class="recipe-list-meta">
             <span>${escH(r.category)}</span>
             <span data-no-i18n>⏱ ${escH(r.prep)}</span>
-            <span>🍽 ${escH(r.servings)} srv</span>
+            <span>🍽 <span data-no-i18n>${escH(r.servings)}</span> srv</span>
             <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(r.difficulty)}</span>
           </div>
           ${matchReason(r, q)}
@@ -10443,11 +10608,11 @@ function drawView(){
         var log = (r.cookLog||[]).slice().sort(function(a,b){ return b.at - a.at; });
         var withNotes = log.filter(function(e){ return e.note || e.rating; });
         return `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span class="cooked-pill">🍳 Cooked ${r.cookCount} time${r.cookCount!==1?'s':''}</span>
+            <span class="cooked-pill">🍳 Cooked <span data-no-i18n>${r.cookCount}</span> time${r.cookCount!==1?'s':''}</span>
             ${r.lastCooked?`<span>· last ${new Date(r.lastCooked).toLocaleDateString()}</span>`:''}
             ${avg!==null?`<span class="rating-stars" title="Average of ${(r.cookLog||[]).filter(function(e){return e.rating>0;}).length} rated cook(s)">${stars(avg)} <span style="color:var(--muted);font-weight:400;">${avg.toFixed(1)}</span></span>`:''}
           </div>`
-          + (withNotes.length ? `<details class="cook-log"><summary>📓 Cooking log (${withNotes.length})</summary>
+          + (withNotes.length ? `<details class="cook-log"><summary>📓 Cooking log (<span data-no-i18n>${withNotes.length}</span>)</summary>
               <div class="cook-log-body">${withNotes.map(function(e){
                 return '<div class="cook-log-entry">'
                   + '<div class="cook-log-head"><span>' + new Date(e.at).toLocaleDateString() + '</span>'
@@ -10458,7 +10623,7 @@ function drawView(){
               }).join('')}</div></details>` : '');
       })()}
       ${r.notes ? `<div style="background:#FFF8E8;border-inline-start:3px solid #D4A843;border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;text-align:start;">NOTES</span><div dir="auto"${langAttr(r.notes)} style="unicode-bidi:plaintext;text-align:start;">${escH(r.notes)}</div></div>` : ''}
-      ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (${r.history.length})</summary>
+      ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (<span data-no-i18n>${r.history.length}</span>)</summary>
           <div class="cook-log-body">${r.history.map(function(v,vi){
             return '<div class="cook-log-entry">'
               + '<div class="cook-log-head"><span>' + new Date(v.at).toLocaleString() + '</span>'
@@ -20213,7 +20378,9 @@ function privacyEntries() {
            + 'to the address you typed.' }
   ];
 }
-function showPrivacyPanel() {
+// v36.35 — the drawing is split from the showing so the translation harvest can
+// call it without a panel appearing on screen.
+function renderPrivacyPanel() {
   var host = document.getElementById('privacyBody');
   if (host) {
     var h = '<div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px;">'
@@ -20234,12 +20401,16 @@ function showPrivacyPanel() {
        + 'never uploaded, not even into a backup.</div>';
     host.innerHTML = h;
   }
+}
+function showPrivacyPanel() {
+  renderPrivacyPanel();
   // Deliberately does NOT close the login screen behind it: someone reading
   // this before signing in should come back to where they were, not be dropped
   // into an app they have not signed into.
   document.getElementById('privacyOverlay').classList.add('open');
 }
 window.privacyEntries = privacyEntries; window.showPrivacyPanel = showPrivacyPanel;
+window.renderPrivacyPanel = renderPrivacyPanel;
 
 // ─── THE BACKUPS PANEL (v36.20) ──────────────────────────────────────────────
 // It has to answer one question before anything else: when did a backup last

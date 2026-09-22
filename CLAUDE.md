@@ -537,6 +537,58 @@ found only because a test was written first and disagreed with the code.
     notes every key the dictionary could not answer; the 🌐 menu shows the count
     and offers "Finish translating", which translates only the gap. The app
     converges on complete by being used.
+- **HARVEST BEFORE YOU CATALOGUE (v36.35).** `i18nCatalogue()` is honestly named:
+  it is every string the interface can show **right now**, and for most of this
+  app that is a fraction of what it has. Logging & debugging, Sync Health,
+  Backups, What leaves this device, the WhatsApp sources, the access list and
+  the entire open-recipe screen are built by a render function the first time
+  they are opened, so on a fresh page they are empty `<div>`s. Tony found eight
+  such panels still in English and could not fix one of them from the editor,
+  because none of their words had ever been in the file. `i18nHarvest()` draws
+  them all first — 582 keys becomes 719.
+  - **Every entry is a RENDER, never an action**, `toast` is muted for the
+    duration, and the whole thing must leave the screen exactly as it found it.
+    The test asserts the library size, `viewId` and the set of open overlays are
+    all unchanged.
+  - **Collect after each screen, not once at the end.** Panels sharing a host
+    overwrite each other, and the recipe screen puts back whatever was being
+    read when it is done — so a single read of the DOM afterwards sees only the
+    last one standing. The recipe screen contributed *nothing* the first time
+    this was written, for exactly that reason. Hence `i18nCollect()` and
+    `i18nFullCatalogue()`.
+  - **`drawView()` takes no argument** — it looks the recipe up by `viewId`, and
+    it OPENS the overlay at the end. The stand-in recipe is pushed into
+    `recipes` for the length of one render and spliced out in a `finally`.
+  - It is drawn from `i18nHarvestRecipe()`, built to light up **every branch**:
+    a real recipe would only show the parts that apply to it, and Version
+    history, the cooking log and the nutrition panel would stay invisible and
+    untranslated for ever.
+- **A varying count must not be part of the key (v36.35).** "🕘 Version history
+  (3)" is a different key from "(1)", so the dictionary is asked for a string it
+  can never hold. Park the number in its own `<span data-no-i18n>` — SPAN is
+  inline, so it becomes a `{1}` placeholder and the key is stable. Done for
+  Version history, the cooking log, Cooked N times, No photo (N), One item away
+  (N) and the servings pill. **Do not** normalise digits globally: half the
+  numbers in this app are fixed documentation ("100 requests/minute free",
+  "Demo tier 50 requests/hour (5,000/hour once approved)"), and a model that
+  reorders two substituted numbers in one sentence makes it say something false.
+- **The length cap ate whole help panels.** It was 400 characters. The WhatsApp
+  export manual is one `<div>` of prose with thirty `<strong>`s in it, arriving
+  as a single 1,400-character unit — dropped without a word, and unfixable from
+  the editor because it was never in the file. `I18N_MAX_LEN` is 2,200, and
+  batching is by **characters as well as count** (`I18N_BATCH_CHARS`): sixty
+  strings used to mean sixty short buttons, and a batch of long passages asks
+  for a reply longer than `max_tokens` allows, which loses the whole batch.
+- **BUTTON and LABEL are placeholder-eligible children.** "Tap a box to tick a
+  line off · … [Clear ticks] · [🎤 Voice]" is one line of help with two controls
+  in it; treating the buttons as walls dropped the hint entirely. Safe because a
+  unit must hold its own text to exist: a row of nothing but buttons has no text
+  node and is never a unit, while each button is still visited and translated
+  separately.
+- **The globe menu cannot claim "fully translated"** — it only knows what has
+  been *shown*. Eight panels were untranslated while the count sat at zero. The
+  action is always offered and says what it does: *Check every screen for
+  missing text*.
 - **The translation can be corrected by hand (v36.33).** `#i18nOverlay`: English
   left, translation right, a search that matches **either** side, untranslated
   rows first, and a per-row 💡 that asks for three alternatives and changes
