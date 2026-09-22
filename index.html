@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.40 -->
+<!-- Tony's Recipes Collection v36.41 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3309,7 +3309,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.40';
+var APP_VERSION = 'v36.41';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4797,6 +4797,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
   .prog-ring-fg.indeterminate { animation: none; stroke-dasharray: 326.73; stroke-dashoffset: 245; }
 }
 
+.wa-manual > div + div { margin-top: 12px; }
 .modal.add-modal.wide { max-width: calc(100vw - 24px); }
 .modal.add-modal.wide .ing-row { grid-template-columns: 24px minmax(90px, 1fr) 4fr 28px 28px; }
 .modal.add-modal.wide .ing-row-sub { grid-template-columns: 24px 1fr 28px 28px; }
@@ -5974,7 +5975,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.40</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.41</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6596,7 +6597,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.40</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.41</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6900,20 +6901,26 @@ body.banner-shown .header {
 
     <details style="margin-bottom:6px;">
       <summary style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600;">How to export, and how to keep it up to date</summary>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px;">
-        <strong>Exporting (both platforms):</strong> open the group → group name → <em>Export chat</em> → <em>Without media</em>.<br><br>
-        <strong>From an iPhone, step by step</strong> — this is the whole route, and it needs no GitHub access at all:<br>
+      <!-- v36.41 — FOUR blocks, not one. As a single <div> this was one
+           translatable unit of 1,541 bytes, and a dictionary key becomes a
+           Firestore field name, which is capped at 1,500. That one string made
+           every save of the master catalogue fail. Splitting it at the breaks
+           it already had costs nothing on screen and gives the translator four
+           passages instead of an essay. -->
+      <div class="wa-manual" style="font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px;">
+        <div><strong>Exporting (both platforms):</strong> open the group → group name → <em>Export chat</em> → <em>Without media</em>.</div>
+        <div><strong>From an iPhone, step by step</strong> — this is the whole route, and it needs no GitHub access at all:<br>
         1. WhatsApp → open the group → tap the <strong>group name</strong> at the top → scroll down → <em>Export Chat</em> → <em>Without Media</em>.<br>
         2. WhatsApp prepares the file (a few seconds on a big group), then the <strong>Share sheet</strong> opens.<br>
         3. Scroll the lower list of actions and tap <strong>Save to Files</strong>. Pick somewhere you will find again — <em>On My iPhone → Downloads</em> is fine — then <strong>Save</strong>.<br>
         4. Come back here: <strong>📂 Import exported .txt or .zip files</strong> above.<br>
-        5. The iPhone's file picker opens. The export is usually the top entry under <strong>Recents</strong>; otherwise tap <em>Browse</em> and go to where you saved it. Tap it.<br><br>
-        <strong>Worth knowing:</strong> WhatsApp hands you a <code>.zip</code> named <code>_chat.zip</code> or similar, not a <code>.txt</code> — that is correct, and this app opens it itself. Do not unzip it on the phone. And leave <em>Also sync imported chats</em> ticked, or the chat stays on the phone and never reaches your other devices.<br><br>
-        <strong>Keeping it current — how far automation actually goes:</strong><br>
+        5. The iPhone's file picker opens. The export is usually the top entry under <strong>Recents</strong>; otherwise tap <em>Browse</em> and go to where you saved it. Tap it.</div>
+        <div><strong>Worth knowing:</strong> WhatsApp hands you a <code>.zip</code> named <code>_chat.zip</code> or similar, not a <code>.txt</code> — that is correct, and this app opens it itself. Do not unzip it on the phone. And leave <em>Also sync imported chats</em> ticked, or the chat stays on the phone and never reaches your other devices.</div>
+        <div><strong>Keeping it current — how far automation actually goes:</strong><br>
         • The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.<br>
         • <strong>iPhone:</strong> the delivery afterwards can be automated <em>if the device can reach GitHub</em> — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.<br>
         • <strong>Android/desktop:</strong> share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.<br>
-        • Re-exporting produces the <em>whole</em> history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.
+        • Re-exporting produces the <em>whole</em> history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.</div>
       </div>
     </details>
   </div>
@@ -8226,9 +8233,29 @@ function i18nSkip(el, attr) {
 // the file. It is not a fragment to be split — it is one passage, and splitting
 // it at the <br>s would translate "then" and "Save" on their own.
 var I18N_MAX_LEN = 2200;
+// …and a hard ceiling in BYTES, because the key becomes a Firestore field name
+// and those are limited to 1,500 bytes. One string in this app — the WhatsApp
+// export manual — came to 1,541, and it took the whole `i18n_en` document with
+// it: every save of the master catalogue failed with "Property strings contains
+// an invalid nested entity", which names the document and not the field, so
+// there was nothing to go on. Hebrew appeared to save fine only because the
+// batch holding that string had truncated and it never became a key there.
+var I18N_MAX_BYTES = 1400;
+function i18nByteLen(s) {
+  var n = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }   // surrogate pair
+    else n += 3;
+  }
+  return n;
+}
 function i18nTranslatable(s) {
   s = String(s == null ? '' : s).trim();
   if (!s || s.length > I18N_MAX_LEN) return false;
+  if (i18nByteLen(s) > I18N_MAX_BYTES) return false;
   if (!/[A-Za-z]/.test(s)) return false;
   if (/^[\d\s.,:;/%×+-]*$/.test(s)) return false;
   // A URL is data in every language, and a model asked to translate one will
@@ -8511,6 +8538,110 @@ var I18N_SCRAPE = [
 ];
 // Deliberately does NOT trim: a literal's trailing space is the space before
 // the hole. "Looking up " + name reads "Looking up{1}" without it.
+// ─── READING THE SOURCE WITHOUT MISREADING IT (v36.41) ───────────────────────
+// The scrape matches an opener and then walks forward pairing quotes. That is
+// only safe if it starts at real code. Matching inside a COMMENT or a REGEX
+// puts it half a quote out of step, and from then on it reads code as text and
+// text as code — which is how these reached Tony's paid Hebrew dictionary:
+//
+//   "+ sharedTitle); if (sharedText) got.push({1} + sharedText); res.innerHTML ="
+//
+// So the file is lexed once first. Comments are blanked to spaces (offsets
+// preserved, so every regex below still works), regex literals are stepped
+// over, and every position inside a string literal is marked. An opener only
+// counts at a position that is real code.
+function i18nLexSource(src) {
+  var n = src.length, clean = new Array(n), inStr = new Uint8Array(n);
+  var i = 0, prev = '';
+  function lastCode() { return prev; }
+  while (i < n) {
+    var c = src.charAt(i), c2 = src.charAt(i + 1);
+    if (c === '/' && c2 === '/') {                       // line comment
+      while (i < n && src.charAt(i) !== '\n') { clean[i] = ' '; i++; }
+      continue;
+    }
+    if (c === '/' && c2 === '*') {                       // block comment
+      clean[i] = ' '; clean[i + 1] = ' '; i += 2;
+      while (i < n && !(src.charAt(i) === '*' && src.charAt(i + 1) === '/')) {
+        clean[i] = (src.charAt(i) === '\n') ? '\n' : ' '; i++;
+      }
+      if (i < n) { clean[i] = ' '; clean[i + 1] = ' '; i += 2; }
+      continue;
+    }
+    // A regex literal, by the standard heuristic: a `/` where a VALUE is
+    // expected rather than where a division could be. This file is full of
+    // them and several contain quotes.
+    if (c === '/' && /^[(,=:[!&|?{};+\-*%~^<>]$/.test(lastCode() || '{')) {
+      clean[i] = ' '; i++;
+      var cls = false;
+      while (i < n) {
+        var r = src.charAt(i);
+        if (r === '\n') break;                           // not a regex after all
+        clean[i] = ' ';
+        if (r === '\\') { if (i + 1 < n) clean[i + 1] = ' '; i += 2; continue; }
+        if (r === '[') cls = true;
+        else if (r === ']') cls = false;
+        else if (r === '/' && !cls) { i++; break; }
+        i++;
+      }
+      prev = '/';
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {           // string literal
+      var q = c;
+      clean[i] = c; i++;
+      while (i < n) {
+        var d = src.charAt(i);
+        if (d === '\\') {
+          clean[i] = d; inStr[i] = 1;
+          if (i + 1 < n) { clean[i + 1] = src.charAt(i + 1); inStr[i + 1] = 1; }
+          i += 2; continue;
+        }
+        clean[i] = d;
+        if (d === q) { i++; break; }
+        inStr[i] = 1; i++;
+      }
+      prev = q;
+      continue;
+    }
+    clean[i] = c;
+    if (!/\s/.test(c)) prev = c;
+    i++;
+  }
+  for (var k = 0; k < n; k++) if (clean[k] === undefined) clean[k] = ' ';
+  return { clean: clean.join(''), inStr: inStr };
+}
+
+// Some objects in this file use the same property names as the interface does
+// and are emphatically NOT interface text. SELF_TEST_FIXES is a table of
+// `fix:` hints written for whoever is debugging the app — the same property
+// name the sync-log findings use, and the opposite kind of string. Its whole
+// span is excluded by finding its matching brace.
+function i18nExcludedSpans(clean) {
+  var spans = [];
+  ['SELF_TEST_FIXES', 'APP_KNOWLEDGE', 'I18N_SCRAPE', 'I18N_EXTRA'].forEach(function(name) {
+    var at = clean.indexOf(name + ' = ');
+    if (at === -1) at = clean.indexOf(name + '=');
+    if (at === -1) return;
+    var open = clean.indexOf('{', at);
+    var bracket = clean.indexOf('[', at);
+    if (bracket !== -1 && (open === -1 || bracket < open)) open = bracket;
+    if (open === -1) return;
+    var closeCh = clean.charAt(open) === '{' ? '}' : ']';
+    var depth = 0;
+    for (var j = open; j < clean.length; j++) {
+      var ch = clean.charAt(j);
+      if (ch === '{' || ch === '[') depth++;
+      else if (ch === '}' || ch === ']') { depth--; if (depth === 0) { spans.push([at, j]); return; } }
+    }
+  });
+  return spans;
+}
+function i18nInSpans(spans, pos) {
+  for (var i = 0; i < spans.length; i++) if (pos >= spans[i][0] && pos <= spans[i][1]) return true;
+  return false;
+}
+
 function i18nUnescape(v) {
   return String(v)
     // \u2026 is an ellipsis in the source and an ellipsis on the screen. Left
@@ -8524,12 +8655,18 @@ async function i18nScrapeSource() {
   try {
     var res = await fetch(location.href, { cache: 'force-cache' });
     if (!res.ok) return 0;
-    var src = await res.text();
-    i18nBuildPatterns(src);
+    var raw = await res.text();
+    // Lexed once and shared: comments blanked, regex literals stepped over,
+    // and the positions inside string literals marked.
+    var lex = i18nLexSource(raw);
+    var src = lex.clean;
+    var spans = i18nExcludedSpans(src);
+    i18nBuildPatterns(src, lex, spans);
     I18N_SCRAPE.forEach(function(re) {
       re.lastIndex = 0;
       var m;
       while ((m = re.exec(src)) !== null) {
+        if (lex.inStr[m.index] || i18nInSpans(spans, m.index)) continue;
         var v = i18nUnescape(m[2]).trim();
         // A single token carrying a dot, a slash or an @ is an example value,
         // not a sentence — "123456789-abc.apps.googleusercontent.com" is the
@@ -8634,10 +8771,15 @@ var I18N_PATTERN_OPENERS = new RegExp([
   '\\bsetDriveStatus\\(\\s*[\'"][^\'"]*[\'"]\\s*,\\s*',
   '\\.textContent\\s*=\\s*'
 ].join('|'), 'g');
-function i18nBuildPatterns(src) {
+function i18nBuildPatterns(src, lex, spans) {
   var found = Object.create(null), re = I18N_PATTERN_OPENERS, m;
   re.lastIndex = 0;
   while ((m = re.exec(src)) !== null) {
+    // Only where the opener is real code. Inside a string or inside one of the
+    // excluded tables it is a coincidence, and following it desynchronises the
+    // quote pairing for everything after it.
+    if (lex && lex.inStr[m.index]) continue;
+    if (spans && i18nInSpans(spans, m.index)) continue;
     var parts = i18nScanCall(src, m.index + m[0].length);
     if (!parts) continue;
     var pat = i18nPartsToPattern(parts);
@@ -8932,7 +9074,25 @@ async function i18nReadCloud(lang) {
 // `shared` under the published rules, and that is not a bug to paper over: the
 // translation still works for them, it simply is not shared, and the caller
 // says so out loud rather than letting them think they published something.
+// Every key here becomes a Firestore field name. One that cannot be takes the
+// WHOLE document with it, and the error names the document rather than the
+// field — so a single bad string silently stops the master catalogue saving,
+// for ever, with nothing to go on. Drop them here and say how many.
+function i18nSanitiseDoc(doc) {
+  var clean = {}, dropped = 0;
+  Object.keys(doc.strings || {}).forEach(function(k) {
+    var v = doc.strings[k];
+    if (!k || typeof v !== 'string') { dropped++; return; }
+    if (i18nByteLen(k) > 1500 || i18nByteLen(v) > 1048487) { dropped++; return; }
+    clean[k] = v;
+  });
+  doc.strings = clean;
+  doc.count = Object.keys(clean).length;
+  if (dropped) syncLog('warn', dropped + ' translation entr(ies) could not be stored', '');
+  return dropped;
+}
 async function i18nWriteCloud(lang, doc) {
+  i18nSanitiseDoc(doc);
   i18nWriteCache(lang, doc);
   if (!window._fbDb || !window._fbUser) return 'local';
   try {
@@ -8960,7 +9120,19 @@ window.i18nWriteCloud = i18nWriteCloud; window.i18nDocId = i18nDocId;
 // The instructions are long on purpose — "translate this list" produces a menu
 // nobody can use, with buttons that no longer fit and placeholders eaten.
 var I18N_BATCH = 60;
-var I18N_BATCH_CHARS = 3500;   // …or this many characters, whichever comes first
+// …or this many characters, whichever comes first. Dropped from 3500 in
+// v36.41 after 18 of Tony's Hebrew batches died on the token ceiling. The
+// answer has to echo every English KEY as well as carry the Hebrew value, and
+// Hebrew costs far more tokens per character than English does, so a batch's
+// reply is several times the size of what went into it. 3,500 characters in
+// was asking for roughly 5,000 tokens back and getting cut off mid-JSON —
+// which loses the whole batch, not the last entry.
+// 1,800 is the largest batch whose budget still fits under the 8,000-token
+// ceiling: 800 + 1800×3 + 60×14 = 7,040. Bigger than that and the cap binds
+// instead of the formula, which is exactly how 18 batches were lost — the
+// budget said one thing and the ceiling said another. If a batch still comes
+// back truncated it is halved and re-asked rather than thrown away.
+var I18N_BATCH_CHARS = 1800;
 function i18nPrompt(lang, batch) {
   var L = I18N_LANGS[lang] || { en: lang };
   return 'You are translating the INTERFACE of a personal recipe app from English into '
@@ -9008,9 +9180,11 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
 
   async function runBatch(batch) {
     var chars = batch.reduce(function(n, s){ return n + String(s).length; }, 0);
-    // Room for the answer in a script that may need more characters than the
-    // English did, plus the JSON scaffolding around every entry.
-    var budget = Math.min(8000, 600 + Math.ceil(chars * 1.4) + batch.length * 12);
+    // Room for the answer: every English key comes back as well as the
+    // translation, and a script like Hebrew can cost two or three tokens per
+    // character where English costs a quarter of one. 1.4 was measured on
+    // nothing and was wrong by about half.
+    var budget = Math.min(8000, 800 + Math.ceil(chars * 3.0) + batch.length * 14);
     var raw = await aiCall(i18nPrompt(lang, batch), budget);
     var obj = extractJSON(raw) || {};
     Object.keys(obj).forEach(function(k){
@@ -9025,6 +9199,22 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
     return batch.filter(function(s){ return !dict[s]; });
   }
 
+  // A ceiling is not a failure, it is a batch that was too big. Halve it and
+  // ask again — twice more if necessary. Anything else throws away work that
+  // has already been paid for and leaves sixty strings English.
+  var splits = 0;
+  async function runOrSplit(batch, depth) {
+    try { await runBatch(batch); }
+    catch (e) {
+      var tooBig = /TRUNCATED|max_tokens|ceiling/i.test(String((e && e.message) || ''));
+      if (!tooBig || batch.length < 2 || depth >= 3) throw e;
+      splits++;
+      var mid = Math.ceil(batch.length / 2);
+      await runOrSplit(batch.slice(0, mid), depth + 1);
+      await runOrSplit(batch.slice(mid), depth + 1);
+    }
+  }
+
   var leftover = [];
   for (var b = 0; b < batches.length; b++) {
     if (onProgress) onProgress(b, batches.length,
@@ -9034,7 +9224,7 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
     // the gap-filler picks up the rest later.
     if (typeof progressCancelled === 'function' && progressCancelled()) break;
     try {
-      await runBatch(batches[b]);
+      await runOrSplit(batches[b], 0);
       var short = shortfall(batches[b]);
       // One retry, of only the strings it skipped. A second full batch would
       // cost the whole batch again to recover two lines of it.
@@ -9055,7 +9245,8 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
     syncLog('warn', leftover.length + ' string(s) came back untranslated for ' + lang,
       leftover.slice(0, 8).join(' · '));
   }
-  return { dict: dict, failed: failed, batches: batches.length,
+  if (splits) syncLog('ai', splits + ' batch(es) were split after hitting the token ceiling', '');
+  return { dict: dict, failed: failed, batches: batches.length, splits: splits,
            missing: leftover.length, missingList: leftover };
 }
 window.i18nPrompt = i18nPrompt; window.i18nTranslateAll = i18nTranslateAll;
@@ -9510,6 +9701,13 @@ function i18nEdRender() {
       + (info.all.length - missing) + ' translated, ' + missing + ' not'
       + (rows.length > I18N_ED_PAGE ? ' · showing the first ' + I18N_ED_PAGE + ' — search to narrow it' : '')
       + (_i18nEdDirty ? ' · UNSAVED CHANGES' : '');
+    var orphans = info.all.filter(info.orphan).length;
+    if (orphans) {
+      cnt.innerHTML = escH(cnt.textContent)
+        + ' · <button onclick="i18nEdDropOrphans()" data-no-i18n style="background:none;border:none;'
+        + 'color:var(--terracotta);cursor:pointer;font:inherit;text-decoration:underline;padding:0;">'
+        + 'remove ' + orphans + ' orphan' + (orphans === 1 ? '' : 's') + '</button>';
+    }
     cnt.style.color = _i18nEdDirty ? 'var(--terracotta)' : 'var(--muted)';
   }
 
@@ -9604,6 +9802,28 @@ function i18nEdTake(btn) {
   var box = row.querySelector('.i18n-ed-opts'); if (box) box.remove();
 }
 window.i18nEdTake = i18nEdTake;
+
+// An orphan is a translation whose English no longer appears anywhere in the
+// app. Usually that means the English was reworded and the old translation is
+// most of the new one, which is why they are shown rather than hidden. But a
+// bad scrape can also leave hundreds of them — v36.41 fixed one that put code
+// fragments into Tony's paid Hebrew file — and then they are just weight.
+async function i18nEdDropOrphans() {
+  var info = i18nEdKeys();
+  var orphans = info.all.filter(info.orphan);
+  if (!orphans.length) { toast('There are no orphans to remove.'); return; }
+  var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + orphans.length + ' orphaned entr(ies)?',
+    message: 'These are translations whose English no longer appears anywhere in the app — either it was '
+      + 'reworded, or it was never really interface text.\n\nRemoving them cannot be undone from here, '
+      + 'but nothing on screen changes: by definition none of them is being used.',
+    okLabel: 'Remove them' });
+  if (!ok) return;
+  orphans.forEach(function(k){ delete _i18nEdDraft[k]; });
+  _i18nEdDirty = true;
+  i18nEdRender();
+  toast('🧹 ' + orphans.length + ' removed. Press Save to keep the change.', 6000);
+}
+window.i18nEdDropOrphans = i18nEdDropOrphans;
 
 async function i18nEdSave() {
   if (!_i18nEdDraft) return;

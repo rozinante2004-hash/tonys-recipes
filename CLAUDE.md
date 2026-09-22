@@ -578,6 +578,39 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **THE SCRAPE MUST LEX BEFORE IT MATCHES (v36.41).** Matching an opener and
+  then walking forward pairing quotes is only safe if it STARTS at real code.
+  An opener matched inside a comment or a regex literal leaves the walk half a
+  quote out of step, and from then on it reads code as text and text as code.
+  That is how `"+ sharedTitle); if (sharedText) got.push({1} + sharedText)"`
+  reached Tony's paid Hebrew dictionary — 127 keys of it. `i18nLexSource()`
+  blanks comments (offsets preserved, so every regex still works), steps over
+  regex literals by the standard "a `/` where a value is expected" heuristic,
+  and marks every position inside a string. An opener only counts at real code.
+  - `i18nExcludedSpans()` additionally drops `SELF_TEST_FIXES`, which uses the
+    same `fix:` property name as the sync-log findings and is the opposite kind
+    of string — instructions for whoever is debugging the app.
+- **A KEY BECOMES A FIRESTORE FIELD NAME, capped at 1,500 bytes (v36.41).** One
+  string here — the WhatsApp export manual — came to 1,541, and it took the
+  whole `i18n_en` document with it: every save of the master catalogue failed
+  with *"Property strings contains an invalid nested entity"*, which names the
+  document and not the field, so there was nothing to go on. Hebrew appeared to
+  save only because the batch holding that string had truncated, so it never
+  became a key there. Two defences: `I18N_MAX_BYTES` (1,400) in
+  `i18nTranslatable`, and `i18nSanitiseDoc()` on every write, because a single
+  bad key must never be able to stop a document saving again.
+  - The manual itself is now four `<div>`s instead of one. Splitting it at the
+    breaks it already had costs nothing on screen and gives the translator four
+    passages instead of an essay.
+- **A BATCH'S REPLY IS SEVERAL TIMES ITS INPUT (v36.41).** The answer echoes
+  every English KEY as well as carrying the translation, and Hebrew costs two or
+  three tokens per character where English costs a quarter of one. 18 of Tony's
+  batches died on the ceiling — and a truncated reply loses the WHOLE batch, not
+  its last entry. `I18N_BATCH_CHARS` is 1,800, chosen so the worst case
+  (800 + 1800×3 + 60×14 = 7,040) still fits under the 8,000-token cap: bigger
+  than that and the cap binds instead of the formula, which is precisely what
+  went wrong. **And a ceiling is not a failure, it is a batch that was too big**
+  — `runOrSplit()` halves it and asks again, up to three times.
 - **BOTH SIDES OF A CONDITION (v36.40).** `when: signedIn ? 'always, while
   signed in' : 'not in use — you are signed out'` puts a panel's worth of text
   behind a ternary, and whichever branch is true when a language is generated is

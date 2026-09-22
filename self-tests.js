@@ -7583,10 +7583,22 @@ window.SELF_TESTS = [
       if(!after.some(function(x){ return /ALLOWED_ORIGINS on the Worker/.test(x); }))
         throw new Error('the Worker\u2019s refusal messages are not in the catalogue');
 
-      // A long help passage is ONE unit and must survive the length cap. The
-      // WhatsApp manual is 1,400 characters and was being dropped in silence.
-      if(!after.some(function(s){ return s.length>1000; }))
-        throw new Error('nothing longer than 1000 characters is in the catalogue — the cap is eating whole panels');
+      // A long help passage is ONE unit, not a handful of fragments — the whole
+      // reason inline markup becomes {1} instead of a wall.
+      var longest = after.reduce(function(n,x){ return Math.max(n, x.length); }, 0);
+      if(longest < 400)
+        throw new Error('the longest key is only '+longest+' characters — prose is being shattered into '
+          + 'fragments, and a fragment translated on its own is word salad');
+      // …but a key becomes a FIRESTORE FIELD NAME, and those stop at 1,500
+      // bytes. One 1,541-byte string took the entire master catalogue document
+      // with it: every save failed with "Property strings contains an invalid
+      // nested entity", which names the document and not the field.
+      var fat = after.filter(function(x){ return i18nByteLen(x) > I18N_MAX_BYTES; });
+      if(fat.length)
+        throw new Error(fat.length+' key(s) are over '+I18N_MAX_BYTES+' bytes and cannot be saved: '
+          + JSON.stringify(fat[0].slice(0,60)));
+      if(i18nByteLen('a') !== 1 || i18nByteLen('—') !== 3 || i18nByteLen('🍽') !== 4)
+        throw new Error('i18nByteLen is not counting UTF-8 bytes, so the ceiling it guards is fiction');
 
       // Harvesting is a READ. It must not open anything, leave a stand-in
       // recipe in the library, or move which recipe is being viewed.
