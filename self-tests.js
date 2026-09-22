@@ -7402,11 +7402,17 @@ window.SELF_TESTS = [
       try{
         window.aiCall=function(prompt){
           calls++;
-          var asked=JSON.parse(prompt.slice(prompt.indexOf('Strings:\n')+9));
+          // v36.42 — the strings go out as a NUMBERED LIST and the answer comes
+          // back keyed by position, so the English is never echoed. That echo
+          // was a third of what kept hitting the token ceiling.
+          var body=prompt.slice(prompt.indexOf('Strings:\n')+9);
+          var asked=body.split('\n').filter(function(l){ return /^\d+\. /.test(l); })
+                        .map(function(l){ return l.replace(/^\d+\. /, ''); });
+          if(!asked.length) throw new Error('the prompt no longer lists the strings in a readable form');
           var out={};
           // First pass answers all but the last two; the retry answers one more.
-          var give=(calls===1) ? asked.slice(0, Math.max(0, asked.length-2)) : asked.slice(0,1);
-          give.forEach(function(s){ out[s]='x'+s; });
+          var n=(calls===1) ? Math.max(0, asked.length-2) : 1;
+          for(var i=0;i<n;i++) out[String(i)]='x'+asked[i];
           return Promise.resolve(JSON.stringify(out));
         };
         var res=await i18nTranslateAll('he', ['a','b','c','d','e']);
@@ -7416,6 +7422,32 @@ window.SELF_TESTS = [
         if(!res.missingList || res.missingList.indexOf('e')===-1)
           throw new Error('the missing string was not named: '+JSON.stringify(res.missingList));
         if(res.dict['d']!=='xd') throw new Error('the retry’s answer was thrown away');
+
+        // A reply keyed by the ENGLISH is still understood — the model does it
+        // sometimes whatever it is asked, and discarding the answer would cost
+        // a whole batch to save nothing.
+        window.aiCall=function(){ return Promise.resolve(JSON.stringify({'p':'xp','q':'xq'})); };
+        var old=await i18nTranslateAll('he', ['p','q']);
+        if(old.dict['p']!=='xp') throw new Error('an answer keyed by the English was discarded');
+
+        // A batch that comes back TRUNCATED is halved and re-asked, not lost.
+        // Sixty strings is too much to throw away over one ceiling.
+        var seen=[];
+        window.aiCall=function(prompt){
+          var body=prompt.slice(prompt.indexOf('Strings:\n')+9);
+          var asked=body.split('\n').filter(function(l){ return /^\d+\. /.test(l); });
+          seen.push(asked.length);
+          if(asked.length>2) return Promise.reject(new Error('TRUNCATED: the answer hit the ceiling'));
+          var out={}; asked.forEach(function(l,i){ out[String(i)]='y'; });
+          return Promise.resolve(JSON.stringify(out));
+        };
+        var big=['a1','a2','a3','a4','a5','a6','a7','a8'];
+        var split=await i18nTranslateAll('he', big);
+        if(!split.splits) throw new Error('a truncated batch was not split — the whole batch was lost');
+        if(seen.filter(function(n){ return n<=2; }).length===0)
+          throw new Error('it never got down to a batch small enough to answer: '+JSON.stringify(seen));
+        if(Object.keys(split.dict).length!==big.length)
+          throw new Error('splitting lost '+(big.length-Object.keys(split.dict).length)+' string(s)');
       } finally { window.aiCall=realAI; }
     } },
 

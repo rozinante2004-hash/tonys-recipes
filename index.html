@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.41 -->
+<!-- Tony's Recipes Collection v36.42 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3309,7 +3309,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.41';
+var APP_VERSION = 'v36.42';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5975,7 +5975,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.41</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.42</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6597,7 +6597,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.41</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.42</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8646,6 +8646,9 @@ function i18nUnescape(v) {
   return String(v)
     // \u2026 is an ellipsis in the source and an ellipsis on the screen. Left
     // as six literal characters it is a key that can never match anything.
+    .replace(/\\u\{([0-9a-fA-F]{1,6})\}/g, function(_, h){
+      try { return String.fromCodePoint(parseInt(h, 16)); } catch(e) { return ''; }
+    })
     .replace(/\\u([0-9a-fA-F]{4})/g, function(_, h){ return String.fromCharCode(parseInt(h, 16)); })
     .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
     .replace(/\\(['"\\])/g, '$1');
@@ -8904,17 +8907,72 @@ var _i18nMissing = Object.create(null);
 var _i18nMissDirty = false, _i18nMissTick = false;
 
 function i18nMissKey(lang) { return I18N_MISS_PREFIX + (lang || _i18nLang || 'en'); }
+// Does this look like source code rather than something a person reads? The
+// v36.41 lexer stops NEW garbage getting in; this is for the garbage already
+// recorded. Tony's device had 400-odd keys like
+// "+ sharedTitle); if (sharedText) got.push(" sitting in its missing list, and
+// the missing list is an input to the next run — so a bug that was fixed on
+// Monday would have gone on being paid for every week until someone cleared it.
+// Two kinds of rule. The first list is unmistakable — no button ever says
+// "innerHTML". The second is suggestive on its own and damning in pairs: a
+// semicolon is not code, but a semicolon AND a hex colour AND a closing brace
+// in the same string is.
+//
+// It errs towards KEEPING, deliberately. Wrongly rejecting "+ Add Recipe ▾"
+// leaves a button English for ever with no way to notice; wrongly keeping a
+// line of junk costs a fraction of a penny and shows up in the editor as an
+// orphan you can delete. The first version of this rejected four real strings,
+// including two buttons.
+var I18N_CODE_CERTAIN = [
+  /\bfunction\s*\(|=>|\bvar\s+[a-zA-Z_$]|\bconst\s+[a-zA-Z_$]/,
+  // `window\.` needs a letter after the dot. Without it this matched the
+  // English sentence "…inside the watchdog window. That is usually…" and threw
+  // away a real sync-log finding.
+  /innerHTML|getElementById|querySelector|\bdocument\.[a-zA-Z]|\bwindow\.[a-zA-Z]/,
+  /<\/?(?:div|span|button|br|em|strong|p)\s*[>\/]/i,
+  /\bstyle\s*=\s*["']|\bclass\s*=\s*["']/,
+  // This project's own audit tags — "(5f.5)", "(v36.31)". They live in
+  // comments, never on screen, and a missing list made before the lexer landed
+  // is full of them.
+  /\((?:v?\d+[a-z]?\.\d+[a-z]?)\)/i
+];
+var I18N_CODE_HINTS = [
+  /\)\s*;/, /;\s*if\s*\(/, /\)\s*\{/,
+  /#[0-9A-Fa-f]{6}\s*;/, /\b\d+px\b/,
+  /\.push\(|\.length\b|\.value\b/,
+  /^\s*\+\s*[a-z_$]/i
+];
+function i18nLooksLikeCode(s) {
+  s = String(s || '');
+  for (var i = 0; i < I18N_CODE_CERTAIN.length; i++) if (I18N_CODE_CERTAIN[i].test(s)) return true;
+  var hits = 0;
+  for (var j = 0; j < I18N_CODE_HINTS.length; j++) if (I18N_CODE_HINTS[j].test(s)) hits++;
+  return hits >= 2;
+}
+function i18nKeepable(s) {
+  return !!s && i18nTranslatable(s) && !i18nLooksLikeCode(s);
+}
 function i18nLoadMissing(lang) {
   _i18nMissing = Object.create(null);
+  var dropped = 0;
   try {
     var raw = localStorage.getItem(i18nMissKey(lang));
-    if (raw) JSON.parse(raw).forEach(function(s){ _i18nMissing[s] = 1; });
+    if (raw) JSON.parse(raw).forEach(function(s){
+      if (i18nKeepable(s)) _i18nMissing[s] = 1; else dropped++;
+    });
   } catch(e) {}
+  // Rewrite it, so the clean-up happens once rather than on every load.
+  if (dropped) {
+    try { localStorage.setItem(i18nMissKey(lang), JSON.stringify(i18nMissingList())); } catch(e) {}
+    syncLog('warn', dropped + ' unusable entr(ies) dropped from the missing list for ' + lang, '');
+  }
 }
+window.i18nLooksLikeCode = i18nLooksLikeCode; window.i18nKeepable = i18nKeepable;
 function i18nMissingList() { return Object.keys(_i18nMissing).sort(); }
 function i18nMissingCount() { return Object.keys(_i18nMissing).length; }
 function i18nNoteMissing(src) {
   if (!src || _i18nMissing[src]) return;
+  if (!i18nKeepable(src)) return;          // never record what we would not send
   // A string the dictionary answers with the English itself is not missing —
   // rule 7 of the prompt asks the model to do exactly that for proper nouns.
   _i18nMissing[src] = 1;
@@ -9127,12 +9185,11 @@ var I18N_BATCH = 60;
 // reply is several times the size of what went into it. 3,500 characters in
 // was asking for roughly 5,000 tokens back and getting cut off mid-JSON —
 // which loses the whole batch, not the last entry.
-// 1,800 is the largest batch whose budget still fits under the 8,000-token
-// ceiling: 800 + 1800×3 + 60×14 = 7,040. Bigger than that and the cap binds
-// instead of the formula, which is exactly how 18 batches were lost — the
-// budget said one thing and the ceiling said another. If a batch still comes
-// back truncated it is halved and re-asked rather than thrown away.
-var I18N_BATCH_CHARS = 1800;
+// Sized so the budget below never reaches its own ceiling: 800 + 1200×5 +
+// 40×16 = 7,440 against a cap of 10,000. When the cap binds instead of the
+// formula the formula is decoration, which is exactly how 18 batches were
+// lost. And if one still comes back truncated it is halved and re-asked.
+var I18N_BATCH_CHARS = 1200;
 function i18nPrompt(lang, batch) {
   var L = I18N_LANGS[lang] || { en: lang };
   return 'You are translating the INTERFACE of a personal recipe app from English into '
@@ -9156,7 +9213,11 @@ function i18nPrompt(lang, batch) {
     + 'without ceremony; match that rather than making it formal.\n'
     + '7. If a string is already a proper noun or has no meaningful translation, return it '
     + 'unchanged rather than inventing one.\n\n'
-    + 'Strings:\n' + JSON.stringify(batch, null, 0);
+    + '8. The answer is keyed by POSITION, not by the English. Return '
+    + '{"0":"…","1":"…"} with one entry for every line below, using its number. '
+    + 'Do not repeat the English anywhere in your answer.\n\n'
+    + 'Strings:\n'
+    + batch.map(function(x, i){ return i + '. ' + x; }).join('\n');
 }
 // Translate the catalogue. `onProgress(done, total)` so a 10-batch run is not a
 // spinner that looks identical to a hang.
@@ -9184,11 +9245,25 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
     // translation, and a script like Hebrew can cost two or three tokens per
     // character where English costs a quarter of one. 1.4 was measured on
     // nothing and was wrong by about half.
-    var budget = Math.min(8000, 800 + Math.ceil(chars * 3.0) + batch.length * 14);
+    // 3.0 was still not enough: a 700-character batch with a 3,130-token
+    // ceiling truncated on Tony's machine. Hebrew runs one and a half to two
+    // and a half tokens per CHARACTER, a translation is usually longer than
+    // its English, and there is fixed JSON overhead per entry that dominates a
+    // small batch. 5.0 with a real floor, and the ceiling raised to match.
+    var budget = Math.min(10000, Math.max(2500, 800 + Math.ceil(chars * 5.0) + batch.length * 16));
     var raw = await aiCall(i18nPrompt(lang, batch), budget);
     var obj = extractJSON(raw) || {};
+    // v36.42 — the reply is keyed by POSITION. Asking for the English back as
+    // the key meant every answer carried a verbatim copy of everything sent,
+    // which is pure cost and was a third of what kept hitting the ceiling.
+    // Anything that is not a position we understand is ignored rather than
+    // guessed at; the shortfall check below then retries it.
     Object.keys(obj).forEach(function(k){
-      if (typeof obj[k] === 'string' && obj[k].trim()) dict[k] = obj[k].trim();
+      var v = obj[k];
+      if (typeof v !== 'string' || !v.trim()) return;
+      var idx = /^\d+$/.test(k) ? parseInt(k, 10) : -1;
+      if (idx >= 0 && idx < batch.length) dict[batch[idx]] = v.trim();
+      else if (batch.indexOf(k) !== -1) dict[k] = v.trim();   // older shape, still accepted
     });
   }
   // What a batch was ASKED for, minus what it answered. A model handed sixty
@@ -9543,7 +9618,8 @@ function i18nGapList() {
   var gaps = Object.create(null);
   i18nMissingList().forEach(function(s){ gaps[s] = 1; });
   i18nFullCatalogue().forEach(function(s){ if (!_i18nDict || !_i18nDict[s]) gaps[s] = 1; });
-  return Object.keys(gaps).sort();
+  // Belt and braces: nothing is ever SENT that would not be recorded.
+  return Object.keys(gaps).filter(i18nKeepable).sort();
 }
 async function i18nFillGaps(lang) {
   lang = lang || _i18nLang;

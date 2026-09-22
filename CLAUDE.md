@@ -578,6 +578,36 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **THE MISSING LIST IS AN INPUT, NOT A RECORD (v36.42).** `i18nGapList()`
+  feeds on it, so a bug fixed on Monday goes on being paid for every week until
+  someone clears what it wrote. Tony's device was carrying 400-odd keys like
+  `"+ sharedTitle); if (sharedText) got.push("` from before the lexer landed,
+  and the next gap-fill would have sent every one of them again.
+  `i18nLoadMissing()` now prunes through the CURRENT rules and rewrites the
+  stored list, `i18nNoteMissing()` refuses to record what it would not send,
+  and `i18nGapList()` filters again on the way out.
+- **`i18nLooksLikeCode()` errs towards KEEPING.** Two tiers: things no button
+  ever says (`innerHTML`, `=>`, `<div>`, this project's `(5f.5)` audit tags),
+  and hints that are damning only in pairs (a `);`, a hex colour, a `px`).
+  Wrongly rejecting a string leaves a button English for ever with no way to
+  notice; wrongly keeping one costs a fraction of a penny and shows up in the
+  editor as an orphan. The first version rejected four real strings, two of
+  them buttons — and `window\.` matched the English words *"inside the watchdog
+  window. That is usually…"*, which is why it now needs a letter after the dot.
+- **THE REPLY IS KEYED BY POSITION (v36.42).** Asking for `{english: hebrew}`
+  meant every answer carried a verbatim copy of everything sent — a third of
+  what kept hitting the token ceiling, paid for twice. Strings go out as a
+  numbered list and come back as `{"0": …}`. A reply keyed by the English is
+  still accepted, because the model sometimes does it anyway and discarding a
+  whole batch to make a point would be absurd.
+- **The token budget was wrong three times.** 1.4, then 3.0, and a 700-character
+  batch still truncated at a 3,130-token ceiling. Hebrew runs one and a half to
+  two and a half tokens per CHARACTER, a translation is usually longer than its
+  English, and fixed JSON overhead dominates a small batch — hence 5.0 with a
+  floor of 2,500 and a cap of 10,000, and batches sized so the formula never
+  reaches that cap. **When the cap binds instead of the formula, the formula is
+  decoration.** The test that matters is not the arithmetic but `runOrSplit()`:
+  a truncated batch is halved and re-asked until it answers.
 - **THE SCRAPE MUST LEX BEFORE IT MATCHES (v36.41).** Matching an opener and
   then walking forward pairing quotes is only safe if it STARTS at real code.
   An opener matched inside a comment or a regex literal leaves the walk half a
