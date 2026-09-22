@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.38 -->
+<!-- Tony's Recipes Collection v36.39 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3309,7 +3309,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.38';
+var APP_VERSION = 'v36.39';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5974,7 +5974,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.38</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.39</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6596,7 +6596,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.38</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.39</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8481,13 +8481,22 @@ var I18N_SCRAPE = [
   /\btoast\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,\s*\d+\s*)?\)/g,
   /\baskPrompt\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,[^)]*)?\)/g,
   /\bshowServiceError\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/g,
-  /\b(?:title|message|okLabel|cancelLabel|placeholder|label|hint)\s*:\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,}]/g
+  /\b(?:title|message|okLabel|cancelLabel|placeholder|label|hint|detail|fix|note)\s*:\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,}]/g,
+  // The header's status line, whose second argument is the words.
+  /\bsetDriveStatus\(\s*['"][^'"]*['"]\s*,\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/g,
+  // …and a label written straight into an element. Since v36.38 the observer
+  // sees these happen; this is what puts their words in the dictionary first.
+  /\.textContent\s*=\s*(['"])((?:\\.|(?!\1).)*)\1\s*;/g
 ];
 // Deliberately does NOT trim: a literal's trailing space is the space before
 // the hole. "Looking up " + name reads "Looking up{1}" without it.
 function i18nUnescape(v) {
-  return String(v).replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-                  .replace(/\\(['"\\])/g, '$1');
+  return String(v)
+    // \u2026 is an ellipsis in the source and an ellipsis on the screen. Left
+    // as six literal characters it is a key that can never match anything.
+    .replace(/\\u([0-9a-fA-F]{4})/g, function(_, h){ return String.fromCharCode(parseInt(h, 16)); })
+    .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+    .replace(/\\(['"\\])/g, '$1');
 }
 async function i18nScrapeSource() {
   var added = 0;
@@ -8554,6 +8563,7 @@ function i18nScanCall(src, start) {
     if (ch === ')') { depth--; if (depth === 0) return parts; i++; continue; }
     if (ch === ',' && depth === 1) return parts;       // the duration argument
     if (ch === '}' && depth === 1) return parts;       // end of an object property
+    if (ch === ';' && depth === 1) return parts;       // end of an assignment
     if (ch === '+' || /\s/.test(ch)) { i++; continue; }
     parts.push({ expr: true }); i++;
   }
@@ -8596,7 +8606,13 @@ function i18nPatternRegex(pat) {
 // 'Translating the app into ' + name }) is the same thing wearing a different
 // hat, and so are askConfirm's title and message. Each opener is followed by a
 // chain that ends at a top-level `)`, `,` or `}`.
-var I18N_PATTERN_OPENERS = /\btoast\(|\b(?:title|message|step|okLabel|cancelLabel)\s*:\s*/g;
+var I18N_PATTERN_OPENERS = new RegExp([
+  '\\btoast\\(',
+  '\\bshowServiceError\\(',
+  '\\b(?:title|message|step|okLabel|cancelLabel|detail|fix|note)\\s*:\\s*',
+  '\\bsetDriveStatus\\(\\s*[\'"][^\'"]*[\'"]\\s*,\\s*',
+  '\\.textContent\\s*=\\s*'
+].join('|'), 'g');
 function i18nBuildPatterns(src) {
   var found = Object.create(null), re = I18N_PATTERN_OPENERS, m;
   re.lastIndex = 0;
@@ -8604,7 +8620,21 @@ function i18nBuildPatterns(src) {
     var parts = i18nScanCall(src, m.index + m[0].length);
     if (!parts) continue;
     var pat = i18nPartsToPattern(parts);
-    if (pat) found[pat] = 1;
+    if (pat) { found[pat] = 1; continue; }
+    // No holes at all. That is not a reason to drop it: a long message is
+    // split across source lines to keep them readable, not because it has
+    // anything variable in it. Every sync-log finding longer than a line is
+    // this shape, and they are the whole point of the Logging panel.
+    var whole = '', allLit = parts.length > 1;
+    for (var k = 0; k < parts.length; k++) {
+      if (parts[k].lit === undefined) { allLit = false; break; }
+      whole += parts[k].lit;
+    }
+    if (!allLit) continue;
+    whole = whole.replace(/\s+/g, ' ').trim();
+    if (whole.length >= 12 && /[A-Za-z]{3}/.test(whole) && i18nTranslatable(whole)) {
+      _i18nHarvested[whole] = 1;
+    }
   }
   var list = Object.keys(found);
   // Longest literal content first: the most specific shape should win, or a
@@ -8653,7 +8683,15 @@ var I18N_EXTRA = [
   'Getting ready…', 'Stopping after this step…', 'Opening each panel in turn…',
   'Reading the app’s own messages',
   'Batch {1} of {2} · {3} phrases', '{1} of {2} batches', '{1} phrases to go',
-  'Working…', 'Checking…'
+  'Working…', 'Checking…',
+  // workerErrorText(): four `return` statements inside a ternary. No opener
+  // could reach them without also dragging in every AI prompt in this file,
+  // and those must never be translated — they are instructions to a model.
+  'The app key was rejected. Set APP_SHARED_KEY on the Worker to match, or clear it there to disable the check.',
+  'The Worker refused this origin. Add this site to ALLOWED_ORIGINS on the Worker.',
+  'Too many requests in the last minute. This is the Worker\u2019s own rate limit — wait a minute.',
+  'The Worker is missing configuration.',
+  'Worker error {1}'
 ];
 function i18nRegisterExtra() {
   I18N_EXTRA.forEach(function(str) {

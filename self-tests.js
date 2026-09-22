@@ -7538,6 +7538,27 @@ window.SELF_TESTS = [
         } finally { i18nInstall(prevLang, prevDict); }
       })();
 
+      // WHAT MUST NEVER BE TRANSLATED. Two things are written in English on
+      // purpose and would be actively harmful in Hebrew: the prompts sent to
+      // the model, and the reports Tony copies out to ask for help with. The
+      // scrape widened a long way in v36.39 and this is the line it must not
+      // cross.
+      ['Return ONLY a JSON object', 'SYNC LOG REPORT', 'WHAT THIS LOOKS LIKE',
+       'EVENTS (newest first)'].forEach(function(probe){
+        var hit = after.filter(function(x){ return x.indexOf(probe) !== -1; });
+        if(hit.length)
+          throw new Error('"'+probe+'" reached the catalogue. A prompt translated into Hebrew changes '
+            + 'what the model is asked, and a report in Hebrew cannot be read by whoever is helping: '
+            + JSON.stringify(hit[0].slice(0,70)));
+      });
+      // …and the things that MUST be there, because they are what the Logging
+      // panel exists to say and they only render when they apply.
+      if(!after.some(function(x){ return /watchdog window/.test(x); }))
+        throw new Error('a sync-log finding is not in the catalogue — a message split across source '
+          + 'lines with nothing variable in it is still one message');
+      if(!after.some(function(x){ return /ALLOWED_ORIGINS on the Worker/.test(x); }))
+        throw new Error('the Worker\u2019s refusal messages are not in the catalogue');
+
       // A long help passage is ONE unit and must survive the length cap. The
       // WhatsApp manual is 1,400 characters and was being dropped in silence.
       if(!after.some(function(s){ return s.length>1000; }))

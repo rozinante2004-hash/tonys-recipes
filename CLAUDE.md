@@ -578,6 +578,26 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **THE LINE THE SCRAPE MUST NOT CROSS (v36.39).** Two kinds of English in this
+  file are written in English *on purpose* and would be actively harmful
+  translated: the **prompts sent to the model** (translating one changes what
+  the model is asked) and the **copyable reports** — the sync log report and the
+  self-test report — which are pasted to whoever is helping and must stay
+  readable to them. The scrape is therefore driven by a list of openers that
+  produce user-visible text (`toast(`, `showServiceError(`, `setDriveStatus(…,`,
+  `.textContent =`, and the properties `title/message/step/okLabel/cancelLabel/
+  detail/fix/note`) and NOT by "every string literal". A general `return`
+  opener was considered and rejected: it would have pulled in every prompt in
+  the file. The test asserts all four probes stay out.
+- **A message with NO holes is still a message.** A long finding is split across
+  source lines to keep them readable, not because anything in it varies —
+  `i18nPartsToPattern` returns null for those, and for a while they were simply
+  dropped. Every sync-log finding longer than one line is that shape, and they
+  are the entire point of the Logging panel.
+- **`\u2026` in the source is an ellipsis on the screen.** Left as six literal
+  characters by the unescaper it is a key that can never match anything.
+- **`workerErrorText()` is in `I18N_EXTRA`** — four `return`s inside a ternary,
+  unreachable by any opener that does not also drag in the prompts.
 - **WHICH English is this element's English? (v36.38)** The copy parked in
   `data-i18n-src` is right only while the element still says what it said when
   it was parked, *or* says the translation we put there. A third value means the
