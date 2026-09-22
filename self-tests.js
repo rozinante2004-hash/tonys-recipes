@@ -7557,6 +7557,77 @@ window.SELF_TESTS = [
           +'", now "'+openIds()+'"');
     } },
 
+  { id:'ui_long_jobs_show_progress', group:'UI', name:'A long job says how far in and how long left (v36.38)',
+    test: async()=>{
+      ['progressOpen','progressStep','progressClose','progressCancel','progressCancelled','progEtaWords']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var ov=document.getElementById('progOverlay');
+      if(!ov) throw new Error('#progOverlay is not in the page');
+      try{
+        progressOpen({ icon:'🌍', title:'Translating', total:10, step:'Getting ready…' });
+        if(!ov.classList.contains('open')) throw new Error('the panel did not open');
+        var ring=document.getElementById('progRing');
+        // Before the first step there is no honest number, so it turns rather
+        // than sitting at 0% looking hung.
+        if(!ring.classList.contains('indeterminate'))
+          throw new Error('it claims a percentage before a single step has finished');
+
+        _prog.started = Date.now() - 3*9000;          // three steps, nine seconds each
+        progressStep(3, 'Batch 3 of 10');
+        if(ring.classList.contains('indeterminate'))
+          throw new Error('it is still spinning after real progress arrived');
+        if(document.getElementById('progPct').textContent!=='30%')
+          throw new Error('it shows '+document.getElementById('progPct').textContent+' at 3 of 10');
+        // The ring IS the countdown — a number that moves and a ring that does
+        // not is worse than no ring.
+        var off=parseFloat(ring.style.strokeDashoffset);
+        if(Math.abs(off - PROG_CIRC*0.7) > 1)
+          throw new Error('the ring is at '+Math.round(off)+', not 70% of the way round');
+        // 7 steps left at 9s each is about a minute, and it must say so rather
+        // than counting seconds it cannot really know.
+        var eta=document.getElementById('progEta').textContent;
+        if(!/minute|second/.test(eta)) throw new Error('no time estimate: '+JSON.stringify(eta));
+
+        if(progEtaWords(3000)!=='almost done') throw new Error('3 seconds is not "almost done"');
+        if(!/about 30 seconds/.test(progEtaWords(28000)))
+          throw new Error('28 seconds reads as '+progEtaWords(28000));
+        if(progEtaWords(70000)!=='about a minute left') throw new Error('70 seconds is not "about a minute"');
+
+        progressStep(10,'done');
+        if(document.getElementById('progEta').textContent!=='finishing…')
+          throw new Error('at 100% it still promises time left');
+
+        // Cancelling is a request, not an abort: work already paid for lands.
+        if(progressCancelled()) throw new Error('it started out cancelled');
+        progressCancel();
+        if(!progressCancelled()) throw new Error('cancel did not register');
+      } finally { progressClose(); }
+      if(ov.classList.contains('open')) throw new Error('the panel stayed on screen');
+      if(progressCancelled()) throw new Error('the cancelled flag outlived the job it belonged to');
+    } },
+
+  { id:'ui_sign_in_says_why', group:'UI', name:'The app can say why sign-in failed (v36.38)',
+    test: async()=>{
+      ['diagnoseSignIn','probeApiKey','signInDiagLines'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('signInDiag')) throw new Error('#signInDiag is not in the page');
+      if(!document.getElementById('signInDiagBtn'))
+        throw new Error('there is no way to ask — the check is unreachable from the login screen');
+      // The key has to be known even when the Firebase scripts never loaded,
+      // because that is exactly when somebody needs to know if it is blocked.
+      if(!window._fbConfigApiKey)
+        throw new Error('the app does not know its own API key, so it can never test it');
+      var L=signInDiagLines();
+      var names=L.map(function(r){ return r[0]; });
+      ['Page','Network','Firebase SDK','Auth object','Signed in as'].forEach(function(k){
+        if(names.indexOf(k)===-1) throw new Error('the check does not report '+k);
+      });
+      // It must name the ORIGIN, since a referrer block is about exactly that
+      // and is otherwise invisible.
+      if(L[0][1].indexOf(location.origin)===-1)
+        throw new Error('it does not say which origin the browser is sending');
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']

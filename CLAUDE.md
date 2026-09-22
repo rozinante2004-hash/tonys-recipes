@@ -578,6 +578,50 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **WHICH English is this element's English? (v36.38)** The copy parked in
+  `data-i18n-src` is right only while the element still says what it said when
+  it was parked, *or* says the translation we put there. A third value means the
+  APP rewrote it — a status line, a step, a countdown — and the parked value is
+  stale. Using it anyway pins the element to whatever it happened to say the
+  first time it was seen: the long-job panel's title stayed "Working…" for ever,
+  however many times the job set its own. `data-i18n-at` records what we wrote;
+  the same three-way comparison applies to attributes.
+- **`el.textContent = '…'` adds a TEXT node, and a text node is not an element.**
+  The observer walked past it, and since the element had never been touched
+  there was no parked English to catch it either. The whole long-job panel was
+  invisible to translation for that reason. An added non-empty text node now
+  queues its parent.
+- **`I18N_EXTRA` is the last resort, and stays short.** Everything else finds
+  strings by *looking* — at the DOM, or at the source of a `toast()` call.
+  `progEtaWords()` builds "about 30 seconds left" from a number and a branch and
+  writes it straight in; nothing would ever have found it whole. Anything listed
+  there must really be shown, or it is money spent translating a string nobody
+  sees.
+- **A shape's EDGE hole must swallow at least one character.** Otherwise
+  `{1}Saved {2} recipes` matches everything `Saved {1} recipes` does, the two are
+  indistinguishable, and which wins is an accident of sort order. Inside the
+  sentence an empty hole is legitimate.
+- **A long job shows a ring and a countdown (v36.38).** Generating a language is
+  ten AI calls and most of a minute; a toast saying "40%" says the job is alive
+  but not whether to put the phone down. `progressOpen/Step/Close`. The estimate
+  is *measured* (elapsed per finished step, extrapolated) and smoothed, because
+  a raw estimate after one slow call reads "4 minutes" and makes people give up
+  on a forty-second job. Before the first step it spins rather than sitting at
+  0% looking hung. Cancelling is a request checked *between* steps — an AI call
+  already paid for is allowed to land and what it returned is kept.
+- **The app can say why sign-in failed (v36.38).** "It keeps connecting in
+  Offline mode" is the symptom of at least six causes and every one of them is
+  invisible from inside the page. `diagnoseSignIn()` reports the origin, the
+  network, whether the SDK loaded, whether auth was created, standalone vs tab,
+  and the last auth error code — then probes `identitytoolkit.googleapis.com`
+  with the app's own key, because **an HTTP-referrer block on that key is
+  completely silent**: Firebase reports it as a generic network failure.
+  `window._fbConfigApiKey` is set at parse time, NOT inside `initFirebase()` —
+  when the scripts fail to load that function never runs, and that is precisely
+  when the key needs testing.
+  - The popup runs on `recipes-f379d.firebaseapp.com`, so the key's website
+    restrictions need **both** that domain and the app's own. The second is the
+    easy one to miss.
 - **A message built out of pieces is translated as a SHAPE (v36.37).**
   `toast('Saved ' + n + ' recipes')` never exists as a string until it is shown,
   and it is a different string every time — 81 of the 250 toasts here are that
