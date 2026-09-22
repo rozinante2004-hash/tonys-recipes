@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.39 -->
+<!-- Tony's Recipes Collection v36.40 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3309,7 +3309,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.39';
+var APP_VERSION = 'v36.40';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5974,7 +5974,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.39</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.40</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6596,7 +6596,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.39</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.40</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8439,26 +8439,47 @@ var _i18nHarvested = Object.create(null);
 function i18nCollect() {
   i18nCatalogue().forEach(function(k){ _i18nHarvested[k] = 1; });
 }
+// Drawn TWICE: once as the app looks now, once as it looks signed in.
+//
+//     when: signedIn ? 'always, while signed in' : 'not in use — you are signed out'
+//
+// Whichever branch happens to be true when a language is generated is the only
+// one that ever reaches the dictionary. Tony is signed in and the harvest was
+// not, so half the privacy panel could not have been found however many times
+// it was drawn. The pretend user is only ever READ — every entry in the list
+// draws, none of them act — and it is put back whatever happens.
 async function i18nHarvest(onScreen) {
-  var realToast = window.toast, drawn = [];
+  var realToast = window.toast, realUser = window._fbUser, drawn = [];
   window.toast = function(){};
   try {
-    for (var i = 0; i < I18N_HARVEST.length; i++) {
-      try {
-        await I18N_HARVEST[i][1]();
-        i18nCollect();
-        drawn.push(I18N_HARVEST[i][0]);
-        if (onScreen) { try { onScreen(I18N_HARVEST[i][0]); } catch(e) {} }
-      } catch(e) { dlog('[i18n] could not harvest ' + I18N_HARVEST[i][0], e && e.message); }
-    }
+    await i18nHarvestPass(drawn, onScreen);
+    // …then again as the OTHER kind of user. Symmetric on purpose: signed in,
+    // the signed-out wording is what is missing, and signed out it is the
+    // signed-in wording. Doing only one of the two just moves which half of the
+    // panel stays English.
+    window._fbUser = realUser
+      ? null
+      : { email: 'someone@example.invalid', displayName: '\u00b7' };
+    try { await i18nHarvestPass(null, null); }
+    finally { window._fbUser = realUser; }
     // …and the messages that never have a screen at all.
     try {
       var n = await i18nScrapeSource();
       if (n) drawn.push(n + ' messages from the source');
     } catch(e) { dlog('[i18n] scrape failed', e && e.message); }
     i18nRegisterExtra();
-  } finally { window.toast = realToast; }
+  } finally { window.toast = realToast; window._fbUser = realUser; }
   return drawn;
+}
+async function i18nHarvestPass(drawn, onScreen) {
+  for (var i = 0; i < I18N_HARVEST.length; i++) {
+    try {
+      await I18N_HARVEST[i][1]();
+      i18nCollect();
+      if (drawn) drawn.push(I18N_HARVEST[i][0]);
+      if (onScreen) { try { onScreen(I18N_HARVEST[i][0]); } catch(e) {} }
+    } catch(e) { dlog('[i18n] could not harvest ' + I18N_HARVEST[i][0], e && e.message); }
+  }
 }
 // ─── THE MESSAGES THAT HAVE NO SCREEN (v36.36) ───────────────────────────────
 // Drawing every panel still misses the largest category of all: a toast, a

@@ -6850,9 +6850,18 @@ window.SELF_TESTS = [
         throw new Error('the test suite is inlined in index.html again — every device is downloading it');
       if(src.indexOf('self-tests.js')===-1)
         throw new Error('index.html does not reference self-tests.js, so the suite can never be fetched');
-      // A ceiling with headroom, not a tripwire on every edit.
+      // A ceiling with headroom, not a tripwire on every edit. Raised to 1300
+      // in v36.40: the two structural checks above are what actually prove the
+      // suite is not inlined, and they both passed while this fired — the app
+      // itself grew about 70 KB across v36.31–v36.39 (the translation engine,
+      // its editor, the harvest and scrape, the long-job panel and the sign-in
+      // check). Raising a budget for real growth is honest; leaving it to fire
+      // and be ignored is not, and neither is a message that names a cause it
+      // has not established.
       var kb = Math.round(src.length/1024);
-      if(kb > 1200) throw new Error('index.html is '+kb+' KB — the suite or something like it is back inside it');
+      if(kb > 1300) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+        + 'checked above — so this is the app growing. Either something large went in that should not '
+        + 'have, or the budget needs raising on purpose rather than by accident.');
 
       // Default OFF, and the menu entry follows the setting.
       var prev = null;
@@ -7461,6 +7470,21 @@ window.SELF_TESTS = [
       });
       if(after.some(function(s){ return /\((?:[1-9]\d*|0)\)$/.test(s) && /history|log|photo|away/i.test(s); }))
         throw new Error('a key still ends in a literal count');
+
+      // BOTH SIDES OF A CONDITION. `when: signedIn ? 'always, while signed in'
+      // : 'not in use — you are signed out'` puts a panel's worth of text
+      // behind a ternary, and whichever branch is true when a language is
+      // generated is the only one that ever reaches the dictionary. Tony is
+      // signed in and the harvest was not, so half the privacy panel could not
+      // have been found however many times it was drawn.
+      ['always, while signed in', 'not in use — you are signed out'].forEach(function(x){
+        if(!after.some(function(k){ return k.indexOf(x)!==-1; }))
+          throw new Error('"'+x+'" is not in the catalogue — only one side of the signed-in '
+            + 'condition is being drawn, so the other half stays English for ever');
+      });
+      // …and the pretending must not survive the harvest.
+      if(window._fbUser && window._fbUser.email==='someone@example.invalid')
+        throw new Error('the stand-in user used to draw the signed-in wording was left signed in');
 
       // The messages that have no screen. A toast or a confirmation lives
       // inside the function that raises it and is never in the DOM to be found

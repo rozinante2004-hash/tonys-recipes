@@ -578,6 +578,15 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **BOTH SIDES OF A CONDITION (v36.40).** `when: signedIn ? 'always, while
+  signed in' : 'not in use — you are signed out'` puts a panel's worth of text
+  behind a ternary, and whichever branch is true when a language is generated is
+  the only one that ever reaches the dictionary. Tony is signed in; the harvest
+  was not; so half the privacy panel could not have been found however many
+  times it was drawn. `i18nHarvest()` now runs **twice**, the second pass with
+  `_fbUser` flipped — symmetric on purpose, because doing only one of the two
+  just moves which half stays English. The stand-in user is only ever READ and
+  is restored in a `finally`; the test asserts it does not survive.
 - **THE LINE THE SCRAPE MUST NOT CROSS (v36.39).** Two kinds of English in this
   file are written in English *on purpose* and would be actively harmful
   translated: the **prompts sent to the model** (translating one changes what
