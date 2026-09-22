@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.36 -->
+<!-- Tony's Recipes Collection v36.37 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3305,7 +3305,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.36';
+var APP_VERSION = 'v36.37';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5918,7 +5918,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.36</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.37</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6540,7 +6540,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.36</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.37</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8380,9 +8380,11 @@ var I18N_SCRAPE = [
   /\bshowServiceError\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/g,
   /\b(?:title|message|okLabel|cancelLabel|placeholder|label|hint)\s*:\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,}]/g
 ];
+// Deliberately does NOT trim: a literal's trailing space is the space before
+// the hole. "Looking up " + name reads "Looking up{1}" without it.
 function i18nUnescape(v) {
   return String(v).replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-                  .replace(/\\(['"\\])/g, '$1').trim();
+                  .replace(/\\(['"\\])/g, '$1');
 }
 async function i18nScrapeSource() {
   var added = 0;
@@ -8390,11 +8392,12 @@ async function i18nScrapeSource() {
     var res = await fetch(location.href, { cache: 'force-cache' });
     if (!res.ok) return 0;
     var src = await res.text();
+    i18nBuildPatterns(src);
     I18N_SCRAPE.forEach(function(re) {
       re.lastIndex = 0;
       var m;
       while ((m = re.exec(src)) !== null) {
-        var v = i18nUnescape(m[2]);
+        var v = i18nUnescape(m[2]).trim();
         // A single token carrying a dot, a slash or an @ is an example value,
         // not a sentence — "123456789-abc.apps.googleusercontent.com" is the
         // placeholder in the Gmail Client ID box and must stay exactly that.
@@ -8407,6 +8410,115 @@ async function i18nScrapeSource() {
   return added;
 }
 window.i18nScrapeSource = i18nScrapeSource;
+
+// ─── MESSAGES BUILT OUT OF PIECES (v36.37) ───────────────────────────────────
+// `toast('Saved ' + n + ' recipes')` never exists as a string anywhere until it
+// is shown, and the string it becomes is different every time. 81 of this
+// app's 250 toasts are that shape, and none of them could ever match a
+// dictionary key — which is why they stayed English through three releases of
+// trying.
+//
+// So the call site is read as a SHAPE: literal, hole, literal. "Saved {1}
+// recipes" is translated once, and at display time a message that fits the
+// shape is recognised and the pieces are put back into the translation. The
+// pieces themselves are never translated — they are counts, names and file
+// sizes, which is exactly right.
+var _i18nPatterns = [];          // [{ pat, re }], most specific first
+
+// A tiny scanner rather than a regex: the argument is a chain of string
+// literals and expressions, and expressions contain brackets, commas and
+// strings of their own. Only a literal at the TOP level of the chain is part of
+// the message — `x ? 'yes' : 'no'` is a decision, not words.
+function i18nScanCall(src, start) {
+  var i = start, depth = 1, parts = [];
+  while (i < src.length) {
+    var ch = src[i];
+    if (ch === '`') return null;                       // template literal: not handled
+    if (ch === "'" || ch === '"') {
+      var q = ch, lit = ''; i++;
+      while (i < src.length) {
+        if (src[i] === '\\') { lit += src[i] + src[i + 1]; i += 2; continue; }
+        if (src[i] === q) break;
+        lit += src[i]; i++;
+      }
+      i++;
+      if (depth === 1) parts.push({ lit: i18nUnescape(lit) });
+      else parts.push({ expr: true });
+      continue;
+    }
+    if (ch === '(' || ch === '[') { depth++; parts.push({ expr: true }); i++; continue; }
+    if (ch === ']') { depth--; i++; continue; }
+    if (ch === ')') { depth--; if (depth === 0) return parts; i++; continue; }
+    if (ch === ',' && depth === 1) return parts;       // the duration argument
+    if (ch === '+' || /\s/.test(ch)) { i++; continue; }
+    parts.push({ expr: true }); i++;
+  }
+  return null;
+}
+// literal, hole, literal → "Saved {1} recipes"
+function i18nPartsToPattern(parts) {
+  var out = '', n = 0, lastWasExpr = false, litChars = 0;
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i].lit !== undefined) {
+      out += parts[i].lit; litChars += parts[i].lit.length; lastWasExpr = false;
+    } else if (!lastWasExpr) {
+      out += '{' + (++n) + '}'; lastWasExpr = true;
+    }
+  }
+  out = out.replace(/\s+/g, ' ').trim();
+  // Needs a hole to be worth the machinery, and enough words that the shape
+  // identifies one message rather than half the app. "{1}" on its own would
+  // match every string there is.
+  if (!n || litChars < 8 || !/[A-Za-z]{3}/.test(out)) return null;
+  if (out.length > I18N_MAX_LEN) return null;
+  return out;
+}
+function i18nPatternRegex(pat) {
+  var body = pat.split(/(\{\d+\})/).map(function(seg) {
+    if (/^\{\d+\}$/.test(seg)) return '([\\s\\S]*?)';
+    return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ +/g, '\\s+');
+  }).join('');
+  try { return new RegExp('^' + body + '$'); } catch(e) { return null; }
+}
+function i18nBuildPatterns(src) {
+  var found = Object.create(null), re = /\btoast\(/g, m;
+  while ((m = re.exec(src)) !== null) {
+    var parts = i18nScanCall(src, m.index + m[0].length);
+    if (!parts) continue;
+    var pat = i18nPartsToPattern(parts);
+    if (pat) found[pat] = 1;
+  }
+  var list = Object.keys(found);
+  // Longest literal content first: the most specific shape should win, or a
+  // loose one swallows a message a tighter one describes exactly.
+  list.sort(function(a, b) { return b.replace(/\{\d+\}/g, '').length - a.replace(/\{\d+\}/g, '').length; });
+  _i18nPatterns = [];
+  list.forEach(function(pat) {
+    var rx = i18nPatternRegex(pat);
+    if (rx) { _i18nPatterns.push({ pat: pat, re: rx }); _i18nHarvested[pat] = 1; }
+  });
+  return _i18nPatterns.length;
+}
+// Does this runtime string fit a shape we have a translation for?
+function i18nMatchPattern(text) {
+  if (!_i18nDict || !_i18nPatterns.length) return null;
+  for (var i = 0; i < _i18nPatterns.length; i++) {
+    var p = _i18nPatterns[i];
+    var to = _i18nDict[p.pat];
+    if (!to) continue;
+    var m = p.re.exec(text);
+    if (!m) continue;
+    // Put the pieces back where the translation asks for them.
+    return String(to).replace(/\{(\d+)\}/g, function(_, d) {
+      var v = m[parseInt(d, 10)];
+      return v === undefined ? '' : v;
+    });
+  }
+  return null;
+}
+window.i18nBuildPatterns = i18nBuildPatterns; window.i18nMatchPattern = i18nMatchPattern;
+window.i18nScanCall = i18nScanCall; window.i18nPartsToPattern = i18nPartsToPattern;
+
 
 // Everything the app can show, including the screens that are not showing now.
 // This is what a translation is generated from. i18nCatalogue() stays strictly
@@ -8486,6 +8598,9 @@ function i18nApply(root) {
     for (var i = 0; i < units.length; i++) {
       var u = units[i];
       var to = _i18nDict ? _i18nDict[u.key] : null;
+      // v36.37 — no exact answer? The message may have been BUILT: "Saved 12
+      // recipes" is not a key and never will be, but "Saved {1} recipes" is.
+      if (!to && u.key.length < 300) to = i18nMatchPattern(u.key);
       // v36.32 — anything the dictionary cannot answer is REMEMBERED rather
       // than silently left in English. This is the only mechanism that can see
       // a string which exists solely inside a function that has not run yet,

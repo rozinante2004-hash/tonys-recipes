@@ -578,6 +578,25 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **A message built out of pieces is translated as a SHAPE (v36.37).**
+  `toast('Saved ' + n + ' recipes')` never exists as a string until it is shown,
+  and it is a different string every time — 81 of the 250 toasts here are that
+  shape, and none of them could ever match a key. So the call site is read by a
+  small scanner (`i18nScanCall`) into "Saved {1} recipes", that is translated
+  once, and at display time `i18nMatchPattern()` recognises a message that fits
+  and puts the pieces back. The pieces are never translated: they are counts,
+  names and file sizes.
+  - **A scanner, not a regex.** The argument is a chain of literals and
+    expressions, and expressions contain brackets, commas and strings of their
+    own — only a literal at the TOP level of the chain is part of the message.
+    `x ? 'yes' : 'no'` is a decision, not words.
+  - **Do not trim the pieces.** A literal's trailing space is the space before
+    the hole; trimming gives "Looking up{1}…", which matches nothing. The
+    scrape trims at its own call site instead.
+  - **A shape needs real words** (≥8 literal characters and a hole) or it
+    swallows unrelated messages. Patterns are tried longest-literal first so the
+    most specific wins, matching is anchored, and a miss returns null rather
+    than a guess.
 - **A PLACEHOLDER is chrome even inside `dir="auto"` (v36.36).** That marking is
   about the recipe text somebody types INTO the field; the grey hint behind it
   is "e.g. 20 min" and never was. Until v36.36 the whole ingredient and method

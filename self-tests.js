@@ -7499,6 +7499,45 @@ window.SELF_TESTS = [
         } finally { probe.remove(); }
       })();
 
+      // MESSAGES BUILT OUT OF PIECES. "Saved 12 recipes" is not a key and never
+      // can be — the number is different every time — so the call site is read
+      // as a shape and the pieces are put back at display time.
+      ['i18nScanCall','i18nPartsToPattern','i18nMatchPattern','i18nBuildPatterns']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      (function(){
+        var shape=function(src){
+          var at=src.indexOf('toast(')+6;
+          var parts=i18nScanCall(src, at);
+          return parts ? i18nPartsToPattern(parts) : null;
+        };
+        // The space before a hole belongs to the literal before it. Trimming
+        // each piece gave "Looking up{1}…", which matches nothing.
+        if(shape("toast('Looking up ' + name + '…')")!=='Looking up {1}…')
+          throw new Error('a hole lost the space in front of it: '+JSON.stringify(shape("toast('Looking up ' + name + '…')")));
+        if(shape("toast('Saved ' + n + ' recipes', 4000)")!=='Saved {1} recipes')
+          throw new Error('the duration argument was read as part of the message');
+        // A string inside an expression is a decision, not words.
+        if(/yes|no/.test(String(shape("toast('It is ' + (x ? 'yes' : 'no') + ' today here')"))))
+          throw new Error('a string inside a ternary was treated as part of the message');
+        // A shape with almost no words of its own would match half the app.
+        if(shape("toast(a + ' - ' + b)"))
+          throw new Error('a shape with no real words was kept: it would swallow unrelated messages');
+        if(shape("toast(`a ${b} c`)")) throw new Error('a template literal was guessed at');
+      })();
+      // …and matching puts the pieces back rather than translating them.
+      (function(){
+        var prevDict=i18nCurrentDict(), prevLang=i18nLang();
+        try{
+          var d={}; after.forEach(function(k){ d[k]='«'+k+'»'; });
+          i18nInstall('he', d);
+          var got=i18nMatchPattern('Looking up Dutch…');
+          if(got!=='«Looking up Dutch…»')
+            throw new Error('a built message did not match its shape, or the piece was lost: '+JSON.stringify(got));
+          if(i18nMatchPattern('zzz nothing like any message in this app zzz')!==null)
+            throw new Error('an unrelated string matched a shape — a loose pattern will mangle real messages');
+        } finally { i18nInstall(prevLang, prevDict); }
+      })();
+
       // A long help passage is ONE unit and must survive the length cap. The
       // WhatsApp manual is 1,400 characters and was being dropped in silence.
       if(!after.some(function(s){ return s.length>1000; }))
