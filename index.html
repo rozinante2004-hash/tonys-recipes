@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.43 -->
+<!-- Tony's Recipes Collection v36.44 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -837,7 +837,7 @@ function renderLoggingPanel() {
     h += '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">';
     list.forEach(function(e, i) {
       h += '<div style="padding:8px 11px;font-size:12px;line-height:1.5;'
-         + (i ? 'border-top:1px solid var(--border);' : '') + '">'
+         + (i ? 'border-top:1px solid var(--border);' : '') + '" data-no-i18n>'
          + '<div style="color:var(--muted);font-size:11px;">' + escH(new Date(e.at).toLocaleString())
          + ' · ' + escH(e.k) + '</div>'
          + '<div dir="auto" style="color:var(--ink);">' + escH(e.m) + '</div>'
@@ -3312,7 +3312,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.43';
+var APP_VERSION = 'v36.44';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5978,7 +5978,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.43</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.44</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6600,7 +6600,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.43</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.44</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8305,8 +8305,14 @@ function i18nUnits(root) {
     // its own separate and possibly different translation. So the DICTIONARY
     // KEY is the sentence without its bookends, while the node keeps the whole
     // thing, because that is what says where the icon goes back.
+    // v36.44 — i18nKeepable, not i18nTranslatable. Everything else in the app
+    // already refuses to RECORD or SEND a string that reads as source code;
+    // this is the one place that was still happily translating one if it
+    // happened to be on screen. A sync-log entry quoting a code fragment is
+    // exactly that, and paying to translate it is the least of the problem:
+    // every message ever logged would otherwise become a dictionary key.
     var e = i18nEdges(src);
-    return i18nTranslatable(e.core)
+    return i18nKeepable(e.core)
       ? { el: el, attr: null, src: src, key: e.core, pre: e.pre, post: e.post }
       : null;
   }
@@ -8338,7 +8344,7 @@ function i18nUnits(root) {
       var cur = el.getAttribute('data-i18n-' + a);
       if (cur === null) cur = live;
       else if (live !== null && live !== cur && live !== el.getAttribute('data-i18n-at-' + a)) cur = live;
-      if (cur !== null && i18nTranslatable(cur)) {
+      if (cur !== null && i18nKeepable(cur)) {
         out.push({ el: el, attr: a, src: cur, key: cur, pre: '', post: '' });
       }
     });
@@ -8377,7 +8383,7 @@ function i18nCatalogue(root) {
 // is read-only by construction — each entry is a render function, never an
 // action — and `toast` is muted because a few of them announce what they found.
 var I18N_HARVEST = [
-  ['the filter bar',        function(){ renderFilters(); }],
+  ['the filter bar',        function(){ i18nHarvestFilters(); }],
   ['logging & debugging',   function(){ renderLoggingPanel(); }],
   ['sync health',           function(){ renderSyncHealth(); }],
   ['what leaves this device', function(){ renderPrivacyPanel(); }],
@@ -8441,6 +8447,22 @@ function i18nHarvestView() {
     // If he WAS reading something, put it back rather than leaving the
     // stand-in's nonsense on the screen in front of him.
     if (wasOpen && prevId !== null) { try { drawView(); } catch(e) {} }
+  }
+}
+// The filter bar hides its own buttons when they would do nothing: "📷 No
+// photo (N)" is drawn only if some recipe HAS no photo. Tony's library is fully
+// illustrated, so on his machine that button never rendered and its words could
+// never reach the dictionary — the same shape of hole as `signedIn ? … : …`.
+// A stand-in with no photograph makes the branch true for one render.
+function i18nHarvestFilters() {
+  var ghost = i18nHarvestRecipe();
+  ghost.id = -2; ghost.photo = ''; ghost.isClip = false;
+  recipes.push(ghost);
+  try { renderFilters(); i18nCollect(); }
+  finally {
+    var at = recipes.indexOf(ghost);
+    if (at !== -1) recipes.splice(at, 1);
+    try { renderFilters(); } catch(e) {}      // put the real bar back
   }
 }
 function i18nHarvestRecipe() {
@@ -9751,8 +9773,23 @@ function i18nEdKeys() {
   i18nFullCatalogue().forEach(function(k){ seen[k] = 1; });
   i18nMissingList().forEach(function(k){ seen[k] = 1; });
   var live = Object.keys(seen);
-  Object.keys(_i18nEdDraft || {}).forEach(function(k){ if (!seen[k]) seen[k] = 2; });
-  return { all: Object.keys(seen).sort(), orphan: function(k){ return seen[k] === 2; }, live: live.length };
+  // Two very different things get called "orphan", and lumping them together
+  // makes the useful one unusable. Tony's Hebrew file holds 2,395 entries
+  // against a catalogue of 1,231: about 1,150 of them are code fragments the
+  // pre-lexer scrape put there, and a handful are real English that was
+  // reworded. Offering "remove 1,160 orphans" hides the second kind inside the
+  // first, and those are the ones worth reading before deleting.
+  Object.keys(_i18nEdDraft || {}).forEach(function(k) {
+    if (seen[k]) return;
+    seen[k] = i18nKeepable(k) ? 2 : 3;      // 2 = reworded English, 3 = junk
+  });
+  return {
+    all: Object.keys(seen).sort(),
+    orphan:  function(k){ return seen[k] === 2 || seen[k] === 3; },
+    junk:    function(k){ return seen[k] === 3; },
+    stale:   function(k){ return seen[k] === 2; },
+    live: live.length
+  };
 }
 
 function i18nEdRender() {
@@ -9786,12 +9823,17 @@ function i18nEdRender() {
       + (info.all.length - missing) + ' translated, ' + missing + ' not'
       + (rows.length > I18N_ED_PAGE ? ' · showing the first ' + I18N_ED_PAGE + ' — search to narrow it' : '')
       + (_i18nEdDirty ? ' · UNSAVED CHANGES' : '');
-    var orphans = info.all.filter(info.orphan).length;
-    if (orphans) {
+    var junk  = info.all.filter(info.junk).length;
+    var stale = info.all.filter(info.stale).length;
+    if (junk || stale) {
+      var link = function(fn, label) {
+        return ' · <button onclick="' + fn + '" data-no-i18n style="background:none;border:none;'
+          + 'color:var(--terracotta);cursor:pointer;font:inherit;text-decoration:underline;padding:0;">'
+          + label + '</button>';
+      };
       cnt.innerHTML = escH(cnt.textContent)
-        + ' · <button onclick="i18nEdDropOrphans()" data-no-i18n style="background:none;border:none;'
-        + 'color:var(--terracotta);cursor:pointer;font:inherit;text-decoration:underline;padding:0;">'
-        + 'remove ' + orphans + ' orphan' + (orphans === 1 ? '' : 's') + '</button>';
+        + (junk  ? link('i18nEdDropJunk()',    'remove ' + junk + ' unusable') : '')
+        + (stale ? link('i18nEdDropOrphans()', 'remove ' + stale + ' orphan' + (stale === 1 ? '' : 's')) : '');
     }
     cnt.style.color = _i18nEdDirty ? 'var(--terracotta)' : 'var(--muted)';
   }
@@ -9893,9 +9935,29 @@ window.i18nEdTake = i18nEdTake;
 // most of the new one, which is why they are shown rather than hidden. But a
 // bad scrape can also leave hundreds of them — v36.41 fixed one that put code
 // fragments into Tony's paid Hebrew file — and then they are just weight.
+// The junk half: entries whose KEY is not something a person would ever read.
+// Nothing is lost by removing them — they cannot match anything on screen,
+// because nothing on screen looks like that.
+async function i18nEdDropJunk() {
+  var info = i18nEdKeys();
+  var junk = info.all.filter(info.junk);
+  if (!junk.length) { toast('There is nothing unusable to remove.'); return; }
+  var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + junk.length + ' unusable entr(ies)?',
+    message: 'These are not interface text — they are fragments of the app\u2019s own source that an '
+      + 'earlier version of the string finder recorded by mistake.\n\nThey cannot match anything on '
+      + 'screen, so nothing changes except the size of the file.',
+    okLabel: 'Remove them' });
+  if (!ok) return;
+  junk.forEach(function(k){ delete _i18nEdDraft[k]; });
+  _i18nEdDirty = true;
+  i18nEdRender();
+  toast('🧹 ' + junk.length + ' removed. Press Save to keep the change.', 6000);
+}
+window.i18nEdDropJunk = i18nEdDropJunk;
+
 async function i18nEdDropOrphans() {
   var info = i18nEdKeys();
-  var orphans = info.all.filter(info.orphan);
+  var orphans = info.all.filter(info.stale);
   if (!orphans.length) { toast('There are no orphans to remove.'); return; }
   var ok = await askConfirm({ icon: '🧹', title: 'Remove ' + orphans.length + ' orphaned entr(ies)?',
     message: 'These are translations whose English no longer appears anywhere in the app — either it was '

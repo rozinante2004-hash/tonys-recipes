@@ -7513,8 +7513,45 @@ window.SELF_TESTS = [
           );
       });
 
+      // THE LOG'S OWN EVENTS ARE NOT INTERFACE TEXT. They are diagnostics, they
+      // are what gets pasted to whoever is helping, and there is no end to
+      // them — every message ever logged would become a dictionary key. Tony's
+      // log was carrying entries that quoted code fragments, and those were
+      // being catalogued and translated.
+      (function(){
+        var kOn = null, kLog = null;
+        try { kOn = localStorage.getItem('tonys_log_enabled'); kLog = localStorage.getItem('tonys_sync_log'); } catch(e) {}
+        try {
+          localStorage.setItem('tonys_log_enabled','1');
+          localStorage.setItem('tonys_sync_log', JSON.stringify([{ at: Date.now(), k: 'ai',
+            m: 'ZQXJLOGMESSAGE recorded here', d: 'ZQXJLOGDETAIL + x); if (y) z.push( + w);' }]));
+          renderLoggingPanel();
+          var host = document.getElementById('loggingBody');
+          if((host.textContent||'').indexOf('ZQXJLOGMESSAGE') === -1)
+            throw new Error('the planted log entry did not reach the screen, so this proves nothing');
+          var leaked = i18nCatalogue(host).filter(function(x){ return /ZQXJLOG/.test(x); });
+          if(leaked.length)
+            throw new Error('a sync-log event reached the catalogue: '+JSON.stringify(leaked[0].slice(0,50)));
+          // …but the panel's own words must still be translatable, or marking
+          // the rows has taken the whole screen with it.
+          if(!i18nCatalogue(host).some(function(x){ return /Purge logs|Copy report/i.test(x); }))
+            throw new Error('the logging panel\u2019s own buttons stopped being translatable');
+        } finally {
+          try {
+            if(kOn === null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled', kOn);
+            if(kLog === null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log', kLog);
+          } catch(e) {}
+          try { renderLoggingPanel(); } catch(e) {}
+        }
+      })();
+
       // A count that changes with the data must NOT be part of the key, or the
       // dictionary is asked for "🕘 Version history (3)" and has "(1)".
+      // "📷 No photo (N)" is only DRAWN when some recipe has no photo, so on a
+      // fully illustrated library it never rendered and its words could never
+      // reach the dictionary. The harvest now pushes a stand-in with no
+      // photograph. This failed on Tony's machine and passed in CI, which is
+      // the signature of a branch rather than a bug.
       ['🕘 Version history ({1})','📓 Cooking log ({1})','📷 No photo ({1})'].forEach(function(k){
         if(after.indexOf(k)===-1)
           throw new Error('"'+k+'" is not a key — a varying number is baked into it and it will never match: '
@@ -7819,6 +7856,30 @@ window.SELF_TESTS = [
         opts[1].click();
         if(ta.value!=='סרטונים') throw new Error('clicking an alternative did not take it: '+JSON.stringify(ta.value));
         if(row.querySelector('.i18n-ed-opt')) throw new Error('the alternatives stayed on screen after one was chosen');
+
+        // Two very different things get called "orphan", and lumping them
+        // together makes the useful one unusable. Tony's Hebrew file held 2,395
+        // entries against a catalogue of 1,231: about 1,150 were code fragments
+        // an earlier string finder recorded, and a handful were real English
+        // that had been reworded. "Remove 1,160 orphans" hides the second kind
+        // inside the first, and those are the ones worth reading first.
+        _i18nEdDraft['+ x); if (y) z.push( + w); res.innerHTML = #FFF8E8;'] = 'junk';
+        _i18nEdDraft['A sentence that was reworded in the markup'] = 'stale';
+        var info = i18nEdKeys();
+        if(!info.junk || !info.stale) throw new Error('the editor no longer tells the two apart');
+        var junk = info.all.filter(info.junk), stale = info.all.filter(info.stale);
+        if(junk.indexOf('+ x); if (y) z.push( + w); res.innerHTML = #FFF8E8;') === -1)
+          throw new Error('a source fragment was not classed as unusable');
+        if(stale.indexOf('A sentence that was reworded in the markup') === -1)
+          throw new Error('a reworded English string was not classed as an orphan');
+        if(junk.indexOf('A sentence that was reworded in the markup') !== -1)
+          throw new Error('real English was classed as unusable — it would be deleted without a reading');
+        i18nEdRender();                       // the count line is drawn, not computed
+        var line = document.getElementById('i18nEdCount').textContent;
+        if(!/remove \d+ unusable/.test(line) || !/remove \d+ orphan/.test(line))
+          throw new Error('the editor offers only one of the two clean-ups: '+JSON.stringify(line));
+        delete _i18nEdDraft['+ x); if (y) z.push( + w); res.innerHTML = #FFF8E8;'];
+        delete _i18nEdDraft['A sentence that was reworded in the markup'];
 
         // Saving changes the LIVE interface, which is why the editor is worth
         // having — and must not eat the button's icon on the way.

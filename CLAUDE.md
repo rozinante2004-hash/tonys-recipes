@@ -578,6 +578,22 @@ found only because a test was written first and disagreed with the code.
   - A single token carrying `.`, `/` or `@` is an example value, not a sentence.
     `123456789-abc.apps.googleusercontent.com` is the Gmail Client ID
     placeholder and has to stay exactly that.
+- **THE LOG'S OWN EVENTS ARE NOT INTERFACE TEXT (v36.44).** They are
+  diagnostics, they are what gets pasted to whoever is helping, and there is no
+  end to them — every message ever logged would become a dictionary key. The
+  event rows carry `data-no-i18n`; the panel's own buttons and headings stay
+  translatable, and the test asserts both halves.
+- **`i18nUnits` filters on `i18nKeepable`, not `i18nTranslatable` (v36.44).**
+  Everything else already refused to RECORD or SEND a string that reads as
+  source code; this was the one place still happily translating one if it
+  happened to be on screen.
+- **A BUTTON THE DATA HIDES (v36.44).** "📷 No photo (N)" is only drawn when
+  some recipe has no photo, so on a fully illustrated library it never rendered
+  and its words could never reach the dictionary. `i18nHarvestFilters()` pushes
+  a stand-in with no photograph, the same trick the recipe screen uses. **A test
+  that fails on Tony's machine and passes in CI is a branch, not a bug** — that
+  is now three of them (`signedIn ?`, a recipe's history, a library with no
+  gaps), and the next one will look the same.
 - **`syncLog` RELABELS AN UNKNOWN KIND AS `error` (v36.43).** That is the right
   call for a logger — never lose the event — and a trap for whoever writes the
   call. There is no `'warn'` kind; three housekeeping messages of mine used it,
