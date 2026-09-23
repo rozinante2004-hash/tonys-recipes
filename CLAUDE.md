@@ -666,6 +666,16 @@ found only because a test was written first and disagreed with the code.
 - **AN ORPHAN IS NOT NECESSARILY DEAD.** "{1} min ago" is a perfectly good key
   that simply is not on screen. The removal dialog says so, because deleting one
   of those means paying to translate it again later.
+- **THE SELF TEST STAYS ENGLISH (v36.53) — Tony's decision.** It is his own
+  diagnostic screen and he reads it in English; translating its ~280 test names
+  and headings made every new language a fifth bigger (1,533 → 1,250 keys, ~10
+  → ~8 minutes). `#selfTestOverlay` and the detail popup are `data-no-i18n`,
+  the harvest no longer draws the list, and entries already in a dictionary are
+  classed **unusable** by `i18nSelfTestWords()` so "remove N unusable" clears
+  them. `i18nForgetSelfTestWords()` loads the suite first (the names cannot be
+  recognised without it) and drops them from the missing list, so the
+  gap-filler never pays for them. **Do not re-add the self-test list to
+  `I18N_HARVEST`.** The v36.51 note below is kept for how the orphans arose.
 - **THE HARVEST HAS TO DOWNLOAD THE SUITE BEFORE IT CAN DRAW IT (v36.51).**
   `SELF_TESTS` is empty until `loadSelfTests()` runs, so the `I18N_HARVEST`
   entry for the self-test list rendered an empty `<div>` and **none of the 265

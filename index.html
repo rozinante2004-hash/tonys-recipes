@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.52 -->
+<!-- Tony's Recipes Collection v36.53 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2130,6 +2130,7 @@ function showSelfTestDetail(testId) {
 
   const overlay = document.createElement('div');
   overlay.id = 'stDetailOverlay';
+  overlay.setAttribute('data-no-i18n', '');   // the Self Test stays English (v36.53)
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
 
   const card = document.createElement('div');
@@ -3331,7 +3332,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.52';
+var APP_VERSION = 'v36.53';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6008,7 +6009,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.52</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.53</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6630,7 +6631,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.52</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.53</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8532,16 +8533,9 @@ var I18N_HARVEST = [
   ['sync health',           function(){ renderSyncHealth(); }],
   ['what leaves this device', function(){ renderPrivacyPanel(); }],
   ['backups',               function(){ return renderBackupPanel(); }],
-  // THE SUITE HAS TO BE DOWNLOADED BEFORE IT CAN BE DRAWN (v36.51). SELF_TESTS
-  // is empty until loadSelfTests() runs, so this entry rendered an empty <div>
-  // and the 265 test names and their group headings were never catalogued.
-  // They ARE translated on screen — the observer looks them up as they render,
-  // and Tony's Hebrew answers — but the editor, which only knows the catalogue,
-  // called every one of them an orphan. That is about 270 of the 310 he was
-  // looking at: not junk, not stale, just invisible to the harvest.
-  // A failed download is not a reason to fail the harvest — the list is then
-  // exactly as uncatalogued as it was before.
-  ['the self-test list',    async function(){ try { await loadSelfTests(); } catch(e) {} renderSelfTestList(); }],
+  // The self-test list is NOT here (v36.53). v36.51 downloaded the suite so
+  // its ~280 names could be catalogued; Tony then decided the Self Test is his
+  // own tool and stays English, and the whole overlay is data-no-i18n.
   ['the WhatsApp sources',  function(){ renderWaSources(); }],
   ['the access list',       function(){ renderAccessMembers(); }],
   ['the Bring! status',     function(){ renderBringTokenStatus(); }],
@@ -10018,11 +10012,11 @@ window.i18nGenerate = i18nGenerate;
 // dialog Tony has since opened, and anything added to the app since the
 // language was made. Cheap — it translates the gap, not the app.
 function i18nGapList() {
-  var gaps = Object.create(null);
+  var gaps = Object.create(null), selfTest = i18nSelfTestWords();
   i18nMissingList().forEach(function(s){ gaps[s] = 1; });
   i18nFullCatalogue().forEach(function(s){ if (!_i18nDict || !_i18nDict[s]) gaps[s] = 1; });
   // Belt and braces: nothing is ever SENT that would not be recorded.
-  return Object.keys(gaps).filter(i18nKeepable).sort();
+  return Object.keys(gaps).filter(function(k){ return i18nKeepable(k) && !selfTest[k]; }).sort();
 }
 async function i18nFillGaps(lang) {
   lang = lang || _i18nLang;
@@ -10030,6 +10024,7 @@ async function i18nFillGaps(lang) {
   progressOpen({ icon: '🔍', title: 'Checking every screen for missing text',
                  total: I18N_HARVEST.length + 1, step: 'Opening each panel in turn…' });
   var seen = 0;
+  await i18nForgetSelfTestWords();
   await i18nHarvest(function(name){ progressStep(++seen, name); });
   progressStep(I18N_HARVEST.length + 1, 'Reading the app\u2019s own messages');
   progressClose();
@@ -10133,6 +10128,7 @@ async function openI18nEditor() {
   i18nEdRender();
   // …and again once the unopened panels have been drawn, so the table lists
   // every string the app has rather than every string it happens to be showing.
+  await i18nForgetSelfTestWords();
   await i18nHarvest();
   i18nEdInvalidate();          // the harvest changed what counts as live
   i18nEdRender();
@@ -10156,10 +10152,35 @@ function i18nEdInfo() {
 function i18nEdInvalidate() { _i18nEdInfo = null; }
 window.i18nEdInvalidate = i18nEdInvalidate;
 
+// ─── THE SELF TEST STAYS ENGLISH (v36.53) ────────────────────────────────────
+// Every dictionary made before this release has the test names in it, and the
+// missing lists of Russian and Japanese picked up more whenever the screen was
+// opened. Left alone they would sit in the editor as orphans for ever, and the
+// gap-filler would pay to translate them again. They can only be recognised
+// with the suite loaded, so the two places that care load it first.
+function i18nSelfTestWords() {
+  var set = Object.create(null);
+  (window.SELF_TESTS || []).forEach(function(t) {
+    if (t && t.name) set[t.name] = 1;
+    if (t && t.group) set[t.group] = 1;
+  });
+  if (Object.keys(set).length) { set['{1} tests'] = 1; set['{1} test'] = 1; }
+  return set;
+}
+async function i18nForgetSelfTestWords() {
+  try { await loadSelfTests(); } catch(e) { return i18nSelfTestWords(); }
+  var st = i18nSelfTestWords();
+  var stale = i18nMissingList().filter(function(k){ return st[k]; });
+  if (stale.length) i18nClearMissing(stale);
+  return st;
+}
+window.i18nSelfTestWords = i18nSelfTestWords; window.i18nForgetSelfTestWords = i18nForgetSelfTestWords;
+
 function i18nEdKeys() {
   var seen = Object.create(null);
-  i18nFullCatalogue().forEach(function(k){ seen[k] = 1; });
-  i18nMissingList().forEach(function(k){ seen[k] = 1; });
+  var selfTest = i18nSelfTestWords();
+  i18nFullCatalogue().forEach(function(k){ if (!selfTest[k]) seen[k] = 1; });
+  i18nMissingList().forEach(function(k){ if (!selfTest[k]) seen[k] = 1; });
   var live = Object.keys(seen);
   // The live keys indexed by their normalised form, so the "already ported"
   // test below can be asked about words rather than about punctuation. Built
@@ -10176,6 +10197,7 @@ function i18nEdKeys() {
   Object.keys(_i18nEdDraft || {}).forEach(function(k) {
     if (seen[k]) return;
     if (!i18nKeepable(k)) { seen[k] = 3; return; }          // source fragments, log rows
+    if (selfTest[k]) { seen[k] = 3; return; }               // the Self Test stays English
     // …and an orphan whose content ALREADY lives under the key the current
     // rules would give it. "4 min ago" holding "לפני {1} דקות" is a leftover
     // from a re-use that has already happened: the work is safe under
@@ -23187,7 +23209,10 @@ window.onHeaderScroll = onHeaderScroll;
 </script>
 
 <!-- SELF TEST MODAL -->
-<div class="modal-overlay" id="selfTestOverlay" onclick="bgClose(event,'selfTestOverlay')">
+<!-- data-no-i18n (v36.53): Tony's call. The Self Test screen is his own
+     diagnostic tool, he reads it in English, and translating its ~280 test
+     names and headings added a fifth to every new language's cost and time. -->
+<div class="modal-overlay" id="selfTestOverlay" data-no-i18n onclick="bgClose(event,'selfTestOverlay')">
   <div class="modal" style="max-width:680px;" id="selfTestModal">
     <button class="modal-close" onclick="closeM('selfTestOverlay')">✕</button>
     <div class="modal-header">

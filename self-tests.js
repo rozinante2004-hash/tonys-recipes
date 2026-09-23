@@ -7591,8 +7591,9 @@ window.SELF_TESTS = [
        [/Logging/,           'the logging panel'],
        [/unsent local edits|Sync Health|last successful sync/i, 'Sync Health'],
        [/Nothing is sold/,   'What leaves this device'],
-       [/Export chat|Without media/, 'the WhatsApp export manual'],
-       [/Select tests to run/, 'the self-test screen']
+       [/Export chat|Without media/, 'the WhatsApp export manual']
+       // The self-test screen was on this list until v36.53, when Tony decided
+       // it stays English. The opposite is asserted further down.
       ].forEach(function(pair){
         if(!has(pair[0])) throw new Error(pair[1]+' is still not in the catalogue, so it cannot be translated'
           );
@@ -7706,29 +7707,34 @@ window.SELF_TESTS = [
           throw new Error('a toast after a nested template literal reads as string content — '
             + 'the scrape walks straight past it');
       })();
-      // THE SUITE HAS TO BE DOWNLOADED BEFORE IT CAN BE DRAWN (v36.51).
-      // SELF_TESTS is empty until loadSelfTests() runs, so the harvest entry
-      // for the self-test list rendered an empty <div> and none of the 265 test
-      // names or their group headings was ever catalogued. They ARE translated
-      // on screen — the observer looks each one up as it renders — so nothing
-      // looked wrong; only the editor knew, and it called all 270 of them
-      // orphans. That was most of what Tony was staring at.
-      if(after.indexOf('Accessibility basics (labels, Escape, focus)')===-1)
-        throw new Error('a self-test NAME is not in the catalogue — the harvest drew the list '
-          + 'before the suite it lists had been downloaded');
-      if(after.indexOf('CRUD')===-1 || after.indexOf('Cloud Sync')===-1)
-        throw new Error('the self-test GROUP headings are not in the catalogue');
-      // …and the two assertions above cannot tell you WHY, here. By the time
-      // this suite is running, the suite has obviously been downloaded — so the
-      // harvest finds the list populated whether or not it asked for it. In the
-      // app it is not, which is the whole bug. The only honest check available
-      // from inside the thing being tested is that the entry asks.
+      // THE SELF TEST STAYS ENGLISH (v36.53). Tony's decision: it is his own
+      // diagnostic screen, and its ~280 test names added a fifth to the cost
+      // and the wait of every new language. v36.51 had gone the other way and
+      // downloaded the suite so the harvest could catalogue it.
+      if(after.indexOf('Accessibility basics (labels, Escape, focus)')!==-1
+         || after.indexOf('CRUD')!==-1 || after.indexOf('Cloud Sync')!==-1)
+        throw new Error('self-test names or headings are in the catalogue — every new language pays for them');
+      if(!document.getElementById('selfTestOverlay').hasAttribute('data-no-i18n'))
+        throw new Error('#selfTestOverlay is not marked data-no-i18n');
+      if((window.I18N_HARVEST||[]).some(function(e){ return /self-test/i.test(e[0]); }))
+        throw new Error('the harvest still draws the self-test list');
+      // …and what is ALREADY in a dictionary is offered as unusable, not left
+      // as an orphan for ever — and a stale missing-list entry is not paid for.
       (function(){
-        var entry=(window.I18N_HARVEST||[]).filter(function(e){ return /self-test/i.test(e[0]); })[0];
-        if(!entry) throw new Error('the self-test list is not in I18N_HARVEST at all');
-        if(!/loadSelfTests/.test(String(entry[1])))
-          throw new Error('the harvest draws the self-test list without downloading the suite first; '
-            + 'it renders an empty div in the app and every test name stays an orphan');
+        var prevDict=i18nCurrentDict(), prevLang=i18nLang(), prevUser=window._fbUser;
+        try{
+          window._fbUser={ email:'rozinante2004@gmail.com' };
+          var d={ 'Accessibility basics (labels, Escape, focus)':'アクセシビリティ', 'CRUD':'CRUD' };
+          i18nInstall('ja', d);
+          i18nNoteMissing('Cloud Sync');
+          _i18nEdLang='ja'; _i18nEdDraft=d; i18nEdInvalidate();
+          var inf=i18nEdInfo();
+          if(!inf.junk('Accessibility basics (labels, Escape, focus)') || !inf.junk('CRUD'))
+            throw new Error('a translated self-test name is not offered for removal as unusable');
+          if(i18nGapList().indexOf('Cloud Sync')!==-1)
+            throw new Error('a self-test heading in the missing list would be paid for by the gap-filler');
+        } finally { i18nClearMissing(['Cloud Sync']); i18nInstall(prevLang, prevDict);
+                    window._fbUser=prevUser; _i18nEdDraft=null; i18nEdInvalidate(); }
       })();
       // …and a keycap step from a static panel, which v36.47 had re-keyed to
       // "{1}️⃣ Click {2} below" and orphaned.
