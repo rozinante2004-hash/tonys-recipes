@@ -8109,6 +8109,70 @@ window.SELF_TESTS = [
       })();
     } },
 
+  { id:'i18n_reordered_links_do_not_loop', group:'UI', name:'A translation that moves the links cannot freeze the app (v36.52)',
+    test: async()=>{
+      // Tony generated Japanese and his laptop stopped responding to anything —
+      // through a reboot, and in a fresh Firefox too, while English and Hebrew
+      // were fine. Japanese is subject-object-verb: "Press {1} and then {2}"
+      // comes back as "{2}の前に{1}を押す", with the links in the other order.
+      // The children were matched to {1}/{2} by their position ON SCREEN, so
+      // the next pass read the translation's order as the English one and
+      // swapped them back — and the pass after that swapped them again. Each
+      // swap was four mutation records, the observer queued the element once
+      // per record, and four became sixteen became sixty-four.
+      ['i18nKidOrder','i18nRewriteRunaway'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var host=document.createElement('div');
+      host.innerHTML='<div id="zko">Press <b id="zkoA">Open</b> and then <b id="zkoB">Save</b> now</div>';
+      document.body.appendChild(host);
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang();
+      var el=document.getElementById('zko');
+      var order=function(){ return Array.prototype.map.call(el.querySelectorAll('b'),
+        function(b){ return b.id==='zkoA'?'A':'B'; }).join(''); };
+      try{
+        i18nInstall('ja', { 'Press {1} and then {2} now':'{2}の前に{1}を押す' });
+        var passes=[];
+        for(var i=0;i<5;i++) passes.push(i18nApply(el)+':'+order());
+        if(passes[0]!=='1:BA')
+          throw new Error('the first pass did not put the links where the translation asks: '+passes[0]);
+        if(passes.slice(1).join(' ')!=='0:BA 0:BA 0:BA 0:BA')
+          throw new Error('every pass rewrote the sentence again: '+passes.join(' ')
+            + ' — the links are being swapped back and forth, which under the observer never stops');
+        var u=i18nUnits(el).filter(function(x){ return x.el===el; })[0];
+        if(!u || u.slots[0]!==document.getElementById('zkoA'))
+          throw new Error('{1} no longer means the first link of the ENGLISH sentence');
+
+        // Under the observer, with nothing else happening, it must go quiet.
+        i18nStartObserver();
+        var rewrites=0;
+        var mo=new MutationObserver(function(r){ rewrites+=r.length; });
+        mo.observe(el,{ childList:true });
+        el.appendChild(document.createTextNode(''));           // a nudge, as a re-render would give it
+        for(var f=0;f<6;f++) await new Promise(function(r){ requestAnimationFrame(function(){ r(); }); });
+        await new Promise(function(r){ setTimeout(r,300); });
+        mo.disconnect();
+        if(rewrites>8)
+          throw new Error(rewrites+' mutations on one sentence in a few frames — it is still rewriting itself');
+
+        // …and going back to English puts each link back in ITS OWN place.
+        i18nInstall('en', null); i18nRevertAll();
+        if(el.textContent!=='Press Open and then Save now')
+          throw new Error('reverting after a reordering language gave '+JSON.stringify(el.textContent));
+      } finally { try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict); host.remove(); }
+
+      // THE BREAKER. Whatever the next language's dictionary does, one bad
+      // entry must cost one label and not the app. Twenty rewrites of one
+      // element inside a second and it is left alone — and logged, with the key
+      // and the value, because that log line is how the fault gets found.
+      var probe=document.createElement('span'), tripped=-1;
+      for(var n=0;n<30;n++){ if(i18nRewriteRunaway(probe,'k','v') && tripped<0) tripped=n; }
+      if(tripped<0) throw new Error('thirty rewrites of one element in a moment did not trip the breaker');
+      if(tripped<15) throw new Error('the breaker tripped after only '+tripped+' — ordinary UI would trip it');
+      if(!i18nRewriteRunaway(probe,'k','v')) throw new Error('a tripped element was let back in');
+      var calm=document.createElement('span');
+      for(var c2=0;c2<5;c2++) if(i18nRewriteRunaway(calm,'k','v')) throw new Error('five rewrites tripped the breaker');
+    } },
+
   { id:'i18n_says_how_long', group:'UI', name:'The translate dialog says how long it really takes (v36.51)',
     test: async()=>{
       // Tony agreed to "about half a minute" and the progress panel — which

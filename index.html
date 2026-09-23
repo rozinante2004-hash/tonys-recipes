@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.51 -->
+<!-- Tony's Recipes Collection v36.52 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3331,7 +3331,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.51';
+var APP_VERSION = 'v36.52';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6008,7 +6008,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.51</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.52</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6630,7 +6630,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.51</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.52</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8239,6 +8239,42 @@ function i18nPlaceholderChild(c) {
   if (I18N_INLINE.test(c.tagName)) return true;
   return !(c.textContent && c.textContent.trim());
 }
+
+// ─── WHICH CHILD IS {1} (v36.52) ─────────────────────────────────────────────
+// The inline children of a sentence — its links, its bold words — are matched
+// to {1}, {2} by POSITION. That is right exactly once: when the element is
+// showing its English. A translation is allowed to move them, and in Japanese
+// it must — "Press {1} and then {2}" comes back as "{2}の前に{1}を押す" — and
+// after that the order on screen is the translation's order. Reading it as the
+// English order on the next pass calls the second link {1}, so the plan swaps
+// them back; the pass after swaps them again; and so on for ever.
+//
+// Hebrew and Russian keep roughly English word order and almost never move a
+// placeholder, which is why this sat unnoticed through three languages. The
+// first language that routinely does froze Tony's laptop solid: each swap is a
+// mutation, the observer re-queues the element for every one of them (four per
+// swap), and four became sixteen became sixty-four. See i18nStartObserver.
+//
+// So the English order is RECORDED when the element is showing English — the
+// only moment the screen can be trusted about it — and used from then on for as
+// long as the same children are still there. The app replacing a child means
+// the app rewrote the sentence, which is a fresh English and a fresh record.
+var _i18nKidOrder = (typeof WeakMap === 'function') ? new WeakMap() : null;
+// `fresh`: the app has just written this text, so it IS English and the screen
+// order is the English order. `looksEnglish`: the text matches the parked
+// English — usually true, but "{1} or {2}" translated as "{2} or {1}" has the
+// SAME raw text in both languages, and only a record knows the links swapped.
+function i18nKidOrder(el, kids, fresh, looksEnglish) {
+  if (!_i18nKidOrder || kids.length < 2) return kids;
+  if (fresh) { _i18nKidOrder.set(el, kids.slice()); return kids; }
+  var rec = _i18nKidOrder.get(el);
+  var same = !!rec && rec.length === kids.length
+          && kids.every(function(k){ return rec.indexOf(k) !== -1; });
+  if (same) return rec.slice();
+  if (looksEnglish) { _i18nKidOrder.set(el, kids.slice()); return kids; }
+  return kids;                     // never seen in English: the best there is
+}
+window.i18nKidOrder = i18nKidOrder;
 // "{1}Clips" → { pre:'{1}', core:'Clips', post:'' }. Only the leading and
 // trailing runs: "paste {1} and press {2}" is one sentence with the links
 // inside it, and the model has to be told where they go.
@@ -8403,7 +8439,12 @@ function i18nUnits(root) {
     // ago" from "2 min ago" and that is exactly the change we must notice.
     var src = el.getAttribute('data-i18n-src');
     var applied = el.getAttribute('data-i18n-at');
-    if (src === null || (nowRaw !== src && nowRaw !== applied)) src = nowRaw;
+    var fresh = (src === null || (nowRaw !== src && nowRaw !== applied));
+    if (fresh) src = nowRaw;
+    // …and which CHILD is which. See i18nKidOrder: after a translation that
+    // moved the links around, the order on screen is the translation's order,
+    // not the English one, and reading it as English swaps them back.
+    kids = i18nKidOrder(el, kids, fresh, nowRaw === src);
 
     // The key comes from the ENGLISH, never from what is on screen. Deriving it
     // from the DOM means that once an element is translated its key becomes the
@@ -9246,6 +9287,35 @@ function i18nPhrase(s) {
 }
 window.i18nPhrase = i18nPhrase;
 
+// ─── THE BREAKER (v36.52) ────────────────────────────────────────────────────
+// v36.51's Japanese froze Tony's laptop so thoroughly that clicking anything
+// did nothing and a reboot did not help, because the language is remembered
+// and the freeze came back with it. The cause is fixed (i18nKidOrder, and the
+// de-duplicated queue in the observer), but the lesson is general: a dictionary
+// is DATA FROM A MODEL, the next language will have some shape nobody has
+// thought of, and a translation fault must never be able to take the app with
+// it. So any single element rewritten more than I18N_RUNAWAY times inside one
+// second is left alone for the rest of the session, and the key and value that
+// did it go to the log — which is the report that says what to fix.
+var _i18nRewrites = (typeof WeakMap === 'function') ? new WeakMap() : null;
+var _i18nStuck = (typeof WeakSet === 'function') ? new WeakSet() : null;
+var I18N_RUNAWAY = 20;
+function i18nRewriteRunaway(el, key, value) {
+  if (!_i18nRewrites) return false;
+  if (_i18nStuck && _i18nStuck.has(el)) return true;
+  var now = Date.now(), r = _i18nRewrites.get(el);
+  if (!r || now - r.t > 1000) { _i18nRewrites.set(el, { t: now, n: 1 }); return false; }
+  if (++r.n <= I18N_RUNAWAY) return false;
+  if (_i18nStuck) _i18nStuck.add(el);
+  try {
+    if (typeof syncLog === 'function')
+      syncLog('error', 'A translation kept rewriting itself and was switched off for one label (' + _i18nLang + ')',
+              JSON.stringify(String(key)).slice(0, 200) + ' → ' + JSON.stringify(String(value)).slice(0, 200));
+  } catch(e) {}
+  return true;
+}
+window.i18nRewriteRunaway = i18nRewriteRunaway;
+
 // ─── APPLYING ────────────────────────────────────────────────────────────────
 // Idempotent, and reversible: the English original is parked on the node the
 // first time it is touched, so the same element can be re-translated into a
@@ -9297,6 +9367,11 @@ function i18nApply(root) {
       // that wakes the observer that performs the rewrite: a loop that spins
       // for as long as the page is open.
       if (i18nMatchesPlan(u.el, plan)) { u.el.setAttribute('data-i18n-at', raw); continue; }
+      // The last line of defence, and deliberately dumb: it does not care WHY
+      // an element keeps being rewritten, only that no honest interface
+      // rewrites one label twenty times a second. A dictionary is data from a
+      // model; one bad entry must cost one label, never the whole app.
+      if (i18nRewriteRunaway(u.el, u.key, v)) continue;
       var frag = document.createDocumentFragment();
       for (var p = 0; p < plan.length; p++) {
         frag.appendChild(typeof plan[p] === 'string' ? document.createTextNode(plan[p]) : plan[p]);
@@ -9686,7 +9761,15 @@ function i18nStartObserver() {
     requestAnimationFrame(function() {
       _i18nTick = false;
       var nodes = _i18nPending || []; _i18nPending = null;
+      // ONCE EACH (v36.52). One rewrite of one element produces three or four
+      // mutation records, and every record pushed the same element again. That
+      // is harmless while apply settles on the first try — and exponential the
+      // moment it does not: four applies make sixteen records, sixteen make
+      // sixty-four. That is what turned a wrong-order bug (see i18nKidOrder)
+      // into a laptop that would not respond to anything, restarted or not.
+      var seen = (typeof Set === 'function') ? new Set() : null;
       for (var k = 0; k < nodes.length; k++) {
+        if (seen) { if (seen.has(nodes[k])) continue; seen.add(nodes[k]); }
         if (nodes[k].isConnected) i18nApply(nodes[k]);
       }
     });
@@ -9755,6 +9838,10 @@ function i18nRevertAll() {
       for (var c = 0; c < els[i].childNodes.length; c++) {
         if (i18nPlaceholderChild(els[i].childNodes[c])) kids.push(els[i].childNodes[c]);
       }
+      // In the ENGLISH order, not the order the translation left them in —
+      // otherwise going back to English after Japanese puts the links in the
+      // Japanese order and labels each with the other's words.
+      kids = i18nKidOrder(els[i], kids, false, false);
       // v36.46 — the parked English is the RAW form, in which each child is a
       // single \u0001 marker and every number is literal. Writing it out
       // verbatim put that marker on the screen ("\u0001Clips"), so the markers

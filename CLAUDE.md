@@ -132,6 +132,43 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A TRANSLATION THAT MOVES THE LINKS FROZE THE APP (v36.52).** Tony generated
+  Japanese and his laptop stopped responding to anything — through a reboot,
+  and in a fresh Firefox profile too, while English and Hebrew were fine and the
+  phone (still in Hebrew) was untouched. Two bugs, and it took both:
+  - **The flip.** Inline children (links, bold words) were matched to `{1}`,
+    `{2}` by their position **on screen**. Japanese is subject-object-verb, so
+    "Press {1} and then {2}" comes back as "{2}の前に{1}を押す" — and after
+    that, the screen order is the translation's order. The next pass read it
+    as English order and swapped them back; the pass after swapped them again.
+    `i18nKidOrder()` records the English order in a WeakMap at the only moment
+    the screen can be trusted about it — when the app has just written English
+    — and uses the record for as long as the same children are there.
+    `i18nRevertAll()` uses it too, or going back to English after Japanese
+    puts each link's words on the other link.
+  - **The explosion.** One rewrite is three or four mutation records, and the
+    observer queued the element once **per record**. Harmless while apply
+    settles first time; exponential the moment it does not — four, sixteen,
+    sixty-four. The queue is de-duplicated per frame now. Measured: with the
+    flip left in and only the de-dup, the app stays responsive; with neither,
+    frozen inside 1.5 s.
+  - **Why the reboot did not help:** the language is remembered per device, so
+    the app came back up in Japanese — with the observer started **before** the
+    dictionary arrived, so every rewrite was seen. A *switch* applies first and
+    starts the observer after, which is why the first reproduction attempt
+    looked fine. Always test the restart path, not just the switch.
+  - **The breaker.** `i18nRewriteRunaway()`: any one element rewritten more than
+    `I18N_RUNAWAY` (20) times in a second is left alone for the session and the
+    key and value go to the log. A dictionary is data from a model; the next
+    language will have a shape nobody thought of, and one bad entry must cost
+    one label, never the app.
+  - **Recovery when the UI is frozen:** in the browser console,
+    `localStorage.setItem('tonys_ui_lang','en'); location.reload()`.
+  - **Headless Chromium throttles requestAnimationFrame to ~2 fps**, which hid
+    this loop in the first three reproductions. Launch with
+    `--disable-renderer-backgrounding --disable-background-timer-throttling
+    --disable-backgrounding-occluded-windows` and `bringToFront()` for anything
+    that depends on frame rate.
 - **THE UNIT CONVERTER ONLY EVER HANDLED THE AMOUNTS A TEST TYPES (v36.51).**
   Tony reported Imperial/metric as broken and was right. `cvtIng` was
   `^([\d.]+)\s*<unit>$` against five exact spellings, so `"200 g"` converted and
