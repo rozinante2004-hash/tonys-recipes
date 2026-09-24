@@ -3070,6 +3070,15 @@ window.SELF_TESTS = [
       // (v36.3) and the analyser ignores those, which is exactly right for the
       // staged failures other tests cause — and exactly wrong here.
       var put=function(k,m){ var l=readSyncLog(); l.unshift({at:Date.now(),k:k,m:m}); writeSyncLog(l); };
+      // v36.58 — the session may ALREADY have nudged. Tony's PC has the nudge
+      // on and his real log held an old error, so it fired when the app opened
+      // — and this test then asked about a healthy log and was told
+      // 'already-shown-this-session'. CI never nudges first, so it passed there.
+      // Set aside, and put back, like every other piece of device state here.
+      var shownWas=_logNudgeShownThisSession;
+      var nudgeEl=document.getElementById('logNudge'), nudgeParent=nudgeEl&&nudgeEl.parentNode;
+      if(nudgeEl) nudgeEl.remove();
+      _logNudgeShownThisSession=false;
       try{
         localStorage.removeItem('tonys_log_nudge');
         localStorage.removeItem('tonys_log_nudge_seen');
@@ -3096,8 +3105,9 @@ window.SELF_TESTS = [
 
         setLogEnabled(true); purgeSyncLog();
         put('load','Read 44 recipe(s) from the cloud');
-        if(maybeNudgeAboutLog()!=='nothing-wrong')
-          throw new Error('the nudge fired on a healthy log');
+        var healthy=maybeNudgeAboutLog();
+        if(healthy!=='nothing-wrong')
+          throw new Error('the nudge fired on a healthy log (it said '+JSON.stringify(healthy)+')');
         if(document.getElementById('logNudge')) throw new Error('a nudge was rendered with nothing wrong');
 
         // A real problem: it shows, and it names the problem rather than saying
@@ -3139,6 +3149,8 @@ window.SELF_TESTS = [
           throw new Error('a healthy finding contributed to the signature');
       } finally {
         dismissLogNudge();
+        _logNudgeShownThisSession=shownWas;
+        if(nudgeEl && nudgeParent) nudgeParent.appendChild(nudgeEl);   // it was his, so it goes back
         try{
           if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
           if(kNudge===null) localStorage.removeItem('tonys_log_nudge'); else localStorage.setItem('tonys_log_nudge',kNudge);

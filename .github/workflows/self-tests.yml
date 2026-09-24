@@ -93,6 +93,15 @@ jobs:
       - name: Run the Self Test suite as Tony's phone is set up
         run: node tests/run-self-tests.js --port 8137 --prefs '{"tonys_view_unit":"imperial","tonys_theme":"dark"}'
 
+      # v36.58 — and as his PC is: logging on, the nudge on, and a log that
+      # already holds an error, so the nudge fires at startup BEFORE the suite
+      # runs. log_nudge_is_quiet_and_per_device assumed it had not, and failed
+      # only there.
+      - name: Run the Self Test suite as Tony's PC is set up
+        run: |
+          PREFS=$(node -e "console.log(JSON.stringify({tonys_log_enabled:'1',tonys_log_nudge:'1',tonys_sync_log:JSON.stringify([{at:Date.now()-60000,k:'error',m:'An old error from before the run'}])}))")
+          node tests/run-self-tests.js --port 8137 --prefs "$PREFS"
+
       # The version banner only fires when version.json and APP_VERSION agree,
       # so a bump that misses one of them ships an update nobody is told about.
       - name: Check the version strings agree

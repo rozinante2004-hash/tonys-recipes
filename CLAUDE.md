@@ -195,6 +195,11 @@ found only because a test was written first and disagreed with the code.
     use `--terracotta-fill`.
   - **`#8A8279` is the old muted grey (3.78:1).** `--muted` replaced it but
     thirteen literal copies survived; all gone.
+- **…AND AS HIS PC IS (v36.58).** The fifth device-state branch: the log nudge
+  is ON on his PC and his log held an error, so the nudge fired at startup and
+  `log_nudge_is_quiet_and_per_device` then read `already-shown-this-session`.
+  The test sets the session flag and any on-screen nudge aside and restores
+  them; CI has a second `--prefs` step with his PC's state.
 - **THE SUITE RUNS AGAIN AS TONY'S PHONE IS SET UP (v36.54).** Four times a test
   failed on his device and passed in CI because something he had chosen was
   never true there — signed in, a recipe with history, a fully illustrated
