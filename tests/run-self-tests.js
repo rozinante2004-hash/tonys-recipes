@@ -127,10 +127,28 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
       const skip = !includeNetwork && (/^net_/.test(t.id) || t.id === 'stor_firebase');
       if (skip) { out.push({ id: t.id, group: t.group, name: t.name, skipped: true }); continue; }
       const started = Date.now();
+      // v36.55 — A TEST MUST LEAVE THE SYNC STATE AS IT FOUND IT. Eleven did
+      // not, and Tony's Sync Health report showed their fixtures as a damaged
+      // cloud document and two phantom cloud recipes. runSelfTests() now
+      // restores the whole lot around a run, so his session is safe either way
+      // — this is what keeps each test honest, by failing the one that leaks.
+      const fp = typeof window._cloudFingerprintForTest === 'function' ? window._cloudFingerprintForTest : null;
+      const before = fp ? fp() : null;
+      const snap = typeof window._cloudSnapshotForTest === 'function' ? window._cloudSnapshotForTest() : null;
       try {
         await t.test();
+        const after = fp ? fp() : null;
+        if (fp && before !== after) {
+          const a = JSON.parse(before), z = JSON.parse(after);
+          const what = Object.keys(z).filter(k => JSON.stringify(a[k]) !== JSON.stringify(z[k]));
+          throw new Error('left the sync state altered (' + what.join(', ') + ') — '
+            + 'wrap it in _cloudSnapshotForTest() / _cloudRestoreForTest()');
+        }
         out.push({ id: t.id, group: t.group, name: t.name, ok: true, ms: Date.now() - started });
       } catch (e) {
+        // Put it back regardless, so one leaking test does not make every test
+        // after it look like it leaked too.
+        if (snap && fp && fp() !== before) window._cloudRestoreForTest(snap);
         out.push({ id: t.id, group: t.group, name: t.name, ok: false, ms: Date.now() - started,
                    err: String((e && e.message) || e) });
       }

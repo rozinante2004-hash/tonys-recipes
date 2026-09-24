@@ -11516,4 +11516,28 @@ window.SELF_TESTS = [
       } finally { setWaBase(prev); }
     } },
 ];
+
+// ─── TESTS THAT GO THROUGH THE REAL SYNC PATH (v36.55) ──────────────────────
+// These save, delete, refresh or read photos through the same functions the app
+// uses, and those functions keep their bookkeeping in module-level maps and in
+// localStorage (what the cloud had, what was last written, what is queued for
+// deletion, how many reads today). Eleven tests left some of it altered, and
+// Tony's Sync Health report — copied a minute after a run — showed a "damaged
+// cloud document" and two phantom cloud recipes that were all fixtures.
+//
+// Declared here rather than hand-wrapped nine times: one list, one restore, and
+// the CI runner compares the sync state before and after EVERY test, so a new
+// test that leaks fails the build until it is added to this list on purpose.
+['cloud_refresh_one_recipe', 'cloud_photo_bulk', 'photo_repair_bounds',
+ 'sync_id_collision_keeps_both', 'test_fixtures_stay_local', 'collect_into_collection',
+ 'coll_split_and_promote', 'feat_recipe_delete', 'feat_undo_delete'
+].forEach(function(id) {
+  var t = window.SELF_TESTS.filter(function(x){ return x.id === id; })[0];
+  if (!t) throw new Error('self-tests.js: the sync-restore list names a test that does not exist: ' + id);
+  var run = t.test;
+  t.test = async function() {
+    var st = _cloudSnapshotForTest();
+    try { return await run.apply(this, arguments); } finally { _cloudRestoreForTest(st); }
+  };
+});
 window._selfTestsLoaded = true;

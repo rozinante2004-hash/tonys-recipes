@@ -132,6 +132,23 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A TEST MUST LEAVE THE SYNC STATE AS IT FOUND IT (v36.55).** Tony's Sync
+  Health, copied a minute after a Self Test run, said "damaged cloud documents:
+  1 (ids 2)" and "57 documents in the cloud" for 55 recipes. All three were test
+  fixtures: `_cloudSnapshotForTest()` did not include `_cloudUnreadable`, kept
+  the maps BY REFERENCE (so a test that mutated one in place was "restored" to
+  the object it had just changed), and `parseCloudRecipeDocs()` calls
+  `saveCloudBase()`, which wrote a fixture's version map over the real one in
+  localStorage. Eleven tests leaked something. Reproduced exactly on v36.54
+  (+2 cloud ids, damaged id 2), identical before/after on v36.55.
+  - The snapshot is complete and by COPY, including every `tonys_cloud_*` key.
+  - `runSelfTests()` snapshots and restores the whole sync state around a run,
+    so Tony's session can never be where a missed leak is found.
+  - The CI runner fingerprints the sync state before and after EVERY test and
+    fails the one that changed it. Tests that go through the real sync path are
+    declared in one list at the end of `self-tests.js` and wrapped there; a new
+    one fails the build until it is added **on purpose**.
+
 - **A TINTED SURFACE AND ITS TEXT ARE A PAIR (v36.54).** Tony's recipe Notes
   were `background:#FFF8E8` under `color:var(--ink)` — near-white on cream in
   dark mode, 1.1:1 — and the contrast scan reported zero findings in both

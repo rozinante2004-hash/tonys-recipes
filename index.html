@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.54 -->
+<!-- Tony's Recipes Collection v36.55 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1517,23 +1517,54 @@ function _fakeFirestore(seed, opts) {
 // running session's idea of the cloud, so every test that touches them snapshots
 // first and restores in a `finally`.
 function _cloudSnapshotForTest() {
-  var ls = null;
-  try { ls = localStorage.getItem(CLOUD_DELETES_KEY); } catch(e) {}
+  // v36.55 — COMPLETE, and by COPY. It used to keep five of the maps by
+  // reference and one localStorage key, and eleven tests still left the sync
+  // state altered: `_cloudUnreadable` was not in it at all (so the corrupt
+  // fixture "recipe_2" stayed flagged as a damaged cloud document for the rest
+  // of the session), tests that mutated a map IN PLACE were "restored" to the
+  // very object they had just changed (phantom cloud ids 1 and 7 — Tony's
+  // report said 57 documents in the cloud for 55 recipes), and
+  // parseCloudRecipeDocs() calls saveCloudBase(), which wrote a fixture's base
+  // map over the real one in localStorage.
+  var copy = function(o){ var c = {}; for (var k in (o || {})) c[k] = o[k]; return c; };
+  var ls = {};
+  try {
+    Object.keys(localStorage).forEach(function(k){ if (/^tonys_cloud_/.test(k)) ls[k] = localStorage.getItem(k); });
+  } catch(e) {}
   return {
-    base: window._cloudRecipeBase, stamp: window._cloudRecipeStamp,
-    ids: window._cloudRecipeIds, del: window._pendingCloudDeletes,
-    schema: window._cloudSchema, ls: ls
+    base: copy(window._cloudRecipeBase), stamp: copy(window._cloudRecipeStamp),
+    ids: copy(window._cloudRecipeIds), del: copy(window._pendingCloudDeletes),
+    unreadable: copy(window._cloudUnreadable),
+    schema: window._cloudSchema, metaAt: window._lastCloudMetaAt, ls: ls
   };
 }
 function _cloudRestoreForTest(s) {
-  window._cloudRecipeBase = s.base; window._cloudRecipeStamp = s.stamp;
-  window._cloudRecipeIds = s.ids;   window._pendingCloudDeletes = s.del;
-  window._cloudSchema = s.schema;
+  var copy = function(o){ var c = {}; for (var k in (o || {})) c[k] = o[k]; return c; };
+  // Assigned to the globals the sync code closes over. These are top-level
+  // `var`s, so window.x and x are one binding.
+  window._cloudRecipeBase = copy(s.base); window._cloudRecipeStamp = copy(s.stamp);
+  window._cloudRecipeIds = copy(s.ids);   window._pendingCloudDeletes = copy(s.del);
+  window._cloudUnreadable = copy(s.unreadable);
+  window._cloudSchema = s.schema; window._lastCloudMetaAt = s.metaAt;
   try {
-    if (s.ls === null) localStorage.removeItem(CLOUD_DELETES_KEY);
-    else localStorage.setItem(CLOUD_DELETES_KEY, s.ls);
+    Object.keys(localStorage).forEach(function(k){
+      if (/^tonys_cloud_/.test(k) && !(k in s.ls)) localStorage.removeItem(k);
+    });
+    Object.keys(s.ls).forEach(function(k){ localStorage.setItem(k, s.ls[k]); });
   } catch(e) {}
 }
+// What the runner compares before and after every test, so a leak fails the
+// build instead of reaching a Sync Health report.
+function _cloudFingerprintForTest() {
+  var keys = function(o){ return Object.keys(o || {}).sort().join(','); };
+  var ls = {};
+  try { Object.keys(localStorage).sort().forEach(function(k){ if (/^tonys_cloud_/.test(k)) ls[k] = localStorage.getItem(k); }); } catch(e) {}
+  return JSON.stringify({ ids: keys(window._cloudRecipeIds), base: JSON.stringify(window._cloudRecipeBase || {}),
+    stamp: keys(window._cloudRecipeStamp), del: keys(window._pendingCloudDeletes),
+    unreadable: keys(window._cloudUnreadable), ls: ls });
+}
+window._cloudSnapshotForTest = _cloudSnapshotForTest; window._cloudRestoreForTest = _cloudRestoreForTest;
+window._cloudFingerprintForTest = _cloudFingerprintForTest;
 
 // ─── The Worker, in one place (v31.1) ───────────────────────────────────────
 // Every call used to inline the URL and send no credentials. The Worker forwards
@@ -1834,6 +1865,13 @@ async function runSelfTests() {
   // Parked, not deleted: it goes back exactly as it was.
   var _unitWas = null;
   try { _unitWas = localStorage.getItem(VIEW_UNIT_KEY); localStorage.removeItem(VIEW_UNIT_KEY); } catch(e) {}
+  // …and the whole of the sync bookkeeping (v36.55). Individual tests snapshot
+  // what they touch, and eleven of them still left it altered: Tony's Sync
+  // Health report, copied a minute after a run, showed a "damaged cloud
+  // document" and two phantom cloud recipes that were all test fixtures. Each
+  // test is held to its own restore by the CI runner; this is the guarantee
+  // that his session is never the place a missed one is found.
+  var _cloudWas = _cloudSnapshotForTest();
   try {
 
   for(let i=0; i<toRun.length; i++) {
@@ -1869,6 +1907,7 @@ async function runSelfTests() {
   }
 
   } finally {
+    try { _cloudRestoreForTest(_cloudWas); } catch(e) {}
     try { if (_unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, _unitWas); } catch(e) {}
     // Back into the language Tony was reading, whatever happened above.
     if (_langWas !== 'en' && typeof i18nInstall === 'function' && _dictWas) {
@@ -3342,7 +3381,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.54';
+var APP_VERSION = 'v36.55';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6039,7 +6078,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.54</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.55</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6661,7 +6700,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.54</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.55</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
