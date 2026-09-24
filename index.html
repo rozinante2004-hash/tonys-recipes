@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.55 -->
+<!-- Tony's Recipes Collection v36.56 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3381,7 +3381,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.55';
+var APP_VERSION = 'v36.56';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6078,7 +6078,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.55</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.56</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6096,7 +6096,10 @@ body.banner-shown .header {
       </div>
       <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app">?</button>
       <div class="drop-group">
-        <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️<span id="helperIndicator" style="position:absolute;top:0;right:0;width:7px;height:7px;border-radius:50%;background:#ccc;border:1px solid rgba(255,255,255,0.5);"></span></button>
+        <!-- v36.56 — no dot. It was the Save Helper's status light; the helper went
+             in v35.0 and nothing had coloured the dot since, so it sat there
+             grey on every device, meaning nothing, until Tony asked what it was. -->
+        <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️</button>
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
           <button class="drop-item" id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
@@ -6700,7 +6703,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.55</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.56</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

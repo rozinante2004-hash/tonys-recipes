@@ -2490,6 +2490,10 @@ window.SELF_TESTS = [
 
   { id:'sec_no_local_save_helper', group:'Network', name:'Exports go straight to the browser, with no local helper (v35.0)',
     test: async()=>{
+      // …including its status light. The dot on the ⚙️ outlived the helper by
+      // a year, permanently grey, until Tony asked what it meant (v36.56).
+      if(document.getElementById('helperIndicator'))
+        throw new Error('#helperIndicator is back on the Settings cog — the helper it reported on no longer exists');
       // The Save Helper is gone, and this is what stops it coming back.
       //
       // It existed to work around ONE thing: Chromium sanitises download
