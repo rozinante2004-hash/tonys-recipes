@@ -26,29 +26,40 @@ service cloud.firestore {
     //   access       the member list itself
     // The legacy single `recipes` document was deleted by hand on 15 Aug 2026
     // and its reading code removed in app v32.2. Nothing refers to it any more.
-    // The {document=**} wildcard already covers all of these, so 5.4 needed no
-    // rules change. Verified rather than assumed, per PLAN-5.4 §5.
-    match /shared/{document=**} {
+    //   i18n_<lang>  shared interface translations                  (v36.31)
+    // All are top-level documents with no subcollections, so one `{docId}`
+    // segment covers them (v36.59; it was `{document=**}` until then).
+    // v36.59 — one segment, `{docId}`, not `{document=**}`: `shared` holds only
+    // top-level documents, and naming the document is what lets the rule below
+    // tell the two admin-only ones apart. (Rules are OR'd, so a narrower match
+    // cannot take a permission back — the exception has to live in this one.)
+    match /shared/{docId} {
       // Read: owner + all members
       allow read: if request.auth != null &&
         request.auth.token.email in [{{READ}}];
 
-      // Create + update: owner + write/admin members.
+      // Create + update: owner + write/admin members — EXCEPT the documents
+      // that change what everybody else sees. `access` is the member list and
+      // `i18n_*` are the shared interface translations; the app only offers
+      // editing them to admins, and now the database agrees.
       // NOT `write`. In Firestore rules `write` expands to create + update +
       // DELETE, and allow rules are OR'd, so granting `write` here would hand
       // every write-role member deletion as well and make the `allow delete`
-      // below decorative. Spelling out create and update is what makes the
-      // delete rule mean something.
-      allow create, update: if request.auth != null &&
-        request.auth.token.email in [{{WRITE}}];
+      // below decorative.
+      allow create, update: if request.auth != null && (
+        request.auth.token.email in [{{ADMIN}}] ||
+        (request.auth.token.email in [{{WRITE}}] && !adminOnlyDoc(docId)));
 
-      // Delete: owner + admin members only. This now genuinely restricts.
+      // Delete: owner + admin members only. This genuinely restricts.
       // Consequence worth knowing: a write-role member deleting a recipe removes
       // it from their own device but cannot remove the cloud documents, so it
       // reappears on their next sync. The app says so plainly rather than
       // letting it look like a bug — see flushCloudDeletes.
       allow delete: if request.auth != null &&
         request.auth.token.email in [{{ADMIN}}];
+    }
+    function adminOnlyDoc(id) {
+      return id == 'access' || id.matches('i18n_.*');
     }
 
     // Legacy per-user documents (owner only). Kept for data written before the

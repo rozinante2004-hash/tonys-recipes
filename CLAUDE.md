@@ -132,6 +132,30 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **AUDIT BLOCK 1 (v36.59 / Worker v41).** Security, all measured or tested:
+  - **Worker `download-store` is gone** — it stored any data under any filename
+    and served it from the Worker's address; nothing had called it since v35.0,
+    and with the app key public it was an open file host. `worker-cors.mjs`
+    proves v40 stored `invoice.exe` and v41 does not.
+  - **No Gmail scope at sign-in.** Nothing used that token; `getGmailToken()`
+    asks for its own when Send Email is pressed.
+  - **Frame guard** (`#frameGuard`, first script): a meta-tag CSP cannot carry
+    `frame-ancestors` and GitHub Pages cannot send the header.
+  - **Payments and Deployments are owner-only** (`isAppOwner()`,
+    `[data-owner-only]`, re-applied whenever ⚙️ opens).
+  - **Rules: `access` and `i18n_*` are admin-only.** `match /shared/{docId}`
+    (single segment — `shared` has no subcollections) with the exception
+    inside the one rule, because rules are OR'd and a narrower match cannot
+    take a permission back. **Tested against the real emulator in CI**
+    (`tests/firestore-rules.test.mjs`); the live rules fail exactly the three
+    new checks. The app's fallback rules copy still had the `allow write` that
+    grants deletion — fixed.
+  - **Firebase API key restriction: verified** from here — a request with a
+    foreign Referer gets 403 "Requests from referer … are blocked".
+  - **SRI deferred** — this environment cannot reach gstatic.com to hash the
+    scripts, and a hash from any other copy that differs by a byte blocks
+    sign-in entirely. Bundling Firebase (WP-A) removes the need.
+
 - **A SELF TEST NEVER TOUCHES A REAL RECIPE OR THE REAL CLOUD (v36.57).**
   `crud_fav` and `feat_cook` used `recipes[0]` — on Tony's machine the
   chestnut collection — and "reverted" by stamping it modified now (feat_cook

@@ -8140,6 +8140,58 @@ window.SELF_TESTS = [
       })();
     } },
 
+  { id:'sec_audit_block1', group:'Network', name:'Frame guard, no Gmail at sign-in, owner-only tools (v36.59)',
+    test: async()=>{
+      var src=await (await fetch(location.href,{cache:'no-store'})).text();
+      // CLICKJACKING. A meta-tag CSP cannot carry frame-ancestors and GitHub
+      // Pages cannot send the header, so the guard is a script — and it has to
+      // be the FIRST one, before anything renders.
+      var firstInline=/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/.exec(src.replace(/<!--[\s\S]*?-->/g,''));
+      if(!firstInline || firstInline[1].indexOf('window.self !== window.top')===-1)
+        throw new Error('the frame guard is not the first script on the page');
+      if(src.indexOf('<script id="frameGuard">') > src.indexOf('<script src='))
+        throw new Error('an external script loads before the frame guard');
+      // GMAIL. Every family member's consent screen said the app could send
+      // e-mail as them, for a token nothing used. Send Email asks on its own.
+      if(/addScope\(\s*['"][^'"]*gmail/i.test(src))
+        throw new Error('sign-in asks for a Gmail permission again');
+      if(String(getGmailToken).indexOf('gmail.send')===-1)
+        throw new Error('Send Email no longer asks for the permission it needs');
+      // OWNER-ONLY TOOLS. Payments and Deployments link into the Cloudflare,
+      // Firebase and Anthropic accounts.
+      if(typeof isAppOwner!=='function'||typeof applyOwnerOnlyItems!=='function')
+        throw new Error('isAppOwner/applyOwnerOnlyItems not defined');
+      var items=document.querySelectorAll('[data-owner-only]');
+      if(items.length<2) throw new Error('Payments and Deployments are not marked owner-only');
+      var prevUser=window._fbUser, realToast=window.toast, said='';
+      try{
+        window.toast=function(m){ said=String(m); };
+        window._fbUser={ email:'someone.else@example.com' };
+        applyOwnerOnlyItems();
+        items.forEach(function(el){ if(el.style.display!=='none') throw new Error('an owner-only item is visible to a member: '+el.textContent.trim()); });
+        openDeployments();
+        if(document.getElementById('deploymentsOverlay').classList.contains('open'))
+          throw new Error('a member could open Deployments');
+        openPayments();
+        if(document.getElementById('paymentsOverlay').classList.contains('open'))
+          throw new Error('a member could open Payments');
+        if(!/owner/i.test(said)) throw new Error('refusing a member said nothing');
+        // …and the shared translations are not even attempted by a non-admin.
+        var wrote=false;
+        window._fbDb={ collection:function(){ return { doc:function(){ return { set:function(){ wrote=true; return Promise.resolve(); } }; } }; } };
+        var res=await i18nWriteCloud('zz',{ lang:'zz', strings:{ a:'b' } });
+        if(wrote) throw new Error('a non-admin tried to write a shared translation');
+        if(res!=='refused') throw new Error('a non-admin translation write returned '+res);
+        window._fbUser={ email:'rozinante2004@gmail.com' };
+        applyOwnerOnlyItems();
+        items.forEach(function(el){ if(el.style.display==='none') throw new Error('an owner-only item is hidden from the owner'); });
+      } finally {
+        window._fbUser=prevUser; window.toast=realToast; applyOwnerOnlyItems();
+        closeM('deploymentsOverlay'); closeM('paymentsOverlay');
+        try{ localStorage.removeItem('tonys_i18n_zz'); }catch(e){}
+      }
+    } },
+
   { id:'st_never_writes_real_cloud', group:'Cloud Sync', name:'A self test run cannot write to the real cloud (v36.57)',
     test: async()=>{
       // Tony's PC stopped mid-run on "EDITED_ELSEWHERE: … ערמונים: 10 מתכונים".
@@ -11276,7 +11328,9 @@ window.SELF_TESTS = [
       var tpl=await fetchRulesTemplate();
       if(tpl.indexOf('{{READ}}')===-1) throw new Error('the fetched template has no {{READ}} placeholder');
       // Substitution must leave no placeholder behind.
-      var filled=tpl.replace('{{READ}}','"a@b.c"').replace('{{WRITE}}','"a@b.c"').replace('{{ADMIN}}','"a@b.c"');
+      // Globally, as the app does (showAccessRules): the v36.59 rules use
+      // {{ADMIN}} twice, and a first-occurrence replace left the second behind.
+      var filled=tpl.replace(/\{\{READ\}\}/g,'"a@b.c"').replace(/\{\{WRITE\}\}/g,'"a@b.c"').replace(/\{\{ADMIN\}\}/g,'"a@b.c"');
       if(/\{\{[A-Z]+\}\}/.test(filled)) throw new Error('a placeholder survived substitution: '+(filled.match(/\{\{[A-Z]+\}\}/)||[])[0]);
       if(filled.indexOf('rules_version')===-1) throw new Error('the rules lost their version header');
     } },

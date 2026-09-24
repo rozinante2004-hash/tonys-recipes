@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.58 -->
+<!-- Tony's Recipes Collection v36.59 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -69,6 +69,21 @@
      heaviest dependencies and only matter when someone imports a spreadsheet or
      a Word file, which almost no session does; loadScriptOnce() fetches them on
      first use instead. qrcodejs is gone entirely, along with the QR share code. -->
+<script id="frameGuard">
+  // v36.59 — CLICKJACKING. `frame-ancestors 'none'` is in the CSP above, but a
+  // CSP delivered in a <meta> tag may not carry that directive — browsers ignore
+  // it (Chrome says so in the console) — and GitHub Pages cannot send the real
+  // header. Without this, any site could load the app invisibly in a frame and
+  // steer a click onto "Delete". First script on the page, before anything can
+  // render: if we are framed, show nothing and try to take the whole window.
+  (function () {
+    var framed;
+    try { framed = window.self !== window.top; } catch (e) { framed = true; }
+    if (!framed) return;
+    document.documentElement.style.visibility = 'hidden';
+    try { window.top.location.replace(window.self.location.href); } catch (e) {}
+  })();
+</script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase Compat SDK — single combined file for faster loading -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="console.error('Failed to load Firebase app SDK')"></script>
@@ -163,7 +178,10 @@
       _fbAuth     = firebase.auth();
       _fbDb       = firebase.firestore();
       _fbProvider = new firebase.auth.GoogleAuthProvider();
-      _fbProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+      // v36.59 — no Gmail scope at sign-in. It made every family member's consent
+      // screen say the app could send e-mail as them, and the token it produced
+      // was never used: "Send Email" asks for its own, at the moment it is
+      // needed (getGmailToken). Asking late is also what Google's review expects.
       window._fbAuth     = _fbAuth;
       window._fbDb       = _fbDb;
       window._fbProvider = _fbProvider;
@@ -3252,12 +3270,14 @@ window.renderSyncHealth = renderSyncHealth;
 window.fmtAgo           = fmtAgo;
 
 function openDeployments() {
+  if (!isAppOwner()) { toast('Deployments are for the owner of this app.'); return; }
   document.getElementById('deploymentsOverlay').classList.add('open');
 }
 window.openDeployments = openDeployments;
 
 // ─── PAYMENTS MODAL ───────────────────────────────────────────────────────────
 function openPayments() {
+  if (!isAppOwner()) { toast('Payments are for the owner of this app.'); return; }
   document.getElementById('paymentsOverlay').classList.add('open');
 }
 window.openPayments = openPayments;
@@ -3393,14 +3413,16 @@ var FIRESTORE_RULES_FALLBACK = [
   "// firestore.rules in the repository before publishing.",
   "service cloud.firestore {",
   "  match /databases/{database}/documents {",
-  "    match /shared/{document=**} {",
+  "    match /shared/{docId} {",
   "      allow read: if request.auth != null &&",
   "        request.auth.token.email in [{{READ}}];",
-  "      allow write: if request.auth != null &&",
-  "        request.auth.token.email in [{{WRITE}}];",
+  "      allow create, update: if request.auth != null && (",
+  "        request.auth.token.email in [{{ADMIN}}] ||",
+  "        (request.auth.token.email in [{{WRITE}}] && !adminOnlyDoc(docId)));",
   "      allow delete: if request.auth != null &&",
   "        request.auth.token.email in [{{ADMIN}}];",
   "    }",
+  "    function adminOnlyDoc(id) { return id == 'access' || id.matches('i18n_.*'); }",
   "    match /users/{userId}/{document=**} {",
   "      allow read, write: if request.auth != null && request.auth.uid == userId;",
   "    }",
@@ -3437,7 +3459,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.58';
+var APP_VERSION = 'v36.59';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -3973,7 +3995,7 @@ async function sendViaGmailApi(to, subject, htmlBody, plainText) {
     var err = await resp.json().catch(function(){ return {}; });
     if(resp.status === 401) {
       window._googleAccessToken = null; // Clear stale token
-      throw new Error('Gmail access expired. Please sign out and sign in again to grant Gmail permission.');
+      throw new Error('Gmail access expired. Press Send Email again and allow access when Google asks.');
     }
     throw new Error('Gmail API error ' + resp.status + ': ' + (err.error ? err.error.message : 'Unknown error'));
   }
@@ -6134,7 +6156,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.58</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.59</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6179,8 +6201,11 @@ body.banner-shown .header {
           <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
+          <!-- v36.59 — owner only (applyOwnerOnlyItems). They link straight into
+               the Cloudflare account, the Firebase project and Anthropic billing,
+               with the account ID on screen: no reason to be on anyone else's. -->
+          <button class="drop-item" data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
+          <button class="drop-item" data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
         </div>
       </div>
     </div>
@@ -6759,7 +6784,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.58</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.59</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9604,6 +9629,10 @@ async function i18nWriteCloud(lang, doc) {
   i18nSanitiseDoc(doc);
   i18nWriteCache(lang, doc);
   if (!window._fbDb || !window._fbUser) return 'local';
+  // v36.59 — the shared translations are admin-only in the rules. Asking
+  // anyway only produced a refusal, logged as an error, every time a
+  // write-role member switched language; the answer is known in advance.
+  if (!i18nCanEdit()) return 'refused';
   try {
     await window._fbDb.collection('shared').doc(i18nDocId(lang)).set(doc);
     syncLog('save', 'Saved the ' + i18nLangName(lang) + ' translation to the cloud', { count: Object.keys(doc.strings).length });
@@ -10055,6 +10084,23 @@ window.renderLangMenu = renderLangMenu;
 // "Full access" is the admin role — the same one the access panel labels
 // 🛡 Full access. Editing a translation rewrites a file every device reads, so
 // it is gated where deletion is.
+// ─── THE OWNER (v36.59) ──────────────────────────────────────────────────────
+// One definition instead of an address typed inline wherever it mattered. The
+// operator tools — Payments, Deployments — are the owner's alone; the
+// translation editor is the owner's and admins'. WP-A moves the address itself
+// into configuration.
+var APP_OWNER_EMAIL = 'rozinante2004@gmail.com';
+function isAppOwner() {
+  try { return !!(window._fbUser && window._fbUser.email
+                  && String(window._fbUser.email).toLowerCase() === APP_OWNER_EMAIL); }
+  catch(e) { return false; }
+}
+function applyOwnerOnlyItems() {
+  var mine = isAppOwner();
+  document.querySelectorAll('[data-owner-only]').forEach(function(el){ el.style.display = mine ? '' : 'none'; });
+}
+window.isAppOwner = isAppOwner; window.applyOwnerOnlyItems = applyOwnerOnlyItems;
+
 function i18nCanEdit() {
   try {
     if (!window._fbUser || !window._fbUser.email) return false;
@@ -10064,7 +10110,7 @@ function i18nCanEdit() {
     // The owner is always full access, and is not necessarily in the member
     // list — locking Tony out of his own translations on an empty list would be
     // an absurd way to fail.
-    if (me === 'rozinante2004@gmail.com') return true;
+    if (isAppOwner()) return true;
     var mem = list.filter(function(m){ return String(m.email || '').toLowerCase() === me; })[0];
     return !!(mem && mem.role === 'admin');
   } catch(e) { return false; }
@@ -14408,6 +14454,7 @@ function _armDropOutside(menu){
 }
 function toggleDrop(id){
   const menu=document.getElementById(id);
+  if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
   const wasOpen=menu.classList.contains('open');
   // Close all
   _disarmDropOutside();
@@ -18193,11 +18240,7 @@ async function startGoogleSignIn() {
   window._justSignedIn = true;
   if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
   try {
-    var popupResult = await _fbAuth.signInWithPopup(_fbProvider);
-    // Store Google OAuth access token for Gmail API calls
-    if(popupResult.credential) {
-      window._googleAccessToken = popupResult.credential.accessToken;
-    }
+    await _fbAuth.signInWithPopup(_fbProvider);
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
   } catch(err) {
     window._justSignedIn = false;

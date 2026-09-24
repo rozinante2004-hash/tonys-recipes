@@ -128,6 +128,30 @@ jobs:
       # The Worker had no tests until v36, and a CORS regression in it took every
       # server-side feature down for three releases without the suite noticing —
       # that suite only ever loaded index.html. This drives the Worker directly.
+      # v36.59 — the Firestore rules, against the REAL emulator. They used to be
+      # pasted into the console and checked by nothing, which is how the app's
+      # fallback copy kept an `allow write` that silently granted deletion.
+      # `demo-` projects never touch a real Firebase project.
+      - name: Set up Java (for the Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Firestore rules checks (emulator)
+        run: |
+          mkdir -p /tmp/rules && cd /tmp/rules
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 >/dev/null
+          # The emulator wants a startable rules file; the test loads the real
+          # template itself and fills in the member lists.
+          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g" \
+            "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
+          echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"ui":{"enabled":false}}}' > firebase.json
+          mkdir -p tests && cp "$GITHUB_WORKSPACE/tests/firestore-rules.test.mjs" tests/
+          cp "$GITHUB_WORKSPACE/firestore.rules" ./firestore.rules
+          npx firebase emulators:exec --only firestore --project demo-rules "node tests/firestore-rules.test.mjs"
+
       - name: Worker checks (CORS, origin, app key)
         run: node tests/worker-cors.mjs
 

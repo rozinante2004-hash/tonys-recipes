@@ -470,6 +470,30 @@ console.log('\nphoto-fetch (v40):');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nNo file hosting (v41):');
+{
+  // download-store stored any data under any filename and served it back from
+  // this Worker's address — an open file host for anyone with the public app
+  // key. It must be gone in BOTH halves: nothing stored, nothing served.
+  const kv = { puts: [], async get() { return null; }, async put(k, v) { this.puts.push(k); }, async delete() {} };
+  const e = { BRING_KV: kv, APP_SHARED_KEY: 'secret-k' };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('{"stub":true}', { status: 200 });
+  let stored;
+  try {
+    stored = await worker.fetch(post({ action: 'download-store', data: btoa('MZ evil'), filename: 'invoice.exe',
+      mime: 'application/x-msdownload', appKey: 'secret-k' }), e);
+  } finally { globalThis.fetch = realFetch; }
+  expect('download-store writes nothing to KV', !kv.puts.some(k => /^dl_/.test(k)), 'stored ' + kv.puts.join(','));
+  const body = await stored.text();
+  expect('download-store stores nothing and returns no link', !/"url"/.test(body) && !/dl_/.test(body),
+    'got ' + stored.status + ' ' + body.slice(0, 120));
+  const served = await worker.fetch(new Request('https://worker.test/invoice.exe?dl=dl_1_abc', { method: 'GET', headers: { Origin: ORIGIN } }), e);
+  const txt = await served.text();
+  expect('a ?dl= GET serves no file', served.status === 200 && txt === 'OK' && !/attachment/.test(served.headers.get('Content-Disposition') || ''),
+    'got ' + served.status + ' ' + (served.headers.get('Content-Disposition') || '') + ' ' + txt.slice(0, 60));
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,

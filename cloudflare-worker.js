@@ -83,7 +83,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v40';
+const WORKER_VERSION = 'v41';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -389,31 +389,9 @@ async function handleRequest(request, env) {
       }});
     }
 
-    // GET: serve stored file with correct Content-Disposition header
+    // GET is a liveness check and nothing else. (v41 — it used to serve files
+    // stored by the `download-store` action; see the note where that was.)
     if (request.method === 'GET') {
-      const dlKey = new URL(request.url).searchParams.get('dl');
-      // URL path may contain encoded filename (for Chrome filename detection)
-      if (dlKey && env.BRING_KV) {
-        try {
-          const stored = await env.BRING_KV.get(dlKey);
-          if (!stored) return new Response('File expired', { status: 404 });
-          const { data, filename, mime } = JSON.parse(stored);
-          await env.BRING_KV.delete(dlKey);
-          const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
-          const encodedName = encodeURIComponent(filename);
-          return new Response(bytes, {
-            status: 200,
-            headers: {
-              'Content-Type': mime || 'application/octet-stream',
-              'Content-Disposition': "attachment; filename*=UTF-8''" + encodedName,
-              'Access-Control-Allow-Origin': '*',
-              'Cache-Control': 'no-store',
-            }
-          });
-        } catch(e) {
-          return new Response('Error: ' + e.message, { status: 500 });
-        }
-      }
       return new Response('OK', { status: 200, headers: {
         'Access-Control-Allow-Origin': (typeof origin === 'string' && origin) ? origin : 'null',
         'Vary': 'Origin',
@@ -952,22 +930,14 @@ async function handleRequest(request, env) {
       }
     }
 
-    // ── File download: store in KV, return one-time GET URL ──────────────────
-    if (body.action === 'download-store') {
-      try {
-        const { data, filename, mime } = body;
-        if (!data || !filename) return jsonResp({ error: 'Missing data or filename' }, 400);
-        const key = 'dl_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-        await env.BRING_KV.put(key, JSON.stringify({ data, filename, mime }), { expirationTtl: 60 });
-        // Put filename in URL path — Chrome uses path segment as filename
-        const baseUrl = request.url.split('?')[0];
-        const encodedFilename = encodeURIComponent(filename);
-        const getUrl = baseUrl + encodedFilename + '?dl=' + encodeURIComponent(key);
-        return jsonResp({ url: getUrl });
-      } catch(err) {
-        return jsonResp({ error: 'download-store failed: ' + err.message }, 500);
-      }
-    }
+    // v41 — `download-store` is gone. It stored ANY data under ANY filename and
+    // file type and handed back a download link on this Worker's address. It was
+    // part of the old Hebrew-filename workaround; nothing has called it since the
+    // locale was fixed (v35.0), and with the app key in the public page it was an
+    // open 60-second file host: a malicious download on a trustworthy-looking
+    // address, paid for out of this account's KV write allowance. An unknown
+    // action now falls through to the Anthropic proxy's own validation, which
+    // refuses a body with no messages.
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
