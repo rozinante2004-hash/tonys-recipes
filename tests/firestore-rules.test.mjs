@@ -59,6 +59,11 @@ await check('a writer can still read a translation',   getDoc(doc(as(WRITER), 's
 await check('a document merely CONTAINING "i18n" is not admin-only',
                                                        setDoc(doc(as(WRITER), 'shared/recipe_i18n_x'), { r: '{}' }), true);
 
+console.log('The family backup record (v36.61)');
+await check('a writer can record a backup',           setDoc(doc(as(WRITER), 'shared/backups'), { at: 1, device: 'a computer', auto: true }), true);
+await check('a reader cannot record a backup',        setDoc(doc(as(READER), 'shared/backups'), { at: 2, device: 'an iPhone', auto: false }), false);
+await check('a reader can read the backup record',    getDoc(doc(as(READER), 'shared/backups')), true);
+
 console.log('Legacy per-user documents');
 await check('you can write your own user document',  setDoc(doc(as(WRITER), 'users/writer/x/y'), { a: 1 }), true);
 await check("you cannot write someone else's",       setDoc(doc(as(WRITER), 'users/reader/x/y'), { a: 1 }), false);

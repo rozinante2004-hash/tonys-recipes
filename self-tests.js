@@ -819,9 +819,11 @@ window.SELF_TESTS = [
         if(typeof window[f]!=='function') throw new Error(f+' not defined');
       });
       var prev=null; try{ prev=localStorage.getItem(BACKUP_AT_KEY); }catch(e){}
+      var bk=_backupRecordForTest();
       try{
-        // Never backed up, with a real collection -> overdue.
-        try{ localStorage.removeItem(BACKUP_AT_KEY); }catch(e){}
+        // Never backed up, with a real collection -> overdue. v36.61: nowhere
+        // in the family either, or a PC that backed up yesterday answers for it.
+        _backupRecordRestoreForTest({});
         if(recipes.length>5 && !backupIsOverdue()) throw new Error('a collection that has never been backed up is not reported as overdue');
         if(backupAgeDays()!==null) throw new Error('backupAgeDays should be null when there has never been a backup');
         // Just backed up -> not overdue, and the age reads 0.
@@ -834,11 +836,17 @@ window.SELF_TESTS = [
         if(backupAgeDays()!==40) throw new Error('expected an age of 40 days, got '+backupAgeDays());
       } finally {
         try{ if(prev===null) localStorage.removeItem(BACKUP_AT_KEY); else localStorage.setItem(BACKUP_AT_KEY,prev); }catch(e){}
+        _backupRecordRestoreForTest(bk);
       }
     } },
 
   { id:'safety_backup_folder', group:'Backup', name:'A chosen folder gets dated snapshots, and only ours are pruned (v36.20)',
     test: async()=>{
+      // v36.61 — this presses Back up now for real (into a fake folder), which
+      // stamps "last backup" on the device. Parked, so the real device does not
+      // come away believing it was backed up.
+      var _bk=_backupRecordForTest();
+      try { await (async()=>{
       ['chooseBackupFolder','forgetBackupFolder','backupDirLoad','autoBackupIfDue',
        'writeBackupToFolder','pruneBackupFolder','backupJson','backupNagLevel'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
@@ -980,6 +988,162 @@ window.SELF_TESTS = [
       // (5) It is reachable. A safety net behind no menu item is no safety net.
       if(!document.querySelector('#settingsDrop button[onclick*="showBackupPanel"]'))
         throw new Error('Backups is not in the Settings menu');
+      })(); } finally { _backupRecordRestoreForTest(_bk); }
+    } },
+
+  { id:'safety_backup_family', group:'Backup', name:'A backup taken on the PC counts on the phone (v36.61, audit E2)',
+    test: async()=>{
+      ['newestBackupAt','familyBackupFetch','familyBackupNote','familyBackupRemember','backupWhereText']
+        .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var bk=_backupRecordForTest(), realDb=window._fbDb, realUser=window._fbUser,
+          realSupported=window.backupFolderSupported, realToast=window.toast, realToastAction=window.toastAction,
+          realAuto=window.autoBackupIfDue, realR=recipes, cloudWas=_cloudSnapshotForTest();
+      var DAY=24*60*60*1000;
+      // A fake cloud holding one document, so both directions can be seen.
+      var cloud={}, wrote=[];
+      function fakeDb(refuse){ return { collection:function(c){ return { doc:function(id){ return {
+        get:async function(){ var d=cloud[c+'/'+id]; return { exists:!!d, data:function(){ return d; } }; },
+        set:async function(v){ if(refuse) throw new Error('Missing or insufficient permissions.');
+                               wrote.push({ path:c+'/'+id, v:v }); cloud[c+'/'+id]=v; } }; } }; } }; }
+      try{
+        _backupRecordRestoreForTest({});                     // a device that has never backed up
+        // (1) The phone has never backed up, but the PC did so yesterday,
+        // automatically. That is a backed-up family, not an overdue one.
+        cloud['shared/backups']={ at:Date.now()-DAY, device:'a computer', auto:true };
+        window._fbUser={ email:'x@example.com' }; window._fbDb=fakeDb(false);
+        await familyBackupFetch();
+        if(newestBackupAt()===null) throw new Error('the family record was read but not adopted');
+        if(backupAgeDays()!==1) throw new Error('expected the PC backup to read 1 day old, got '+backupAgeDays());
+        if(backupIsOverdue()) throw new Error('a phone whose family backed up yesterday is still told it is overdue');
+        if(backupWhereText()!=='on a computer (automatic)') throw new Error('where it came from reads "'+backupWhereText()+'"');
+        // …and its own older backup does not win over the newer family one.
+        localStorage.setItem(BACKUP_AT_KEY, String(Date.now()-10*DAY));
+        if(backupAgeDays()!==1) throw new Error('the older local backup won over the newer family one');
+        // A newer local one does, and says so.
+        localStorage.setItem(BACKUP_AT_KEY, String(Date.now()));
+        if(backupAgeDays()!==0 || backupWhereText()!=='on this device') throw new Error('the newer local backup did not win');
+
+        // (2) It only moves forward, and never into the future — a device with
+        // its clock a year ahead must not silence every reminder in the family.
+        _backupRecordRestoreForTest({});
+        familyBackupRemember({ at:Date.now()-5*DAY, device:'a computer' });
+        if(familyBackupRemember({ at:Date.now()-50*DAY, device:'an iPhone' })) throw new Error('an OLDER record replaced a newer one');
+        if(familyBackupRemember({ at:Date.now()+365*DAY, device:'a computer' })) throw new Error('a record from the future was accepted');
+        if(familyBackupRemember({ at:'yesterday' })) throw new Error('a malformed record was accepted');
+        if(backupAgeDays()!==5) throw new Error('expected 5 days, got '+backupAgeDays());
+
+        // (3) Backing up here records it for everyone: when and on what, and
+        // nothing else — no file name, no path, no email.
+        _backupRecordRestoreForTest({}); wrote.length=0;
+        var res=await familyBackupNote(true);
+        if(res!=='recorded') throw new Error('the backup was not recorded in the cloud: '+res);
+        if(wrote.length!==1 || wrote[0].path!=='shared/backups') throw new Error('wrote to the wrong place: '+JSON.stringify(wrote));
+        var keys=Object.keys(wrote[0].v).sort().join(',');
+        if(keys!=='at,auto,device') throw new Error('the shared record carries more than when and where: '+keys);
+        // A read-only member is refused by the rules; their backup still counts here.
+        _backupRecordRestoreForTest({}); window._fbDb=fakeDb(true);
+        if(await familyBackupNote(false)!=='local only') throw new Error('a refused write was reported as recorded');
+        if(backupAgeDays()!==0) throw new Error('a refused cloud write lost the local record of the backup');
+        // Signed out: the last value seen still answers.
+        window._fbUser=null;
+        if(!(await familyBackupFetch())) throw new Error('signed out, the last known family backup was forgotten');
+
+        // (4) The reminder itself stays quiet when the family is backed up, and
+        // names where the backup was when it is not.
+        recipes=realR.concat([1,2,3,4,5,6].map(function(i){ return normalizeRecipe({ id:888990+i, name:'b'+i, ingredients:[], steps:['x'] }); }));
+        window.autoBackupIfDue=async function(){ return 'no folder connected'; };
+        var said=[]; window.toast=function(t){ said.push(String(t)); };
+        window.toastAction=function(t){ said.push(String(t)); };
+        _backupRecordRestoreForTest({}); familyBackupRemember({ at:Date.now()-2*DAY, device:'a computer', auto:true });
+        await checkBackupOverdue();
+        if(said.length) throw new Error('nagged although the computer backed up two days ago: '+said.join(' | '));
+        _backupRecordRestoreForTest({}); familyBackupRemember({ at:Date.now()-40*DAY, device:'a computer', auto:true });
+        await checkBackupOverdue();
+        if(!said.some(function(t){ return /40 days ago, on a computer/.test(t); }))
+          throw new Error('the overdue reminder does not say where the last backup was: '+said.join(' | '));
+
+        // (5) The phone's Backups panel says the computer is the backup device,
+        // rather than looking permanently unprotected.
+        window.backupFolderSupported=function(){ return false; };
+        await renderBackupPanel();
+        var note=document.getElementById('backupNoFolderNote');
+        if(!note || !/Automatic backups happen on the computer/.test(note.textContent))
+          throw new Error('the Backups panel on a phone does not say where automatic backups happen');
+        var w=document.getElementById('backupWhere');
+        if(!w || !/on a computer/.test(w.textContent)) throw new Error('the panel does not say where the last backup was taken');
+      } finally {
+        window._fbDb=realDb; window._fbUser=realUser; window.backupFolderSupported=realSupported;
+        window.toast=realToast; window.toastAction=realToastAction; window.autoBackupIfDue=realAuto; recipes=realR;
+        _backupRecordRestoreForTest(bk);
+        try{ await renderBackupPanel(); }catch(e){}
+        _cloudRestoreForTest(cloudWas);   // the fake reads were counted
+      }
+    } },
+
+  { id:'storage_audit_block3', group:'Storage', name:'One language per device, bounded bins, storage shown (v36.61)',
+    test: async()=>{
+      // Everything this touches is parked: Tony's device has real languages.
+      var parked={};
+      Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k)) parked[k]=localStorage.getItem(k); });
+      var putBack=function(){
+        Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k) && !(k in parked)) localStorage.removeItem(k); });
+        Object.keys(parked).forEach(function(k){ localStorage.setItem(k, parked[k]); });
+      };
+      var langs=Object.keys(I18N_LANGS); if(langs.length<2) throw new Error('need two languages to test with');
+      var A=langs[0], B=langs[1];
+      try{
+        // (1) Only the language in use stays; the others are remembered as
+        // translated, so the menu does not offer a paid run for them.
+        localStorage.removeItem(I18N_KNOWN_KEY);
+        localStorage.setItem('tonys_i18n_'+A, JSON.stringify({ strings:{ Hello:'a' } }));
+        localStorage.setItem('tonys_i18n_'+B, JSON.stringify({ strings:{ Hello:'b' } }));
+        localStorage.setItem('tonys_i18n_zz', 'not a dictionary');
+        localStorage.setItem(I18N_BIN_PREFIX+A, '{}');
+        var gone=i18nPruneCaches([B]);
+        if(localStorage.getItem('tonys_i18n_'+A)!==null) throw new Error('the unused language '+A+' was kept');
+        if(!localStorage.getItem('tonys_i18n_'+B)) throw new Error('the language in use was pruned');
+        if(gone.join()!==A) throw new Error('pruned the wrong things: '+gone.join());
+        if(localStorage.getItem('tonys_i18n_zz')===null) throw new Error('pruning deleted a key that is not a dictionary');
+        if(localStorage.getItem(I18N_BIN_PREFIX+A)===null) throw new Error('pruning deleted a translation bin');
+        if(localStorage.getItem(I18N_KNOWN_KEY)===null) throw new Error('pruning deleted the list of known languages');
+        if(i18nKnownLangs().indexOf(A)===-1) throw new Error('a pruned language is no longer known to be translated');
+        renderLangMenu();
+        var menu=document.getElementById('langMenu');
+        var row=menu && Array.from(menu.querySelectorAll('button')).filter(function(b){ return (b.getAttribute('onclick')||'').indexOf("'"+A+"'")!==-1; })[0];
+        if(!row) throw new Error('no menu row for '+A);
+        if(!/ready/.test(row.textContent)) throw new Error('the menu no longer calls a pruned language ready: "'+row.textContent+'"');
+        // Switching to English keeps none but English.
+        i18nPruneCaches([]);
+        if(localStorage.getItem('tonys_i18n_'+B)!==null) throw new Error('English kept a foreign dictionary');
+
+        // (2) The bins are bounded: newest 1000, for 90 days.
+        localStorage.removeItem(I18N_BIN_PREFIX+A); localStorage.removeItem(I18N_BIN_AT_PREFIX+A);
+        var big={}; for(var i=0;i<I18N_BIN_MAX+100;i++) big['k'+i]='v'+i;
+        var n=i18nEdStash(A, big);
+        if(n!==I18N_BIN_MAX) throw new Error('the bin holds '+n+', not '+I18N_BIN_MAX);
+        var bin=i18nEdBin(A);
+        if(bin.k0 || !bin['k'+(I18N_BIN_MAX+99)]) throw new Error('the bin dropped the NEWEST entries instead of the oldest');
+        localStorage.setItem(I18N_BIN_AT_PREFIX+A, String(Date.now()-(I18N_BIN_DAYS+1)*86400000));
+        if(Object.keys(i18nEdBin(A)).length) throw new Error('a bin older than '+I18N_BIN_DAYS+' days was kept');
+        if(localStorage.getItem(I18N_BIN_PREFIX+A)!==null) throw new Error('the expired bin was hidden but not deleted');
+        // …and a fresh one is not thrown away.
+        i18nEdStash(A, { x:'y' });
+        if(!i18nEdBin(A).x) throw new Error('a fresh bin was thrown away');
+
+        // (3) How full the device is, by what, in Sync Health and its report.
+        var r0=deviceStorageReport();
+        localStorage.setItem('tonys_i18n_'+A, 'x'.repeat(50000));
+        var r1=deviceStorageReport();
+        if(r1.cats.languages-r0.cats.languages<50000) throw new Error('a 50,000-character language was not counted as a language');
+        var sum=Object.keys(r1.cats).reduce(function(a,k){ return a+r1.cats[k]; },0);
+        if(sum!==r1.total) throw new Error('the categories do not add up to the total ('+sum+' vs '+r1.total+')');
+        if(!(r1.budget>=2000000)) throw new Error('implausible budget '+r1.budget);
+        if(!/% of about/.test(deviceStorageLine(r1))) throw new Error('the storage line reads "'+deviceStorageLine(r1)+'"');
+        renderSyncHealth();
+        var body=document.getElementById('syncHealthBody');
+        if(!body || body.textContent.indexOf('Device storage used')===-1) throw new Error('Sync Health does not show device storage');
+        if(syncHealthText().indexOf('device storage: ')===-1) throw new Error('the Sync Health report does not include device storage');
+      } finally { putBack(); }
     } },
 
   { id:'safety_restore_merge', group:'Backup', name:'Restore can add back only what is missing (v36.21)',
@@ -7013,7 +7177,7 @@ window.SELF_TESTS = [
       // Drive a real aiCall and read the body that would go to the Worker.
       var realFetch=window.fetch, sent=[];
       var prevCache=null;
-      try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      prevCache=_aiCacheParkForTest();
       try{
         window.fetch=function(u, opts){
           var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
@@ -7028,7 +7192,7 @@ window.SELF_TESTS = [
         if(sent[1]!==AI_MODEL_SMALL) throw new Error('the routed call asked for "'+sent[1]+'", not '+AI_MODEL_SMALL);
       } finally {
         window.fetch=realFetch;
-        try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
+        _aiCacheRestoreForTest(prevCache);
       }
 
       // The cache is big enough to be worth having.
@@ -7134,7 +7298,7 @@ window.SELF_TESTS = [
       // the word "System:" therefore sat at exactly the same level as the real
       // instructions. It is also the only shape prompt caching can work in.
       var realFetch=window.fetch, sent=[], prevCache=null;
-      try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      prevCache=_aiCacheParkForTest();
       try{
         window.fetch=function(u, opts){
           var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
@@ -7160,7 +7324,7 @@ window.SELF_TESTS = [
         if('system' in sent[0]) throw new Error('a call with no instructions still sent a system field');
       } finally {
         window.fetch=realFetch;
-        try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
+        _aiCacheRestoreForTest(prevCache);
       }
 
       // The cache must tell two different sets of instructions apart.
@@ -7185,7 +7349,7 @@ window.SELF_TESTS = [
       // answer that could not change. Anthropic's own 429 still IS retried,
       // because that one genuinely clears; only our Worker sets `rateLimited`.
       var realFetch=window.fetch, calls=0, prevCache=null;
-      try{ prevCache=localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); }catch(e){}
+      prevCache=_aiCacheParkForTest();
       // The retry path backs off 2s, 4s, 8s, 16s. Driving it for real cost this
       // suite THIRTY SECONDS of doing nothing, on every run, on every device —
       // measured at 30,004ms, twenty times the next slowest test. The waiting is
@@ -7231,7 +7395,7 @@ window.SELF_TESTS = [
           throw new Error('an Anthropic 429 did not end in the generic rate-limit message: "'+busyMsg+'"');
       } finally {
         window.fetch=realFetch; window.sleep=realSleep;
-        try{ if(prevCache===null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, prevCache); }catch(e){}
+        _aiCacheRestoreForTest(prevCache);
       }
       if(aiRetryable(new Error('SPEND_CAP: daily ceiling')))
         throw new Error('a spend ceiling is marked retryable');
@@ -11531,23 +11695,40 @@ window.SELF_TESTS = [
       if(k1!==k2) throw new Error('the same prompt must produce the same key');
       if(k1===k3) throw new Error('different prompts must not collide');
       if(aiCacheKey('hello world',2000)===aiCacheKey('hello world',3000)) throw new Error('the token budget must be part of the key');
-      var saved=null; try{ saved=localStorage.getItem('tonys_ai_cache'); }catch(e){}
+      var parked=_aiCacheParkForTest();
       try {
-        localStorage.removeItem('tonys_ai_cache');
         if(aiCacheGet(k1)!==null) throw new Error('an empty cache must miss');
         aiCachePut(k1,'the answer');
         if(aiCacheGet(k1)!=='the answer') throw new Error('a stored answer was not returned');
         // Expiry is honoured.
-        var o=JSON.parse(localStorage.getItem('tonys_ai_cache'));
-        o[k1].at=Date.now()-(AI_CACHE_TTL+60000);   // just past it, whatever it is
-        localStorage.setItem('tonys_ai_cache',JSON.stringify(o));
+        aiCacheRead()[k1].at=Date.now()-(AI_CACHE_TTL+60000);   // just past it, whatever it is
         if(aiCacheGet(k1)!==null) throw new Error('an entry older than the TTL must not be served');
         // The cache is capped so it can never crowd out the recipes.
         for(var i=0;i<AI_CACHE_MAX+10;i++) aiCachePut(aiCacheKey('p'+i,2000),'v'+i);
-        var n=Object.keys(JSON.parse(localStorage.getItem('tonys_ai_cache'))).length;
+        var n=Object.keys(aiCacheRead()).length;
         if(n>AI_CACHE_MAX) throw new Error('the cache grew past its cap: '+n+' entries, max '+AI_CACHE_MAX);
+      } finally { _aiCacheRestoreForTest(parked); }
+
+      // IT LIVES IN INDEXEDDB (v36.61), not in the ~5-million-character
+      // localStorage budget it used to share with the recipes. The move merges
+      // rather than replaces, and only drops the old copy once the new one holds.
+      if(typeof aiCacheInit!=='function'||typeof kvGet!=='function') throw new Error('aiCacheInit/kvGet not defined');
+      var parked2=_aiCacheParkForTest(), prevIdb=await kvGet('ai_cache');
+      try{
+        var old={}; old['legacy-key']={ v:'from before', at:Date.now() };
+        localStorage.setItem(AI_CACHE_KEY, JSON.stringify(old));
+        _aiCacheMem=null;
+        await kvPut('ai_cache', { 'idb-key':{ v:'already moved', at:Date.now() } });
+        var ok=await aiCacheInit();
+        if(!ok) throw new Error('the AI cache could not move to IndexedDB');
+        if(localStorage.getItem(AI_CACHE_KEY)!==null) throw new Error('the old localStorage copy was left behind');
+        var inIdb=await kvGet('ai_cache')||{};
+        if(!inIdb['legacy-key']||!inIdb['idb-key'])
+          throw new Error('the move lost entries: '+JSON.stringify(Object.keys(inIdb)));
+        if(aiCacheGet('legacy-key')!=='from before') throw new Error('a moved answer is not served');
       } finally {
-        try{ if(saved===null) localStorage.removeItem('tonys_ai_cache'); else localStorage.setItem('tonys_ai_cache',saved); }catch(e){}
+        await kvPut('ai_cache', prevIdb||{});
+        _aiCacheRestoreForTest(parked2);
       }
     } },
   { id:'feat_ai_error_states', group:'Features', name:'AI failures offer a way forward',

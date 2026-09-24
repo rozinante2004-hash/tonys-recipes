@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.60 -->
+<!-- Tony's Recipes Collection v36.61 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1936,6 +1936,9 @@ async function runSelfTests() {
   // test is held to its own restore by the CI runner; this is the guarantee
   // that his session is never the place a missed one is found.
   var _cloudWas = _cloudSnapshotForTest();
+  // …and when the last backup was (v36.61): a test that presses Back up now
+  // against a fake folder must not leave this device believing it is backed up.
+  var _backupWas = _backupRecordForTest();
   var _realDb = window._fbDb;
   _selfTestHeldWrites = 0;
   if (_realDb) window._fbDb = _selfTestNoCloudWrites(_realDb);
@@ -1982,6 +1985,7 @@ async function runSelfTests() {
       try { syncLog('system', _selfTestHeldWrites + ' cloud write(s) held back during the self test', ''); } catch(e) {}
     }
     try { _cloudRestoreForTest(_cloudWas); } catch(e) {}
+    try { _backupRecordRestoreForTest(_backupWas); } catch(e) {}
     try { if (_unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, _unitWas); } catch(e) {}
     // Back into the language Tony was reading, whatever happened above.
     if (_langWas !== 'en' && typeof i18nInstall === 'function' && _dictWas) {
@@ -3119,6 +3123,9 @@ function renderSyncHealth() {
 
   out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Collection</div>';
   out += healthRow('Recipes on this device', String(h.localRecipes), '');
+  var _ds = deviceStorageReport();
+  out += healthRow('Device storage used', _ds.pct + '%', _ds.pct >= 80 ? 'bad' : _ds.pct >= 60 ? 'warn' : 'good',
+                   _ds.pct >= 60 ? 'saving to this device fails when it is full — see the copied report for what uses it' : '');
   // On SCREEN, not only in the copyable dump. The cloud wins on load, so a
   // disagreement here predicts exactly which photos will revert — and it is the
   // line you open this panel to read after a reload. Warn when it is non-zero.
@@ -3147,8 +3154,9 @@ function renderSyncHealth() {
   out += healthRow('Cloud reads today', h.readsToday + ' of ' + h.readsBudget.toLocaleString(),
                    pct >= 80 ? 'bad' : pct >= 40 ? 'warn' : 'good',
                    'free tier, counted on this device only');
-  out += healthRow('Last backup', h.backupDays === null ? 'never on this device' : (h.backupDays + ' day' + (h.backupDays !== 1 ? 's' : '') + ' ago'),
-                   (h.backupDays === null || h.backupDays > 30) ? 'warn' : 'good');
+  out += healthRow('Last backup', h.backupDays === null ? 'never' : (h.backupDays + ' day' + (h.backupDays !== 1 ? 's' : '') + ' ago'),
+                   (h.backupDays === null || h.backupDays > 30) ? 'warn' : 'good',
+                   h.backupDays === null ? 'on any device' : backupWhereText());
 
   el.innerHTML = out;
 }
@@ -3180,10 +3188,12 @@ function syncHealthText() {
   L.push('damaged cloud documents: ' + h.unreadable
     + (h.unreadable ? ' (ids ' + cloudUnreadableIds().join(', ') + ')' : ''));
   L.push('recipes on this device: ' + h.localRecipes);
+  L.push('device storage: ' + deviceStorageLine());
   L.push('recipe documents seen in cloud: ' + (h.signedIn ? h.cloudRecipes : 'unknown — signed out'));
   L.push('cloud storage layout: schema ' + h.schema);
   L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
-  L.push('last backup: ' + (h.backupDays === null ? 'never on this device' : h.backupDays + ' days ago'));
+  L.push('last backup: ' + (h.backupDays === null ? 'never, on any device'
+    : h.backupDays + ' days ago, ' + backupWhereText()));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
   // Two numbers that must AGREE with the "No photo" chip. They did not: the panel
   // counted !!r.photo while the chip excluded clips, so "30 of 44" sat beside
@@ -3460,7 +3470,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.60';
+var APP_VERSION = 'v36.61';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6157,7 +6167,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.60</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.61</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6788,7 +6798,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.60</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.61</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9285,6 +9295,10 @@ var I18N_EXTRA = [
   'in — inches',
   'ft — feet',
   '📏 Units: metric', '📏 Units: imperial',
+  // v36.61 — where the newest backup came from (backupWhereText)
+  'on this device', 'on a computer', 'on a computer (automatic)', 'on an iPhone', 'on an iPad',
+  'on an Android phone', 'on another device', 'No backup has been taken yet',
+  'on any device',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
   // only part of that line that is words rather than a title.
   'and {1} more',
@@ -9619,7 +9633,43 @@ function i18nReadCache(lang) {
 }
 function i18nWriteCache(lang, doc) {
   try { localStorage.setItem(i18nCacheKey(lang), JSON.stringify(doc)); } catch(e) {}
+  i18nNoteKnown(lang);
 }
+// ─── ONE LANGUAGE PER DEVICE (v36.61) ────────────────────────────────────────
+// Every language this device had ever switched to stayed cached here, about
+// 110,000 characters each, in the same ~5-million-character budget as the
+// recipes (half that on an iPhone). A device only needs the language it is
+// showing — plus English, the master catalogue — and the rest are one cloud read
+// away. Pruned languages are REMEMBERED as translated, or the menu would call
+// Russian a paid, ten-minute job the next time it was drawn.
+var I18N_KNOWN_KEY = 'tonys_i18n_known';
+function i18nKnownLangs() {
+  try { var k = JSON.parse(localStorage.getItem(I18N_KNOWN_KEY) || '[]'); return Array.isArray(k) ? k : []; }
+  catch(e) { return []; }
+}
+function i18nNoteKnown(lang) {
+  if (!lang || lang === 'en') return;
+  var k = i18nKnownLangs();
+  if (k.indexOf(lang) !== -1) return;
+  k.push(lang);
+  try { localStorage.setItem(I18N_KNOWN_KEY, JSON.stringify(k)); } catch(e) {}
+}
+function i18nPruneCaches(keep) {
+  keep = (keep || []).concat('en');
+  var pruned = [];
+  try {
+    Object.keys(localStorage).forEach(function(key) {
+      var m = /^tonys_i18n_([a-z]{2,3})$/.exec(key);
+      if (!m || keep.indexOf(m[1]) !== -1) return;
+      if (m[1] !== 'en' && !I18N_LANGS[m[1]]) return;      // not a dictionary
+      i18nNoteKnown(m[1]);
+      localStorage.removeItem(key);
+      pruned.push(m[1]);
+    });
+  } catch(e) {}
+  return pruned;
+}
+window.i18nPruneCaches = i18nPruneCaches; window.i18nKnownLangs = i18nKnownLangs;
 async function i18nReadCloud(lang) {
   if (!window._fbDb || !window._fbUser) return null;
   try {
@@ -9979,12 +10029,21 @@ async function i18nSetLanguage(lang) {
     try { localStorage.setItem(I18N_LANG_KEY, 'en'); } catch(e) {}
     i18nRevertAll();
     i18nApplyDirection();
+    i18nPruneCaches([]);
     renderLangMenu();
     toast('Interface language: English');
     return true;
   }
 
   var dict = await i18nLoadDict(lang);
+  // A language this device dropped to save space (v36.61) is still translated —
+  // it just could not be fetched. Offering to generate it again would be
+  // offering to pay for something that already exists.
+  if (!dict && i18nKnownLangs().indexOf(lang) !== -1) {
+    toast(i18nLangName(lang) + ' is already translated, but it could not be downloaded right now. '
+      + 'Check the connection (and that you are signed in), then try again.', 8000);
+    return false;
+  }
   if (!dict) {
     dict = await i18nGenerate(lang);
     if (!dict) return false;
@@ -9998,6 +10057,7 @@ async function i18nSetLanguage(lang) {
   i18nApply(document.body);
   i18nApplyDirection();
   i18nStartObserver();
+  i18nPruneCaches([lang]);
   renderLangMenu();
   return true;
 }
@@ -10079,7 +10139,7 @@ function renderLangMenu() {
   Object.keys(I18N_LANGS).forEach(function(code) {
     // "ready" means somebody has already translated it and everyone gets it for
     // free. Without this the menu gives no clue which choice costs a wait.
-    var ready = !!i18nReadCache(code);
+    var ready = !!i18nReadCache(code) || i18nKnownLangs().indexOf(code) !== -1;
     h += row(code, I18N_LANGS[code].label + ' — ' + I18N_LANGS[code].en, ready ? 'ready' : '');
   });
   h += '<div style="height:1px;background:var(--border);margin:4px 0;"></div>';
@@ -10741,18 +10801,31 @@ window.i18nEdOrphanMatches = i18nEdOrphanMatches; window.i18nEdNorm = i18nEdNorm
 // offer — so it is not offered that way any more. What is removed is stashed on
 // the device first, and the editor shows a way back for as long as it is there.
 var I18N_BIN_PREFIX = 'tonys_i18n_bin_';
+// v36.61 — bounded. The bins had no limit of size or age, and lived in the same
+// localStorage budget as the recipes. Kept: the newest I18N_BIN_MAX entries, for
+// I18N_BIN_DAYS after the most recent removal — long enough to notice a mistake.
+var I18N_BIN_MAX = 1000, I18N_BIN_DAYS = 90, I18N_BIN_AT_PREFIX = 'tonys_i18n_binat_';
 function i18nEdStash(lang, removed) {
   try {
-    var bin = {};
-    try { bin = JSON.parse(localStorage.getItem(I18N_BIN_PREFIX + lang) || '{}') || {}; } catch(e) {}
-    Object.keys(removed).forEach(function(k){ bin[k] = removed[k]; });
+    var bin = i18nEdBin(lang);
+    Object.keys(removed).forEach(function(k){ delete bin[k]; bin[k] = removed[k]; });   // newest last
+    var keys = Object.keys(bin);
+    if (keys.length > I18N_BIN_MAX) keys.slice(0, keys.length - I18N_BIN_MAX).forEach(function(k){ delete bin[k]; });
     localStorage.setItem(I18N_BIN_PREFIX + lang, JSON.stringify(bin));
+    localStorage.setItem(I18N_BIN_AT_PREFIX + lang, String(Date.now()));
     return Object.keys(bin).length;
   } catch(e) { return 0; }        // a full disk must not stop the removal
 }
 function i18nEdBin(lang) {
-  try { return JSON.parse(localStorage.getItem(I18N_BIN_PREFIX + (lang || _i18nEdLang)) || '{}') || {}; }
-  catch(e) { return {}; }
+  lang = lang || _i18nEdLang;
+  try {
+    var at = parseInt(localStorage.getItem(I18N_BIN_AT_PREFIX + lang), 10);
+    if (at && Date.now() - at > I18N_BIN_DAYS * 86400000) {
+      localStorage.removeItem(I18N_BIN_PREFIX + lang); localStorage.removeItem(I18N_BIN_AT_PREFIX + lang);
+      return {};
+    }
+    return JSON.parse(localStorage.getItem(I18N_BIN_PREFIX + lang) || '{}') || {};
+  } catch(e) { return {}; }
 }
 async function i18nEdRestoreBin() {
   var bin = i18nEdBin(_i18nEdLang);
@@ -14213,6 +14286,44 @@ window.AI_MODEL = AI_MODEL; window.AI_MODEL_SMALL = AI_MODEL_SMALL;
 var AI_CACHE_KEY = 'tonys_ai_cache';
 var AI_CACHE_MAX = 300;                    // entries (v36.15 — was 40)
 var AI_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days (v36.15 — was 7)
+// ─── A SMALL KEY-VALUE STORE FOR APP DATA (v36.61) ───────────────────────────
+// Its OWN database rather than a fourth store in tonys_recipes_db: adding a
+// store means a version bump, and a version bump is blocked for as long as any
+// tab still runs the old code — which would stall PHOTO loading in the new tab
+// until the old one closed. A separate database has no such coupling.
+var KV_DB = 'tonys_kv', KV_STORE = 'kv', _kvPromise = null;
+function kvOpen() {
+  if (typeof indexedDB === 'undefined' || !indexedDB) return Promise.reject(new Error('IndexedDB unavailable'));
+  if (_kvPromise) return _kvPromise;
+  _kvPromise = new Promise(function(resolve, reject) {
+    try {
+      var req = indexedDB.open(KV_DB, 1);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(KV_STORE)) db.createObjectStore(KV_STORE, { keyPath: 'id' });
+      };
+      req.onsuccess = function(e) { resolve(e.target.result); };
+      req.onerror = function() { _kvPromise = null; reject(req.error); };
+    } catch(e) { _kvPromise = null; reject(e); }
+  });
+  return _kvPromise;
+}
+function kvGet(id) {
+  return kvOpen().then(function(db) { return new Promise(function(res, rej) {
+    var r = db.transaction(KV_STORE, 'readonly').objectStore(KV_STORE).get(id);
+    r.onsuccess = function(){ res(r.result ? r.result.v : null); };
+    r.onerror = function(){ rej(r.error); };
+  }); });
+}
+function kvPut(id, v) {
+  return kvOpen().then(function(db) { return new Promise(function(res, rej) {
+    var r = db.transaction(KV_STORE, 'readwrite').objectStore(KV_STORE).put({ id: id, v: v });
+    r.onsuccess = function(){ res(); };
+    r.onerror = function(){ rej(r.error); };
+  }); });
+}
+window.kvGet = kvGet; window.kvPut = kvPut;
+
 var _aiCacheHits = 0, _aiCacheMisses = 0;
 
 function aiCacheKey(prompt, maxTokens, model, system){
@@ -14225,14 +14336,63 @@ function aiCacheKey(prompt, maxTokens, model, system){
   for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36) + '-' + s.length;
 }
-function aiCacheRead(){
+// v36.61 — the cache lives in IndexedDB, behind an in-memory copy, so every
+// caller stays synchronous. It was the largest thing in localStorage (up to
+// 300 whole AI answers) sharing a ~5-million-character budget with the recipes
+// themselves — and on an iPhone that budget is about half.
+var _aiCacheMem = null, _aiCacheSaveTimer = null, _aiCacheInIdb = false;
+function aiCacheLegacy(){
   try { var o = JSON.parse(localStorage.getItem(AI_CACHE_KEY) || '{}'); return (o && typeof o === 'object') ? o : {}; }
   catch(e) { return {}; }
 }
-function aiCacheWrite(o){
-  try { localStorage.setItem(AI_CACHE_KEY, JSON.stringify(o)); }
-  catch(e) { try { localStorage.removeItem(AI_CACHE_KEY); } catch(e2) {} }  // quota — drop the cache, never the recipes
+function aiCacheRead(){
+  if (!_aiCacheMem) _aiCacheMem = aiCacheLegacy();
+  return _aiCacheMem;
 }
+function aiCacheWrite(o){
+  _aiCacheMem = o;
+  if (!_aiCacheInIdb) {
+    // No IndexedDB (a private window, an old browser): the old behaviour.
+    try { localStorage.setItem(AI_CACHE_KEY, JSON.stringify(o)); }
+    catch(e) { try { localStorage.removeItem(AI_CACHE_KEY); } catch(e2) {} }  // quota — drop the cache, never the recipes
+    return;
+  }
+  if (_aiCacheSaveTimer) return;
+  _aiCacheSaveTimer = setTimeout(function(){
+    _aiCacheSaveTimer = null;
+    kvPut('ai_cache', _aiCacheMem).catch(function(){});
+  }, 400);
+}
+// At startup: whatever is in IndexedDB, plus anything still in localStorage from
+// before, plus anything cached in the few moments before this ran — newest wins.
+// The localStorage copy is removed only once IndexedDB holds the merged whole.
+function aiCacheInit(){
+  return kvGet('ai_cache').then(function(stored){
+    var merged = {}, add = function(o){ Object.keys(o || {}).forEach(function(k){
+      if (!merged[k] || ((o[k] && o[k].at) || 0) > ((merged[k] && merged[k].at) || 0)) merged[k] = o[k]; }); };
+    add(stored); add(aiCacheLegacy()); add(_aiCacheMem);
+    _aiCacheMem = merged;
+    return kvPut('ai_cache', merged).then(function(){
+      _aiCacheInIdb = true;
+      try { localStorage.removeItem(AI_CACHE_KEY); } catch(e) {}
+      return true;
+    });
+  }).catch(function(){ return false; });
+}
+window.aiCacheInit = aiCacheInit;
+// For tests: set the whole cache aside (memory AND any legacy copy) and put it
+// back exactly. Removing the localStorage key no longer empties anything.
+function _aiCacheParkForTest(){
+  var p = { mem: _aiCacheMem, ls: null };
+  try { p.ls = localStorage.getItem(AI_CACHE_KEY); localStorage.removeItem(AI_CACHE_KEY); } catch(e) {}
+  _aiCacheMem = {};
+  return p;
+}
+function _aiCacheRestoreForTest(p){
+  _aiCacheMem = p.mem;
+  try { if (p.ls === null) localStorage.removeItem(AI_CACHE_KEY); else localStorage.setItem(AI_CACHE_KEY, p.ls); } catch(e) {}
+}
+window._aiCacheParkForTest = _aiCacheParkForTest; window._aiCacheRestoreForTest = _aiCacheRestoreForTest;
 function aiCacheGet(key){
   var o = aiCacheRead(), e = o[key];
   if (!e) return null;
@@ -14251,6 +14411,8 @@ function aiCachePut(key, value){
 }
 function clearAiCache(){
   try { localStorage.removeItem(AI_CACHE_KEY); } catch(e) {}
+  _aiCacheMem = {};
+  if (_aiCacheInIdb) kvPut('ai_cache', {}).catch(function(){});
   _aiCacheHits = 0; _aiCacheMisses = 0;
   toast('AI cache cleared');
 }
@@ -17135,6 +17297,38 @@ window.getReadsToday = getReadsToday;
 
 // When each thing last actually succeeded — not when it was last attempted.
 var _lastSyncOkAt = null, _lastSaveOkAt = null, _conflictCount = 0;
+// ─── HOW FULL IS THIS DEVICE (v36.61) ────────────────────────────────────────
+// localStorage is one budget per ORIGIN — shared by every project on
+// rozinante2004-hash.github.io — of about 5.24 million characters in Chromium
+// (measured) and about half that in Safari, which counts two bytes a character.
+// When it runs out, saving to the device fails. Nothing showed how close it was.
+function deviceStorageReport() {
+  var isSafari = /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(navigator.userAgent);
+  var budget = isSafari ? 2500000 : 5000000;
+  var cats = { recipes: 0, languages: 0, translationUpkeep: 0, aiCache: 0, log: 0, other: 0 }, total = 0;
+  try {
+    Object.keys(localStorage).forEach(function(k) {
+      var n = k.length + (localStorage.getItem(k) || '').length;
+      total += n;
+      if (k === STORAGE_KEY) cats.recipes += n;
+      else if (/^tonys_i18n_[a-z]{2,3}$/.test(k)) cats.languages += n;
+      else if (/^tonys_i18n_/.test(k)) cats.translationUpkeep += n;
+      else if (k === AI_CACHE_KEY) cats.aiCache += n;
+      else if (/^tonys_sync_log/.test(k)) cats.log += n;
+      else cats.other += n;
+    });
+  } catch(e) {}
+  return { total: total, budget: budget, pct: Math.round(total * 100 / budget), cats: cats, safari: isSafari };
+}
+function deviceStorageLine(r) {
+  r = r || deviceStorageReport();
+  var k = function(n){ return n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : Math.round(n / 1000) + 'K'; };
+  return r.pct + '% of about ' + k(r.budget) + ' characters — recipes ' + k(r.cats.recipes)
+    + ', languages ' + k(r.cats.languages) + ', translation upkeep ' + k(r.cats.translationUpkeep)
+    + (r.cats.aiCache ? ', AI cache ' + k(r.cats.aiCache) : '') + ', log ' + k(r.cats.log) + ', other ' + k(r.cats.other);
+}
+window.deviceStorageReport = deviceStorageReport; window.deviceStorageLine = deviceStorageLine;
+
 function syncHealth() {
   var localCount = (recipes || []).length;
   return {
@@ -22340,6 +22534,7 @@ async function autoBackupIfDue() {
   try {
     var name = await writeBackupToFolder(rec.handle, backupJson());
     markAutoBackup(); markBackupTaken();
+    familyBackupNote(true);
     toast('\u{1F4BE} Backed up to "' + rec.name + '/' + name + '"', 6000);
     return 'written';
   } catch(e) {
@@ -22441,11 +22636,13 @@ async function renderBackupPanel() {
   var rec = null;
   try { rec = await backupDirLoad(); } catch(e) {}
   var perm = rec && rec.handle ? await backupDirPermission(rec.handle, false) : 'denied';
+  try { await familyBackupFetch(); } catch(e) {}
   var days = backupAgeDays();
+  var where = backupWhereText();
   var supported = backupFolderSupported();
 
   var ageText, ageColour;
-  if (days === null)      { ageText = 'No backup has been taken on this device'; ageColour = 'var(--danger)'; }
+  if (days === null)      { ageText = 'No backup has been taken yet'; ageColour = 'var(--danger)'; }
   else if (days === 0)    { ageText = 'Last backup: today'; ageColour = 'var(--muted)'; }
   else if (days === 1)    { ageText = 'Last backup: yesterday'; ageColour = 'var(--muted)'; }
   else                    { ageText = 'Last backup: ' + days + ' days ago';
@@ -22454,6 +22651,7 @@ async function renderBackupPanel() {
   var h = '';
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
      + '<div style="font-size:14px;font-weight:600;color:' + ageColour + ';">' + escH(ageText) + '</div>'
+     + (where ? '<div id="backupWhere" style="font-size:12px;color:var(--muted);margin-top:2px;">' + escH(where) + '</div>' : '')
      + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
      + escH(String(recipes ? recipes.length : 0)) + ' recipes would be written. A backup holds every '
      + 'photo inside it, so restoring it years from now depends on nothing.</div></div>';
@@ -22462,10 +22660,14 @@ async function renderBackupPanel() {
   h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
      + '<div style="font-size:14px;font-weight:600;">Backup folder</div>';
   if (!supported) {
-    h += '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
-       + 'This browser cannot be given a folder to write into — that needs the File System Access '
-       + 'API, which Chrome and Edge on a computer have. Backup — Save here goes to your normal '
-       + 'download folder, which works fine; it just will not happen by itself.</div>';
+    // v36.61 (audit E2) — say where the automatic backups DO happen, instead of
+    // leaving a phone to look permanently unprotected.
+    h += '<div id="backupNoFolderNote" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
+       + 'This browser cannot be given a folder to write into — that needs Chrome or Edge on a '
+       + 'computer. <strong>Automatic backups happen on the computer</strong>: once a folder is chosen '
+       + 'there, it saves a snapshot of the whole family collection every week, and this device\u2019s '
+       + 'reminder follows that. As long as the computer is used now and then, nothing here needs doing.'
+       + '<br><br>Back up now still works here, and saves to this device\u2019s downloads.</div>';
   } else if (rec && rec.handle) {
     h += '<div style="font-size:13px;margin-top:6px;">\u{1F4C1} <strong>' + escH(rec.name || '(folder)') + '</strong></div>'
        + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
@@ -22511,15 +22713,115 @@ function getLastBackupAt() {
   try { var v = parseInt(localStorage.getItem(BACKUP_AT_KEY), 10); return isNaN(v) ? null : v; } catch(e) { return null; }
 }
 function markBackupTaken() { try { localStorage.setItem(BACKUP_AT_KEY, String(Date.now())); } catch(e) {} }
+// v36.61 — both of these now ask about the newest backup ANYWHERE in the family,
+// not only on this device. See newestBackupAt below.
 function backupAgeDays() {
-  var at = getLastBackupAt();
+  var at = newestBackupAt();
   return at === null ? null : Math.floor((Date.now() - at) / (24*60*60*1000));
 }
 function backupIsOverdue() {
   if (!recipes || recipes.length <= 5) return false;      // seed data isn't worth nagging about
-  var at = getLastBackupAt();
+  var at = newestBackupAt();
   return at === null || (Date.now() - at) > BACKUP_MAX_AGE;
 }
+
+// ─── THE FAMILY'S NEWEST BACKUP (v36.61, audit E2) ───────────────────────────
+// Automatic backups need a folder, and a folder needs the File System Access
+// API, which no browser on an iPhone has. So the snapshots are only ever taken
+// on the PC — and until now the iPhone, which could see none of them, said "No
+// backup taken on this device yet" for ever, about a collection that was being
+// backed up every week. A reminder that is always on is a reminder nobody reads.
+//
+// Every backup is of the WHOLE shared collection, so one taken anywhere protects
+// everyone. Each device that takes one now records it in a small shared cloud
+// document (`shared/backups`: when, and on what kind of device — never a file
+// name or a path), and every device's reminder follows the newest one. The last
+// value seen is kept here too, so a phone that starts offline still knows.
+var FAMILY_BACKUP_DOC = 'backups';
+var FAMILY_BACKUP_KEY = 'tonys_family_backup';
+function backupDeviceKind() {
+  var ua = navigator.userAgent || '';
+  if (/iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'an iPad';
+  if (/iPhone|iPod/.test(ua)) return 'an iPhone';
+  if (/Android/i.test(ua)) return 'an Android phone';
+  return 'a computer';
+}
+function familyBackupCached() {
+  try {
+    var o = JSON.parse(localStorage.getItem(FAMILY_BACKUP_KEY) || 'null');
+    return o && typeof o.at === 'number' && isFinite(o.at) ? o : null;
+  } catch(e) { return null; }
+}
+// Only ever moves forward, and never into the future: a device with its clock
+// set a year ahead must not silence every reminder in the family for a year.
+function familyBackupRemember(o) {
+  if (!o || typeof o.at !== 'number' || !isFinite(o.at)) return false;
+  if (o.at > Date.now() + 24*60*60*1000) return false;
+  var cur = familyBackupCached();
+  if (cur && cur.at >= o.at) return false;
+  try {
+    localStorage.setItem(FAMILY_BACKUP_KEY, JSON.stringify({
+      at: o.at, device: String(o.device || '').slice(0, 40), auto: !!o.auto }));
+    return true;
+  } catch(e) { return false; }
+}
+function newestBackupAt() {
+  var mine = getLastBackupAt(), fam = familyBackupCached();
+  if (mine === null) return fam ? fam.at : null;
+  return fam && fam.at > mine ? fam.at : mine;
+}
+// Signed out, or read-only: the reading still works from the last value seen.
+async function familyBackupFetch() {
+  if (!window._fbDb || !window._fbUser) return familyBackupCached();
+  try {
+    var snap = await window._fbDb.collection('shared').doc(FAMILY_BACKUP_DOC).get();
+    if (typeof countCloudRead === 'function') countCloudRead();
+    if (snap.exists) familyBackupRemember(snap.data() || {});
+  } catch(e) { dlog('[backup] could not read the family backup record', e && e.message); }
+  return familyBackupCached();
+}
+// Called after a backup has really been written, never before. A read-only
+// member's write is refused by the rules and lands in the catch; their backup
+// still counts on their own device.
+async function familyBackupNote(auto) {
+  var rec = { at: Date.now(), device: backupDeviceKind(), auto: !!auto };
+  familyBackupRemember(rec);
+  if (!window._fbDb || !window._fbUser) return 'local only';
+  try {
+    await window._fbDb.collection('shared').doc(FAMILY_BACKUP_DOC).set(rec);
+    return 'recorded';
+  } catch(e) {
+    dlog('[backup] could not record the backup in the cloud', e && e.message);
+    return 'local only';
+  }
+}
+// "3 days ago, on a computer (automatic)" — or on this device, said plainly.
+function backupWhereText() {
+  var mine = getLastBackupAt(), fam = familyBackupCached();
+  if (fam && (mine === null || fam.at > mine))
+    return 'on ' + (fam.device || 'another device') + (fam.auto ? ' (automatic)' : '');
+  return mine === null ? '' : 'on this device';
+}
+// Parked around the self test (v36.61). Several tests press Back up now against
+// a fake folder; without this the real device came away believing a backup had
+// been taken, which is the one lie a backup reminder must never tell.
+var BACKUP_RECORD_KEYS = [BACKUP_AT_KEY, 'tonys_backup_auto_at', 'tonys_backup_nagged_at', FAMILY_BACKUP_KEY];
+function _backupRecordForTest() {
+  var o = {};
+  BACKUP_RECORD_KEYS.forEach(function(k) { try { o[k] = localStorage.getItem(k); } catch(e) { o[k] = null; } });
+  return o;
+}
+function _backupRecordRestoreForTest(o) {
+  if (!o) return;
+  BACKUP_RECORD_KEYS.forEach(function(k) {
+    try { if (o[k] === null || o[k] === undefined) localStorage.removeItem(k); else localStorage.setItem(k, o[k]); } catch(e) {}
+  });
+}
+window.newestBackupAt = newestBackupAt; window.familyBackupFetch = familyBackupFetch;
+window.familyBackupNote = familyBackupNote; window.familyBackupRemember = familyBackupRemember;
+window.familyBackupCached = familyBackupCached; window.backupWhereText = backupWhereText;
+window.backupDeviceKind = backupDeviceKind;
+window._backupRecordForTest = _backupRecordForTest; window._backupRecordRestoreForTest = _backupRecordRestoreForTest;
 // v36.20 — the nudge escalates. A toast is gone in twelve seconds and is easy to
 // be busy during, and the audit's point (F2) is that the reminder should get
 // harder to ignore the longer it has been, because that is exactly when it
@@ -22540,11 +22842,12 @@ function backupNagLevel(days) {
 async function checkBackupOverdue() {
   // Try the automatic one first. If it writes, there is nothing left to nag about.
   try { if (await autoBackupIfDue() === 'written') return; } catch(e) {}
+  try { await familyBackupFetch(); } catch(e) {}
   if (!backupIsOverdue()) return;
   var days = backupAgeDays();
   var msg = days === null
-    ? '\u{1F4BE} No backup taken on this device yet'
-    : '\u{1F4BE} Last backup was ' + days + ' days ago';
+    ? '\u{1F4BE} No backup has been taken yet'
+    : '\u{1F4BE} Last backup was ' + days + ' days ago, ' + backupWhereText();
   var level = backupNagLevel(days);
   if (level === 'modal' && backupNaggedToday()) level = 'sticky';
   if (level === 'modal') {
@@ -22619,7 +22922,7 @@ async function backupSave() {
     if (rec && rec.handle && await backupDirPermission(rec.handle, true) === 'granted') {
       try {
         var name = await writeBackupToFolder(rec.handle, json);
-        markBackupTaken(); markAutoBackup();
+        markBackupTaken(); markAutoBackup(); familyBackupNote(false);
         toast('\u2705 Backup saved to "' + rec.name + '/' + name + '" \u2014 '
           + recipes.length + ' recipes, ' + nPhotos + ' photos', 7000);
         return;
@@ -22637,6 +22940,7 @@ async function backupSave() {
     var date=new Date().toISOString().slice(0,10);
     a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    familyBackupNote(false);
     toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos');
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
 }
@@ -23378,6 +23682,7 @@ window.onHeaderScroll = onHeaderScroll;
   loadPendingCloudDeletes();   // 5.4 — a delete made offline still has to reach the cloud
   loadLastCloudMetaAt();       // 5.9 — how we know whether the cloud has moved since last time
   loadCloudBase();             // v29.2 — and what version of each recipe the cloud held
+  aiCacheInit();               // v36.61 — the AI cache moves to IndexedDB (not awaited)
   initPullToRefresh();         // 5c.3
   labelIconButtons();          // a11y: give the ✕ / heart buttons an accessible name
   applyHeaderGeometry();       // v36.27 — set the slide and the filter bar's landing height
@@ -23394,7 +23699,9 @@ window.onHeaderScroll = onHeaderScroll;
       if (!d) return;                         // never translated here; leave English
       _i18nDict = d; _i18nLang = want;
       i18nClearMissing(i18nMissingList().filter(function(s){ return !!d[s]; }));
-      i18nApply(document.body); i18nApplyDirection(); renderLangMenu();
+      i18nApply(document.body); i18nApplyDirection();
+      i18nPruneCaches([want]);
+      renderLangMenu();
     }).catch(function(e){ dlog('[i18n] could not restore', e && e.message); });
   })();
   applySelfTestVisibility();   // v36.15 — 🧪 Self Test only where this device asked for it

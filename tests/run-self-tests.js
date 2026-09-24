@@ -149,11 +149,22 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
         .filter(r => !(typeof window.isTestFixture === 'function' && window.isTestFixture(r)))
         .map(r => typeof window.slimRecipeForCloud === 'function' ? window.slimRecipeForCloud(r) : r));
       const realBefore = realOf();
+      // v36.61 — A TEST MUST NOT CLAIM A BACKUP WAS TAKEN. Three tests pressed
+      // Back up now against a fake folder and left the real device's "last
+      // backup" at the moment of the run, which then silenced the reminder.
+      const bk = typeof window._backupRecordForTest === 'function' ? window._backupRecordForTest : null;
+      const bkBefore = bk ? bk() : null;
       try {
         await t.test();
         if (realOf() !== realBefore)
           throw new Error('changed a REAL recipe (not a fixture) and did not put it back exactly — '
             + 'on a signed-in device that change is written to the family cloud. Use a fixture id ≥ TEST_ID_MIN.');
+        if (bk && JSON.stringify(bk()) !== JSON.stringify(bkBefore)) {
+          const z = bk();
+          const what = Object.keys(z).filter(k => z[k] !== bkBefore[k]);
+          throw new Error('left the backup record altered (' + what.join(', ') + ') — the device would '
+            + 'believe a backup was taken. Wrap it in _backupRecordForTest() / _backupRecordRestoreForTest()');
+        }
         const after = fp ? fp() : null;
         if (fp && before !== after) {
           const a = JSON.parse(before), z = JSON.parse(after);
@@ -166,6 +177,7 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
         // Put it back regardless, so one leaking test does not make every test
         // after it look like it leaked too.
         if (snap && fp && fp() !== before) window._cloudRestoreForTest(snap);
+        if (bk) window._backupRecordRestoreForTest(bkBefore);
         out.push({ id: t.id, group: t.group, name: t.name, ok: false, ms: Date.now() - started,
                    err: String((e && e.message) || e) });
       }

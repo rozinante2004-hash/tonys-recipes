@@ -132,6 +132,34 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **AUDIT BLOCK 3 (v36.61).** Storage and backups:
+  - **localStorage is ~5.24M characters per ORIGIN** (measured, Chromium; about
+    half on Safari), shared with every project on rozinante2004-hash.github.io.
+    The AI cache now lives in IndexedDB (`tonys_kv` / `kv`, via `kvGet/kvPut`),
+    read through an in-memory copy — `aiCacheRead()` stays synchronous;
+    `aiCacheInit()` migrates the old localStorage copy once. Tests park it with
+    `_aiCacheParkForTest/_aiCacheRestoreForTest`, never by touching the key.
+  - **One interface language per device.** `i18nPruneCaches(keep)` drops every
+    other cached dictionary (English always stays) and records it in
+    `tonys_i18n_known`, so the menu still says "ready" and a failed fetch of a
+    known language says "could not be downloaded" — never offers a paid run.
+  - Translation bins: newest `I18N_BIN_MAX` (1000) entries, cleared
+    `I18N_BIN_DAYS` (90) after the last removal.
+  - Sync Health shows "Device storage used" (`deviceStorageReport()`), by
+    category; the report carries the same line.
+  - **The family's newest backup (`shared/backups`)**: `{at, device, auto}`,
+    nothing else. Every device that takes a backup records it
+    (`familyBackupNote`, after the write, never before); every device's reminder
+    follows `newestBackupAt()` = newer of its own and the family's. Forward-only
+    and never in the future. The phone's Backups panel says automatic backups
+    happen on the computer. Readers are refused by the rules and keep a local
+    record only.
+  - **A test must not claim a backup was taken.** `_backupRecordForTest()` /
+    `_backupRecordRestoreForTest()` park `BACKUP_RECORD_KEYS`; runSelfTests parks
+    them around the run and the CI runner fails any test that changes them —
+    which found that the backup-folder test had been stamping "last backup" on
+    the real device since v36.20.
+
 - **AUDIT BLOCK 2 (v36.60).** Everyday UX:
   - **An English label beside a Hebrew value needs its own bidi isolate.** In a
     Hebrew recipe "⏱ 2 hours" rendered "hours 2" and "Source:" became
