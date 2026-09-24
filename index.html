@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.56 -->
+<!-- Tony's Recipes Collection v36.57 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1553,6 +1553,52 @@ function _cloudRestoreForTest(s) {
     Object.keys(s.ls).forEach(function(k){ localStorage.setItem(k, s.ls[k]); });
   } catch(e) {}
 }
+// ─── A SELF TEST NEVER WRITES TO THE REAL CLOUD (v36.57) ─────────────────────
+// Two tests used recipes[0] — Tony's first REAL recipe, the chestnut collection
+// — and "reverted" it by stamping it modified now. The next save wrote it to
+// the family's cloud on every run ("[test] Wrote "ערמונים…"" in every log), and
+// once v36.55 began restoring the sync bookkeeping after a run, the app's
+// record of that recipe's cloud version was put back to the pre-run one — so
+// the following save was refused as "changed on another device", in a dialog
+// that sat on top of the Self Test. Tests that need a cloud bring their own
+// fake one; for the length of a run the real connection is replaced by this,
+// which reads straight through and HOLDS BACK every write — silently, because a
+// refused write raises exactly the kind of error dialog that started this.
+var _selfTestHeldWrites = 0;
+function _selfTestNoCloudWrites(db) {
+  if (!db || typeof Proxy !== 'function') return db;
+  function held() { _selfTestHeldWrites++; return Promise.resolve(); }
+  function guardRef(ref) {
+    return new Proxy(ref, { get: function(t, p) {
+      if (p === 'set' || p === 'update' || p === 'delete') return held;
+      if (p === 'collection') return function(){ return guardColl(t.collection.apply(t, arguments)); };
+      var v = t[p]; return typeof v === 'function' ? v.bind(t) : v;
+    } });
+  }
+  function guardColl(coll) {
+    return new Proxy(coll, { get: function(t, p) {
+      if (p === 'doc') return function(){ return guardRef(t.doc.apply(t, arguments)); };
+      if (p === 'add') return held;
+      var v = t[p]; return typeof v === 'function' ? v.bind(t) : v;
+    } });
+  }
+  return new Proxy(db, { get: function(t, p) {
+    if (p === '__selfTestGuard') return true;
+    if (p === 'collection') return function(){ return guardColl(t.collection.apply(t, arguments)); };
+    if (p === 'runTransaction') return function(fn) {
+      return Promise.resolve(fn({ get: function(r){ return r.get(); },
+                                  set: function(){ _selfTestHeldWrites++; }, update: function(){ _selfTestHeldWrites++; },
+                                  delete: function(){ _selfTestHeldWrites++; } }));
+    };
+    if (p === 'batch') return function() {
+      return { set: function(){ _selfTestHeldWrites++; }, update: function(){ _selfTestHeldWrites++; },
+               delete: function(){ _selfTestHeldWrites++; }, commit: function(){ return Promise.resolve(); } };
+    };
+    var v = t[p]; return typeof v === 'function' ? v.bind(t) : v;
+  } });
+}
+window._selfTestNoCloudWrites = _selfTestNoCloudWrites;
+
 // What the runner compares before and after every test, so a leak fails the
 // build instead of reaching a Sync Health report.
 function _cloudFingerprintForTest() {
@@ -1872,6 +1918,9 @@ async function runSelfTests() {
   // test is held to its own restore by the CI runner; this is the guarantee
   // that his session is never the place a missed one is found.
   var _cloudWas = _cloudSnapshotForTest();
+  var _realDb = window._fbDb;
+  _selfTestHeldWrites = 0;
+  if (_realDb) window._fbDb = _selfTestNoCloudWrites(_realDb);
   try {
 
   for(let i=0; i<toRun.length; i++) {
@@ -1907,6 +1956,13 @@ async function runSelfTests() {
   }
 
   } finally {
+    // The real connection back BEFORE anything else can save. A test that
+    // swapped in its own fake and restored "the previous one" restored the
+    // guard, which is why this assigns rather than trusting the chain.
+    if (_realDb) window._fbDb = _realDb;
+    if (_selfTestHeldWrites) {
+      try { syncLog('system', _selfTestHeldWrites + ' cloud write(s) held back during the self test', ''); } catch(e) {}
+    }
     try { _cloudRestoreForTest(_cloudWas); } catch(e) {}
     try { if (_unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, _unitWas); } catch(e) {}
     // Back into the language Tony was reading, whatever happened above.
@@ -3381,7 +3437,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.56';
+var APP_VERSION = 'v36.57';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6078,7 +6134,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.56</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.57</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6703,7 +6759,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.56</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.57</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16418,6 +16474,12 @@ function normalizeRecipe(r) {
              rating: (isNaN(rating) || rating < 0 || rating > 5) ? 0 : rating,
              note: typeof e.note === 'string' ? e.note : String(e.note == null ? '' : e.note) };
   });
+  // v36.57 — something never cooked has no "last cooked". The feat_cook self
+  // test marked Tony's first real recipe cooked and put the count and the log
+  // back, but not this — so every run stamped it with the time of the run.
+  // Only the unambiguous case is repaired: with a count or a log there is no
+  // way to tell a test's stamp from a real cook whose note was later deleted.
+  if (!r.cookCount && !r.cookLog.length && r.lastCooked) r.lastCooked = null;
   // 2.3 — one concept, one flag. `isVideoBookmark` was the original name and
   // `isClip` the later one; they always meant the same thing to a user, and
   // having both produced inconsistent badges. Legacy data is folded in here and

@@ -135,8 +135,25 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
       const fp = typeof window._cloudFingerprintForTest === 'function' ? window._cloudFingerprintForTest : null;
       const before = fp ? fp() : null;
       const snap = typeof window._cloudSnapshotForTest === 'function' ? window._cloudSnapshotForTest() : null;
+      // v36.57 — A TEST MUST NOT CHANGE A REAL RECIPE. crud_fav and feat_cook
+      // used recipes[0] — on Tony's machine his chestnut collection — and left
+      // it stamped modified (and "last cooked" at the time of the run), so the
+      // next save wrote it to the family's cloud every time. Fixtures (ids at
+      // or above TEST_ID_MIN) are exempt; everything else must come out exactly
+      // as it went in.
+      // `recipes`, not `window.recipes`: it is a top-level `let`, which is NOT
+      // a property of window. Reading window.recipes compared nothing with
+      // nothing and passed the old, guilty tests — found by running them.
+      // eslint-disable-next-line no-undef
+      const realOf = () => JSON.stringify(((typeof recipes !== 'undefined') ? recipes : [])
+        .filter(r => !(typeof window.isTestFixture === 'function' && window.isTestFixture(r)))
+        .map(r => typeof window.slimRecipeForCloud === 'function' ? window.slimRecipeForCloud(r) : r));
+      const realBefore = realOf();
       try {
         await t.test();
+        if (realOf() !== realBefore)
+          throw new Error('changed a REAL recipe (not a fixture) and did not put it back exactly — '
+            + 'on a signed-in device that change is written to the family cloud. Use a fixture id ≥ TEST_ID_MIN.');
         const after = fp ? fp() : null;
         if (fp && before !== after) {
           const a = JSON.parse(before), z = JSON.parse(after);

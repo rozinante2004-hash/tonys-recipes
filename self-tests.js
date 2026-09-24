@@ -110,11 +110,16 @@ window.SELF_TESTS = [
   },
   { id:'crud_fav',       group:'CRUD',    name:'Favourite toggle works',
     test: async()=>{
-      if(!recipes.length) throw new Error('No recipes');
-      const r=recipes[0]; const was=r.fav;
-      r.fav=!was; r.updatedAt=Date.now(); saveLocal();
-      if(r.fav===was) throw new Error('Fav toggle did not change');
-      r.fav=was; r.updatedAt=Date.now(); saveLocal(); // revert
+      // Its OWN recipe (v36.57). This used recipes[0] — Tony's first real
+      // recipe — and "reverted" by stamping it modified now, so the next save
+      // wrote his chestnut collection to the family cloud on every run.
+      const id=888960;
+      recipes.unshift(normalizeRecipe({id:id,name:'FavTest',ingredients:[{a:'1',n:'x'}],steps:['s'],updatedAt:1}));
+      try {
+        const r=recipes[0], was=r.fav;
+        r.fav=!was; r.updatedAt=Date.now(); saveLocal();
+        if(r.fav===was) throw new Error('Fav toggle did not change');
+      } finally { recipes=recipes.filter(function(x){ return x.id!==id; }); saveLocal(); }
     }
   },
 
@@ -379,7 +384,11 @@ window.SELF_TESTS = [
     test: async()=>{
       if(typeof markCooked!=='function') throw new Error('markCooked not defined');
       if(typeof commitCooked!=='function') throw new Error('commitCooked not defined');
-      if(!recipes.length) throw new Error('No recipes');
+      // Its OWN recipe (v36.57). With recipes[0] the count and the log were put
+      // back but lastCooked was not, so Tony's chestnut collection was marked
+      // cooked at the time of every run — and written to the cloud that way.
+      const id=888961;
+      recipes.unshift(normalizeRecipe({id:id,name:'CookTest',ingredients:[{a:'1',n:'x'}],steps:['s'],updatedAt:1}));
       const r=recipes[0]; const before=r.cookCount||0; const logBefore=(r.cookLog||[]).length;
       try {
         markCooked(r.id);
@@ -389,8 +398,8 @@ window.SELF_TESTS = [
         if((r.cookCount||0)!==before+1) throw new Error('cookCount not incremented');
         if((r.cookLog||[]).length!==logBefore+1) throw new Error('the attempt was not added to the cooking log');
       } finally {
-        r.cookCount=before; r.cookLog=(r.cookLog||[]).slice(0,logBefore);
-        r.updatedAt=Date.now(); saveLocal(); closeM('cookLogOverlay'); closeM('viewOverlay');
+        closeM('cookLogOverlay'); closeM('viewOverlay');
+        recipes=recipes.filter(function(x){ return x.id!==id; }); saveLocal();
       }
     }
   },
@@ -8117,6 +8126,36 @@ window.SELF_TESTS = [
         if(i18nDeriveKey('Step 2 of 3', []).key!=='Step {1} of {2}')
           throw new Error('an ordinary number stopped being a placeholder');
       })();
+    } },
+
+  { id:'st_never_writes_real_cloud', group:'Cloud Sync', name:'A self test run cannot write to the real cloud (v36.57)',
+    test: async()=>{
+      // Tony's PC stopped mid-run on "EDITED_ELSEWHERE: … ערמונים: 10 מתכונים".
+      // Two tests had been writing his first real recipe to the family cloud on
+      // every run. For the length of a run the real connection is replaced by
+      // a guard that reads straight through and holds every write back.
+      if(typeof _selfTestNoCloudWrites!=='function') throw new Error('_selfTestNoCloudWrites not defined');
+      var inner=_fakeFirestore({ 'recipe_5':{ r:JSON.stringify({id:5,name:'real'}), updatedAt:7 } });
+      var g=_selfTestNoCloudWrites(inner);
+      var got=await g.collection('shared').doc('recipe_5').get();
+      if(!got.exists || got.data().updatedAt!==7) throw new Error('a READ through the guard did not reach the database');
+      await g.collection('shared').doc('recipe_5').set({ r:'{}', updatedAt:99 });
+      await g.collection('shared').doc('recipe_6').set({ r:'{}', updatedAt:1 });
+      await g.collection('shared').doc('recipe_5').delete();
+      await g.runTransaction(async function(tx){
+        var s=await tx.get(g.collection('shared').doc('recipe_5'));
+        if(!s.exists) throw new Error('a read inside a guarded transaction did not reach the database');
+        tx.set(g.collection('shared').doc('recipe_5'), { r:'{}', updatedAt:123 });
+      });
+      var after=await inner.collection('shared').doc('recipe_5').get();
+      if(!after.exists) throw new Error('a DELETE went through the guard');
+      if(after.data().updatedAt!==7) throw new Error('a WRITE went through the guard: updatedAt is '+after.data().updatedAt);
+      if((await inner.collection('shared').doc('recipe_6').get()).exists)
+        throw new Error('a new document was CREATED through the guard');
+      // …and runSelfTests actually installs it, and takes it off again.
+      var src=String(runSelfTests);
+      if(src.indexOf('_selfTestNoCloudWrites(')===-1) throw new Error('runSelfTests does not install the guard');
+      if(!/window\._fbDb\s*=\s*_realDb/.test(src)) throw new Error('runSelfTests does not put the real connection back');
     } },
 
   { id:'i18n_reordered_links_do_not_loop', group:'UI', name:'A translation that moves the links cannot freeze the app (v36.52)',

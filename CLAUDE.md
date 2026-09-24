@@ -132,6 +132,28 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A SELF TEST NEVER TOUCHES A REAL RECIPE OR THE REAL CLOUD (v36.57).**
+  `crud_fav` and `feat_cook` used `recipes[0]` — on Tony's machine the
+  chestnut collection — and "reverted" by stamping it modified now (feat_cook
+  also left `lastCooked` at the time of the run). The next save wrote it to the
+  family cloud on EVERY run: the `[test] Wrote "ערמונים…"` line in every log.
+  v36.55's restore of the sync bookkeeping then put back the pre-run version
+  record, so the following save was refused as edited elsewhere — a dialog on
+  top of the Self Test. Three layers now:
+  - `runSelfTests()` swaps `_fbDb` for `_selfTestNoCloudWrites(realDb)` for the
+    length of the run: reads pass through, every write (set/update/delete, in
+    transactions and batches too) is held back **silently** — a refusal raises
+    exactly the dialog that started this — and counted in the log. Tests that
+    need a cloud already bring `_fakeFirestore()`.
+  - The CI runner fails any test that leaves a non-fixture recipe different.
+    **`recipes` is a top-level `let`, which is NOT on `window`** — the first
+    version read `window.recipes`, compared nothing with nothing, and passed the
+    guilty tests. Found by running them.
+  - Tests use their own recipe with an id ≥ `TEST_ID_MIN`. Never `recipes[0]`
+    for anything that writes.
+  - `normalizeRecipe` drops `lastCooked` from a recipe with no count and no log
+    — the only case where a test's stamp is provably not a real cook.
+
 - **A TEST MUST LEAVE THE SYNC STATE AS IT FOUND IT (v36.55).** Tony's Sync
   Health, copied a minute after a Self Test run, said "damaged cloud documents:
   1 (ids 2)" and "57 documents in the cloud" for 55 recipes. All three were test
