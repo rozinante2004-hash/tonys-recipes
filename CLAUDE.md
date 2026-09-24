@@ -132,6 +132,24 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **AUDIT BLOCK 2 (v36.60).** Everyday UX:
+  - **An English label beside a Hebrew value needs its own bidi isolate.** In a
+    Hebrew recipe "⏱ 2 hours" rendered "hours 2" and "Source:" became
+    ":Source". Meta chips are `<bdi>` (direction from their own first strong
+    letter) and recipe VALUES carry `dir="auto"`. Chrome LABELS use `<bdi>`,
+    never `dir="auto"` — `i18nSkip` treats `dir="auto"` as recipe content and
+    would stop translating the label.
+  - **`servingsIsYield()`**: a servings value with a word that is not a way of
+    saying "people" ("1.5 ליטר", "1 loaf") is a yield — shown as "Yield:", no
+    people stepper, ×N only. `parseServings` took the first number and offered
+    "Make it for 2 servings" for 1.5 litres of hummus.
+  - Every `<select>` has an accessible name (axe *critical*); the family-role
+    select's aria-label embeds an e-mail, so it is `data-i18n-skip-attrs` — or
+    it becomes a new translation key per member.
+  - The family member list is escaped — the only unescaped data the audit found.
+  - 📏 Units in ⚙️ Settings; converter units show their names ("fl oz — fluid
+    ounces"), translated, with the symbol kept as the option's value.
+
 - **AUDIT BLOCK 1 (v36.59 / Worker v41).** Security, all measured or tested:
   - **Worker `download-store` is gone** — it stored any data under any filename
     and served it from the Worker's address; nothing had called it since v35.0,

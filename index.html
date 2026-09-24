@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.59 -->
+<!-- Tony's Recipes Collection v36.60 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3322,11 +3322,12 @@ function renderAccessMembers() {
   el.innerHTML = members.map(function(m, i) {
     var parts = (roleColors[m.role]||'#F5F5F5:#555').split(':');
     return '<div class="access-row">' +
-      '<div class="access-avatar">' + (m.email[0].toUpperCase()) + '</div>' +
+      '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
       // Same reason as the owner row above: names and addresses are data.
-      '<div class="access-info"><div class="access-name" data-no-i18n>' + (m.name||m.email.split('@')[0]) + '</div>' +
-      '<div class="access-email" data-no-i18n>' + m.email + '</div></div>' +
-      '<select class="access-role-btn" onchange="changeAccessRole(' + i + ',this.value)" style="margin-right:4px;">' +
+      // Escaped (v36.60) — the only unescaped data the audit's scan found.
+      '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
+      '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div></div>' +
+      '<select class="access-role-btn" data-i18n-skip-attrs="aria-label" aria-label="Role for ' + escA(m.email) + '" onchange="changeAccessRole(' + i + ',this.value)" style="margin-right:4px;">' +
         ['read','write','admin'].map(function(r){ return '<option value="'+r+'"'+(m.role===r?' selected':'')+'>'+roleLabels[r]+'</option>'; }).join('') +
       '</select>' +
       '<button class="access-remove-btn" onclick="removeAccessMember(' + i + ')">✕</button>' +
@@ -3459,7 +3460,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.59';
+var APP_VERSION = 'v36.60';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6156,7 +6157,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.59</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.60</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6199,6 +6200,9 @@ body.banner-shown .header {
           <button class="drop-item" id="healCloudPhotosItem" onclick="closeDrop('settingsDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
           <button class="drop-item" id="photoRescueItem" onclick="closeDrop('settingsDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
           <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
+          <!-- v36.60 — the unit choice is remembered per device since v36.51, but
+               could only be made from inside a recipe. -->
+          <button class="drop-item" id="unitsMenuItem" onclick="toggleUnitPref()">📏 Units: metric</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <!-- v36.59 — owner only (applyOwnerOnlyItems). They link straight into
@@ -6427,11 +6431,11 @@ body.banner-shown .header {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Category</label>
+          <label class="form-label" for="f-category">Category</label>
           <select class="form-select" id="f-category"></select>
         </div>
         <div class="form-group">
-          <label class="form-label">Difficulty</label>
+          <label class="form-label" for="f-diff">Difficulty</label>
           <select class="form-select" id="f-diff">
             <option>Easy</option><option>Medium</option><option>Hard</option>
           </select>
@@ -6667,8 +6671,8 @@ body.banner-shown .header {
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px;">
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">From</div>
-          <select id="translateFrom" class="form-select" style="width:100%;">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;" id="translateFromLbl">From</div>
+          <select id="translateFrom" class="form-select" style="width:100%;" aria-labelledby="translateFromLbl">
 <option value="auto"  selected>🔍 Auto-detect</option>
 <option value="en">🇬🇧 English</option>
 <option value="he">🇮🇱 Hebrew</option>
@@ -6694,8 +6698,8 @@ body.banner-shown .header {
         </div>
         <div style="font-size:20px;color:var(--muted);padding-top:18px;">→</div>
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">To</div>
-          <select id="translateTo" class="form-select" style="width:100%;">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;" id="translateToLbl">To</div>
+          <select id="translateTo" class="form-select" style="width:100%;" aria-labelledby="translateToLbl">
 <option value="en"  selected>🇬🇧 English</option>
 <option value="he">🇮🇱 Hebrew</option>
 <option value="ru">🇷🇺 Russian</option>
@@ -6784,7 +6788,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.59</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.60</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6912,8 +6916,8 @@ body.banner-shown .header {
         <input class="calc-input" id="calcTo" type="number" placeholder="0" oninput="doCalcReverse()">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <select class="calc-unit-select" id="calcUnitFrom" onchange="doCalc()"></select>
-        <select class="calc-unit-select" id="calcUnitTo" onchange="doCalc()"></select>
+        <select class="calc-unit-select" id="calcUnitFrom" onchange="doCalc()" aria-label="Convert from"></select>
+        <select class="calc-unit-select" id="calcUnitTo" onchange="doCalc()" aria-label="Convert to"></select>
       </div>
       <div class="calc-result-box" id="calcResultBox">
         <span class="calc-result-value" id="calcResultVal">—</span>
@@ -9260,6 +9264,27 @@ var I18N_EXTRA = [
   // entry in I18N_HARVEST is read-only by construction. All three are real
   // words on a real screen; none of them could ever be found by looking.
   '+ Add Recipe', '≈ rounded', 'reset to {1}',
+  // v36.60 — only drawn for a recipe whose servings field is a yield.
+  '🍽 Yield:',
+  // v36.60 — converter unit names; only one category is drawn by the harvest.
+  'g — grams',
+  'kg — kilograms',
+  'oz — ounces',
+  'lb — pounds',
+  'ml — millilitres',
+  'l — litres',
+  'tsp — teaspoons',
+  'tbsp — tablespoons',
+  'cup — cups',
+  'fl oz — fluid ounces',
+  '°C — Celsius',
+  '°F — Fahrenheit',
+  'mm — millimetres',
+  'cm — centimetres',
+  'm — metres',
+  'in — inches',
+  'ft — feet',
+  '📏 Units: metric', '📏 Units: imperial',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
   // only part of that line that is words rather than a title.
   'and {1} more',
@@ -10095,6 +10120,23 @@ function isAppOwner() {
                   && String(window._fbUser.email).toLowerCase() === APP_OWNER_EMAIL); }
   catch(e) { return false; }
 }
+function unitPref() {
+  try { return localStorage.getItem(VIEW_UNIT_KEY) === 'imperial' ? 'imperial' : 'metric'; } catch(e) { return 'metric'; }
+}
+function renderUnitsMenuItem() {
+  var el = document.getElementById('unitsMenuItem');
+  if (el) el.textContent = '📏 Units: ' + unitPref();
+}
+function toggleUnitPref() {
+  var next = unitPref() === 'imperial' ? 'metric' : 'imperial';
+  try { localStorage.setItem(VIEW_UNIT_KEY, next); } catch(e) {}
+  renderUnitsMenuItem();
+  // An open recipe follows at once, the same way pressing the toggle inside it does.
+  var ov = document.getElementById('viewOverlay');
+  if (ov && ov.classList.contains('open') && typeof setUnit === 'function') setUnit(next);
+  toast(next === 'imperial' ? 'Amounts will be shown in imperial units' : 'Amounts will be shown in metric units');
+}
+window.toggleUnitPref = toggleUnitPref; window.unitPref = unitPref;
 function applyOwnerOnlyItems() {
   var mine = isAppOwner();
   document.querySelectorAll('[data-owner-only]').forEach(function(el){ el.style.display = mine ? '' : 'none'; });
@@ -11293,8 +11335,8 @@ function renderGrid() {
           <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${escH(r.category)}</span>
-            <span data-no-i18n>⏱ ${escH(r.prep)}</span>
-            <span>🍽 <span data-no-i18n>${escH(r.servings)}</span> srv</span>
+            <bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi>
+            ${servingsIsYield(r.servings) ? `<bdi data-no-i18n>🍽 ${escH(r.servings)}</bdi>` : `<bdi>🍽 <span data-no-i18n>${escH(r.servings)}</span> srv</bdi>`}
             <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(r.difficulty)}</span>
           </div>
           ${matchReason(r, q)}
@@ -11316,7 +11358,7 @@ function renderGrid() {
         </div>
         <div class="card-body">
           <div class="card-title" dir="auto">${escH(r.name)}</div>
-          <div class="card-meta"><span data-no-i18n>⏱ ${escH(r.prep)}</span><div class="card-meta-dot"></div><span><span data-no-i18n>${escH(r.servings)}</span> srv</span></div>
+          <div class="card-meta"><bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi><div class="card-meta-dot"></div>${servingsIsYield(r.servings) ? `<bdi data-no-i18n>${escH(r.servings)}</bdi>` : `<bdi><span data-no-i18n>${escH(r.servings)}</span> srv</bdi>`}</div>
           ${matchReason(r, q)}
         </div>
         <div class="card-footer">
@@ -12185,10 +12227,12 @@ function drawView(){
       <div class="modal-title" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
         ${isCollection(r) ? `<span>📚 ${recipeParts(r).length} recipes</span>` : `
-        <span data-no-i18n>⏱ ${escH(r.prep)}</span><span>🍽 <span data-no-i18n>${escH(r.servings)}</span> servings</span>
+        <bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi>${servingsIsYield(r.servings)
+          ? `<bdi>🍽 Yield: <span dir="auto" data-no-i18n>${escH(r.servings)}</span></bdi>`
+          : `<bdi>🍽 <span dir="auto" data-no-i18n>${escH(r.servings)}</span> servings</bdi>`}
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;unicode-bidi:isolate;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><bdi style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</bdi><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -12212,6 +12256,7 @@ function drawView(){
       ${(function(){
         var base = parseServings(r.servings);
         if (base === null) return '';   // no number to scale from — no control
+        if (servingsIsYield(r.servings)) return '';   // a yield, not people: ×N only (v36.60)
         var cur = Math.round(base * viewMult);
         var exact = Math.abs(base * viewMult - cur) > 0.01;
         return `<div class="servings-row">
@@ -12329,6 +12374,21 @@ function setMult(m){
 // you actually think, but ×2 is quicker when that's what you want.
 // Needs a base serving count to divide by; recipes whose servings field is "—"
 // or prose simply don't get the control, rather than getting a broken one.
+// ─── A COUNT OF PEOPLE, OR SOMETHING ELSE? (v36.60) ─────────────────────────
+// Tony's hummus says "1.5 ליטר" in the servings field. It was shown as
+// "1.5 ליטר servings" and offered "Make it for 2 servings", because
+// parseServings takes the first number it finds. A value with a word in it
+// that is not a way of saying "people" is a YIELD: shown as such, and scaled
+// with the ×N buttons only — there is no number of people to aim at.
+var SERVING_WORDS = /^(servings?|serves|people|persons?|portions?|pax|about|approx\.?|approximately|around|up|to|ca\.?|for|מנות|מנה|סועדים|אנשים|איש|נפשות|כ|כ-|עד|בערך|порци[йияю]|человек|人前|人分|人)$/i;
+function servingsIsYield(s){
+  s = String(s == null ? '' : s).trim();
+  if (!s || !/\d/.test(s)) return false;
+  var rest = s.replace(/\d+(?:[.,]\d+)?/g, ' ').replace(/[-–—~+\/()·.,:]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!rest) return false;
+  return rest.split(' ').some(function(w){ return /\p{L}/u.test(w) && !SERVING_WORDS.test(w); });
+}
+window.servingsIsYield = servingsIsYield;
 function parseServings(s){
   var m = String(s==null?'':s).match(/\d+(?:\.\d+)?/);
   if (!m) return null;
@@ -14454,7 +14514,7 @@ function _armDropOutside(menu){
 }
 function toggleDrop(id){
   const menu=document.getElementById(id);
-  if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
+  if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') { applyOwnerOnlyItems(); renderUnitsMenuItem(); }
   const wasOpen=menu.classList.contains('open');
   // Close all
   _disarmDropOutside();
@@ -22817,13 +22877,19 @@ function setCalcCat(cat) {
   document.getElementById('calcTo').value = '';
 }
 
+// v36.60 — the unit's NAME beside its symbol. "fl oz" or "tbsp" means nothing
+// to a Hebrew or Japanese reader, and the name is interface text, so it is
+// translated like any other label; the symbol stays as the value.
+var CALC_UNIT_NAMES = { 'g':'grams', 'kg':'kilograms', 'oz':'ounces', 'lb':'pounds', 'ml':'millilitres', 'l':'litres', 'tsp':'teaspoons', 'tbsp':'tablespoons', 'cup':'cups', 'fl oz':'fluid ounces', '°C':'Celsius', '°F':'Fahrenheit', 'mm':'millimetres', 'cm':'centimetres', 'm':'metres', 'in':'inches', 'ft':'feet' };
+function calcUnitLabel(u) { return CALC_UNIT_NAMES[u] ? u + ' — ' + CALC_UNIT_NAMES[u] : u; }
 function populateCalcUnits() {
   var cat = CALC_CATS[_calcCat];
   var fromSel = document.getElementById('calcUnitFrom');
   var toSel   = document.getElementById('calcUnitTo');
   if (!fromSel || !toSel) return;
-  fromSel.innerHTML = cat.units.map(function(u){ return '<option>'+u+'</option>'; }).join('');
-  toSel.innerHTML   = cat.units.map(function(u,i){ return '<option'+(i===1?' selected':'')+'>'+u+'</option>'; }).join('');
+  var opt = function(u, sel){ return '<option value="' + escA(u) + '"' + (sel ? ' selected' : '') + '>' + escH(calcUnitLabel(u)) + '</option>'; };
+  fromSel.innerHTML = cat.units.map(function(u){ return opt(u, false); }).join('');
+  toSel.innerHTML   = cat.units.map(function(u,i){ return opt(u, i===1); }).join('');
 }
 
 function doCalc() {

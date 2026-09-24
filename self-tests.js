@@ -8192,6 +8192,73 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'ux_audit_block2', group:'UI', name:'Hebrew values keep their order; yields; named dropdowns; units in Settings (v36.60)',
+    test: async()=>{
+      ['servingsIsYield','toggleUnitPref','unitPref','calcUnitLabel'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // YIELD OR PEOPLE. Tony's hummus says "1.5 ליטר" and was shown as
+      // "1.5 ליטר servings" with "Make it for 2 servings" under it.
+      [['4',false],['6 servings',false],['4-6',false],['6 מנות',false],['about 4 people',false],['8 סועדים',false],
+       ['1.5 ליטר',true],['1 loaf',true],['24 cookies',true],['2 cakes',true],['',false],['—',false]
+      ].forEach(function(c){
+        if(servingsIsYield(c[0])!==c[1]) throw new Error(JSON.stringify(c[0])+' read as '+(c[1]?'people':'a yield'));
+      });
+      var ids=[888971,888972], prevView=viewId;
+      recipes.unshift(normalizeRecipe({id:ids[0],name:'החומוס של טוני',prep:'2 hours',servings:'1.5 ליטר',source:"Tony's own",
+        ingredients:[{a:'1',n:'חומוס'}],steps:['לבשל'],updatedAt:1}));
+      recipes.unshift(normalizeRecipe({id:ids[1],name:'Soup',prep:'20 min',servings:'4',ingredients:[{a:'1',n:'x'}],steps:['y'],updatedAt:1}));
+      try{
+        openView(ids[0]); await wait(80);
+        var meta=document.querySelector('#viewOverlay .modal-meta');
+        var chips=Array.prototype.slice.call(meta.children).filter(function(e){ return /⏱|🍽/.test(e.textContent); });
+        chips.forEach(function(c){
+          // An English label beside a Hebrew value is only safe inside its OWN
+          // bidi isolate: "⏱ 2 hours" showed as "hours 2" in a Hebrew recipe.
+          if(c.tagName!=='BDI') throw new Error('a meta chip is not isolated: '+c.outerHTML.slice(0,80));
+        });
+        if(!/Yield/.test(meta.textContent)) throw new Error('a yield is still shown as servings: '+meta.textContent);
+        if(/servings/.test(meta.textContent)) throw new Error('"servings" is still on a yield');
+        if(document.querySelector('#viewOverlay .serv-input')) throw new Error('a yield still offers a number of people to aim at');
+        var src=document.querySelector('#viewOverlay .source-link');
+        if(!src || !src.querySelector('bdi') || !/Source:/.test(src.querySelector('bdi').textContent))
+          throw new Error('the Source: label is not isolated, so its colon lands on the wrong side in a Hebrew recipe');
+        closeM('viewOverlay');
+        openView(ids[1]); await wait(80);
+        if(!/servings/.test(document.querySelector('#viewOverlay .modal-meta').textContent))
+          throw new Error('a real count of people lost its "servings"');
+        if(!document.querySelector('#viewOverlay .serv-input')) throw new Error('a real count lost its servings stepper');
+        closeM('viewOverlay');
+      } finally { recipes=recipes.filter(function(x){ return ids.indexOf(x.id)===-1; }); viewId=prevView; renderGrid(); }
+
+      // EVERY DROPDOWN HAS A NAME (axe: critical). Drawn first, then asked.
+      openCalcModal(); await wait(50); openAddModal(null); await wait(50);
+      try{
+        document.querySelectorAll('select').forEach(function(sel){
+          var named=sel.getAttribute('aria-label')||sel.getAttribute('aria-labelledby')
+            ||(sel.id && document.querySelector('label[for="'+sel.id+'"]'))||sel.closest('label');
+          if(!named) throw new Error('a dropdown has no accessible name: #'+(sel.id||sel.className));
+        });
+        // The converter names its units but keeps the symbol as the VALUE.
+        var from=document.getElementById('calcUnitFrom');
+        if(!from.options.length || from.options[0].value!==CALC_CATS[_calcCat].units[0])
+          throw new Error('the converter unit value is no longer the symbol');
+        if(!/—/.test(from.options[0].textContent)) throw new Error('the converter units are still bare symbols');
+      } finally { closeM('calcOverlay'); closeM('editOverlay'); }
+
+      // UNITS IN SETTINGS.
+      var prev=null; try{ prev=localStorage.getItem(VIEW_UNIT_KEY); }catch(e){}
+      var realToast=window.toast; window.toast=function(){};
+      try{
+        localStorage.removeItem(VIEW_UNIT_KEY);
+        toggleUnitPref();
+        if(unitPref()!=='imperial') throw new Error('the Settings toggle did not switch to imperial');
+        renderUnitsMenuItem();
+        if(!/imperial/.test(document.getElementById('unitsMenuItem').textContent)) throw new Error('the menu item does not say imperial');
+        toggleUnitPref();
+        if(unitPref()!=='metric') throw new Error('the Settings toggle did not switch back');
+      } finally { window.toast=realToast; try{ if(prev===null) localStorage.removeItem(VIEW_UNIT_KEY); else localStorage.setItem(VIEW_UNIT_KEY,prev); }catch(e){} }
+    } },
+
   { id:'st_never_writes_real_cloud', group:'Cloud Sync', name:'A self test run cannot write to the real cloud (v36.57)',
     test: async()=>{
       // Tony's PC stopped mid-run on "EDITED_ELSEWHERE: … ערמונים: 10 מתכונים".
