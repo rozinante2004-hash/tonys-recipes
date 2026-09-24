@@ -11280,9 +11280,16 @@ window.SELF_TESTS = [
       if(parseServings('0')!==null) throw new Error('zero servings must not become a divisor');
       var testId=888908;
       recipes.unshift(normalizeRecipe({id:testId,name:'ServTest',servings:'4',ingredients:[{a:'200g',n:'flour'},{a:'2',n:'eggs'}],steps:['s'],updatedAt:Date.now()}));
-      var prevView=viewId, prevMult=viewMult;
+      var prevView=viewId, prevMult=viewMult, prevUnitPref=null;
+      // Metric on purpose, and put back afterwards: since v36.51 the unit is
+      // remembered per device, and on Tony's Imperial phone this test read
+      // "3.5 oz" where it expected 100g — while passing in CI, where nothing
+      // is remembered. runSelfTests parks the preference too; this covers the
+      // headless runner, which calls each test directly.
+      try{ prevUnitPref=localStorage.getItem(VIEW_UNIT_KEY); localStorage.removeItem(VIEW_UNIT_KEY); }catch(e){}
       try {
         openView(testId); await wait(60);
+        if(viewUnit!=='metric') throw new Error('the view did not open in metric with no preference stored');
         setServings(8);
         if(Math.abs(viewMult-2)>0.001) throw new Error('8 servings from a base of 4 should be ×2, got '+viewMult);
         // The ×N buttons must still be there — this is an addition, not a
@@ -11323,6 +11330,7 @@ window.SELF_TESTS = [
       } finally {
         closeM('viewOverlay'); recipes=recipes.filter(function(x){return x.id!==testId;});
         try{localStorage.removeItem('scale_'+testId);}catch(e){}
+        try{ if(prevUnitPref!==null) localStorage.setItem(VIEW_UNIT_KEY,prevUnitPref); }catch(e){}
         viewId=prevView; viewMult=prevMult; saveData(); renderGrid();
       }
     } },

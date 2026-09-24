@@ -85,6 +85,14 @@ jobs:
       - name: Run the Self Test suite
         run: node tests/run-self-tests.js --port 8137
 
+      # v36.54 — the same suite again, starting from Tony's phone's saved
+      # settings instead of a factory-fresh browser. Four times a test has
+      # failed on his device and passed here because something he had chosen
+      # was never true in CI; the last was Imperial units, which v36.51 began
+      # remembering. Add a setting here when it starts to matter.
+      - name: Run the Self Test suite as Tony's phone is set up
+        run: node tests/run-self-tests.js --port 8137 --prefs '{"tonys_view_unit":"imperial","tonys_theme":"dark"}'
+
       # The version banner only fires when version.json and APP_VERSION agree,
       # so a bump that misses one of them ships an update nobody is told about.
       - name: Check the version strings agree

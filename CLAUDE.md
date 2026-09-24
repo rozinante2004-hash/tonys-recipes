@@ -132,6 +132,39 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A TINTED SURFACE AND ITS TEXT ARE A PAIR (v36.54).** Tony's recipe Notes
+  were `background:#FFF8E8` under `color:var(--ink)` — near-white on cream in
+  dark mode, 1.1:1 — and the contrast scan reported zero findings in both
+  themes. Every tinted surface is a token pair now: `--note-*`, `--bad-*`,
+  `--warn-*`, `--ok-*`, `--info-text`, each flipping with the theme. **Never
+  write a literal pastel under themed text, or a literal dark colour on a
+  themed surface.** A literal *pair* (the print page) is fine.
+  - **Why the scan missed it: it measured what rendered, and nothing did.** Its
+    fixture recipe had no notes; its panels were opened by class without their
+    render functions running; its only recipe words were the harvest's `·`,
+    which the text filter skips. It now uses `i18nHarvestRecipe()` with real
+    words in both scripts, a collection, a seeded log, every `I18N_HARVEST`
+    render, the error dialog with actions and the converter with a category.
+  - **Plus two static checks** for what no fixture reaches, both build
+    failures: an undefined CSS variable (`var(--card)` never existed, so four
+    surfaces had no background and their `--warm-brown` text was 1.08:1), and a
+    light literal surface with themed text in one inline style.
+  - **`--warm-brown` is a SURFACE in dark mode** (`#2A211A`). As text it only
+    works on a light surface (the white round close buttons). Text on a card is
+    `--heading`.
+  - **`--terracotta` is LIFTED in dark mode for use as text.** Behind white text
+    use `--terracotta-fill`.
+  - **`#8A8279` is the old muted grey (3.78:1).** `--muted` replaced it but
+    thirteen literal copies survived; all gone.
+- **THE SUITE RUNS AGAIN AS TONY'S PHONE IS SET UP (v36.54).** Four times a test
+  failed on his device and passed in CI because something he had chosen was
+  never true there — signed in, a recipe with history, a fully illustrated
+  library, and then Imperial units (remembered per device since v36.51, which
+  made `feat_scale_servings` read "3.5 oz"). `run-self-tests.js --prefs '{…}'`
+  seeds localStorage before the first load, and CI runs the suite a second time
+  with his settings. `runSelfTests()` parks the unit preference as it parks
+  the language. **Any new per-device preference goes into that CI step.**
+
 - **A TRANSLATION THAT MOVES THE LINKS FROZE THE APP (v36.52).** Tony generated
   Japanese and his laptop stopped responding to anything — through a reboot,
   and in a fresh Firefox profile too, while English and Hebrew were fine and the

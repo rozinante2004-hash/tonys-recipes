@@ -126,12 +126,51 @@ const SCAN = `(() => {
   const off = p.locator('text=Continue offline').first();
   if (await off.count()) { await off.click(); await p.waitForTimeout(600); }
 
+  // v36.54 — THE FIXTURE HAS TO HAVE EVERYTHING IN IT. Until this release it
+  // was a recipe with no notes, and Tony's Notes box — hard-coded cream under
+  // var(--ink) text, which is near-white in dark mode — sat at about 1.1:1 on
+  // his phone while this scan reported zero findings in both themes. A scan
+  // measures what rendered; a section that never renders is never measured.
+  // i18nHarvestRecipe() is the recipe the translation harvest builds to light
+  // up every branch of the view (notes, Version history, the cooking log,
+  // nutrition, sub-headings), so it is the right fixture here for the same
+  // reason. Plus a plain one, because a normal card is its own surface too.
   await p.evaluate(() => {
     setTheme(new URLSearchParams(location.search).get('t') || 'dark');
     recipes.length = 0;
-    recipes.push(normalizeRecipe({ id: 974001, uid: 'x', name: 'Onion soup', category: 'Soup',
+    var rich = i18nHarvestRecipe();
+    rich.id = 974001; rich.name = 'Onion soup'; rich.photo = '';
+    // Its own words are '·', which is right for the harvest (they must never
+    // reach a dictionary) and wrong here: the scan skips a text that has no
+    // letters in it, so the one fixture built to show everything showed
+    // nothing measurable. Real words, in both of Tony's scripts.
+    var W = 'Fry the onions slowly — טגנו לאט';
+    rich.notes = 'Keep it warm. שמרו חם עד ההגשה.'; rich.by = 'Tony';
+    rich.ingredients = [{ sub: 'For the soup' }, { a: '1', n: 'onion בצל' }, { a: '2', n: 'water מים', ind: 1 }];
+    rich.steps = [W, { sub: 'Serving' }, { t: W, ind: 1 }];
+    rich.cookLog.forEach(function (c) { c.note = 'Very good — טעים'; });
+    rich.history.forEach(function (h) { h.name = 'Onion soup (old)'; });
+    recipes.push(normalizeRecipe(rich));
+    recipes.push(normalizeRecipe({ id: 974002, uid: 'y', name: 'Plain soup', category: 'Soup',
       difficulty: 'Easy', bg: '#F6EFE6', diets: ['Keto'], source: 'https://example.com/x',
-      ingredients: [{ a: '3', n: 'onions' }], steps: ['Fry them'] }));
+      notes: 'Keep it warm.', ingredients: [{ a: '3', n: 'onions' }], steps: ['Fry them'] }));
+    // A collection, because its part titles and its "collection actions"
+    // heading are surfaces no single recipe has — and both were dark brown on
+    // the dark card (v36.54).
+    recipes.push(normalizeRecipe({ id: 974003, uid: 'z', name: 'Winter soups', category: 'Soup',
+      difficulty: 'Easy', ingredients: [], steps: [],
+      parts: [{ uid: 'p1', name: 'Tomato soup', ingredients: [{ a: '1', n: 'tomato' }], steps: ['Cook it'] },
+              { uid: 'p2', name: 'Lentil soup', ingredients: [{ a: '1', n: 'lentils' }], steps: ['Cook them'] }] }));
+    // …and a log with something in every finding level, or the Logging panel
+    // draws "Nothing recorded yet" and its bad/warn cards are never measured.
+    setLogEnabled(true);
+    var now = Date.now();
+    writeSyncLog([
+      { at: now,        k: 'conflict', m: 'Save refused for "Soup" — changed on another device' },
+      { at: now - 1000, k: 'error',    m: 'Cloud read timed out after 45s' },
+      { at: now - 2000, k: 'save',     m: 'Wrote "Soup"' },
+      { at: now - 3000, k: 'photo',    m: 'Photo missing from the cloud' }
+    ]);
     renderFilters(); renderGrid();
   });
   await p.waitForTimeout(400);
@@ -169,6 +208,21 @@ const SCAN = `(() => {
   await scan('select bar');
   await p.evaluate(() => { cancelSelectMode(); });
 
+  // DRAW the panels before measuring them (v36.54). Logging, Sync Health,
+  // Backups, What leaves this device, the access list… are built by a render
+  // function the first time they are opened. Adding the .open class to their
+  // overlay, which is all the loop below does, measured an empty <div>. The
+  // translation harvest keeps the list of those functions for the same reason
+  // — it had to draw the screens nobody has opened — so it is reused here
+  // rather than copied. The open-recipe entry is left to the loop, which draws
+  // the view itself with the overlay open.
+  await p.evaluate(async () => {
+    for (const [name, fn] of (window.I18N_HARVEST || [])) {
+      if (/open recipe|converter/.test(name)) continue;
+      try { await fn(); } catch (e) {}
+    }
+  });
+
   // Every modal overlay.
   const overlays = await p.evaluate(() => Array.from(document.querySelectorAll('.modal-overlay')).map(e => e.id).filter(Boolean));
   for (const id of overlays) {
@@ -188,6 +242,30 @@ const SCAN = `(() => {
   await p.waitForTimeout(200);
   await scan('ask dialog');
   await p.evaluate(() => { var o = document.getElementById('askOverlay'); if (o) o.remove(); });
+
+  // The collection view.
+  await p.evaluate(() => { document.querySelectorAll('.modal-overlay').forEach(e => e.classList.remove('open'));
+                           viewId = 974003; try { drawView(); } catch (e) {}
+                           document.getElementById('viewOverlay').classList.add('open'); });
+  await p.waitForTimeout(250);
+  await scan('collection view');
+  await p.evaluate(() => document.getElementById('viewOverlay').classList.remove('open'));
+
+  // The error dialog WITH action buttons — its secondary buttons were dark
+  // brown on the dark card, and a plain error never draws them.
+  await p.evaluate(() => { showServiceError('API_KEY: the key was rejected', [
+    { label: 'Try again', primary: true, onClick: function () {} },
+    { label: 'Open settings', onClick: function () {} }]); });
+  await p.waitForTimeout(200);
+  await scan('error dialog with actions');
+  await p.evaluate(() => { Array.from(document.body.children).forEach(function (e) {
+    if (e.style && e.style.position === 'fixed' && /Try again/.test(e.textContent)) e.remove(); }); });
+
+  // The converter with a category chosen: its quick-value buttons exist only then.
+  await p.evaluate(() => { try { openCalcModal(); setCalcCat('Volume'); } catch (e) {} });
+  await p.waitForTimeout(200);
+  await scan('converter');
+  await p.evaluate(() => document.querySelectorAll('.modal-overlay').forEach(e => e.classList.remove('open')));
 
   await p.evaluate(() => showPhotoSourcePicker(974001, 'Onion soup'));
   await p.waitForTimeout(200);
@@ -222,6 +300,40 @@ const SCAN = `(() => {
   console.log('\n=== OTHER LOW CONTRAST (' + rest.length + ') ===');
   rest.sort((a, b) => a.ratio - b.ratio).forEach(r => console.log('  ' + r.ratio.toFixed(2) + '  ' + r.sel + '  bg ' + r.bg + ' fg ' + r.color + '  "' + r.text + '"'));
   console.log('errors', errs.length ? errs.join(' | ') : 'none');
+
+  // STATIC CHECKS (v36.54) — for surfaces no fixture can reach. The rendered
+  // scan measures what it can open; these read the source for the two shapes
+  // that have actually shipped broken.
+  const fs = require('fs');
+  const src = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  //  (a) A CSS variable that is used and never defined. `var(--card)` had no
+  //      definition anywhere, so four surfaces had NO background at all — and
+  //      in dark mode their var(--warm-brown) text was brown on brown, 1.08:1.
+  //      Allowed: a fallback in the var() itself, or a value set from script.
+  const defined = new Set([...src.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map(m => m[1]));
+  const setByJs = new Set([...src.matchAll(/setProperty\(\s*['"](--[a-z0-9-]+)/g)].map(m => m[1]));
+  const undef = [...new Set([...src.matchAll(/var\(\s*(--[a-z0-9-]+)\s*\)/gi)].map(m => m[1]))]
+    .filter(v => !defined.has(v) && !setByJs.has(v));
+  console.log('\n=== UNDEFINED CSS VARIABLES (' + undef.length + ') ===');
+  undef.forEach(v => console.log('  ' + v));
+  //  (b) One inline style giving a LIGHT literal surface and THEMED text — the
+  //      exact shape of the Notes box. In light mode it reads; in dark mode the
+  //      text turns near-white on a surface that did not move. A literal pair
+  //      (literal surface, literal text) is fine; so is a token pair.
+  function lumHex(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    return 0.2126 * ch(h.substr(0, 2)) + 0.7152 * ch(h.substr(2, 2)) + 0.0722 * ch(h.substr(4, 2));
+    function ch(x) { const v = parseInt(x, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); } }
+  const mixed = [];
+  for (const m of src.matchAll(/style=\\?"([^"]*)"|cssText\s*=\s*'([^']*)'/g)) {
+    const t = m[1] || m[2] || '';
+    const bg = /background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6}\b|white\b)/.exec(t);
+    if (!bg || lumHex(bg[1] === 'white' ? '#ffffff' : bg[1]) < 0.6) continue;
+    if (!/(^|;)\s*color\s*:\s*var\(--(ink|muted|heading)\)/.test(t)) continue;
+    mixed.push(src.slice(0, m.index).split('\n').length + ': ' + t.replace(/\s+/g, ' ').slice(0, 110));
+  }
+  console.log('\n=== LIGHT LITERAL SURFACE + THEMED TEXT (' + mixed.length + ') ===');
+  mixed.forEach(r => console.log('  ' + r));
+
   await b.close();
-  process.exit((lightInDark.length + rest.length + errs.length) ? 1 : 0);
+  process.exit((lightInDark.length + rest.length + errs.length + undef.length + mixed.length) ? 1 : 0);
 })();

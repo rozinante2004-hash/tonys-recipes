@@ -61,6 +61,27 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(String(e.message)));
 
+  // --prefs '{"tonys_view_unit":"imperial"}' — start with a DEVICE's saved
+  // settings rather than a factory-fresh browser (v36.54). Four times now a
+  // test has failed on Tony's phone and passed here, because something he had
+  // chosen (signed in, a recipe with history, a fully illustrated library, and
+  // then Imperial units) was simply never true in CI. Written once, before the
+  // first load, so a test that changes a setting and puts it back is not
+  // second-guessed on a later navigation.
+  const PREFS = arg('prefs', '');
+  if (PREFS) {
+    let prefs;
+    try { prefs = JSON.parse(PREFS); } catch (e) { console.error('--prefs is not JSON: ' + e.message); process.exit(2); }
+    await page.addInitScript(p => {
+      try {
+        if (sessionStorage.getItem('__prefsSeeded')) return;
+        Object.keys(p).forEach(k => localStorage.setItem(k, p[k]));
+        sessionStorage.setItem('__prefsSeeded', '1');
+      } catch (e) {}
+    }, prefs);
+    console.log('starting with device preferences: ' + PREFS);
+  }
+
   const url = `http://127.0.0.1:${PORT}/index.html`;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });

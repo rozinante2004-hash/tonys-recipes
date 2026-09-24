@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.53 -->
+<!-- Tony's Recipes Collection v36.54 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -746,7 +746,9 @@ function renderLoggingPanel() {
   var all = readSyncLog();
   var list = _logFilter === 'all' ? all : all.filter(function(e){ return e.k === _logFilter; });
   var findings = analyseSyncLog(all);
-  var COLOR = { bad:['#FEECEC','#F0B4B4','#B03030'], warn:['#FFF8E8','#E8D9A8','#7A5C00'], ok:['#EAF5E9','#B4D9B4','#1B5E20'] };
+  var COLOR = { bad:['var(--bad-bg)','var(--bad-border)','var(--bad-text)'],
+                warn:['var(--warn-bg)','var(--warn-border)','var(--warn-text)'],
+                ok:['var(--ok-bg)','var(--ok-border)','var(--ok-text)'] };
 
   var h = '';
 
@@ -843,7 +845,7 @@ function renderLoggingPanel() {
     if (k !== 'all' && !n) return;                       // don't offer an empty filter
     h += '<button onclick="setLogFilter(&quot;' + k + '&quot;)" style="padding:5px 10px;border-radius:999px;font-size:11.5px;'
        + 'font-family:inherit;cursor:pointer;border:1px solid var(--border);'
-       + (_logFilter === k ? 'background:var(--terracotta-fill);color:#fff;font-weight:700;' : 'background:var(--card);color:var(--warm-brown);')
+       + (_logFilter === k ? 'background:var(--terracotta-fill);color:#fff;font-weight:700;' : 'background:var(--card-bg);color:var(--heading);')
        + '">' + k + ' (' + n + ')</button>';
   });
   h += '</div>';
@@ -868,7 +870,7 @@ function renderLoggingPanel() {
   // 5 — the buttons
   h += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
      + '<button onclick="copySyncLogReport()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Copy report</button>'
-     + '<button onclick="purgeSyncLogUI()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--card-bg);color:#B03030;border:1px solid #F0B4B4;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🗑 Purge logs</button>'
+     + '<button onclick="purgeSyncLogUI()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--card-bg);color:var(--danger);border:1px solid var(--bad-border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🗑 Purge logs</button>'
      + '</div>'
      + '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;">'
      + 'The report is plain text: the findings above plus every event. Nobody but you can read this log — '
@@ -878,7 +880,7 @@ function renderLoggingPanel() {
   h += '<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;">'
      + '<button class="drop-item" id="debugModeItem" onclick="toggleDebugMode();updateDebugMenuLabel();"'
      + ' style="width:100%;text-align:start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;'
-     + 'background:var(--card);font-family:inherit;font-size:13.5px;cursor:pointer;">🐞 Debug mode: '
+     + 'background:var(--card-bg);color:var(--ink);font-family:inherit;font-size:13.5px;cursor:pointer;">🐞 Debug mode: '
      + (typeof _debugMode !== 'undefined' && _debugMode ? 'On' : 'Off') + '</button>'
      + '<div style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;">'
      + 'Separate from the log above: this prints verbose tracing to the browser console while you watch, '
@@ -1449,7 +1451,7 @@ function handleShareTarget() {
     res.innerHTML = '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:12px;font-size:13px;color:#5C3D2E;line-height:1.6;">'
       + '⚠️ <strong>No web link or recipe text was found in what you shared.</strong> The app you shared from sent only a short title or author, not the page address or recipe.<br><br>'
       + 'To fix: in that app tap <strong>Share → Copy Link</strong> and paste it above, or open the recipe in a browser and share from there.'
-      + '<div style="margin-top:8px;font-size:11px;color:#8A8279;word-break:break-all;">Received — ' + escH(got.join('  |  ').slice(0,240)) + '</div>'
+      + '<div style="margin-top:8px;font-size:11px;color:var(--muted);word-break:break-all;">Received — ' + escH(got.join('  |  ').slice(0,240)) + '</div>'
       + '</div>';
   }, 600);
 }
@@ -1825,6 +1827,13 @@ async function runSelfTests() {
     i18nApplyDirection();
     await wait(60);
   }
+  // …and the same for the UNITS (v36.54). Since v36.51 the metric/imperial
+  // choice is remembered per device, and Tony's phone is set to Imperial — so
+  // "200g at ×0.5 should read 100g" read "3.5 oz" on his phone and passed in
+  // CI, where nothing is remembered. Every amount-reading test assumed metric.
+  // Parked, not deleted: it goes back exactly as it was.
+  var _unitWas = null;
+  try { _unitWas = localStorage.getItem(VIEW_UNIT_KEY); localStorage.removeItem(VIEW_UNIT_KEY); } catch(e) {}
   try {
 
   for(let i=0; i<toRun.length; i++) {
@@ -1860,6 +1869,7 @@ async function runSelfTests() {
   }
 
   } finally {
+    try { if (_unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, _unitWas); } catch(e) {}
     // Back into the language Tony was reading, whatever happened above.
     if (_langWas !== 'en' && typeof i18nInstall === 'function' && _dictWas) {
       i18nInstall(_langWas, _dictWas);
@@ -2056,7 +2066,7 @@ var SELF_TEST_FIXES = {
   stor_save:      { fix:'saveLocal() failed to write to localStorage. Check STORAGE_KEY constant and localStorage quota.', autofix: null },
   stor_firebase:  { fix:'Firebase connection failed. Sign in first, then re-run the test. Check Firebase project is active.', autofix: null },
   backup_fn:      { fix:'Backup functions missing. They should be defined in the main script. Check for truncation or syntax errors.', autofix: null },
-  css_vars:       { fix:'CSS variables not set. The :root { } block is missing from the stylesheet. Re-add the CSS variable definitions.', autofix: ()=>{ const s=document.createElement('style'); s.textContent=':root{--cream:#FAF7F2;--warm-brown:#5C3D2E;--terracotta:#C1440E;--gold:#D4A843;--ink:#1C1A18;--muted:#8A8279;--border:#E8E0D5;--card-bg:#FFFFFF;--bg:#FAF7F2;--green:#2E7D32;}'; document.head.appendChild(s); } },
+  css_vars:       { fix:'CSS variables not set. The :root { } block is missing from the stylesheet. Re-add the CSS variable definitions.', autofix: ()=>{ const s=document.createElement('style'); s.textContent=':root{--cream:#FAF7F2;--warm-brown:#5C3D2E;--terracotta:#C1440E;--gold:#D4A843;--ink:#1C1A18;--muted:#6F6A60;--border:#E8E0D5;--card-bg:#FFFFFF;--bg:#FAF7F2;--green:#2E7D32;}'; document.head.appendChild(s); } },
   css_header:     { fix:'Header background is transparent — :root CSS variables may not be loaded. Run the css_vars fix first.', autofix: null },
   feat_sort:      { fix:'sortMode variable is not declared. Add: var sortMode = "default"; alongside the other filter state variables (showFavOnly, showClipsOnly etc).', autofix: ()=>{ if(typeof sortMode==='undefined') window.sortMode='default'; } },
   feat_recent:    { fix:'toggleRecentFilter not defined or recent_views localStorage not being written. Check openView() writes to recent_views key.', autofix: null },
@@ -2945,7 +2955,7 @@ function fmtAgo(ts) {
   return days + ' day' + (days !== 1 ? 's' : '') + ' ago';
 }
 function healthRow(label, value, tone, note) {
-  var colour = tone === 'bad' ? '#C62828' : tone === 'warn' ? '#8B6914' : tone === 'good' ? 'var(--green)' : 'var(--ink)';
+  var colour = tone === 'bad' ? 'var(--bad-text)' : tone === 'warn' ? 'var(--warn-text)' : tone === 'good' ? 'var(--green)' : 'var(--ink)';
   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);">'
     + '<div style="font-size:13px;color:var(--muted);flex-shrink:0;">' + escH(label) + '</div>'
     + '<div style="font-size:14px;font-weight:600;color:' + colour + ';text-align:end;">' + escH(value)
@@ -2959,7 +2969,7 @@ function renderSyncHealth() {
   var out = '';
 
   if (!h.signedIn) {
-    out += '<div style="background:#FFF8E8;border:1px solid var(--gold);border-radius:10px;padding:12px;font-size:13px;line-height:1.5;color:var(--ink);margin-bottom:12px;">'
+    out += '<div style="background:var(--warn-bg);border:1px solid var(--gold);border-radius:10px;padding:12px;font-size:13px;line-height:1.5;color:var(--ink);margin-bottom:12px;">'
         + 'Not signed in — nothing is syncing. Recipes are saved on this device only, and this device only.</div>';
   }
 
@@ -3332,7 +3342,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.53';
+var APP_VERSION = 'v36.54';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -3556,7 +3566,7 @@ function rHtml(r) {
 
   var srcHref = safeUrl(r.source);
   var sourceBlock = r.source
-    ? '<div style="margin-top:8px;font-size:12px;color:#8A8279;">Source: '
+    ? '<div style="margin-top:8px;font-size:12px;color:#6F6A60;">Source: '
       + (srcHref ? '<a href="' + escA(srcHref) + '" style="color:#C1440E;">' + escH(r.source) + '</a>' : escH(r.source))
       + '</div>'
     : '';
@@ -3673,7 +3683,7 @@ function showEmailModal(id) {
   previewWrap.appendChild(iframe);
 
   var hint = document.createElement('div');
-  hint.style.cssText = 'font-size:11px;color:#8A8279;text-align:center;';
+  hint.style.cssText = 'font-size:11px;color:var(--muted);text-align:center;';
   hint.textContent = 'Preview of your email — click Open Gmail to send';
 
   var btnRow = document.createElement('div');
@@ -3928,6 +3938,16 @@ window.addEventListener('unhandledrejection', function(e) {
      the theme flips, so headings get their own variable — identical in light
      mode, inverted in dark. */
   --heading:    #5C3D2E;
+  /* v36.54 — TINTED SURFACES. The Notes box and the green/amber/red status
+     cards were written as literal pastels under var(--ink) text, which is
+     near-white in dark mode: Tony's recipe notes read at 1.1:1 on his phone.
+     A tinted surface and the text on it are a PAIR and have to flip together,
+     so they are tokens now, never literals. */
+  --note-bg:     #FFF8E8;  --note-border: #D4A843;  --note-label: #8A6A00;
+  --bad-bg:      #FEECEC;  --bad-border:  #F0B4B4;  --bad-text:   #B03030;
+  --warn-bg:     #FFF8E8;  --warn-border: #E8D9A8;  --warn-text:  #7A5C00;
+  --ok-bg:       #EAF5E9;  --ok-border:   #B4D9B4;  --ok-text:    #1B5E20;
+  --info-text:   #1565C0;
   color-scheme: light;
 }
 
@@ -3951,6 +3971,11 @@ window.addEventListener('unhandledrejection', function(e) {
   --bg:         #17140F;
   --green:      #6FBF73;
   --heading:    #F0E3D2;   /* headings invert; --warm-brown stays a surface */
+  --note-bg:     #2B2416;  --note-border: #B8923A;  --note-label: #E3BC63;
+  --bad-bg:      #3A1D1D;  --bad-border:  #6E3434;  --bad-text:   #F4A3A3;
+  --warn-bg:     #33291A;  --warn-border: #6A5528;  --warn-text:  #E8C888;
+  --ok-bg:       #1C3120;  --ok-border:   #3B6B40;  --ok-text:    #9BD79F;
+  --info-text:   #8FB4F0;
   color-scheme: dark;
 }
 /* Photos and emoji tiles sit on light pastel backgrounds baked into each recipe
@@ -3971,6 +3996,7 @@ window.addEventListener('unhandledrejection', function(e) {
 :root[data-theme="dark"] .modal { background: var(--card-bg); }
 :root[data-theme="dark"] .drop-item { color: var(--ink); }
 :root[data-theme="dark"] .drop-item:hover { background: #2E251E; color: var(--terracotta); }
+:root[data-theme="dark"] .calc-quick-btn { background: var(--card-bg); color: var(--ink); border-color: var(--border); }
 
 /* Surfaces that were written as literal `white` long before a theme existed.
    Listed explicitly rather than with a blanket rule so nothing that is meant to
@@ -4122,7 +4148,9 @@ window.addEventListener('unhandledrejection', function(e) {
 }
 .collection-badge .collection-count {
   position: absolute; bottom: -3px; inset-inline-end: -3px;
-  background: var(--terracotta); color: #fff;
+  /* -fill, not --terracotta: that one is LIFTED in dark mode for use as text,
+     and white on the lifted orange is 2.6:1 (v36.54). */
+  background: var(--terracotta-fill); color: #fff;
   min-width: 16px; height: 16px; border-radius: 999px;
   font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
   padding: 0 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.35);
@@ -4572,7 +4600,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .part-actions-label { font-size: 10.5px; letter-spacing: 0.6px; text-transform: uppercase;
   color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 .collection-actions-label { margin: 18px 0 8px; padding-top: 12px; border-top: 2px solid var(--terracotta);
-  font-size: 13px; font-weight: 700; color: var(--warm-brown); }
+  font-size: 13px; font-weight: 700; color: var(--heading); }
 .collection-actions-label span { display: block; font-weight: 400; font-size: 11.5px;
   color: var(--muted); letter-spacing: 0; text-transform: none; margin-top: 2px; }
 /* Specificity, not order: `.ingredients-list li { padding: 5px 0 }` is (0,1,1)
@@ -5557,12 +5585,14 @@ body.banner-shown .header {
 .bring-token-label { flex: 1; color: var(--ink); }
 .bring-token-btn {
   font-size: 12px; padding: 4px 10px;
-  background: #E8630A; color: white;
+  /* #B84F06, not Bring!'s own #E8630A: white on that is 3.38:1 at 12px, and
+     this is a button someone has to read to know what it does. 5.05:1. */
+  background: #B84F06; color: white;
   border: none; border-radius: 6px;
   cursor: pointer; font-family: 'DM Sans', 'Heebo', sans-serif;
   font-weight: 600; white-space: nowrap;
 }
-.bring-token-btn:hover { background: #c45508; }
+.bring-token-btn:hover { background: #9E4305; }
 
 
 /* ── A PHOTO FOR A NEW COLLECTION (v36.10) ──────────────────────────────────
@@ -6009,7 +6039,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.53</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.54</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6613,7 +6643,7 @@ body.banner-shown .header {
 
 
 <!-- LOGIN / STORAGE SCREEN -->
-<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#8A8279;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
+<div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#6F6A60;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
     <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
@@ -6631,7 +6661,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.53</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.54</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -6644,7 +6674,7 @@ body.banner-shown .header {
       </svg>
       Sign in with Google
     </button>
-    <div id="loginError" style="color:#B03030;font-size:12px;margin-top:8px;display:none;"></div>
+    <div id="loginError" style="color:var(--bad-text);font-size:12px;margin-top:8px;display:none;"></div>
     <!-- v36.38 — "it just goes to Offline mode" had no next step. Every reason
          sign-in fails is invisible from inside the page unless it is asked for
          by name, so it is asked for by name. -->
@@ -6654,9 +6684,9 @@ body.banner-shown .header {
       Why can't I sign in?
     </button>
     <div id="signInDiag" style="display:none;margin-top:10px;text-align:start;font-size:11.5px;
-         line-height:1.6;color:var(--ink);background:#FFF8E8;border:1px solid var(--gold);
+         line-height:1.6;color:var(--ink);background:var(--warn-bg);border:1px solid var(--gold);
          border-radius:8px;padding:10px 12px;"></div>
-    <div id="firebaseError" style="color:#B03030;font-size:11px;margin-top:4px;display:none;">📶 Offline — tap "Sign in with Google" when connected to sync your changes.</div>
+    <div id="firebaseError" style="color:var(--bad-text);font-size:11px;margin-top:4px;display:none;">📶 Offline — tap "Sign in with Google" when connected to sync your changes.</div>
     <div id="autoLoginNotice" style="color:#5C3D2E;font-size:12px;margin-top:8px;display:none;background:#FFF0E8;padding:8px 12px;border-radius:6px;">
       ⏳ Signing in automatically in 3 seconds…
       <button onclick="cancelAutoLogin()" style="margin-left:8px;background:none;border:none;color:var(--terracotta);cursor:pointer;font-size:12px;font-weight:600;text-decoration:underline;">Cancel</button>
@@ -7688,7 +7718,7 @@ function buildRecipePage(r) {
     + '.hero{width:100%;display:block;}'
     + '.pad{padding:26px 24px 34px;}'
     + 'h1{font-family:Georgia,serif;font-size:30px;margin:0 0 6px;color:#5C3D2E;unicode-bidi:plaintext;text-align:start;}'
-    + '.meta{color:#8A8279;font-size:13px;margin-bottom:22px;}'
+    + '.meta{color:#6F6A60;font-size:13px;margin-bottom:22px;}'
     + 'h2{font-family:Georgia,serif;font-size:17px;color:#5C3D2E;margin:26px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px;}'
     + 'ul,ol{padding-inline-start:20px;margin:0;}'
     + 'ul{list-style:none;padding:0;}'
@@ -11434,10 +11464,10 @@ function collectionSectionsHtml(r) {
         + '</div>';
 
     return '<div class="collection-part" style="border:1px solid var(--border);border-radius:12px;'
-      + 'padding:14px 16px;margin-bottom:14px;background:var(--card);">'
+      + 'padding:14px 16px;margin-bottom:14px;background:var(--card-bg);">'
       + '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">'
       + '<div style="flex:1;min-width:0;">'
-      + '<div dir="auto" style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--warm-brown);">'
+      + '<div dir="auto" style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);">'
       // .clip-badge is display:flex, which on its own would push the title onto
       // the next line — inline-flex keeps it beside the name.
       + (p.isClip ? '<span class="clip-badge clip-badge-sm" style="display:inline-flex;vertical-align:middle;margin-inline-end:6px;">🎬</span>' : '')
@@ -12014,7 +12044,7 @@ function drawView(){
         <span data-no-i18n>⏱ ${escH(r.prep)}</span><span>🍽 <span data-no-i18n>${escH(r.servings)}</span> servings</span>
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;unicode-bidi:isolate;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="color:var(--muted);font-weight:500;flex-shrink:0;unicode-bidi:isolate;">Source:</span><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -12079,7 +12109,7 @@ function drawView(){
                   + '</div>';
               }).join('')}</div></details>` : '');
       })()}
-      ${r.notes ? `<div style="background:#FFF8E8;border-inline-start:3px solid #D4A843;border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:#8A6A00;display:block;margin-bottom:4px;letter-spacing:0.5px;text-align:start;">NOTES</span><div dir="auto"${langAttr(r.notes)} style="unicode-bidi:plaintext;text-align:start;">${escH(r.notes)}</div></div>` : ''}
+      ${r.notes ? `<div style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:var(--note-label);display:block;margin-bottom:4px;letter-spacing:0.5px;text-align:start;">NOTES</span><div dir="auto"${langAttr(r.notes)} style="unicode-bidi:plaintext;text-align:start;">${escH(r.notes)}</div></div>` : ''}
       ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (<span data-no-i18n>${r.history.length}</span>)</summary>
           <div class="cook-log-body">${r.history.map(function(v,vi){
             return '<div class="cook-log-entry">'
@@ -13287,7 +13317,7 @@ function showImportError(msg, salvage) {
   // 2.5 — a dead end plus "OK" wastes the work already done. Offer the recovery
   // route as a button, and carry any text we managed to extract straight into it.
   var tip = document.createElement('div');
-  tip.style.cssText = 'font-size:12px;color:#8A8279;margin-bottom:14px;line-height:1.6;';
+  tip.style.cssText = 'font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;';
   tip.textContent = salvage
     ? 'The text was read successfully — only the recipe structure could not be worked out. You can paste it into the free-hand importer, where you can fix it by hand.'
     : 'Free-hand import lets you paste the recipe text yourself, which works when file reading does not.';
@@ -13308,7 +13338,7 @@ function showImportError(msg, salvage) {
   };
 
   var btn = document.createElement('button');
-  btn.style.cssText = 'padding:12px 18px;background:transparent;color:#8A8279;border:1px solid #E0DAD2;border-radius:8px;font-size:14px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
+  btn.style.cssText = 'padding:12px 18px;background:transparent;color:var(--muted);border:1px solid #E0DAD2;border-radius:8px;font-size:14px;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   btn.textContent = 'Close';
   btn.onclick = function(){ overlay.remove(); };
 
@@ -13776,7 +13806,7 @@ async function runExplore() {
     renderSuggestions(extractJSON(raw), "exploreResult");
   } catch(err) {
     if (err.message && err.message.includes("Rate limit")) {
-      res.innerHTML = "<div class=\"explore-result\" style=\"color:#B05E00;\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026<div class=\"ai-spinner\" style=\"margin:8px auto;display:block;width:20px;height:20px;\"></div></div>";
+      res.innerHTML = "<div class=\"explore-result\" style=\"color:var(--warn-text);\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026<div class=\"ai-spinner\" style=\"margin:8px auto;display:block;width:20px;height:20px;\"></div></div>";
       setTimeout(async () => {
         try { renderSuggestions(extractJSON(await aiCall(prompt, 3000)), "exploreResult"); }
         catch(e2) { res.innerHTML = aiFailPane(e2, 'runExplore'); }
@@ -13889,7 +13919,7 @@ async function runSuggest() {
     renderSuggestions(extractJSON(raw), "suggestResult");
   } catch(err) {
     if (err.message && err.message.includes("Rate limit")) {
-      res.innerHTML = "<div class=\"explore-result\" style=\"color:#B05E00;\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026</div>";
+      res.innerHTML = "<div class=\"explore-result\" style=\"color:var(--warn-text);\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026</div>";
       setTimeout(async function(){
         try { renderSuggestions(extractJSON(await aiCall(prompt,3000)),"suggestResult"); }
         catch(e2){res.innerHTML=aiFailPane(e2,'runSuggest');}
@@ -14208,15 +14238,15 @@ function showServiceError(message, actions) {
 
   if (message.startsWith('BILLING:')) {
     html = '<div style="font-size:24px;text-align:center;margin-bottom:8px;">💳</div>'
-      + '<div style="font-weight:600;color:#c62828;margin-bottom:12px;text-align:center;">Anthropic API — Credits Exhausted</div>';
+      + '<div style="font-weight:600;color:var(--bad-text);margin-bottom:12px;text-align:center;">Anthropic API — Credits Exhausted</div>';
     isError = true;
   } else if (message.startsWith('API_KEY:')) {
     html = '<div style="font-size:24px;text-align:center;margin-bottom:8px;">🔑</div>'
-      + '<div style="font-weight:600;color:#c62828;margin-bottom:12px;text-align:center;">Anthropic API — Key Error</div>';
+      + '<div style="font-weight:600;color:var(--bad-text);margin-bottom:12px;text-align:center;">Anthropic API — Key Error</div>';
     isError = true;
   } else {
     html = '<div style="font-size:24px;text-align:center;margin-bottom:8px;">⚠️</div>'
-      + '<div style="font-weight:600;color:#c62828;margin-bottom:12px;text-align:center;">Service Error</div>';
+      + '<div style="font-weight:600;color:var(--bad-text);margin-bottom:12px;text-align:center;">Service Error</div>';
   }
 
   lines.forEach(function(line) {
@@ -14225,7 +14255,7 @@ function showServiceError(message, actions) {
     if (!line) return;
     // Make URLs clickable
     line = line.replace(/(https?:\/\/[^\s]+)/g, function(url) {
-      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="color:#1565C0;text-decoration:underline;">' + url + '</a>';
+      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="color:var(--info-text);text-decoration:underline;">' + url + '</a>';
     });
     html += '<div style="font-size:13px;color:var(--ink);margin-bottom:6px;line-height:1.6;">' + line + '</div>';
   });
@@ -14250,7 +14280,7 @@ function showServiceError(message, actions) {
     b.style.cssText = 'width:100%;padding:12px;border:none;border-radius:10px;'
       + 'font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:12px;'
       + (a.primary ? 'background:var(--terracotta-fill);color:white;'
-                   : 'background:var(--card);color:var(--warm-brown);border:1.5px solid var(--border);');
+                   : 'background:var(--card-bg);color:var(--heading);border:1.5px solid var(--border);');
     b.onclick = function() { overlay.remove(); a.onClick(); };
     inner.appendChild(b);
   });
@@ -18605,7 +18635,7 @@ function buildPrintHtml(list) {
     + 'table{width:100%;border-collapse:collapse;}'
     + 'td{vertical-align:top;unicode-bidi:plaintext;text-align:start;}'
     + 'h1,.notes,.meta{unicode-bidi:plaintext;text-align:start;}'
-    + '.meta{font-size:13px;color:#8A8279;margin-bottom:16px;}'
+    + '.meta{font-size:13px;color:#6F6A60;margin-bottom:16px;}'
     + '.source{font-size:12px;color:#888;margin-top:12px;}'
     + '.notes{background:#FFF8E8;border-inline-start:3px solid #D4A843;padding:10px 14px;margin-top:16px;font-size:14px;}'
     + '.notes > div{unicode-bidi:plaintext;text-align:start;}'
@@ -19575,8 +19605,8 @@ function saveBringSecret() {
   var v = (el && el.value || '').trim();
   setBringTokenSecret(v);
   if (st) st.innerHTML = v
-    ? '<span style="color:#2e7d32;">Saved on this device. Re-copy the bookmarklet below — it embeds this value.</span>'
-    : '<span style="color:#8A6D00;">Cleared. The token refresh will not work until a secret is set.</span>';
+    ? '<span style="color:var(--ok-text);">Saved on this device. Re-copy the bookmarklet below — it embeds this value.</span>'
+    : '<span style="color:var(--warn-text);">Cleared. The token refresh will not work until a secret is set.</span>';
   // v32.5 — do NOT blank the field. Re-rendering the modal below repopulates it,
   // and a box that empties itself on save reads as "it did not take".
   if (v) showBringBookmarklet();
@@ -19632,7 +19662,7 @@ function showBringBookmarklet() {
         + 'Cloudflare Worker (Settings \u2192 Variables & Secrets).';
   }
   var st = document.getElementById('bringSecretStatus');
-  if (st && !_secret) st.innerHTML = '<span style="color:#8A6D00;">No secret set on this device yet.</span>';
+  if (st && !_secret) st.innerHTML = '<span style="color:var(--warn-text);">No secret set on this device yet.</span>';
   document.getElementById('bringBookmarkletOverlay').classList.add('open');
 }
 
@@ -19642,21 +19672,21 @@ async function submitManualBringToken(){
   var ta=document.getElementById('bringManualToken');
   var st=document.getElementById('bringManualStatus');
   var tok=(ta&&ta.value||'').trim().replace(/^["']|["']$/g,'');
-  if(!tok){ st.innerHTML='<span style="color:#c62828;">Paste the token first.</span>'; return; }
-  if(tok.split('.').length!==3){ st.innerHTML='<span style="color:#c62828;">That doesn\'t look like a Bring! token (expected three dot-separated parts).</span>'; return; }
+  if(!tok){ st.innerHTML='<span style="color:var(--bad-text);">Paste the token first.</span>'; return; }
+  if(tok.split('.').length!==3){ st.innerHTML='<span style="color:var(--bad-text);">That doesn\'t look like a Bring! token (expected three dot-separated parts).</span>'; return; }
   st.innerHTML='Saving…';
   var res=await updateBringToken(tok);
   var ok=res&&res.ok;
   if(ok){
     ta.value='';
-    st.innerHTML='<span style="color:#2e7d32;">✅ Saved. Checking with the server…</span>';
+    st.innerHTML='<span style="color:var(--ok-text);">✅ Saved. Checking with the server…</span>';
     var s=await checkBringTokenStatus(true);
-    if(s&&s.valid) st.innerHTML='<span style="color:#2e7d32;">✅ Token accepted by Bring!'+(typeof s.daysLeft==='number'?' — '+s.daysLeft+' days left.':'')+'</span>';
-    else if(s&&s.unknown) st.innerHTML='<span style="color:#8A6D00;">Saved, but the server status check failed: '+escH(s.reason)+'</span>';
-    else st.innerHTML='<span style="color:#c62828;">Saved, but Bring! still rejects it. Is it the current token?</span>';
+    if(s&&s.valid) st.innerHTML='<span style="color:var(--ok-text);">✅ Token accepted by Bring!'+(typeof s.daysLeft==='number'?' — '+s.daysLeft+' days left.':'')+'</span>';
+    else if(s&&s.unknown) st.innerHTML='<span style="color:var(--warn-text);">Saved, but the server status check failed: '+escH(s.reason)+'</span>';
+    else st.innerHTML='<span style="color:var(--bad-text);">Saved, but Bring! still rejects it. Is it the current token?</span>';
   } else {
     // Say what the Worker said, not what it might have been.
-    st.innerHTML='<span style="color:#c62828;">'+escH((res&&res.reason)||'The Worker refused the token, without saying why.')+'</span>';
+    st.innerHTML='<span style="color:var(--bad-text);">'+escH((res&&res.reason)||'The Worker refused the token, without saying why.')+'</span>';
   }
 }
 window.submitManualBringToken=submitManualBringToken;
@@ -19692,10 +19722,10 @@ function renderBringTokenStatus() {
     else { dot=''; label='Bring! connected ('+days+' days left)'; }
   }
 
-  var buttons='<button class="bring-token-btn" style="background:#8A8279;" onclick="event.stopPropagation();checkBringTokenStatus(true)" title="Ask the server whether the token really works">Check</button>';
+  var buttons='<button class="bring-token-btn" style="background:#6F6A60;" onclick="event.stopPropagation();checkBringTokenStatus(true)" title="Ask the server whether the token really works">Check</button>';
   if(!isMobile() && needsRefresh){
     buttons+='<button class="bring-token-btn" style="margin-left:4px;" onclick="event.stopPropagation();openBringAutoRefresh()">Refresh</button>'
-      +'<button class="bring-token-btn" style="background:#8A8279;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Token help</button>';
+      +'<button class="bring-token-btn" style="background:#6F6A60;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Token help</button>';
   } else if(needsRefresh) {
     buttons+='<span style="font-size:11px;color:var(--muted);margin-left:4px;">Refresh on PC when needed</span>';
   }
@@ -19713,13 +19743,13 @@ function openBringForTokenRefresh() {
   _bringTokenPollAttempts=0; clearInterval(_bringTokenPollInterval);
   _bringTokenPollInterval=setInterval(async function(){
     _bringTokenPollAttempts++;
-    if(_bringTokenPollAttempts>40){ clearInterval(_bringTokenPollInterval); document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:#c62828;">Timed out. Try again.</span>'; return; }
+    if(_bringTokenPollAttempts>40){ clearInterval(_bringTokenPollInterval); document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:var(--bad-text);">Timed out. Try again.</span>'; return; }
     try {
       var resp=await fetch(BRING_WORKER_URL,{method:'POST',headers: workerHeaders(),body: workerBody({action:'bring-lists'})});
       var data=await resp.json();
       if(data.ok||(data.lists&&data.lists.length>0)){
         clearInterval(_bringTokenPollInterval);
-        document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:#2e7d32;">✅ Token refreshed!</span>';
+        document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:var(--ok-text);">✅ Token refreshed!</span>';
         // Ask the Worker for the real expiry rather than assuming 7 days.
         checkBringTokenStatus(false);
         setTimeout(function(){ closeM('bringTokenExpiredOverlay'); if(_bringRetryItems&&_bringRetryItems.length>0){ toast('Sending ingredients to Bring!...'); sendItemsToBring(_bringRetryItems); } },1200);
@@ -20406,7 +20436,7 @@ async function waRefreshFolder(quiet){
   var st = quiet ? null : document.getElementById('waFolderStatus');
   var base = getWaBase();
   _waLastFolderError = '';
-  if (!base) { _waLastFolderError = 'no folder URL is set'; if(st) st.innerHTML = '<span style="color:#c62828;">Set a folder URL first.</span>'; return; }
+  if (!base) { _waLastFolderError = 'no folder URL is set'; if(st) st.innerHTML = '<span style="color:var(--bad-text);">Set a folder URL first.</span>'; return; }
   if (st) st.textContent = 'Looking in ' + base + ' …';
   // 5f.7 — list the folder first. Uploading a file is then the ONLY step needed
   // to add a chat; index.json is optional and only supplies nicer group labels.
@@ -20425,18 +20455,18 @@ async function waRefreshFolder(quiet){
     list = indexed;
   } else {
     _waLastFolderError = "couldn't list " + base + ' and no index.json was readable';
-    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read ' + escH(base)
+    if (st) st.innerHTML = '<span style="color:var(--bad-text);">Couldn\'t read ' + escH(base)
       + ' — the folder could not be listed and there is no readable index.json.</span>';
     return;
   }
   if (!Array.isArray(list)) {
     _waLastFolderError = 'index.json does not contain a JSON array';
-    if (st) st.innerHTML = '<span style="color:#c62828;">index.json must contain a JSON array of file names.</span>';
+    if (st) st.innerHTML = '<span style="color:var(--bad-text);">index.json must contain a JSON array of file names.</span>';
     return;
   }
   if (!list.length) {
     _waLastFolderError = 'index.json is an empty list — the chat files are not listed in it';
-    if (st) st.innerHTML = '<span style="color:#8A6D00;">index.json is empty, so there is nothing to load. Add your chat files to it.</span>';
+    if (st) st.innerHTML = '<span style="color:var(--warn-text);">index.json is empty, so there is nothing to load. Add your chat files to it.</span>';
     return;
   }
   var idx = waIndex().filter(function(e){ return e.source !== 'remote'; });
@@ -20654,13 +20684,13 @@ window.waMergeCloudIntoIndex = waMergeCloudIntoIndex;
 async function waRefreshCloud(quiet) {
   var st = quiet ? null : document.getElementById('waFolderStatus');
   if (!_fbDb) {
-    if (st) st.innerHTML = '<span style="color:#8A6D00;">Not signed in — cloud chats need the same sign-in as recipes.</span>';
+    if (st) st.innerHTML = '<span style="color:var(--warn-text);">Not signed in — cloud chats need the same sign-in as recipes.</span>';
     return { added: 0, error: 'not signed in' };
   }
   var cloud;
   try { cloud = await readCloudChatIndex(_fbDb); }
   catch(e) {
-    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t read cloud chats: ' + escH(e.message) + '</span>';
+    if (st) st.innerHTML = '<span style="color:var(--bad-text);">Couldn\'t read cloud chats: ' + escH(e.message) + '</span>';
     return { added: 0, error: e.message };
   }
   var merged = waMergeCloudIntoIndex(waIndex(), cloud);
@@ -20701,10 +20731,10 @@ async function waPushToCloud(id) {
     }
     await saveChatDoc(entry.file, entry.group, text);
     await waRefreshCloud(true);
-    if (st) st.innerHTML = '<span style="color:#2e7d32;">Uploaded ' + escH(entry.group) + ' to the cloud.</span>';
+    if (st) st.innerHTML = '<span style="color:var(--ok-text);">Uploaded ' + escH(entry.group) + ' to the cloud.</span>';
     toast('☁️ ' + entry.group + ' is now in the cloud');
   } catch(e) {
-    if (st) st.innerHTML = '<span style="color:#c62828;">Couldn\'t upload: ' + escH(e.message) + '</span>';
+    if (st) st.innerHTML = '<span style="color:var(--bad-text);">Couldn\'t upload: ' + escH(e.message) + '</span>';
   }
 }
 window.waRefreshCloud = waRefreshCloud; window.waPushToCloud = waPushToCloud;
@@ -21801,7 +21831,7 @@ async function waAsk(){
     if (!loaded.messages.length) {
       load.style.display = 'none';
       ans.style.display = 'block';
-      ans.innerHTML = '<div style="color:#c62828;">No chat messages could be read.'
+      ans.innerHTML = '<div style="color:var(--bad-text);">No chat messages could be read.'
         + (loaded.problems.length ? '<br><br>Problems: ' + escH(loaded.problems.join('; ')) : '')
         + '</div>';
       return;
@@ -21845,13 +21875,13 @@ async function waAsk(){
       + 'Show the ' + ctx.count + ' messages this was based on</summary>'
       + '<div dir="auto" style="unicode-bidi:plaintext;text-align:start;font-size:12px;color:var(--muted);white-space:pre-wrap;margin-top:8px;max-height:280px;overflow-y:auto;">'
       + escH(context) + '</div></details>'
-      + (loaded.problems.length ? '<div style="margin-top:10px;font-size:12px;color:#8A6D00;">Couldn\'t read: '
+      + (loaded.problems.length ? '<div style="margin-top:10px;font-size:12px;color:var(--warn-text);">Couldn\'t read: '
           + escH(loaded.problems.join('; ')) + '</div>' : '');
   } catch(e) {
     load.style.display = 'none';
     ans.style.display = 'block';
     if (e.message && (e.message.startsWith('BILLING:') || e.message.startsWith('API_KEY:'))) { showServiceError(e.message); return; }
-    ans.innerHTML = '<div style="color:#c62828;">' + escH(e.message) + '</div>';
+    ans.innerHTML = '<div style="color:var(--bad-text);">' + escH(e.message) + '</div>';
   }
 }
 
@@ -22829,7 +22859,7 @@ function showInstagramCaptionFallback(url, igData) {
   if (!res) return;
   var known = igData && (igData.author || igData.title) ? escH([igData.title, igData.author ? 'by ' + igData.author : ''].filter(Boolean).join(' — ')) : '';
   res.innerHTML =
-      '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:10px;padding:14px;font-size:14px;line-height:1.6;color:#5C3D2E;">'
+      '<div style="background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:14px;font-size:14px;line-height:1.6;color:var(--ink);">'
     + '<strong>📸 Instagram doesn\'t hand over the caption.</strong><br>'
     + 'The post was reachable' + (known ? ' (' + known + ')' : '') + ', but Instagram\'s public API returns the embed and the author, not the caption text — and the recipe is in the caption.'
     + '<div style="margin-top:10px;font-size:13px;">The quickest way in: open the post, copy the caption, and paste it here.</div>'
@@ -22838,7 +22868,7 @@ function showInstagramCaptionFallback(url, igData) {
     + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="padding:11px 16px;min-height:44px;display:inline-flex;align-items:center;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;font-family:\'DM Sans\',\'Heebo\',sans-serif;">↗ Open the post</a>'
     + '<button onclick="showSaveAsVideoBookmark(' + JSON.stringify(url).replace(/"/g, '&quot;') + ', \'Instagram post\', \'📸\')" style="padding:11px 16px;min-height:44px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🔖 Just bookmark it</button>'
     + '</div>'
-    + '<div style="margin-top:12px;font-size:12px;color:#8A8279;">Tip: sharing the post to this app straight from Instagram usually carries the caption with it, which skips all of this.</div>'
+    + '<div style="margin-top:12px;font-size:12px;color:var(--muted);">Tip: sharing the post to this app straight from Instagram usually carries the caption with it, which skips all of this.</div>'
     + '</div>';
 }
 window.showInstagramCaptionFallback = showInstagramCaptionFallback;
