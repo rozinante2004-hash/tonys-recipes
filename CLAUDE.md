@@ -132,6 +132,27 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **AUDIT BLOCK 4 (v36.62).** Speed:
+  - **Recipe cards are translated as they are BUILT.** `renderGrid` passes its
+    labels (meal type, difficulty, "srv" / "🍽 {1} srv", the heart's name,
+    "Cooked {1} times", the 🏷️ match line) through `i18nPhrase` (`T`) and marks
+    each card `data-no-i18n`, so the observer skips it whole. `i18nInstall`
+    redraws the grid when the dictionary changes. **Anything new on a card must
+    go through `T()`** — `i18n_cards_translated_when_built` renders every card
+    variant with a Latin-free dictionary and fails on any English left.
+    Measured at 300 cards: translated grid 32 ms → 14 ms (English 12 ms).
+  - `i18nUnits` no longer walks into a `data-no-i18n` subtree at all
+    (`i18nNoWordsHere`, TreeWalker FILTER_REJECT) — same result, since nothing
+    in one was ever a unit.
+  - The page walk no longer sees card labels, so `i18nCardLabels()` (every
+    category/difficulty the recipes use) and I18N_EXTRA keep them in the
+    catalogue. Dropping one would report its paid-for translation as an orphan
+    — checked by diffing the full catalogue before and after (nothing lost).
+  - **A new language runs `I18N_LANES` (3) batches at once** from one shared
+    queue. Stop still stops between batches. `tonys_i18n_ms_per_batch` stays
+    the time ONE batch takes; the estimate is `ceil(batches / lanes)` rounds.
+    Three ~11 s lanes are ~16 calls/min against the Worker's 40.
+
 - **AUDIT BLOCK 3 (v36.61).** Storage and backups:
   - **localStorage is ~5.24M characters per ORIGIN** (measured, Chromium; about
     half on Safari), shared with every project on rozinante2004-hash.github.io.

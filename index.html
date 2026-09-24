@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.61 -->
+<!-- Tony's Recipes Collection v36.62 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3470,7 +3470,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.61';
+var APP_VERSION = 'v36.62';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6167,7 +6167,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.61</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.62</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6798,7 +6798,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.61</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.62</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8560,6 +8560,10 @@ function i18nTranslatable(s) {
   return true;
 }
 
+// The two markings i18nSkip treats as "nothing in here, not even a placeholder".
+function i18nNoWordsHere(n) {
+  return !!(n.hasAttribute && (n.hasAttribute('data-no-i18n') || n.id === 'i18nOverlay'));
+}
 // Collect the units under `root`. Each is { el, attr, src } where a null attr
 // means the element's own text. Pure: it reads, it never writes.
 function i18nUnits(root) {
@@ -8628,7 +8632,17 @@ function i18nUnits(root) {
       : null;
   }
 
-  var all = Array.prototype.slice.call(scope.querySelectorAll('*'));
+  // v36.62 (audit C1) — a subtree marked data-no-i18n (or the translation
+  // editor) can never hold a unit, placeholders included, so it is not walked
+  // at all. Before, every element in it was visited and walked back up to
+  // <body> to find that out: at 300 recipe cards, 4,500 elements for nothing.
+  for (var up = scope; up && up.nodeType === 1 && up !== document.body; up = up.parentElement) {
+    if (i18nNoWordsHere(up)) return out;
+  }
+  var all = [];
+  var tw = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT, { acceptNode: function(n) {
+    return i18nNoWordsHere(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; } });
+  while (tw.nextNode()) all.push(tw.currentNode);
   if (scope.nodeType === 1 && scope !== document.body) all.unshift(scope);
   for (var i = 0; i < all.length; i++) {
     var el = all[i];
@@ -9298,6 +9312,8 @@ var I18N_EXTRA = [
   // v36.61 — where the newest backup came from (backupWhereText)
   'on this device', 'on a computer', 'on a computer (automatic)', 'on an iPhone', 'on an iPad',
   'on an Android phone', 'on another device', 'No backup has been taken yet',
+  // v36.62 — on recipe cards, which the page walk no longer visits (renderGrid)
+  'srv', '🍽 {1} srv', 'Add to favourites', 'Remove from favourites', 'Cooked {1} times',
   'on any device',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
   // only part of that line that is words rather than a title.
@@ -9331,9 +9347,24 @@ window.i18nScanCall = i18nScanCall; window.i18nPartsToPattern = i18nPartsToPatte
 // Everything the app can show, including the screens that are not showing now.
 // This is what a translation is generated from. i18nCatalogue() stays strictly
 // present-tense, which is what the recipe-safety test needs to mean anything.
+// v36.62 — what the recipe cards label, which the page walk no longer visits
+// (renderGrid translates them as it builds them). A meal type like "Pasta" that
+// only ever appeared on a card would otherwise drop out of the catalogue and
+// its paid-for translation would be reported as an orphan.
+function i18nCardLabels() {
+  var seen = Object.create(null);
+  (typeof recipes !== 'undefined' && recipes ? recipes : []).forEach(function(r) {
+    [r.category, r.difficulty].forEach(function(v) {
+      if (v && i18nTranslatable(v)) seen[String(v).trim()] = 1;
+    });
+  });
+  return Object.keys(seen);
+}
+window.i18nCardLabels = i18nCardLabels;
 function i18nFullCatalogue() {
   var seen = Object.create(null);
   i18nCatalogue().forEach(function(k){ seen[k] = 1; });
+  i18nCardLabels().forEach(function(k){ seen[k] = 1; });
   Object.keys(_i18nHarvested).forEach(function(k){ seen[k] = 1; });
   return Object.keys(seen).sort();
 }
@@ -9827,10 +9858,13 @@ function i18nDurationWords(ms) {
   return 'about ' + mins + ' minutes';
 }
 // What to tell someone BEFORE they agree to pay for it.
+// v36.62 — batches run I18N_LANES at a time, so the wait is the number of
+// ROUNDS, not the number of batches.
+var I18N_LANES = 3;
 function i18nEstimate(catalogue) {
   var batches = i18nBatchCatalogue(catalogue).length;
-  return { batches: batches, ms: batches * i18nMsPerBatch(),
-           words: i18nDurationWords(batches * i18nMsPerBatch()) };
+  var ms = Math.ceil(batches / I18N_LANES) * i18nMsPerBatch();
+  return { batches: batches, ms: ms, words: i18nDurationWords(ms) };
 }
 window.i18nBatchCatalogue = i18nBatchCatalogue; window.i18nEstimate = i18nEstimate;
 window.i18nDurationWords = i18nDurationWords; window.i18nMsPerBatch = i18nMsPerBatch;
@@ -9900,30 +9934,44 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
   }
 
   var leftover = [];
-  for (var b = 0; b < batches.length; b++) {
-    if (onProgress) onProgress(b, batches.length,
-      'Batch ' + (b + 1) + ' of ' + batches.length + ' · ' + batches[b].length + ' phrases');
-    // Stopping is allowed between batches. Whatever has already come back is
-    // kept and saved: a half-finished language is worth more than none, and
-    // the gap-filler picks up the rest later.
-    if (typeof progressCancelled === 'function' && progressCancelled()) break;
-    try {
-      await runOrSplit(batches[b], 0);
-      var short = shortfall(batches[b]);
-      // One retry, of only the strings it skipped. A second full batch would
-      // cost the whole batch again to recover two lines of it.
-      if (short.length) {
-        try { await runBatch(short); } catch(e) {}
-        leftover = leftover.concat(shortfall(batches[b]));
+  // v36.62 (audit C2) — I18N_LANES batches at a time, from one shared queue.
+  // One at a time, Russian took thirteen minutes, nearly all of it waiting on
+  // the model. Three lanes of ~11 s batches are about sixteen calls a minute,
+  // well inside the Worker's forty. Nothing else changes: each batch is still
+  // split, retried and counted exactly as before, and the result is the same
+  // dictionary whatever order the answers come back in.
+  var next = 0, done = 0;
+  async function lane() {
+    while (next < batches.length) {
+      // Stopping is allowed between batches. Whatever has already come back is
+      // kept and saved: a half-finished language is worth more than none, and
+      // the gap-filler picks up the rest later.
+      if (typeof progressCancelled === 'function' && progressCancelled()) return;
+      var b = next++;
+      if (onProgress) onProgress(done, batches.length,
+        'Batch ' + (b + 1) + ' of ' + batches.length + ' · ' + batches[b].length + ' phrases');
+      try {
+        await runOrSplit(batches[b], 0);
+        var short = shortfall(batches[b]);
+        // One retry, of only the strings it skipped. A second full batch would
+        // cost the whole batch again to recover two lines of it.
+        if (short.length) {
+          try { await runBatch(short); } catch(e) {}
+          leftover = leftover.concat(shortfall(batches[b]));
+        }
+      } catch(e) {
+        // One batch out of ten is not a reason to lose the other nine — the
+        // strings it held simply stay English, and re-running fills them in.
+        failed++;
+        leftover = leftover.concat(batches[b]);
+        syncLog('error', 'A translation batch failed for ' + lang, String(e && e.message).slice(0, 160));
       }
-    } catch(e) {
-      // One batch out of ten is not a reason to lose the other nine — the
-      // strings it held simply stay English, and re-running fills them in.
-      failed++;
-      leftover = leftover.concat(batches[b]);
-      syncLog('error', 'A translation batch failed for ' + lang, String(e && e.message).slice(0, 160));
+      done++;
     }
   }
+  var lanes = [];
+  for (var l = 0; l < Math.min(I18N_LANES, batches.length); l++) lanes.push(lane());
+  await Promise.all(lanes);
   if (onProgress) onProgress(batches.length, batches.length);
   if (leftover.length) {
     // 'ai', not an error: every batch that actually failed is already logged
@@ -9933,7 +9981,9 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
   }
   if (splits) syncLog('ai', splits + ' batch(es) were split after hitting the token ceiling', '');
   // What it really cost, so the next dialog can say so instead of guessing.
-  i18nNoteBatchTime(Date.now() - _runStarted, batches.length);
+  // Stored as the time ONE batch takes, so it means the same whatever the
+  // number of lanes — the estimate divides by the lanes itself.
+  i18nNoteBatchTime((Date.now() - _runStarted) * Math.min(I18N_LANES, batches.length), batches.length);
   return { dict: dict, failed: failed, batches: batches.length, splits: splits,
            missing: leftover.length, missingList: leftover };
 }
@@ -10358,9 +10408,16 @@ window.i18nFillGaps = i18nFillGaps; window.i18nGapList = i18nGapList;
 // run and without impersonating Firestore — and, just as important, has to be
 // able to put the interface back to English afterwards.
 function i18nInstall(lang, dict) {
+  var was = _i18nDict;
   _i18nDict = dict || null;
   _i18nLang = dict ? lang : 'en';
   if (dict) i18nLoadMissing(lang); else _i18nMissing = Object.create(null);
+  // v36.62 — recipe cards are translated while they are BUILT (renderGrid), and
+  // the observer leaves them alone, so a new language has to redraw them.
+  if (was !== _i18nDict) {
+    var g = document.getElementById('recipeGrid');
+    if (g && g.childElementCount && typeof renderGrid === 'function') { try { renderGrid(); } catch(e) {} }
+  }
   return _i18nLang;
 }
 function i18nCurrentDict() { return _i18nDict; }
@@ -11284,7 +11341,13 @@ function matchReason(r, q) {
   var tag = [r.category, r.difficulty]
     .concat(recipeParts(r).reduce(function(a, p){ return a.concat([p.category, p.difficulty]); }, []))
     .filter(function(v){ return v && lc(v).includes(q); })[0];
-  if (tag) return '<div class="match-why">🏷️ ' + hlMatch(tag, q) + '</div>';
+  // v36.62 — inside a card, which is translated as it is built. A label the
+  // interface translates is shown translated; highlighting the English query
+  // inside a Hebrew word would mark nothing.
+  if (tag) {
+    var shown = (typeof i18nPhrase === 'function') ? i18nPhrase(tag) : tag;
+    return '<div class="match-why">🏷️ ' + (shown === tag ? hlMatch(tag, q) : escH(shown)) + '</div>';
+  }
   return '';
 }
 // Escapes first, then wraps the matched run — never the other way round.
@@ -11390,10 +11453,27 @@ function renderGrid() {
     return;
   }
 
+  // v36.62 (audit C1) — THE CARDS ARE TRANSLATED AS THEY ARE BUILT. Each card
+  // carries four labels (meal type, difficulty, "srv", the heart's name), and
+  // leaving them to the observer meant walking every element of every card
+  // after it was drawn — at 300 recipes, a translated grid cost two and a half
+  // times an English one, on every filter tap. So the labels go through
+  // i18nPhrase here and the card is marked data-no-i18n: the observer skips it
+  // whole. The recipe's own words need nothing — they are never translated.
+  // A new language redraws the grid (i18nInstall). Anything added to a card
+  // later MUST go through T() too, or it stays English: i18n_cards_translated_when_built
+  // renders every card variant and fails on any English left.
+  var T = i18nPhrase;
+  function favLabel(r) { return T(r.fav ? 'Remove from favourites' : 'Add to favourites'); }
+  // The list view's "🍽 4 srv" is one phrase with the number in it — a
+  // language may well put the number after the word.
+  var srvParts = String(T('🍽 {1} srv')).split('{1}');
+  if (srvParts.length !== 2) srvParts = ['🍽 ', ' srv'];
+  function srvHtml(v) { return escH(srvParts[0]) + '<span>' + escH(v) + '</span>' + escH(srvParts[1]); }
   if (viewMode === 'list') {
     g.className = 'recipe-list';
     g.innerHTML = list.map(r => `
-      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-i18n-skip-attrs="aria-label" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
@@ -11405,38 +11485,38 @@ function renderGrid() {
             : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="clip-badge clip-badge-sm">🎬</div></div>`) : ''}
         </div>
         <div class="recipe-list-info">
-          <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="Cooked ${r.cookCount} times" style="font-size:12px;">🔥</span>`:''}</div>
+          <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
-            <span>${escH(r.category)}</span>
-            <bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi>
-            ${servingsIsYield(r.servings) ? `<bdi data-no-i18n>🍽 ${escH(r.servings)}</bdi>` : `<bdi>🍽 <span data-no-i18n>${escH(r.servings)}</span> srv</bdi>`}
-            <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(r.difficulty)}</span>
+            <span>${escH(T(r.category))}</span>
+            <bdi>⏱ ${escH(r.prep)}</bdi>
+            ${servingsIsYield(r.servings) ? `<bdi>🍽 ${escH(r.servings)}</bdi>` : `<bdi>${srvHtml(r.servings)}</bdi>`}
+            <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(T(r.difficulty))}</span>
           </div>
           ${matchReason(r, q)}
         </div>
         <div class="recipe-list-right">
-          <button class="fav-btn" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
+          <button class="fav-btn" aria-label="${escA(favLabel(r))}" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
         </div>
       </div>`).join('');
   } else {
     g.className = 'recipe-grid';
     g.innerHTML = list.map(r => `
-      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-i18n-skip-attrs="aria-label" tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
         <div class="card-image" style="background:${escA(r.bg)}">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
-          <div class="card-category-badge">${escH(r.category)}</div>
+          <div class="card-category-badge">${escH(T(r.category))}</div>
           ${r.isClip ? `<div class="clip-badge" style="position:absolute;top:8px;right:8px;">🎬</div>` : ''}
           ${isCollection(r) ? `<div class="collection-badge" style="position:absolute;top:8px;right:8px;">📚<span class="collection-count">${recipeParts(r).length}</span></div>` : ''}
         </div>
         <div class="card-body">
           <div class="card-title" dir="auto">${escH(r.name)}</div>
-          <div class="card-meta"><bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi><div class="card-meta-dot"></div>${servingsIsYield(r.servings) ? `<bdi data-no-i18n>${escH(r.servings)}</bdi>` : `<bdi><span data-no-i18n>${escH(r.servings)}</span> srv</bdi>`}</div>
+          <div class="card-meta"><bdi>⏱ ${escH(r.prep)}</bdi><div class="card-meta-dot"></div>${servingsIsYield(r.servings) ? `<bdi>${escH(r.servings)}</bdi>` : `<bdi><span>${escH(r.servings)}</span> ${escH(T('srv'))}</bdi>`}</div>
           ${matchReason(r, q)}
         </div>
         <div class="card-footer">
-          <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>
-          <button class="fav-btn" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
+          <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(T(r.difficulty))}</span>
+          <button class="fav-btn" aria-label="${escA(favLabel(r))}" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
         </div>
       </div>`).join('');
   }

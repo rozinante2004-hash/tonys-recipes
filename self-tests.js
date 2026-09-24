@@ -8574,6 +8574,132 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'i18n_batches_run_three_at_once', group:'UI', name:'A new language runs three batches at a time (v36.62, audit C2)',
+    test: async()=>{
+      if(typeof I18N_LANES!=='number' || I18N_LANES<2) throw new Error('I18N_LANES is not set');
+      var realAI=window.aiCall, realCancel=window.progressCancelled, prevMs=null;
+      try{ prevMs=localStorage.getItem(I18N_MS_PER_BATCH_KEY); }catch(e){}
+      // Long enough strings that the catalogue makes plenty of batches.
+      var cat=[]; for(var i=0;i<300;i++) cat.push('Interface sentence number '+i+' with some length to it');
+      var nBatches=i18nBatchCatalogue(cat).length;
+      if(nBatches<I18N_LANES*2) throw new Error('the fixture makes only '+nBatches+' batches');
+      function answer(prompt){
+        var body=prompt.slice(prompt.indexOf('Strings:\n')+9);
+        var out={}; body.split('\n').forEach(function(l){ var m=/^(\d+)\. (.*)$/.exec(l); if(m) out[m[1]]='T:'+m[2]; });
+        return JSON.stringify(out);
+      }
+      try{
+        // (1) Three at once — never more, which is what keeps it inside the
+        // Worker's forty a minute — and every string comes back.
+        var inFlight=0, peak=0, calls=0;
+        window.aiCall=async function(prompt){
+          calls++; inFlight++; peak=Math.max(peak,inFlight);
+          await new Promise(function(r){ setTimeout(r, 15); });
+          inFlight--; return answer(prompt);
+        };
+        var res=await i18nTranslateAll('he', cat);
+        if(peak!==I18N_LANES) throw new Error('ran '+peak+' batch(es) at once, not '+I18N_LANES);
+        if(calls!==nBatches) throw new Error('made '+calls+' calls for '+nBatches+' batches');
+        if(Object.keys(res.dict).length!==cat.length || res.missing)
+          throw new Error('lost strings: '+Object.keys(res.dict).length+' of '+cat.length);
+        if(res.dict[cat[123]]!=='T:'+cat[123]) throw new Error('an answer landed on the wrong string');
+
+        // (2) One failed batch is still one failed batch: the others finish.
+        var n2=0;
+        window.aiCall=async function(prompt){
+          var me=++n2; await new Promise(function(r){ setTimeout(r, 5); });
+          if(me===2) throw new Error('API error 400: bad request');
+          return answer(prompt);
+        };
+        var res2=await i18nTranslateAll('he', cat);
+        if(res2.failed!==1) throw new Error('expected exactly 1 failed batch, got '+res2.failed);
+        if(Object.keys(res2.dict).length<cat.length-I18N_BATCH) throw new Error('a failed batch took others down with it');
+
+        // (3) Stop still stops: no new batch starts after it is pressed.
+        var n3=0, stopped=false;
+        window.progressCancelled=function(){ return stopped; };
+        window.aiCall=async function(prompt){
+          n3++; if(n3===I18N_LANES) stopped=true;
+          await new Promise(function(r){ setTimeout(r, 5); });
+          return answer(prompt);
+        };
+        await i18nTranslateAll('he', cat);
+        if(n3>I18N_LANES) throw new Error('batches kept starting after Stop: '+n3+' calls');
+
+        // (4) The estimate is the number of ROUNDS, and what is learned is the
+        // time one batch takes, so the two agree however many lanes there are.
+        localStorage.setItem(I18N_MS_PER_BATCH_KEY, '9000');
+        var est=i18nEstimate(cat);
+        if(est.ms!==Math.ceil(nBatches/I18N_LANES)*9000)
+          throw new Error('the estimate is '+est.ms+' ms, not '+Math.ceil(nBatches/I18N_LANES)+' rounds of 9 s');
+      } finally {
+        window.aiCall=realAI; window.progressCancelled=realCancel;
+        try{ if(prevMs===null) localStorage.removeItem(I18N_MS_PER_BATCH_KEY); else localStorage.setItem(I18N_MS_PER_BATCH_KEY,prevMs); }catch(e){}
+      }
+    } },
+
+  { id:'i18n_cards_translated_when_built', group:'UI', name:'Recipe cards are translated as they are built (v36.62, audit C1)',
+    test: async()=>{
+      ['i18nPhrase','i18nCardLabels','i18nInstall'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var realR=recipes, realView=viewMode, langWas=_i18nLang, dictWas=_i18nDict;
+      // A language nobody uses, so no real "still missing" list is touched.
+      var LANG='xx', missKey=I18N_MISS_PREFIX+LANG;
+      var fix=[
+        { id:888970, name:'Card test one',   category:'Pasta',  difficulty:'Hard', servings:'4', cookCount:5, fav:true },
+        { id:888971, name:'Card test two',   category:'Dinner', difficulty:'Easy', servings:'2', fav:false, isClip:true },
+        { id:888972, name:'Card test three', category:'Soup',   difficulty:'Medium', servings:'6',
+          parts:[{ name:'Part A', ingredients:[], steps:['x'] }, { name:'Part B', ingredients:[], steps:['y'] }] }
+      ].map(function(o){ o.ingredients=o.ingredients||[]; o.steps=o.steps||['x']; return normalizeRecipe(o); });
+      try{
+        recipes=fix.slice();
+        document.getElementById('searchInput').value='';
+        // The catalogue still knows what only a card shows.
+        if(i18nFullCatalogue().indexOf('Pasta')===-1) throw new Error('a meal type only a card shows fell out of the catalogue');
+        // A dictionary with an answer for everything, and no Latin letters in
+        // any answer — so any English left on a card is English we missed.
+        var dict={}, n=0;
+        i18nFullCatalogue().concat(I18N_EXTRA).forEach(function(k){ dict[k]='ש'+(n++)+(k.indexOf('{1}')!==-1?' {1}':''); });
+        i18nInstall(LANG, dict);
+        var left=[];
+        // …including under a search that matched only the meal type, which
+        // adds a "🏷️ Pasta" line to the card.
+        [['grid','',3],['list','',3],['grid','pasta',1],['list','pasta',1]].forEach(function(run){
+          var mode=run[0]+(run[1]?' searching "'+run[1]+'"':'');
+          viewMode=run[0]; document.getElementById('searchInput').value=run[1]; renderGrid();
+          var cards=document.querySelectorAll('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item');
+          if(cards.length!==run[2]) throw new Error(mode+': drew '+cards.length+' cards, not '+run[2]);
+          if(run[1] && !document.querySelector('#recipeGrid .match-why')) throw new Error(mode+': no match reason was drawn');
+          cards.forEach(function(c){
+            if(!c.hasAttribute('data-no-i18n')) left.push(mode+': a card is not marked as already translated');
+            // Take the marking off a COPY and ask the ordinary translation walk
+            // what it would still find. The card's aria-label is the recipe's
+            // name, which is content.
+            var copy=c.cloneNode(true);
+            copy.removeAttribute('data-no-i18n'); copy.setAttribute('data-i18n-skip-attrs','aria-label');
+            copy.querySelectorAll('[data-no-i18n]').forEach(function(e){ e.removeAttribute('data-no-i18n'); });
+            i18nUnits(copy).forEach(function(u){ left.push(mode+': "'+u.key+'"'+(u.attr?' ('+u.attr+')':'')); });
+          });
+          // …and the translation pass itself has nothing to do on the grid.
+          if(i18nUnits(document.getElementById('recipeGrid')).length) left.push(mode+': the observer still walks the cards');
+        });
+        document.getElementById('searchInput').value='';
+        viewMode='list'; renderGrid();
+        if(left.length) throw new Error('English left on a card in a translated interface: '+left.slice(0,8).join(' · '));
+        var badge=document.querySelector('#recipeGrid .recipe-list-meta span');
+        if(!badge || badge.textContent!==dict['Pasta']) throw new Error('the meal type was not translated: '+(badge&&badge.textContent));
+        // Switching language redraws the cards — back in English they say Pasta.
+        i18nInstall('en', null);
+        badge=document.querySelector('#recipeGrid .recipe-list-meta span');
+        if(!badge || badge.textContent!=='Pasta') throw new Error('back in English, a card still reads '+(badge&&badge.textContent));
+      } finally {
+        recipes=realR; viewMode=realView; document.getElementById('searchInput').value='';
+        i18nInstall(langWas, dictWas);
+        renderGrid();
+        await new Promise(function(r){ setTimeout(r, 500); });   // the missing-list writer runs on a timer
+        try{ localStorage.removeItem(missKey); }catch(e){}
+      }
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']
