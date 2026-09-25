@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.68 -->
+<!-- Tony's Recipes Collection v36.69 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3592,7 +3592,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.68';
+var APP_VERSION = 'v36.69';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4465,6 +4465,9 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .drop-group { position: static; }
 .drop-menu { opacity: 0; pointer-events: none; position: fixed; top: -999px; left: -999px; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transition: opacity 0.12s ease; }   /* v36.67 — scrolls when capped to the screen (dropPlacement) */
 .drop-menu.open { opacity: 1; pointer-events: auto; }
+/* v36.69 — a menu taller than the screen scrolls; the fade at its foot says so. */
+.drop-menu.drop-scrolls { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+                          mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); padding-bottom: 20px; }
 #helpOverlay.open,
 #photoSearchOverlay.open,
 #bringTokenExpiredOverlay.open,
@@ -6265,7 +6268,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.68</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.69</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6897,7 +6900,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.68</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.69</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15271,9 +15274,14 @@ function dropPlacement(r, mw, mh, vw, vh) {
   var above = (r.top - 4) - DROP_MARGIN;
   if (mh <= below) return { top: r.bottom + 4, left: left, maxHeight: 0 };
   if (mh <= above) return { top: r.top - 4 - mh, left: left, maxHeight: 0 };
-  if (below >= above) return { top: r.bottom + 4, left: left, maxHeight: Math.max(120, below) };
-  var h = Math.max(120, above);
-  return { top: Math.max(DROP_MARGIN, r.top - 4 - h), left: left, maxHeight: h };
+  // v36.69 — fits on the screen at all? Then ALL of it shows, moved up as far
+  // as it has to go (over the header, which is fine: it closes on the next
+  // tap). v36.67 capped it to the room below and made it scroll, and on
+  // Tony's phone "🚀 Deployments" and "💳 Payments" simply disappeared below
+  // "Logging & debugging" — nothing says an iPhone menu scrolls.
+  if (mh <= vh - 2 * DROP_MARGIN) return { top: vh - DROP_MARGIN - mh, left: left, maxHeight: 0 };
+  // Taller than the screen: the whole screen, scrolling (and the menu says so).
+  return { top: DROP_MARGIN, left: left, maxHeight: vh - 2 * DROP_MARGIN };
 }
 window.dropPlacement = dropPlacement;
 function toggleDrop(id){
@@ -15301,6 +15309,7 @@ function toggleDrop(id){
       menu.style.left=p.left+'px';
       menu.style.maxHeight=p.maxHeight ? p.maxHeight+'px' : '';
       menu.scrollTop=0;
+      menu.classList.toggle('drop-scrolls', !!p.maxHeight);   // the "there is more" fade
       // Now it's in position, opacity transition kicks in
     });
     _armDropOutside(menu);

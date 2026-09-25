@@ -201,6 +201,16 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A MENU THAT FITS ON THE SCREEN SHOWS ALL OF IT (v36.69).** v36.67 capped a
+  menu that did not fit below its button to the room below and made it scroll
+  — and on Tony's iPhone AND his laptop (a browser viewport of ~650–700 px),
+  "💳 Payments" and "🚀 Deployments" vanished under "Logging & debugging":
+  nothing tells you a menu scrolls. `dropPlacement`: below if it fits, above if
+  it fits, else — if it fits on the screen at all — moved up until all of it
+  shows (over the header); only a menu taller than the whole screen scrolls,
+  with a fade at its foot (`.drop-scrolls`). Tony's published rules (v36.59
+  template, his four members) were verified in the emulator, 29 checks.
+
 - **A "LAST BACKUP" NOBODY TOOK, AND A HALF-PASTED WORKER (v36.68).**
   - Tony's iPhone said "last backup: 0 days ago, on this device" with no backup
     for weeks: a stamp left by a pre-v36.61 Self Test run (the folder test ran

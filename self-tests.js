@@ -1545,7 +1545,12 @@ window.SELF_TESTS = [
       var p=dropPlacement(btn, 230, 1100, W, H);
       if(p.top<8) throw new Error('a tall menu starts off the top of the screen (top '+p.top+')');
       if(!p.maxHeight || p.top+p.maxHeight>H-8) throw new Error('a menu taller than the screen is not capped to it (top '+p.top+', max '+p.maxHeight+')');
-      if(p.top!==btn.bottom+4) throw new Error('with more room below, it should open below the button');
+      // v36.69 — Tony's NEXT case: a menu that does not fit below the button
+      // but DOES fit on the screen. v36.67 capped it and made it scroll, and
+      // Deployments vanished below the fold. All of it must show, uncapped.
+      var mid=dropPlacement(btn, 230, 760, W, H);
+      if(mid.maxHeight) throw new Error('a menu that fits on the screen was cut to the room below the button — its last items hide');
+      if(mid.top<8 || mid.top+760>H-8) throw new Error('a menu that fits on the screen is not wholly on it (top '+mid.top+')');
       // A menu that fits below opens below, uncapped.
       var q=dropPlacement(btn, 230, 400, W, H);
       if(q.top!==btn.bottom+4 || q.maxHeight) throw new Error('a menu that fits below did not simply open below');
