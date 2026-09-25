@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.69 -->
+<!-- Tony's Recipes Collection v36.70 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -112,8 +112,40 @@
     ownerEmail:          'rozinante2004@gmail.com',
     githubRepo:          'rozinante2004-hash/tonys-recipes',
     siteOrigin:          'https://rozinante2004-hash.github.io',
-    sitePath:            '/tonys-recipes/'
+    sitePath:            '/tonys-recipes/',
+    // v36.70 (WP-A.3) — features that belong to THIS household's set-up and
+    // may not suit anyone else's: they lean on a personal WhatsApp export, an
+    // unofficial Bring! connection, and a Gmail permission. All on here. Off,
+    // a feature's buttons and menu items are hidden, its functions refuse,
+    // and nothing of it runs in the background or appears in the privacy list.
+    features: Object.freeze({
+      whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
+      bring:    true,     // Send ingredients to the Bring! shopping list
+      gmail:    true      // Send a recipe by e-mail through your Gmail
+    })
   });
+  // Is a feature on? A test may override it for a moment (the config itself is
+  // frozen). Unknown names are OFF: a typo must not switch something on.
+  window._featureOverride = {};
+  window.featureOn = function (name) {
+    var o = window._featureOverride;
+    if (o && Object.prototype.hasOwnProperty.call(o, name)) return !!o[name];
+    return !!(window.APP_CONFIG.features && window.APP_CONFIG.features[name] === true);
+  };
+  // Everything marked data-feature="x" is hidden by ONE rule while x is off —
+  // including buttons drawn later (the recipe view, a collection's parts).
+  window.applyFeatureFlags = function () {
+    Object.keys(window.APP_CONFIG.features).forEach(function (n) {
+      document.documentElement.toggleAttribute('data-feature-off-' + n, !window.featureOn(n));
+    });
+  };
+  window.applyFeatureFlags();
+  // What a tap on a switched-off feature says — once, plainly, and nothing else.
+  window.featureOffNotice = function (name) {
+    var what = { whatsapp: 'WhatsApp groups', bring: 'Bring!', gmail: 'Sending through Gmail' }[name] || name;
+    if (typeof toast === 'function') toast(what + ' is not available in this app.');
+    return null;
+  };
   // Links and labels in the page that name the deployment carry
   // data-cfg-href / data-cfg-text templates such as "{projectId}"; this fills
   // them in once the page is parsed.
@@ -134,6 +166,12 @@
   };
   document.addEventListener('DOMContentLoaded', function () { window.applyAppConfig(); });
 </script>
+<style id="featureFlagCss">
+  /* v36.70 — see APP_CONFIG.features. */
+  html[data-feature-off-whatsapp] [data-feature="whatsapp"],
+  html[data-feature-off-bring]    [data-feature="bring"],
+  html[data-feature-off-gmail]    [data-feature="gmail"] { display: none !important; }
+</style>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase Compat SDK — single combined file for faster loading -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="console.error('Failed to load Firebase app SDK')"></script>
@@ -3592,7 +3630,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.69';
+var APP_VERSION = 'v36.70';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -3894,7 +3932,10 @@ function showEmailModal(id) {
 
   var hint = document.createElement('div');
   hint.style.cssText = 'font-size:11px;color:var(--muted);text-align:center;';
-  hint.textContent = 'Preview of your email — click Open Gmail to send';
+  // v36.70 — said "click Open Gmail" beside a button reading "Send Email".
+  hint.textContent = featureOn('gmail')
+    ? 'Preview of your email — press Send Email to send it from your Gmail'
+    : 'Preview of your email — open it in your mail app, or copy it';
 
   var btnRow = document.createElement('div');
   btnRow.style.cssText = 'display:flex;gap:8px;';
@@ -3903,6 +3944,7 @@ function showEmailModal(id) {
   gmailBtn.style.cssText = 'flex:2;padding:11px;background:#C1440E;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   gmailBtn.textContent = '📧 Send Email';
   gmailBtn.title = 'Will ask for Gmail permission on first use';
+  gmailBtn.setAttribute('data-feature', 'gmail');   // v36.70 — Copy stays when Gmail is off
   gmailBtn.onclick = async function(){
     var to      = toInput.value.trim();
     var subject = subjectInput.value.trim();
@@ -3942,6 +3984,20 @@ function showEmailModal(id) {
   closeBtn.onclick = function(){ overlay.remove(); };
 
   btnRow.appendChild(gmailBtn);
+  // v36.70 — with Gmail switched off, the phone's own mail app does the
+  // sending: plain text, because a mailto: link cannot carry the formatting.
+  if (!featureOn('gmail')) {
+    var mailBtn = document.createElement('button');
+    mailBtn.id = 'emailMailtoBtn';
+    mailBtn.style.cssText = gmailBtn.style.cssText;
+    mailBtn.textContent = '✉️ Open in my mail app';
+    mailBtn.onclick = function() {
+      var to = toInput.value.trim(), subject = subjectInput.value.trim() || r.name;
+      location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(plainText);
+    };
+    btnRow.appendChild(mailBtn);
+  }
   btnRow.appendChild(copyBtn);
   btnRow.appendChild(closeBtn);
 
@@ -3969,6 +4025,7 @@ var GMAIL_CLIENT_KEY = 'tonys_gmail_client_id';
 })();
 
 async function openGmailSetup() {
+  if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
   var current = window._gmailOAuthClientId || '';
   var val = await askPrompt(
     'Find it at console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client IDs.\n\n'
@@ -3992,6 +4049,7 @@ window.openGmailSetup = openGmailSetup;
 
 // ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
 async function getGmailToken() {
+  if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
   return new Promise(function(resolve, reject) {
     if(!window.google || !window.google.accounts) {
       reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
@@ -4020,6 +4078,7 @@ async function getGmailToken() {
 window.getGmailToken = getGmailToken;
 
 async function sendViaGmailApi(to, subject, htmlBody, plainText) {
+  if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
   var token = await getGmailToken();
   if(!token) throw new Error('Gmail access token not received. Please try again.');
 
@@ -6268,7 +6327,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.69</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.70</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6294,11 +6353,11 @@ body.banner-shown .header {
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
           <button class="drop-item" onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
           <button class="drop-item" id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
+          <button class="drop-item" data-feature="whatsapp" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
+          <button class="drop-item" data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
+          <button class="drop-item" data-feature="bring" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
@@ -6343,8 +6402,8 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Convert measurements</button>
-          <button class="drop-item" id="waAskItem" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
-          <button class="drop-item" id="waLinksItem" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
+          <button class="drop-item" id="waAskItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
+          <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make?</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -6900,7 +6959,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.69</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.70</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7114,7 +7173,7 @@ body.banner-shown .header {
         <div>3️⃣ Ingredients will send automatically ✅</div>
       </div>
     </div>
-    <button onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button data-feature="bring" onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       🌐 Open Bring! to Refresh
     </button>
     <div id="bringTokenExpiredStatus" style="text-align:center;font-size:12px;color:var(--muted);min-height:20px;margin-bottom:8px;"></div>
@@ -7344,7 +7403,7 @@ body.banner-shown .header {
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Suggestions:</div>
       <span class="help-suggestion" onclick="askHelpQ('How do I add a recipe?')">How do I add a recipe?</span>
       <span class="help-suggestion" onclick="askHelpQ('Where is my data stored?')">Where is my data stored?</span>
-      <span class="help-suggestion" onclick="askHelpQ('How do I send ingredients to Bring?')">How do I send to Bring?</span>
+      <span class="help-suggestion" data-feature="bring" onclick="askHelpQ('How do I send ingredients to Bring?')">How do I send to Bring?</span>
       <span class="help-suggestion" onclick="askHelpQ('How do I import from a URL?')">Import from URL?</span>
       <span class="help-suggestion" onclick="askHelpQ('How do I export my recipes?')">Export recipes?</span>
       <span class="help-suggestion" onclick="askHelpQ('What AI features are available?')">AI features?</span>
@@ -7421,7 +7480,7 @@ body.banner-shown .header {
     <div class="bring-footer">
       <button class="bring-select-all" onclick="bringToggleAll()">Select all</button>
       <button class="bring-cancel-btn" onclick="closeM('bringOverlay')">Cancel</button>
-      <button class="bring-send-btn" onclick="bringConfirmSend()">Send to Bring!</button>
+      <button class="bring-send-btn" data-feature="bring" onclick="bringConfirmSend()">Send to Bring!</button>
     </div>
   </div>
 </div>
@@ -9417,6 +9476,8 @@ var I18N_EXTRA = [
   '✓ Ready — switches instantly', 'Not translated yet — a few minutes, once', '✓ ready', 'original',
   '🔄 Update all supported languages', 'Every language is up to date', 'up to date',
   'Select this recipe',
+  'Preview of your email — press Send Email to send it from your Gmail',
+  'Preview of your email — open it in your mail app, or copy it', '✉️ Open in my mail app',
   'srv', '🍽 {1} srv', 'Add to favourites', 'Remove from favourites', 'Cooked {1} times',
   'on any device',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
@@ -12357,7 +12418,7 @@ function partActionsHtml(coll, p) {
     + '<button class="action-btn" onclick="expOneWord(' + q + ')">📄 Word</button>'
     + '<button class="action-btn" onclick="printRecipe(' + q + ')">🖨️ Print</button>'
     + '<button class="action-btn" onclick="toggleShare(' + q + ')">📤 Share</button>'
-    + '<button class="action-btn action-btn-bring" '
+    + '<button class="action-btn action-btn-bring" data-feature="bring" '
     + 'onclick="openBringModal(' + q + ')">🛒 Bring!</button>'
     + '<button class="action-btn" onclick="promotePartToRecipe(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)" '
     + 'title="Make this a recipe of its own">⤴ Make its own</button>'
@@ -13012,7 +13073,7 @@ function drawView(){
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
         <button class="action-btn" onclick="duplicateRecipe(${r.id})" title="Create an editable copy">⧉ Duplicate</button>
         <button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" onclick="deleteRecipe(${r.id})">🗑️ Delete</button>
-        <button class="action-btn action-btn-bring" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
+        <button class="action-btn action-btn-bring" data-feature="bring" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
         ${r.originalPhoto ? `<button class="action-btn" id="origPhotoBtn-${r.id}" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:var(--danger);" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
@@ -20472,6 +20533,7 @@ var _bringTokenStatus = null;
 var _bringTokenChecking = false;
 
 async function checkBringTokenStatus(probe){
+  if (!featureOn('bring')) return null;   // v36.70 — switched off: nothing in the background
   if(_bringTokenChecking) return _bringTokenStatus;
   _bringTokenChecking = true;
   renderBringTokenStatus();
@@ -20561,6 +20623,7 @@ window.addEventListener('message',function(event){
 });
 
 function openBringAutoRefresh() {
+  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
   toast('Opening Bring! relay...');
   // Open as a normal TAB, not a sized popup: a popup window has no bookmarks
   // bar, so the 🛒 bookmarklet is unclickable there — which is exactly the
@@ -20619,6 +20682,7 @@ window.buildBringBookmarklet = buildBringBookmarklet;
 // way forward" §4b calls a bug. It now always opens; the code box explains what
 // is missing instead of pretending there is a menu that would fix it.
 function showBringBookmarklet() {
+  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
   var _secret = getBringTokenSecret();
   var box = document.getElementById('bringBookmarkletCode');
   var inp = document.getElementById('bringSecretInput');
@@ -20696,8 +20760,8 @@ function renderBringTokenStatus() {
 
   var buttons='<button class="bring-token-btn" style="background:#6F6A60;" onclick="event.stopPropagation();checkBringTokenStatus(true)" title="Ask the server whether the token really works">Check</button>';
   if(!isMobile() && needsRefresh){
-    buttons+='<button class="bring-token-btn" style="margin-left:4px;" onclick="event.stopPropagation();openBringAutoRefresh()">Refresh</button>'
-      +'<button class="bring-token-btn" style="background:#6F6A60;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Token help</button>';
+    buttons+='<button class="bring-token-btn" data-feature="bring" style="margin-left:4px;" onclick="event.stopPropagation();openBringAutoRefresh()">Refresh</button>'
+      +'<button class="bring-token-btn" data-feature="bring" style="background:#6F6A60;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Token help</button>';
   } else if(needsRefresh) {
     buttons+='<span style="font-size:11px;color:var(--muted);margin-left:4px;">Refresh on PC when needed</span>';
   }
@@ -20710,6 +20774,7 @@ function isMobile(){ return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent
 var _bringRetryItems=null; var _bringTokenPollInterval=null; var _bringTokenPollAttempts=0;
 
 function openBringForTokenRefresh() {
+  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
   window.open('https://web.getbring.com','_blank');
   document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:var(--terracotta);">⏳ Waiting... click your 🛒 bookmark on that page</span>';
   _bringTokenPollAttempts=0; clearInterval(_bringTokenPollInterval);
@@ -20787,6 +20852,7 @@ function waSaveIndex(list){
   try { localStorage.setItem(WA_INDEX_KEY, JSON.stringify(list)); } catch(e) {}
 }
 function initWhatsAppSources(){
+  if (!featureOn('whatsapp')) return null;   // v36.70 — switched off: nothing in the background
   // Nothing heavy at boot — just label the menu with how many chats are known.
   updateWaMenuLabel();
 }
@@ -22171,6 +22237,7 @@ window.waHarvestAcc = waHarvestAcc;
 // Opening must never start a long scan on its own. It shows whatever was saved
 // last time — instantly — and lets the user decide to refresh.
 async function openWaLinks(){
+  if (!featureOn('whatsapp')) return featureOffNotice('whatsapp');   // v36.70
   document.getElementById('waLinksOverlay').classList.add('open');
   if (!_waHarvest.loaded) {
     var saved = await waHarvestLoad();
@@ -22747,6 +22814,7 @@ window.waHarvestText = waHarvestText;
 window.copyWaHarvest = copyWaHarvest;
 
 function openWaAsk(){
+  if (!featureOn('whatsapp')) return featureOffNotice('whatsapp');   // v36.70
   document.getElementById('waAskAnswer').style.display = 'none';
   document.getElementById('waAskAnswer').innerHTML = '';
   document.getElementById('waAskLoading').style.display = 'none';
@@ -22789,7 +22857,7 @@ async function refreshWaAskState(){
     + 'Most often this means <code>index.json</code> in that folder is still empty — '
     + 'uploading the chat file is only half of it, the file also has to be listed there. '
     + 'See <strong>⚙️ Settings → 💬 WhatsApp Groups</strong>.'
-    + '<div style="margin-top:10px;"><button class="help-btn" onclick="openWaSetup()">Open WhatsApp settings</button></div>';
+    + '<div style="margin-top:10px;"><button class="help-btn" data-feature="whatsapp" onclick="openWaSetup()">Open WhatsApp settings</button></div>';
 }
 window.refreshWaAskState = refreshWaAskState;
 async function waAsk(){
@@ -22858,6 +22926,7 @@ async function waAsk(){
 }
 
 function openWaSetup(){
+  if (!featureOn('whatsapp')) return featureOffNotice('whatsapp');   // v36.70
   document.getElementById('waBaseInput').value = getWaBase();
   document.getElementById('waFolderStatus').textContent = '';
   var box = document.getElementById('waCloudSyncBox');
@@ -23134,7 +23203,10 @@ function privacyEntries() {
   return [
     { who: 'Google Firebase', when: signedIn ? 'always, while signed in' : 'not in use — you are signed out',
       on: signedIn,
-      sends: 'Every recipe, its photos, and the family member list. This is YOUR Firebase project: '
+      sends: 'Every recipe, its photos, and the family member list'
+           // v36.70 — the synced chats were never mentioned, and they go there too.
+           + (featureOn('whatsapp') ? ', and any WhatsApp chat exports you chose to sync' : '')
+           + '. This is YOUR Firebase project: '
            + 'the data sits in a Google account you own, and the access rules are yours to publish.' },
     { who: 'Google Sign-in', when: signedIn ? 'always, while signed in' : 'only when you sign in', on: true,
       sends: 'Your email address, so the access rules can tell family from strangers. Nothing else.' },
@@ -23153,10 +23225,15 @@ function privacyEntries() {
       sends: 'The address of a page you are importing, when this app’s own server cannot fetch it. '
            + 'These relays are not ours, and they choose what text comes back — which is why you are '
            + 'asked first. You can change that in ⚙️ → Logging & debugging.' },
-    { who: 'Bring! and Gmail', when: 'only if you have connected them, and only when you send something', on: true,
-      sends: 'To Bring!: an ingredient list you chose to send. To Gmail: a recipe you chose to email, '
-           + 'to the address you typed.' }
-  ];
+  ].concat(
+    // v36.70 — only the ones switched on in this app (APP_CONFIG.features).
+    (featureOn('bring') || featureOn('gmail')) ? [{
+      who: [featureOn('bring') ? 'Bring!' : '', featureOn('gmail') ? 'Gmail' : ''].filter(Boolean).join(' and '),
+      when: 'only if you have connected ' + (featureOn('bring') && featureOn('gmail') ? 'them' : 'it') + ', and only when you send something', on: true,
+      sends: [featureOn('bring') ? 'To Bring!: an ingredient list you chose to send.' : '',
+              featureOn('gmail') ? 'To Gmail: a recipe you chose to email, to the address you typed.' : '']
+             .filter(Boolean).join(' ') }] : []
+  );
 }
 // v36.35 — the drawing is split from the showing so the translation harvest can
 // call it without a panel appearing on screen.
@@ -23843,6 +23920,7 @@ window.doCalcReverse = doCalcReverse;
 var _bringScaledAmounts = []; // amounts actually sent — matches the recipe view's current scale/unit
 
 function openBringModal(recipeId) {
+  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
   _bringRecipeId = recipeId;
   var r = findRecipeRef(recipeId);
   if (!r) return;
@@ -23886,6 +23964,7 @@ function bringToggleAll() {
 }
 
 function bringConfirmSend() {
+  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
   var r = findRecipeRef(_bringRecipeId);
   if (!r) return;
   var checked = document.querySelectorAll('.bring-ing-cb:checked');

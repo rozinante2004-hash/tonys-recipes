@@ -201,6 +201,21 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **FEATURE SWITCHES (v36.70, go-public WP-A.3).** `APP_CONFIG.features`
+  (`whatsapp`, `bring`, `gmail` — all ON for this household) and
+  `featureOn(name)` (unknown names are OFF; `_featureOverride` is the test
+  hook, since the config is frozen). **Mark every entry point
+  `data-feature="x"`** — one CSS rule (`html[data-feature-off-x]`, set by
+  `applyFeatureFlags()`) hides it, including buttons drawn later; and **guard
+  its entry function** with `if (!featureOn('x')) return featureOffNotice('x')`
+  (background work: `return null`, silently). `feat_switches_off_means_off`
+  scans the SOURCE for any onclick reaching a feature's functions without the
+  mark — it found five on its first run — then switches each off and checks:
+  hidden, refuses, no network request, no dialog, not in "What leaves this
+  device", and back on again. With Gmail off the e-mail dialog offers
+  "✉️ Open in my mail app" (mailto, plain text). The privacy list now also
+  says synced WhatsApp chats go to Firebase — it never had.
+
 - **A MENU THAT FITS ON THE SCREEN SHOWS ALL OF IT (v36.69).** v36.67 capped a
   menu that did not fit below its button to the room below and made it scroll
   — and on Tony's iPhone AND his laptop (a browser viewport of ~650–700 px),

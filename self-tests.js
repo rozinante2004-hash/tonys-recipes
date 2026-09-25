@@ -1670,6 +1670,88 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'feat_switches_off_means_off', group:'Features', name:'A switched-off feature is hidden, refuses, and runs nothing (v36.70, WP-A.3)',
+    test: async()=>{
+      ['featureOn','applyFeatureFlags','featureOffNotice'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var ENTRY={
+        whatsapp:{ loud:['openWaAsk','openWaLinks','openWaSetup'], quiet:['initWhatsAppSources'], word:/WhatsApp/ },
+        bring:   { loud:['openBringModal','showBringBookmarklet','openBringAutoRefresh','openBringForTokenRefresh','bringConfirmSend'], quiet:['checkBringTokenStatus'], word:/Bring!/ },
+        gmail:   { loud:['openGmailSetup','sendViaGmailApi','getGmailToken'], quiet:[], word:/Gmail/ }
+      };
+      // (0) All on in THIS app — the household keeps everything.
+      Object.keys(ENTRY).forEach(function(f){ if(!featureOn(f)) throw new Error(f+' is off in this app — Tony’s household uses it'); });
+      if(featureOn('nonsense')) throw new Error('an unknown feature name reads as ON');
+      // (1) Every button that reaches a feature carries its mark — in the SOURCE,
+      // so an entry point added next year is caught the day it is written.
+      var src=await (await fetch(location.href,{cache:'no-store'})).text();
+      var unmarked=[];
+      Object.keys(ENTRY).forEach(function(f){
+        ENTRY[f].loud.forEach(function(fn){
+          var re=new RegExp('<(button|span|a)\\b[^>]*onclick="[^"]*\\b'+fn+'\\(', 'g'), m;
+          while((m=re.exec(src))){ if(m[0].indexOf('data-feature="'+f+'"')===-1) unmarked.push(fn+' at '+src.slice(0,m.index).split('\n').length); }
+        });
+      });
+      if(unmarked.length) throw new Error('entry points without data-feature: '+unmarked.join(', '));
+      var realFetch=window.fetch, realToast=window.toast, calls=0, said=[], realR=recipes, wasOver=Object.assign({}, _featureOverride);
+      var fix=normalizeRecipe({ id:888985, name:'Switch test', ingredients:[{a:'1',n:'egg'}], steps:['x'] });
+      try{
+        window.fetch=function(){ calls++; return Promise.reject(new Error('no network in this test')); };
+        window.toast=function(t){ said.push(String(t)); };
+        recipes=realR.concat([fix]);
+        for(var f in ENTRY){
+          _featureOverride[f]=false; applyFeatureFlags();
+          // (2) Hidden — including a button drawn after the switch (the recipe view).
+          openView(fix.id); await wait(60);
+          var marked=Array.prototype.slice.call(document.querySelectorAll('[data-feature="'+f+'"]'));
+          if(!marked.length) throw new Error(f+': nothing in the page is marked as belonging to it');
+          var shown=marked.filter(function(el){ return getComputedStyle(el).display!=='none'; });
+          closeM('viewOverlay');
+          if(shown.length) throw new Error(f+' is off but '+shown.length+' of its controls still show: '+shown.slice(0,3).map(function(e){ return e.textContent.trim(); }).join(' | '));
+          // (3) Refuses — no network, no dialog, one plain sentence.
+          calls=0; said.length=0;
+          for(var i=0;i<ENTRY[f].loud.length;i++){
+            var r=await window[ENTRY[f].loud[i]](fix.id);
+            if(r) throw new Error(f+': '+ENTRY[f].loud[i]+' ran although the feature is off');
+          }
+          for(var j=0;j<ENTRY[f].quiet.length;j++) await window[ENTRY[f].quiet[j]](true);
+          await wait(30);
+          if(calls) throw new Error(f+' is off but '+calls+' network request(s) were made');
+          var opened=Array.prototype.slice.call(document.querySelectorAll('[id$="Overlay"].open')).map(function(o){ return o.id; }).filter(function(id){ return id!=='selfTestOverlay'; });
+          if(opened.length) throw new Error(f+' is off but a dialog opened: '+opened.join(', '));
+          if(!said.some(function(t){ return /not available in this app/.test(t); })) throw new Error(f+': a tap on it said nothing');
+          if(said.length!==ENTRY[f].loud.length) throw new Error(f+': expected one message per tap, got '+said.length+' ('+said.join(' | ')+')');
+          // (3b) Gmail off: the e-mail dialog still sends, through the mail app.
+          if(f==='gmail'){
+            showEmailModal(fix.id); await wait(60);
+            var em=document.getElementById('emailModalOverlay');
+            var mt=document.getElementById('emailMailtoBtn');
+            if(em) em.remove();
+            if(!mt) throw new Error('with Gmail off, the e-mail dialog offers no way to send');
+          }
+          // (4) Not in the privacy list.
+          if(privacyEntries().some(function(e){ return ENTRY[f].word.test(e.who+' '+e.sends); }))
+            throw new Error(f+' is off but "What leaves this device" still lists it');
+          // (5) On again: back.
+          if(f==='gmail'){
+            _featureOverride.gmail=true; showEmailModal(fix.id); await wait(60);
+            var em2=document.getElementById('emailModalOverlay'), mt2=document.getElementById('emailMailtoBtn');
+            if(em2) em2.remove();
+            if(mt2) throw new Error('with Gmail on, the mail-app fallback appears as well');
+          }
+          delete _featureOverride[f]; applyFeatureFlags();
+          var back=document.querySelector('#settingsDrop [data-feature="'+f+'"], #moreDrop [data-feature="'+f+'"]');
+          if(back && getComputedStyle(back).display==='none') throw new Error(f+' switched back on but its menu item stays hidden');
+          if(!privacyEntries().some(function(e){ return ENTRY[f].word.test(e.who+' '+e.sends); }))
+            throw new Error(f+' is on but missing from "What leaves this device"');
+        }
+      } finally {
+        window.fetch=realFetch; window.toast=realToast; recipes=realR;
+        Object.keys(_featureOverride).forEach(function(k){ delete _featureOverride[k]; });
+        Object.assign(_featureOverride, wasOver); applyFeatureFlags();
+        document.querySelectorAll('[id$="Overlay"].open').forEach(function(o){ if(o.id!=='selfTestOverlay') o.classList.remove('open'); });
+      }
+    } },
+
   { id:'ui_swipe_fav', group:'UI', name:'Swipe favourites only — never deletes (5c.2)',
     test: async()=>{
       ['swipeStart','swipeMove','swipeEnd'].forEach(function(f){
