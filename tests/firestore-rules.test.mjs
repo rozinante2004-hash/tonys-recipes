@@ -59,6 +59,11 @@ await check('a writer can still read a translation',   getDoc(doc(as(WRITER), 's
 await check('a document merely CONTAINING "i18n" is not admin-only',
                                                        setDoc(doc(as(WRITER), 'shared/recipe_i18n_x'), { r: '{}' }), true);
 
+console.log('The language index (v36.64)');
+await check('a writer cannot change the language index', setDoc(doc(as(WRITER), 'shared/i18n_index'), { langs: {} }), false);
+await check('the owner can change the language index',   setDoc(doc(as(OWNER),  'shared/i18n_index'), { langs: { he: { at: 1, count: 1 } } }), true);
+await check('a reader can read the language index',      getDoc(doc(as(READER), 'shared/i18n_index')), true);
+
 console.log('The family backup record (v36.61)');
 await check('a writer can record a backup',           setDoc(doc(as(WRITER), 'shared/backups'), { at: 1, device: 'a computer', auto: true }), true);
 await check('a reader cannot record a backup',        setDoc(doc(as(READER), 'shared/backups'), { at: 2, device: 'an iPhone', auto: false }), false);

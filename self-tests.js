@@ -5941,8 +5941,12 @@ window.SELF_TESTS = [
       try{
         // Tony's case exactly: a recipe saved as a CLIP — name and photo already
         // right, no ingredients, and "Enjoy!" standing in for a method.
-        testId=nextId++;
-        recipes.push(normalizeRecipe({ id:testId, name:'שניצל של סבתא', ingredients:[], steps:['Enjoy!'], isClip:true, photo:'' }));
+        // v36.64 — a fixture id (it used to take a real one from nextId and
+        // never give it back), and a Russian name rather than a Hebrew one, at
+        // Tony's request: still a non-Latin title that must survive, but one
+        // nobody could mistake for a recipe of the family's own.
+        testId=888981;
+        recipes.push(normalizeRecipe({ id:testId, name:'Бабушкин шницель', ingredients:[], steps:['Enjoy!'], isClip:true, photo:'' }));
         openAddModal(testId);
         openFreehandForForm();
         var ov=document.getElementById('freehandOverlay');
@@ -5954,8 +5958,8 @@ window.SELF_TESTS = [
         if(html.indexOf('Fill in what')===-1||html.indexOf('Replace')===-1)
           throw new Error('the preview does not offer both fill and replace');
         applyParsedToForm(parsed,'fill');
-        // The curated Hebrew name must survive; the parser's guess must not win.
-        if(document.getElementById('f-name').value!=='שניצל של סבתא')
+        // The curated name must survive; the parser's guess must not win.
+        if(document.getElementById('f-name').value!=='Бабушкин шницель')
           throw new Error('the existing recipe name was overwritten by the parsed one');
         if(readIngsTable().filter(function(i){return i.n;}).length!==2)
           throw new Error('ingredients were not filled into the form');
@@ -8784,6 +8788,95 @@ window.SELF_TESTS = [
         window.fetch=realFetch;
         try{ if(was===null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, was); }catch(e){}
         try{ renderSyncHealth(); }catch(e){}
+      }
+    } },
+
+  { id:'i18n_languages_menu_badge_update_all', group:'UI', name:'Ready languages, the 🌐 badge, and Update all (v36.64)',
+    test: async()=>{
+      ['i18nUpdateAll','i18nIndexFetch','i18nSupportedLangs','i18nRenderBadge'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // Everything touched is parked: Tony's device has real languages, a real
+      // known-list and real "still missing" lists.
+      var parked={};
+      Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k)) parked[k]=localStorage.getItem(k); });
+      var realDb=window._fbDb, realUser=window._fbUser, realAsk=window.askConfirm, realAI=window.aiCall,
+          realHarvest=window.i18nHarvest, realToast=window.toast, langWas=_i18nLang, dictWas=_i18nDict,
+          cloudWas=_cloudSnapshotForTest(), fetchedWas=_i18nIndexFetched;
+      try{
+        // (1) The badge says which language is on, and the button says it in full.
+        i18nInstall('ru', { Hello:'Привет' });
+        if(document.getElementById('langBadge').textContent!=='RU') throw new Error('the 🌐 badge reads '+document.getElementById('langBadge').textContent+', not RU');
+        if(!/Russian/.test(document.getElementById('langBtn').getAttribute('aria-label'))) throw new Error('the 🌐 button does not name the language');
+        i18nInstall('en', null);
+        if(document.getElementById('langBadge').textContent!=='EN') throw new Error('back in English the badge does not read EN');
+
+        // (2) The menu shows which languages are ready, as a group.
+        Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k)) localStorage.removeItem(k); });
+        i18nNoteKnown('ru');
+        renderLangMenu();
+        var txt=document.getElementById('langMenu').textContent;
+        var iReady=txt.indexOf('Ready'), iRu=txt.indexOf('Русский'), iNot=txt.indexOf('Not translated yet'), iEs=txt.indexOf('Español');
+        if(!(iReady>-1 && iReady<iRu && iRu<iNot && iNot<iEs))
+          throw new Error('the menu does not group ready languages ahead of the rest: '+txt.slice(0,200));
+
+        // (3) The shared index: an admin's first look builds it from what is in
+        // the cloud, and every device learns the languages from it.
+        var cat=i18nFullCatalogue(); if(cat.length<50) throw new Error('catalogue too small to test with');
+        var newWords=cat.slice(-5), ruStrings={}, jaStrings={};
+        cat.forEach(function(k,i){ jaStrings[k]='ja'+i; if(newWords.indexOf(k)===-1) ruStrings[k]='ru'+i; });
+        var db=_fakeFirestore({ i18n_ru:{ strings:ruStrings, updatedAt:1 }, i18n_ja:{ strings:jaStrings, updatedAt:1 } });
+        window._fbDb=db; window._fbUser={ email:APP_OWNER_EMAIL };
+        Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k)) localStorage.removeItem(k); });
+        _i18nIndexFetched=false;
+        await i18nIndexFetch();
+        var idx=db._docs.i18n_index;
+        if(!idx || !idx.probed || !idx.langs.ru || !idx.langs.ja) throw new Error('the index was not built from the cloud: '+JSON.stringify(idx));
+        if(i18nSupportedLangs().join()!=='ru,ja') throw new Error('supported languages read '+i18nSupportedLangs().join());
+
+        // (4) Update all: only the DELTA is translated, per language, and it is
+        // saved and indexed.
+        window.i18nHarvest=async function(){};
+        var asked=null, prompts=[];
+        window.askConfirm=async function(o){ asked=o; return true; };
+        window.toast=function(){};
+        window.aiCall=async function(prompt){
+          prompts.push(prompt);
+          var body=prompt.slice(prompt.indexOf('Strings:\n')+9), out={};
+          body.split('\n').forEach(function(l){ var m=/^(\d+)\. (.*)$/.exec(l); if(m) out[m[1]]='RU:'+m[2]; });
+          return JSON.stringify(out);
+        };
+        var r=await i18nUpdateAll();
+        if(!asked || !/Russian: 5 phrases/.test(asked.message) || !/Japanese: up to date/.test(asked.message))
+          throw new Error('the confirmation does not say per language what is missing: '+(asked&&asked.message));
+        if(prompts.length!==1) throw new Error('made '+prompts.length+' AI calls for five missing phrases in one language');
+        var sentLines=prompts[0].split('Strings:\n')[1].split('\n').filter(function(l){ return /^\d+\. /.test(l); });
+        if(sentLines.length!==5) throw new Error('sent '+sentLines.length+' phrases, not the 5 that were missing — it redid work already paid for');
+        var ruNow=db._docs.i18n_ru.strings;
+        if(newWords.some(function(k){ return !ruNow[k]; })) throw new Error('the new words did not reach the Russian translation');
+        if(Object.keys(ruNow).length!==cat.length) throw new Error('the Russian translation lost entries: '+Object.keys(ruNow).length+' of '+cat.length);
+        if(ruNow[cat[0]]!=='ru0') throw new Error('an existing translation was overwritten');
+        if(db._docs.i18n_ja.updatedAt!==1) throw new Error('Japanese was rewritten though nothing was missing');
+        if(!db._docs.i18n_index.langs.ru || db._docs.i18n_index.langs.ru.count!==cat.length) throw new Error('the index was not updated with the new count');
+        if(!db._docs.i18n_index.langs.ja) throw new Error('updating one language dropped another from the index');
+        // One language per device still holds.
+        if(localStorage.getItem('tonys_i18n_ru')!==null || localStorage.getItem('tonys_i18n_ja')!==null)
+          throw new Error('updating left other languages cached on this device');
+
+        // (5) A member without full access is not offered it and cannot run it.
+        window._fbUser={ email:'someone-else@example.com' };
+        renderLangMenu();
+        if(document.getElementById('i18nUpdateAllBtn')) throw new Error('Update all is offered to a member who cannot write translations');
+        prompts.length=0;
+        await i18nUpdateAll();
+        if(prompts.length) throw new Error('a member without full access ran a paid update');
+      } finally {
+        window._fbDb=realDb; window._fbUser=realUser; window.askConfirm=realAsk; window.aiCall=realAI;
+        window.i18nHarvest=realHarvest; window.toast=realToast; _i18nIndexFetched=fetchedWas;
+        Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k) && !(k in parked)) localStorage.removeItem(k); });
+        Object.keys(parked).forEach(function(k){ localStorage.setItem(k, parked[k]); });
+        i18nInstall(langWas, dictWas);
+        _cloudRestoreForTest(cloudWas);
+        try{ progressClose(); }catch(e){}
+        renderLangMenu();
       }
     } },
 

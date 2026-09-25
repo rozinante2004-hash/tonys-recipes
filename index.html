@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.63 -->
+<!-- Tony's Recipes Collection v36.64 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1505,7 +1505,22 @@ function _fakeFirestore(seed, opts) {
           data: function(){ return docs[id]; }
         });
       },
-      set: function(v){ docs[id] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); },
+      // `{merge: true}` merges nested maps the way Firestore does (v36.64 —
+      // the language index relies on it; a fake that replaced the document
+      // would have let an index that forgets languages pass).
+      set: function(v, o){
+        var nv = JSON.parse(JSON.stringify(v));
+        if (o && o.merge && docs[id] && typeof docs[id] === 'object') {
+          (function deep(into, from) {
+            Object.keys(from).forEach(function(k) {
+              if (from[k] && typeof from[k] === 'object' && !Array.isArray(from[k])
+                  && into[k] && typeof into[k] === 'object' && !Array.isArray(into[k])) deep(into[k], from[k]);
+              else into[k] = from[k];
+            });
+          })(docs[id], nv);
+        } else docs[id] = nv;
+        return Promise.resolve();
+      },
       delete: function(){
         if (opts && opts.denyDelete) {
           var err = new Error('Missing or insufficient permissions.');
@@ -3503,7 +3518,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.63';
+var APP_VERSION = 'v36.64';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -5882,6 +5897,14 @@ body.banner-shown .header {
   flex-shrink: 0;
 }
 .help-icon-btn:hover { background: rgba(255,255,255,0.3); }
+/* v36.64 — which interface language is on, on the globe itself (Tony's ask). */
+.lang-badge {
+  position: absolute; right: -6px; bottom: -5px;
+  min-width: 15px; padding: 1px 3px; border-radius: 6px;
+  background: var(--terracotta-fill); color: #fff; border: 1px solid rgba(255,255,255,0.7);
+  font-size: 8px; font-weight: 700; line-height: 1.15; letter-spacing: 0.2px;
+  font-family: 'DM Sans', 'Heebo', sans-serif; pointer-events: none;
+}
 
 
 /* ── INGREDIENT TABLE ── */
@@ -6200,7 +6223,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.63</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.64</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6212,8 +6235,9 @@ body.banner-shown .header {
            where the app's own settings already live; a globe in the filter bar
            would read as filtering by language. -->
       <div class="drop-group">
-        <button class="help-icon-btn" onclick="toggleLangMenu()" title="Interface language"
-                aria-label="Interface language" data-no-i18n>🌐</button>
+        <button class="help-icon-btn" id="langBtn" onclick="toggleLangMenu()" title="Interface language"
+                aria-label="Interface language: English" data-no-i18n style="position:relative;">🌐<span
+                id="langBadge" class="lang-badge" aria-hidden="true">EN</span></button>
         <div class="drop-menu" id="langMenu" style="min-width:230px;right:0;"></div>
       </div>
       <button class="help-icon-btn" onclick="openHelp()" title="Ask a question about the app">?</button>
@@ -6831,7 +6855,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.63</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.64</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9347,6 +9371,8 @@ var I18N_EXTRA = [
   'on an Android phone', 'on another device', 'No backup has been taken yet',
   // v36.62 — on recipe cards, which the page walk no longer visits (renderGrid)
   'AI this month', 'from this device', 'under $0.01',
+  '✓ Ready — switches instantly', 'Not translated yet — a few minutes, once', '✓ ready', 'original',
+  '🔄 Update all supported languages', 'Every language is up to date', 'up to date',
   'srv', '🍽 {1} srv', 'Add to favourites', 'Remove from favourites', 'Cooked {1} times',
   'on any device',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
@@ -9776,12 +9802,74 @@ async function i18nWriteCloud(lang, doc) {
   try {
     await window._fbDb.collection('shared').doc(i18nDocId(lang)).set(doc);
     syncLog('save', 'Saved the ' + i18nLangName(lang) + ' translation to the cloud', { count: Object.keys(doc.strings).length });
+    await i18nIndexNote(lang, Object.keys(doc.strings).length);
     return 'cloud';
   } catch(e) {
     syncLog('error', 'The ' + lang + ' translation could not be shared', String(e && e.message).slice(0,160));
     return 'refused';
   }
 }
+// ─── WHICH LANGUAGES EXIST (v36.64) ──────────────────────────────────────────
+// Tony asked for the menu to show which languages are already translated. A
+// device only knew the ones it had used itself, so the answer to "is Spanish
+// done?" depended on which phone you asked. `shared/i18n_index` lists every
+// language in the cloud — {langs: {he: {at, count}}} — and is written with each
+// save. It is admin-only in the rules (it matches i18n_*), like the
+// translations it describes; everyone signed in can read it. What it says is
+// folded into this device's known list, so the menu is right offline too.
+var I18N_INDEX_DOC = 'i18n_index';
+var _i18nIndexFetched = false;
+async function i18nIndexNote(lang, count) {
+  if (!window._fbDb || !window._fbUser || !i18nCanEdit() || !lang || lang === 'en') return false;
+  try {
+    var patch = { langs: {} };
+    patch.langs[lang] = { at: Date.now(), count: count || 0 };
+    await window._fbDb.collection('shared').doc(I18N_INDEX_DOC).set(patch, { merge: true });
+    return true;
+  } catch(e) { dlog('[i18n] could not update the language index', e && e.message); return false; }
+}
+// Read once a session. An admin's device also builds the index the first time:
+// every language translated before v36.64 predates it, so it checks each one
+// once (a document that does not exist costs nothing to ask about) and records
+// what it found, with `probed` so no device ever does it again.
+async function i18nIndexFetch(force) {
+  if (!window._fbDb || !window._fbUser) return i18nKnownLangs();
+  if (_i18nIndexFetched && !force) return i18nKnownLangs();
+  _i18nIndexFetched = true;
+  var idx = null;
+  try {
+    var snap = await window._fbDb.collection('shared').doc(I18N_INDEX_DOC).get();
+    if (typeof countCloudRead === 'function') countCloudRead();
+    idx = snap.exists ? (snap.data() || {}) : {};
+  } catch(e) { dlog('[i18n] could not read the language index', e && e.message); return i18nKnownLangs(); }
+  var langs = (idx && idx.langs) || {};
+  if (!idx.probed && i18nCanEdit()) {
+    var found = {};
+    for (var code in I18N_LANGS) {
+      if (langs[code]) continue;
+      try {
+        var d = await window._fbDb.collection('shared').doc(i18nDocId(code)).get();
+        if (typeof countCloudRead === 'function') countCloudRead();
+        if (d.exists && d.data() && d.data().strings)
+          found[code] = { at: d.data().updatedAt || Date.now(), count: Object.keys(d.data().strings).length };
+      } catch(e) {}
+    }
+    Object.keys(found).forEach(function(c){ langs[c] = found[c]; });
+    try { await window._fbDb.collection('shared').doc(I18N_INDEX_DOC).set({ langs: found, probed: true }, { merge: true }); }
+    catch(e) { dlog('[i18n] could not write the language index', e && e.message); }
+  }
+  Object.keys(langs).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
+  return i18nKnownLangs();
+}
+// Every language that is translated, as far as this device can tell.
+function i18nSupportedLangs() {
+  return Object.keys(I18N_LANGS).filter(function(c) {
+    return !!i18nReadCache(c) || i18nKnownLangs().indexOf(c) !== -1;
+  });
+}
+window.i18nIndexFetch = i18nIndexFetch; window.i18nIndexNote = i18nIndexNote;
+window.i18nSupportedLangs = i18nSupportedLangs;
+
 async function i18nLoadDict(lang) {
   if (lang === 'en') return {};
   var cloud = await i18nReadCloud(lang);
@@ -9922,7 +10010,7 @@ window.i18nDurationWords = i18nDurationWords; window.i18nMsPerBatch = i18nMsPerB
 
 // Translate the catalogue. `onProgress(done, total)` so a 10-batch run is not a
 // spinner that looks identical to a hang.
-async function i18nTranslateAll(lang, catalogue, onProgress, into) {
+async function i18nTranslateAll(lang, catalogue, onProgress, into, lanesWanted) {
   var dict = into || {}, failed = 0;
   // v36.35 — batched by LENGTH as well as by count. Sixty strings used to mean
   // sixty short buttons; since the length cap went up one of them can be a
@@ -10020,8 +10108,11 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
       done++;
     }
   }
+  // Several languages at once (i18nUpdateAll) each take ONE lane, so the total
+  // in flight stays at I18N_LANES whatever the number of languages.
+  var nLanes = Math.max(1, Math.min(lanesWanted || I18N_LANES, batches.length));
   var lanes = [];
-  for (var l = 0; l < Math.min(I18N_LANES, batches.length); l++) lanes.push(lane());
+  for (var l = 0; l < nLanes; l++) lanes.push(lane());
   await Promise.all(lanes);
   if (onProgress) onProgress(batches.length, batches.length);
   if (leftover.length) {
@@ -10034,7 +10125,7 @@ async function i18nTranslateAll(lang, catalogue, onProgress, into) {
   // What it really cost, so the next dialog can say so instead of guessing.
   // Stored as the time ONE batch takes, so it means the same whatever the
   // number of lanes — the estimate divides by the lanes itself.
-  i18nNoteBatchTime((Date.now() - _runStarted) * Math.min(I18N_LANES, batches.length), batches.length);
+  i18nNoteBatchTime((Date.now() - _runStarted) * nLanes, batches.length);
   return { dict: dict, failed: failed, batches: batches.length, splits: splits,
            missing: leftover.length, missingList: leftover };
 }
@@ -10126,6 +10217,7 @@ async function i18nSetLanguage(lang) {
 
   if (lang === 'en') {
     _i18nDict = null; _i18nLang = 'en';
+    i18nRenderBadge();
     _i18nMissing = Object.create(null);
     try { localStorage.setItem(I18N_LANG_KEY, 'en'); } catch(e) {}
     i18nRevertAll();
@@ -10150,6 +10242,7 @@ async function i18nSetLanguage(lang) {
     if (!dict) return false;
   }
   _i18nDict = dict; _i18nLang = lang;
+  i18nRenderBadge();
   try { localStorage.setItem(I18N_LANG_KEY, lang); } catch(e) {}
   // What this language was missing last time is still missing now, unless the
   // dictionary that just loaded has since answered it.
@@ -10233,16 +10326,29 @@ function renderLangMenu() {
       // string on every device. Without this they would also each land in the
       // catalogue and be counted as untranslated for ever.
       + '<span data-no-i18n>' + escH(label) + '</span>'
-      + (note ? '<span style="margin-inline-start:auto;font-size:10px;color:var(--muted);">' + escH(note) + '</span>' : '')
+      + (note ? '<span style="margin-inline-start:auto;font-size:10px;font-weight:600;color:'
+                + (note === '✓ ready' ? 'var(--ok-text)' : 'var(--muted)') + ';">' + escH(note) + '</span>' : '')
       + '</button>';
   }
-  h += row('en', 'English', i18nReadCache('en') ? '' : '');
-  Object.keys(I18N_LANGS).forEach(function(code) {
-    // "ready" means somebody has already translated it and everyone gets it for
-    // free. Without this the menu gives no clue which choice costs a wait.
-    var ready = !!i18nReadCache(code) || i18nKnownLangs().indexOf(code) !== -1;
-    h += row(code, I18N_LANGS[code].label + ' — ' + I18N_LANGS[code].en, ready ? 'ready' : '');
+  // v36.64 — in two groups, at Tony's request. "Ready" means somebody has
+  // already translated it and everyone gets it instantly and for free; the
+  // rest cost a few minutes and a little money, once, for the whole family.
+  function head(t) {
+    return '<div style="padding:8px 12px 2px;font-size:10px;font-weight:600;color:var(--muted);">' + escH(t) + '</div>';
+  }
+  var supported = i18nSupportedLangs();
+  var notYet = Object.keys(I18N_LANGS).filter(function(c){ return supported.indexOf(c) === -1; });
+  h += head('✓ Ready — switches instantly');
+  h += row('en', 'English', 'original');
+  supported.forEach(function(code) {
+    h += row(code, I18N_LANGS[code].label + ' — ' + I18N_LANGS[code].en, '✓ ready');
   });
+  if (notYet.length) {
+    h += head('Not translated yet — a few minutes, once');
+    notYet.forEach(function(code) {
+      h += row(code, I18N_LANGS[code].label + ' — ' + I18N_LANGS[code].en, '');
+    });
+  }
   h += '<div style="height:1px;background:var(--border);margin:4px 0;"></div>';
   // v36.32 — how complete the current language actually is, said out loud. A
   // translation that is 96% done looks broken and gives no clue what to do
@@ -10259,6 +10365,11 @@ function renderLangMenu() {
               : '🧩 Check every screen for missing text')
       + '</button>';
   }
+  // v36.64 — Tony's idea: when the app gains new words, bring EVERY
+  // translated language up to date in one go, translating only what each is
+  // missing. Admins only — it writes the shared translations.
+  if (i18nCanEdit() && supported.length)
+    h += '<button class="drop-item" id="i18nUpdateAllBtn" onclick="closeDrop(\'langMenu\');i18nUpdateAll()">🔄 Update all supported languages</button>';
   h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
      + (i18nCanEdit()
         ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');openI18nEditor()">✏️ Edit translations…</button>'
@@ -10320,7 +10431,14 @@ function i18nCanEdit() {
 }
 window.i18nCanEdit = i18nCanEdit;
 
-function toggleLangMenu() { renderLangMenu(); toggleDrop('langMenu'); }
+function toggleLangMenu() {
+  renderLangMenu(); toggleDrop('langMenu');
+  // The index may know about languages this device has never used; redraw
+  // when it answers. Once a session.
+  if (!_i18nIndexFetched && window._fbUser) {
+    i18nIndexFetch().then(function(){ renderLangMenu(); }).catch(function(){});
+  }
+}
 window.toggleLangMenu = toggleLangMenu;
 
 // Generate a language nobody has done yet. Deliberately explicit about the cost
@@ -10389,10 +10507,13 @@ window.i18nGenerate = i18nGenerate;
 // cannot answer: the strings a batch dropped, the ones that only exist inside a
 // dialog Tony has since opened, and anything added to the app since the
 // language was made. Cheap — it translates the gap, not the app.
-function i18nGapList() {
+// v36.64 — for any language, not only the one on screen: `dict` is that
+// language's dictionary and `missing` what it was recorded as lacking.
+function i18nGapList(dict, missing, catalogue) {
+  if (arguments.length === 0) { dict = _i18nDict; missing = i18nMissingList(); }
   var gaps = Object.create(null), selfTest = i18nSelfTestWords();
-  i18nMissingList().forEach(function(s){ gaps[s] = 1; });
-  i18nFullCatalogue().forEach(function(s){ if (!_i18nDict || !_i18nDict[s]) gaps[s] = 1; });
+  (missing || []).forEach(function(s){ gaps[s] = 1; });
+  (catalogue || i18nFullCatalogue()).forEach(function(s){ if (!dict || !dict[s]) gaps[s] = 1; });
   // Belt and braces: nothing is ever SENT that would not be recorded.
   return Object.keys(gaps).filter(function(k){ return i18nKeepable(k) && !selfTest[k]; }).sort();
 }
@@ -10456,6 +10577,111 @@ async function i18nFillGaps(lang) {
 }
 window.i18nFillGaps = i18nFillGaps; window.i18nGapList = i18nGapList;
 
+// ─── UPDATE ALL SUPPORTED LANGUAGES (v36.64) ─────────────────────────────────
+// Tony's idea. Every release adds words — a button, a message, a Sync Health
+// row — and each translated language then shows them in English until someone
+// switches to it and finishes it by hand. This brings every translated language
+// up to date at once, translating ONLY what each one is missing: typically a
+// dozen phrases apiece, one batch each, seconds rather than minutes.
+//
+// One harvest, then one confirmation that says per language how many phrases,
+// how long and (from the Worker's allowance) whether today can cover it. The
+// languages run side by side, ONE lane each, so however many there are the
+// calls in flight stay within the Worker's per-minute limit. Each language is
+// merged into a COPY and saved on its own: one that fails costs only itself.
+function i18nMissingFor(lang) {
+  if (lang === _i18nLang) return i18nMissingList();
+  try { return JSON.parse(localStorage.getItem(i18nMissKey(lang)) || '[]') || []; } catch(e) { return []; }
+}
+async function i18nUpdateAll() {
+  if (!i18nCanEdit()) { toast('Updating the shared translations needs full access.'); return null; }
+  try { await i18nIndexFetch(); } catch(e) {}
+  var langs = i18nSupportedLangs();
+  if (!langs.length) { toast('No language has been translated yet — 🌐 → pick one to start.'); return null; }
+
+  progressOpen({ icon: '🔍', title: 'Checking every screen for new text',
+                 total: I18N_HARVEST.length + langs.length, step: 'Opening each panel in turn…' });
+  var seen = 0;
+  await i18nForgetSelfTestWords();
+  await i18nHarvest(function(name){ progressStep(++seen, name); });
+  var cat = i18nFullCatalogue();
+  var plan = [];
+  for (var i = 0; i < langs.length; i++) {
+    var lang = langs[i];
+    progressStep(++seen, i18nLangName(lang));
+    var dict = (lang === _i18nLang && _i18nDict) ? _i18nDict : await i18nLoadDict(lang);
+    if (!dict) { plan.push({ lang: lang, error: 'could not be downloaded' }); continue; }
+    var gaps = i18nGapList(dict, i18nMissingFor(lang), cat);
+    plan.push({ lang: lang, dict: dict, gaps: gaps, batches: i18nBatchCatalogue(gaps).length });
+  }
+  progressClose();
+  // A device keeps one language (v36.61); the others it just read go again.
+  i18nPruneCaches(_i18nLang === 'en' ? [] : [_i18nLang]);
+
+  var todo = plan.filter(function(p){ return p.gaps && p.gaps.length; });
+  var lines = plan.map(function(p) {
+    return '• ' + i18nLangName(p.lang) + ': ' + (p.error ? p.error
+      : p.gaps.length ? p.gaps.length + ' phrase' + (p.gaps.length === 1 ? '' : 's') : 'up to date');
+  }).join('\n');
+  if (!todo.length) {
+    await askConfirm({ icon: '✓', title: 'Every language is up to date', message: lines,
+                       okLabel: 'Good', cancelLabel: 'Close' });
+    return { updated: [], plan: plan };
+  }
+  var totalBatches = todo.reduce(function(n, p){ return n + p.batches; }, 0);
+  var ok = await askConfirm({
+    icon: '🔄', title: 'Update ' + todo.length + ' language' + (todo.length === 1 ? '' : 's') + '?',
+    message: 'New words have appeared in the app since these were translated. Only those are '
+      + 'translated — nothing already done is redone.\n\n' + lines + '\n\n'
+      + totalBatches + ' batch' + (totalBatches === 1 ? '' : 'es') + ', '
+      + i18nDurationWords(Math.ceil(totalBatches / I18N_LANES) * i18nMsPerBatch()) + '.'
+      + i18nBudgetNote(totalBatches),
+    okLabel: 'Update them' });
+  if (!ok) return null;
+
+  progressOpen({ icon: '🔄', title: 'Updating ' + todo.length + ' language' + (todo.length === 1 ? '' : 's'),
+                 total: totalBatches, step: 'Translating…', onCancel: function(){} });
+  var done = {};
+  function tick() {
+    var n = 0; Object.keys(done).forEach(function(k){ n += done[k]; });
+    progressStep(n, n + ' of ' + totalBatches + ' batches');
+  }
+  var lanesEach = Math.max(1, Math.floor(I18N_LANES / todo.length));
+  var results = await Promise.all(todo.map(async function(p) {
+    try {
+      var merged = {};
+      Object.keys(p.dict).forEach(function(k){ merged[k] = p.dict[k]; });
+      var res = await i18nTranslateAll(p.lang, p.gaps, function(d){ done[p.lang] = d; tick(); }, merged, lanesEach);
+      var filled = p.gaps.filter(function(g){ return !!res.dict[g] && !p.dict[g]; });
+      if (!filled.length) return { lang: p.lang, filled: 0, missing: res.missing };
+      var doc = { lang: p.lang, strings: res.dict, count: Object.keys(res.dict).length, updatedAt: Date.now(),
+                  by: (window._fbUser && window._fbUser.email) || '' };
+      var where = await i18nWriteCloud(p.lang, doc);
+      // What was missing and is now there comes off that language's list.
+      try {
+        var left = i18nMissingFor(p.lang).filter(function(g){ return !res.dict[g]; });
+        localStorage.setItem(i18nMissKey(p.lang), JSON.stringify(left));
+      } catch(e) {}
+      if (p.lang === _i18nLang) { _i18nDict = res.dict; i18nClearMissing(filled); }
+      return { lang: p.lang, filled: filled.length, missing: res.missing, where: where };
+    } catch(e) {
+      syncLog('error', 'Updating the ' + i18nLangName(p.lang) + ' translation failed', String(e && e.message).slice(0, 160));
+      return { lang: p.lang, filled: 0, error: (e && e.message) || String(e) };
+    }
+  }));
+  progressClose();
+  i18nPruneCaches(_i18nLang === 'en' ? [] : [_i18nLang]);
+  if (_i18nLang !== 'en') { i18nApply(document.body); renderGrid(); }
+  renderLangMenu();
+  var summary = results.map(function(r) {
+    return i18nLangName(r.lang) + ' ' + (r.error ? '✗' : '+' + r.filled);
+  }).join(' · ');
+  var shared = results.every(function(r){ return r.error || !r.filled || r.where === 'cloud'; });
+  toast('🔄 ' + summary + (shared ? ' — shared with everyone' : ' — on this device only'), 9000);
+  return { updated: results, plan: plan };
+}
+window.i18nUpdateAll = i18nUpdateAll;
+
 // Install a dictionary directly. This exists for the self-test suite, which has
 // to be able to check that a translated interface still works without a paid AI
 // run and without impersonating Firestore — and, just as important, has to be
@@ -10464,6 +10690,7 @@ function i18nInstall(lang, dict) {
   var was = _i18nDict;
   _i18nDict = dict || null;
   _i18nLang = dict ? lang : 'en';
+  i18nRenderBadge();
   if (dict) i18nLoadMissing(lang); else _i18nMissing = Object.create(null);
   // v36.62 — recipe cards are translated while they are BUILT (renderGrid), and
   // the observer leaves them alone, so a new language has to redraw them.
@@ -10474,6 +10701,18 @@ function i18nInstall(lang, dict) {
   return _i18nLang;
 }
 function i18nCurrentDict() { return _i18nDict; }
+// "HE", "EN", "RU" on the corner of the 🌐, and the button's spoken name says
+// the language in full.
+function i18nRenderBadge() {
+  var code = (_i18nLang || 'en').toUpperCase().slice(0, 2);
+  var b = document.getElementById('langBadge'), btn = document.getElementById('langBtn');
+  if (b && b.textContent !== code) b.textContent = code;
+  if (btn) {
+    var L = I18N_LANGS[_i18nLang];
+    btn.setAttribute('aria-label', 'Interface language: ' + (L ? L.en : 'English'));
+  }
+}
+window.i18nRenderBadge = i18nRenderBadge;
 window.i18nInstall = i18nInstall; window.i18nCurrentDict = i18nCurrentDict;
 window.i18nPlaceholderChild = i18nPlaceholderChild; window.i18nEdges = i18nEdges;
 
@@ -23888,6 +24127,7 @@ window.onHeaderScroll = onHeaderScroll;
     i18nLoadDict(want).then(function(d){
       if (!d) return;                         // never translated here; leave English
       _i18nDict = d; _i18nLang = want;
+      i18nRenderBadge();
       i18nClearMissing(i18nMissingList().filter(function(s){ return !!d[s]; }));
       i18nApply(document.body); i18nApplyDirection();
       i18nPruneCaches([want]);

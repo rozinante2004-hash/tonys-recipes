@@ -132,6 +132,27 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **TONY'S LANGUAGE REQUESTS (v36.64).**
+  - **`shared/i18n_index`** — `{langs: {code: {at, count}}, probed}` — which
+    languages exist in the cloud. Written (merge) by `i18nIndexNote` after every
+    successful `i18nWriteCloud`; admin-only in the rules (matches `i18n_*`).
+    `i18nIndexFetch()` reads it once a session (when the 🌐 menu opens) and
+    folds it into `tonys_i18n_known`; an admin's first read with no `probed`
+    checks each I18N_LANGS document once and records what exists.
+    `i18nSupportedLangs()` = cached ∪ known. The menu groups "✓ Ready" above
+    "Not translated yet".
+  - **The 🌐 carries the language code** (`#langBadge`, `i18nRenderBadge`),
+    called wherever `_i18nLang` changes — add it to any new switch path.
+  - **🔄 Update all supported languages** (`i18nUpdateAll`, admins only): one
+    harvest, then per language `i18nGapList(dict, missing, catalogue)` — only
+    the DELTA — one confirmation listing each language, then every language in
+    parallel with ONE lane each (`i18nTranslateAll(..., lanes)`), so calls in
+    flight stay at I18N_LANES. Each is merged into a copy and saved alone.
+    Caches are pruned back to the one language in use afterwards.
+  - `_fakeFirestore().set(v, {merge:true})` deep-merges like Firestore.
+  - The free-hand import test uses a fixture id and a Russian name
+    ("Бабушкин шницель"), at Tony's request; it took a real id from `nextId`.
+
 - **AUDIT BLOCK 5 (v36.63).** Test hygiene and cost visibility:
   - **`_selfTestPark()` / `_selfTestUnpark(p)`** hold everything the suite puts
     aside: English interface, metric units, sync state, backup record, this
