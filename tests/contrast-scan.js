@@ -331,6 +331,33 @@ const SCAN = `(() => {
     if (!/(^|;)\s*color\s*:\s*var\(--(ink|muted|heading)\)/.test(t)) continue;
     mixed.push(src.slice(0, m.index).split('\n').length + ': ' + t.replace(/\s+/g, ' ').slice(0, 110));
   }
+  // v36.68 — and the STYLESHEET, :hover and :focus included. The Deployments
+  // links' hover was `background:#FFF0E8; color:var(--terracotta)` — 2.3:1 in
+  // dark mode — and nothing looked, because this only read inline styles and
+  // the live scan only sees a hover if the pointer happens to rest there.
+  const styleSrc = [...src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  // A rule the dark theme overrides is fine: `:root[data-theme="dark"] X`
+  // outranks X, :hover and :focus included, so a dark background set there
+  // is what dark mode shows.
+  const rules = [...styleSrc.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ sel: m[1].trim(), t: m[2] }));
+  const plain = x => x.replace(/:(hover|focus|focus-visible|focus-within|active)\b/g, '').replace(/\s+/g, ' ').trim();
+  const darkBg = new Set();
+  rules.forEach(r => {
+    if (!/\[data-theme="dark"\]/.test(r.sel) || !/background/.test(r.t)) return;
+    r.sel.split(',').forEach(piece => {
+      const m = /\[data-theme="dark"\]\s+(.+)$/.exec(piece.trim());
+      if (m) darkBg.add(plain(m[1]));
+    });
+  });
+  rules.forEach(r => {
+    if (/\[data-theme/.test(r.sel)) return;
+    const bg = /background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6}\b|white\b)/.exec(r.t);
+    if (!bg || lumHex(bg[1] === 'white' ? '#ffffff' : bg[1]) < 0.6) return;
+    if (!/(^|;)\s*color\s*:\s*var\(--/.test(r.t)) return;
+    const open = r.sel.split(',').map(x => x.trim()).filter(x => !darkBg.has(plain(x)));
+    if (open.length) mixed.push('CSS ' + open.join(', ').slice(0, 70) + ' { ' + r.t.replace(/\s+/g, ' ').trim().slice(0, 80) + ' }');
+  });
   console.log('\n=== LIGHT LITERAL SURFACE + THEMED TEXT (' + mixed.length + ') ===');
   mixed.forEach(r => console.log('  ' + r));
 

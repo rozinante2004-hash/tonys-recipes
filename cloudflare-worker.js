@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v40
+// Tony's Recipes — Cloudflare Worker v41
+// v41: `download-store` and the `?dl=` GET are gone. They stored ANY data under
+//      ANY filename and served it back from this Worker's address — a free file
+//      host for anyone holding the public app key (proved in tests: it stored
+//      and served `invoice.exe`). GET is a liveness check and nothing else.
 // v40: `photo-fetch` — download an image's BYTES through here instead of
 //      straight from the browser. Applying a chosen photo fetches from whatever
 //      host the photo source returned, and Openverse federates Flickr,
@@ -988,3 +992,5 @@ export default {
     return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h });
   }
 };
+
+// ── END OF WORKER v41 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

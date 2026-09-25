@@ -499,6 +499,28 @@ const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't',
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,
   `got ${noSecret.status} — an unset secret must CLOSE the endpoint, never fall back to a default`);
 
+// v41 — the file said "Worker v40" on line 1 and 'v41' in WORKER_VERSION; Tony
+// spotted it while pasting. The number he sees at the top of the file he
+// pastes must be the number Sync Health then reports.
+{
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../cloudflare-worker.js', import.meta.url), 'utf8');
+  const head = (src.match(/^\/\/ Tony's Recipes — Cloudflare Worker (v\d+)/) || [])[1];
+  const code = (src.match(/const WORKER_VERSION = '(v\d+)'/) || [])[1];
+  const log  = (src.match(/^\/\/ (v\d+):/m) || [])[1];
+  console.log('Version labels');
+  if (head && head === code && log === code) console.log(`  ok   heading, changelog and WORKER_VERSION all say ${code}`);
+  else failures.push(`version labels disagree: heading ${head}, newest changelog entry ${log}, WORKER_VERSION ${code}`);
+  // …and the LAST line says it is the end, with the same number. Tony's first
+  // paste into Cloudflare stopped a sixth of the way in ("Unexpected end of
+  // input at 150:73"); with this line he can see at a glance whether it all
+  // arrived, and the app's copy button refuses a file without it.
+  const last = src.trimEnd().split('\n').pop();
+  const endV = (last.match(/^\/\/ ── END OF WORKER (v\d+) ──/) || [])[1];
+  if (endV === code) console.log(`  ok   the last line marks the end of ${code}`);
+  else failures.push(`the last line is not the end marker for ${code}: ${JSON.stringify(last.slice(0, 60))}`);
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

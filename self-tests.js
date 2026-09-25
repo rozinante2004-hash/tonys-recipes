@@ -1092,6 +1092,49 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'safety_backup_unvouched_stamp', group:'Backup', name:'A "last backup" nothing vouches for is not believed (v36.68)',
+    test: async()=>{
+      // Tony's iPhone said "last backup: 0 days ago, on this device" with no
+      // backup taken for weeks: a stamp left by a pre-v36.61 Self Test run,
+      // silencing the reminder for thirty days.
+      if(typeof backupForgetUnvouched!=='function') throw new Error('backupForgetUnvouched not defined');
+      var bk=_backupRecordForTest(), logWas=null, DAY=86400000;
+      try{ logWas=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      try{
+        var now=Date.now();
+        // (1) Tony's case: a stamp, and nothing written with it.
+        _backupRecordRestoreForTest({}); localStorage.setItem(BACKUP_AT_KEY, String(now-3*3600000));
+        if(backupForgetUnvouched()!=='dropped' || getLastBackupAt()!==null) throw new Error('a stamp nothing vouches for was believed');
+        // (2) A real backup since v36.61: the family record written in the same moment.
+        _backupRecordRestoreForTest({}); localStorage.setItem(BACKUP_AT_KEY, String(now));
+        familyBackupRemember({ at:now+2, device:'an iPhone' });
+        if(backupForgetUnvouched()!=='vouched' || getLastBackupAt()===null) throw new Error('a real backup (family record alongside) was thrown away');
+        // (3) The PC's folder backup: its own "auto" stamp alongside.
+        _backupRecordRestoreForTest({}); localStorage.setItem(BACKUP_AT_KEY, String(now)); localStorage.setItem('tonys_backup_auto_at', String(now));
+        if(backupForgetUnvouched()!=='vouched') throw new Error('a folder backup was thrown away');
+        // (4) A family record OLDER than the stamp does not vouch for it — no
+        // v36.61+ backup can leave its own stamp newer than the family's.
+        _backupRecordRestoreForTest({}); localStorage.setItem(BACKUP_AT_KEY, String(now-DAY));
+        familyBackupRemember({ at:now-10*DAY, device:'a computer' });
+        if(backupForgetUnvouched()!=='dropped') throw new Error('a stamp newer than the family record was believed');
+        if(backupAgeDays()!==10) throw new Error('after dropping it, the family backup (10 days) should answer, got '+backupAgeDays());
+        // (4b) On the PC, the folder backup's own "auto" stamp still counts when
+        // a leaked stamp beside it is dropped — no false "no backup" there.
+        _backupRecordRestoreForTest({}); localStorage.setItem('tonys_backup_auto_at', String(now-2*DAY));
+        localStorage.setItem(BACKUP_AT_KEY, String(now-3600000));
+        if(backupForgetUnvouched()!=='dropped') throw new Error('a leaked stamp beside an older folder backup was believed');
+        if(backupAgeDays()!==2) throw new Error('the folder backup (2 days) should still answer, got '+backupAgeDays());
+        // (5) It runs before the reminder, so a dropped stamp cannot silence it.
+        if(String(checkBackupOverdue).indexOf('backupForgetUnvouched')===-1) throw new Error('the reminder does not check first');
+        // (6) The report says WHEN, not only "0 days ago".
+        _backupRecordRestoreForTest({}); familyBackupRemember({ at:now, device:'a computer' });
+        if(!/last backup: .*\(\d{4}-\d\d-\d\d \d\d:\d\d UTC\)/.test(syncHealthText())) throw new Error('the report does not give the time of the last backup');
+      } finally {
+        _backupRecordRestoreForTest(bk);
+        try{ if(logWas===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',logWas); }catch(e){}
+      }
+    } },
+
   { id:'storage_audit_block3', group:'Storage', name:'One language per device, bounded bins, storage shown (v36.61)',
     test: async()=>{
       // Everything this touches is parked: Tony's device has real languages.
@@ -1581,6 +1624,45 @@ window.SELF_TESTS = [
       // …and the end of the run re-arms it, against the real connection.
       if(String(_selfTestUnpark).indexOf('_cloudSaveHeldForSelfTest')===-1)
         throw new Error('the end of a run does not re-arm a held save');
+    } },
+
+  { id:'deploy_copy_worker_whole', group:'Features', name:'Copy Worker code copies the WHOLE file, or nothing (v36.68)',
+    test: async()=>{
+      // Tony's first paste of Worker v41 stopped a sixth of the way in
+      // ("Unexpected end of input at worker.js:150:73").
+      ['copyWorkerCode','workerCodeCheck'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('copyWorkerBtn')) throw new Error('Deployments has no Copy Worker code button');
+      var whole="// Tony's Recipes — Cloudflare Worker v99\nconst WORKER_VERSION = 'v99';\nexport default {};\n\n// ── END OF WORKER v99 ── If this is the last line…\n";
+      // Cut AFTER the version line, so the only thing wrong with it is the
+      // missing end — a cut before it would be refused for the wrong reason.
+      var cut=whole.slice(0, whole.indexOf('export default')+18);
+      var realFetch=window.fetch, realErr=window.showServiceError, realToast=window.toast;
+      var clipDesc=Object.getOwnPropertyDescriptor(Navigator.prototype,'clipboard'), own=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+      var copied=null, errs=[], serve=whole;
+      async function readItems(items){ var b=await items[0].getType('text/plain'); copied=await b.text(); }
+      try{
+        Object.defineProperty(navigator,'clipboard',{ configurable:true, value:{
+          writeText:async function(t){ copied=t; }, write:async function(items){ await readItems(items); } } });
+        window.fetch=function(u, o){
+          if(String(u).indexOf('cloudflare-worker.js')!==-1) return Promise.resolve(new Response(serve,{status:200}));
+          return realFetch.apply(window, arguments);
+        };
+        window.showServiceError=function(m){ errs.push(String(m)); }; window.toast=function(){};
+        if(!(await copyWorkerCode())) throw new Error('a complete Worker file was not copied: '+errs.join(' | '));
+        if(copied!==whole) throw new Error('what was copied is not the whole file ('+(copied||'').length+' of '+whole.length+' characters)');
+        // A file cut short is refused — nothing goes on the clipboard.
+        copied=null; errs.length=0; serve=cut;
+        if(await copyWorkerCode()) throw new Error('a truncated Worker file was copied');
+        if(copied) throw new Error('a truncated file reached the clipboard');
+        if(!errs.some(function(m){ return /incomplete|not usable/.test(m); })) throw new Error('refusing it did not say why: '+errs.join(' | '));
+        // The real file in the repository passes the same check.
+        var real=await (await realFetch('cloudflare-worker.js',{cache:'no-store'})).text();
+        var c=workerCodeCheck(real);
+        if(!c.ok) throw new Error('the Worker file this site serves fails its own check: '+c.why);
+      } finally {
+        window.fetch=realFetch; window.showServiceError=realErr; window.toast=realToast;
+        if(own) Object.defineProperty(navigator,'clipboard',own); else delete navigator.clipboard;
+      }
     } },
 
   { id:'ui_swipe_fav', group:'UI', name:'Swipe favourites only — never deletes (5c.2)',

@@ -201,6 +201,31 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A "LAST BACKUP" NOBODY TOOK, AND A HALF-PASTED WORKER (v36.68).**
+  - Tony's iPhone said "last backup: 0 days ago, on this device" with no backup
+    for weeks: a stamp left by a pre-v36.61 Self Test run (the folder test ran
+    the real backupSave). It silences the reminder for 30 days.
+    **`backupForgetUnvouched()`** runs before every reminder and in the Backups
+    panel: since v36.61 a real backup always writes the family record in the
+    same moment (never older than the stamp), and a folder backup its own
+    "auto" stamp; a device stamp neither vouches for came from older code and
+    is dropped. Wrong in the safe direction only. `ownBackupAt()` counts the
+    folder backup's "auto" stamp too, so the PC is not falsely nagged. The
+    report gives the exact time of the last backup.
+  - **Worker labels:** line 1 said v40, `WORKER_VERSION` v41 (Tony spotted
+    it). The newest changelog entry, the heading and `WORKER_VERSION` must
+    agree, and the LAST line is `// ── END OF WORKER vNN ──` — worker-cors
+    checks all four. His first paste stopped at 9,159 of 52,896 characters
+    ("Unexpected end of input at 150:73"); the marker makes a short paste
+    visible, and 🚀 Deployments → **📋 Copy Worker code** fetches the file from
+    the site, refuses it without the marker, and copies all of it (Safari:
+    ClipboardItem with a promise, so the write stays inside the tap).
+  - The contrast scan's static check now reads the STYLESHEET (:hover
+    included), allowing for `:root[data-theme="dark"] X` overrides. It found
+    the Deployments links' hover (#FFF0E8 behind themed terracotta, 2.3:1 in
+    dark mode), which the live scan only saw when the pointer happened to
+    rest there.
+
 - **FIVE ISSUES FROM TONY'S IPHONE (v36.67)** — all "gone after a restart":
   - **Cards kept the old language after a switch.** v36.62 put the card redraw
     in `i18nInstall`, but the 🌐 menu, the switch to English and the startup
