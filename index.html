@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.65 -->
+<!-- Tony's Recipes Collection v36.66 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,6 +84,56 @@
     try { window.top.location.replace(window.self.location.href); } catch (e) {}
   })();
 </script>
+<script id="appConfig">
+  // ─── WHERE THIS APP LIVES (v36.66, go-public WP-A.2) ─────────────────────────
+  // Every identifier that ties this file to ONE deployment — Tony's Firebase
+  // project, his Worker, his Cloudflare account, the owner, the repository and
+  // the site — in one place, instead of typed out wherever it was needed (the
+  // Firebase settings were written out twice, and the second copy had lost two
+  // of its six fields). A staging copy, or anyone else's, changes this block
+  // and nothing else. Nothing here is a secret: the Firebase key is restricted
+  // to this site's address and the Worker key is the documented public one.
+  // The one place that cannot read it is the Content-Security-Policy <meta>
+  // above, which the browser reads before any script; a build step (WP-A.1)
+  // is what will fill that in.
+  window.APP_CONFIG = Object.freeze({
+    firebase: Object.freeze({
+      apiKey:            'AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4',
+      authDomain:        'recipes-f379d.firebaseapp.com',
+      projectId:         'recipes-f379d',
+      storageBucket:     'recipes-f379d.firebasestorage.app',
+      messagingSenderId: '313792199018',
+      appId:             '1:313792199018:web:9e5fe1df28b94bb031cd13'
+    }),
+    workerUrl:           'https://lively-bread-273a.rozinante2004.workers.dev',
+    workerAppKey:        'tonys-recipes-web-v1',
+    workerName:          'lively-bread-273a',
+    cloudflareAccountId: '4dbc420100c13bf94fda83047ce0a7ac',
+    ownerEmail:          'rozinante2004@gmail.com',
+    githubRepo:          'rozinante2004-hash/tonys-recipes',
+    siteOrigin:          'https://rozinante2004-hash.github.io',
+    sitePath:            '/tonys-recipes/'
+  });
+  // Links and labels in the page that name the deployment carry
+  // data-cfg-href / data-cfg-text templates such as "{projectId}"; this fills
+  // them in once the page is parsed.
+  window.appConfigValue = function (key) {
+    var c = window.APP_CONFIG;
+    var v = {
+      projectId: c.firebase.projectId, authDomain: c.firebase.authDomain,
+      siteUrl: c.siteOrigin + c.sitePath, siteHost: (c.siteOrigin + c.sitePath).replace(/^https?:\/\//, '').replace(/\/$/, ''),
+      workerName: c.workerName, cloudflareAccountId: c.cloudflareAccountId,
+      githubRepo: c.githubRepo, workerUrl: c.workerUrl, ownerEmail: c.ownerEmail
+    }[key];
+    return v === undefined ? '' : String(v);
+  };
+  window.applyAppConfig = function (root) {
+    var fill = function (t) { return String(t).replace(/\{([A-Za-z]+)\}/g, function (m, k) { return window.appConfigValue(k) || m; }); };
+    (root || document).querySelectorAll('[data-cfg-href]').forEach(function (a) { a.setAttribute('href', fill(a.getAttribute('data-cfg-href'))); });
+    (root || document).querySelectorAll('[data-cfg-text]').forEach(function (e) { e.textContent = fill(e.getAttribute('data-cfg-text')); });
+  };
+  document.addEventListener('DOMContentLoaded', function () { window.applyAppConfig(); });
+</script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <!-- Firebase Compat SDK — single combined file for faster loading -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" onerror="console.error('Failed to load Firebase app SDK')"></script>
@@ -150,7 +200,7 @@
         attempts++;
         if (attempts >= 30) {
           // Still not loaded after 15 seconds — show error
-          console.warn('Firebase SDK not loaded — likely offline. Sign-in will load it dynamically.');
+          console.warn('Firebase SDK not loaded — likely offline. Sign in reloads the page to fetch it.');
           // Don't show the error permanently — user can still tap Sign In to retry
           return;
         }
@@ -163,16 +213,9 @@
     // Set at parse time, not inside initFirebase(): when the Firebase scripts
     // do not load, initFirebase() never runs, and that is precisely the moment
     // somebody needs to know whether the key is the thing being blocked.
-    window._fbConfigApiKey = "AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4";
+    window._fbConfigApiKey = window.APP_CONFIG.firebase.apiKey;
     function initFirebase() {
-      var firebaseConfig = {
-        apiKey:            window._fbConfigApiKey,
-        authDomain:        "recipes-f379d.firebaseapp.com",
-        projectId:         "recipes-f379d",
-        storageBucket:     "recipes-f379d.firebasestorage.app",
-        messagingSenderId: "313792199018",
-        appId:             "1:313792199018:web:9e5fe1df28b94bb031cd13"
-      };
+      var firebaseConfig = Object.assign({}, window.APP_CONFIG.firebase);
 
       firebase.initializeApp(firebaseConfig);
       _fbAuth     = firebase.auth();
@@ -1375,28 +1418,6 @@ function copyBookmarklet() {
 window.copyBookmarklet = copyBookmarklet;
 
 
-// ─── TRANSLATE FUNCTIONS ──────────────────────────────────────────────────────
-
-async function applyTranslation(id, btn) {
-  var r = recipes.find(function(x){ return x.id===id; });
-  if (!r) return;
-  try {
-    var parsed = JSON.parse(btn.getAttribute('data-parsed').replace(/&#39;/g,"'"));
-    if (parsed.name) r.name = parsed.name;
-    if (parsed.ingredients) r.ingredients = parsed.ingredients;
-    if (parsed.steps) r.steps = parsed.steps;
-    if (parsed.notes !== undefined) r.notes = parsed.notes;
-    r.updatedAt = Date.now();
-    saveData();
-    closeM('translateOverlay');
-    drawView(id);
-    toast('✅ Translation applied!');
-  } catch(e) { toast('❌ ' + e.message); }
-}
-
-// setLang, runTranslate, applyTranslation defined in main script
-
-
 // ─── SHARE TARGET (iOS Shortcut) ─────────────────────────────────────────────
 // Find the first real http(s) link across every field a share might carry.
 // Different apps put the link in url / text / title (or none at all), so we scan
@@ -1654,8 +1675,8 @@ window._cloudFingerprintForTest = _cloudFingerprintForTest;
 // Be honest about what the key is worth: it SHIPS IN THIS FILE, so it is not a
 // secret and does not stop anyone who reads the source. It stops drive-by
 // scripted abuse. The rate limit is the control that actually bounds the damage.
-var WORKER_ENDPOINT = 'https://lively-bread-273a.rozinante2004.workers.dev';
-var WORKER_APP_KEY  = 'tonys-recipes-web-v1';
+var WORKER_ENDPOINT = APP_CONFIG.workerUrl;       // see #appConfig
+var WORKER_APP_KEY  = APP_CONFIG.workerAppKey;
 // The key travels in the BODY, not a header. A custom request header forces a
 // CORS preflight, and the deployed Worker answers OPTIONS with
 // `Access-Control-Allow-Headers: Content-Type` — so adding `X-App-Key` in v31.1
@@ -2212,7 +2233,7 @@ var SELF_TEST_FIXES = {
   modal_bring:    { fix:'openBringModal not defined or bringOverlay missing.', autofix: null },
   modal_help:     { fix:'openHelp not defined or helpOverlay missing.', autofix: null },
   modal_explore:  { fix:'openExploreModal not defined or exploreOverlay missing.', autofix: null },
-  net_worker:     { fix:'Cloudflare Worker is unreachable. Check https://lively-bread-273a.rozinante2004.workers.dev is deployed and running. Visit the Cloudflare dashboard.', autofix: null },
+  net_worker:     { fix:'Cloudflare Worker is unreachable. Check ' + APP_CONFIG.workerUrl + ' is deployed and running. Visit the Cloudflare dashboard.', autofix: null },
   net_ai:         { fix:'AI call failed. Check the Cloudflare Worker has ANTHROPIC_API_KEY set as a secret, and the Worker is not rate-limited.', autofix: null },
   net_url_import: { fix:'URL fetch via Worker failed. Check Worker fetch-url action is implemented and allrecipes.com is accessible.', autofix: null },
   net_photo:      { fix:'Photo search failed. Check Worker photo-search action is implemented and PIXABAY_API_KEY is set.', autofix: null },
@@ -3518,7 +3539,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.65';
+var APP_VERSION = 'v36.66';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -3615,46 +3636,6 @@ function checkAppVersion() {
 window.checkAppVersion = checkAppVersion;
 
 
-
-// ─── NATIVE FILE PICKER (File System Access API) ─────────────────────────────
-// Uses showOpenFilePicker which bypasses Chrome's file input sandbox on Linux
-async function importViaFilePicker() {
-  if(!window.showOpenFilePicker) {
-    toast('⚠️ Native file picker not supported in this browser. Try Firefox instead.');
-    return;
-  }
-  try {
-    var handles = await window.showOpenFilePicker({
-      types: [
-        { description: 'Recipe files', accept: {
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-          'application/msword': ['.doc'],
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-          'application/pdf': ['.pdf'],
-          'text/html': ['.html', '.htm'],
-          'text/plain': ['.txt'],
-        }}
-      ],
-      multiple: false
-    });
-    if(!handles || !handles.length) return;
-    var fileHandle = handles[0];
-    toast('📂 Getting file via native picker…');
-    var file = await fileHandle.getFile();
-    dlog('[picker] file:', file.name, 'size:', file.size, 'type:', file.type);
-    if(file.size === 0) {
-      showImportError('File still reports 0 bytes via native picker.\n\nPlease try:\n1. Open the file in LibreOffice\n2. File → Save As → Word 2007-365 (.docx)\n3. Import the new .docx file\n\nOr copy the recipe text and use ✍️ Free-hand text import.');
-      return;
-    }
-    // Reuse importFromFile with synthetic event
-    await importFromFile({ target: { files: [file], value: '' } });
-  } catch(err) {
-    if(err.name === 'AbortError') return; // user cancelled
-    toast('❌ File picker error: ' + err.message);
-    console.error('[picker]', err);
-  }
-}
-window.importViaFilePicker = importViaFilePicker;
 
 // ─── FILE DROP ZONE ───────────────────────────────────────────────────────────
 function openDropZone() {
@@ -3924,23 +3905,6 @@ function showEmailModal(id) {
 window.showEmailModal = showEmailModal;
 
 
-function showGmailPasteHint() {
-  var existing = document.getElementById('gmailPasteHint');
-  if(existing) existing.remove();
-  var div = document.createElement('div');
-  div.id = 'gmailPasteHint';
-  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;background:#1C1A18;color:white;border-radius:12px;padding:16px 20px;max-width:340px;width:calc(100vw - 32px);box-shadow:0 8px 32px rgba(0,0,0,0.4);font-family:DM Sans,Heebo,sans-serif;';
-  div.innerHTML =
-    '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">📋 HTML email copied!</div>' +
-    '<div style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.6;">In Gmail compose:<br>' +
-    '<strong style="color:#D4A843;">Ctrl+Shift+V</strong> to paste with full formatting<br>' +
-    '<span style="font-size:11px;opacity:0.6;">(Ctrl+V pastes plain text only)</span></div>' +
-    '<button onclick="var el=document.getElementById(\'gmailPasteHint\');if(el)el.remove();" ' +
-    'style="margin-top:10px;width:100%;padding:8px;background:#C1440E;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">Got it</button>';
-  document.body.appendChild(div);
-  setTimeout(function(){ if(div.parentNode) div.remove(); }, 12000);
-}
-window.showGmailPasteHint = showGmailPasteHint;
 
 
 
@@ -6241,7 +6205,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.65</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.66</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6873,7 +6837,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.65</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.66</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7678,7 +7642,6 @@ window.resetFilters      = resetFilters;
 window.toggleFavFilter   = toggleFavFilter;
 window.toggleCatFilter   = toggleCatFilter;
 window.toggleDietFilter  = toggleDietFilter;
-function setCat(c){ if(c==='All') resetFilters(); else if(c==='Favourites') { showFavOnly=true; renderFilters(); renderGrid(); } }
 
 let viewMode = 'list';
 
@@ -10404,7 +10367,7 @@ window.renderLangMenu = renderLangMenu;
 // operator tools — Payments, Deployments — are the owner's alone; the
 // translation editor is the owner's and admins'. WP-A moves the address itself
 // into configuration.
-var APP_OWNER_EMAIL = 'rozinante2004@gmail.com';
+var APP_OWNER_EMAIL = APP_CONFIG.ownerEmail;      // see #appConfig
 function isAppOwner() {
   try { return !!(window._fbUser && window._fbUser.email
                   && String(window._fbUser.email).toLowerCase() === APP_OWNER_EMAIL); }
@@ -13157,7 +13120,6 @@ async function compressPhotoToDataUrl(file, recipeId) {
     rd.readAsDataURL(file);
   });
 }
-function resizePhotoToDataUrl(file) { return compressPhotoToDataUrl(file, 'tmp'); }
 
 
 function heroPhotoChanged(event){
@@ -13393,12 +13355,6 @@ function rText(r){
 // and difficulty when it inherits them from its collection: partAsRecipe
 // settles `part.category || coll.category` before any of this runs, so the
 // shared text carries real values rather than blanks.
-function doEmail(id){
-  var r=findRecipeRef(id);
-  if(!r) return;
-  // Always show the email modal — it has Gmail compose + copy options
-  showEmailModal(id);
-}
 function doWhatsApp(id){
   var r=findRecipeRef(id);
   if(!r){ toast('That recipe is no longer here'); return; }
@@ -14130,67 +14086,6 @@ function showImportError(msg, salvage) {
 }
 window.showImportError = showImportError;
 
-function parseWordText(text){
-  // Split on recipe headings: lines that contain an emoji followed by a name (our export format)
-  // Look for blocks separated by page-break markers or heading patterns
-  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  let count=0;
-  // Find lines that look like "🍝 Recipe Name" (our heading format)
-  const emojiRe=/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]\s+.+/u;
-  const headingIdxs=[];
-  lines.forEach((l,i)=>{if(emojiRe.test(l))headingIdxs.push(i);});
-
-  headingIdxs.forEach((startIdx,hi)=>{
-    const endIdx=hi+1<headingIdxs.length?headingIdxs[hi+1]:lines.length;
-    const block=lines.slice(startIdx,endIdx);
-    try{
-      // Line 0: emoji + name
-      const nameRaw=block[0].replace(/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]\s*/u,'').trim();
-      if(!nameRaw)return;
-      if(recipes.find(r=>r.name.toLowerCase()===nameRaw.toLowerCase()))return;
-      // Line 1: meta line
-      let cat='Dinner',diff='Medium',prep='',srv='';
-      const metaLine=block.find(l=>l.includes('Category:'))||'';
-      const catM=metaLine.match(/Category:\s*([^|]+)/i);if(catM)cat=catM[1].trim();
-      const diffM=metaLine.match(/Difficulty:\s*([^|]+)/i);if(diffM)diff=diffM[1].trim();
-      const prepM=metaLine.match(/Prep:\s*([^|]+)/i);if(prepM)prep=prepM[1].trim();
-      const srvM=metaLine.match(/Servings:\s*([^|]+)/i);if(srvM)srv=srvM[1].trim();
-      // Ingredients section
-      const ingStart=block.findIndex(l=>/^ingredients$/i.test(l));
-      const methStart=block.findIndex(l=>/^method$/i.test(l));
-      let ings=[];
-      if(ingStart>=0){
-        const ingEnd=methStart>ingStart?methStart:block.length;
-        for(let i=ingStart+1;i<ingEnd;i++){
-          const l=block[i];
-          if(!l||/^(method|ingredients)$/i.test(l))continue;
-          // "amount  name" — bold amount followed by name
-          const m=l.match(/^(.+?)\s{2,}(.+)$/);
-          if(m)ings.push({a:m[1].trim(),n:m[2].trim()});
-          else ings.push({a:'',n:l});
-        }
-      }
-      let steps=[];
-      if(methStart>=0){
-        for(let i=methStart+1;i<block.length;i++){
-          const l=block[i];
-          if(!l)continue;
-          const m=l.match(/^\d+\.\s+(.+)/);
-          if(m)steps.push(m[1].trim());
-          else if(!/^(method|ingredients)$/i.test(l))steps.push(l);
-        }
-      }
-      recipes.unshift({id: nextId++, uid: newUid(),name:nameRaw,emoji:rndEmoji(),photo:'',
-        category:CATS.includes(cat)?cat:'Dinner',
-        difficulty:['Easy','Medium','Hard'].includes(diff)?diff:'Medium',
-        prep,servings:srv,bg:rndBg(),fav:false,
-        ingredients:ings.length?ings:[{a:'',n:'See notes'}],
-        steps:steps.length?steps:['See notes']});
-      count++;
-    }catch{}
-  });
-  return count;
-}
 
 // ═══════════════════════════════════
 // ADD / EDIT MODAL
@@ -15264,13 +15159,6 @@ function closeDrop(id){
   m.style.top='-999px'; m.style.left='-999px';
   _disarmDropOutside();
 }
-function closeAllDrops(){
-  _disarmDropOutside();
-  document.querySelectorAll('.drop-menu.open').forEach(function(m){
-    m.classList.remove('open'); m.style.top='-999px'; m.style.left='-999px';
-  });
-}
-window.closeAllDrops = closeAllDrops;
 
 // ═══════════════════════════════════
 // MODAL / UTILS
@@ -18578,11 +18466,11 @@ function handleFirestoreSaveError(err) {
   if (code === 'permission-denied' || msg.toLowerCase().indexOf('permission') > -1) {
     showServiceError('PERMISSION: The cloud write was denied by your Firestore security rules.\n\n'
       + 'Make sure your account is allowed to write to the shared collection:\n'
-      + 'https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules');
+      + 'https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/firestore/databases/-default-/security/rules');
     return;
   }
   if (msg.indexOf('quota') > -1 || code === 'resource-exhausted' || msg.indexOf('RESOURCE_EXHAUSTED') > -1) {
-    showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data\n\nUpgrade at: https://console.firebase.google.com/u/0/project/recipes-f379d/overview');
+    showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/firestore/databases/-default-/data\n\nUpgrade at: https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/overview');
     return;
   }
   if (code === 'unavailable' || !navigator.onLine) {
@@ -18970,56 +18858,6 @@ document.addEventListener('visibilitychange', function() {
 });
 
 
-// Dynamically load Firebase if it wasn't available on startup (e.g. opened offline)
-function loadFirebaseDynamically() {
-  return new Promise(function(resolve, reject) {
-    var scripts = [
-      'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
-      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
-      'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
-    ];
-
-    function loadScript(src) {
-      return new Promise(function(res, rej) {
-        // Skip if already loaded
-        if (document.querySelector('script[src="' + src + '"]')) { res(); return; }
-        var s = document.createElement('script');
-        s.src = src;
-        s.onload = res;
-        s.onerror = function() { rej(new Error('Failed to load ' + src)); };
-        document.head.appendChild(s);
-      });
-    }
-
-    // Load scripts sequentially then re-init Firebase
-    loadScript(scripts[0])
-      .then(function() { return loadScript(scripts[1]); })
-      .then(function() { return loadScript(scripts[2]); })
-      .then(function() {
-        // Re-initialise Firebase
-        if (typeof firebase !== 'undefined' && !_fbAuth) {
-          try {
-            var app = firebase.apps.length
-              ? firebase.apps[0]
-              : firebase.initializeApp({
-                  apiKey: 'AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4',
-                  authDomain: 'recipes-f379d.firebaseapp.com',
-                  projectId: 'recipes-f379d'
-                });
-            _fbAuth = firebase.auth(app);
-            _fbProvider = new firebase.auth.GoogleAuthProvider();
-            _fbDb = firebase.firestore(app);
-            dlog('[Firebase] Dynamically loaded and initialised');
-          } catch(e) {
-            console.warn('[Firebase] Re-init error:', e);
-          }
-        }
-        resolve();
-      })
-      .catch(reject);
-  });
-}
-
 async function startGoogleSignIn() {
   var btn = document.getElementById('googleSignInBtn');
   var errDiv = document.getElementById('loginError');
@@ -19237,9 +19075,9 @@ async function diagnoseSignIn() {
   var advice = '';
   if (/BLOCKED for this website/.test(key)) {
     advice = 'Open <b>console.cloud.google.com/apis/credentials</b>, pick the browser key for '
-      + 'project <b>recipes-f379d</b>, and under <b>Website restrictions</b> make sure BOTH of these '
+      + 'project <b>' + escH(APP_CONFIG.firebase.projectId) + '</b>, and under <b>Website restrictions</b> make sure BOTH of these '
       + 'are listed:<br>• <code>' + escH(location.host) + '/*</code><br>'
-      + '• <code>recipes-f379d.firebaseapp.com/*</code><br>'
+      + '• <code>' + escH(APP_CONFIG.firebase.authDomain) + '/*</code><br>'
       + 'The second one is the easy one to miss: the sign-in popup runs on that domain, not this one. '
       + 'Changes can take a few minutes to take effect.';
   } else if (typeof firebase === 'undefined') {
@@ -20236,7 +20074,7 @@ var HELP_SYSTEM_PROMPT = [
   "Answer questions clearly, practically, and in the same language the user writes in (Hebrew or English).",
   "",
   "=== APP OVERVIEW ===",
-  "Tony's Recipes Collection is a single-page web app hosted at https://rozinante2004-hash.github.io/tonys-recipes/",
+  "Tony's Recipes Collection is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
   "It stores recipes in Firebase Firestore (cloud) and localStorage (offline). All AI features route through a Cloudflare Worker.",
   "",
   "=== BROWSING & FILTERING ===",
@@ -20534,7 +20372,7 @@ async function updateBringToken(token) {
 }
 
 window.addEventListener('message',function(event){
-  var allowed=['https://rozinante2004-hash.github.io','https://web.getbring.com'];
+  var allowed=[APP_CONFIG.siteOrigin,'https://web.getbring.com'];
   if(!allowed.includes(event.origin)) return; if(!event.data||!event.data.bringToken) return;
   clearTimeout(window._bringRelayTimeout); clearInterval(_bringTokenCheckInterval);
   if(_bringPopup&&!_bringPopup.closed) _bringPopup.close();
@@ -20549,7 +20387,7 @@ function openBringAutoRefresh() {
   // Open as a normal TAB, not a sized popup: a popup window has no bookmarks
   // bar, so the 🛒 bookmarklet is unclickable there — which is exactly the
   // dead end this flow used to lead into.
-  _bringPopup=window.open('https://rozinante2004-hash.github.io/tonys-recipes/bring-relay.html','_blank');
+  _bringPopup=window.open(APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + 'bring-relay.html','_blank');
   if(!_bringPopup){ toast('Popup blocked. Use the bookmarklet instead.'); showBringBookmarklet(); return; }
   var timeout=setTimeout(function(){ if(_bringPopup&&!_bringPopup.closed) _bringPopup.close(); toast('Auto-capture timed out. Use the bookmarklet.'); showBringBookmarklet(); },120000);
   window._bringRelayTimeout=timeout;
@@ -20751,7 +20589,7 @@ async function sendItemsToBring(items) {
 
 var WA_BASE_KEY   = 'tonys_wa_base';
 var WA_INDEX_KEY  = 'tonys_wa_index';
-var WA_DEFAULT_BASE = 'https://rozinante2004-hash.github.io/tonys-recipes/whatsapp/';
+var WA_DEFAULT_BASE = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + 'whatsapp/';
 var _waRemoteCache = {};   // file -> parsed messages, per session
 
 function getWaBase(){
@@ -24513,7 +24351,7 @@ window.onHeaderScroll = onHeaderScroll;
             <span style="color:var(--muted);font-size:12px;">Quota resets daily</span>
           </div>
         </div>
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" rel="noopener noreferrer" class="payment-link">Dashboard ↗</a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers" target="_blank" rel="noopener noreferrer" class="payment-link">Dashboard ↗</a>
       </div>
 
       <!-- Firebase -->
@@ -24528,7 +24366,7 @@ window.onHeaderScroll = onHeaderScroll;
             <span style="color:var(--muted);font-size:12px;">1 GB storage, 50K reads/day free</span>
           </div>
         </div>
-        <a href="https://console.firebase.google.com/project/recipes-f379d" target="_blank" rel="noopener noreferrer" class="payment-link">Console ↗</a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/project/{projectId}" target="_blank" rel="noopener noreferrer" class="payment-link">Console ↗</a>
       </div>
 
       <!-- GitHub -->
@@ -24536,12 +24374,12 @@ window.onHeaderScroll = onHeaderScroll;
         <div class="payment-icon" style="background:#F5E8FF;">🐙</div>
         <div class="payment-body">
           <div class="payment-name">GitHub Pages <span class="payment-badge free">Free</span></div>
-          <div class="payment-desc">Hosts the app at rozinante2004-hash.github.io/tonys-recipes — unlimited bandwidth for public repos.</div>
+          <div class="payment-desc">Hosts the app at <span data-no-i18n data-cfg-text="{siteHost}"></span> — unlimited bandwidth for public repos.</div>
           <div class="payment-meta">
             <span class="payment-cost free">$0 / month</span>
           </div>
         </div>
-        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" rel="noopener noreferrer" class="payment-link">Repo ↗</a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}" target="_blank" rel="noopener noreferrer" class="payment-link">Repo ↗</a>
       </div>
 
       <!-- Pixabay -->
@@ -24651,9 +24489,9 @@ window.onHeaderScroll = onHeaderScroll;
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Hosts the app — the <code>index.html</code> file lives here and is served to users via GitHub Pages</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://github.com/rozinante2004-hash/tonys-recipes/upload/main" target="_blank" rel="noopener noreferrer" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
-        <a href="https://github.com/rozinante2004-hash/tonys-recipes" target="_blank" rel="noopener noreferrer" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
-        <a href="https://rozinante2004-hash.github.io/tonys-recipes/" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/upload/main" target="_blank" rel="noopener noreferrer" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}" target="_blank" rel="noopener noreferrer" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
+        <a href="#" data-cfg-href="{siteUrl}" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -24664,9 +24502,9 @@ window.onHeaderScroll = onHeaderScroll;
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Secure API proxy — routes all AI calls, photo search, URL imports, Bring! and YouTube through a server so API keys stay private</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/edit/lively-bread-273a/production" target="_blank" rel="noopener noreferrer" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint">lively-bread-273a</span></a>
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers/services/view/lively-bread-273a/production/settings" target="_blank" rel="noopener noreferrer" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
-        <a href="https://dash.cloudflare.com/4dbc420100c13bf94fda83047ce0a7ac/workers" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/edit/{workerName}/production" target="_blank" rel="noopener noreferrer" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint" data-no-i18n data-cfg-text="{workerName}"></span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/view/{workerName}/production/settings" target="_blank" rel="noopener noreferrer" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -24690,8 +24528,8 @@ window.onHeaderScroll = onHeaderScroll;
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Cloud database & authentication — stores your recipes in the cloud so they sync across all devices, and handles Google sign-in</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/data" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Firestore database <span class="deploy-hint">recipes-f379d</span></a>
-        <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/firestore/databases/-default-/data" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Firestore database <span class="deploy-hint" data-no-i18n data-cfg-text="{projectId}"></span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -24812,7 +24650,7 @@ window.onHeaderScroll = onHeaderScroll;
       <!-- How it works note -->
       <div style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
         <div style="font-size:12px;color:#2255AA;line-height:1.6;">
-          <strong>How it works:</strong> Family members sign in with their own Google account at the same URL: <strong>rozinante2004-hash.github.io/tonys-recipes/</strong><br><br>
+          <strong>How it works:</strong> Family members sign in with their own Google account at the same URL: <strong data-no-i18n data-cfg-text="{siteHost}"></strong><br><br>
         All accounts read and write to the <strong>same shared recipe collection</strong> — changes sync in real-time across everyone's devices, just like your PC↔iPhone sync today.<br><br>
         After adding members below, tap <strong>"🔧 Show Firestore security rules"</strong>, copy the rules, and paste them into Firebase Console to activate access. <strong>Nothing takes effect until you do</strong> — the member list here is only half of it.
         </div>
@@ -24827,7 +24665,7 @@ window.onHeaderScroll = onHeaderScroll;
       <div style="margin-top:14px;">
         <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans','Heebo',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:10px;">
-          <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="https://console.firebase.google.com/u/0/project/recipes-f379d/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>
+          <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>
           <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
           <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy Rules</button>
         </div>

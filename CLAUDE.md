@@ -3,6 +3,75 @@
 Read this before changing anything. It records decisions that are easy to
 accidentally undo, and conventions that keep the app deliverable.
 
+## Index (v36.66)
+
+The file is long on purpose — each entry under *Traps* is a mistake that was
+made once. Entries are bullets, roughly newest first, so **search for the bold title**
+below (Ctrl+F) rather than scrolling. Sections: *What this is* · *How to verify
+work* · *Conventions* · *Decisions that must not be silently reverted* ·
+*Traps this codebase has already sprung* · *Outstanding*.
+
+- **Standing rules (read first):** "Nothing secret may live in `index.html`" ·
+  "The Family Access list is not the permission" · the employer-managed iPhone
+  (in *What this is*: never proxy GitHub through the Worker) · "NEVER send a
+  custom request header to the Worker" · "The Worker is not free to call".
+- **Configuration:** "AUDIT BLOCK 1" (owner-only tools, `isAppOwner`) ·
+  `#appConfig` in index.html (v36.66, below) — every deployment identifier.
+- **Security & CSP:** "AUDIT BLOCK 1" · "This CSP has now caused four separate
+  outages" · "The CSP must stay in step with the CONNECT hosts too" · "…with the
+  script hosts" · "Firebase Auth needs its own authDomain in the CSP" ·
+  "`rHtml` output is rendered in an iframe on this origin" · "Escape before
+  highlighting/interpolating, never after" · "A relay never sees a URL without
+  the user's consent".
+- **Cloud sync (Firestore):** "The 5.4 concurrency base must be PERSISTED" ·
+  "The change stamp must describe the recipe you KEEP" · "An open edit form is a
+  snapshot" · "A cloud document that will not parse must still yield a base" ·
+  "`id` is a PER-DEVICE counter" · "Firestore documents have a 1 MiB limit" ·
+  "A KEY BECOMES A FIRESTORE FIELD NAME" · *Outstanding* → 5.4.
+- **Backups & restore:** "A backup folder is a HANDLE, not a path" · "Restore
+  has two modes" · "Restore is the most destructive action in the app" · "The
+  bulk, structural operations have Undo now" · "AUDIT BLOCK 3" (the family
+  backup record, `shared/backups`).
+- **Storage on the device:** "AUDIT BLOCK 3" (one language per device, the AI
+  cache in IndexedDB, bins, "Device storage used") · "`localStorage` is
+  per-device".
+- **Testing & CI:** "A SELF TEST NEVER TOUCHES A REAL RECIPE OR THE REAL CLOUD" ·
+  "A TEST MUST LEAVE THE SYNC STATE AS IT FOUND IT" · "AUDIT BLOCK 5"
+  (`_selfTestPark`, `--lang he`) · "THE SUITE RUNS AGAIN AS TONY'S PHONE IS SET
+  UP" · "…AND AS HIS PC IS" · "A TEST THAT CANNOT FAIL IS NOT A TEST" · "Mutate
+  on purpose to FIND gaps" · "A top-level `let`/`const` is NOT a window
+  property" · "The self-test suite is a SEPARATE FILE" · "The self-test suite
+  runs in ENGLISH" · "A test that passes in CI and fails on Tony's devices is
+  usually the test".
+- **Interface translation (i18n):** "The interface can be translated; the
+  RECIPES never are" · "Getting ALL of it translated is a separate problem" ·
+  "HARVEST BEFORE YOU CATALOGUE" · "A NUMBER IS NEVER PART OF A KEY" · "THE
+  REPLY IS KEYED BY POSITION" · "A TRANSLATION THAT MOVES THE LINKS FROZE THE
+  APP" · the orphan entries ("AN ORPHAN IS …") · "AUDIT BLOCK 4" (cards
+  translated at build time, three lanes) · "TONY'S LANGUAGE REQUESTS"
+  (`i18n_index`, badge, Update all).
+- **Right-to-left & accessibility:** "RTL is layout as well as text" ·
+  "`direction: auto` is not valid CSS" · "A Hebrew recipe's LABELS read right
+  too" · "AUDIT BLOCK 2" (bidi isolates) · "AUDIT BLOCK 6" (cards, dialogs,
+  axe) · "A focus ring needs `:focus:not(:focus-visible)`" · "Making something
+  focusable is half a keyboard path".
+- **Theme & contrast:** "A TINTED SURFACE AND ITS TEXT ARE A PAIR" ·
+  "`--warm-brown` is both a surface and heading text".
+- **The Worker (Cloudflare):** "CORS is applied CENTRALLY" · "The Worker meters
+  the bill" · "A photo's bytes go through the Worker, and ONLY the Worker" ·
+  "The Worker's live version is on screen" · "AUDIT BLOCK 5" (AI cost).
+- **Photos:** "`_ph` / `_po` are the ONLY record that a photo exists somewhere
+  else" · "\"Missing\" is not `!r.photo`" · "One failing photo source must not
+  end the search" · "Openverse is Creative Commons".
+- **WhatsApp & Bring!:** "`whatsapp/` is scanned by the app" · "A chat listed
+  twice is fed to the AI twice" · "The Bring! bookmarklet runs on
+  web.getbring.com" · *Outstanding* → classifier long tail.
+- **Collections:** "Collections: several recipes in one record" · "A part is a
+  recipe, and keeps what a recipe keeps" · "Gathering recipes into a
+  collection".
+- **Releasing:** "Bumping the version is a targeted edit" · "The version badge
+  must show what is RUNNING" · "\"Update Now\" must clear the caches".
+
 ## What this is
 
 A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
@@ -10,7 +79,7 @@ A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
-- **`index.html` is the whole app** — inline `<style>`, inline JS, ~24 350 lines,
+- **`index.html` is the whole app** — inline `<style>`, inline JS, ~24 750 lines,
   no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
@@ -131,6 +200,30 @@ found only because a test was written first and disagreed with the code.
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 
 ## Traps this codebase has already sprung
+
+- **WP-A, THE NON-ARCHITECTURAL PART (v36.66).**
+  - **`#appConfig`** — a `<script>` right after the frame guard — holds
+    `window.APP_CONFIG` (frozen): the Firebase settings (ONE copy; the offline
+    re-initialisation had its own, missing two of six fields), Worker URL and
+    app key, Worker name, Cloudflare account, owner e-mail, GitHub repo, site
+    origin and path. `WORKER_ENDPOINT`, `APP_OWNER_EMAIL` etc. are read from it.
+    Links and labels that name the deployment use `data-cfg-href` /
+    `data-cfg-text` templates (`{projectId}`, `{siteUrl}`…) filled by
+    `applyAppConfig()`. `cfg_identifiers_in_one_place` fails on any identifier
+    typed outside the block. **The CSP `<meta>` is the one exception** — no
+    script can reach it; the CSP tests compare it against `APP_CONFIG.workerUrl`
+    so a change to one without the other fails. A build step (WP-A.1) fills it.
+  - **Dead code, found by coverage, not by reading:** the whole suite plus the
+    harvest under V8 function coverage; 246 functions never ran; of those, the
+    ones referenced nowhere (code, markup, other pages, tests) were removed —
+    `applyTranslation`, `importViaFilePicker`, `showGmailPasteHint`, `setCat`,
+    `resizePhotoToDataUrl`, `doEmail`, `parseWordText`, `closeAllDrops`,
+    `loadFirebaseDynamically` (190 lines; sign-in reloads the page instead, so
+    the startup message saying it "will load it dynamically" was also wrong).
+    Kept on purpose, console helpers: `clearAiCache`, `forgetPhotoProbes`,
+    `getCloudReads`. Never-ran is not dead: most of the 246 run only signed in,
+    online, or on an error.
+  - This index.
 
 - **AUDIT BLOCK 6 (v36.65).** Accessibility:
   - **A recipe card is not a button.** The recipe's NAME is (`button.card-open`,

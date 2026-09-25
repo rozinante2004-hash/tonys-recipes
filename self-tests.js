@@ -1459,6 +1459,39 @@ window.SELF_TESTS = [
       if(bad.length) throw new Error(bad.length+' problem(s): '+bad.slice(0,8).join(' · '));
     } },
 
+  { id:'cfg_identifiers_in_one_place', group:'Security', name:'Every deployment identifier lives in APP_CONFIG (v36.66, WP-A.2)',
+    test: async()=>{
+      if(!window.APP_CONFIG || !Object.isFrozen(APP_CONFIG) || !Object.isFrozen(APP_CONFIG.firebase))
+        throw new Error('APP_CONFIG is missing or can be changed at run time');
+      ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'].forEach(function(k){
+        if(!APP_CONFIG.firebase[k]) throw new Error('APP_CONFIG.firebase.'+k+' is empty'); });
+      ['workerUrl','workerAppKey','workerName','cloudflareAccountId','ownerEmail','githubRepo','siteOrigin','sitePath'].forEach(function(k){
+        if(!APP_CONFIG[k]) throw new Error('APP_CONFIG.'+k+' is empty'); });
+      // The code reads it — not a copy typed out somewhere else.
+      if(WORKER_ENDPOINT!==APP_CONFIG.workerUrl || APP_OWNER_EMAIL!==APP_CONFIG.ownerEmail)
+        throw new Error('a constant does not come from APP_CONFIG');
+      // Outside #appConfig and the CSP <meta> (which no script can reach), the
+      // file names none of them. The Firebase settings were typed out twice,
+      // and the second copy had lost two of its six fields.
+      var src=await (await fetch(location.href,{cache:'no-store'})).text();
+      var a=src.indexOf('<script id="appConfig">'), z=src.indexOf('</script>', a);
+      if(a===-1) throw new Error('no #appConfig block in the page');
+      var rest=(src.slice(0,a)+src.slice(z)).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/,'');
+      var ids=[APP_CONFIG.firebase.apiKey, APP_CONFIG.firebase.projectId, APP_CONFIG.firebase.messagingSenderId,
+               APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerEmail, APP_CONFIG.githubRepo,
+               APP_CONFIG.siteOrigin.replace(/^https:\/\//,'')+APP_CONFIG.sitePath.replace(/\/$/,'')];
+      var hits=ids.filter(function(v){ return rest.indexOf(v)!==-1; });
+      if(hits.length) throw new Error('hard-wired outside APP_CONFIG: '+hits.join(', '));
+      // Every link built from it was actually filled in.
+      var unfilled=Array.prototype.slice.call(document.querySelectorAll('[data-cfg-href]'))
+        .filter(function(el){ var h=el.getAttribute('href')||''; return h==='#' || h.indexOf('{')!==-1; });
+      if(unfilled.length) throw new Error(unfilled.length+' configured link(s) were never filled in');
+      var emptyText=Array.prototype.slice.call(document.querySelectorAll('[data-cfg-text]'))
+        .filter(function(el){ return !el.textContent.trim(); });
+      if(emptyText.length) throw new Error(emptyText.length+' configured label(s) are empty');
+      if(document.querySelectorAll('[data-cfg-href]').length<10) throw new Error('the owner console links are no longer configured');
+    } },
+
   { id:'ui_swipe_fav', group:'UI', name:'Swipe favourites only — never deletes (5c.2)',
     test: async()=>{
       ['swipeStart','swipeMove','swipeEnd'].forEach(function(f){
@@ -5575,8 +5608,10 @@ window.SELF_TESTS = [
       // means something.
       if(/connect-src[^;]*\bhttps:(\s|;)/.test(c))
         throw new Error('connect-src has a bare `https:` again — it allows every origin and makes the list after it decorative');
-      if(c.indexOf('lively-bread-273a.rozinante2004.workers.dev')===-1)
-        throw new Error('the Worker is not in connect-src, so every photo, import and AI call is blocked by our own CSP');
+      // v36.66 — against APP_CONFIG, so changing the Worker in #appConfig
+      // without the CSP (which no script can reach) fails here, not in use.
+      if(c.indexOf(APP_CONFIG.workerUrl.replace(/^https:\/\//,''))===-1)
+        throw new Error('the Worker in APP_CONFIG ('+APP_CONFIG.workerUrl+') is not in connect-src, so every photo, import and AI call is blocked by our own CSP');
       // A failed apply must raise a REAL error dialog. A three-second toast on a
       // failure that leaves the old photo in place reads as "nothing happened" —
       // which is exactly what Tony reported. Driven: grepping the function for
@@ -5637,7 +5672,7 @@ window.SELF_TESTS = [
       ].forEach(function(pair){
         if(c.indexOf(pair[0])===-1) throw new Error('CSP is missing '+pair[0]+' — '+pair[1]+' is not blocked');
       });
-      if(c.indexOf('lively-bread')===-1) throw new Error('connect-src does not allow the Worker, so every AI call would fail');
+      if(c.indexOf(APP_CONFIG.workerUrl.replace(/^https:\/\//,''))===-1) throw new Error('connect-src does not allow the Worker, so every AI call would fail');
       // Firebase Auth compat creates a hidden iframe on the project's authDomain
       // and talks to it. Omitting the host stalls sign-in with no visible error.
       if(c.indexOf('firebaseapp.com')===-1)
