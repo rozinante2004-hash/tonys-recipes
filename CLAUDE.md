@@ -132,6 +132,28 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **AUDIT BLOCK 6 (v36.65).** Accessibility:
+  - **A recipe card is not a button.** The recipe's NAME is (`button.card-open`,
+    no `dir` of its own — `dir="auto"` on its container skips descendants that
+    have one, and a Hebrew name lost its alignment that way). The ♥ and the
+    select tick (`button.select-check`, `aria-pressed`) are siblings, never
+    nested. The card keeps its onclick, so a click anywhere still opens it; the
+    focus ring is drawn round the card via `:has(.card-open:focus-visible)`.
+    `cardKey` is gone — a button answers Enter/Space itself.
+  - **Every dialog is handled in one place.** A MutationObserver: any element
+    whose id ends in Overlay/Modal that gains `open` (or is appended to <body>
+    shown) gets `role="dialog" aria-modal="true"`, `aria-labelledby` its title
+    (`dialogTitleEl`: heading, `[class*=title]`, or the first serif line), focus
+    moved in unless it already is, and its opener remembered PER DIALOG
+    (`_dialogReturn[id]`). Losing `open` / being removed returns focus there,
+    or into the dialog underneath. The old single `_focusReturn` stack, pushed
+    only by the recipe view but popped by every close, is gone.
+    `trapFocus`/`releaseFocus(id)` remain as thin callers.
+  - `a11y_every_dialog` opens ALL dialogs; `tests/axe-scan.js` (CI) runs axe
+    over the page, the recipe view and every dialog — serious/critical fails.
+    v36.64 had 5× nested-interactive and an unlabelled textarea; now none.
+  - Not automatable, still owed: a real VoiceOver pass on the iPhone.
+
 - **TONY'S LANGUAGE REQUESTS (v36.64).**
   - **`shared/i18n_index`** — `{langs: {code: {at, count}}, probed}` — which
     languages exist in the cloud. Written (merge) by `i18nIndexNote` after every

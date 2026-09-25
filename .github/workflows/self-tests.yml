@@ -37,7 +37,7 @@ jobs:
       - name: Install Playwright (package + Chromium)
         run: |
           npm init -y >/dev/null 2>&1 || true
-          npm install --no-audit --no-fund playwright@1.56.1
+          npm install --no-audit --no-fund playwright@1.56.1 axe-core@4.10.2
           npx playwright install --with-deps chromium
 
       # A single-file app fails silently and completely on a syntax error, so
@@ -179,3 +179,10 @@ jobs:
       # budget, so a new header row fails the build and says by how much.
       - name: Phone chrome budget (390x844)
         run: node tests/phone-chrome.js --port 8137
+
+      # v36.65 (audit block 6) — axe-core over the page, the recipe view and
+      # every dialog opened in turn. A dialog's controls only exist to a
+      # scanner while it is open; both findings the audit made were in places
+      # a scan of the start page never sees. Serious or critical fails.
+      - name: Accessibility scan (axe, every dialog)
+        run: node tests/axe-scan.js --port 8137

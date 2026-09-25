@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.64 -->
+<!-- Tony's Recipes Collection v36.65 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3518,7 +3518,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.64';
+var APP_VERSION = 'v36.65';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4587,14 +4587,28 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
   font-size: 15px; font-weight: 600; text-decoration: none; transition: transform 0.15s;
 }
 .skip-link:focus { transform: translateX(-50%) translateY(0); outline: 3px solid var(--gold); outline-offset: 2px; }
-.recipe-card:focus:not(:focus-visible),
-.recipe-list-item:focus:not(:focus-visible) { outline: none; }
-.recipe-card:focus-visible, .recipe-list-item:focus-visible {
-  outline: 3px solid var(--terracotta);
-  outline-offset: 3px;
+/* v36.65 (audit D2) — the recipe's NAME is the card's button; the card itself
+   is no longer focusable. The ring is still drawn round the WHOLE card, via
+   :has(), which is what Tony sees when he tabs. Browsers without :has() draw
+   it round the name instead (the @supports rule below takes that off where
+   the card's ring exists, so nobody gets two). Each :has() selector is a rule
+   of its own: one unknown selector in a list drops the whole rule. */
+.card-open {
+  background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit;
+  text-align: start; cursor: pointer; display: block; width: 100%; line-height: inherit;
+  unicode-bidi: plaintext; -webkit-tap-highlight-color: transparent;
+}
+.card-open:focus:not(:focus-visible) { outline: none; }
+.card-open:focus-visible { outline: 3px solid var(--terracotta); outline-offset: 2px; border-radius: 4px; }
+.recipe-card:has(.card-open:focus-visible) {
+  outline: 3px solid var(--terracotta); outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(193,68,14,0.18); transform: translateY(-3px);
+}
+.recipe-list-item:has(.card-open:focus-visible) {
+  outline: 3px solid var(--terracotta); outline-offset: 3px;
   box-shadow: 0 0 0 6px rgba(193,68,14,0.18);
 }
-.recipe-card:focus-visible { transform: translateY(-3px); }
+@supports selector(:has(a)) { .card-open:focus-visible { outline: none; } }
 .card-image { width: 100%; height: 148px; display: flex; align-items: center; justify-content: center; font-size: 48px; position: relative; overflow: hidden; }
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.72); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -5307,7 +5321,10 @@ li.line-sub-indent { padding-inline-start: 22px; }
 }
 .recipe-list-thumb img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .recipe-list-info { flex: 1; min-width: 0; }
-.recipe-list-name { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; unicode-bidi: plaintext; }
+.recipe-list-name { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; unicode-bidi: plaintext; display: flex; align-items: center; gap: 4px; min-width: 0; }
+/* The name is a button now (v36.65); it is what gets the ellipsis, and the 🔥 stays beside it. */
+.recipe-list-name .card-open { flex: 0 1 auto; min-width: 0; width: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recipe-list-name > span { flex: none; }
 .recipe-list-meta { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
 .recipe-list-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -5423,6 +5440,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
   align-items: center;
   justify-content: center;
   font-size: 13px;
+  padding: 0; font-family: inherit; color: var(--terracotta); line-height: 1;   /* a <button> since v36.65 */
 }
 .select-mode .recipe-card .select-check,
 .select-mode .recipe-list-item .select-check { display: flex; }
@@ -6223,7 +6241,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.64</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.65</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6855,7 +6873,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.64</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.65</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7336,9 +7354,9 @@ body.banner-shown .header {
       </div>
       <div id="bringSecretStatus" style="font-size:12px;color:var(--muted);min-height:16px;margin-top:6px;"></div>
     </div>
-    <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Step 1: Copy the bookmarklet code</div>
+    <div id="bringBookmarkletCodeLabel" style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Step 1: Copy the bookmarklet code</div>
     <div style="position:relative;margin-bottom:12px;">
-      <textarea id="bringBookmarkletCode" readonly style="width:100%;height:60px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;background:#f5f0ea;box-sizing:border-box;"></textarea>
+      <textarea id="bringBookmarkletCode" aria-labelledby="bringBookmarkletCodeLabel" readonly style="width:100%;height:60px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;background:#f5f0ea;box-sizing:border-box;"></textarea>
       <button onclick="copyBookmarklet()" style="position:absolute;top:6px;right:6px;font-size:11px;padding:3px 8px;background:var(--terracotta-fill);color:white;border:none;border-radius:5px;cursor:pointer;">Copy</button>
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;">Step 2: Create a bookmark</div>
@@ -8341,7 +8359,6 @@ window.refreshLineMarker = refreshLineMarker; window.loadLineMark = loadLineMark
 // focus behind on the card in the grid, so Tab walked the page *underneath* the
 // dialog and nothing in the recipe could be operated at all. A dialog has to take
 // focus, keep it while it is open, and hand it back on close.
-var _focusReturn = [];
 function focusablesIn(el) {
   if (!el) return [];
   return Array.prototype.slice.call(el.querySelectorAll(
@@ -9373,6 +9390,7 @@ var I18N_EXTRA = [
   'AI this month', 'from this device', 'under $0.01',
   '✓ Ready — switches instantly', 'Not translated yet — a few minutes, once', '✓ ready', 'original',
   '🔄 Update all supported languages', 'Every language is up to date', 'up to date',
+  'Select this recipe',
   'srv', '🍽 {1} srv', 'Add to favourites', 'Remove from favourites', 'Cooked {1} times',
   'on any device',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
@@ -11345,27 +11363,120 @@ function applyContentLang(root) {
 }
 window.textLang = textLang; window.langAttr = langAttr; window.applyContentLang = applyContentLang;
 
-function trapFocus(overlayId) {
-  var el = document.getElementById(overlayId);
-  if (!el) return;
+// ─── EVERY DIALOG BEHAVES LIKE ONE (v36.65, audit D3) ────────────────────────
+// Measured on v36.64, all 33 dialogs: none was announced as a dialog, none had
+// a name, focus moved into exactly one (the recipe view) and came back from
+// none. And the one return path there was a single shared stack that only the
+// recipe view pushed to but EVERY close popped — so closing Sync Health over an
+// open recipe sent focus to the grid behind the recipe.
+//
+// Fixing thirty-three dialogs one at a time would last until the thirty-fourth.
+// So it is done in one place: whenever an element whose id ends in "Overlay"
+// gains the `open` class, its box is marked role="dialog" aria-modal="true" and
+// named after its title; focus moves in (to the first real control, not the
+// close button) unless something inside has already taken it; and where focus
+// came FROM is remembered for that dialog alone. When it loses `open`, focus
+// goes back there — or, if that control has gone, to the dialog underneath.
+var _dialogReturn = Object.create(null);
+function isDialogHost(el) { return !!(el && el.nodeType === 1 && el.id && /(Overlay|Modal)$/.test(el.id)); }
+function dialogShown(el) {
+  return document.contains(el) && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
+}
+function dialogBox(el) {
+  for (var c = el.firstElementChild; c; c = c.nextElementSibling) if (c.tagName === 'DIV') return c;
+  return el;
+}
+// Its title: a heading, anything classed as a title, or — the convention in
+// this file — the first line set in the headings' serif. Buttons never.
+function dialogTitleEl(box) {
+  var t = box.querySelector('h1, h2, h3, .modal-title, [class*="title"]:not(button)');
+  if (t && t.textContent.trim()) return t;
+  var all = box.querySelectorAll('div, span');
+  for (var i = 0; i < all.length && i < 60; i++) {
+    var st = all[i].getAttribute('style') || '';
+    if (/Playfair Display/.test(st) && all[i].textContent.trim()) return all[i];
+  }
+  return null;
+}
+function dialogFocusTarget(el) {
+  var f = focusablesIn(el);
+  return f.find(function(n){ return !/close/i.test(n.getAttribute('aria-label') || '') && !/^✕/.test((n.textContent || '').trim()); })
+      || f[0] || null;
+}
+function focusQuietly(n) {
+  try { n.focus({ preventScroll: true }); } catch(e) { try { n.focus(); } catch(e2) {} }
+}
+function dialogOpened(el) {
+  var box = dialogBox(el);
+  if (box.getAttribute('role') !== 'dialog') box.setAttribute('role', 'dialog');
+  if (box.getAttribute('aria-modal') !== 'true') box.setAttribute('aria-modal', 'true');
+  if (!box.hasAttribute('aria-label')) {
+    var t = dialogTitleEl(box);
+    if (t) { if (!t.id) t.id = el.id + 'Title'; box.setAttribute('aria-labelledby', t.id); }
+  }
+  var a = document.activeElement;
+  if (a && a !== document.body && !el.contains(a) && !_dialogReturn[el.id]) _dialogReturn[el.id] = a;
   labelIconButtons(el);
-  _focusReturn.push(document.activeElement);
-  // Give the dialog a moment to finish rendering, then land on the first real
-  // control rather than the close button, which is rarely what you want first.
+  // A moment for the dialog to finish drawing — and for a dialog that focuses
+  // its own field (a search box, a prompt) to do so first.
   setTimeout(function() {
-    var f = focusablesIn(el);
-    var target = f.find(function(n){ return !/close/i.test(n.getAttribute('aria-label') || ''); }) || f[0] || el;
-    if (target === el) { el.setAttribute('tabindex', '-1'); }
-    try { target.focus({ preventScroll: true }); } catch(e) { try { target.focus(); } catch(e2) {} }
+    if (!dialogShown(el) || el.contains(document.activeElement)) return;
+    var n = dialogFocusTarget(el);
+    if (!n) { box.setAttribute('tabindex', '-1'); n = box; }
+    focusQuietly(n);
   }, 60);
 }
-function releaseFocus() {
-  var prev = _focusReturn.pop();
-  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
-    try { prev.focus({ preventScroll: true }); } catch(e) { try { prev.focus(); } catch(e2) {} }
-  }
+function dialogVisible(n) {
+  return !!(n && document.contains(n) && (n.offsetParent !== null || getComputedStyle(n).position === 'fixed'));
+}
+function dialogClosed(el) {
+  if (!el) return;
+  var back = _dialogReturn[el.id];
+  delete _dialogReturn[el.id];
+  var a = document.activeElement;
+  var lost = !a || a === document.body || el.contains(a);
+  if (!lost) return;                       // focus is already somewhere sensible
+  if (dialogVisible(back)) { focusQuietly(back); return; }
+  // Its opener has gone (a menu that closed, a card that re-rendered): the
+  // dialog underneath, if any, rather than the top of the page.
+  var under = Array.prototype.slice.call(document.querySelectorAll('[id$="Overlay"].open'))
+    .filter(function(o){ return o !== el; }).pop();
+  if (under) { var n = dialogFocusTarget(under); if (n) focusQuietly(n); }
+}
+if (typeof MutationObserver !== 'undefined') {
+  new MutationObserver(function(recs) {
+    for (var i = 0; i < recs.length; i++) {
+      var el = recs[i].target;
+      if (!isDialogHost(el)) continue;
+      var was = /(^|\s)open(\s|$)/.test(recs[i].oldValue || '');
+      var now = el.classList.contains('open');
+      if (now && !was) dialogOpened(el);
+      else if (!now && was) dialogClosed(el);
+    }
+  }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+  // …and the dialogs built on the fly — a confirmation, a prompt, an error —
+  // which are appended to <body> and removed again rather than toggled.
+  var watchBody = function() {
+    new MutationObserver(function(recs) {
+      for (var i = 0; i < recs.length; i++) {
+        var add = recs[i].addedNodes, rem = recs[i].removedNodes, j;
+        for (j = 0; j < add.length; j++) if (isDialogHost(add[j]) && dialogShown(add[j])) dialogOpened(add[j]);
+        for (j = 0; j < rem.length; j++) if (isDialogHost(rem[j])) dialogClosed(rem[j]);
+      }
+    }).observe(document.body, { childList: true });
+  };
+  if (document.body) watchBody(); else document.addEventListener('DOMContentLoaded', watchBody);
+}
+// Kept for their callers: the dialog handling above does the work.
+function trapFocus(overlayId) {
+  var el = document.getElementById(overlayId);
+  if (el) dialogOpened(el);
+}
+function releaseFocus(overlayId) {
+  if (overlayId) dialogClosed(document.getElementById(overlayId));
 }
 window.trapFocus = trapFocus; window.releaseFocus = releaseFocus; window.focusablesIn = focusablesIn;
+window.dialogOpened = dialogOpened; window.dialogClosed = dialogClosed; window.dialogTitleEl = dialogTitleEl;
 
 // Keep Tab inside the topmost open dialog. Without this, Tab leaves the recipe
 // and walks the grid behind it, which is how this bug presented.
@@ -11745,6 +11856,18 @@ function renderGrid() {
     return;
   }
 
+  // v36.65 (audit D2) — A CARD IS NOT A BUTTON. It used to be one
+  // (role="button", tabindex, its own Enter/Space handler) with the ♥ and the
+  // select tick INSIDE it: nested interactive controls, which a screen reader
+  // cannot separate and axe rates serious. Now the recipe's NAME is the button
+  // — what Tab reaches and what is announced — and the ♥ and the tick are
+  // buttons of their own beside it. A click anywhere on the card still opens
+  // the recipe (the card keeps its onclick, and the name button's click bubbles
+  // to it), and the focus ring is still drawn round the whole card (:has).
+  // The name button carries NO dir of its own: dir="auto" on its container
+  // skips any descendant that has one, and would then see no letters at all —
+  // a Hebrew name in an English interface lost its right alignment that way.
+  //
   // v36.62 (audit C1) — THE CARDS ARE TRANSLATED AS THEY ARE BUILT. Each card
   // carries four labels (meal type, difficulty, "srv", the heart's name), and
   // leaving them to the observer meant walking every element of every card
@@ -11757,6 +11880,13 @@ function renderGrid() {
   // renders every card variant and fails on any English left.
   var T = i18nPhrase;
   function favLabel(r) { return T(r.fav ? 'Remove from favourites' : 'Add to favourites'); }
+  // v36.65 (audit D2) — the tick is a real toggle button. It is only displayed
+  // in select mode, so outside it Tab never lands on it.
+  function selectHtml(r) {
+    var on = selectedIds.has(r.id);
+    return '<button type="button" class="select-check" aria-pressed="' + on + '" aria-label="'
+      + escA(T('Select this recipe')) + '" onclick="toggleRecipeSelect(event,' + r.id + ')">' + (on ? '✓' : '') + '</button>';
+  }
   // The list view's "🍽 4 srv" is one phrase with the number in it — a
   // language may well put the number after the word.
   var srvParts = String(T('🍽 {1} srv')).split('{1}');
@@ -11765,8 +11895,8 @@ function renderGrid() {
   if (viewMode === 'list') {
     g.className = 'recipe-list';
     g.innerHTML = list.map(r => `
-      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
-        <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
+      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+        ${selectHtml(r)}
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
           ${r.isClip ? (r.photo
@@ -11777,7 +11907,7 @@ function renderGrid() {
             : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="clip-badge clip-badge-sm">🎬</div></div>`) : ''}
         </div>
         <div class="recipe-list-info">
-          <div class="recipe-list-name" dir="auto">${escH(r.name)}${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
+          <div class="recipe-list-name" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button>${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${escH(T(r.category))}</span>
             <bdi>⏱ ${escH(r.prep)}</bdi>
@@ -11793,8 +11923,8 @@ function renderGrid() {
   } else {
     g.className = 'recipe-grid';
     g.innerHTML = list.map(r => `
-      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n tabindex="0" role="button" aria-label="${escA(r.name)}" onkeydown="cardKey(event,${r.id})" ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
-        <div class="select-check" onclick="toggleRecipeSelect(event,${r.id})">${selectedIds.has(r.id) ? '✓' : ''}</div>
+      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+        ${selectHtml(r)}
         <div class="card-image" style="background:${escA(r.bg)}">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
           <div class="card-category-badge">${escH(T(r.category))}</div>
@@ -11802,7 +11932,7 @@ function renderGrid() {
           ${isCollection(r) ? `<div class="collection-badge" style="position:absolute;top:8px;right:8px;">📚<span class="collection-count">${recipeParts(r).length}</span></div>` : ''}
         </div>
         <div class="card-body">
-          <div class="card-title" dir="auto">${escH(r.name)}</div>
+          <div class="card-title" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button></div>
           <div class="card-meta"><bdi>⏱ ${escH(r.prep)}</bdi><div class="card-meta-dot"></div>${servingsIsYield(r.servings) ? `<bdi>${escH(r.servings)}</bdi>` : `<bdi><span>${escH(r.servings)}</span> ${escH(T('srv'))}</bdi>`}</div>
           ${matchReason(r, q)}
         </div>
@@ -11824,18 +11954,14 @@ function renderGrid() {
 // press already does something.
 function focusFirstRecipe(e) {
   if (e) e.preventDefault();
-  var first = document.querySelector('.recipe-card, .recipe-list-item');
+  var first = document.querySelector('.recipe-card .card-open, .recipe-list-item .card-open');
   if (first) { first.focus(); first.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   else { var g = document.getElementById('recipeGrid'); if (g) g.scrollIntoView({ behavior: 'smooth' }); }
 }
 window.focusFirstRecipe = focusFirstRecipe;
 
-function cardKey(e, id) {
-  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
-  e.preventDefault();
-  if (selectMode) toggleRecipeSelect(e, id); else openView(id);
-}
-window.cardKey = cardKey;
+// cardKey went in v36.65: the name is a real <button>, and a button already
+// answers Enter and Space with a click.
 
 // ── 5c.2 — swipe a card to favourite it ───────────────────────────────────────
 // Favourite ONLY. Deliberately not delete: destructive actions should not be one
@@ -12669,7 +12795,7 @@ function drawView(){
     <div class="modal-content${recipeIsRTL(r) ? ' rtl-recipe' : ''}">
       ${conflictBannerHtml(r)}
       <div class="modal-category">${escH(r.category)}</div>
-      <div class="modal-title" dir="auto">${escH(r.name)}</div>
+      <div class="modal-title" id="viewTitle" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
         ${isCollection(r) ? `<span>📚 ${recipeParts(r).length} recipes</span>` : `
         <bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi>${servingsIsYield(r.servings)
@@ -15157,7 +15283,7 @@ function closeM(id){
     return;
   }
   document.getElementById(id).classList.remove('open');
-  releaseFocus();   // 5c.1b — hand focus back to whatever opened this
+  releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
   if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
   // The harvest import queue advances here, because this is the one funnel every

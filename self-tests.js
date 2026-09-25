@@ -639,7 +639,9 @@ window.SELF_TESTS = [
       try{
         setView('grid');
         focusFirstRecipe();
-        if(!document.activeElement || !document.activeElement.classList.contains('recipe-card'))
+        // v36.65 — the card's button is the recipe's name (audit D2).
+        if(!document.activeElement || !document.activeElement.classList.contains('card-open')
+           || !document.activeElement.closest('.recipe-card'))
           throw new Error('the skip link does not land on a recipe card');
       } finally { setView(prevView); }
     } },
@@ -661,18 +663,28 @@ window.SELF_TESTS = [
           var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
           for(var j=0;j<rules.length;j++){
             var sel=rules[j].selectorText||'';
-            if(/\.recipe-card:focus-visible/.test(sel)){
+            // v36.65 — the ring is drawn round the card when its NAME button has
+            // keyboard focus (.recipe-card:has(.card-open:focus-visible)).
+            if(/\.recipe-card:has\(\.card-open:focus-visible\)/.test(sel)){
               var css=rules[j].cssText||'';
               // several focus-visible rules exist (one only sets transform) —
               // keep the one that actually draws something.
               if(!ring && /outline\s*:/.test(css) && !/outline\s*:\s*none/.test(css)) ring={i:j, css:css};
             }
             // a bare :focus reset that does NOT exempt :focus-visible will win
-            if(/\.recipe-card:focus(?![-a-z])/.test(sel) && !/not\(:focus-visible\)/.test(sel)
+            if(/\.(recipe-card|card-open):focus(?![-a-z])/.test(sel) && !/not\(:focus-visible\)/.test(sel)
                && (rules[j].style.outline==='none'||rules[j].style.outlineStyle==='none')) reset={i:j};
           }
         }
-        if(!ring) throw new Error('no :focus-visible rule for .recipe-card draws an outline — nothing paints when you tab to a card');
+        if(!ring) throw new Error('no rule draws an outline round a card whose name has keyboard focus — nothing paints when you tab to a card');
+        // …and it really paints: focus the name the way a keyboard does and read the cascade.
+        var nameBtn=card.querySelector('.card-open');
+        if(!nameBtn) throw new Error('the card has no name button to focus');
+        nameBtn.focus({ focusVisible:true });
+        var cs=getComputedStyle(card);
+        if(nameBtn.matches(':focus-visible') && (cs.outlineStyle==='none' || parseFloat(cs.outlineWidth)<2))
+          throw new Error('tabbing to a card draws no ring round it (outline '+cs.outlineStyle+' '+cs.outlineWidth+')');
+        nameBtn.blur();
         if(reset) throw new Error('a bare .recipe-card:focus outline reset still exists — it overrides the ring and nothing paints');
         if(reset && ring && reset.i > ring.i)
           throw new Error('an outline reset comes after the ring rule and overrides it');
@@ -688,7 +700,7 @@ window.SELF_TESTS = [
         if(typeof window[f]!=='function') throw new Error(f+' not defined');
       });
       if(!recipes.length) throw new Error('no recipes to open');
-      var grid=document.querySelector('.recipe-card, .recipe-list-item');
+      var grid=document.querySelector('.recipe-card .card-open, .recipe-list-item .card-open');
       if(grid) grid.focus();
       var before=document.activeElement;
       try{
@@ -1347,20 +1359,104 @@ window.SELF_TESTS = [
       try{ prevStored=localStorage.getItem('tonys_view_mode'); }catch(e){}
       try{
         setView('grid');
-        var card=document.querySelector('.recipe-card');
-        if(!card) throw new Error('no recipe card rendered');
-        if(card.getAttribute('tabindex')!=='0') throw new Error('recipe cards are not focusable — the grid has no keyboard path');
-        if(card.getAttribute('role')!=='button') throw new Error('a card behaves as a button but does not say so to assistive tech');
-        if(!card.getAttribute('aria-label')) throw new Error('a focusable card with no accessible name is unusable by screen reader');
-        if((card.getAttribute('onkeydown')||'').indexOf('cardKey')===-1) throw new Error('cards are focusable but Enter/Space do nothing');
-        if(typeof cardKey!=='function') throw new Error('cardKey not defined');
-        setView('list');
-        var row=document.querySelector('.recipe-list-item');
-        if(row && row.getAttribute('tabindex')!=='0') throw new Error('list rows are not keyboard-reachable either');
+        // v36.65 (audit D2) — the recipe's NAME is the card's button. The card
+        // itself was a role="button" holding the ♥ and the select tick: nested
+        // interactive controls, which a screen reader cannot separate.
+        ['grid','list'].forEach(function(mode){
+          setView(mode);
+          var card=document.querySelector(mode==='grid' ? '.recipe-card' : '.recipe-list-item');
+          if(!card) throw new Error(mode+': no recipe card rendered');
+          if(card.getAttribute('role')==='button' || card.hasAttribute('tabindex'))
+            throw new Error(mode+': the card is still a button itself, with buttons inside it');
+          var name=card.querySelector('button.card-open');
+          if(!name) throw new Error(mode+': the recipe name is not a button — the card has no keyboard path');
+          if(!name.textContent.trim()) throw new Error(mode+': the card button has no name to announce');
+          if(name.getAttribute('type')!=='button') throw new Error(mode+': the card button has no type');
+          // No control inside another control, anywhere on a card.
+          var inter='button, a[href], input, select, textarea, [role="button"], [tabindex]';
+          card.querySelectorAll(inter).forEach(function(el){
+            var outer=el.parentElement && el.parentElement.closest(inter);
+            if(outer && card.contains(outer)) throw new Error(mode+': a '+el.tagName.toLowerCase()+' is nested inside another control');
+          });
+          var tick=card.querySelector('.select-check');
+          if(!tick || tick.tagName!=='BUTTON' || !tick.hasAttribute('aria-pressed'))
+            throw new Error(mode+': the select tick is not a toggle button');
+        });
+        // Enter on the name (a click, for a button) opens the recipe — through
+        // the card's own handler, so mouse and keyboard do the same thing.
+        setView('grid');
+        var realOpen=window.openView, opened=null;
+        window.openView=function(id){ opened=id; };
+        try{ document.querySelector('.recipe-card .card-open').click(); }
+        finally{ window.openView=realOpen; }
+        if(opened===null) throw new Error('activating the name button does not open the recipe');
       } finally {
         setView(prevView);
         try{ if(prevStored===null) localStorage.removeItem('tonys_view_mode'); else localStorage.setItem('tonys_view_mode',prevStored); }catch(e){}
       }
+    } },
+
+  { id:'a11y_every_dialog', group:'UI', name:'Every dialog is announced, named, takes focus and gives it back (v36.65, audit D3)',
+    test: async()=>{
+      ['dialogOpened','dialogClosed'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // Measured on v36.64: of 33 dialogs none was a dialog to a screen reader,
+      // none had a name, one took focus and none gave it back. This opens EVERY
+      // one, so the thirty-fourth is covered the day it is added.
+      var opener=document.createElement('button');
+      opener.textContent='opener'; opener.style.cssText='position:fixed;top:0;left:0;z-index:1;';
+      document.body.appendChild(opener);
+      var skip={ selfTestOverlay:1, progOverlay:1, i18nOverlay:1 };
+      var bad=[];
+      function frames(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+      try{
+        var ids=Array.prototype.slice.call(document.querySelectorAll('[id$="Overlay"]'))
+          .map(function(e){ return e.id; }).filter(function(id){ return !skip[id] && !document.getElementById(id).classList.contains('open'); });
+        if(ids.length<25) throw new Error('only '+ids.length+' dialogs found — the selector no longer finds them');
+        for(var i=0;i<ids.length;i++){
+          var el=document.getElementById(ids[i]);
+          opener.focus();
+          el.classList.add('open');
+          await frames(110);
+          var box=el.querySelector('[role="dialog"]');
+          var lb=box && box.getAttribute('aria-labelledby'), name=box && (box.getAttribute('aria-label') || (lb && document.getElementById(lb) ? document.getElementById(lb).textContent.trim() : ''));
+          if(!box) bad.push(ids[i]+': not announced as a dialog');
+          else if(box.getAttribute('aria-modal')!=='true') bad.push(ids[i]+': not modal');
+          if(box && !name && ids[i]!=='viewOverlay') bad.push(ids[i]+': no name');
+          if(!el.contains(document.activeElement)) bad.push(ids[i]+': focus stayed outside');
+          el.classList.remove('open');
+          await frames(20);
+          if(document.activeElement!==opener) bad.push(ids[i]+': focus did not come back');
+        }
+        // A dialog over a dialog: closing the top one returns focus INTO the one
+        // underneath, not to the page behind both (the old shared stack did).
+        var A=document.getElementById('backupOverlay'), B=document.getElementById('privacyOverlay');
+        opener.focus(); A.classList.add('open'); await frames(110);
+        var inA=document.activeElement;
+        if(!A.contains(inA)) bad.push('nested: the first dialog did not take focus');
+        B.classList.add('open'); await frames(110);
+        closeM('privacyOverlay'); await frames(20);
+        if(!A.contains(document.activeElement)) bad.push('nested: closing the top dialog did not return focus to the one underneath');
+        closeM('backupOverlay'); await frames(20);
+        if(document.activeElement!==opener) bad.push('nested: closing the last dialog did not return focus to where it started');
+        // A dialog built on the fly.
+        opener.focus();
+        var pr=askConfirm({ title:'Probe', message:'probe', okLabel:'OK' });
+        await frames(150);
+        var ask=document.getElementById('askOverlay');
+        if(!ask) bad.push('askConfirm: no dialog appeared');
+        else {
+          if(!ask.querySelector('[role="dialog"]')) bad.push('askConfirm: not announced as a dialog');
+          if(!ask.contains(document.activeElement)) bad.push('askConfirm: focus stayed outside');
+          var cancel=Array.prototype.slice.call(ask.querySelectorAll('button')).filter(function(b){ return /cancel/i.test(b.textContent); })[0];
+          if(cancel) cancel.click(); else closeTopModal();
+        }
+        await pr; await frames(40);
+        if(document.activeElement!==opener) bad.push('askConfirm: focus did not come back');
+      } finally {
+        opener.remove();
+        document.querySelectorAll('[id$="Overlay"].open').forEach(function(o){ if(!skip[o.id]) o.classList.remove('open'); });
+      }
+      if(bad.length) throw new Error(bad.length+' problem(s): '+bad.slice(0,8).join(' · '));
     } },
 
   { id:'ui_swipe_fav', group:'UI', name:'Swipe favourites only — never deletes (5c.2)',
@@ -10745,7 +10841,8 @@ window.SELF_TESTS = [
         if(document.getElementById('noPhotoPrompt').style.display==='none') throw new Error('auto-fetch prompt should appear with the filter on');
         var shown=Array.prototype.slice.call(document.querySelectorAll('#recipeGrid .recipe-card,#recipeGrid .recipe-list-item'));
         if(!shown.length) throw new Error('filter hid everything, including photoless recipes');
-        var labels=shown.map(function(el){ return el.getAttribute('aria-label')||''; });
+        // The name is on the card's button since v36.65 (audit D2).
+        var labels=shown.map(function(el){ var b=el.querySelector('.card-open'); return b ? b.textContent.trim() : ''; });
         if(labels.indexOf('ClipNoPhoto')===-1)
           throw new Error('a clip with no photo is hidden from the "No photo" filter, so there is no way to find it and give it one');
         if(labels.indexOf('ClipWithPhoto')>-1)
@@ -10766,7 +10863,7 @@ window.SELF_TESTS = [
           ['list','grid'].forEach(function(mode){
             viewMode=mode; renderGrid();
             var card=Array.prototype.slice.call(document.querySelectorAll('#recipeGrid .recipe-card,#recipeGrid .recipe-list-item'))
-              .filter(function(el){ return el.getAttribute('aria-label')==='ClipWithPhoto'; })[0];
+              .filter(function(el){ var b=el.querySelector('.card-open'); return b && b.textContent.trim()==='ClipWithPhoto'; })[0];
             if(!card) throw new Error('['+mode+'] the clip with a photo is missing from the grid entirely');
             if(!card.querySelector('img'))
               throw new Error('['+mode+"] a clip's photo is not rendered — the card falls back to the emoji, so giving a clip a photo achieves nothing visible");
