@@ -200,11 +200,23 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
       // backup" at the moment of the run, which then silenced the reminder.
       const bk = typeof window._backupRecordForTest === 'function' ? window._backupRecordForTest : null;
       const bkBefore = bk ? bk() : null;
+      // v36.67 — A TEST MUST CLOSE WHAT IT OPENS, checked after EVERY test. It
+      // used to be checked once, at the end, so a dialog one test left open
+      // and a later test happened to close was invisible here — and sat over
+      // the Self Test on Tony's phone for a minute ("Unsaved changes").
+      const openNow = () => Array.from(document.querySelectorAll('[id$="Overlay"].open, [id$="Modal"].open, #askOverlay'))
+        .map(e => e.id).filter(id => id && id !== 'selfTestOverlay');
+      const openBefore = openNow();
       try {
         await t.test();
         if (realOf() !== realBefore)
           throw new Error('changed a REAL recipe (not a fixture) and did not put it back exactly — '
             + 'on a signed-in device that change is written to the family cloud. Use a fixture id ≥ TEST_ID_MIN.');
+        const stranded = openNow().filter(id => openBefore.indexOf(id) === -1);
+        if (stranded.length) {
+          stranded.forEach(id => { const el = document.getElementById(id); if (el) { el.classList.remove('open'); if (id === 'askOverlay') el.remove(); } });
+          throw new Error('left a dialog open: ' + stranded.join(', ') + ' — close it in finally (a dirty edit form needs _editFormSnapshot=null first)');
+        }
         if (bk && JSON.stringify(bk()) !== JSON.stringify(bkBefore)) {
           const z = bk();
           const what = Object.keys(z).filter(k => z[k] !== bkBefore[k]);

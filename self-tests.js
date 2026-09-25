@@ -1492,6 +1492,97 @@ window.SELF_TESTS = [
       if(document.querySelectorAll('[data-cfg-href]').length<10) throw new Error('the owner console links are no longer configured');
     } },
 
+  { id:'ui_menus_stay_on_screen', group:'UI', name:'A menu never opens off the screen (v36.67)',
+    test: async()=>{
+      if(typeof dropPlacement!=='function') throw new Error('dropPlacement not defined');
+      // Tony's case: ⚙️ near the top of a 393×852 phone, and a menu taller than
+      // the room below it. The old rule flipped it ABOVE the button — to a
+      // negative top — leaving only "🚀 Deployments" showing.
+      var btn={ top:112, bottom:148, right:380 }, W=393, H=852;
+      var p=dropPlacement(btn, 230, 1100, W, H);
+      if(p.top<8) throw new Error('a tall menu starts off the top of the screen (top '+p.top+')');
+      if(!p.maxHeight || p.top+p.maxHeight>H-8) throw new Error('a menu taller than the screen is not capped to it (top '+p.top+', max '+p.maxHeight+')');
+      if(p.top!==btn.bottom+4) throw new Error('with more room below, it should open below the button');
+      // A menu that fits below opens below, uncapped.
+      var q=dropPlacement(btn, 230, 400, W, H);
+      if(q.top!==btn.bottom+4 || q.maxHeight) throw new Error('a menu that fits below did not simply open below');
+      // A button near the bottom, a menu that fits above: above, uncapped.
+      var low={ top:760, bottom:796, right:200 };
+      var a=dropPlacement(low, 230, 400, W, H);
+      if(a.top!==low.top-4-400 || a.maxHeight) throw new Error('a menu that only fits above did not open above');
+      // Never off the sides.
+      var edge=dropPlacement({ top:100, bottom:130, right:60 }, 230, 200, W, H);
+      if(edge.left<8 || edge.left+230>W-8) throw new Error('the menu runs off the side (left '+edge.left+')');
+      // And for real: the ⚙️ menu, opened, is inside the window.
+      toggleDrop('settingsDrop');
+      await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+      await wait(40);
+      var m=document.getElementById('settingsDrop'), rc=m.getBoundingClientRect();
+      try{
+        if(rc.top<0 || rc.bottom>window.innerHeight+1) throw new Error('the Settings menu is outside the window ('+Math.round(rc.top)+'…'+Math.round(rc.bottom)+' of '+window.innerHeight+')');
+        if(m.scrollHeight>m.clientHeight+1 && getComputedStyle(m).overflowY!=='auto') throw new Error('a capped menu cannot be scrolled');
+      } finally { closeDrop('settingsDrop'); }
+    } },
+
+  { id:'report_staged_errors_apart', group:'UI', name:'Errors the tests stage are not reported as real ones (v36.67)',
+    test: async()=>{
+      // Tony's report listed "AI down", "boom" and "IndexedDB unreadable" under
+      // RECENT JS ERRORS — every one staged by a test — and each run also wrote
+      // them into his persistent log, where the log nudge counts errors.
+      var errWas=_recentErrors.slice(), logWas=null, runWas=_selfTestRunning;
+      try{ logWas=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      try{
+        _selfTestRunning=true;
+        var before=(localStorage.getItem('tonys_sync_log')||'');
+        recordError('test','STAGED-PROBE-1','probe');
+        if((localStorage.getItem('tonys_sync_log')||'')!==before) throw new Error('an error raised during the test run was written into the persistent log');
+        _selfTestRunning=false;
+        recordError('test','REAL-PROBE-2','probe');
+        _selfTestRunning=true;
+        var txt=selfTestReportText();
+        var realSec=txt.slice(txt.indexOf('RECENT JS ERRORS'), txt.indexOf('RAISED DURING THE TEST RUN'));
+        if(txt.indexOf('RAISED DURING THE TEST RUN')===-1) throw new Error('the report has no separate list for errors raised during the run');
+        if(realSec.indexOf('STAGED-PROBE-1')!==-1) throw new Error('a staged error is listed as a real one');
+        if(realSec.indexOf('REAL-PROBE-2')===-1) throw new Error('a real error is missing from RECENT JS ERRORS');
+        if(txt.indexOf('STAGED-PROBE-1')===-1) throw new Error('the staged error vanished from the report altogether');
+      } finally {
+        _selfTestRunning=runWas;
+        _recentErrors.length=0; errWas.forEach(function(e){ _recentErrors.push(e); });
+        try{ if(logWas===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',logWas); }catch(e){}
+      }
+    } },
+
+  { id:'st_timed_save_waits_for_the_run', group:'Cloud Sync', name:'A timed cloud save waits for the self test to end (v36.67)',
+    test: async()=>{
+      // Tony, after a Self Test run: "Cloud sync failed: db.runTransaction is not
+      // a function". saveData() arms a 1.5 s timer; when it came due while a test
+      // had swapped in its own small fake database, the app's REAL save ran
+      // against the TEST's fake. This fake has no runTransaction, like those.
+      if(typeof timedCloudSave!=='function') throw new Error('timedCloudSave not defined');
+      var realDb=window._fbDb, realUser=window._fbUser, realDrive=window._driveMode, realErr=window.handleFirestoreSaveError,
+          runWas=_selfTestRunning, heldWas=_cloudSaveHeldForSelfTest, cloudWas=_cloudSnapshotForTest(), touched=0, errors=0;
+      try{
+        window._fbDb={ collection:function(){ touched++; return { doc:function(){ return { get:function(){ return Promise.resolve({ exists:false, data:function(){ return {}; } }); },
+                                                                             set:function(){ return Promise.resolve(); } }; } }; } };
+        window._fbUser={ email:'t@example.com' }; window._driveMode=true;
+        window.handleFirestoreSaveError=function(){ errors++; };
+        _selfTestRunning=true; _cloudSaveHeldForSelfTest=false;
+        saveData();
+        await wait(1800);                                  // past the 1.5 s timer
+        if(touched) throw new Error('a timed save ran against the test’s database in the middle of the run');
+        if(errors) throw new Error('a timed save failed in the middle of the run');
+        if(!_cloudSaveHeldForSelfTest) throw new Error('the held save was not remembered, so it would never happen');
+      } finally {
+        clearTimeout(saveTimer);
+        window._fbDb=realDb; window._fbUser=realUser; window._driveMode=realDrive; window.handleFirestoreSaveError=realErr;
+        _selfTestRunning=runWas; _cloudSaveHeldForSelfTest=heldWas;
+        _cloudRestoreForTest(cloudWas);
+      }
+      // …and the end of the run re-arms it, against the real connection.
+      if(String(_selfTestUnpark).indexOf('_cloudSaveHeldForSelfTest')===-1)
+        throw new Error('the end of a run does not re-arm a held save');
+    } },
+
   { id:'ui_swipe_fav', group:'UI', name:'Swipe favourites only — never deletes (5c.2)',
     test: async()=>{
       ['swipeStart','swipeMove','swipeEnd'].forEach(function(f){
@@ -2955,6 +3046,7 @@ window.SELF_TESTS = [
 
   { id:'cloud_conflict_has_a_way_out', group:'Cloud Sync', name:'A refused save says so on reopening and offers the fix (v35.3)',
     test: async()=>{
+      var _viewWasOpen=document.getElementById('viewOverlay').classList.contains('open');
       var testId=771002;
       recipes.unshift({id:testId,name:'Banner Test',emoji:'🥘',category:'Dinner',difficulty:'Easy',
         prep:'1',servings:'1',bg:'#fff',fav:false,photo:'',ingredients:[],steps:[],diets:[],
@@ -3032,6 +3124,7 @@ window.SELF_TESTS = [
         clearRecipeConflict(testId);
         recipes=recipes.filter(function(x){ return x.id!==testId; });
         var ov=document.getElementById('serviceErrorOverlay'); if(ov) ov.remove();
+        if(!_viewWasOpen && document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay');   // v36.67
       }
     } },
 
@@ -6115,6 +6208,10 @@ window.SELF_TESTS = [
         if(document.getElementById('f-steps').value.indexOf('Mix it')===-1)
           throw new Error('replace did not overwrite the method');
       } finally {
+        // v36.67 — the form is dirty on purpose, and closeM on a dirty form
+        // asks "Unsaved changes?" instead of closing. That dialog then sat over
+        // the Self Test on Tony's phone until a later test happened to close it.
+        _editFormSnapshot=null;
         closeM('freehandOverlay'); closeM('editOverlay');
         if(testId) recipes=recipes.filter(function(r){ return r.id!==testId; });
       }
@@ -9011,6 +9108,42 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'i18n_cards_follow_the_real_switch', group:'UI', name:'Cards change language through the 🌐 menu, both ways (v36.67)',
+    test: async()=>{
+      // v36.62's test switched language with i18nInstall, which redraws the
+      // cards. The 🌐 menu does not use it — so on Tony's phone the cards kept
+      // their Hebrew meal types after switching to English. This goes through
+      // the menu's own path, i18nSetLanguage, in both directions.
+      if(typeof i18nSetLanguage!=='function') throw new Error('i18nSetLanguage not defined');
+      var parked={};
+      Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k) || k===I18N_LANG_KEY) parked[k]=localStorage.getItem(k); });
+      var realR=recipes, realView=viewMode, langWas=_i18nLang, dictWas=_i18nDict, realToast=window.toast;
+      var fix=normalizeRecipe({ id:888983, name:'Switch test', category:'Dinner', difficulty:'Hard', servings:'2', ingredients:[], steps:['x'] });
+      function badge(){ var b=document.querySelector('#recipeGrid .card-category-badge'); return b ? b.textContent : null; }
+      try{
+        window.toast=function(){};
+        recipes=[fix]; viewMode='grid'; document.getElementById('searchInput').value=''; renderGrid();
+        localStorage.setItem('tonys_i18n_ru', JSON.stringify({ strings:{ Dinner:'Ужин', Hard:'Сложно' }, updatedAt:1 }));
+        if(!(await i18nSetLanguage('ru'))) throw new Error('could not switch to the stand-in language');
+        if(badge()!=='Ужин') throw new Error('after switching TO a language the card reads "'+badge()+'", not "Ужин"');
+        if(!(await i18nSetLanguage('en'))) throw new Error('could not switch back to English');
+        if(badge()!=='Dinner') throw new Error('after switching back to English the card still reads "'+badge()+'" — Tony’s bug');
+        // And nothing else may set the language behind i18nActivate's back.
+        var srcLines=String(document.documentElement.innerHTML).split('\n').filter(function(l){ return /(^|[^.\w])_i18nDict\s*=[^=]/.test(l); });
+        if(srcLines.length!==2) throw new Error('the dictionary is set outside i18nActivate: '+srcLines.map(function(l){ return l.trim().slice(0,60); }).join(' | '));
+      } finally {
+        window.toast=realToast;
+        recipes=realR; viewMode=realView;
+        i18nInstall(langWas, dictWas);
+        if(langWas!=='en'){ i18nApply(document.body); }
+        i18nApplyDirection();
+        await new Promise(function(r){ setTimeout(r, 500); });   // the missing-list writer runs on a timer
+        Object.keys(localStorage).forEach(function(k){ if((/^tonys_i18n_/.test(k) || k===I18N_LANG_KEY) && !(k in parked)) localStorage.removeItem(k); });
+        Object.keys(parked).forEach(function(k){ localStorage.setItem(k, parked[k]); });
+        renderGrid(); renderLangMenu();
+      }
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']
@@ -9906,6 +10039,7 @@ window.SELF_TESTS = [
 
   { id:'coll_remove_part', group:'Import/Export', name:'A recipe can be dropped from a collection without keeping it (v36.2)',
     test: async()=>{
+      var _viewWasOpen=document.getElementById('viewOverlay').classList.contains('open');
       var realAsk=window.askConfirm, realToast=window.toast;
       var before=recipes.slice(), beforeId=nextId;
       try{
@@ -9981,6 +10115,7 @@ window.SELF_TESTS = [
       } finally {
         window.askConfirm=realAsk; window.toast=realToast;
         recipes.length=0; before.forEach(function(r){ recipes.push(r); }); nextId=beforeId;
+        if(!_viewWasOpen && document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay');   // v36.67
       }
     } },
 
@@ -10399,6 +10534,7 @@ window.SELF_TESTS = [
 
   { id:'coll_view_and_ticks', group:'UI', name:'A collection renders per-recipe sections with their own ticks (v36.0)',
     test: async()=>{
+      var _viewWasOpen=document.getElementById('viewOverlay').classList.contains('open');
       var built = buildImportFromParsed({ collectionName:'Viewable', category:'Dinner', recipes:[
         { name:'First', ingredients:[{a:'1',n:'onion',g:'for the base'},{a:'2',n:'garlic'}], steps:['s1','s2'] },
         { name:'Second', ingredients:[{a:'3',n:'rice'}], steps:['t1'] }
@@ -10448,6 +10584,7 @@ window.SELF_TESTS = [
       } finally {
         recipes = recipes.filter(function(x){ return x.id!==testId; });
         viewId=kView; if(viewId!=null) drawView();
+        if(!_viewWasOpen && document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay');   // v36.67
       }
     } },
 
@@ -11109,6 +11246,7 @@ window.SELF_TESTS = [
         if(document.getElementById('lineMarker').classList.contains('on')) throw new Error('the marker is still visible after clearing');
       } finally {
         closeM('viewOverlay');
+        if(document.getElementById('editOverlay').classList.contains('open')){ _editFormSnapshot=null; closeM('editOverlay'); }   // v36.67
         try{ if(savedMark===null) localStorage.removeItem('tonys_linemark'); else localStorage.setItem('tonys_linemark',savedMark); }catch(e){}
         recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
       }
@@ -11155,11 +11293,26 @@ window.SELF_TESTS = [
     test: async()=>{
       if(typeof closeTopModal!=='function') throw new Error('closeTopModal (Escape handling) not defined');
       applyAriaLabels();
+      // v36.67 — "icon-only" is no letters in ANY script. /[A-Za-z0-9]/ counted
+      // every Hebrew recipe name (a button since v36.65) as an unlabelled icon,
+      // and failed on Tony's phone with 43 of them.
       var iconOnly=Array.prototype.slice.call(document.querySelectorAll('button')).filter(function(b){
-        var t=(b.textContent||'').trim(); return t && !/[A-Za-z0-9]/.test(t);
+        var t=(b.textContent||'').trim(); return t && !hasWords(t);
       });
       var bad=iconOnly.filter(function(b){ return !b.getAttribute('aria-label'); });
-      if(bad.length) throw new Error(bad.length+' icon-only button(s) have no accessible name');
+      if(bad.length) throw new Error(bad.length+' icon-only button(s) have no accessible name: '
+        + bad.slice(0,5).map(function(b){ return JSON.stringify((b.textContent||'').trim()); }).join(', '));
+      // …and a name in any script is a name: it must NOT be relabelled "Button".
+      var names=document.createElement('div');
+      names.innerHTML='<button>עוגת שוקולד</button><button>Бабушкин шницель</button><button>كعكة</button><button>蛋糕</button><button>🍰</button>';
+      document.body.appendChild(names);
+      try{
+        applyAriaLabels(names);
+        var nb=names.querySelectorAll('button');
+        for(var ni=0;ni<4;ni++) if(nb[ni].getAttribute('aria-label'))
+          throw new Error('a recipe name ('+nb[ni].textContent+') was relabelled "'+nb[ni].getAttribute('aria-label')+'" — a screen reader would not say the name');
+        if(!nb[4].getAttribute('aria-label')) throw new Error('an emoji-only button was not given a name');
+      } finally { names.remove(); }
       if(!document.getElementById('searchInput').getAttribute('aria-label')) throw new Error('search box has no accessible name');
       if(document.getElementById('toast').getAttribute('aria-live')!=='polite') throw new Error('toast is not announced to screen readers');
       // Escape must close an open dialog.

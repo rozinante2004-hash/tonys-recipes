@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.66 -->
+<!-- Tony's Recipes Collection v36.67 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1991,12 +1991,40 @@ function _selfTestUnpark(p) {
   try { _backupRecordRestoreForTest(p.backupWas); } catch(e) {}
   try { if (p.spendWas === null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, p.spendWas); } catch(e) {}
   try { if (p.unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, p.unitWas); } catch(e) {}
+  // v36.67 — a toast a test raised is the test's, not Tony's. One with an
+  // "↩ Undo" button (a collection test's "1 recipe now in 'Winter soups'")
+  // outlived the run on his phone, offering to undo something done to test
+  // data. Taken down, and its button with it.
+  try {
+    var tt = document.getElementById('toast');
+    if (tt) { clearTimeout(tt._tid); tt.classList.remove('show'); tt.style.pointerEvents = ''; tt.textContent = ''; }
+  } catch(e) {}
+  // A cloud save that came due during the run was held (timedCloudSave); it
+  // runs now, against the real connection.
+  if (_cloudSaveHeldForSelfTest) {
+    _cloudSaveHeldForSelfTest = false;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(timedCloudSave, 1500);
+  }
   // Back into the language Tony was reading, whatever happened above.
   if (p.langWas !== 'en' && typeof i18nInstall === 'function' && p.dictWas) {
     i18nInstall(p.langWas, p.dictWas);
     i18nApply(document.body);
     i18nApplyDirection();
   }
+}
+function _selfTestOpenDialogs() {
+  return Array.prototype.slice.call(document.querySelectorAll('[id$="Overlay"].open, [id$="Modal"].open, #askOverlay'))
+    .map(function(e){ return e.id; }).filter(function(id){ return id && id !== 'selfTestOverlay'; });
+}
+function _selfTestCloseDialogs(ids) {
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'editOverlay') { try { _editFormSnapshot = null; } catch(e) {} }
+    if (id === 'askOverlay') { el.remove(); return; }
+    el.classList.remove('open');
+  });
 }
 window._selfTestPark = _selfTestPark; window._selfTestUnpark = _selfTestUnpark;
 
@@ -2032,13 +2060,23 @@ async function runSelfTests() {
     if(row) row.scrollIntoView({block:'nearest',behavior:'smooth'});
 
     var _t0 = Date.now();
+    // v36.67 — a dialog a test leaves open is closed at once and the test
+    // fails for it, rather than sitting over the suite until some later test
+    // happens to close it ("Unsaved changes" on Tony's phone for a minute).
+    var _openBefore = _selfTestOpenDialogs();
     try {
       await t.test();
+      var _stranded = _selfTestOpenDialogs().filter(function(id){ return _openBefore.indexOf(id) === -1; });
+      if (_stranded.length) {
+        _selfTestCloseDialogs(_stranded);
+        throw new Error('left a dialog open: ' + _stranded.join(', '));
+      }
       _selfTestResults[t.id] = {pass:true, ms:Date.now()-_t0, group:t.group, name:t.name};
       if(statusEl) statusEl.textContent = '✅';
       if(row) row.style.background = '#f0fdf0';
       passed++;
     } catch(err) {
+      try { _selfTestCloseDialogs(_selfTestOpenDialogs().filter(function(id){ return _openBefore.indexOf(id) === -1; })); } catch(e) {}
       _selfTestResults[t.id] = {pass:false, error:err.message, stack:err.stack,
                                 ms:Date.now()-_t0, group:t.group, name:t.name};
       if(statusEl) statusEl.textContent = '❌';
@@ -2159,10 +2197,19 @@ function selfTestReportText() {
   }
 
   // ── Recent JS errors. Often the real cause of a test failure. ─────────────
-  var errs = (typeof recentErrors === 'function') ? recentErrors() : [];
+  var allErrs = (typeof recentErrors === 'function') ? recentErrors() : [];
+  var errs = allErrs.filter(function(e){ return !e.duringTest; });
+  var staged = allErrs.filter(function(e){ return e.duringTest; });
+  var line = function(e){ L.push('  ' + e.at + '  [' + e.kind + '] ' + e.message + (e.where ? '  @ ' + e.where : '')); };
   L.push('RECENT JS ERRORS (' + errs.length + ')');
   if (!errs.length) L.push('  none captured this session');
-  errs.forEach(function(e){ L.push('  ' + e.at + '  [' + e.kind + '] ' + e.message + (e.where ? '  @ ' + e.where : '')); });
+  errs.forEach(line);
+  // v36.67 — apart, and said to be what they mostly are.
+  if (staged.length) {
+    L.push('');
+    L.push('RAISED DURING THE TEST RUN (' + staged.length + ') — mostly failures the tests stage on purpose');
+    staged.forEach(line);
+  }
   L.push('');
 
   // ── Sync health, verbatim. Already exists; no reason to duplicate it. ─────
@@ -3191,7 +3238,7 @@ function renderSyncHealth() {
   out += healthRow('Photos differing from the cloud',
     _photoCloudDiff === null
       ? (_photoCloudChecking ? 'checking…'
-         : (h.signedIn ? 'could not be read' : 'unknown — signed out'))
+         : (!h.signedIn ? 'unknown — signed out' : (_photoCloudTried ? 'could not be read' : 'not checked yet')))
       : String(_photoCloudDiff),
     _photoCloudDiff ? 'warn' : (_photoCloudDiff === 0 ? 'good' : ''),
     _photoCloudDiff ? 'the cloud copy wins on every load, so these will come back wrong until you use ⚙️ → “Send my photos to the cloud”' : '');
@@ -3281,7 +3328,11 @@ function syncHealthText() {
   // than "agree" until it has actually been compared — never assert what has not
   // been observed.
   L.push('photos differing from the cloud: ' + (_photoCloudDiff === null
-    ? (_photoCloudChecking ? 'checking…' : (_fbDb && window._fbUser ? 'could not be read' : 'not signed in'))
+    ? (_photoCloudChecking ? 'checking…' : !(_fbDb && window._fbUser) ? 'not signed in'
+       // v36.67 — "could not be read" only when a read was TRIED and failed.
+       // The Self Test's copy of this report never opens Sync Health, so it
+       // never asks — and said "could not be read" about a question not asked.
+       : _photoCloudTried ? 'could not be read' : 'not checked (open ⚙️ → Sync Health to compare)')
     : (_photoCloudDiff + (_photoCloudDiff ? ' — these WILL come back wrong on the next load until sent up'
                                           : ' (the cloud agrees with this device)'))));
   L.push('whatsapp chats: ' + h.chats.synced + ' synced (' + Math.round(h.chats.bytes / 1024) + ' KB), '
@@ -3308,11 +3359,11 @@ window.copySyncHealth = copySyncHealth;
 // Posing the question and declining to answer it is not honesty, it is a panel
 // that does not work. It costs ONE bulk read, and the panel is opened rarely and
 // deliberately. (v34.8)
-var _photoCloudChecking = false;
+var _photoCloudChecking = false, _photoCloudTried = false;
 function checkPhotoCloudDiff() {
   if (_photoCloudChecking) return;
   if (!_fbDb || !window._fbUser) return;      // nothing to compare against
-  _photoCloudChecking = true;
+  _photoCloudChecking = true; _photoCloudTried = true;
   comparePhotosWithCloud()
     .catch(function(){ return null; })
     .then(function(){ _photoCloudChecking = false; renderSyncHealth(); });
@@ -3539,7 +3590,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.66';
+var APP_VERSION = 'v36.67';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4034,11 +4085,16 @@ window.sendViaGmailApi = sendViaGmailApi;
 // difference between a diagnosis and another round of questions.
 var _recentErrors = [];
 function recordError(kind, message, where) {
+  // v36.67 — raised while the Self Test runs? Most of those are failures the
+  // tests stage on purpose ("AI down", "boom"). They are marked, listed apart
+  // in the report, and kept OUT of the persistent log — where every run used
+  // to leave a handful of "errors" for the log nudge to count.
+  var duringTest = (typeof _selfTestRunning !== 'undefined') && !!_selfTestRunning;
   _recentErrors.push({ at: new Date().toISOString(), kind: kind,
-                       message: String(message || '(no message)'), where: where || '' });
+                       message: String(message || '(no message)'), where: where || '', duringTest: duringTest });
   // The in-memory buffer dies with the tab; the log survives it, so an error
   // that only happens once a week is still there when someone comes looking.
-  try { syncLog('error', String(message || '(no message)'), where || undefined); } catch(e) {}
+  if (!duringTest) { try { syncLog('error', String(message || '(no message)'), where || undefined); } catch(e) {} }
   if (_recentErrors.length > 20) _recentErrors.shift();   // ring buffer, newest kept
 }
 window.recentErrors = function(){ return _recentErrors.slice(); };
@@ -4405,7 +4461,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 
 /* Dropdown menus */
 .drop-group { position: static; }
-.drop-menu { opacity: 0; pointer-events: none; position: fixed; top: -999px; left: -999px; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow: hidden; transition: opacity 0.12s ease; }
+.drop-menu { opacity: 0; pointer-events: none; position: fixed; top: -999px; left: -999px; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transition: opacity 0.12s ease; }   /* v36.67 — scrolls when capped to the screen (dropPlacement) */
 .drop-menu.open { opacity: 1; pointer-events: auto; }
 #helpOverlay.open,
 #photoSearchOverlay.open,
@@ -6205,7 +6261,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.66</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.67</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6837,7 +6893,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.66</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.67</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10197,9 +10253,8 @@ async function i18nSetLanguage(lang) {
   await i18nEnsureBaseSaved();
 
   if (lang === 'en') {
-    _i18nDict = null; _i18nLang = 'en';
-    i18nRenderBadge();
     _i18nMissing = Object.create(null);
+    i18nActivate('en', null);
     try { localStorage.setItem(I18N_LANG_KEY, 'en'); } catch(e) {}
     i18nRevertAll();
     i18nApplyDirection();
@@ -10222,8 +10277,7 @@ async function i18nSetLanguage(lang) {
     dict = await i18nGenerate(lang);
     if (!dict) return false;
   }
-  _i18nDict = dict; _i18nLang = lang;
-  i18nRenderBadge();
+  i18nActivate(lang, dict);
   try { localStorage.setItem(I18N_LANG_KEY, lang); } catch(e) {}
   // What this language was missing last time is still missing now, unless the
   // dictionary that just loaded has since answered it.
@@ -10544,7 +10598,7 @@ async function i18nFillGaps(lang) {
   var filled = gaps.filter(function(s){ return !!res.dict[s]; });
   if (!filled.length) { showServiceError('Nothing came back. The interface is unchanged.'); return false; }
 
-  _i18nDict = res.dict;
+  i18nActivate(lang, res.dict, true);
   i18nClearMissing(filled);
   var doc = { lang: lang, strings: res.dict, count: Object.keys(res.dict).length, updatedAt: Date.now(),
               by: (window._fbUser && window._fbUser.email) || '' };
@@ -10643,7 +10697,7 @@ async function i18nUpdateAll() {
         var left = i18nMissingFor(p.lang).filter(function(g){ return !res.dict[g]; });
         localStorage.setItem(i18nMissKey(p.lang), JSON.stringify(left));
       } catch(e) {}
-      if (p.lang === _i18nLang) { _i18nDict = res.dict; i18nClearMissing(filled); }
+      if (p.lang === _i18nLang) { i18nActivate(p.lang, res.dict, true); i18nClearMissing(filled); }
       return { lang: p.lang, filled: filled.length, missing: res.missing, where: where };
     } catch(e) {
       syncLog('error', 'Updating the ' + i18nLangName(p.lang) + ' translation failed', String(e && e.message).slice(0, 160));
@@ -10668,19 +10722,31 @@ window.i18nUpdateAll = i18nUpdateAll;
 // run and without impersonating Firestore — and, just as important, has to be
 // able to put the interface back to English afterwards.
 function i18nInstall(lang, dict) {
+  if (dict) i18nLoadMissing(lang); else _i18nMissing = Object.create(null);
+  return i18nActivate(lang, dict);
+}
+// ─── THE ONE PLACE THE LANGUAGE CHANGES (v36.67) ─────────────────────────────
+// Tony switched Hebrew → English and every card kept its Hebrew meal type
+// until he restarted. v36.62 made the cards translate as they are BUILT and put
+// the redraw in i18nInstall — but the 🌐 menu, the switch to English and the
+// startup restore each set `_i18nDict` themselves and never went through it.
+// The tests did, so they passed. Every one of those paths now comes here.
+// `changed` for a dictionary edited in place (the editor's draft can be the
+// very object already installed, so comparing references would miss it).
+function i18nActivate(lang, dict, changed) {
   var was = _i18nDict;
   _i18nDict = dict || null;
   _i18nLang = dict ? lang : 'en';
   i18nRenderBadge();
-  if (dict) i18nLoadMissing(lang); else _i18nMissing = Object.create(null);
-  // v36.62 — recipe cards are translated while they are BUILT (renderGrid), and
-  // the observer leaves them alone, so a new language has to redraw them.
-  if (was !== _i18nDict) {
+  // Recipe cards are translated while they are BUILT (renderGrid), and the
+  // observer leaves them alone, so a different language has to redraw them.
+  if (was !== _i18nDict || changed) {
     var g = document.getElementById('recipeGrid');
     if (g && g.childElementCount && typeof renderGrid === 'function') { try { renderGrid(); } catch(e) {} }
   }
   return _i18nLang;
 }
+window.i18nActivate = i18nActivate;
 function i18nCurrentDict() { return _i18nDict; }
 // "HE", "EN", "RU" on the corner of the 🌐, and the button's spoken name says
 // the language in full.
@@ -11244,7 +11310,7 @@ async function i18nEdSave() {
   // The live interface follows immediately — the point of an editor you can see
   // the result in is that you can see the result.
   if (_i18nLang === lang) {
-    _i18nDict = _i18nEdDraft;
+    i18nActivate(lang, _i18nEdDraft, true);
     i18nClearMissing(Object.keys(_i18nEdDraft));
     i18nApply(document.body);
   }
@@ -11497,6 +11563,16 @@ var ARIA_LABELS = {
   '📊 Excel': 'Export to Excel', '📄 Word': 'Export to Word',
   '✏️': 'Edit', '📷': 'Add or change photo'
 };
+// v36.67 — "icon-only" means no letters or digits in ANY script. This read
+// /[A-Za-z0-9֐-׿]/ — Latin and Hebrew — so once a recipe's name became its
+// card's button (v36.65), a Russian, Arabic or Chinese name was labelled
+// "Button" for a screen reader, and the self test counted Tony's 43 Hebrew
+// names as unlabelled icons.
+function hasWords(t) {
+  try { return /[\p{L}\p{N}]/u.test(String(t)); }
+  catch(e) { return /[A-Za-z0-9\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(String(t)); }
+}
+window.hasWords = hasWords;
 function applyAriaLabels(root) {
   (root || document).querySelectorAll('button').forEach(function(b) {
     if (b.getAttribute('aria-label')) return;
@@ -11504,7 +11580,7 @@ function applyAriaLabels(root) {
     var label = ARIA_LABELS[txt];
     if (!label && b.title) label = b.title;
     // Any button whose visible text is only emoji/symbols needs a spoken name
-    if (!label && txt && !/[A-Za-z0-9֐-׿]/.test(txt)) label = b.title || 'Button';
+    if (!label && txt && !hasWords(txt)) label = b.title || 'Button';
     if (label) b.setAttribute('aria-label', label);
   });
 }
@@ -15124,6 +15200,28 @@ function _armDropOutside(menu){
   // Defer so the click that opened the menu doesn't immediately close it.
   setTimeout(function(){ if(_dropOutsideFn === fn) document.addEventListener('click', fn); }, 0);
 }
+// ─── WHERE A MENU OPENS (v36.67) ─────────────────────────────────────────────
+// Tony: "occasionally the Settings menu opens ABOVE the icon, mostly invisible
+// and inaccessible." The rule was: if it does not fit below the button, put it
+// above — without asking whether it fits above either. ⚙️ is near the top of
+// the screen and its menu is long (longer still for the owner), so on a phone
+// it flipped up and ran off the top, leaving only its last item showing. Now:
+// below if it fits, above if it fits, otherwise on whichever side has more
+// room, capped to that room and scrollable. It can never start off-screen.
+var DROP_MARGIN = 8;
+function dropPlacement(r, mw, mh, vw, vh) {
+  var left = r.right - mw;
+  if (left + mw > vw - DROP_MARGIN) left = vw - mw - DROP_MARGIN;
+  if (left < DROP_MARGIN) left = DROP_MARGIN;
+  var below = vh - DROP_MARGIN - (r.bottom + 4);
+  var above = (r.top - 4) - DROP_MARGIN;
+  if (mh <= below) return { top: r.bottom + 4, left: left, maxHeight: 0 };
+  if (mh <= above) return { top: r.top - 4 - mh, left: left, maxHeight: 0 };
+  if (below >= above) return { top: r.bottom + 4, left: left, maxHeight: Math.max(120, below) };
+  var h = Math.max(120, above);
+  return { top: Math.max(DROP_MARGIN, r.top - 4 - h), left: left, maxHeight: h };
+}
+window.dropPlacement = dropPlacement;
 function toggleDrop(id){
   const menu=document.getElementById(id);
   if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') { applyOwnerOnlyItems(); renderUnitsMenuItem(); }
@@ -15141,13 +15239,14 @@ function toggleDrop(id){
     menu.classList.add('open'); // opacity:0 at this point
     // Use rAF to let browser calculate size without showing
     requestAnimationFrame(function(){
-      const mw=menu.offsetWidth, mh=menu.offsetHeight;
-      var top=r.bottom+4, left=r.right-mw;
-      if(left<8) left=8;
-      if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
-      if(top+mh>window.innerHeight-8) top=r.top-mh-4;
-      menu.style.top=top+'px';
-      menu.style.left=left+'px';
+      menu.style.maxHeight='';                 // measure its NATURAL height
+      var vv=window.visualViewport;
+      var p=dropPlacement(r, menu.offsetWidth, menu.scrollHeight,
+                          window.innerWidth, (vv && vv.height) || window.innerHeight);
+      menu.style.top=p.top+'px';
+      menu.style.left=p.left+'px';
+      menu.style.maxHeight=p.maxHeight ? p.maxHeight+'px' : '';
+      menu.scrollTop=0;
       // Now it's in position, opacity transition kicks in
     });
     _armDropOutside(menu);
@@ -17324,9 +17423,25 @@ function saveData() {
       return;
     }
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveToFirestore, 1500);
+    saveTimer = setTimeout(timedCloudSave, 1500);
   }
 }
+// ─── A TIMED SAVE WAITS FOR THE SELF TEST (v36.67) ───────────────────────────
+// Tony, twice after a Self Test run: "❌ Cloud sync failed: db.runTransaction is
+// not a function — will retry shortly", and the header red. Many tests call
+// saveData(), which arms this 1.5-second timer; twenty-odd tests swap `_fbDb`
+// for a small fake of their own for a moment. When the timer came due inside
+// one of those moments, the app's REAL save ran against the TEST's fake. It is
+// the timer that is wrong, not the fakes: nothing the app does on its own
+// should run in the middle of a test. So a timed save that comes due during a
+// run is held, and armed again by _selfTestUnpark once the run is over — by
+// which time `_fbDb` is the real connection and the recipes are the real ones.
+var _cloudSaveHeldForSelfTest = false;
+function timedCloudSave() {
+  if (_selfTestRunning) { _cloudSaveHeldForSelfTest = true; return Promise.resolve(); }
+  return saveToFirestore();
+}
+window.timedCloudSave = timedCloudSave;
 
 // ─── CLOUD PHOTO STORAGE ──────────────────────────────────────────────────────
 // Firestore caps a single document at ~1 MiB. Photos are base64 and quickly overflow
@@ -18478,7 +18593,7 @@ function handleFirestoreSaveError(err) {
     setTimeout(function() {
       if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) {
         toast('🔄 Retrying cloud sync...');
-        saveToFirestore().then(function() {
+        timedCloudSave().then(function() {
           _offlineQueue = false;
           try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
         });
@@ -18489,7 +18604,7 @@ function handleFirestoreSaveError(err) {
   // Unknown error — be honest about what actually happened, then retry once
   toast('❌ Cloud sync failed: ' + (code || msg.slice(0, 60)) + ' — will retry shortly');
   setTimeout(function() {
-    if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) saveToFirestore();
+    if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) timedCloudSave();
   }, 30000);
 }
 
@@ -24090,8 +24205,7 @@ window.onHeaderScroll = onHeaderScroll;
     i18nLoadMissing(want);
     i18nLoadDict(want).then(function(d){
       if (!d) return;                         // never translated here; leave English
-      _i18nDict = d; _i18nLang = want;
-      i18nRenderBadge();
+      i18nActivate(want, d);
       i18nClearMissing(i18nMissingList().filter(function(s){ return !!d[s]; }));
       i18nApply(document.body); i18nApplyDirection();
       i18nPruneCaches([want]);

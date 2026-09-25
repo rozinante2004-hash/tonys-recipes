@@ -201,6 +201,40 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **FIVE ISSUES FROM TONY'S IPHONE (v36.67)** — all "gone after a restart":
+  - **Cards kept the old language after a switch.** v36.62 put the card redraw
+    in `i18nInstall`, but the 🌐 menu, the switch to English and the startup
+    restore set `_i18nDict` themselves. **`i18nActivate(lang, dict, changed)` is
+    now the ONLY place the dictionary changes** (the finish, update-all and
+    editor paths too); `i18n_cards_follow_the_real_switch` goes through
+    `i18nSetLanguage` and checks no other assignment exists. Test the path the
+    USER takes, not a helper that happens to do the right thing.
+  - **⚙️ opened above the icon, off the screen.** "Doesn't fit below → put it
+    above" never asked whether it fit above. `dropPlacement()` (pure, tested):
+    below if it fits, above if it fits, else the roomier side capped and
+    scrollable (`.drop-menu` is `overflow-y:auto`); visualViewport height.
+  - **a11y_basics failed on the phone: "43 icon-only buttons".** Since v36.65
+    a recipe's name is a button, and "icon-only" was `/[A-Za-z0-9]/` — every
+    Hebrew name counted. The app's own labeller knew Latin + Hebrew only, so a
+    Russian/Arabic/Chinese name would have been announced "Button". **`hasWords()`
+    = `\p{L}\p{N}`, any script.** CI never saw it: no Hebrew recipes there.
+  - **"Unsaved changes" sat over the Self Test for a minute.** A test closed a
+    deliberately dirty edit form with `closeM`, which asks instead of closing;
+    a later test happened to close it. Both runners now check EVERY test for a
+    dialog it left open (in-app: closed at once and the test fails) — which
+    found four more.
+  - **"Cloud sync failed: db.runTransaction is not a function."** `saveData()`
+    arms a 1.5 s timer; when it came due while a test had swapped `_fbDb` for a
+    small fake, the app's real save ran against the test's fake.
+    **`timedCloudSave()` holds a due save while `_selfTestRunning`**;
+    `_selfTestUnpark` re-arms it. Nothing the app does on its own should run
+    in the middle of a test.
+  - Also: errors raised during a run are marked `duringTest`, kept out of the
+    persistent log and listed apart in the report (they are mostly staged);
+    toasts a test raised are taken down at the end of a run (one offered
+    "↩ Undo" on test data); Sync Health says "not checked" rather than "could
+    not be read" when the photo comparison was never asked.
+
 - **WP-A, THE NON-ARCHITECTURAL PART (v36.66).**
   - **`#appConfig`** — a `<script>` right after the frame guard — holds
     `window.APP_CONFIG` (frozen): the Firebase settings (ONE copy; the offline
