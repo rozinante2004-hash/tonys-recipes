@@ -7127,8 +7127,12 @@ window.SELF_TESTS = [
       // check). Raising a budget for real growth is honest; leaving it to fire
       // and be ignored is not, and neither is a message that names a cause it
       // has not established.
+      // Raised to 1400 in v36.63, the same way: the audit's six blocks added
+      // ~35 KB of real features (security guards, device storage, the family
+      // backup record, the AI cost line, the parallel translation lanes). The
+      // go-public work's build step (WP-A) is where minification belongs.
       var kb = Math.round(src.length/1024);
-      if(kb > 1300) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 1400) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
@@ -8447,10 +8451,21 @@ window.SELF_TESTS = [
       if(after.data().updatedAt!==7) throw new Error('a WRITE went through the guard: updatedAt is '+after.data().updatedAt);
       if((await inner.collection('shared').doc('recipe_6').get()).exists)
         throw new Error('a new document was CREATED through the guard');
-      // …and runSelfTests actually installs it, and takes it off again.
+      // …and the parking installs it and takes it off again (v36.63: shared by
+      // runSelfTests and the CI runner, so it is tested by what it DOES).
       var src=String(runSelfTests);
-      if(src.indexOf('_selfTestNoCloudWrites(')===-1) throw new Error('runSelfTests does not install the guard');
-      if(!/window\._fbDb\s*=\s*_realDb/.test(src)) throw new Error('runSelfTests does not put the real connection back');
+      if(src.indexOf('_selfTestPark(')===-1 || src.indexOf('_selfTestUnpark(')===-1)
+        throw new Error('runSelfTests does not park and unpark');
+      var outerDb=window._fbDb, heldWas=_selfTestHeldWrites, real2=_fakeFirestore({});
+      try{
+        window._fbDb=real2;
+        var p=await _selfTestPark();
+        if(window._fbDb===real2) throw new Error('parking did not install the guard');
+        await window._fbDb.collection('shared').doc('recipe_9').set({ r:'{}' });
+        if((await real2.collection('shared').doc('recipe_9').get()).exists) throw new Error('a write went through the parked connection');
+        _selfTestUnpark(p);
+        if(window._fbDb!==real2) throw new Error('unparking did not put the real connection back');
+      } finally { window._fbDb=outerDb; _selfTestHeldWrites=heldWas; }
     } },
 
   { id:'i18n_reordered_links_do_not_loop', group:'UI', name:'A translation that moves the links cannot freeze the app (v36.52)',
@@ -8697,6 +8712,78 @@ window.SELF_TESTS = [
         renderGrid();
         await new Promise(function(r){ setTimeout(r, 500); });   // the missing-list writer runs on a timer
         try{ localStorage.removeItem(missKey); }catch(e){}
+      }
+    } },
+
+  { id:'cost_ai_this_month', group:'Cloud Sync', name:'Sync Health says what the AI cost this month (v36.63, audit H1)',
+    test: async()=>{
+      ['aiCallCost','aiSpendNote','aiSpendRead','aiSpendLine'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var was=null; try{ was=localStorage.getItem(AI_SPEND_KEY); }catch(e){}
+      var realFetch=window.fetch;
+      function near(a,b){ return Math.abs(a-b)<1e-9; }
+      try{
+        // (1) The arithmetic, against the published prices.
+        var M=1000000;
+        if(!near(aiCallCost('claude-sonnet-5',{ input_tokens:M, output_tokens:M }), 12)) throw new Error('Sonnet 5: 1M in + 1M out should be $12');
+        if(!near(aiCallCost('claude-sonnet-5',{ cache_read_input_tokens:M, cache_creation_input_tokens:M }), 2.7)) throw new Error('Sonnet 5 cache read + write should be $2.70');
+        if(!near(aiCallCost('claude-haiku-4-5',{ input_tokens:M, output_tokens:M }), 6)) throw new Error('Haiku 4.5: 1M in + 1M out should be $6');
+        if(!near(aiCallCost('claude-sonnet-5',{ server_tool_use:{ web_search_requests:3 } }), 0.03)) throw new Error('three web searches should be $0.03');
+        if(aiCallCost('claude-somebody-new',{ input_tokens:5 })!==null) throw new Error('a model with no price was priced by guessing');
+        // Both models the app actually uses have a price.
+        [AI_MODEL, AI_MODEL_SMALL].forEach(function(m){ if(!AI_PRICES[m]) throw new Error('no price for '+m+', which the app uses'); });
+
+        // (2) Counted per calendar month: last month's total does not carry over.
+        localStorage.setItem(AI_SPEND_KEY, JSON.stringify({ month:'2000-01', calls:99, usd:50, unpriced:0 }));
+        if(aiSpendRead().calls!==0 || aiSpendRead().usd!==0) throw new Error('an old month was carried into this one');
+        localStorage.removeItem(AI_SPEND_KEY);
+        aiSpendNote('claude-somebody-new', { input_tokens:10 });
+        var o=aiSpendRead();
+        if(o.calls!==1 || o.unpriced!==1 || o.usd!==0) throw new Error('an unpriced call was not counted as one: '+JSON.stringify(o));
+        if(!/no price listed/.test(aiSpendLine(o))) throw new Error('the line hides that a call could not be priced: '+aiSpendLine(o));
+
+        // (3) The real call path counts what the answer says it used — even
+        // when the answer was cut off, because that one is billed too.
+        localStorage.removeItem(AI_SPEND_KEY);
+        window.fetch=function(u, init){
+          var b={}; try{ b=JSON.parse(init && init.body || '{}'); }catch(e){}
+          if(b.messages) return Promise.resolve(new Response(JSON.stringify({ content:[{ text:'{"a":1}' }], stop_reason:'end_turn',
+            usage:{ input_tokens:100000, output_tokens:10000 } }), { status:200 }));
+          return realFetch.apply(window, arguments);
+        };
+        await _aiCallUncached('cost test '+Date.now(), 500, null, null, AI_MODEL_SMALL);
+        o=aiSpendRead();
+        if(o.calls!==1) throw new Error('a real answer was not counted');
+        if(!near(o.usd, 0.1+0.05)) throw new Error('100k in + 10k out on Haiku should be $0.15, got '+o.usd);
+        window.fetch=function(u, init){
+          var b={}; try{ b=JSON.parse(init && init.body || '{}'); }catch(e){}
+          if(b.messages) return Promise.resolve(new Response(JSON.stringify({ content:[{ text:'{"a":' }], stop_reason:'max_tokens',
+            usage:{ input_tokens:1000, output_tokens:500 } }), { status:200 }));
+          return realFetch.apply(window, arguments);
+        };
+        try{ await _aiCallUncached('cost test cut '+Date.now(), 500, null, null, AI_MODEL_SMALL); }catch(e){}
+        if(aiSpendRead().calls!==2) throw new Error('a truncated answer (still billed) was not counted');
+
+        // (4) H2 — a translation that would outrun today's Worker allowance
+        // says so before it starts, and one that fits says nothing.
+        var wh=_workerHealth;
+        try{
+          _workerHealth={ spend:{ dailyUsed:280, dailyMax:300 } };
+          if(!/20 more AI call/.test(i18nBudgetNote(50))) throw new Error('50 batches with 20 calls left was not warned about: "'+i18nBudgetNote(50)+'"');
+          _workerHealth={ spend:{ dailyUsed:10, dailyMax:300 } };
+          if(i18nBudgetNote(50)!=='') throw new Error('a translation that fits was warned about');
+          _workerHealth={ spend:{ dailyUsed:null, dailyMax:300 } };
+          if(i18nBudgetNote(50)!=='') throw new Error('an unknown count produced a made-up warning');
+        } finally { _workerHealth=wh; }
+
+        // (5) It is where Tony would see it.
+        renderSyncHealth();
+        var body=document.getElementById('syncHealthBody');
+        if(!body || body.textContent.indexOf('AI this month')===-1) throw new Error('Sync Health does not show the AI spend');
+        if(syncHealthText().indexOf('AI this month')===-1) throw new Error('the Sync Health report does not include the AI spend');
+      } finally {
+        window.fetch=realFetch;
+        try{ if(was===null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, was); }catch(e){}
+        try{ renderSyncHealth(); }catch(e){}
       }
     } },
 

@@ -102,6 +102,14 @@ jobs:
           PREFS=$(node -e "console.log(JSON.stringify({tonys_log_enabled:'1',tonys_log_nudge:'1',tonys_sync_log:JSON.stringify([{at:Date.now()-60000,k:'error',m:'An old error from before the run'}])}))")
           node tests/run-self-tests.js --port 8137 --prefs "$PREFS"
 
+      # v36.63 (audit R1) — and with the interface in Hebrew, which is how his
+      # phone may well start. The runner parks the language exactly as the
+      # app's own Self Test does; without that parking seven tests fail here.
+      # The stand-in dictionary has no English in it, so a pass means the
+      # suite really did put the interface back into English first.
+      - name: Run the Self Test suite with a translated interface
+        run: node tests/run-self-tests.js --port 8137 --lang he --prefs '{"tonys_view_unit":"imperial","tonys_theme":"dark"}'
+
       # The version banner only fires when version.json and APP_VERSION agree,
       # so a bump that misses one of them ships an update nobody is told about.
       - name: Check the version strings agree

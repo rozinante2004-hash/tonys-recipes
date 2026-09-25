@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.62 -->
+<!-- Tony's Recipes Collection v36.63 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1887,20 +1887,13 @@ window.selfTestGroupCheck       = selfTestGroupCheck;
 window.selfTestUpdateGroupHeader = selfTestUpdateGroupHeader;
 
 // ── RUN TESTS ────────────────────────────────────────────────────────────────
-async function runSelfTests() {
-  if(_selfTestRunning) return;
-  _selfTestRunning = true;
-  const btn = document.getElementById('selfTestRunBtn');
-  btn.disabled = true; btn.textContent = '⏳ Running...';
-
-  const selected = Array.from(document.querySelectorAll('.st-checkbox:checked')).map(cb=>cb.getAttribute('data-id'));
-  const toRun = SELF_TESTS.filter(t=>selected.includes(t.id));
-  let passed=0, failed=0;
-  // Recorded so the report can say what was NOT run. A summary that counts only
-  // what ran reads as a full pass when half the suite was deselected.
-  _selfTestNotRun = SELF_TESTS.filter(t=>!selected.includes(t.id)).map(t=>t.id);
-  _selfTestStartedAt = new Date();
-
+// ─── WHAT THE SUITE PUTS ASIDE WHILE IT RUNS (v36.63) ────────────────────────
+// Split out of runSelfTests so the CI runner parks EXACTLY the same things
+// (audit R1). The runner calls each test directly; before this it parked
+// nothing, so a CI profile with a translated interface would have tested the
+// translated app with English expectations — the failure the app's own Self
+// Test fixed for Tony in v36.32, never fixed for CI. One function, two callers.
+async function _selfTestPark() {
   // v36.32 — THE SUITE RUNS IN ENGLISH. Two hundred and fifty of these tests
   // find a button by the words on it, and after v36.31 those words can be in
   // Hebrew. Tony's first run with the interface translated reported eight
@@ -1939,9 +1932,54 @@ async function runSelfTests() {
   // …and when the last backup was (v36.61): a test that presses Back up now
   // against a fake folder must not leave this device believing it is backed up.
   var _backupWas = _backupRecordForTest();
+  // …and this month's AI spend (v36.63): a test that drives a stubbed answer
+  // through the real call path must not add pretend dollars to Tony's total.
+  var _spendWas = null;
+  try { _spendWas = localStorage.getItem(AI_SPEND_KEY); } catch(e) {}
   var _realDb = window._fbDb;
   _selfTestHeldWrites = 0;
   if (_realDb) window._fbDb = _selfTestNoCloudWrites(_realDb);
+  return { langWas: _langWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
+           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb };
+}
+function _selfTestUnpark(p) {
+  if (!p) return;
+  // The real connection back BEFORE anything else can save. A test that
+  // swapped in its own fake and restored "the previous one" restored the
+  // guard, which is why this assigns rather than trusting the chain.
+  if (p.realDb) window._fbDb = p.realDb;
+  if (_selfTestHeldWrites) {
+    try { syncLog('system', _selfTestHeldWrites + ' cloud write(s) held back during the self test', ''); } catch(e) {}
+  }
+  try { _cloudRestoreForTest(p.cloudWas); } catch(e) {}
+  try { _backupRecordRestoreForTest(p.backupWas); } catch(e) {}
+  try { if (p.spendWas === null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, p.spendWas); } catch(e) {}
+  try { if (p.unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, p.unitWas); } catch(e) {}
+  // Back into the language Tony was reading, whatever happened above.
+  if (p.langWas !== 'en' && typeof i18nInstall === 'function' && p.dictWas) {
+    i18nInstall(p.langWas, p.dictWas);
+    i18nApply(document.body);
+    i18nApplyDirection();
+  }
+}
+window._selfTestPark = _selfTestPark; window._selfTestUnpark = _selfTestUnpark;
+
+async function runSelfTests() {
+  if(_selfTestRunning) return;
+  _selfTestRunning = true;
+  const btn = document.getElementById('selfTestRunBtn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+
+  const selected = Array.from(document.querySelectorAll('.st-checkbox:checked')).map(cb=>cb.getAttribute('data-id'));
+  const toRun = SELF_TESTS.filter(t=>selected.includes(t.id));
+  let passed=0, failed=0;
+  // Recorded so the report can say what was NOT run. A summary that counts only
+  // what ran reads as a full pass when half the suite was deselected.
+  _selfTestNotRun = SELF_TESTS.filter(t=>!selected.includes(t.id)).map(t=>t.id);
+  _selfTestStartedAt = new Date();
+
+  // Everything the suite puts aside — see _selfTestPark.
+  var _parked = await _selfTestPark();
   try {
 
   for(let i=0; i<toRun.length; i++) {
@@ -1977,22 +2015,7 @@ async function runSelfTests() {
   }
 
   } finally {
-    // The real connection back BEFORE anything else can save. A test that
-    // swapped in its own fake and restored "the previous one" restored the
-    // guard, which is why this assigns rather than trusting the chain.
-    if (_realDb) window._fbDb = _realDb;
-    if (_selfTestHeldWrites) {
-      try { syncLog('system', _selfTestHeldWrites + ' cloud write(s) held back during the self test', ''); } catch(e) {}
-    }
-    try { _cloudRestoreForTest(_cloudWas); } catch(e) {}
-    try { _backupRecordRestoreForTest(_backupWas); } catch(e) {}
-    try { if (_unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, _unitWas); } catch(e) {}
-    // Back into the language Tony was reading, whatever happened above.
-    if (_langWas !== 'en' && typeof i18nInstall === 'function' && _dictWas) {
-      i18nInstall(_langWas, _dictWas);
-      i18nApply(document.body);
-      i18nApplyDirection();
-    }
+    _selfTestUnpark(_parked);    // language, units, sync state, backup record, cloud
   }
 
   _selfTestRunning = false;
@@ -3154,6 +3177,13 @@ function renderSyncHealth() {
   out += healthRow('Cloud reads today', h.readsToday + ' of ' + h.readsBudget.toLocaleString(),
                    pct >= 80 ? 'bad' : pct >= 40 ? 'warn' : 'good',
                    'free tier, counted on this device only');
+  var _sp = aiSpendRead();
+  out += healthRow('AI this month', aiSpendLine(_sp).replace(/^\d+ AI calls?, /, ''), '',
+                   'from this device' + (_workerHealth && _workerHealth.spend && _workerHealth.spend.monthlyUsed !== null
+                     && _workerHealth.spend.monthlyUsed !== undefined
+                     ? ' (' + _sp.calls + ' calls) — the whole family: ' + _workerHealth.spend.monthlyUsed + ' of '
+                       + _workerHealth.spend.monthlyMax + ' calls allowed'
+                     : ', ' + _sp.calls + ' calls'));
   out += healthRow('Last backup', h.backupDays === null ? 'never' : (h.backupDays + ' day' + (h.backupDays !== 1 ? 's' : '') + ' ago'),
                    (h.backupDays === null || h.backupDays > 30) ? 'warn' : 'good',
                    h.backupDays === null ? 'on any device' : backupWhereText());
@@ -3189,6 +3219,9 @@ function syncHealthText() {
     + (h.unreadable ? ' (ids ' + cloudUnreadableIds().join(', ') + ')' : ''));
   L.push('recipes on this device: ' + h.localRecipes);
   L.push('device storage: ' + deviceStorageLine());
+  L.push('AI this month (this device): ' + aiSpendLine()
+    + (_workerHealth && _workerHealth.spend && _workerHealth.spend.monthlyUsed != null
+       ? ' — family ' + _workerHealth.spend.monthlyUsed + ' of ' + _workerHealth.spend.monthlyMax + ' calls' : ''));
   L.push('recipe documents seen in cloud: ' + (h.signedIn ? h.cloudRecipes : 'unknown — signed out'));
   L.push('cloud storage layout: schema ' + h.schema);
   L.push('cloud reads today: ' + h.readsToday + ' of ' + h.readsBudget);
@@ -3470,7 +3503,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.62';
+var APP_VERSION = 'v36.63';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6167,7 +6200,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.62</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.63</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6798,7 +6831,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.62</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.63</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9313,6 +9346,7 @@ var I18N_EXTRA = [
   'on this device', 'on a computer', 'on a computer (automatic)', 'on an iPhone', 'on an iPad',
   'on an Android phone', 'on another device', 'No backup has been taken yet',
   // v36.62 — on recipe cards, which the page walk no longer visits (renderGrid)
+  'AI this month', 'from this device', 'under $0.01',
   'srv', '🍽 {1} srv', 'Add to favourites', 'Remove from favourites', 'Cooked {1} times',
   'on any device',
   // The log nudge joins finding titles by hand (see showLogNudge) — this is the
@@ -9866,6 +9900,23 @@ function i18nEstimate(catalogue) {
   var ms = Math.ceil(batches / I18N_LANES) * i18nMsPerBatch();
   return { batches: batches, ms: ms, words: i18nDurationWords(ms) };
 }
+// v36.63 (audit H2) — the Worker allows AI_DAILY_MAX calls a day for the whole
+// family (300 by default), and one new language is ~57 of them. Three in a day
+// would fit; a fourth would stop half-way with "RATE_LIMIT" in the log. Rather
+// than raise a guard rail on the bill, the dialog says so BEFORE the money is
+// committed. Allows for the retries and splits a run usually needs. '' when the
+// Worker has not said (no KV, or not checked yet) — no number is better than a
+// made-up one.
+function i18nBudgetNote(batches) {
+  var sp = (typeof _workerHealth === 'object' && _workerHealth) ? _workerHealth.spend : null;
+  if (!sp || typeof sp.dailyUsed !== 'number' || typeof sp.dailyMax !== 'number') return '';
+  var need = Math.ceil(batches * 1.2), left = Math.max(0, sp.dailyMax - sp.dailyUsed);
+  if (left >= need) return '';
+  return '\n\n⚠️ The app can make ' + left + ' more AI call(s) today and this needs about ' + need
+    + '. It will stop part-way when they run out; what has come back is kept, and the 🌐 menu '
+    + 'finishes the rest tomorrow. (The daily limit is AI_DAILY_MAX on the Worker.)';
+}
+window.i18nBudgetNote = i18nBudgetNote;
 window.i18nBatchCatalogue = i18nBatchCatalogue; window.i18nEstimate = i18nEstimate;
 window.i18nDurationWords = i18nDurationWords; window.i18nMsPerBatch = i18nMsPerBatch;
 
@@ -10289,7 +10340,8 @@ async function i18nGenerate(lang) {
       + 'kept — the 🌐 menu finishes the rest later.\n\n'
       + 'It is saved once and shared, so this happens only ever once: every other device, and '
       + 'everyone else in the family, gets it instantly from then on.\n\n'
-      + 'Your recipes are not touched — only the buttons, menus and labels.',
+      + 'Your recipes are not touched — only the buttons, menus and labels.'
+      + i18nBudgetNote(est.batches),
     okLabel: 'Translate it' });
   if (!ok) return null;
 
@@ -10364,7 +10416,8 @@ async function i18nFillGaps(lang) {
     message: gaps.length + ' phrase(s) are still in English. Some are parts of the app that had not been '
       + 'opened yet when ' + name + ' was made — a dialog\'s wording only exists once it is asked.\n\n'
       + 'This translates only those, and adds them to the existing file. It does not redo the rest — '
-      + gapEst.batches + ' batch(es), ' + gapEst.words + '.',
+      + gapEst.batches + ' batch(es), ' + gapEst.words + '.'
+      + i18nBudgetNote(gapEst.batches),
     okLabel: 'Fill them in' });
   if (!ok) return false;
 
@@ -14356,6 +14409,61 @@ var AI_MODEL = 'claude-sonnet-5';
 var AI_MODEL_SMALL = 'claude-haiku-4-5';
 window.AI_MODEL = AI_MODEL; window.AI_MODEL_SMALL = AI_MODEL_SMALL;
 
+// ─── WHAT THE AI HAS COST THIS MONTH (v36.63, audit H1) ──────────────────────
+// Spend was invisible unless someone opened the Anthropic console. Every answer
+// says exactly what it used (`usage`), so this device adds it up per calendar
+// month (UTC, the way the bill counts) and Sync Health shows it next to the
+// Worker's family-wide call count. USD per million tokens, from
+// platform.claude.com/docs/en/about-claude/pricing, checked 2026-09-24. Change
+// the model above without adding its price here and the line says so rather
+// than guessing.
+var AI_PRICES = {
+  'claude-sonnet-5':  { input: 2, cacheWrite: 2.5,  cacheRead: 0.2, output: 10 },
+  'claude-haiku-4-5': { input: 1, cacheWrite: 1.25, cacheRead: 0.1, output: 5 }
+};
+var AI_WEB_SEARCH_USD = 0.01;             // $10 per 1,000 searches
+var AI_SPEND_KEY = 'tonys_ai_spend';
+function aiSpendMonth(t) {
+  var d = new Date(t || Date.now());
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+function aiSpendRead() {
+  var fresh = { month: aiSpendMonth(), calls: 0, usd: 0, unpriced: 0 };
+  try {
+    var o = JSON.parse(localStorage.getItem(AI_SPEND_KEY) || 'null');
+    return (o && o.month === fresh.month && typeof o.usd === 'number') ? o : fresh;
+  } catch(e) { return fresh; }
+}
+// What one answer cost, from its own usage report. null when the model has no
+// price here — counted, never guessed.
+function aiCallCost(model, usage) {
+  var p = AI_PRICES[model];
+  if (!p || !usage) return null;
+  var M = 1000000;
+  var usd = (usage.input_tokens || 0) * p.input / M
+          + (usage.cache_creation_input_tokens || 0) * p.cacheWrite / M
+          + (usage.cache_read_input_tokens || 0) * p.cacheRead / M
+          + (usage.output_tokens || 0) * p.output / M;
+  var st = usage.server_tool_use || {};
+  usd += (st.web_search_requests || 0) * AI_WEB_SEARCH_USD;
+  return usd;
+}
+function aiSpendNote(model, usage) {
+  if (!usage) return;
+  var o = aiSpendRead(), c = aiCallCost(model, usage);
+  o.calls++;
+  if (c === null) o.unpriced = (o.unpriced || 0) + 1; else o.usd += c;
+  try { localStorage.setItem(AI_SPEND_KEY, JSON.stringify(o)); } catch(e) {}
+}
+function aiSpendLine(o) {
+  o = o || aiSpendRead();
+  var usd = o.usd < 0.01 && o.usd > 0 ? 'under $0.01' : '$' + o.usd.toFixed(2);
+  return o.calls + ' AI call' + (o.calls === 1 ? '' : 's') + ', about ' + usd
+    + (o.unpriced ? ' (+' + o.unpriced + ' on a model with no price listed)' : '');
+}
+window.aiCallCost = aiCallCost; window.aiSpendNote = aiSpendNote; window.aiSpendRead = aiSpendRead;
+window.aiSpendLine = aiSpendLine; window.AI_PRICES = AI_PRICES;
+
 // ─── AI RESPONSE CACHE (5.7) ─────────────────────────────────────────────────
 // Re-importing the same URL, re-translating the same recipe or re-running a
 // suggestion costs money and a round trip for an answer we already have.
@@ -14630,6 +14738,8 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
         throw new Error('API error ' + r.status + (errText ? ': ' + errText.slice(0,100) : ''));
       }
       const d = await r.json();
+      // Counted before anything below can throw: a truncated answer is still billed.
+      if (d && d.usage) aiSpendNote(model || AI_MODEL, d.usage);
       // Check for errors in the response body too
       if (d.error) {
         const errType = d.error.type || '';

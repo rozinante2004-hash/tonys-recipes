@@ -132,6 +132,27 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **AUDIT BLOCK 5 (v36.63).** Test hygiene and cost visibility:
+  - **`_selfTestPark()` / `_selfTestUnpark(p)`** hold everything the suite puts
+    aside: English interface, metric units, sync state, backup record, this
+    month's AI spend, and cloud writes (the guard). runSelfTests AND the CI
+    runner use them — the runner used to park nothing. Add a new "device
+    record" there, not in one caller.
+  - `run-self-tests.js --lang he` starts the app in a stand-in translated
+    interface (every answer "ע<n>", no English) via the device cache and a
+    reload; CI runs it. Without the parking 7 tests fail there. The runner
+    also fails a run that leaves the interface in another language.
+  - **AI this month** in Sync Health: `aiSpendNote(model, usage)` adds each
+    answer's `usage` at `AI_PRICES` (USD/MTok, from the pricing page, checked
+    2026-09-24: Sonnet 5 $2/$10, Haiku 4.5 $1/$5, cache ×1.25 / ×0.1) per UTC
+    month in `tonys_ai_spend`. A model with no price is counted, never
+    guessed. Counted before the truncation check — a cut-off answer is billed.
+    Beside it, the Worker's family-wide monthly call count.
+  - `i18nBudgetNote(batches)`: the translate/finish dialogs warn when today's
+    Worker allowance (AI_DAILY_MAX) will not cover the run. The ceiling itself
+    is unchanged — it is a guard rail on the bill.
+  - index.html size budget raised to 1,400 KB on purpose (real growth).
+
 - **AUDIT BLOCK 4 (v36.62).** Speed:
   - **Recipe cards are translated as they are BUILT.** `renderGrid` passes its
     labels (meal type, difficulty, "srv" / "🍽 {1} srv", the heart's name,

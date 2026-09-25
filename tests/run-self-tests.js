@@ -7,6 +7,7 @@
  *
  *     python3 -m http.server 8137 &
  *     node tests/run-self-tests.js --port 8137
+ *     node tests/run-self-tests.js --port 8137 --lang he     # translated interface
  *
  * Three things about it are deliberate and easy to get wrong:
  *
@@ -83,6 +84,37 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
   }
 
   const url = `http://127.0.0.1:${PORT}/index.html`;
+
+  // --lang he — start the app in a TRANSLATED interface, as Tony's phone does
+  // (v36.63, audit R1). A stand-in dictionary is built from the app's own
+  // catalogue — every answer is "ע<n>", with no English in it, so a test that
+  // finds a button by its English words can only pass if the suite really did
+  // put the interface back into English first — and saved as the device's
+  // cached copy, so the app restores it at startup exactly as it would its own.
+  const LANG = arg('lang', '');
+  if (LANG) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(2500);
+      const n = await page.evaluate(async (lang) => {
+        if (typeof window.i18nHarvest === 'function') { try { await window.i18nHarvest(); } catch (e) {} }
+        const keys = window.i18nFullCatalogue().concat(window.I18N_EXTRA || []);
+        const strings = {};
+        keys.forEach((k, i) => {
+          const slots = (k.match(/\{\d+\}/g) || []).join(' ');
+          strings[k] = '\u05e2' + i + (slots ? ' ' + slots : '');
+        });
+        localStorage.setItem('tonys_i18n_' + lang, JSON.stringify({ strings, updatedAt: Date.now() }));
+        localStorage.setItem('tonys_ui_lang', lang);
+        return Object.keys(strings).length;
+      }, LANG);
+      console.log('starting with a stand-in "' + LANG + '" interface (' + n + ' strings)');
+    } catch (e) {
+      console.error('Could not prepare the --lang interface: ' + e.message);
+      await browser.close();
+      process.exit(2);
+    }
+  }
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   } catch (e) {
@@ -114,9 +146,23 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     process.exit(2);
   }
 
+  if (LANG) {
+    const now = await page.evaluate(() => (typeof window.i18nLang === 'function') ? window.i18nLang() : 'en');
+    if (now !== LANG) {
+      console.error('--lang ' + LANG + ': the app started in "' + now + '" — this profile would test nothing.');
+      await browser.close();
+      process.exit(2);
+    }
+  }
+
   const results = await page.evaluate(async (includeNetwork) => {
     const overlay = document.getElementById('selfTestOverlay');
     if (overlay) overlay.classList.add('open');   // see note 1 in the header
+    // v36.63 (audit R1) — the SAME parking the app's own Self Test does:
+    // English interface, metric units, the sync state, the backup record, and
+    // cloud writes held back. Before this the runner parked nothing.
+    const langBefore = (typeof window.i18nLang === 'function') ? window.i18nLang() : 'en';
+    const parked = (typeof window._selfTestPark === 'function') ? await window._selfTestPark() : null;
     // see note 3 — the app raises this flag around its own run, and anything
     // that behaves differently while tests are running is invisible here unless
     // this runner raises it too.
@@ -183,7 +229,10 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
       }
     }
     if (hasFlag) window._selfTestRunning = false;
+    if (parked) window._selfTestUnpark(parked);
+    const langAfter = (typeof window.i18nLang === 'function') ? window.i18nLang() : 'en';
     return {
+      langBefore, langAfter,
       tests: out,
       sawSelfTestFlag: hasFlag,
       suiteStillOpen: !!(overlay && overlay.classList.contains('open')),
@@ -209,6 +258,12 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
   let hygiene = 0;
   if (!results.suiteStillOpen) {
     console.log('✗ HYGIENE: a test closed #selfTestOverlay — everything after it ran blind.');
+    hygiene++;
+  }
+  // …and one that leaves the interface in a different language from the one
+  // it started in. On Tony's phone that is the whole app in English afterwards.
+  if (results.langAfter !== results.langBefore) {
+    console.log(`✗ HYGIENE: the interface started in "${results.langBefore}" and was left in "${results.langAfter}".`);
     hygiene++;
   }
   const stranded = results.leftOpen.filter(id => id !== 'selfTestOverlay');
