@@ -271,7 +271,7 @@ found only because a test was written first and disagreed with the code.
     one file the in-app Self Test loads from tests/ (`tests/sw-probe.js`).
   - **The test copy:** Cloudflare Pages project `tonys-recipes-test`
     (https://tonys-recipes-test.pages.dev), build command
-    `node tools/build.js test`, output `dist`, production branch `main`,
+    `node tools/build.js test`, output `dist`, production branch `test` (since v36.74),
     `NODE_VERSION=20`. Firebase project `tonys-recipes-test` (Spark,
     Firestore in me-west1). The Worker allows it via its `ALLOWED_ORIGINS`
     variable (dashboard). **Bring! is OFF there** — it shares the live Worker,
