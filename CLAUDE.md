@@ -219,17 +219,33 @@ found only because a test was written first and disagreed with the code.
   environment". Firebase's sign-in page runs on the authDomain; Safari keeps
   that site's storage apart from the app's (worst in a Home Screen app), and
   the page loses its own state half-way. Firebase's documented remedy is to
-  serve `/__/auth/*` from the app's own address. The test copy does:
-  `functions/__/[[path]].js` (a Cloudflare Pages Function, left out of
-  `dist/` by the build) relays `/__/auth/` and `/__/firebase/` to
-  `tonys-recipes-test.firebaseapp.com`, and the test copy's `authDomain` is
-  `tonys-recipes-test.pages.dev`. Needs
-  `https://tonys-recipes-test.pages.dev/__/auth/handler` in the OAuth
-  client's Authorized redirect URIs (Google Cloud → Credentials → "Web client
-  (auto created by Google Service)"). **The family's copy has the same
-  exposure** for any iPhone signing in afresh — and GitHub Pages cannot
-  run a relay; the fix there is hosting Firebase's handler files at the root
-  of `rozinante2004-hash.github.io`. Must be settled before going public.
+  serve `/__/auth/*` from the app's own address and make that the
+  `authDomain`.
+  - **v36.75** did it for the test copy with a relay (a Cloudflare Pages
+    Function). **v36.78 replaced it with self-hosting** — Firebase's other
+    documented option, and the only one GitHub Pages can do — so the test
+    copy rehearses exactly what the family's copy will run: `tools/build.js`
+    fetches `handler`, `handler.js`, `experiments.js`, `iframe`, `iframe.js`
+    and `/__/firebase/init.json` from `<projectId>.firebaseapp.com` into
+    `dist/__/` whenever a copy's `authDomain` equals its own host
+    (`handler`/`iframe` saved as `.html`; both hosts serve `/x` from
+    `x.html`). `SKIP_AUTH_HELPERS=1` builds without them (this sandbox cannot
+    reach firebaseapp.com; CI and Cloudflare can).
+  - Each copy's OAuth client ("Web client (auto created by Google Service)",
+    Google Cloud → Credentials) must list `https://<its host>/__/auth/handler`
+    under Authorized redirect URIs. Done for the test copy.
+  - **The family's copy:** its root is the OTHER repository,
+    `rozinante2004-hash/rozinante2004-hash.github.io`, whose Actions workflow
+    fetches the same six files from `recipes-f379d` on every deploy and
+    weekly (Pages source must be "GitHub Actions"). Only once
+    https://rozinante2004-hash.github.io/__/auth/handler is served and its
+    redirect URI is added does the live `authDomain` change to
+    `rozinante2004-hash.github.io`. Changing it does not sign anyone out
+    (Firebase keys the saved sign-in by API key, not authDomain).
+  - `net_signin_helpers` checks the files really are served whenever
+    `authDomain` is the page's own host.
+  - The service worker leaves `/__/` alone (only the app page and its icons
+    are its business), so it cannot serve a stale sign-in page.
 - **NEW WORK GOES THROUGH THE `test` BRANCH FIRST (v36.74).** Cloudflare Pages
   builds the test copy from `test`; GitHub Pages builds the family's copy
   from `main`. Anything that touches Firebase, saving, sync or the service

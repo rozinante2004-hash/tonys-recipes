@@ -109,8 +109,7 @@ if (envName === 'live') {
 
 // ── The site ─────────────────────────────────────────────────────────────────
 // Everything the site serves; not the tooling, tests, docs or dependencies.
-const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'tests', 'tools', 'functions', 'package.json', 'package-lock.json']);
-// (functions/ is Cloudflare Pages server code, read from the repository itself — not a page to serve.)
+const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'tests', 'tools', 'package.json', 'package-lock.json']);
 function copyTree(from, to) {
   fs.mkdirSync(to, { recursive: true });
   for (const name of fs.readdirSync(from)) {
@@ -150,5 +149,47 @@ fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify({
   commit: process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || null
 }, null, 2) + '\n');
 
-console.log('built ' + envName + ' → ' + path.relative(repo, outDir) + '/  (' +
-  (envName === 'live' ? 'page identical to the source' : 'project ' + cfg.firebase.projectId + ', site ' + cfg.siteOrigin + cfg.sitePath) + ')');
+// ── Google sign-in, served from this copy's own address (v36.78) ────────────
+// On an iPhone, sign-in run on <project>.firebaseapp.com stops half-way with
+// "missing initial state": Safari keeps that site's storage apart from the
+// app's. Firebase's documented remedy ("self-host the helper code") is to serve
+// its sign-in pages from the app's own address and make that the authDomain.
+// When a copy's authDomain IS its own address, those files are fetched from its
+// Firebase project here, at build time, into dist/__/. They are Google's files,
+// unchanged, and nothing in them is secret; fetching them on every build keeps
+// them current. `handler` and `iframe` are pages, saved as .html so the host
+// serves them as pages (both Cloudflare Pages and GitHub Pages answer
+// /__/auth/handler with handler.html).
+// The family's copy lives at the ROOT of rozinante2004-hash.github.io, which is
+// another repository; its files are fetched there, the same way.
+const AUTH_HELPERS = [
+  ['__/auth/handler', '__/auth/handler.html'], ['__/auth/handler.js', '__/auth/handler.js'],
+  ['__/auth/experiments.js', '__/auth/experiments.js'], ['__/auth/iframe', '__/auth/iframe.html'],
+  ['__/auth/iframe.js', '__/auth/iframe.js'], ['__/firebase/init.json', '__/firebase/init.json']
+];
+async function fetchAuthHelpers() {
+  if (envName === 'live') return 'n/a';
+  const siteHost = new URL(cfg.siteOrigin).host;
+  if (cfg.firebase.authDomain !== siteHost) return 'not needed (sign-in runs on ' + cfg.firebase.authDomain + ')';
+  if (process.env.SKIP_AUTH_HELPERS === '1') return 'SKIPPED (SKIP_AUTH_HELPERS=1) — sign-in will not work in this build';
+  const from = 'https://' + cfg.firebase.projectId + '.firebaseapp.com/';
+  for (const [src, dest] of AUTH_HELPERS) {
+    let res;
+    try { res = await fetch(from + src, { redirect: 'follow' }); }
+    catch (e) { fail('could not fetch ' + from + src + ' (' + e.message + ') — set SKIP_AUTH_HELPERS=1 to build without sign-in'); }
+    if (!res.ok) fail(from + src + ' answered ' + res.status);
+    const body = Buffer.from(await res.arrayBuffer());
+    if (!body.length) fail(from + src + ' came back empty');
+    if (src.endsWith('init.json') && JSON.parse(body.toString('utf8')).projectId !== cfg.firebase.projectId)
+      fail('init.json is for another Firebase project');
+    fs.mkdirSync(path.dirname(path.join(outDir, dest)), { recursive: true });
+    fs.writeFileSync(path.join(outDir, dest), body);
+  }
+  return AUTH_HELPERS.length + ' sign-in files from ' + from;
+}
+
+fetchAuthHelpers().then(function (helpers) {
+  console.log('built ' + envName + ' → ' + path.relative(repo, outDir) + '/  (' +
+    (envName === 'live' ? 'page identical to the source' : 'project ' + cfg.firebase.projectId + ', site ' + cfg.siteOrigin + cfg.sitePath
+      + '; sign-in: ' + helpers) + ')');
+});

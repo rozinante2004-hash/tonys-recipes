@@ -198,6 +198,27 @@ window.SELF_TESTS = [
       if(r.status!==200 && r.status!==529 && r.status!==400) throw new Error('Worker returned '+r.status);
     }
   },
+  { id:'net_signin_helpers', group:'Network', name:'Google sign-in pages are served from this copy\u2019s own address (v36.78)',
+    test: async()=>{
+      // On an iPhone, sign-in on <project>.firebaseapp.com stops with "missing
+      // initial state". The fix serves Firebase's own sign-in files from the
+      // app's address and makes that the authDomain; if they are not actually
+      // there, nobody can sign in — so this looks, rather than trusting.
+      var fb=window.APP_CONFIG.firebase, host=location.host;
+      if(fb.authDomain!==host){
+        if(/\.firebaseapp\.com$/.test(fb.authDomain)) return;   // not moved yet: nothing here to check
+        throw new Error('sign-in is set to run on '+fb.authDomain+', which is neither this address nor Firebase\u2019s own');
+      }
+      async function get(p){ var r=await fetch('/'+p,{cache:'no-store'}); if(!r.ok) throw new Error('/'+p+' answered '+r.status+' — sign-in would fail'); return r.text(); }
+      var init=JSON.parse(await get('__/firebase/init.json'));
+      if(init.projectId!==fb.projectId) throw new Error('/__/firebase/init.json is for '+init.projectId+', not '+fb.projectId);
+      var page=await get('__/auth/handler');
+      if(/APP_CONFIG|Tony.s Recipes/.test(page)) throw new Error('/__/auth/handler returned the app itself, not Firebase\u2019s sign-in page');
+      if(!/handler\.js/.test(page)) throw new Error('/__/auth/handler is not Firebase\u2019s sign-in page');
+      var js=await get('__/auth/handler.js');
+      if(js.length<1000) throw new Error('/__/auth/handler.js is suspiciously small ('+js.length+' bytes)');
+      await get('__/auth/iframe'); await get('__/auth/iframe.js');
+    } },
   { id:'net_ai',         group:'Network', name:'AI call (recipe extraction)',
     test: async()=>{
       if(typeof aiCall!=='function') throw new Error('aiCall not defined');
