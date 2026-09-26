@@ -1612,6 +1612,27 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'ui_test_copy_marker_covers_nothing', group:'UI', name:'The TEST COPY marking covers no control (v36.76)',
+    test: async()=>{
+      // v36.72's strip was fixed over the top of the screen; on Tony's iPhone
+      // it sat on the header's buttons and he could not reach the Self Test.
+      var env=String(window.APP_CONFIG.environment), rib=document.getElementById('envRibbon'), frame=document.getElementById('envFrame');
+      if(env==='live'){
+        if(rib||frame) throw new Error('the family\u2019s copy shows the test-copy marking');
+        return;
+      }
+      if(!rib) throw new Error('a '+env+' copy does not say so');
+      if(!rib.closest('.header')) throw new Error('the strip is not part of the header — it would sit on top of something');
+      if(getComputedStyle(rib).position!=='static') throw new Error('the strip is positioned ('+getComputedStyle(rib).position+'), not in the flow');
+      if(!frame || getComputedStyle(frame).pointerEvents!=='none') throw new Error('the frame round the screen is missing or catches taps');
+      var r=rib.getBoundingClientRect();
+      var under=Array.prototype.slice.call(document.querySelectorAll('button, a[href], input, select, [role="button"]')).filter(function(el){
+        if(el===rib||rib.contains(el)||!el.offsetParent) return false;
+        var q=el.getBoundingClientRect(); return q.width&&q.height&&q.top<r.bottom&&q.bottom>r.top&&q.left<r.right&&q.right>r.left;
+      });
+      if(under.length) throw new Error('the strip overlaps '+under.length+' control(s): '+under.slice(0,3).map(function(e){return e.id||e.textContent.trim().slice(0,20);}).join(', '));
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing

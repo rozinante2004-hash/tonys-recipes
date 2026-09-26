@@ -264,8 +264,15 @@ found only because a test was written first and disagreed with the code.
     Firestore in me-west1). The Worker allows it via its `ALLOWED_ORIGINS`
     variable (dashboard). **Bring! is OFF there** — it shares the live Worker,
     so it would write to the family's real shopping list.
-  - **`APP_CONFIG.environment`**: anything but 'live' shows an orange
-    "TEST COPY" strip and "[TEST]" in the title, from the first paint.
+  - **`APP_CONFIG.environment`**: anything but 'live' shows a striped
+    orange/black "⚠️ TEST COPY" strip and "[TEST]" in the title, from the
+    first paint, plus a 6px orange frame round the screen.
+    **v36.76: the strip is the header's FIRST ROW, in the flow — never
+    fixed.** Fixed over the top (v36.72), it sat on the header's buttons on
+    Tony's iPhone and he could not reach the Self Test. The frame is fixed
+    but `pointer-events: none`. Tony wants it loud ("very eye catching, so I
+    won't get confused") — do not tone it down. Test:
+    `ui_test_copy_marker_covers_nothing` (CI runs it on the test build).
   - **Its own icons (after v36.72, build only — the page is unchanged).**
     `environments.json` `test.brand`: the build recolours the tab icon
     (favicon) background from brown to teal `#1F6F78` and copies
