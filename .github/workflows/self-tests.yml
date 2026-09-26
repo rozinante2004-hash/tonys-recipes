@@ -160,6 +160,22 @@ jobs:
           cp "$GITHUB_WORKSPACE/firestore.rules" ./firestore.rules
           npx firebase emulators:exec --only firestore --project demo-rules "node tests/firestore-rules.test.mjs"
 
+      # v36.71 (go-public WP-A step 2) — the app itself, signed in, on several
+      # simulated devices, syncing through the Firestore + Auth EMULATORS
+      # against the published rules. The first time the suite runs the app
+      # signed in at all; it found two real sync bugs on its first run. The
+      # Firebase SDK is served from npm at the version the app loads, and a
+      # `demo-` project can never reach a real backend.
+      - name: End-to-end sync on the Firebase emulator
+        run: |
+          mkdir -p /tmp/e2e && cd /tmp/e2e
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10.12.0 playwright@1.56.1 >/dev/null
+          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g" \
+            "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
+          echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"auth":{"port":9099},"ui":{"enabled":false}}}' > firebase.json
+          npx firebase emulators:exec --only firestore,auth --project demo-tonys "node $GITHUB_WORKSPACE/tests/e2e-sync.mjs"
+
       - name: Worker checks (CORS, origin, app key)
         run: node tests/worker-cors.mjs
 

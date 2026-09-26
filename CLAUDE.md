@@ -201,6 +201,39 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **END-TO-END SYNC ON THE FIREBASE EMULATOR (v36.71, WP-A step 2).**
+  `tests/e2e-sync.mjs` runs the REAL app, signed in, as several devices
+  (separate browser profiles) through the Firestore + Auth emulators, against
+  the published rules filled with an owner, a writer and a reader. How:
+  - the app uses the emulator only when served from 127.0.0.1/localhost AND
+    `window.__FIREBASE_EMULATOR__` is set before load AND the project is
+    `demo-…` (`initFirebase`); the live site can never be pointed at one;
+  - the test serves the repo itself (a tiny node server) and adds the two
+    emulator addresses to ITS copy's CSP — a page rewritten by Playwright's
+    route() counts as public, and Chrome's Private Network Access then blocks
+    127.0.0.1 ("Permission was denied … address space");
+  - the Firebase SDK is served from npm `firebase@<the version the page asks
+    for>` in place of gstatic (the run refuses a mismatch);
+  - sign-in is a fake Google credential (`GoogleAuthProvider.credential(
+    JSON.stringify({sub,email,email_verified}))`), which only the emulator accepts;
+  - cloud truth is read over the emulator's REST API with `Bearer owner`;
+    `@firebase/rules-unit-testing`'s `ctx.firestore()` may be called ONCE per
+    `withSecurityRulesDisabled` (a second call throws "already been started");
+  - the cloud is seeded with `meta` and one recipe: an EMPTY cloud is the
+    first-run path, where no load counts as a sync;
+  - another device's change arrives as the "🔄 New changes available" banner;
+    the test taps it, as a person would.
+  Scenarios: add/rename travels, both directions, a clashing save refused with
+  nothing overwritten or lost, writer delete refused and explained, owner
+  delete travels, reader cannot write, offline edit goes up on reconnect.
+  **It found two real bugs on its first run:**
+  - **A change from another device inside 5 s of your own save was dropped**
+    (no banner): the listener skipped anything while `_justSaved`. It now
+    skips only its OWN writes, by the exact `meta.updatedAt` stamp
+    (`noteOwnMetaStamp` in `writeCloudMeta`, recorded BEFORE the write).
+  - **An offline edit never went up on reconnect** — nothing listened for
+    `online`. Now it triggers the ordinary save (conflict check included).
+
 - **FEATURE SWITCHES (v36.70, go-public WP-A.3).** `APP_CONFIG.features`
   (`whatsapp`, `bring`, `gmail` — all ON for this household) and
   `featureOn(name)` (unknown names are OFF; `_featureOverride` is the test

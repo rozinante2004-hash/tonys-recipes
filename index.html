@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.70 -->
+<!-- Tony's Recipes Collection v36.71 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -254,10 +254,25 @@
     window._fbConfigApiKey = window.APP_CONFIG.firebase.apiKey;
     function initFirebase() {
       var firebaseConfig = Object.assign({}, window.APP_CONFIG.firebase);
+      // v36.71 (WP-A step 2) — the Firebase EMULATOR, for the end-to-end sync
+      // tests (tests/e2e-sync.mjs). Three conditions, all required: the page is
+      // on this computer's own address, a test set __FIREBASE_EMULATOR__ before
+      // the page loaded, and the project is a `demo-` one — which the Firebase
+      // SDK guarantees never reaches a real backend. The live site fails the
+      // first, so it can never be pointed at an emulator.
+      var emu = window.__FIREBASE_EMULATOR__;
+      var useEmu = !!(emu && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+                      && /^demo-/.test(String(emu.projectId || '')));
+      if (useEmu) firebaseConfig.projectId = emu.projectId;
 
       firebase.initializeApp(firebaseConfig);
       _fbAuth     = firebase.auth();
       _fbDb       = firebase.firestore();
+      if (useEmu) {
+        _fbDb.useEmulator(emu.host, emu.firestorePort);
+        _fbAuth.useEmulator('http://' + emu.host + ':' + emu.authPort, { disableWarnings: true });
+        window._fbEmulated = true;
+      }
       _fbProvider = new firebase.auth.GoogleAuthProvider();
       // v36.59 — no Gmail scope at sign-in. It made every family member's consent
       // screen say the app could send e-mail as them, and the token it produced
@@ -3630,7 +3645,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.70';
+var APP_VERSION = 'v36.71';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6327,7 +6342,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.70</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.71</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6959,7 +6974,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.70</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.71</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17560,6 +17575,20 @@ function saveData() {
 // should run in the middle of a test. So a timed save that comes due during a
 // run is held, and armed again by _selfTestUnpark once the run is over — by
 // which time `_fbDb` is the real connection and the recipes are the real ones.
+// ─── BACK ONLINE, SEND WHAT WAITED (v36.71) ──────────────────────────────────
+// An edit made offline was kept on the device ("changes saved locally") — and
+// then nothing listened for the connection coming back, so it stayed there
+// until the next edit or the next restart. Found by the end-to-end test
+// (tests/e2e-sync.mjs). The save it starts is the ordinary one, conflict
+// check included: an offline edit to a recipe someone else has since changed
+// is refused and reported, never forced over theirs.
+window.addEventListener('online', function() {
+  var waiting = _offlineQueue || localStorage.getItem('tonys_offline_queue') === '1';
+  if (!waiting || !window._driveMode || !window._fbUser) return;
+  if (typeof setDriveStatus === 'function') setDriveStatus('syncing', '☁️ Back online — sending your changes…');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(timedCloudSave, 1500);
+});
 var _cloudSaveHeldForSelfTest = false;
 function timedCloudSave() {
   if (_selfTestRunning) { _cloudSaveHeldForSelfTest = true; return Promise.resolve(); }
@@ -18398,9 +18427,18 @@ async function saveRecipeDoc(r, db) {
 // new recipe yet must not drop it from the list on its next save.
 // Returns the updatedAt stamp it wrote, so the caller can record it as the
 // high-water mark and its own save doesn't force a full re-read next time.
+// v36.71 — every `meta` stamp THIS device writes, so the listener can tell its
+// own echo from somebody else's save exactly (see the listener in
+// loadFromFirestore). Recorded BEFORE the write: the snapshot can arrive before
+// the write's promise resolves.
+var _ownMetaStamps = [];
+function noteOwnMetaStamp(t) { _ownMetaStamps.push(t); if (_ownMetaStamps.length > 50) _ownMetaStamps.shift(); }
+function isOwnMetaStamp(t) { return _ownMetaStamps.indexOf(t) !== -1; }
+window.isOwnMetaStamp = isOwnMetaStamp;
 async function writeCloudMeta(list, nextIdVal, db) {
   db = db || _fbDb;
   var stamp = Date.now();
+  noteOwnMetaStamp(stamp);
   var ref = db.collection('shared').doc('meta');
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
@@ -19021,13 +19059,15 @@ async function _loadFromFirestoreInner(user) {
           if (isFirstSnapshot) { isFirstSnapshot = false; return; }
           if (!docSnap.exists) return;
           if (docSnap.metadata.hasPendingWrites) return;
-          // Only suppress if we just saved AND it's coming from server cache
-          // _justSaved alone is unreliable — Firestore can fire after save settles
-          if (window._justSaved && !docSnap.metadata.fromCache) {
-            // This is our own write settling — skip it
-            return;
-          }
           if (docSnap.metadata.fromCache) return; // local cache, not a remote change
+          // v36.71 — our OWN save settling, recognised by the exact stamp we
+          // wrote. This used to be "anything within 5 seconds of our last save
+          // (_justSaved)", which also swallowed a genuine change from another
+          // device that happened to land in those 5 seconds: no banner, and the
+          // change unseen until the next restart. Found by the end-to-end test
+          // (tests/e2e-sync.mjs) with two devices editing back to back.
+          var metaAt = (docSnap.data() || {}).updatedAt;
+          if (typeof metaAt === 'number' && isOwnMetaStamp(metaAt)) return;
           // Genuine remote change from another device — show banner.
           // The payload is no longer the recipes themselves: with per-recipe
           // documents the only honest way to apply an update is to re-read.
