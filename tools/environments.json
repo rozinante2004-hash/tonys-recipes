@@ -1,0 +1,20 @@
+{
+  "_comment": "What differs per copy of the app (v36.72). The LIVE copy's settings are the #appConfig block in index.html itself, so 'live' changes nothing. Every other copy lists only what is different; tools/build.js writes it into its own copy of the page. Nothing here is secret: a Firebase web key only works from the addresses allowed for it in Google Cloud.",
+  "live": {},
+  "test": {
+    "environment": "test",
+    "firebase": {
+      "apiKey": "AIzaSyBNyAZgRrIuPImDN_9X7z1Zf_LpoYxtvnQ",
+      "authDomain": "tonys-recipes-test.firebaseapp.com",
+      "projectId": "tonys-recipes-test",
+      "storageBucket": "tonys-recipes-test.firebasestorage.app",
+      "messagingSenderId": "254872649278",
+      "appId": "1:254872649278:web:d25d333705860c5e4d9b6f"
+    },
+    "siteOrigin": "https://tonys-recipes-test.pages.dev",
+    "sitePath": "/",
+    "features": { "bring": false },
+    "_why_bring_off": "Bring! goes through the same Worker as the live app, so the test copy would add items to the family's real shopping list.",
+    "manifest": { "name": "Tony's Recipes (test)", "short_name": "Recipes TEST" }
+  }
+}

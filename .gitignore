@@ -15,3 +15,6 @@ package-lock.json
 # index.json stays tracked on purpose — it holds only group LABELS, no messages.
 whatsapp/*.txt
 whatsapp/*.zip
+
+# v36.72 — tools/build.js output; built by CI and Cloudflare Pages, never committed
+dist/

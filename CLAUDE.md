@@ -201,6 +201,40 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **TWO COPIES: LIVE AND TEST (v36.72, WP-A step 3).**
+  - **`tools/build.js <live|test>` → `dist/`.** `index.html` stays the file
+    that is edited. The LIVE build is the source byte for byte (its settings
+    ARE `#appConfig`; checked every build). Any other build rewrites the
+    `window.APP_CONFIG = Object.freeze(…)` block from `tools/environments.json`
+    (deep merge, re-serialised, read back and compared) and REFUSES if any live
+    Firebase identifier survives anywhere in the page. It also renames the
+    installable app (`manifest` override) and writes `build-info.json`.
+    `dist/` is gitignored. Copies the site minus tooling/tests/docs, plus the
+    one file the in-app Self Test loads from tests/ (`tests/sw-probe.js`).
+  - **The test copy:** Cloudflare Pages project `tonys-recipes-test`
+    (https://tonys-recipes-test.pages.dev), build command
+    `node tools/build.js test`, output `dist`, production branch `main`,
+    `NODE_VERSION=20`. Firebase project `tonys-recipes-test` (Spark,
+    Firestore in me-west1). The Worker allows it via its `ALLOWED_ORIGINS`
+    variable (dashboard). **Bring! is OFF there** — it shares the live Worker,
+    so it would write to the family's real shopping list.
+  - **`APP_CONFIG.environment`**: anything but 'live' shows an orange
+    "TEST COPY" strip and "[TEST]" in the title, from the first paint.
+  - **Paths are relative now** so one set of files serves both a
+    `/tonys-recipes/` site and a root one: `manifest.json` (`./`, `icons/…`),
+    the manifest/icon links, `register('sw.js')`, and **sw.js v5** takes its
+    folder from its registration (`SW_BASE` for the probe) and handles only
+    its own origin + folder — it used to match ANY url containing
+    "/tonys-recipes/". Verified by installing the real worker both ways: the
+    live-style install caches the same five paths as before.
+  - `_selfTestPark` switches every feature ON for a run (tests exercise the
+    code against stand-ins), so the suite passes on a copy with Bring! off.
+  - 🚀 Deployments has a "🧪 Test copy" group (`APP_CONFIG.testCopy`,
+    `liveSiteUrl` — "🌐 Live App" no longer means "this copy").
+  - CI builds both, checks live == source, and runs the whole suite on the
+    built test copy.
+  - The live deploy (GitHub Pages, repo root) is UNCHANGED for now.
+
 - **END-TO-END SYNC ON THE FIREBASE EMULATOR (v36.71, WP-A step 2).**
   `tests/e2e-sync.mjs` runs the REAL app, signed in, as several devices
   (separate browser profiles) through the Firestore + Auth emulators, against

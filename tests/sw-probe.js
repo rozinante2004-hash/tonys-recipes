@@ -22,6 +22,9 @@ self.addEventListener = function(type, fn) { captured[type] = fn; };
 self.skipWaiting = self.skipWaiting || function() {};
 self.clients = self.clients || { claim: function() { return Promise.resolve(); } };
 
+// sw.js takes its folder from its registration; loaded from tests/ as a plain
+// worker it has none, so say which folder the probed URLs live under (v5).
+self.SW_BASE = '/tonys-recipes/';
 var loadError = null;
 try {
   importScripts('../sw.js');

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.71 -->
+<!-- Tony's Recipes Collection v36.72 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,8 +54,8 @@
      Worker is the thing to check first: ⚙️ → 📡 Sync Health reports its live
      version. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
-<link rel="manifest" href="/tonys-recipes/manifest.json">
-<link rel="apple-touch-icon" href="/tonys-recipes/icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
 <title>Tony's Recipes Collection</title>
 <!-- 5b.1 — Frank Ruhl Libre and Heebo carry the Hebrew. Playfair Display and
@@ -97,6 +97,9 @@
   // above, which the browser reads before any script; a build step (WP-A.1)
   // is what will fill that in.
   window.APP_CONFIG = Object.freeze({
+    // v36.72 — which copy this is. 'live' is the family's; tools/build.js
+    // writes 'test' into the test copy, which then says so on every screen.
+    environment:         'live',
     firebase: Object.freeze({
       apiKey:            'AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4',
       authDomain:        'recipes-f379d.firebaseapp.com',
@@ -113,6 +116,14 @@
     githubRepo:          'rozinante2004-hash/tonys-recipes',
     siteOrigin:          'https://rozinante2004-hash.github.io',
     sitePath:            '/tonys-recipes/',
+    // v36.72 — the two copies, by name, for the 🚀 Deployments links. The two
+    // lines above are THIS copy's address; these stay the same in every copy.
+    liveSiteUrl:         'https://rozinante2004-hash.github.io/tonys-recipes/',
+    testCopy: Object.freeze({
+      siteUrl:           'https://tonys-recipes-test.pages.dev/',
+      pagesProject:      'tonys-recipes-test',
+      firebaseProjectId: 'tonys-recipes-test'
+    }),
     // v36.70 (WP-A.3) — features that belong to THIS household's set-up and
     // may not suit anyone else's: they lean on a personal WhatsApp export, an
     // unofficial Bring! connection, and a Gmail permission. All on here. Off,
@@ -155,7 +166,10 @@
       projectId: c.firebase.projectId, authDomain: c.firebase.authDomain,
       siteUrl: c.siteOrigin + c.sitePath, siteHost: (c.siteOrigin + c.sitePath).replace(/^https?:\/\//, '').replace(/\/$/, ''),
       workerName: c.workerName, cloudflareAccountId: c.cloudflareAccountId,
-      githubRepo: c.githubRepo, workerUrl: c.workerUrl, ownerEmail: c.ownerEmail
+      githubRepo: c.githubRepo, workerUrl: c.workerUrl, ownerEmail: c.ownerEmail,
+      liveSiteUrl: c.liveSiteUrl,
+      testSiteUrl: c.testCopy && c.testCopy.siteUrl, testPagesProject: c.testCopy && c.testCopy.pagesProject,
+      testProjectId: c.testCopy && c.testCopy.firebaseProjectId
     }[key];
     return v === undefined ? '' : String(v);
   };
@@ -165,6 +179,24 @@
     (root || document).querySelectorAll('[data-cfg-text]').forEach(function (e) { e.textContent = fill(e.getAttribute('data-cfg-text')); });
   };
   document.addEventListener('DOMContentLoaded', function () { window.applyAppConfig(); });
+</script>
+<style id="envRibbonCss">
+  /* v36.72 — the test copy can never be mistaken for the family's app. */
+  #envRibbon { position: fixed; top: 0; left: 0; right: 0; z-index: 100000; pointer-events: none;
+               background: #B54708; color: #fff; font: 700 11px/1.6 'DM Sans', 'Heebo', sans-serif;
+               text-align: center; letter-spacing: 0.6px; padding-top: env(safe-area-inset-top); }
+</style>
+<script>
+  // Anything but the live copy says so, on every screen, from the first paint.
+  if (window.APP_CONFIG.environment !== 'live') {
+    document.title = '[' + String(window.APP_CONFIG.environment).toUpperCase() + '] ' + document.title;
+    document.addEventListener('DOMContentLoaded', function () {
+      var r = document.createElement('div');
+      r.id = 'envRibbon'; r.setAttribute('data-no-i18n', ''); r.setAttribute('role', 'note');
+      r.textContent = String(window.APP_CONFIG.environment).toUpperCase() + ' COPY — separate data, not the family\u2019s recipes';
+      document.body.appendChild(r);
+    });
+  }
 </script>
 <style id="featureFlagCss">
   /* v36.70 — see APP_CONFIG.features. */
@@ -2028,8 +2060,15 @@ async function _selfTestPark() {
   var _realDb = window._fbDb;
   _selfTestHeldWrites = 0;
   if (_realDb) window._fbDb = _selfTestNoCloudWrites(_realDb);
+  // …and every feature switched ON for the run (v36.72). The tests check the
+  // CODE of WhatsApp, Bring! and Gmail — against stand-ins, never the real
+  // services — so they mean the same on a copy where a feature is off (the test
+  // copy has Bring! off, so it cannot touch the family's real shopping list).
+  var _featuresWas = Object.assign({}, window._featureOverride || {});
+  Object.keys(APP_CONFIG.features || {}).forEach(function(k){ window._featureOverride[k] = true; });
+  if (typeof applyFeatureFlags === 'function') applyFeatureFlags();
   return { langWas: _langWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
-           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb };
+           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas };
 }
 function _selfTestUnpark(p) {
   if (!p) return;
@@ -2042,6 +2081,13 @@ function _selfTestUnpark(p) {
   }
   try { _cloudRestoreForTest(p.cloudWas); } catch(e) {}
   try { _backupRecordRestoreForTest(p.backupWas); } catch(e) {}
+  try {
+    if (p.featuresWas) {
+      Object.keys(window._featureOverride).forEach(function(k){ delete window._featureOverride[k]; });
+      Object.assign(window._featureOverride, p.featuresWas);
+      applyFeatureFlags();
+    }
+  } catch(e) {}
   try { if (p.spendWas === null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, p.spendWas); } catch(e) {}
   try { if (p.unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, p.unitWas); } catch(e) {}
   // v36.67 — a toast a test raised is the test's, not Tony's. One with an
@@ -3645,7 +3691,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.71';
+var APP_VERSION = 'v36.72';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6342,7 +6388,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.71</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.72</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6974,7 +7020,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.71</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.72</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -19541,7 +19587,7 @@ async function clearAllData() {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/tonys-recipes/sw.js')
+    navigator.serviceWorker.register('sw.js')   /* relative (v36.72): /tonys-recipes/sw.js live, /sw.js on the test copy */
       .then(function(reg) {
         dlog('[SW] Registered:', reg.scope);
 
@@ -24824,7 +24870,23 @@ window.onHeaderScroll = onHeaderScroll;
       <div style="display:flex;flex-direction:column;gap:4px;">
         <a href="#" data-cfg-href="https://github.com/{githubRepo}/upload/main" target="_blank" rel="noopener noreferrer" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
         <a href="#" data-cfg-href="https://github.com/{githubRepo}" target="_blank" rel="noopener noreferrer" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
-        <a href="#" data-cfg-href="{siteUrl}" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
+        <a href="#" data-cfg-href="{liveSiteUrl}" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- v36.72 — the TEST COPY: built from the same code on every push, with
+           its own Firebase project, so a change can be tried before the family
+           gets it. Addresses from APP_CONFIG.testCopy. -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🧪 Test copy</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">The same app with its own, separate data — for trying a change before the family gets it. Rebuilt on Cloudflare Pages after every change.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="#" id="deployTestSite" data-cfg-href="{testSiteUrl}" target="_blank" rel="noopener noreferrer" class="deploy-link">🧪 Open the test copy <span class="deploy-hint" data-no-i18n data-cfg-text="{testSiteUrl}"></span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/pages/view/{testPagesProject}" target="_blank" rel="noopener noreferrer" class="deploy-link">🏗️ Its builds <span class="deploy-hint">Cloudflare Pages — each change, and whether it built</span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/project/{testProjectId}/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">🔥 Its Firebase project <span class="deploy-hint" data-no-i18n data-cfg-text="{testProjectId}"></span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/project/{testProjectId}/firestore/databases/-default-/data" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Its database <span class="deploy-hint">test recipes only</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>

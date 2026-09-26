@@ -1533,6 +1533,10 @@ window.SELF_TESTS = [
         .filter(function(el){ return !el.textContent.trim(); });
       if(emptyText.length) throw new Error(emptyText.length+' configured label(s) are empty');
       if(document.querySelectorAll('[data-cfg-href]').length<10) throw new Error('the owner console links are no longer configured');
+      // v36.72 — Deployments names the test copy, from the same block.
+      var tl=document.getElementById('deployTestSite');
+      if(!APP_CONFIG.testCopy || !tl || tl.getAttribute('href')!==APP_CONFIG.testCopy.siteUrl)
+        throw new Error('Deployments does not link the test copy at '+(APP_CONFIG.testCopy||{}).siteUrl);
     } },
 
   { id:'ui_menus_stay_on_screen', group:'UI', name:'A menu never opens off the screen (v36.67)',
@@ -1678,8 +1682,10 @@ window.SELF_TESTS = [
         bring:   { loud:['openBringModal','showBringBookmarklet','openBringAutoRefresh','openBringForTokenRefresh','bringConfirmSend'], quiet:['checkBringTokenStatus'], word:/Bring!/ },
         gmail:   { loud:['openGmailSetup','sendViaGmailApi','getGmailToken'], quiet:[], word:/Gmail/ }
       };
-      // (0) All on in THIS app — the household keeps everything.
-      Object.keys(ENTRY).forEach(function(f){ if(!featureOn(f)) throw new Error(f+' is off in this app — Tony’s household uses it'); });
+      // (0) All on in the LIVE app — the household keeps everything. (The test
+      // copy has Bring! off on purpose; the run itself switches all on.)
+      if(APP_CONFIG.environment==='live') Object.keys(ENTRY).forEach(function(f){
+        if(APP_CONFIG.features[f]!==true) throw new Error(f+' is off in the live app — Tony’s household uses it'); });
       if(featureOn('nonsense')) throw new Error('an unknown feature name reads as ON');
       // (1) Every button that reaches a feature carries its mark — in the SOURCE,
       // so an entry point added next year is caught the day it is written.
@@ -1738,7 +1744,9 @@ window.SELF_TESTS = [
             if(em2) em2.remove();
             if(mt2) throw new Error('with Gmail on, the mail-app fallback appears as well');
           }
-          delete _featureOverride[f]; applyFeatureFlags();
+          // Explicitly ON — clearing the override would mean "as configured",
+          // and the test copy has Bring! off on purpose (v36.72).
+          _featureOverride[f]=true; applyFeatureFlags();
           var back=document.querySelector('#settingsDrop [data-feature="'+f+'"], #moreDrop [data-feature="'+f+'"]');
           if(back && getComputedStyle(back).display==='none') throw new Error(f+' switched back on but its menu item stays hidden');
           if(!privacyEntries().some(function(e){ return ENTRY[f].word.test(e.who+' '+e.sends); }))

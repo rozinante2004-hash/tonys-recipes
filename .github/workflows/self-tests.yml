@@ -110,6 +110,22 @@ jobs:
       - name: Run the Self Test suite with a translated interface
         run: node tests/run-self-tests.js --port 8137 --lang he --prefs '{"tonys_view_unit":"imperial","tonys_theme":"dark"}'
 
+      # v36.72 (go-public WP-A step 3) — the two copies. The LIVE build must be
+      # the source byte for byte (its settings ARE the #appConfig block); the
+      # TEST build must not name the family's Firebase project anywhere (the
+      # build refuses if it does), and the whole suite must pass on it — it is
+      # what Cloudflare Pages publishes at tonys-recipes-test.pages.dev.
+      - name: Build both copies
+        run: |
+          node tools/build.js live && cmp dist/index.html index.html
+          node tools/build.js test
+
+      - name: Run the Self Test suite on the built TEST copy
+        run: |
+          (cd dist && python3 -m http.server 8139 --bind 127.0.0.1 &)
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8139/index.html && break; sleep 1; done
+          node tests/run-self-tests.js --port 8139
+
       # The version banner only fires when version.json and APP_VERSION agree,
       # so a bump that misses one of them ships an update nobody is told about.
       - name: Check the version strings agree

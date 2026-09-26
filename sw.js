@@ -1,15 +1,22 @@
-// Tony's Recipes — Service Worker v4
+// Tony's Recipes — Service Worker v5
 // Strategy: stale-while-revalidate for the document, cache-first for assets.
 // version.json is never cached, and the in-app update banner is what tells the
 // user a newer version has landed — see the note on the fetch handler below.
 
 const CACHE_NAME = 'tonys-recipes-v8';
+// v5 (app v36.72) — WHERE the app lives is no longer written in: it is the
+// folder this worker was registered for. The live site is served from
+// /tonys-recipes/ (so nothing changes there); the test copy from the root of its
+// own address. `SW_BASE` lets the self-test's probe, which loads this file from
+// tests/, say which folder to act as.
+const SCOPE = self.registration ? new URL(self.registration.scope) : null;
+const BASE = self.SW_BASE || (SCOPE ? SCOPE.pathname : new URL('./', self.location).pathname);
 const URLS_TO_CACHE = [
-  '/tonys-recipes/',
-  '/tonys-recipes/index.html',
-  '/tonys-recipes/manifest.json',
-  '/tonys-recipes/icons/icon-192.png',
-  '/tonys-recipes/icons/icon-512.png',
+  BASE,
+  BASE + 'index.html',
+  BASE + 'manifest.json',
+  BASE + 'icons/icon-192.png',
+  BASE + 'icons/icon-512.png',
 ];
 
 // This worker caches THE APP SHELL AND NOTHING ELSE. Everything above is listed
@@ -29,7 +36,7 @@ function swPath(url) {
 }
 function isAppDocument(url) {
   const p = swPath(url);
-  return p === '/tonys-recipes/' || p === '/tonys-recipes/index.html';
+  return p === BASE || p === BASE + 'index.html';
 }
 function isPrecachedAsset(url) {
   return URLS_TO_CACHE.indexOf(swPath(url)) !== -1;
@@ -66,8 +73,11 @@ self.addEventListener('activate', function(event) {
 
 // Fetch: network first, cache fallback
 self.addEventListener('fetch', function(event) {
-  // Only handle same-origin requests for our app files
-  if (!event.request.url.includes('/tonys-recipes/')) return;
+  // Only this site's own files. Was `url.includes('/tonys-recipes/')`, which
+  // also matched any OTHER site's address containing that text; and served from
+  // a root, a bare path test would claim every request, Firebase's included.
+  if (SCOPE && new URL(event.request.url).origin !== SCOPE.origin) return;
+  if (swPath(event.request.url).indexOf(BASE) !== 0) return;
 
   // Never cache version.json — always fetch fresh
   if (event.request.url.includes('version.json')) {
