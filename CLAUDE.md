@@ -201,6 +201,12 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **A MENU WHOSE BUTTON HAS SCROLLED AWAY (v36.79).** On a phone the header
+  slides off on scroll, ⚙️ with it. The Self Test opened ⚙️ mid-run, after
+  the page had scrolled, and the menu was placed below the off-screen button
+  (-35px, Tony's iPhone). `toggleDrop` now brings the header back first when
+  the button is off the screen, and `dropPlacement` never returns a top above
+  the margin. `ui_menus_stay_on_screen` slides the header away before opening.
 - **"COVERS" MEANS ON TOP, NOT MERELY OVERLAPPING (v36.77).**
   `ui_test_copy_marker_covers_nothing` first compared rectangles only, and
   failed on Tony's iPhone because the Self Test window — full-screen there,
@@ -230,7 +236,10 @@ found only because a test was written first and disagreed with the code.
     `dist/__/` whenever a copy's `authDomain` equals its own host
     (`handler`/`iframe` saved as `.html`; both hosts serve `/x` from
     `x.html`). `SKIP_AUTH_HELPERS=1` builds without them (this sandbox cannot
-    reach firebaseapp.com; CI and Cloudflare can).
+    reach firebaseapp.com; CI and Cloudflare can). **`init.json` is
+    optional (v36.79):** Firebase publishes it only for projects that use its
+    Hosting; the test project does not, and v36.78's build refused on its
+    404. Sign-in never needed it (the v36.75 relay passed that 404 through).
   - Each copy's OAuth client ("Web client (auto created by Google Service)",
     Google Cloud → Credentials) must list `https://<its host>/__/auth/handler`
     under Authorized redirect URIs. Done for the test copy.

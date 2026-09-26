@@ -210,8 +210,10 @@ window.SELF_TESTS = [
         throw new Error('sign-in is set to run on '+fb.authDomain+', which is neither this address nor Firebase\u2019s own');
       }
       async function get(p){ var r=await fetch('/'+p,{cache:'no-store'}); if(!r.ok) throw new Error('/'+p+' answered '+r.status+' — sign-in would fail'); return r.text(); }
-      var init=JSON.parse(await get('__/firebase/init.json'));
-      if(init.projectId!==fb.projectId) throw new Error('/__/firebase/init.json is for '+init.projectId+', not '+fb.projectId);
+      // init.json is optional (Firebase publishes it only for projects using its
+      // Hosting) — but if it is there, it must be this project's.
+      var ir=await fetch('/__/firebase/init.json',{cache:'no-store'});
+      if(ir.ok){ var init=JSON.parse(await ir.text()); if(init.projectId!==fb.projectId) throw new Error('/__/firebase/init.json is for '+init.projectId+', not '+fb.projectId); }
       var page=await get('__/auth/handler');
       if(/APP_CONFIG|Tony.s Recipes/.test(page)) throw new Error('/__/auth/handler returned the app itself, not Firebase\u2019s sign-in page');
       if(!/handler\.js/.test(page)) throw new Error('/__/auth/handler is not Firebase\u2019s sign-in page');
@@ -1594,15 +1596,22 @@ window.SELF_TESTS = [
       // Never off the sides.
       var edge=dropPlacement({ top:100, bottom:130, right:60 }, 230, 200, W, H);
       if(edge.left<8 || edge.left+230>W-8) throw new Error('the menu runs off the side (left '+edge.left+')');
-      // And for real: the ⚙️ menu, opened, is inside the window.
+      // v36.79 — Tony's iPhone, mid-run: the page scrolled, the header (and ⚙️)
+      // slid off the top, and the menu opened at -35px below the hidden button.
+      var gone=dropPlacement({ top:-150, bottom:-122, right:380 }, 230, 510, W, H);
+      if(gone.top<8) throw new Error('a menu for a button above the screen starts off the top (top '+gone.top+')');
+      // And for real: the ⚙️ menu, opened with the header slid away, is inside the window.
+      var hidWas=_hdrHidden;
+      _hdrHidden=headerSlidePx(); applyHeaderGeometry();
       toggleDrop('settingsDrop');
       await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
       await wait(40);
       var m=document.getElementById('settingsDrop'), rc=m.getBoundingClientRect();
       try{
+        if(headerSlidePx() && _hdrHidden) throw new Error('opening ⚙️ with the header slid away did not bring the header back');
         if(rc.top<0 || rc.bottom>window.innerHeight+1) throw new Error('the Settings menu is outside the window ('+Math.round(rc.top)+'…'+Math.round(rc.bottom)+' of '+window.innerHeight+')');
         if(m.scrollHeight>m.clientHeight+1 && getComputedStyle(m).overflowY!=='auto') throw new Error('a capped menu cannot be scrolled');
-      } finally { closeDrop('settingsDrop'); }
+      } finally { closeDrop('settingsDrop'); _hdrHidden=hidWas; applyHeaderGeometry(); }
     } },
 
   { id:'report_staged_errors_apart', group:'UI', name:'Errors the tests stage are not reported as real ones (v36.67)',

@@ -173,10 +173,16 @@ async function fetchAuthHelpers() {
   if (cfg.firebase.authDomain !== siteHost) return 'not needed (sign-in runs on ' + cfg.firebase.authDomain + ')';
   if (process.env.SKIP_AUTH_HELPERS === '1') return 'SKIPPED (SKIP_AUTH_HELPERS=1) — sign-in will not work in this build';
   const from = 'https://' + cfg.firebase.projectId + '.firebaseapp.com/';
+  const skipped = [];
   for (const [src, dest] of AUTH_HELPERS) {
     let res;
     try { res = await fetch(from + src, { redirect: 'follow' }); }
     catch (e) { fail('could not fetch ' + from + src + ' (' + e.message + ') — set SKIP_AUTH_HELPERS=1 to build without sign-in'); }
+    // init.json exists only for a project that uses Firebase Hosting (the test
+    // project does not). Sign-in works without it — the v36.75 relay passed its
+    // 404 straight through and Tony signed in on both devices — so it is
+    // optional; every other file is required.
+    if (res.status === 404 && src.endsWith('init.json')) { skipped.push(src); continue; }
     if (!res.ok) fail(from + src + ' answered ' + res.status);
     const body = Buffer.from(await res.arrayBuffer());
     if (!body.length) fail(from + src + ' came back empty');
@@ -185,7 +191,7 @@ async function fetchAuthHelpers() {
     fs.mkdirSync(path.dirname(path.join(outDir, dest)), { recursive: true });
     fs.writeFileSync(path.join(outDir, dest), body);
   }
-  return AUTH_HELPERS.length + ' sign-in files from ' + from;
+  return (AUTH_HELPERS.length - skipped.length) + ' sign-in files from ' + from + (skipped.length ? ' (' + skipped.join(', ') + ' not published there — optional)' : '');
 }
 
 fetchAuthHelpers().then(function (helpers) {
