@@ -15,6 +15,8 @@
     "sitePath": "/",
     "features": { "bring": false },
     "_why_bring_off": "Bring! goes through the same Worker as the live app, so the test copy would add items to the family's real shopping list.",
-    "manifest": { "name": "Tony's Recipes (test)", "short_name": "Recipes TEST" }
+    "manifest": { "name": "Tony's Recipes (test)", "short_name": "Recipes TEST" },
+    "brand": { "iconFrom": "#5C3D2E", "color": "#1F6F78", "band": "#B54708", "icons": "icons/test" },
+    "_why_brand": "Its own icons (tools/make-test-icons.mjs) and a teal tab icon, so the test copy cannot be mistaken for the family's app on a home screen or in a browser tab."
   }
 }

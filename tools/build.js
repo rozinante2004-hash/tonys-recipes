@@ -66,7 +66,7 @@ const live = vm.runInNewContext('(' + literal + ')', { Object });
 function merge(base, over) {
   const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
   Object.keys(over).forEach(k => {
-    if (k.charAt(0) === '_' || k === 'manifest') return;   // notes, and what is not app config
+    if (k.charAt(0) === '_' || k === 'manifest' || k === 'brand') return;   // notes, and what is not app config
     const v = over[k];
     out[k] = (v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object')
       ? merge(base[k], v) : v;
@@ -98,6 +98,13 @@ if (envName === 'live') {
   const back = vm.runInNewContext('(' + page.slice(a2 + 1, matchParen(page, a2)) + ')', { Object });
   if (JSON.stringify(back) !== JSON.stringify(cfg)) fail('the rewritten settings do not read back as intended');
   if (back.environment === 'live') fail("a non-live copy must not call itself 'live'");
+  // Its own tab icon (v36.73): the favicon's brown background in this copy's colour.
+  if (overrides.brand) {
+    const link = /<link rel="icon"[^\n]*?<\/svg>">/.exec(page);   // the SVG inside holds '>' of its own
+    const from = "fill='%23" + overrides.brand.iconFrom.slice(1) + "'";
+    if (!link || link[0].indexOf(from) === -1) fail('could not find the brown background of the tab icon to recolour');
+    page = page.replace(link[0], link[0].split(from).join("fill='%23" + overrides.brand.color.slice(1) + "'"));
+  }
 }
 
 // ── The site ─────────────────────────────────────────────────────────────────
@@ -128,6 +135,13 @@ if (overrides.manifest) {
   const mf = JSON.parse(fs.readFileSync(path.join(repo, 'manifest.json'), 'utf8'));
   Object.assign(mf, overrides.manifest);
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(mf, null, 2) + '\n');
+}
+// …and its own home-screen icons, drawn by tools/make-test-icons.mjs (v36.73).
+if (overrides.brand && overrides.brand.icons) {
+  for (const name of fs.readdirSync(path.join(repo, overrides.brand.icons))) {
+    if (!fs.existsSync(path.join(repo, 'icons', name))) fail(overrides.brand.icons + '/' + name + ' replaces no icon in icons/');
+    fs.copyFileSync(path.join(repo, overrides.brand.icons, name), path.join(outDir, 'icons', name));
+  }
 }
 // Which build this is, for anyone looking at the deployed files.
 fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify({
