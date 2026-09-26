@@ -201,6 +201,15 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **EVERY REPORT SAYS WHICH COPY WROTE IT (v36.73).** Tony pasted a Self Test
+  report from the test copy and nothing in it said so. `appCopyLabel()`
+  (next to `featureOn`) is the one wording: LIVE or TEST COPY, the site
+  address, the Firebase project. The Self Test report, Sync Health and the
+  sync log report put it at the top, and a non-live copy's first line ends
+  "— TEST COPY". Test: `report_names_the_copy` (also swaps in a test-copy
+  config for a moment). **And `loadScriptOnce` tags are `data-on-demand`:**
+  after a Word import it had put mammoth's `<script>` in `<head>`, and
+  `perf_lazy_libs` called that eager loading. A failed tag is now removed.
 - **TWO COPIES: LIVE AND TEST (v36.72, WP-A step 3).**
   - **`tools/build.js <live|test>` → `dist/`.** `index.html` stays the file
     that is edited. The LIVE build is the source byte for byte (its settings

@@ -517,6 +517,14 @@ window.SELF_TESTS = [
       var threw=false;
       try{ await loadScriptOnce('https://127.0.0.1:9/nope.js','__NoSuchGlobal__'); }catch(e){ threw=true; }
       if(!threw) throw new Error('loadScriptOnce resolved for a script that could not load');
+      if(document.querySelector('head script[src="https://127.0.0.1:9/nope.js"]')) throw new Error('loadScriptOnce left the failed <script> tag behind');
+      // What it does add is marked as added on first use (v36.73), which is
+      // what lets the check above tell it apart from a tag written in the page.
+      var marked=null;
+      document.head.appendChild=function(n){ marked=n.hasAttribute('data-on-demand'); return Node.prototype.appendChild.call(document.head,n); };
+      try{ await loadScriptOnce('https://127.0.0.1:9/nope-2.js','__NoSuchGlobal2__').catch(function(){}); }
+      finally{ delete document.head.appendChild; }
+      if(marked!==true) throw new Error('loadScriptOnce adds its <script> tag without data-on-demand');
     }
   },
   { id:'export_word',     group:'Import/Export', name:'Export Word function exists',
@@ -1602,6 +1610,31 @@ window.SELF_TESTS = [
         _recentErrors.length=0; errWas.forEach(function(e){ _recentErrors.push(e); });
         try{ if(logWas===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',logWas); }catch(e){}
       }
+    } },
+
+  { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
+    test: async()=>{
+      // Tony ran the Self Test on the test copy and pasted the report: nothing
+      // in it said so. The Self Test report, Sync Health and the sync log
+      // report now all open with the copy, its address and its Firebase project.
+      function check(label){
+        var want=appCopyLabel(), env=String(window.APP_CONFIG.environment);
+        if(want.indexOf(window.APP_CONFIG.firebase.projectId)===-1) throw new Error(label+': the copy label does not name the Firebase project');
+        [['Self Test report',selfTestReportText()],['Sync Health',syncHealthText()],['sync log report',syncLogReportText()]].forEach(function(r){
+          var head=r[1].split('\n').slice(0,4).join('\n');
+          if(head.indexOf(want)===-1) throw new Error(label+': the '+r[0]+' does not say which copy it came from near the top');
+          if(env!=='live' && r[1].split('\n')[0].indexOf(env.toUpperCase()+' COPY')===-1) throw new Error(label+': the '+r[0]+"'s first line does not say "+env.toUpperCase()+' COPY');
+        });
+      }
+      check('this copy');
+      // …and as the test copy would be built (swapped back before anything can await).
+      var real=window.APP_CONFIG;
+      try{
+        window.APP_CONFIG=Object.freeze(Object.assign({},real,{ environment:'test', siteOrigin:'https://example.test', sitePath:'/',
+          firebase:Object.freeze(Object.assign({},real.firebase,{ projectId:'demo-copy-probe' })) }));
+        if(appCopyLabel().indexOf('TEST COPY')!==0) throw new Error('the test copy is not labelled TEST COPY');
+        check('as the test copy');
+      } finally { window.APP_CONFIG=real; }
     } },
 
   { id:'st_timed_save_waits_for_the_run', group:'Cloud Sync', name:'A timed cloud save waits for the self test to end (v36.67)',

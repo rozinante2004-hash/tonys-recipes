@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.72 -->
+<!-- Tony's Recipes Collection v36.73 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -142,6 +142,13 @@
     var o = window._featureOverride;
     if (o && Object.prototype.hasOwnProperty.call(o, name)) return !!o[name];
     return !!(window.APP_CONFIG.features && window.APP_CONFIG.features[name] === true);
+  };
+  // v36.73 — which copy this is, in words, for the top of every report, so a
+  // report pasted into a chat can never be mistaken for the other copy's.
+  window.appCopyLabel = function () {
+    var c = window.APP_CONFIG, env = String(c.environment || 'live');
+    return (env === 'live' ? 'LIVE — the family’s copy' : env.toUpperCase() + ' COPY — separate data, not the family’s')
+      + ' — ' + c.siteOrigin + c.sitePath + ' — Firebase ' + c.firebase.projectId;
   };
   // Everything marked data-feature="x" is hidden by ONE rule while x is off —
   // including buttons drawn later (the recipe view, a collection's parts).
@@ -722,7 +729,9 @@ function syncLogReportText() {
   var list = readSyncLog();
   var findings = analyseSyncLog(list);
   var L = [];
-  L.push('TONY’S RECIPES — SYNC LOG REPORT');
+  var env = String(window.APP_CONFIG.environment || 'live');
+  L.push('TONY’S RECIPES — SYNC LOG REPORT' + (env === 'live' ? '' : ' — ' + env.toUpperCase() + ' COPY'));
+  L.push('Copy: ' + appCopyLabel());
   L.push('App ' + (typeof APP_VERSION === 'string' ? APP_VERSION : '?')
        + '  ·  ' + new Date().toISOString());
   L.push('Logging ' + (logEnabled() ? 'ON' : 'OFF') + ', keeping ' + logRetentionDays() + ' day(s)'
@@ -2243,8 +2252,10 @@ function selfTestReportText() {
     (_selfTestResults[id].pass ? passing : failing).push(id);
   });
 
-  L.push('SELF TEST REPORT — Tony\u2019s Recipes');
+  var env = String(window.APP_CONFIG.environment || 'live');
+  L.push('SELF TEST REPORT — Tony\u2019s Recipes' + (env === 'live' ? '' : ' — ' + env.toUpperCase() + ' COPY'));
   L.push('='.repeat(52));
+  L.push('copy:          ' + appCopyLabel());
   L.push('app version:   ' + APP_VERSION);
   L.push('run at:        ' + (_selfTestStartedAt ? _selfTestStartedAt.toISOString() : new Date().toISOString()));
   L.push('result:        ' + passing.length + ' passed, ' + failing.length + ' failed, '
@@ -2399,7 +2410,7 @@ var SELF_TEST_FIXES = {
   import_url_modal:{ fix:'openUrlImportModal not defined or urlImportOverlay missing. Check function and modal HTML exist in the main script.', autofix: null },
   import_freehand: { fix:'openFreehandModal not defined or freehandOverlay missing. Check function and modal HTML exist.', autofix: null },
   import_camera:   { fix:'openCameraImport not defined. Check the function is in the main script block.', autofix: null },
-  perf_lazy_libs:  { fix:'5.11 — xlsx and mammoth must NOT be <script> tags in <head>; they load on first use via loadScriptOnce, which must reject when a script fails so the caller can report it.', autofix: null },
+  perf_lazy_libs:  { fix:'5.11 — xlsx and mammoth must NOT be <script> tags in <head>; they load on first use via loadScriptOnce, which must reject when a script fails so the caller can report it, and must mark its own tags data-on-demand (v36.73) so they are not mistaken for eager ones.', autofix: null },
   export_word:     { fix:'exportAllWord not defined. Check the function is in the main script block.', autofix: null },
   import_save_recipe:{ fix:'saveRecipe not defined. Check the function is in the main script block.', autofix: null },
   feat_autotag:    { fix:'aiTagAllDiets not defined. Check the function is in the main script block.', autofix: null },
@@ -3378,7 +3389,9 @@ function renderSyncHealth() {
 function syncHealthText() {
   var h = syncHealth();
   var L = [];
-  L.push('Sync Health — ' + APP_VERSION + ' — ' + new Date().toISOString());
+  var env = String(window.APP_CONFIG.environment || 'live');
+  L.push('Sync Health — ' + (env === 'live' ? '' : env.toUpperCase() + ' COPY — ') + APP_VERSION + ' — ' + new Date().toISOString());
+  L.push('copy: ' + appCopyLabel());
   L.push('account: ' + (h.signedIn ? (h.account || 'signed in') : 'signed out'));
   L.push('network: ' + (h.online ? 'online' : 'offline'));
   L.push('last successful sync: ' + fmtAgo(h.lastSyncOkAt));
@@ -3691,7 +3704,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.72';
+var APP_VERSION = 'v36.73';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6388,7 +6401,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.72</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.73</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7020,7 +7033,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.72</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.73</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14890,6 +14903,7 @@ function loadScriptOnce(url, globalName) {
     var s = document.createElement('script');
     s.src = url;
     s.async = true;
+    s.setAttribute('data-on-demand', '');   // v36.73: tells perf_lazy_libs this tag was added on first use, not in the page
     s.onload = function() {
       if (globalName && typeof window[globalName] === 'undefined') {
         delete _scriptPromises[url];
@@ -14900,6 +14914,7 @@ function loadScriptOnce(url, globalName) {
     };
     s.onerror = function() {
       delete _scriptPromises[url];   // let a later attempt retry instead of reusing the failure
+      if (s.parentNode) s.parentNode.removeChild(s);   // …with a fresh tag, not next to a dead one
       reject(new Error('could not load ' + url));
     };
     document.head.appendChild(s);
