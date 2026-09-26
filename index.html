@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.76 -->
+<!-- Tony's Recipes Collection v36.77 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3719,7 +3719,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.76';
+var APP_VERSION = 'v36.77';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6416,7 +6416,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.76</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.77</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7048,7 +7048,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.76</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.77</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18238,6 +18238,17 @@ function loadCloudBase() {
 }
 window.hashStr = hashStr; window.saveCloudBase = saveCloudBase; window.loadCloudBase = loadCloudBase;
 var _cloudRecipeIds   = {};   // id -> true when shared/recipe_<id> is known to exist
+// v36.77 — a skipped fan-out (5.9) reads no recipe documents, and this list is
+// not kept between launches, so after a restart with nothing new in the cloud
+// Sync Health said "recipe documents seen in cloud: 0" beside 62 recipes (Tony's
+// iPhone). meta.ids is the cloud's own index of them, and canSkipCloudFanout()
+// has just checked it matches what this device holds.
+function noteCloudIdsFromMeta(meta) {
+  (Array.isArray(meta && meta.ids) ? meta.ids : []).forEach(function(id) {
+    if (id !== null && id !== undefined && id !== '') _cloudRecipeIds[id] = true;
+  });
+}
+window.noteCloudIdsFromMeta = noteCloudIdsFromMeta;
 var _cloudSchema      = 0;    // schema of the cloud data as last read
 
 // Deletions are propagated EXPLICITLY, never inferred by diffing the cloud
@@ -19038,6 +19049,7 @@ async function _loadFromFirestoreInner(user) {
       dlog('[5.9] cloud unchanged (meta.updatedAt ' + meta.updatedAt + ') — skipped the per-recipe fan-out');
       _lastSyncOkAt = Date.now();   // a confirmed no-change IS a successful sync
       nextId = mergeNextId(nextId, meta.nextId || 0);
+      noteCloudIdsFromMeta(meta);   // v36.77 — or Sync Health reports 0 recipes in the cloud
       skipFanout = true;   // fall through: the change listeners below must still be installed
     }
 

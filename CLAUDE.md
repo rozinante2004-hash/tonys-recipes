@@ -201,6 +201,18 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **"COVERS" MEANS ON TOP, NOT MERELY OVERLAPPING (v36.77).**
+  `ui_test_copy_marker_covers_nothing` first compared rectangles only, and
+  failed on Tony's iPhone because the Self Test window — full-screen there,
+  and running the test — has buttons in the strip's area, above it. It now
+  asks `elementFromPoint` what a tap would actually reach. Any "is X hidden
+  behind Y" test must do the same: a desktop viewport will not show this.
+- **`_cloudRecipeIds` IS NOT KEPT BETWEEN LAUNCHES (v36.77).** A skipped
+  fan-out (5.9: nothing new in the cloud) reads no recipe documents, so after
+  a restart Sync Health said "recipe documents seen in cloud: 0" beside 62
+  recipes. The skip path now fills it from `meta.ids`
+  (`noteCloudIdsFromMeta`); only Sync Health reads it. Test:
+  `cloud_ids_known_after_skipped_read`.
 - **ON AN iPHONE, SIGN-IN ON `<project>.firebaseapp.com` FAILS (v36.75).**
   Tony, first sign-in on the test copy from his iPhone: "Unable to process
   request due to missing initial state … storage-partitioned browser

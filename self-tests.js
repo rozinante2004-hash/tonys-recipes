@@ -1625,12 +1625,22 @@ window.SELF_TESTS = [
       if(!rib.closest('.header')) throw new Error('the strip is not part of the header — it would sit on top of something');
       if(getComputedStyle(rib).position!=='static') throw new Error('the strip is positioned ('+getComputedStyle(rib).position+'), not in the flow');
       if(!frame || getComputedStyle(frame).pointerEvents!=='none') throw new Error('the frame round the screen is missing or catches taps');
+      // Covered means the strip is what a tap there would reach — not merely
+      // that the two share screen space. On an iPhone the Self Test window
+      // (running this very test) fills the screen and sits ABOVE the strip;
+      // counting its buttons failed v36.76 on Tony's phone for nothing.
       var r=rib.getBoundingClientRect();
       var under=Array.prototype.slice.call(document.querySelectorAll('button, a[href], input, select, [role="button"]')).filter(function(el){
         if(el===rib||rib.contains(el)||!el.offsetParent) return false;
-        var q=el.getBoundingClientRect(); return q.width&&q.height&&q.top<r.bottom&&q.bottom>r.top&&q.left<r.right&&q.right>r.left;
+        var q=el.getBoundingClientRect();
+        var x1=Math.max(q.left,r.left), x2=Math.min(q.right,r.right), y1=Math.max(q.top,r.top), y2=Math.min(q.bottom,r.bottom);
+        if(!(q.width&&q.height&&x2>x1&&y2>y1)) return false;
+        var hit=document.elementFromPoint((x1+x2)/2,(y1+y2)/2);
+        return !!hit && (hit===rib||rib.contains(hit));
       });
-      if(under.length) throw new Error('the strip overlaps '+under.length+' control(s): '+under.slice(0,3).map(function(e){return e.id||e.textContent.trim().slice(0,20);}).join(', '));
+      if(under.length) throw new Error('the strip covers '+under.length+' control(s): '+under.slice(0,3).map(function(e){
+        return e.id||e.getAttribute('aria-label')||e.title||e.textContent.trim().slice(0,20)||e.tagName.toLowerCase();
+      }).join(', '));
     } },
 
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
@@ -2586,6 +2596,24 @@ window.SELF_TESTS = [
         if(shown.indexOf(expect.trim())===-1)
           throw new Error('a synced chat row does not say when it synced — expected '+JSON.stringify(expect.trim())+' in the row');
       } finally { window.waIndex=wsIdx; }
+    } },
+
+  { id:'cloud_ids_known_after_skipped_read', group:'Cloud Sync', name:'Sync Health counts the cloud\u2019s recipes after a skipped read (v36.77)',
+    test: async()=>{
+      // Tony's iPhone: "recipe documents seen in cloud: 0" beside 62 recipes.
+      // With nothing new in the cloud the app skips reading every recipe (5.9)
+      // and the list of cloud documents, not kept between launches, stayed empty.
+      if(typeof noteCloudIdsFromMeta!=='function') throw new Error('noteCloudIdsFromMeta not defined');
+      if(String(_loadFromFirestoreInner).indexOf('noteCloudIdsFromMeta(meta)')===-1) throw new Error('the skipped-read path does not record the cloud\u2019s recipe ids');
+      var st=_cloudSnapshotForTest();
+      try{
+        window._cloudRecipeIds={};
+        noteCloudIdsFromMeta({ updatedAt:5, ids:[1,2,3] });
+        noteCloudIdsFromMeta({ ids:null }); noteCloudIdsFromMeta(null);
+        var n=Object.keys(window._cloudRecipeIds).length;
+        if(n!==3) throw new Error('expected 3 cloud recipes from meta.ids, got '+n);
+        if(syncHealth().cloudRecipes!==3) throw new Error('Sync Health does not report them: '+syncHealth().cloudRecipes);
+      } finally { _cloudRestoreForTest(st); }
     } },
 
   { id:'cloud_unreadable_doc', group:'Cloud Sync', name:'An unreadable cloud document self-heals (v29.4)',
