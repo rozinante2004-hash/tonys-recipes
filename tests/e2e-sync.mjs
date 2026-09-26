@@ -9,8 +9,8 @@
  * whether the answer is right. This checks the whole round trip, against the
  * published rules, with the same Firebase SDK version the live app loads.
  *
- *     cd <a folder with firebase-tools@13, @firebase/rules-unit-testing@3,
- *        firebase@10.12.0 and playwright installed>
+ *     cd <a folder with firebase-tools@13, @firebase/rules-unit-testing@5,
+ *        firebase@<the version index.html loads> and playwright installed>
  *     npx firebase emulators:exec --only firestore,auth --project demo-tonys \
  *       "node <repo>/tests/e2e-sync.mjs"
  *

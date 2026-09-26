@@ -11,7 +11,9 @@ name: Self Tests
 
 on:
   push:
-    branches: ["main"]
+    # `test` (v36.74): new work lands there first, and Cloudflare Pages builds
+    # the test copy from it; `main` is the family's copy.
+    branches: ["main", "test"]
   pull_request:
   workflow_dispatch:
 
@@ -186,7 +188,7 @@ jobs:
         run: |
           mkdir -p /tmp/e2e && cd /tmp/e2e
           npm init -y >/dev/null 2>&1
-          npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10.12.0 playwright@1.56.1 >/dev/null
+          npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@5 firebase@12.19.0 playwright@1.56.1 >/dev/null
           sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g" \
             "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
           echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"auth":{"port":9099},"ui":{"enabled":false}}}' > firebase.json

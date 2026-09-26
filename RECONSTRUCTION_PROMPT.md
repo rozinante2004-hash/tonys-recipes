@@ -30,7 +30,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.73` — app. **Worker: v41**, deployed separately and versioned separately
+**Current version:** `v36.74` — app. **Worker: v41**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -61,7 +61,7 @@ slide‑up modal animation.
 | `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v36.73"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.74"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1065,7 +1065,7 @@ Rules that follow from that:
 
 ## 6. Firebase auth & sync behaviour (subtle — match carefully)
 
-- Firebase **compat** SDK v10.12.0 loaded from `gstatic.com` (app + auth + firestore), plus
+- Firebase **compat** SDK v12.19.0 (v36.74) loaded from `gstatic.com` (app + auth + firestore), plus
   Google Identity Services (`accounts.google.com/gsi/client`). Init on `DOMContentLoaded` with a
   retry loop (up to 30×500ms) in case the SDK is slow/offline; a `loadFirebaseDynamically()`
   path re‑loads it on demand at sign‑in.
@@ -1223,7 +1223,7 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 - **Excel EXPORT was removed in v28.5** along with the QR code — both were unused and cost a
   CDN library each. Do **not** rebuild them. Excel *import* remains (`.xlsx` via SheetJS).
 - **`xlsx` and `mammoth` load ON DEMAND** via `loadScriptOnce()` (5.11), never from `<head>` —
-  there is a test pinning this. Only Firebase compat 10.12.0 and GSI are in `<head>`.
+  there is a test pinning this. Only Firebase compat 12.19.0 and GSI are in `<head>`.
 - **Collections (v36.0)** — a new kind of recipe alongside the ordinary one and the clip.
   A themed round‑up ("10 recipes with chestnuts") imports as ONE record whose **`parts`**
   array holds the individual recipes: `{uid, name, by, servings, prep, notes,

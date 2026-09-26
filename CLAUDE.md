@@ -80,7 +80,7 @@ is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
 - **`index.html` is the whole app** — inline `<style>`, inline JS, ~24 750 lines,
-  no build step. CDN scripts in `<head>`: Firebase compat 10.12.0, GSI. **xlsx and
+  no build step. CDN scripts in `<head>`: Firebase compat 12.19.0 (v36.74; was 10.12.0), GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
 - `cloudflare-worker.js` is pasted into the Cloudflare dashboard, **not** deployed
@@ -201,6 +201,26 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **NEW WORK GOES THROUGH THE `test` BRANCH FIRST (v36.74).** Cloudflare Pages
+  builds the test copy from `test`; GitHub Pages builds the family's copy
+  from `main`. Anything that touches Firebase, saving, sync or the service
+  worker is pushed to `test`, Tony tries it on
+  https://tonys-recipes-test.pages.dev, and only after his OK is `main`
+  fast-forwarded to it. Keep `test` = `main` + the work waiting for his OK
+  (merge `main` into `test` after any direct push to `main`). Small,
+  harmless fixes may still go straight to `main`. CI runs on both.
+- **FIREBASE SDK 12.19.0, STILL THE COMPAT BUILD (v36.74, WP-A step 4).**
+  Tony chose to upgrade in place (option A). Measured first: the modular SDK
+  does NOT make the app smaller — gzip, app+auth+firestore: compat 10.12
+  ~145 KB, compat 12.19 ~205 KB, a tree-shaken modular 12.19 bundle of just
+  what the app calls ~187 KB. The audit's size argument for modular does not
+  hold. What modular would still buy: the `enablePersistence` deprecation
+  warning goes away (needs `initializeFirestore` + `persistentLocalCache`).
+  **Tony asked to re-discuss B (modular behind a thin compat-shaped adapter)
+  vs staying on compat before going public — raise it then.** The e2e run
+  serves the SDK from npm at the version `index.html` loads, so bump CI's
+  `firebase@…` with it (and `@firebase/rules-unit-testing` to the major
+  that accepts it: 5 for firebase 12).
 - **EVERY REPORT SAYS WHICH COPY WROTE IT (v36.73).** Tony pasted a Self Test
   report from the test copy and nothing in it said so. `appCopyLabel()`
   (next to `featureOn`) is the one wording: LIVE or TEST COPY, the site
