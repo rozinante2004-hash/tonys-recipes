@@ -220,6 +220,13 @@ found only because a test was written first and disagreed with the code.
     so it would write to the family's real shopping list.
   - **`APP_CONFIG.environment`**: anything but 'live' shows an orange
     "TEST COPY" strip and "[TEST]" in the title, from the first paint.
+  - **Its own icons (after v36.72, build only — the page is unchanged).**
+    `environments.json` `test.brand`: the build recolours the tab icon
+    (favicon) background from brown to teal `#1F6F78` and copies
+    `icons/test/*.png` over `icons/*.png` — teal, with an orange TEST band.
+    Those PNGs are committed; `tools/make-test-icons.mjs` (Playwright, run by
+    hand) redraws them from the real icons if those ever change. The build
+    refuses if it cannot find the favicon's brown to recolour.
   - **Paths are relative now** so one set of files serves both a
     `/tonys-recipes/` site and a root one: `manifest.json` (`./`, `icons/…`),
     the manifest/icon links, `register('sw.js')`, and **sw.js v5** takes its
