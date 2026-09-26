@@ -109,7 +109,8 @@ if (envName === 'live') {
 
 // ── The site ─────────────────────────────────────────────────────────────────
 // Everything the site serves; not the tooling, tests, docs or dependencies.
-const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'tests', 'tools', 'package.json', 'package-lock.json']);
+const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'tests', 'tools', 'functions', 'package.json', 'package-lock.json']);
+// (functions/ is Cloudflare Pages server code, read from the repository itself — not a page to serve.)
 function copyTree(from, to) {
   fs.mkdirSync(to, { recursive: true });
   for (const name of fs.readdirSync(from)) {

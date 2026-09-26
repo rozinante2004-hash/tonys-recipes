@@ -201,6 +201,23 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **ON AN iPHONE, SIGN-IN ON `<project>.firebaseapp.com` FAILS (v36.75).**
+  Tony, first sign-in on the test copy from his iPhone: "Unable to process
+  request due to missing initial state … storage-partitioned browser
+  environment". Firebase's sign-in page runs on the authDomain; Safari keeps
+  that site's storage apart from the app's (worst in a Home Screen app), and
+  the page loses its own state half-way. Firebase's documented remedy is to
+  serve `/__/auth/*` from the app's own address. The test copy does:
+  `functions/__/[[path]].js` (a Cloudflare Pages Function, left out of
+  `dist/` by the build) relays `/__/auth/` and `/__/firebase/` to
+  `tonys-recipes-test.firebaseapp.com`, and the test copy's `authDomain` is
+  `tonys-recipes-test.pages.dev`. Needs
+  `https://tonys-recipes-test.pages.dev/__/auth/handler` in the OAuth
+  client's Authorized redirect URIs (Google Cloud → Credentials → "Web client
+  (auto created by Google Service)"). **The family's copy has the same
+  exposure** for any iPhone signing in afresh — and GitHub Pages cannot
+  run a relay; the fix there is hosting Firebase's handler files at the root
+  of `rozinante2004-hash.github.io`. Must be settled before going public.
 - **NEW WORK GOES THROUGH THE `test` BRANCH FIRST (v36.74).** Cloudflare Pages
   builds the test copy from `test`; GitHub Pages builds the family's copy
   from `main`. Anything that touches Firebase, saving, sync or the service

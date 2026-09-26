@@ -5,7 +5,7 @@
     "environment": "test",
     "firebase": {
       "apiKey": "AIzaSyBNyAZgRrIuPImDN_9X7z1Zf_LpoYxtvnQ",
-      "authDomain": "tonys-recipes-test.firebaseapp.com",
+      "authDomain": "tonys-recipes-test.pages.dev",
       "projectId": "tonys-recipes-test",
       "storageBucket": "tonys-recipes-test.firebasestorage.app",
       "messagingSenderId": "254872649278",
@@ -14,6 +14,7 @@
     "siteOrigin": "https://tonys-recipes-test.pages.dev",
     "sitePath": "/",
     "features": { "bring": false },
+    "_why_authDomain": "Sign-in runs on the test copy's own address, relayed to tonys-recipes-test.firebaseapp.com by functions/__/[[path]].js (v36.75): on an iPhone, sign-in on the firebaseapp.com address fails with 'missing initial state'. Google must list https://tonys-recipes-test.pages.dev/__/auth/handler as an allowed redirect for this to work.",
     "_why_bring_off": "Bring! goes through the same Worker as the live app, so the test copy would add items to the family's real shopping list.",
     "manifest": { "name": "Tony's Recipes (test)", "short_name": "Recipes TEST" },
     "brand": { "iconFrom": "#5C3D2E", "color": "#1F6F78", "band": "#B54708", "icons": "icons/test" },
