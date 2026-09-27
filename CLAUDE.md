@@ -240,6 +240,9 @@ found only because a test was written first and disagreed with the code.
     optional (v36.79):** Firebase publishes it only for projects that use its
     Hosting; the test project does not, and v36.78's build refused on its
     404. Sign-in never needed it (the v36.75 relay passed that 404 through).
+    **And Cloudflare Pages answers a missing file with the app's own page
+    and a 200** (no 404.html there), so "is it there" means "does it read as
+    JSON" (v36.80 — `net_signin_helpers` choked on `<` on Tony's iPhone).
   - Each copy's OAuth client ("Web client (auto created by Google Service)",
     Google Cloud → Credentials) must list `https://<its host>/__/auth/handler`
     under Authorized redirect URIs. Done for the test copy.

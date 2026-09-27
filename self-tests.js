@@ -211,9 +211,12 @@ window.SELF_TESTS = [
       }
       async function get(p){ var r=await fetch('/'+p,{cache:'no-store'}); if(!r.ok) throw new Error('/'+p+' answered '+r.status+' — sign-in would fail'); return r.text(); }
       // init.json is optional (Firebase publishes it only for projects using its
-      // Hosting) — but if it is there, it must be this project's.
-      var ir=await fetch('/__/firebase/init.json',{cache:'no-store'});
-      if(ir.ok){ var init=JSON.parse(await ir.text()); if(init.projectId!==fb.projectId) throw new Error('/__/firebase/init.json is for '+init.projectId+', not '+fb.projectId); }
+      // Hosting) — but if it is there, it must be this project's. v36.80: a
+      // host may answer a missing file with the app's own page and a 200
+      // (Cloudflare Pages does), so "there" means it reads as JSON.
+      var ir=await fetch('/__/firebase/init.json',{cache:'no-store'}), init=null;
+      if(ir.ok){ try{ init=JSON.parse(await ir.text()); }catch(e){ init=null; } }
+      if(init && init.projectId!==fb.projectId) throw new Error('/__/firebase/init.json is for '+init.projectId+', not '+fb.projectId);
       var page=await get('__/auth/handler');
       if(/APP_CONFIG|Tony.s Recipes/.test(page)) throw new Error('/__/auth/handler returned the app itself, not Firebase\u2019s sign-in page');
       if(!/handler\.js/.test(page)) throw new Error('/__/auth/handler is not Firebase\u2019s sign-in page');
