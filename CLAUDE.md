@@ -219,8 +219,10 @@ found only because a test was written first and disagreed with the code.
 
 - **WP-D — HOUSEHOLDS (v36.84, in progress).** Each household gets its own
   space instead of one `shared` collection guarded by e-mails typed into the
-  rules. `firestore.households.rules` (draft, NOT published; tested on the
-  emulator by `tests/firestore-households-rules.test.mjs`, in CI) defines
+  rules. The HOUSEHOLDS part of `firestore.rules` (added alongside the
+  `shared` rules in v36.86 — every path is new, so publishing it changes
+  nothing today; tested on the emulator by
+  `tests/firestore-households-rules.test.mjs`, in CI) defines
   `households/{hid}` + `members/{uid}` (owner · admin · editor · viewer),
   `recipes`, `photos`, `chats`, `state` under it, top-level `invites/{code}`,
   `pending/{hid}:{email}` (a place kept for an e-mail — how the family's
@@ -252,6 +254,21 @@ found only because a test was written first and disagreed with the code.
     Access editing members and kept places, and a member unable to manage.
     NB the Auth emulator gives each person a RANDOM uid — never seed data
     keyed by a guessed uid; let the app found the household, then fill it.
+  - **v36.86 — the move.** Family Access → "🏠 Copy this collection into a
+    household…" (owner only, first layout only): `householdMoveIn()` COPIES
+    all of `shared` (not `access`) to the owner's household via
+    `cloudDocPath(name, 'households', hid)` in batches (≤200 writes, ≤4 MB),
+    turns the member list (cloud copy ∪ this device's) into `pending` places,
+    reads every copy back and compares (`hhSame`, key-order-proof), and
+    records `state/move`. It deletes nothing; a second run reuses the
+    household that has `state/move`. Switching the app over is a separate
+    step: `dataLayout: 'households'` (test copy first, via
+    environments.json). Tested at the end of the plain e2e run: move, verify,
+    re-run, switch, owner and a family member inside.
+  - **The household rules now live IN `firestore.rules`** (after the shared
+    ones; `firestore.households.rules` is gone) — one source, filled and shown
+    by Family Access → Show rules (`{{APP_ADMINS}}` = the owner). Publishing
+    them is harmless before the move and required for it.
 - **LANGUAGES LIVE PER COPY — AND NOW IN BACKUPS (v36.83).** Each copy keeps
   its translations in its own Firebase project (`shared/i18n_<lang>`), so the
   test copy had en/he while the family's had eight, and tested a different

@@ -1746,6 +1746,13 @@ window.SELF_TESTS = [
         Object.keys(want).forEach(function(k){ if(j(cloudDocPath(k))!==want[k]) throw new Error(k+' → '+j(cloudDocPath(k))+', expected '+want[k]); });
       } finally { window._cloudLayout=was; window._cloudHid=hidWas; }
       if(householdDefaultName({ displayName:'Tony Schvekher' })!=='Tony\u2019s Recipes') throw new Error('a new household is not named after its founder');
+      // The move compares every copy with its original: key order must not
+      // matter, a real difference must.
+      if(typeof hhSame!=='function'||typeof householdMoveIn!=='function') throw new Error('the move into a household is missing');
+      if(!hhSame({a:1,b:{c:[1,2],d:'x'}},{b:{d:'x',c:[1,2]},a:1})) throw new Error('the same document in another key order counted as different');
+      if(hhSame({a:1,b:[1,2]},{a:1,b:[2,1]})||hhSame({r:'x'},{r:'y'})) throw new Error('a changed document counted as identical');
+      if(hhKind('recipe_4')!=='recipes'||hhKind('photo_4')!=='photos'||hhKind('chatpart_a_1')!=='chats'||hhKind('i18n_he')!=='languages'||hhKind('meta')!=='other')
+        throw new Error('the move\u2019s report counts documents under the wrong heading');
       if(householdDefaultName({ email:'michal.dovrat@gmail.com' }).indexOf('Michal.dovrat')!==0 && householdDefaultName({ email:'michal@x.com' })!=='Michal\u2019s Recipes')
         throw new Error('a founder with no display name gets no sensible name');
     } },

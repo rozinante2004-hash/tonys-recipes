@@ -171,24 +171,24 @@ jobs:
           npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 >/dev/null
           # The emulator wants a startable rules file; the test loads the real
           # template itself and fills in the member lists.
-          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g" \
+          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g; s/{{APP_ADMINS}}/'a@b'/g" \
             "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
           echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"ui":{"enabled":false}}}' > firebase.json
           mkdir -p tests && cp "$GITHUB_WORKSPACE/tests/firestore-rules.test.mjs" tests/
           cp "$GITHUB_WORKSPACE/firestore.rules" ./firestore.rules
           npx firebase emulators:exec --only firestore --project demo-rules "node tests/firestore-rules.test.mjs"
 
-      # v36.84 (WP-D) — the household rules (not yet published): who may found,
+      # v36.84 (WP-D) — the household rules (in firestore.rules since v36.86): who may found,
       # join, invite, manage, read, write and delete, across separate households.
       - name: Household rules checks (emulator)
         run: |
           mkdir -p /tmp/hh && cd /tmp/hh
           npm init -y >/dev/null 2>&1
           npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 >/dev/null
-          sed -e "s/{{APP_ADMINS}}/'a@b'/g" "$GITHUB_WORKSPACE/firestore.households.rules" > boot.rules
+          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g; s/{{APP_ADMINS}}/'a@b'/g" "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
           echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"ui":{"enabled":false}}}' > firebase.json
           mkdir -p tests && cp "$GITHUB_WORKSPACE/tests/firestore-households-rules.test.mjs" tests/
-          cp "$GITHUB_WORKSPACE/firestore.households.rules" ./
+          cp "$GITHUB_WORKSPACE/firestore.rules" ./
           npx firebase emulators:exec --only firestore --project demo-households "node tests/firestore-households-rules.test.mjs"
 
       # v36.71 (go-public WP-A step 2) — the app itself, signed in, on several
@@ -202,7 +202,7 @@ jobs:
           mkdir -p /tmp/e2e && cd /tmp/e2e
           npm init -y >/dev/null 2>&1
           npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@5 firebase@12.19.0 playwright@1.56.1 >/dev/null
-          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g" \
+          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g; s/{{APP_ADMINS}}/'a@b'/g" \
             "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
           echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"auth":{"port":9099},"ui":{"enabled":false}}}' > firebase.json
           npx firebase emulators:exec --only firestore,auth --project demo-tonys "node $GITHUB_WORKSPACE/tests/e2e-sync.mjs"

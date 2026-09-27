@@ -1,6 +1,6 @@
-// Firestore rules for HOUSEHOLDS (WP-D, draft), tested against the real
-// emulator (v36.84). The rules are not published yet; this is how they are
-// designed — every "may" and "may not" below is a line of firestore.households.rules.
+// Firestore rules for HOUSEHOLDS (WP-D), tested against the real emulator
+// (v36.84). Every "may" and "may not" below is a line of the HOUSEHOLDS part of
+// firestore.rules (merged there, alongside the family's `shared` rules, in v36.86).
 //
 //   npx firebase emulators:exec --only firestore --project demo-households \
 //     "node tests/firestore-households-rules.test.mjs"
@@ -13,8 +13,9 @@ import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebas
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp,
          collection, collectionGroup, query, where, getDocs } from 'firebase/firestore';
 
-const rules = readFileSync(new URL('../firestore.households.rules', import.meta.url), 'utf8')
-  .replaceAll('{{APP_ADMINS}}', "'alice@example.com'");
+const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
+  .replaceAll('{{READ}}', "'nobody@example.com'").replaceAll('{{WRITE}}', "'nobody@example.com'")
+  .replaceAll('{{ADMIN}}', "'nobody@example.com'").replaceAll('{{APP_ADMINS}}', "'alice@example.com'");
 const env = await initializeTestEnvironment({ projectId: 'demo-households', firestore: { rules } });
 const person = (uid, extra) => env.authenticatedContext(uid, Object.assign({ email: uid + '@example.com', email_verified: true }, extra || {})).firestore();
 const alice = person('alice'), bob = person('bob'), carol = person('carol'), dave = person('dave'),

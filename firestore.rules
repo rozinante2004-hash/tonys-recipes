@@ -62,6 +62,185 @@ service cloud.firestore {
       return id == 'access' || id.matches('i18n_.*');
     }
 
+    // ═══ HOUSEHOLDS (WP-D, v36.86) ═══════════════════════════════════════════
+    // Added ALONGSIDE the rules above, never instead of them: every path below
+    // is new, so publishing this changes nothing for the app as it runs today.
+    // It is what the move into households (Family Access → 🏠) writes to, and
+    // what the app reads once it runs in the household layout.
+    //
+    //   households/{hid}                    { name, ownerUid, createdAt }
+    //   households/{hid}/members/{uid}      { uid, role, email, name?, joinedAt, invite? }
+    //   households/{hid}/recipes/{id}       one recipe each (today: shared/recipe_<id>)
+    //   households/{hid}/photos/{id}        one photo each  (today: shared/photo_<id>)
+    //   households/{hid}/chats/{id}         WhatsApp chats  (today: shared/chat_*)
+    //   households/{hid}/state/{doc}        meta, backups   (today: shared/meta, shared/backups)
+    //   pending/{hid}:{email}               { hid, email, role } — a place kept for an
+    //                                         e-mail, claimed on first sign-in (how
+    //                                         the family's members arrive)
+    //   invites/{code}                      { hid, role, createdBy, expiresAt } — the
+    //                                         code is the secret (random, long)
+    //   i18n/{lang}                         interface translations, for EVERY household
+    //   users/{uid}/…                       each person's own, and nobody else's
+    //
+    // Roles, lowest to highest: viewer · editor · admin · owner.
+    //   viewer  reads everything in the household
+    //   editor  + adds and changes recipes, photos, chats (cannot delete — as today)
+    //   admin   + deletes; invites and manages editors and viewers
+    //   owner   + manages admins; renames, transfers or deletes the household
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    function signedIn() { return request.auth != null; }
+    function hh(hid) { return /databases/$(database)/documents/households/$(hid); }
+    function memberPath(hid, uid) { return /databases/$(database)/documents/households/$(hid)/members/$(uid); }
+    function isMember(hid) { return signedIn() && exists(memberPath(hid, request.auth.uid)); }
+    function myRole(hid) { return get(memberPath(hid, request.auth.uid)).data.role; }
+    function rank(r) {
+      return r == 'owner' ? 4 : (r == 'admin' ? 3 : (r == 'editor' ? 2 : (r == 'viewer' ? 1 : 0)));
+    }
+    function atLeast(hid, r) { return isMember(hid) && rank(myRole(hid)) >= rank(r); }
+    function validRole(r) { return r in ['owner', 'admin', 'editor', 'viewer']; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function verified() { return request.auth.token.email_verified == true; }
+    // An invitation for this household and this role, not expired. A missing or
+    // empty code is a plain "no", not an evaluation error.
+    function validInvite(hid, code, role) {
+      let path = /databases/$(database)/documents/invites/$(code);
+      return code is string && code.size() > 0 && exists(path)
+        && get(path).data.hid == hid && get(path).data.role == role
+        && get(path).data.expiresAt > request.time;
+    }
+
+    match /households/{hid} {
+      allow read: if isMember(hid);
+      // Founding a household: you are its owner, and your own owner membership
+      // is written in the same batch (so a household never exists ownerless).
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'createdAt'])
+        && getAfter(memberPath(hid, request.auth.uid)).data.role == 'owner';
+      // Renaming: owner or admin. Handing it over: the owner only, to a member
+      // who is an owner after the same batch.
+      allow update: if request.resource.data.keys().hasOnly(['name', 'ownerUid', 'createdAt'])
+        && request.resource.data.createdAt == resource.data.createdAt
+        && ( (atLeast(hid, 'admin') && request.resource.data.ownerUid == resource.data.ownerUid)
+          || (resource.data.ownerUid == request.auth.uid
+              && getAfter(memberPath(hid, request.resource.data.ownerUid)).data.role == 'owner') );
+      allow delete: if resource.data.ownerUid == request.auth.uid;
+
+      match /members/{uid} {
+        allow read: if isMember(hid);
+        // Joining. Three ways, and each can only make YOU a member:
+        allow create: if signedIn() && uid == request.auth.uid
+          && request.resource.data.uid == uid
+          && request.resource.data.keys().hasOnly(['uid', 'role', 'email', 'name', 'joinedAt', 'invite'])
+          && validRole(request.resource.data.role)
+          && (
+            // 1. founding the household (the batch that creates it)
+            (request.resource.data.role == 'owner'
+              && getAfter(hh(hid)).data.ownerUid == request.auth.uid
+              && !exists(hh(hid)))
+            // 2. an invitation for this household, for this role, not expired
+            || (request.resource.data.role != 'owner'
+              && validInvite(hid, request.resource.data.get('invite', ''), request.resource.data.role))
+            // 3. a place kept for your (verified) e-mail — how the family's
+            //    members arrive at migration, before anyone knows their uid
+            || (request.resource.data.role != 'owner' && verified()
+              && exists(/databases/$(database)/documents/pending/$(hid + ':' + myEmail()))
+              && get(/databases/$(database)/documents/pending/$(hid + ':' + myEmail())).data.role == request.resource.data.role)
+          );
+        // Changing a role. The owner may change anyone's (that is how ownership
+        // is handed over); an admin only editors' and viewers', and only to
+        // editor or viewer. Nobody changes the uid or the e-mail on file.
+        allow update: if request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && validRole(request.resource.data.role)
+          && ( (atLeast(hid, 'owner')
+                // an owner steps down only once the household is someone else's
+                && (uid != request.auth.uid || request.resource.data.role == 'owner'
+                    || getAfter(hh(hid)).data.ownerUid != request.auth.uid))
+            || (atLeast(hid, 'admin') && uid != request.auth.uid
+                && rank(resource.data.role) <= 2 && rank(request.resource.data.role) <= 2) );
+        // Leaving (anyone but the owner), or being removed: by the owner, or by
+        // an admin if the person is an editor or viewer.
+        allow delete: if (uid == request.auth.uid && resource.data.role != 'owner')
+          || (uid != request.auth.uid && resource.data.role != 'owner'
+              && (atLeast(hid, 'owner') || (atLeast(hid, 'admin') && rank(resource.data.role) <= 2)));
+      }
+
+      // The household's content. Editors add and change; only admins delete —
+      // the same line today's rules draw between write and delete.
+      match /recipes/{id} {
+        allow read: if isMember(hid);
+        allow create, update: if atLeast(hid, 'editor');
+        allow delete: if atLeast(hid, 'admin');
+      }
+      match /photos/{id} {
+        allow read: if isMember(hid);
+        allow create, update: if atLeast(hid, 'editor');
+        allow delete: if atLeast(hid, 'admin');
+      }
+      match /chats/{id} {
+        allow read: if isMember(hid);
+        allow create, update: if atLeast(hid, 'editor');
+        allow delete: if atLeast(hid, 'admin');
+      }
+      match /state/{doc} {
+        allow read: if isMember(hid);
+        allow create, update: if atLeast(hid, 'editor');
+        allow delete: if atLeast(hid, 'admin');
+      }
+    }
+
+    // A member finding their own memberships across households — the app asks
+    // "which households am I in?" with a collection-group query on `members`.
+    match /{path=**}/members/{uid} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Places kept by e-mail — `pending/<hid>:<email>` = { hid, email, role }.
+    // Top-level so the person can FIND theirs (a query on their own address)
+    // before they know which household it is. Admins keep places for editors
+    // and viewers, the owner for admins too; the person removes their own once
+    // claimed.
+    match /pending/{key} {
+      allow read: if signedIn() && (
+        (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['hid', 'email', 'role'])
+        && key == request.resource.data.hid + ':' + request.resource.data.email
+        && request.resource.data.email == request.resource.data.email.lower()
+        && request.resource.data.role in ['admin', 'editor', 'viewer']
+        && (atLeast(request.resource.data.hid, 'owner')
+            || (atLeast(request.resource.data.hid, 'admin') && request.resource.data.role != 'admin'));
+      allow delete: if signedIn() && (
+        (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
+    }
+
+    // Invitations. Anyone signed in who HAS the code may read it (that is how
+    // it is accepted); it cannot be listed. Admins invite editors and viewers;
+    // only the owner invites admins. Nobody is ever invited as owner.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['hid', 'role', 'createdBy', 'expiresAt'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.role in ['admin', 'editor', 'viewer']
+        && request.resource.data.expiresAt is timestamp
+        && (atLeast(request.resource.data.hid, 'owner')
+            || (atLeast(request.resource.data.hid, 'admin') && request.resource.data.role != 'admin'));
+      allow delete: if signedIn() && atLeast(resource.data.hid, 'admin');
+    }
+
+    // Interface translations: one copy for everyone, so no household pays to
+    // translate what another already has. Written by the app's own admins —
+    // the APP_ADMINS placeholder is filled in exactly as the member lists are.
+    match /i18n/{lang} {
+      allow read: if signedIn();
+      allow write: if signedIn() && verified() && myEmail() in [{{APP_ADMINS}}];
+    }
+
+
     // Legacy per-user documents (owner only). Kept for data written before the
     // collection became shared; nothing writes here any more.
     match /users/{userId}/{document=**} {

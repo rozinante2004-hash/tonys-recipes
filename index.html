@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.85 -->
+<!-- Tony's Recipes Collection v36.86 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,7 +135,7 @@
     // and nothing of it runs in the background or appears in the privacy list.
     // v36.85 (WP-D) — where the data lives: 'shared' (one collection for the
     // family — today) or 'households' (every household its own space, with
-    // members, roles and invitations; firestore.households.rules).
+    // members, roles and invitations; the HOUSEHOLDS part of firestore.rules).
     dataLayout:          'shared',
     features: Object.freeze({
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
@@ -3675,7 +3675,7 @@ window.changeAccessRole = changeAccessRole;
 // ═══ HOUSEHOLDS (WP-D, v36.85) ═══════════════════════════════════════════════
 // In the household layout (APP_CONFIG.dataLayout = 'households') every
 // household has its own space, members and roles, enforced by the rules
-// (firestore.households.rules) — not by a list of addresses pasted into them.
+// (the HOUSEHOLDS part of firestore.rules) — not by a list of addresses.
 // At sign-in the app finds this person's household; if there is none it
 // claims a place kept for their e-mail (how the family's members arrive), or
 // founds a new one ("<name>'s Recipes"). Family Access then edits members and
@@ -3947,6 +3947,136 @@ window.householdRename = householdRename; window.householdInvite = householdInvi
 window.householdSwitch = householdSwitch; window.householdDefaultName = householdDefaultName;
 window.householdLoadMembers = householdLoadMembers; window.householdAddMember = householdAddMember;
 
+// ─── MOVING THE FAMILY'S COLLECTION INTO A HOUSEHOLD (WP-D, v36.86) ─────────
+// The owner's one-time step from the first layout to the household one. It
+// COPIES — everything in `shared` stays exactly where it is, so the app as it
+// runs today is untouched and the move can be repeated or abandoned — then
+// reads every copy back and compares it with the original. The family's
+// member list becomes places kept for their addresses, taken up the first
+// time each signs in once the app runs in the household layout. Needs the
+// HOUSEHOLDS part of firestore.rules published (Family Access → Show rules).
+function hhStable(v) {
+  if (v && typeof v.toMillis === 'function') return { __ts: v.toMillis() };
+  if (Array.isArray(v)) return v.map(hhStable);
+  if (v && typeof v === 'object') { var o = {}; Object.keys(v).sort().forEach(function(k){ o[k] = hhStable(v[k]); }); return o; }
+  return v;
+}
+function hhSame(a, b) { return JSON.stringify(hhStable(a)) === JSON.stringify(hhStable(b)); }
+function hhKind(id) {
+  return id.indexOf('recipe_') === 0 ? 'recipes' : id.indexOf('photo_') === 0 ? 'photos'
+       : id.indexOf('chat') === 0 ? 'chats' : id.indexOf('i18n_') === 0 ? 'languages' : 'other';
+}
+async function householdMoveIn(opts) {
+  opts = opts || {};
+  if (!isAppOwner()) { toast('Only the owner of the app can do this.'); return null; }
+  if (cloudLayout() === 'households') { toast('This copy already keeps its recipes in households.'); return null; }
+  var db = window._fbDb, user = window._fbUser;
+  if (!db || !user) { toast('Sign in first.'); return null; }
+  if (!navigator.onLine) { toast('This needs a connection.'); return null; }
+  if ((typeof _offlineQueue !== 'undefined' && _offlineQueue) || Object.keys(_pendingCloudDeletes || {}).length) {
+    toast('There are changes on this device not yet sent — sync first.', 8000); return null;
+  }
+  var name = opts.name;
+  if (!opts.yes) {
+    var go = await askConfirm({ icon: '\u{1F3E0}', title: 'Move this collection into a household?',
+      message: 'Everything the family shares — recipes, photos, chats, languages — is COPIED into a household of its own, '
+        + 'and each copy is read back and compared. Nothing is deleted or changed where it is now, and the app keeps working as '
+        + 'it does today until it is switched over.\n\nThe family’s member list becomes places kept for their addresses: '
+        + 'each person takes theirs up the first time they sign in afterwards.\n\nTaking a backup first is strongly recommended.',
+      okLabel: 'Back up, then copy', altLabel: 'Copy without a backup', cancelLabel: 'Cancel' });
+    if (go !== true && go !== 'alt') return null;
+    if (go === true) await backupSave();
+    name = await askConfirm({ icon: '✏️', title: 'Name of the household', input: householdDefaultName(user), okLabel: 'Copy now' });
+    if (typeof name !== 'string') return null;
+  }
+  name = String(name || householdDefaultName(user)).trim().slice(0, 60) || householdDefaultName(user);
+  var report = { hid: null, copied: {}, verified: 0, mismatched: [], kept: [], skipped: [] };
+  try {
+    progressOpen({ icon: '\u{1F3E0}', title: 'Moving into a household', total: 4, step: 'Finding or founding the household…' });
+    // 1. The household — the one an earlier move made, if there is one, so a
+    //    second run tops it up rather than founding another.
+    var mine = await householdMemberships(user);
+    for (var i = 0; i < mine.length && !report.hid; i++) {
+      if (mine[i].role !== 'owner') continue;
+      try { if ((await db.doc('households/' + mine[i].hid + '/state/move').get()).exists) report.hid = mine[i].hid; } catch(e) {}
+    }
+    if (!report.hid) report.hid = await householdFound(user, name);
+    var hid = report.hid;
+
+    // 2. Everything in `shared`.
+    progressStep(1, 'Reading the family’s collection…');
+    var snap = await db.collection('shared').get();
+    countCloudRead(snap.size || 0);
+    var docs = [];
+    snap.forEach(function(d) { docs.push({ id: d.id, data: d.data() || {} }); });
+
+    // 3. Copied, in batches kept well under Firestore's limits (500 writes,
+    //    10 MiB a request) — a photo can be most of a megabyte.
+    progressStep(2, 'Copying ' + docs.length + ' documents…');
+    var todo = docs.filter(function(d) { if (d.id === 'access') { report.skipped.push(d.id); return false; } return true; });
+    var batch = db.batch(), n = 0, bytes = 0;
+    for (var k = 0; k < todo.length; k++) {
+      var d = todo[k], sz = JSON.stringify(d.data).length;
+      if (n && (n >= 200 || bytes + sz > 4000000)) { await batch.commit(); batch = db.batch(); n = 0; bytes = 0; }
+      var to = cloudDocPath(d.id, 'households', hid);
+      batch.set(db.collection(to[0]).doc(to[1]), d.data);
+      n++; bytes += sz;
+      var kind = hhKind(d.id); report.copied[kind] = (report.copied[kind] || 0) + 1;
+    }
+    if (n) await batch.commit();
+
+    // 4. The member list → places kept by address. The cloud's copy and this
+    //    device's, together (the list was only ever complete on the owner's).
+    var list = [];
+    var acc = docs.filter(function(d){ return d.id === 'access'; })[0];
+    if (acc && Array.isArray(acc.data.members)) list = list.concat(acc.data.members);
+    list = list.concat(getAccessMembers() || []);
+    var seen = {}, meEmail = String(user.email || '').toLowerCase();
+    for (var m = 0; m < list.length; m++) {
+      var em = String(list[m] && list[m].email || '').toLowerCase().trim();
+      if (!em || em === meEmail || seen[em] || em.indexOf('@') < 1) continue;
+      seen[em] = true;
+      var role = ACCESS_TO_HH[list[m].role] || 'viewer';
+      await db.collection('pending').doc(hid + ':' + em).set({ hid: hid, email: em, role: role });
+      report.kept.push(em + ' (' + role + ')');
+    }
+
+    // 5. Every copy read back and compared with its original.
+    progressStep(3, 'Checking every copy…');
+    for (var v = 0; v < todo.length; v++) {
+      var p2 = cloudDocPath(todo[v].id, 'households', hid);
+      var back = await db.collection(p2[0]).doc(p2[1]).get();
+      countCloudRead(1);
+      if (back.exists && hhSame(back.data(), todo[v].data)) report.verified++;
+      else report.mismatched.push(todo[v].id);
+    }
+    await db.doc('households/' + hid + '/state/move').set({ from: 'shared', at: Date.now(), by: user.email || '',
+      copied: report.copied, verified: report.verified, mismatched: report.mismatched.length, kept: report.kept.length });
+    progressStep(4, 'Done');
+  } catch(e) {
+    progressClose();
+    var denied = /permission|insufficient/i.test(String(e && e.message));
+    syncLog('error', 'Moving into a household failed', String(e && e.message).slice(0, 200));
+    showServiceError('The move into a household stopped:\n\n' + (e && e.message ? e.message : String(e))
+      + (denied ? '\n\nThis usually means the HOUSEHOLDS part of the rules is not published yet: Family Access → '
+                + 'Show Firestore security rules → copy → paste into the Firebase console → Publish. Then run it again.' : '')
+      + '\n\nNothing was deleted or changed in the family’s collection; running it again is safe.');
+    return null;
+  }
+  progressClose();
+  var kinds = Object.keys(report.copied).map(function(k){ return report.copied[k] + ' ' + k; }).join(', ');
+  syncLog('save', 'Copied the collection into a household', { hid: report.hid, verified: report.verified, mismatched: report.mismatched.length });
+  if (!opts.yes) await askConfirm({ icon: report.mismatched.length ? '⚠️' : '✅',
+    title: report.mismatched.length ? 'Copied, with differences' : 'Copied and checked',
+    message: 'Copied: ' + (kinds || 'nothing') + '.\nRead back and identical: ' + report.verified
+      + (report.mismatched.length ? '\nDIFFERENT: ' + report.mismatched.join(', ') : '')
+      + '\n\nPlaces kept for: ' + (report.kept.join(', ') || 'nobody')
+      + '\n\nThe app still runs as before. Switching it to the household is a separate step.',
+    okLabel: 'OK' });
+  return report;
+}
+window.householdMoveIn = householdMoveIn; window.hhSame = hhSame; window.hhKind = hhKind;
+
 function updateAccessRules() {
   var members = getAccessMembers();
   var ownerUid = window._fbUser ? window._fbUser.uid : 'YOUR_UID_HERE';
@@ -3972,7 +4102,9 @@ function updateAccessRules() {
     rulesEl.textContent = tpl
       .replace(/\{\{READ\}\}/g,  allRead)
       .replace(/\{\{WRITE\}\}/g, allWrite)
-      .replace(/\{\{ADMIN\}\}/g, allAdmin);
+      .replace(/\{\{ADMIN\}\}/g, allAdmin)
+      // v36.86 — the household rules' app-wide admins (translations): the owner.
+      .replace(/\{\{APP_ADMINS\}\}/g, '"' + APP_OWNER_EMAIL + '"');
   });
 }
 
@@ -4035,7 +4167,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.85';
+var APP_VERSION = 'v36.86';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6655,7 +6787,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.85</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.86</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7287,7 +7419,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.85</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.86</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18306,16 +18438,18 @@ window.photoDeletesRefused = function(){ return Object.keys(_photoDeleteRefused)
 // households/<hid>/recipes/12, …/photos/12, …/chats/…, …/state/meta — and the
 // interface translations are app-wide (i18n/he, i18n/_index), so no household
 // pays to translate what another already has. One place decides, so switching
-// is one setting rather than forty edits (firestore.households.rules).
+// is one setting rather than forty edits (firestore.rules, HOUSEHOLDS part).
 var _cloudLayout = (window.APP_CONFIG.dataLayout === 'households') ? 'households' : 'shared';
 var _cloudHid = null;          // the household in use, in the household layout
 function cloudLayout() { return _cloudLayout; }
-function cloudDocPath(name) {
+function cloudDocPath(name, layout, hid) {
   name = String(name);
-  if (_cloudLayout !== 'households') return ['shared', name];
+  layout = layout || _cloudLayout;
+  hid = hid || _cloudHid;
+  if (layout !== 'households') return ['shared', name];
   if (name.indexOf('i18n_') === 0) return ['i18n', name === 'i18n_index' ? '_index' : name.slice(5)];
-  if (!_cloudHid) throw new Error('No household is selected yet');
-  var base = 'households/' + _cloudHid + '/';
+  if (!hid) throw new Error('No household is selected yet');
+  var base = 'households/' + hid + '/';
   if (name.indexOf('recipe_') === 0) return [base + 'recipes', name.slice(7)];
   if (name.indexOf('photo_') === 0)  return [base + 'photos', name.slice(6)];
   if (name.indexOf('chat') === 0)    return [base + 'chats', name];
@@ -25556,6 +25690,9 @@ window.onHeaderScroll = onHeaderScroll;
            missed entirely. It is a primary action on this screen and is sized
            like one. Colours go through --heading/--ink rather than --warm-brown,
            which is a surface as well as a text colour and inverts in dark mode. -->
+      <div data-layout-only="shared" data-owner-only style="margin-top:14px;">
+        <button onclick="closeM('accessOverlay');householdMoveIn()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans','Heebo',sans-serif;">🏠 Copy this collection into a household…</button>
+      </div>
       <div data-layout-only="shared" style="margin-top:14px;">
         <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans','Heebo',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:10px;">

@@ -43,11 +43,12 @@ let PORT = 0;                     // chosen when the local server starts
 const EMU = { host: '127.0.0.1', firestorePort: 8085, authPort: 9099, projectId: 'demo-tonys' };
 // v36.85 (WP-D) — `--layout households` runs the same checks with every
 // household in its own space (APP_CONFIG.dataLayout = 'households', rules from
-// firestore.households.rules), plus the household-only ones: places kept by
+// the HOUSEHOLDS part of firestore.rules), plus the household-only ones: places kept by
 // e-mail being taken up, a newcomer founding a separate household, and joining
 // by invitation link. The family's household is seeded as `e2e-home`.
 const LAYOUT = arg('layout', process.env.E2E_LAYOUT || 'shared');
 const HH = LAYOUT === 'households';
+let SERVE_HH = HH;      // the layout the served page runs in — switched mid-run by the move test
 let HID = null;   // the household the owner founds at first sign-in
 let SEED = null, SEED_AT = 0;
 // The household the owner founded, filled as the family's will be at
@@ -92,9 +93,8 @@ const READER = 'reader@example.com';
 
 // The published rules, filled in the way the app fills them.
 const q = list => list.map(e => '"' + e + '"').join(', ');
-const rules = HH
-  ? readFileSync(path.join(repo, 'firestore.households.rules'), 'utf8').replace(/\{\{APP_ADMINS\}\}/g, '"' + OWNER + '"')
-  : readFileSync(path.join(repo, 'firestore.rules'), 'utf8')
+const rules = readFileSync(path.join(repo, 'firestore.rules'), 'utf8')
+  .replace(/\{\{APP_ADMINS\}\}/g, '"' + OWNER + '"')
   .replace(/\{\{READ\}\}/g,  q([OWNER, WRITER, READER]))
   .replace(/\{\{WRITE\}\}/g, q([OWNER, WRITER]))
   .replace(/\{\{ADMIN\}\}/g, q([OWNER]));
@@ -181,7 +181,7 @@ const server = http.createServer((req, res) => {
   if (p === '/index.html') {
     body = body.toString('utf8').replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?connect-src )/,
       `$1http://${EMU.host}:${EMU.authPort} http://${EMU.host}:${EMU.firestorePort} `);
-    if (HH) {
+    if (SERVE_HH) {
       const before = body;
       body = body.replace(/dataLayout:(\s*)'shared'/, "dataLayout:$1'households'");
       if (body === before) throw new Error('could not switch the page to the household layout');
@@ -424,6 +424,36 @@ try {
       openAccessControl(); const bar = document.getElementById('householdBar').textContent;
       return !/Invitation link|Rename/.test(bar) && /Leave this household/.test(bar);
     }));
+  }
+
+  if (!HH) {
+    // v36.86 — the owner's one-time move from `shared` into a household,
+    // and then the app switched over, exactly as it will be done for real.
+    console.log('Moving the family into a household');
+    const rep = await inPage(A, async () => {
+      window.backupSave = async () => {};                       // no download dialogs in a test
+      return householdMoveIn({ yes: true, name: 'E2E moved family' });
+    });
+    ok('the move copies the collection', rep && rep.copied && rep.copied.recipes >= 2, JSON.stringify(rep));
+    ok('…and every copy reads back identical', rep && rep.verified > 0 && !rep.mismatched.length, JSON.stringify(rep && rep.mismatched));
+    ok('…and keeps places for the family\'s members', rep && rep.kept.some(k => k.startsWith(WRITER + ' (editor')) && rep.kept.some(k => k.startsWith(READER + ' (viewer')),
+       JSON.stringify(rep && rep.kept));
+    HID = rep && rep.hid;
+    const copiedRecipe = await restDoc('households/' + HID + '/recipes/4000');
+    ok('a recipe is in the household', copiedRecipe && JSON.parse(copiedRecipe.r).name, JSON.stringify(copiedRecipe));
+    ok('…and the original is untouched', !!(await restDoc('shared/recipe_4000')));
+    const rep2 = await inPage(A, () => householdMoveIn({ yes: true, name: 'ignored' }));
+    ok('running it again tops up the SAME household', rep2 && rep2.hid === HID, JSON.stringify(rep2 && rep2.hid));
+
+    SERVE_HH = true;                                              // the app switched over
+    await A.page.reload({ waitUntil: 'domcontentloaded' });
+    await A.page.waitForFunction(() => window._driveMode && window._fbUser && window._lastSyncOkAt, null, { timeout: 30000 });
+    const ah = await inPage(A, () => householdOf());
+    ok('after the switch the owner is in the moved household', ah && ah.hid === HID && ah.role === 'owner', JSON.stringify(ah));
+    ok('…with every recipe', (await names(A)).includes('E2E seed stew'), JSON.stringify(await names(A)));
+    const W = await device('W (writer, after the move)', WRITER);
+    ok('a family member signs in and takes up their kept place',
+       await inPage(W, () => (householdOf() || {}).role === 'editor') && (await names(W)).includes('E2E seed stew'), JSON.stringify(await names(W)));
   }
 
 } catch (e) {

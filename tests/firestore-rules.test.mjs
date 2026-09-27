@@ -20,7 +20,8 @@ const q = list => list.map(e => "'" + e + "'").join(', ');
 const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
   .replaceAll('{{READ}}',  q([OWNER, ADMIN, WRITER, READER]))
   .replaceAll('{{WRITE}}', q([OWNER, ADMIN, WRITER]))
-  .replaceAll('{{ADMIN}}', q([OWNER, ADMIN]));
+  .replaceAll('{{ADMIN}}', q([OWNER, ADMIN]))
+  .replaceAll('{{APP_ADMINS}}', q([OWNER]));
 
 const env = await initializeTestEnvironment({ projectId: 'demo-rules', firestore: { rules } });
 const as = email => env.authenticatedContext(email.split('@')[0], { email }).firestore();
