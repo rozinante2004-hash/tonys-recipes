@@ -213,6 +213,19 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **LANGUAGES LIVE PER COPY — AND NOW IN BACKUPS (v36.83).** Each copy keeps
+  its translations in its own Firebase project (`shared/i18n_<lang>`), so the
+  test copy had en/he while the family's had eight, and tested a different
+  interface. 🌐 → "⬇️ Export languages (file)" / "⬆️ Import languages (file)…"
+  (full access only) move them as a `tonys-recipes-languages` JSON file.
+  Tony then asked for them in backups too: `backupPayloadWithLanguages()`
+  (used by "Backup — Save" AND the automatic folder backup) adds
+  `languages` — read from the cloud when signed in and online (a device keeps
+  only one, v36.61), else the device's own. Restore offers them after the
+  recipes ("Restore the languages too?"), full access only; Import accepts a
+  backup file as well. `backupJson()` stays synchronous and language-free
+  (tests and the folder-writer checks use it). Test:
+  `i18n_languages_file_round_trip`.
 - **A MENU WHOSE BUTTON HAS SCROLLED AWAY (v36.79).** On a phone the header
   slides off on scroll, ⚙️ with it. The Self Test opened ⚙️ mid-run, after
   the page had scrolled, and the menu was placed below the off-screen button

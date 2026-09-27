@@ -1676,6 +1676,35 @@ window.SELF_TESTS = [
       }).join(', '));
     } },
 
+  { id:'i18n_languages_file_round_trip', group:'UI', name:'Languages move between copies, and in backups, intact (v36.83)',
+    test: async()=>{
+      // The test copy had English and Hebrew while the family's had eight; the
+      // translations now travel as a file. What goes in must come out, and a
+      // wrong or damaged file must be refused with a sentence, not half-imported.
+      ['i18nPackLanguages','i18nUnpackLanguages','i18nExportLanguages','i18nImportLanguages'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var he={ strings:{ 'Save':'שמור', 'Delete {1} recipes':'מחק {1} מתכונים' }, count:2, at:5 };
+      var file=i18nPackLanguages({ he:he, en:{strings:{a:'a'}}, xx:{strings:{a:'b'}}, ru:{ nope:1 } }, 'https://example.test/');
+      if(Object.keys(file.langs).join()!=='he') throw new Error('the export kept '+Object.keys(file.langs).join()+' — only real, translated languages belong in it');
+      var back=i18nUnpackLanguages(JSON.stringify(file));
+      if(back.langs.he.strings['Delete {1} recipes']!=='מחק {1} מתכונים' || back.langs.he.count!==2) throw new Error('a phrase did not survive the round trip');
+      if(back.from!=='https://example.test/') throw new Error('the file does not say which copy it came from');
+      var bad=[ 'not json', JSON.stringify({kind:'something-else',langs:{he:he}}), JSON.stringify({kind:file.kind,langs:{en:he,zz:he}}) ];
+      bad.forEach(function(txt,i){ var threw=false; try{ i18nUnpackLanguages(txt); }catch(e){ threw=!!e.message; } if(!threw) throw new Error('bad file #'+(i+1)+' was accepted'); });
+      var mixed=i18nUnpackLanguages(JSON.stringify({kind:file.kind,langs:{he:{strings:{a:'b',n:7}}, zz:he}}));
+      if(mixed.skipped.indexOf('zz')===-1 || mixed.langs.he.strings.n!==undefined) throw new Error('an unknown language or a non-text phrase got through');
+      // Tony: the languages are backed up with the recipes — so a BACKUP file
+      // must work as a languages file too, and one without them must say why.
+      var fromBackup=i18nUnpackLanguages(JSON.stringify({ version:1, recipes:[], languages:file }));
+      if(!fromBackup.langs.he) throw new Error('a backup that holds languages could not be imported as one');
+      var said=''; try{ i18nUnpackLanguages(JSON.stringify({ version:1, recipes:[] })); }catch(e){ said=e.message; }
+      if(!/without languages/.test(said)) throw new Error('a backup without languages was not explained: '+JSON.stringify(said));
+      if(typeof backupPayloadWithLanguages!=='function') throw new Error('backups do not carry the languages');
+      if(!/backupPayloadWithLanguages/.test(String(backupSave))||!/backupPayloadWithLanguages/.test(String(autoBackupIfDue)))
+        throw new Error('a backup path (the button or the automatic one) still leaves the languages out');
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.82 -->
+<!-- Tony's Recipes Collection v36.83 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3723,7 +3723,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.82';
+var APP_VERSION = 'v36.83';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6337,7 +6337,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.82</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.83</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6969,7 +6969,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.82</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.83</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10486,6 +10486,9 @@ function renderLangMenu() {
   h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
      + (i18nCanEdit()
         ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');openI18nEditor()">✏️ Edit translations…</button>'
+          // v36.83 — move the translations between copies (live ↔ test) as a file.
+          + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nExportLanguages()">⬇️ Export languages (file)</button>'
+          + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nImportLanguages()">⬆️ Import languages (file)…</button>'
         : '');
   host.innerHTML = h;
 }
@@ -10844,6 +10847,105 @@ async function i18nUpdateAll() {
   return { updated: results, plan: plan };
 }
 window.i18nUpdateAll = i18nUpdateAll;
+
+// ─── COPYING THE LANGUAGES BETWEEN COPIES (v36.83) ───────────────────────────
+// Each copy of the app keeps its translations in its own Firebase project, so
+// the test copy started with English and Hebrew while the family's had eight —
+// and tested a different interface from the one the family sees. Tony: "make
+// them the same, to make the tests more life-like". Translating again would cost
+// AI calls for words already paid for; this moves them as a file instead:
+// export on one copy, import on the other. Full access only on both ends,
+// like every other write to the shared translations.
+var I18N_FILE_KIND = 'tonys-recipes-languages';
+function i18nPackLanguages(docs, from) {
+  var langs = {};
+  Object.keys(docs || {}).forEach(function(code) {
+    var d = docs[code];
+    if (code !== 'en' && I18N_LANGS[code] && d && d.strings && typeof d.strings === 'object') langs[code] = d;
+  });
+  return { kind: I18N_FILE_KIND, v: 1, exportedAt: new Date().toISOString(), from: from || '', langs: langs };
+}
+// → { langs: {code: doc}, skipped: [code…] } or throws with a sentence to show.
+function i18nUnpackLanguages(text) {
+  var o;
+  try { o = JSON.parse(text); } catch(e) { throw new Error('This is not a languages file (it is not readable data).'); }
+  // A backup (v36.83+) carries the same thing inside it, so either file will do.
+  if (o && o.version && Array.isArray(o.recipes)) {
+    if (!o.languages) throw new Error('This backup was saved without languages (before v36.83, or while offline with none on the device).');
+    o = o.languages;
+  }
+  if (!o || o.kind !== I18N_FILE_KIND || !o.langs || typeof o.langs !== 'object')
+    throw new Error('This is not a languages file exported from this app.');
+  var langs = {}, skipped = [];
+  Object.keys(o.langs).forEach(function(code) {
+    var d = o.langs[code];
+    if (code === 'en' || !I18N_LANGS[code] || !d || !d.strings || typeof d.strings !== 'object') { skipped.push(code); return; }
+    var strings = {};
+    Object.keys(d.strings).forEach(function(k){ if (typeof d.strings[k] === 'string') strings[k] = d.strings[k]; });
+    var doc = {}; Object.keys(d).forEach(function(k){ if (k !== 'strings') doc[k] = d[k]; });
+    doc.strings = strings; doc.count = Object.keys(strings).length;
+    langs[code] = doc;
+  });
+  if (!Object.keys(langs).length) throw new Error('The file holds no language this app can use.');
+  return { langs: langs, skipped: skipped, from: String(o.from || '') };
+}
+async function i18nExportLanguages() {
+  if (!i18nCanEdit()) { toast('Exporting the shared translations needs full access.'); return null; }
+  try { await i18nIndexFetch(true); } catch(e) {}
+  var codes = i18nSupportedLangs().filter(function(c){ return c !== 'en'; }), docs = {};
+  for (var i = 0; i < codes.length; i++) {
+    var d = await i18nReadCloud(codes[i]);
+    if (d) docs[codes[i]] = d;
+  }
+  var file = i18nPackLanguages(docs, (APP_CONFIG.siteOrigin || '') + (APP_CONFIG.sitePath || ''));
+  var n = Object.keys(file.langs).length;
+  if (!n) { toast('No translated language could be read from the cloud.'); return null; }
+  downloadBlob(new Blob([JSON.stringify(file)], { type: 'application/json' }),
+               'languages-' + (APP_CONFIG.environment || 'live') + '-' + new Date().toISOString().slice(0, 10) + '.json');
+  toast('Exported ' + n + ' language' + (n === 1 ? '' : 's'));
+  return file;
+}
+async function i18nImportLanguagesText(text) {
+  if (!i18nCanEdit()) { toast('Importing shared translations needs full access.'); return null; }
+  var got;
+  try { got = i18nUnpackLanguages(text); } catch(e) { await askConfirm({ icon: '⚠️', title: 'Cannot import', message: e.message, okLabel: 'OK' }); return null; }
+  var codes = Object.keys(got.langs);
+  var ok = await askConfirm({ icon: '🌐', title: 'Import ' + codes.length + ' language' + (codes.length === 1 ? '' : 's') + '?',
+    message: codes.map(function(c){ return '• ' + i18nLangName(c) + ' — ' + got.langs[c].count + ' phrases'; }).join('\n')
+      + (got.from ? '\n\nFrom: ' + got.from : '')
+      + '\n\nEach replaces this copy\u2019s translation of the same language, for everyone signed in here.',
+    okLabel: 'Import' });
+  if (!ok) return null;
+  return i18nApplyLanguages(got);
+}
+async function i18nApplyLanguages(got) {
+  var codes = Object.keys(got.langs);
+  var done = [], failed = [];
+  for (var i = 0; i < codes.length; i++) {
+    var r = await i18nWriteCloud(codes[i], got.langs[codes[i]]);
+    (r === 'cloud' ? done : failed).push(codes[i]);
+  }
+  try { await i18nIndexFetch(true); } catch(e) {}
+  i18nPruneCaches(_i18nLang === 'en' ? [] : [_i18nLang]);   // one language per device (v36.61)
+  if (typeof renderLangMenu === 'function') try { renderLangMenu(); } catch(e) {}
+  if (_i18nLang && got.langs[_i18nLang] && done.indexOf(_i18nLang) !== -1)
+    try { i18nActivate(_i18nLang, got.langs[_i18nLang].strings, true); } catch(e) {}
+  toast(failed.length ? 'Imported ' + done.length + '; ' + failed.length + ' could not be saved to the cloud'
+                      : 'Imported ' + done.length + ' language' + (done.length === 1 ? '' : 's'));
+  return { done: done, failed: failed };
+}
+function i18nImportLanguages() {
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json,.json';
+  inp.onchange = function() {
+    var f = inp.files && inp.files[0]; if (!f) return;
+    f.text().then(i18nImportLanguagesText);
+  };
+  inp.click();
+}
+window.i18nPackLanguages = i18nPackLanguages; window.i18nUnpackLanguages = i18nUnpackLanguages;
+window.i18nExportLanguages = i18nExportLanguages; window.i18nImportLanguages = i18nImportLanguages;
+window.i18nImportLanguagesText = i18nImportLanguagesText; window.i18nApplyLanguages = i18nApplyLanguages;
 
 // Install a dictionary directly. This exists for the self-test suite, which has
 // to be able to check that a translated interface still works without a paid AI
@@ -23231,7 +23333,7 @@ async function autoBackupIfDue() {
   if (at !== null && (Date.now() - at) < BACKUP_EVERY_MS) return 'not due yet';
   if (await backupDirPermission(rec.handle, false) !== 'granted') return 'permission needs a click';
   try {
-    var name = await writeBackupToFolder(rec.handle, backupJson());
+    var name = await writeBackupToFolder(rec.handle, JSON.stringify(await backupPayloadWithLanguages(), null, 2));
     markAutoBackup(); markBackupTaken();
     familyBackupNote(true);
     toast('\u{1F4BE} Backed up to "' + rec.name + '/' + name + '"', 6000);
@@ -23651,12 +23753,42 @@ function backupPayload() {
 }
 function backupJson() { return JSON.stringify(backupPayload(), null, 2); }
 window.backupPayload = backupPayload; window.backupJson = backupJson;
+// v36.83 — Tony: "The languages should also be backed up, the same as the
+// recipes." A device keeps only the language it shows (v36.61), so they are read
+// from the cloud when signed in and online — one read each, a handful a day at
+// most. Otherwise the ones this device holds go in. A failure here never costs
+// the backup: it is written without them and says so.
+async function backupLanguages() {
+  var docs = {};
+  try {
+    if (window._fbDb && window._fbUser && navigator.onLine) {
+      try { await i18nIndexFetch(true); } catch(e) {}
+      var codes = i18nSupportedLangs().filter(function(c){ return c !== 'en'; });
+      for (var i = 0; i < codes.length; i++) {
+        var d = await i18nReadCloud(codes[i]);
+        if (d) docs[codes[i]] = d;
+      }
+      i18nPruneCaches(_i18nLang === 'en' ? [] : [_i18nLang]);
+    }
+    Object.keys(I18N_LANGS).forEach(function(c){ if (!docs[c]) { var l = i18nReadCache(c); if (l) docs[c] = l; } });
+  } catch(e) { return null; }
+  var pack = i18nPackLanguages(docs, (APP_CONFIG.siteOrigin || '') + (APP_CONFIG.sitePath || ''));
+  return Object.keys(pack.langs).length ? pack : null;
+}
+async function backupPayloadWithLanguages() {
+  var payload = backupPayload();
+  var langs = await backupLanguages();
+  if (langs) payload.languages = langs;
+  return payload;
+}
+window.backupLanguages = backupLanguages; window.backupPayloadWithLanguages = backupPayloadWithLanguages;
 
 async function backupSave() {
   try {
-    var payload = backupPayload();
+    var payload = await backupPayloadWithLanguages();
     var json = JSON.stringify(payload, null, 2);
     var nPhotos = Object.keys(payload.photos).length;
+    var nLangs = payload.languages ? Object.keys(payload.languages.langs).length : 0;
 
     // v36.20 \u2014 if a folder has been chosen, write there. It keeps dated
     // snapshots, so yesterday's file is still yesterday's file, and nothing
@@ -23668,7 +23800,7 @@ async function backupSave() {
         var name = await writeBackupToFolder(rec.handle, json);
         markBackupTaken(); markAutoBackup(); familyBackupNote(false);
         toast('\u2705 Backup saved to "' + rec.name + '/' + name + '" \u2014 '
-          + recipes.length + ' recipes, ' + nPhotos + ' photos', 7000);
+          + recipes.length + ' recipes, ' + nPhotos + ' photos, ' + nLangs + ' languages', 7000);
         return;
       } catch(e) {
         // Say which one failed and that the download is a fallback, rather than
@@ -23685,7 +23817,7 @@ async function backupSave() {
     a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     familyBackupNote(false);
-    toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos');
+    toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos, '+nLangs+' languages');
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
 }
 
@@ -23816,6 +23948,18 @@ async function backupRestoreFile(event) {
     cancelLabel:'Cancel' });
 
   if(answer !== true && answer !== 'alt') { toast('Restore cancelled \u2014 nothing changed'); return; }
+  // v36.83 — languages travel in the backup; offer them after the recipes, and
+  // only to someone allowed to change the shared translations.
+  var offerLanguages = async function() {
+    if (!backup.languages || typeof i18nCanEdit !== 'function' || !i18nCanEdit()) return;
+    var got; try { got = i18nUnpackLanguages(JSON.stringify(backup.languages)); } catch(e) { return; }
+    var codes = Object.keys(got.langs);
+    if (await askConfirm({ icon:'\u{1F310}', title:'Restore the languages too?',
+        message:'The backup also holds '+codes.length+' language'+(codes.length===1?'':'s')+': '
+          + codes.map(function(c){ return i18nLangName(c); }).join(', ')
+          + '.\n\nEach replaces this copy\u2019s translation of the same language, for everyone signed in here.',
+        okLabel:'Restore languages', cancelLabel:'Not now' }) === true) await i18nApplyLanguages(got);
+  };
 
   // \u2500\u2500 the non-destructive mode \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if(answer === true) {
@@ -23835,6 +23979,7 @@ async function backupRestoreFile(event) {
         + 'to the cloud:\n\n' + (err && err.message ? err.message : String(err))
         + '\n\nUse \u2699\ufe0f \u2192 Sync now once the connection is back.'); }
     }
+    await offerLanguages();
     return;
   }
 
@@ -23858,6 +24003,7 @@ async function backupRestoreFile(event) {
       + (err && err.message ? err.message : String(err))
       + '\n\nYour other devices still hold the old collection. Fix the connection and use \u2699\ufe0f \u2192 Sync now, or they will overwrite this device on their next sync.'); }
   }
+  await offerLanguages();
 }
 // A backup written before exportedAt existed, or with a damaged one, must not
 // throw \u2014 the label is decoration, not data.
