@@ -174,10 +174,14 @@ found only because a test was written first and disagreed with the code.
 - **Versioning:** minor bumps (`v28.2` → `v28.3`) for ordinary work; majors reserved
   for genuinely big changes. Bump `version.json` **and** the four version strings in
   `index.html` together (line-1 comment, `APP_VERSION`, two badges in the markup).
-- **Delivery: push straight to `main`.** Standing instruction from Tony, 1 Aug 2026 —
-  he would rather not upload files by hand. Pushing deploys to Pages within minutes,
-  so **tell him in advance when a change is risky** (anything touching cloud data or
-  migrations) so he can take a backup first. Still `git fetch origin main` before
+- **Delivery: push to `test`; ASK TONY before anything reaches `main`.** (27 Sep
+  2026 — supersedes "push straight to `main`" of 1 Aug 2026.) Work goes to the
+  `test` branch (the test copy, CI); only after **CI is green AND Tony has said
+  yes for that specific release** is `main` fast-forwarded to `test`. His "assume
+  agreement / stop asking" refers to tool permission pop-ups, NOT to releasing
+  to the family app. A scheduled check may REPORT CI, never move `main` by
+  itself. **Tell him in advance when a change is risky** (cloud data,
+  migrations) so he can take a backup first. `git fetch origin main` before
   starting. The old convention — hand-uploads through the web UI, branch
   `claude/tonys-recipes-app-nv31q1`, PR #1 — is retired; that PR was closed unmerged.
 - Keep `RECONSTRUCTION_PROMPT.md` and `IMPROVEMENT_IDEAS.md` current in the same commit.
