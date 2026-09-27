@@ -9451,6 +9451,7 @@ window.SELF_TESTS = [
       // known-list and real "still missing" lists.
       var parked={};
       Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k)) parked[k]=localStorage.getItem(k); });
+      var realCat=window.i18nFullCatalogue, realCentral=window.i18nCentralIndex;
       var realDb=window._fbDb, realUser=window._fbUser, realAsk=window.askConfirm, realAI=window.aiCall,
           realHarvest=window.i18nHarvest, realToast=window.toast, langWas=_i18nLang, dictWas=_i18nDict,
           cloudWas=_cloudSnapshotForTest(), fetchedWas=_i18nIndexFetched;
@@ -9474,6 +9475,12 @@ window.SELF_TESTS = [
         // (3) The shared index: an admin's first look builds it from what is in
         // the cloud, and every device learns the languages from it.
         var cat=i18nFullCatalogue(); if(cat.length<50) throw new Error('catalogue too small to test with');
+        // v36.89 — the word list is PINNED for the rest of this test, and the
+        // central language list answers from here. With the network real (CI),
+        // that request took long enough for the app to catalogue three more
+        // on-screen phrases meanwhile, and every language then looked three short.
+        window.i18nFullCatalogue=function(){ return cat.slice(); };
+        window.i18nCentralIndex=async function(){ return i18nKnownLangs(); };
         var newWords=cat.slice(-5), ruStrings={}, jaStrings={};
         cat.forEach(function(k,i){ jaStrings[k]='ja'+i; if(newWords.indexOf(k)===-1) ruStrings[k]='ru'+i; });
         var db=_fakeFirestore({ i18n_ru:{ strings:ruStrings, updatedAt:1 }, i18n_ja:{ strings:jaStrings, updatedAt:1 } });
@@ -9524,6 +9531,7 @@ window.SELF_TESTS = [
       } finally {
         window._fbDb=realDb; window._fbUser=realUser; window.askConfirm=realAsk; window.aiCall=realAI;
         window.i18nHarvest=realHarvest; window.toast=realToast; _i18nIndexFetched=fetchedWas;
+        window.i18nFullCatalogue=realCat; window.i18nCentralIndex=realCentral;
         Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k) && !(k in parked)) localStorage.removeItem(k); });
         Object.keys(parked).forEach(function(k){ localStorage.setItem(k, parked[k]); });
         i18nInstall(langWas, dictWas);

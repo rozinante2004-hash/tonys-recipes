@@ -245,6 +245,14 @@ found only because a test was written first and disagreed with the code.
   before sign-in. Export/Import (v36.83) remain for moving edits by hand.
   **Needs the rules published on the family project** — until then the
   central read is refused and each copy falls back to its own.
+  **Never during a Self Test run** (`i18nCentralGet` returns null while
+  `_selfTestRunning`): CI runs signed out and would otherwise pull the
+  family's REAL translations into tests that bring their own words. v36.88–89
+  went red in CI for exactly this kind of reason: the real (slow) request let
+  the app catalogue three more phrases mid-test, so `i18n_languages_menu_
+  badge_update_all` saw every language three short — it now pins the word list.
+  CI failed for four pushes before this was noticed: **check CI after every
+  push, before moving anything to main.**
   `tools/build.js` refuses a non-live build that names the live project —
   EXCEPT inside `languageSource`, which it sets aside before scanning (and
   refuses if it cannot find it). v36.88 was pushed before that exception and
