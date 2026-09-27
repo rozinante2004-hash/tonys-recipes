@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.80 -->
+<!-- Tony's Recipes Collection v36.81 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -102,7 +102,11 @@
     environment:         'live',
     firebase: Object.freeze({
       apiKey:            'AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4',
-      authDomain:        'recipes-f379d.firebaseapp.com',
+      // v36.81 — sign-in runs on this site's own address, not
+      // recipes-f379d.firebaseapp.com: on an iPhone that address fails with
+      // "missing initial state". Firebase's sign-in pages are served at
+      // /__/auth/ by the site root (repository rozinante2004-hash.github.io).
+      authDomain:        'rozinante2004-hash.github.io',
       projectId:         'recipes-f379d',
       storageBucket:     'recipes-f379d.firebasestorage.app',
       messagingSenderId: '313792199018',
@@ -3719,7 +3723,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.80';
+var APP_VERSION = 'v36.81';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6416,7 +6420,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.80</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.81</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7048,7 +7052,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.80</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.81</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -19453,8 +19457,9 @@ async function diagnoseSignIn() {
     advice = 'Open <b>console.cloud.google.com/apis/credentials</b>, pick the browser key for '
       + 'project <b>' + escH(APP_CONFIG.firebase.projectId) + '</b>, and under <b>Website restrictions</b> make sure BOTH of these '
       + 'are listed:<br>• <code>' + escH(location.host) + '/*</code><br>'
-      + '• <code>' + escH(APP_CONFIG.firebase.authDomain) + '/*</code><br>'
-      + 'The second one is the easy one to miss: the sign-in popup runs on that domain, not this one. '
+      + (APP_CONFIG.firebase.authDomain === location.host ? '' :
+         '• <code>' + escH(APP_CONFIG.firebase.authDomain) + '/*</code><br>'
+         + 'The second one is the easy one to miss: the sign-in popup runs on that domain, not this one. ')
       + 'Changes can take a few minutes to take effect.';
   } else if (typeof firebase === 'undefined') {
     advice = 'The Firebase scripts never loaded. That is a network or content-blocker problem rather '

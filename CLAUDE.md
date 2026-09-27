@@ -248,12 +248,15 @@ found only because a test was written first and disagreed with the code.
     under Authorized redirect URIs. Done for the test copy.
   - **The family's copy:** its root is the OTHER repository,
     `rozinante2004-hash/rozinante2004-hash.github.io`, whose Actions workflow
-    fetches the same six files from `recipes-f379d` on every deploy and
-    weekly (Pages source must be "GitHub Actions"). Only once
-    https://rozinante2004-hash.github.io/__/auth/handler is served and its
-    redirect URI is added does the live `authDomain` change to
-    `rozinante2004-hash.github.io`. Changing it does not sign anyone out
-    (Firebase keys the saved sign-in by API key, not authDomain).
+    fetches the same files from `recipes-f379d` on every deploy and weekly
+    (Pages source set to "GitHub Actions" by Tony, 27 Sep 2026; first deploy
+    served five files — `recipes-f379d` has no `init.json` either). **v36.81**
+    changed the live `authDomain` to `rozinante2004-hash.github.io`, after
+    Tony added `https://rozinante2004-hash.github.io/__/auth/handler` to
+    that project's OAuth redirect URIs. Changing it does not sign anyone out
+    (Firebase keys the saved sign-in by API key, not authDomain). **If that
+    repository's workflow stops deploying, the family cannot sign in** —
+    it is part of the app now, though it lives elsewhere.
   - `net_signin_helpers` checks the files really are served whenever
     `authDomain` is the page's own host.
   - The service worker leaves `/__/` alone (only the app page and its icons
