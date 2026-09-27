@@ -257,6 +257,8 @@ found only because a test was written first and disagreed with the code.
     (Firebase keys the saved sign-in by API key, not authDomain). **If that
     repository's workflow stops deploying, the family cannot sign in** —
     it is part of the app now, though it lives elsewhere.
+    Verified by Tony on his iPhone, 27 Sep 2026: signed out and back in on
+    v36.81 (live) and on the test copy; Self Test green on both.
   - `net_signin_helpers` checks the files really are served whenever
     `authDomain` is the page's own host.
   - The service worker leaves `/__/` alone (only the app page and its icons
