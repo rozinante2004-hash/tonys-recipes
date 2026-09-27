@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.81 -->
+<!-- Tony's Recipes Collection v36.82 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3723,7 +3723,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.81';
+var APP_VERSION = 'v36.82';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4346,7 +4346,6 @@ window.addEventListener('unhandledrejection', function(e) {
 :root[data-theme="dark"] .modal { background: var(--card-bg); }
 :root[data-theme="dark"] .drop-item { color: var(--ink); }
 :root[data-theme="dark"] .drop-item:hover { background: #2E251E; color: var(--terracotta); }
-:root[data-theme="dark"] .calc-quick-btn { background: var(--card-bg); color: var(--ink); border-color: var(--border); }
 
 /* Surfaces that were written as literal `white` long before a theme existed.
    Listed explicitly rather than with a blanket rule so nothing that is meant to
@@ -4410,7 +4409,6 @@ window.addEventListener('unhandledrejection', function(e) {
 :root[data-theme="dark"] .nutrition-unit  { color: #B9AFA3; }
 :root[data-theme="dark"] .nutrition-label { color: #EFE7DC; }
 :root[data-theme="dark"] .nutrition-value { color: #F5C77E; }
-:root[data-theme="dark"] .nutrition-loading { color: #B9AFA3; }
 :root[data-theme="dark"] .filter-btn:hover { background: #33291F; color: var(--ink); border-color: #55372A; }
 
 /* v36.14 — these four carried their colours inline, where no dark-mode rule
@@ -4610,8 +4608,6 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .btn-primary:hover { background: #a83a0c; }
 .btn-secondary { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
 .btn-secondary:hover { background: rgba(255,255,255,0.25); }
-.btn-gold { background: var(--gold); color: var(--warm-brown); }
-.btn-gold:hover { background: #c49a38; }
 
 /* Dropdown menus */
 .drop-group { position: static; }
@@ -4710,17 +4706,10 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .drop-item:hover { background: #FFF0E8; color: var(--terracotta); }
 
 /* SEARCH */
-.search-section { background: var(--warm-brown); padding: 0 1.5rem 1.25rem; }
-.search-wrap { position: relative; max-width: 560px; }
-.search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.45); pointer-events: none; }
-.search-input { width: 100%; padding: 10px 14px 10px 38px; border: none; border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; background: rgba(255,255,255,0.12); color: white; outline: none; }
-.search-input::placeholder { color: rgba(255,255,255,0.38); }
-.search-input:focus { background: rgba(255,255,255,0.18); }
 
 /* FILTERS */
 .filter-bar { display: flex; gap: 10px; padding: 10px 1.5rem; flex-wrap: wrap; align-items: flex-start; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; z-index: 150; }
 .filter-frame { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); align-items: center; }
-.filter-frame-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; white-space: nowrap; }
 /* v36.10 — ☑ Select, in its own frame at the right-most point of the bar.
    `margin-inline-start:auto` rather than `float`/`order` so it also lands on
    the right in RTL, and so a wrapped bar puts it at the end of the last line
@@ -4790,7 +4779,6 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.72); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-body { padding: 11px 13px 13px; flex: 1 1 auto; }
-.card-category { font-size: 10px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 3px; }
 .card-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3; text-align: start; unicode-bidi: plaintext; }
 .card-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
 .card-footer { padding: 8px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
@@ -5053,9 +5041,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 /* 3.5 — cooking log: rating + note per attempt */
 .cooked-pill { background: #FFF0E8; border-radius: 12px; padding: 2px 10px; color: var(--terracotta); font-weight: 600; }
 :root[data-theme="dark"] .cooked-pill { background: #3A241A; }
-.star-btn { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 1px; transition: transform 0.1s; }
-.star-btn.on { color: var(--gold); }
-.star-btn:hover { transform: scale(1.15); }
 .rating-stars { color: var(--gold); letter-spacing: 1px; font-weight: 600; }
 .cook-log { margin-bottom: 12px; }
 .cook-log > summary { cursor: pointer; font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -5083,12 +5068,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .conv-opt.active { background: var(--warm-brown); color: white; }
 
 /* Share */
-.share-panel { display: none; background: #f0ebe4; border-radius: 8px; padding: 11px 13px; margin-top: 7px; }
-.share-panel.open { display: block; }
-.share-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
-.share-link { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 500; font-family: 'DM Sans', 'Heebo', sans-serif; cursor: pointer; border: none; transition: opacity 0.15s; }
-.share-link:hover { opacity: 0.85; }
-.share-mail { background: #4A90D9; color: white; } .share-whatsapp { background: #25D366; color: white; } .share-copy { background: var(--warm-brown); color: white; }
 
 /* ADD/EDIT MODAL */
 .add-modal { max-width: 540px; }
@@ -5302,10 +5281,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 
 /* TRANSLATE MODAL */
 .translate-modal { max-width: 620px; }
-.lang-toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
-.lang-btn { padding: 6px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: white; font-size: 13px; font-family: "DM Sans", sans-serif; cursor: pointer; color: var(--muted); transition: all 0.15s; font-weight: 500; }
-.lang-btn.active { background: var(--terracotta); border-color: var(--terracotta); color: white; }
-.lang-arrow { font-size: 18px; color: var(--muted); }
 .translate-block { background: white; border: 1.5px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 12px; }
 .translate-block[dir=rtl] { text-align: right; }
 .translate-block-title { font-family: "Playfair Display", serif; font-size: 20px; font-weight: 700; color: var(--heading); margin-bottom: 10px; }
@@ -5325,7 +5300,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 
 /* EMPTY / TOAST */
 .empty-state { text-align: center; padding: 3rem 2rem; color: var(--muted); grid-column: 1/-1; }
-.empty-icon { font-size: 42px; margin-bottom: 0.75rem; }
 .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--card-bg); color: var(--ink); padding: 10px 16px 10px 10px; border-radius: 14px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; white-space: nowrap; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 10px; }
 .toast.show { transform: translateX(-50%) translateY(0); }
 .toast-icon-wrap { width: 28px; height: 28px; border-radius: 50%; background: #FFF0E8; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
@@ -5342,15 +5316,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .btn-secondary:active { box-shadow: 0 1px 0 rgba(0,0,0,0.2); transform: translateY(3px); }
 
 /* Gold */
-.btn-gold {
-  background: var(--gold);
-  color: var(--heading);
-  box-shadow: 0 4px 0 #8a6318, 0 5px 6px rgba(0,0,0,0.2);
-  transform: translateY(0);
-  transition: all 0.1s ease;
-}
-.btn-gold:hover  { background: #d9ac3a; box-shadow: 0 4px 0 #8a6318, 0 5px 8px rgba(0,0,0,0.22); transform: translateY(-1px); }
-.btn-gold:active { background: #c49a38; box-shadow: 0 1px 0 #8a6318; transform: translateY(3px); }
 
 /* btn-submit (full-width terracotta in modals) */
 .btn-submit {
@@ -5439,17 +5404,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 }
 
 /* Lang buttons */
-.lang-btn {
-  box-shadow: 0 3px 0 #c8c0b5, 0 4px 5px rgba(0,0,0,0.1);
-  transform: translateY(0);
-  transition: all 0.1s ease;
-}
-.lang-btn:hover  { box-shadow: 0 3px 0 #b8b0a5, 0 4px 6px rgba(0,0,0,0.13); transform: translateY(-1px); }
-.lang-btn:active { box-shadow: 0 1px 0 #c8c0b5; transform: translateY(2px); }
-.lang-btn.active {
-  background: var(--terracotta); border-color: var(--terracotta); color: white;
-  box-shadow: 0 3px 0 #7a2b08;
-}
 
 /* Fav button */
 .fav-btn { transition: transform 0.15s, filter 0.15s; }
@@ -5577,8 +5531,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .share-app-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
 .share-whatsapp-app { background: #0F7A41; color: white; }
 .share-copy-link    { background: var(--warm-brown); color: white; }
-.share-qr-wrap { text-align: center; margin-top: 14px; }
-.share-qr-wrap canvas { border-radius: 8px; border: 1px solid var(--border); }
 
 
 /* Source field */
@@ -5653,7 +5605,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
   cursor: pointer;
   box-shadow: 0 2px 0 rgba(0,0,0,0.2);
 }
-.del-bar-cancel { background: rgba(255,255,255,0.15); color: white; }
 .del-bar-delete { background: white; color: var(--terracotta); }
 .del-bar-action  { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); }
 .del-bar-action:hover { background: rgba(255,255,255,0.32); }
@@ -5693,7 +5644,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
    reads as the heading it is. */
 .nutrition-unit { font-size: 11px; color: var(--muted); }
 .nutrition-label { font-size: 12px; color: var(--ink); font-weight: 600; }
-.nutrition-loading { font-size: 12px; color: var(--muted); text-align: center; padding: 8px 0; }
 .nutrition-btn {
   font-size: 11px; padding: 4px 10px; border-radius: 6px;
   border: 1px solid var(--border); background: white;
@@ -5783,14 +5733,6 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .calc-common-row {
   display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px;
 }
-.calc-quick-btn {
-  padding: 4px 10px; border-radius: 6px;
-  border: 1px solid var(--border); background: white;
-  font-size: 11px; cursor: pointer; color: var(--muted);
-  font-family: 'DM Sans', 'Heebo', sans-serif;
-  transition: all 0.15s;
-}
-.calc-quick-btn:hover { border-color: var(--terracotta); color: var(--terracotta); }
 
 
 /* ── BIDIRECTIONAL TEXT (Hebrew / RTL support) ──
@@ -5895,18 +5837,6 @@ body.banner-shown .header {
   cursor: pointer;
 }
 .bring-ing-item:last-child { border-bottom: none; }
-.bring-ing-check {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 2px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: 13px;
-  transition: all 0.15s;
-}
-.bring-ing-item.selected .bring-ing-check {
-  background: #E8630A; border-color: #E8630A; color: white;
-}
-.bring-ing-name { flex: 1; font-size: 14px; color: var(--ink); }
-.bring-ing-amt  { font-size: 13px; color: var(--muted); font-weight: 500; }
 .bring-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--border);
@@ -5938,15 +5868,6 @@ body.banner-shown .header {
 
 
 /* ── BRING! TOKEN STATUS ── */
-.bring-token-bar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px;
-  background: #fff8f0;
-  border: 1px solid #f0d9b5;
-  border-radius: 10px;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
 .bring-token-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: #4CAF50; flex-shrink: 0;
@@ -6034,7 +5955,6 @@ body.banner-shown .header {
 }
 
 /* ── HELP MODAL ── */
-.help-modal { max-width: 500px; }
 .help-input-row {
   display: flex; gap: 8px; margin-bottom: 12px;
 }
@@ -6380,9 +6300,6 @@ body.banner-shown .header {
 .access-name { font-size:13px;font-weight:600;color:var(--ink); }
 .access-email { font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .access-badge { font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;flex-shrink:0; }
-.access-role-btn { padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--ink); }
-.access-role-btn:hover { border-color:var(--terracotta);color:var(--terracotta); }
-.access-remove-btn { padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:none;background:#FFE8E8;color:#c0392b; }
 .access-role-opt { display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card-bg);font-family:'DM Sans','Heebo',sans-serif; }
 .access-role-opt:has(input:checked) { border-color:var(--terracotta);background:#FFF5F2;color:var(--terracotta); }
 
@@ -6420,7 +6337,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.81</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.82</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7052,7 +6969,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.81</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.82</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

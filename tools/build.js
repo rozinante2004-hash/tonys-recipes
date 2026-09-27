@@ -88,6 +88,15 @@ if (envName === 'live') {
   if (Object.keys(overrides).some(k => k.charAt(0) !== '_')) fail("the live copy's settings are the #appConfig block itself — put nothing in environments.json 'live'");
 } else {
   page = src.slice(0, at) + 'window.APP_CONFIG = ' + literalOf(cfg, 1) + src.slice(close + 1);
+  // The Content-Security-Policy <meta> is read by the browser before any script
+  // runs, so APP_CONFIG cannot reach it — the build does (v36.82). A copy with
+  // its own Worker gets that Worker in connect-src in place of the live one.
+  if (cfg.workerUrl !== live.workerUrl) {
+    const liveHost = new URL(live.workerUrl).host, ownHost = new URL(cfg.workerUrl).host;
+    const csp = /<meta http-equiv="Content-Security-Policy" content="[^"]*">/.exec(page);
+    if (!csp || csp[0].indexOf(liveHost) === -1) fail('could not find the live Worker in the Content-Security-Policy to replace');
+    page = page.replace(csp[0], csp[0].split(liveHost).join(ownHost));
+  }
   // Nothing of the live Firebase project may survive in another copy.
   const liveIds = [live.firebase.apiKey, live.firebase.projectId, live.firebase.messagingSenderId, live.firebase.appId]
     .filter(id => cfg.firebase.apiKey !== live.firebase.apiKey || id !== live.firebase.apiKey);
@@ -129,6 +138,12 @@ SELF_TEST_FILES.forEach(f => {
 });
 fs.writeFileSync(path.join(outDir, 'index.html'), page);
 if (envName === 'live' && fs.readFileSync(path.join(outDir, 'index.html'), 'utf8') !== src) fail('the live page is not the source, byte for byte');
+// Every copy: its Content-Security-Policy must let the page reach its own Worker.
+{
+  const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page);
+  if (!csp) fail('the page has no Content-Security-Policy');
+  if (csp[1].indexOf(new URL(cfg.workerUrl).host) === -1) fail('the Content-Security-Policy does not allow ' + cfg.workerUrl + ' — every AI call would be blocked');
+}
 
 // The installable app's name, so a test copy on a home screen cannot pass for the real one.
 if (overrides.manifest) {

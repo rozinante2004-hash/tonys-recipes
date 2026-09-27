@@ -3,7 +3,7 @@
 Read this before changing anything. It records decisions that are easy to
 accidentally undo, and conventions that keep the app deliverable.
 
-## Index (v36.66)
+## Index (v36.82)
 
 The file is long on purpose — each entry under *Traps* is a mistake that was
 made once. Entries are bullets, roughly newest first, so **search for the bold title**
@@ -16,11 +16,21 @@ work* · *Conventions* · *Decisions that must not be silently reverted* ·
   (in *What this is*: never proxy GitHub through the Worker) · "NEVER send a
   custom request header to the Worker" · "The Worker is not free to call".
 - **Configuration:** "AUDIT BLOCK 1" (owner-only tools, `isAppOwner`) ·
-  `#appConfig` in index.html (v36.66, below) — every deployment identifier.
+  `#appConfig` in index.html (v36.66, below) — every deployment identifier ·
+  "FEATURE SWITCHES" (v36.70) · "EVERY REPORT SAYS WHICH COPY WROTE IT".
+- **Two copies, branches & delivery:** "TWO COPIES: LIVE AND TEST" (the
+  build, `tools/environments.json`, the orange marking, its own icons) ·
+  "NEW WORK GOES THROUGH THE `test` BRANCH FIRST" · "FIREBASE SDK 12.19.0,
+  STILL THE COMPAT BUILD" (and the open modular-vs-compat question).
+- **Sign-in:** "ON AN iPHONE, SIGN-IN ON `<project>.firebaseapp.com` FAILS"
+  (self-hosted `/__/auth/`; the family's copy depends on the
+  `rozinante2004-hash.github.io` repository) · "Firebase Auth needs its own
+  authDomain in the CSP" · "The app can say why sign-in failed".
 - **Security & CSP:** "AUDIT BLOCK 1" · "This CSP has now caused four separate
   outages" · "The CSP must stay in step with the CONNECT hosts too" · "…with the
   script hosts" · "Firebase Auth needs its own authDomain in the CSP" ·
-  "`rHtml` output is rendered in an iframe on this origin" · "Escape before
+  "`rHtml` output is rendered in an iframe on this origin" · the build fills
+  the CSP's Worker host per copy (v36.82, under "TWO COPIES") · "Escape before
   highlighting/interpolating, never after" · "A relay never sees a URL without
   the user's consent".
 - **Cloud sync (Firestore):** "The 5.4 concurrency base must be PERSISTED" ·
@@ -42,7 +52,9 @@ work* · *Conventions* · *Decisions that must not be silently reverted* ·
   on purpose to FIND gaps" · "A top-level `let`/`const` is NOT a window
   property" · "The self-test suite is a SEPARATE FILE" · "The self-test suite
   runs in ENGLISH" · "A test that passes in CI and fails on Tony's devices is
-  usually the test".
+  usually the test" · "END-TO-END SYNC ON THE FIREBASE EMULATOR" (v36.71) ·
+  "\"COVERS\" MEANS ON TOP, NOT MERELY OVERLAPPING" · "A MENU WHOSE BUTTON
+  HAS SCROLLED AWAY".
 - **Interface translation (i18n):** "The interface can be translated; the
   RECIPES never are" · "Getting ALL of it translated is a separate problem" ·
   "HARVEST BEFORE YOU CATALOGUE" · "A NUMBER IS NEVER PART OF A KEY" · "THE
@@ -468,7 +480,10 @@ found only because a test was written first and disagreed with the code.
     `applyAppConfig()`. `cfg_identifiers_in_one_place` fails on any identifier
     typed outside the block. **The CSP `<meta>` is the one exception** — no
     script can reach it; the CSP tests compare it against `APP_CONFIG.workerUrl`
-    so a change to one without the other fails. A build step (WP-A.1) fills it.
+    so a change to one without the other fails. **v36.82: the build fills it**
+    — a copy whose `workerUrl` differs gets its own Worker host in
+    `connect-src` in place of the live one, and every build refuses if the
+    CSP does not allow its own Worker.
   - **Dead code, found by coverage, not by reading:** the whole suite plus the
     harvest under V8 function coverage; 246 functions never ran; of those, the
     ones referenced nowhere (code, markup, other pages, tests) were removed —
@@ -477,7 +492,10 @@ found only because a test was written first and disagreed with the code.
     `loadFirebaseDynamically` (190 lines; sign-in reloads the page instead, so
     the startup message saying it "will load it dynamically" was also wrong).
     Kept on purpose, console helpers: `clearAiCache`, `forgetPhotoProbes`,
-    `getCloudReads`. Never-ran is not dead: most of the 246 run only signed in,
+    `getCloudReads`. **v36.82 (WP-A.5)** found no other function without a
+    caller, and removed 50 style rules (~5 KB) whose classes appear nowhere in
+    markup or code (the old search bar, share panel, language toggle, star
+    rating, Bring! checkboxes, access-role buttons …). Never-ran is not dead: most of the 246 run only signed in,
     online, or on an error.
   - This index.
 
