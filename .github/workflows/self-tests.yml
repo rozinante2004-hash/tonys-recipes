@@ -178,6 +178,19 @@ jobs:
           cp "$GITHUB_WORKSPACE/firestore.rules" ./firestore.rules
           npx firebase emulators:exec --only firestore --project demo-rules "node tests/firestore-rules.test.mjs"
 
+      # v36.84 (WP-D) — the household rules (not yet published): who may found,
+      # join, invite, manage, read, write and delete, across separate households.
+      - name: Household rules checks (emulator)
+        run: |
+          mkdir -p /tmp/hh && cd /tmp/hh
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 >/dev/null
+          sed -e "s/{{APP_ADMINS}}/'a@b'/g" "$GITHUB_WORKSPACE/firestore.households.rules" > boot.rules
+          echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"ui":{"enabled":false}}}' > firebase.json
+          mkdir -p tests && cp "$GITHUB_WORKSPACE/tests/firestore-households-rules.test.mjs" tests/
+          cp "$GITHUB_WORKSPACE/firestore.households.rules" ./
+          npx firebase emulators:exec --only firestore --project demo-households "node tests/firestore-households-rules.test.mjs"
+
       # v36.71 (go-public WP-A step 2) — the app itself, signed in, on several
       # simulated devices, syncing through the Firestore + Auth EMULATORS
       # against the published rules. The first time the suite runs the app

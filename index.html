@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.83 -->
+<!-- Tony's Recipes Collection v36.84 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3567,7 +3567,7 @@ function saveAccessMembers(members) {
   localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(members));
   // Also save to Firestore so all family members see the same access list
   if(window._fbDb && window._fbUser) {
-    window._fbDb.collection('shared').doc('access').set({ members: members, updatedAt: Date.now() })
+    cloudDoc('access').set({ members: members, updatedAt: Date.now() })
       .catch(function(e){ console.warn('Access save to Firestore failed:', e); });
   }
 }
@@ -3723,7 +3723,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.83';
+var APP_VERSION = 'v36.84';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -4779,6 +4779,9 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .card-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .card-category-badge { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: rgba(28,26,24,0.72); padding: 2px 8px; border-radius: 10px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-body { padding: 11px 13px 13px; flex: 1 1 auto; }
+.star-btn { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 1px; transition: transform 0.1s; }   /* the cooking log's rating (built in JS — v36.84 restored; v36.82's sweep missed it) */
+.star-btn.on { color: var(--gold); }
+.star-btn:hover { transform: scale(1.15); }
 .card-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 7px; line-height: 1.3; text-align: start; unicode-bidi: plaintext; }
 .card-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
 .card-footer { padding: 8px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
@@ -6300,6 +6303,9 @@ body.banner-shown .header {
 .access-name { font-size:13px;font-weight:600;color:var(--ink); }
 .access-email { font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .access-badge { font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;flex-shrink:0; }
+.access-role-btn { padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--ink); }
+.access-role-btn:hover { border-color:var(--terracotta);color:var(--terracotta); }
+.access-remove-btn { padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:none;background:#FFE8E8;color:#c0392b; }
 .access-role-opt { display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card-bg);font-family:'DM Sans','Heebo',sans-serif; }
 .access-role-opt:has(input:checked) { border-color:var(--terracotta);background:#FFF5F2;color:var(--terracotta); }
 
@@ -6337,7 +6343,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.83</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.84</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6969,7 +6975,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.83</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.84</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9879,7 +9885,7 @@ window.i18nPruneCaches = i18nPruneCaches; window.i18nKnownLangs = i18nKnownLangs
 async function i18nReadCloud(lang) {
   if (!window._fbDb || !window._fbUser) return null;
   try {
-    var snap = await window._fbDb.collection('shared').doc(i18nDocId(lang)).get();
+    var snap = await cloudDoc(i18nDocId(lang)).get();
     if (!snap.exists) return null;
     var d = snap.data();
     return (d && d.strings) ? d : null;
@@ -9915,7 +9921,7 @@ async function i18nWriteCloud(lang, doc) {
   // write-role member switched language; the answer is known in advance.
   if (!i18nCanEdit()) return 'refused';
   try {
-    await window._fbDb.collection('shared').doc(i18nDocId(lang)).set(doc);
+    await cloudDoc(i18nDocId(lang)).set(doc);
     syncLog('save', 'Saved the ' + i18nLangName(lang) + ' translation to the cloud', { count: Object.keys(doc.strings).length });
     await i18nIndexNote(lang, Object.keys(doc.strings).length);
     return 'cloud';
@@ -9939,7 +9945,7 @@ async function i18nIndexNote(lang, count) {
   try {
     var patch = { langs: {} };
     patch.langs[lang] = { at: Date.now(), count: count || 0 };
-    await window._fbDb.collection('shared').doc(I18N_INDEX_DOC).set(patch, { merge: true });
+    await cloudDoc(I18N_INDEX_DOC).set(patch, { merge: true });
     return true;
   } catch(e) { dlog('[i18n] could not update the language index', e && e.message); return false; }
 }
@@ -9953,7 +9959,7 @@ async function i18nIndexFetch(force) {
   _i18nIndexFetched = true;
   var idx = null;
   try {
-    var snap = await window._fbDb.collection('shared').doc(I18N_INDEX_DOC).get();
+    var snap = await cloudDoc(I18N_INDEX_DOC).get();
     if (typeof countCloudRead === 'function') countCloudRead();
     idx = snap.exists ? (snap.data() || {}) : {};
   } catch(e) { dlog('[i18n] could not read the language index', e && e.message); return i18nKnownLangs(); }
@@ -9963,14 +9969,14 @@ async function i18nIndexFetch(force) {
     for (var code in I18N_LANGS) {
       if (langs[code]) continue;
       try {
-        var d = await window._fbDb.collection('shared').doc(i18nDocId(code)).get();
+        var d = await cloudDoc(i18nDocId(code)).get();
         if (typeof countCloudRead === 'function') countCloudRead();
         if (d.exists && d.data() && d.data().strings)
           found[code] = { at: d.data().updatedAt || Date.now(), count: Object.keys(d.data().strings).length };
       } catch(e) {}
     }
     Object.keys(found).forEach(function(c){ langs[c] = found[c]; });
-    try { await window._fbDb.collection('shared').doc(I18N_INDEX_DOC).set({ langs: found, probed: true }, { merge: true }); }
+    try { await cloudDoc(I18N_INDEX_DOC).set({ langs: found, probed: true }, { merge: true }); }
     catch(e) { dlog('[i18n] could not write the language index', e && e.message); }
   }
   Object.keys(langs).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
@@ -17747,7 +17753,7 @@ async function repairMissingPhotos() {
     if (r.photo || r._ph || r.hp || probed[r.id]) continue;
     checked++;
     try {
-      var snap = await _fbDb.collection('shared').doc(photoDocId(r.id)).get();
+      var snap = await cloudDoc(photoDocId(r.id)).get();
       countCloudRead();
       var pd = snap.exists ? (snap.data() || {}) : {};
       if (pd.photo || pd.photoUrl) {
@@ -17848,7 +17854,7 @@ async function pushLocalPhotosToCloud(list) {
   for (var i = 0; i < targets.length; i++) {
     var r = targets[i];
     try {
-      await _fbDb.collection('shared').doc(photoDocId(r.id))
+      await cloudDoc(photoDocId(r.id))
         .set({ photo: r.photo, updatedAt: r.updatedAt || Date.now() });
       _cloudPhotoStamps[r.id] = r.photo;
       _cloudPhotoIds[r.id] = true;
@@ -17917,7 +17923,7 @@ async function syncCloudPhotos() {
         continue;
       }
       try {
-        await _fbDb.collection('shared').doc(photoDocId(r.id))
+        await cloudDoc(photoDocId(r.id))
           .set({ photo: r.photo, updatedAt: r.updatedAt || Date.now() });
         _cloudPhotoStamps[r.id] = r.photo;
         _cloudPhotoIds[r.id] = true;
@@ -17932,7 +17938,7 @@ async function syncCloudPhotos() {
       // the app forgot a document it had failed to remove and nothing ever
       // cleaned it up. Keep the record and report, as flushCloudDeletes does.
       try {
-        await _fbDb.collection('shared').doc(photoDocId(r.id)).delete();
+        await cloudDoc(photoDocId(r.id)).delete();
         delete _cloudPhotoIds[r.id];
         delete _cloudPhotoStamps[r.id];
       } catch(e) { _photoDeleteRefused[r.id] = true; }
@@ -17942,7 +17948,7 @@ async function syncCloudPhotos() {
   var goneIds = Object.keys(_cloudPhotoIds).filter(function(id){ return !currentIds[id]; });
   for (var g = 0; g < goneIds.length; g++) {
     try {
-      await _fbDb.collection('shared').doc(photoDocId(goneIds[g])).delete();
+      await cloudDoc(photoDocId(goneIds[g])).delete();
       delete _cloudPhotoIds[goneIds[g]];
       delete _cloudPhotoStamps[goneIds[g]];
     } catch(e) { _photoDeleteRefused[goneIds[g]] = true; }
@@ -17976,6 +17982,57 @@ window.photoDeletesRefused = function(){ return Object.keys(_photoDeleteRefused)
 // still report `complete: true`, and clear `_ph` — permanent photo loss, no error
 // anywhere. The bounds are DERIVED from the builder now, so they cannot drift:
 // rename the prefix and the range follows.
+// ─── WHERE A CLOUD DOCUMENT LIVES (WP-D, v36.84) ────────────────────────────
+// Every read and write still names its document the way the first layout did —
+// `recipe_12`, `photo_12`, `meta`, `backups`, `chat_…`, `i18n_he` — and these
+// functions decide where that document actually is. In the family's layout
+// ('shared', today's, and the default) that is shared/<name>, exactly as it
+// always was. In the HOUSEHOLD layout every household has its own space —
+// households/<hid>/recipes/12, …/photos/12, …/chats/…, …/state/meta — and the
+// interface translations are app-wide (i18n/he, i18n/_index), so no household
+// pays to translate what another already has. One place decides, so switching
+// is one setting rather than forty edits (firestore.households.rules).
+var _cloudLayout = 'shared';   // 'shared' | 'households'
+var _cloudHid = null;          // the household in use, in the household layout
+function cloudLayout() { return _cloudLayout; }
+function cloudDocPath(name) {
+  name = String(name);
+  if (_cloudLayout !== 'households') return ['shared', name];
+  if (name.indexOf('i18n_') === 0) return ['i18n', name === 'i18n_index' ? '_index' : name.slice(5)];
+  if (!_cloudHid) throw new Error('No household is selected yet');
+  var base = 'households/' + _cloudHid + '/';
+  if (name.indexOf('recipe_') === 0) return [base + 'recipes', name.slice(7)];
+  if (name.indexOf('photo_') === 0)  return [base + 'photos', name.slice(6)];
+  if (name.indexOf('chat') === 0)    return [base + 'chats', name];
+  return [base + 'state', name];
+}
+function cloudDoc(name, db) {
+  var p = cloudDocPath(name);
+  return (db || _fbDb).collection(p[0]).doc(p[1]);
+}
+// The documents whose (first-layout) names fall in [lo, hi) — every recipe,
+// every photo, every chat. Answers in the shape a query snapshot has (size,
+// forEach(doc → doc.id, doc.data())), with the ids as the first layout named
+// them, so the code reading it does not care which layout it came from.
+async function cloudRange(lo, hi, db) {
+  db = db || _fbDb;
+  var out = [], fp = firebase.firestore.FieldPath.documentId(), q;
+  if (_cloudLayout !== 'households') {
+    q = await db.collection('shared').where(fp, '>=', lo).where(fp, '<', hi).get();
+    q.forEach(function(d){ out.push({ id: d.id, d: d.data() }); });
+  } else if (lo === 'recipe_' || lo === 'photo_') {
+    q = await db.collection(cloudDocPath(lo + '0')[0]).get();
+    q.forEach(function(d){ out.push({ id: lo + d.id, d: d.data() }); });
+  } else {
+    q = await db.collection(cloudDocPath(lo)[0]).where(fp, '>=', lo).where(fp, '<', hi).get();
+    q.forEach(function(d){ out.push({ id: d.id, d: d.data() }); });
+  }
+  return { size: out.length, docs: out,
+           forEach: function(fn){ out.forEach(function(o){ fn({ id: o.id, data: function(){ return o.d; } }); }); } };
+}
+window.cloudLayout = cloudLayout; window.cloudDocPath = cloudDocPath;
+window.cloudDoc = cloudDoc; window.cloudRange = cloudRange;
+
 function photoDocId(id) { return 'photo_' + id; }
 var PHOTO_DOC_LO = photoDocId('');
 // The upper bound is the prefix with its last character stepped up by one, so the
@@ -17987,9 +18044,7 @@ async function readCloudPhotoDocs(db) {
   db = db || _fbDb;
   var byId = {};
   try {
-    var fp = firebase.firestore.FieldPath.documentId();
-    var q  = await db.collection('shared')
-      .where(fp, '>=', PHOTO_DOC_LO).where(fp, '<', PHOTO_DOC_HI).get();
+    var q  = await cloudRange(PHOTO_DOC_LO, PHOTO_DOC_HI, db);
     countCloudRead(q.size || 0);
     q.forEach(function(doc){ byId[doc.id] = doc.data() || {}; });
     return { byId: byId, complete: true };
@@ -18025,7 +18080,7 @@ async function attachCloudPhotos(list) {
           d = bulk.byId[photoDocId(r.id)] || null;
           exists = !!d;
         } else {
-          var snap = await _fbDb.collection('shared').doc(photoDocId(r.id)).get();
+          var snap = await cloudDoc(photoDocId(r.id)).get();
           countCloudRead();
           exists = snap.exists;
           d = exists ? (snap.data() || {}) : null;
@@ -18498,7 +18553,7 @@ window.PHOTO_DOC_LO = PHOTO_DOC_LO; window.PHOTO_DOC_HI = PHOTO_DOC_HI;
 // Returns {id, ok} | {id, skipped:'conflict'} | {id, skipped:'too-big', bytes}
 async function saveRecipeDoc(r, db) {
   db = db || _fbDb;
-  var ref  = db.collection('shared').doc(recipeDocId(r.id));
+  var ref  = cloudDoc(recipeDocId(r.id), db);
   var base = _cloudRecipeBase[r.id];
   // Decide the version FIRST and serialise with it, so the stored change-stamp
   // describes exactly the recipe we will hold afterwards. Serialising before
@@ -18558,7 +18613,7 @@ async function writeCloudMeta(list, nextIdVal, db) {
   db = db || _fbDb;
   var stamp = Date.now();
   noteOwnMetaStamp(stamp);
-  var ref = db.collection('shared').doc('meta');
+  var ref = cloudDoc('meta', db);
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
     var cur  = snap.exists ? (snap.data() || {}) : {};
@@ -18595,8 +18650,8 @@ async function flushCloudDeletes(db) {
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i];
     try {
-      await db.collection('shared').doc(recipeDocId(id)).delete();
-      await db.collection('shared').doc(photoDocId(id)).delete();
+      await cloudDoc(recipeDocId(id), db).delete();
+      await cloudDoc(photoDocId(id), db).delete();
     } catch(e) {
       // A fixture's delete being refused is not worth telling anyone about: it
       // is leftover test junk, not one of their recipes. Reporting it would put
@@ -18623,9 +18678,7 @@ async function readCloudRecipeDocs(db, metaIds) {
   db = db || _fbDb;
   var out = [];
   try {
-    var fp = firebase.firestore.FieldPath.documentId();
-    var q  = await db.collection('shared')
-      .where(fp, '>=', RECIPE_DOC_LO).where(fp, '<', RECIPE_DOC_HI).get();
+    var q  = await cloudRange(RECIPE_DOC_LO, RECIPE_DOC_HI, db);
     q.forEach(function(doc) { out.push({ id: doc.id, data: doc.data() }); });
     return out;
   } catch(e) {
@@ -18633,7 +18686,7 @@ async function readCloudRecipeDocs(db, metaIds) {
     var ids = metaIds || [];
     for (var i = 0; i < ids.length; i++) {
       try {
-        var s = await db.collection('shared').doc(recipeDocId(ids[i])).get();
+        var s = await cloudDoc(recipeDocId(ids[i]), db).get();
         if (s.exists) out.push({ id: s.id, data: s.data() });
       } catch(e2) {}
     }
@@ -18729,7 +18782,7 @@ async function refreshRecipeFromCloud(id) {
   if (!local) return { ok:false, reason:'not-here' };
 
   var snap;
-  try { snap = await _fbDb.collection('shared').doc(recipeDocId(id)).get(); }
+  try { snap = await cloudDoc(recipeDocId(id)).get(); }
   catch(e) {
     syncLog('error', 'Refresh of #' + id + ' could not read the cloud: ' + ((e && e.message) || e));
     return { ok:false, reason:'read-failed', error:(e && e.message) || String(e) };
@@ -18829,7 +18882,7 @@ async function sweepOrphanPhotos() {
   var removed = 0, denied = 0;
   for (var i = 0; i < orphans.length; i++) {
     try {
-      await _fbDb.collection('shared').doc(photoDocId(orphans[i])).delete();
+      await cloudDoc(photoDocId(orphans[i])).delete();
       delete _cloudPhotoIds[orphans[i]];
       delete _cloudPhotoStamps[orphans[i]];
       removed++;
@@ -19058,7 +19111,7 @@ async function _loadFromFirestoreInner(user) {
     // says the migration finished. A migration interrupted half way leaves some
     // recipe_* documents written and schema still below 2; trusting their mere
     // existence would silently drop everything that hadn't been written yet.
-    var metaSnap = await _fbDb.collection('shared').doc('meta').get();
+    var metaSnap = await cloudDoc('meta').get();
     countCloudRead();
     var meta = metaSnap.exists ? (metaSnap.data() || {}) : {};
     _cloudSchema = meta.schema || 0;
@@ -19174,7 +19227,7 @@ async function _loadFromFirestoreInner(user) {
       // Each listener skips its own first snapshot, which always fires
       // immediately with current data and is not a remote change.
       var isFirstSnapshot = true;
-      subs.push(_fbDb.collection('shared').doc(docName)
+      subs.push(cloudDoc(docName)
         .onSnapshot({includeMetadataChanges: false}, function(docSnap) {
           if (isFirstSnapshot) { isFirstSnapshot = false; return; }
           if (!docSnap.exists) return;
@@ -21775,7 +21828,7 @@ async function saveChatDoc(file, group, text, db) {
   var chunks = waChunkText(text);
   for (var i = 0; i < chunks.length; i++) {
     if (byteLen(chunks[i]) > FIRESTORE_DOC_LIMIT) throw new Error('a chunk exceeded the document limit');
-    await db.collection('shared').doc(waChatPartId(slug, i + 1)).set({ t: chunks[i], slug: slug, n: i + 1 });
+    await cloudDoc(waChatPartId(slug, i + 1), db).set({ t: chunks[i], slug: slug, n: i + 1 });
   }
   var msgs = waParse(text, group);
   var head = {
@@ -21786,12 +21839,12 @@ async function saveChatDoc(file, group, text, db) {
     last:  msgs.length ? msgs[msgs.length - 1].date : '',
     updatedAt: Date.now()
   };
-  await db.collection('shared').doc(waChatDocId(slug)).set(head);
+  await cloudDoc(waChatDocId(slug), db).set(head);
   // Older uploads may have had more parts than this one does. Leaving them
   // behind would be harmless but untidy, and they would count against storage
   // forever; a delete failure is not worth failing the upload over.
   for (var j = chunks.length + 1; j <= chunks.length + 8; j++) {
-    try { await db.collection('shared').doc(waChatPartId(slug, j)).delete(); } catch(e) { break; }
+    try { await cloudDoc(waChatPartId(slug, j), db).delete(); } catch(e) { break; }
   }
   return head;
 }
@@ -21802,9 +21855,7 @@ async function readCloudChatIndex(db) {
   db = db || _fbDb;
   if (!db) return [];
   var out = [];
-  var fp = firebase.firestore.FieldPath.documentId();
-  var q = await db.collection('shared')
-    .where(fp, '>=', CHAT_DOC_LO).where(fp, '<', CHAT_DOC_HI).get();
+  var q = await cloudRange(CHAT_DOC_LO, CHAT_DOC_HI, db);
   q.forEach(function(doc) {
     var d = doc.data() || {};
     if (!d.file) return;                      // not a chat head; ignore rather than guess
@@ -21830,7 +21881,7 @@ async function loadCloudChatText(entry, db) {
   }
   var text = '';
   for (var n = 1; n <= (entry.parts || 1); n++) {
-    var snap = await db.collection('shared').doc(waChatPartId(entry.slug, n)).get();
+    var snap = await cloudDoc(waChatPartId(entry.slug, n), db).get();
     if (!snap.exists) throw new Error('part ' + n + ' of ' + entry.parts + ' is missing from the cloud');
     text += (snap.data() || {}).t || '';
   }
@@ -21844,9 +21895,9 @@ async function deleteCloudChat(entry, db) {
   db = db || _fbDb;
   if (!db) throw new Error('not signed in to the cloud');
   for (var n = 1; n <= (entry.parts || 1); n++) {
-    await db.collection('shared').doc(waChatPartId(entry.slug, n)).delete();
+    await cloudDoc(waChatPartId(entry.slug, n), db).delete();
   }
-  await db.collection('shared').doc(waChatDocId(entry.slug)).delete();
+  await cloudDoc(waChatDocId(entry.slug), db).delete();
 }
 window.saveChatDoc = saveChatDoc; window.readCloudChatIndex = readCloudChatIndex;
 window.loadCloudChatText = loadCloudChatText; window.deleteCloudChat = deleteCloudChat;
@@ -23592,7 +23643,7 @@ function newestBackupAt() {
 async function familyBackupFetch() {
   if (!window._fbDb || !window._fbUser) return familyBackupCached();
   try {
-    var snap = await window._fbDb.collection('shared').doc(FAMILY_BACKUP_DOC).get();
+    var snap = await cloudDoc(FAMILY_BACKUP_DOC).get();
     if (typeof countCloudRead === 'function') countCloudRead();
     if (snap.exists) familyBackupRemember(snap.data() || {});
   } catch(e) { dlog('[backup] could not read the family backup record', e && e.message); }
@@ -23606,7 +23657,7 @@ async function familyBackupNote(auto) {
   familyBackupRemember(rec);
   if (!window._fbDb || !window._fbUser) return 'local only';
   try {
-    await window._fbDb.collection('shared').doc(FAMILY_BACKUP_DOC).set(rec);
+    await cloudDoc(FAMILY_BACKUP_DOC).set(rec);
     return 'recorded';
   } catch(e) {
     dlog('[backup] could not record the backup in the cloud', e && e.message);

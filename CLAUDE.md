@@ -217,6 +217,19 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **WP-D — HOUSEHOLDS (v36.84, in progress).** Each household gets its own
+  space instead of one `shared` collection guarded by e-mails typed into the
+  rules. `firestore.households.rules` (draft, NOT published; tested on the
+  emulator by `tests/firestore-households-rules.test.mjs`, in CI) defines
+  `households/{hid}` + `members/{uid}` (owner · admin · editor · viewer),
+  `recipes`, `photos`, `chats`, `state` under it, top-level `invites/{code}`,
+  `pending/{hid}:{email}` (a place kept for an e-mail — how the family's
+  members arrive at migration), app-wide `i18n/{lang}` and `users/{uid}`.
+  **Every cloud read and write goes through `cloudDoc(name)` /
+  `cloudRange(lo, hi)`**, which take the FIRST layout's document names
+  (`recipe_12`, `photo_12`, `meta`, `chat_…`, `i18n_he`) and resolve them for
+  `_cloudLayout` — `'shared'` (today; identical paths) or `'households'`.
+  Never write `collection('shared')` anywhere else again.
 - **LANGUAGES LIVE PER COPY — AND NOW IN BACKUPS (v36.83).** Each copy keeps
   its translations in its own Firebase project (`shared/i18n_<lang>`), so the
   test copy had en/he while the family's had eight, and tested a different
@@ -512,7 +525,13 @@ found only because a test was written first and disagreed with the code.
     `getCloudReads`. **v36.82 (WP-A.5)** found no other function without a
     caller, and removed 50 style rules (~5 KB) whose classes appear nowhere in
     markup or code (the old search bar, share panel, language toggle, star
-    rating, Bring! checkboxes, access-role buttons …). Never-ran is not dead: most of the 246 run only signed in,
+    rating, Bring! checkboxes, access-role buttons …). **Three of those were
+    NOT unused** — `star-btn`, `access-role-btn`, `access-remove-btn` are
+    built inside JavaScript strings, and the scan's `<style>…</style>` regex
+    matched a `'<style'` inside a script and swallowed the code between. They
+    were restored in v36.84 (`css_classes_built_in_code_are_styled`). **A
+    class is unused only if it appears nowhere in the file outside its own
+    rule — search the raw text, never a regex-stripped copy.** Never-ran is not dead: most of the 246 run only signed in,
     online, or on an error.
   - This index.
 

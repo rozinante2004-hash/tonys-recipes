@@ -1705,6 +1705,24 @@ window.SELF_TESTS = [
         throw new Error('a backup path (the button or the automatic one) still leaves the languages out');
     } },
 
+  { id:'css_classes_built_in_code_are_styled', group:'CSS', name:'Controls drawn by code keep their styling (v36.84)',
+    test: async()=>{
+      // v36.82's sweep for unused styling read the page with a regular
+      // expression that swallowed part of the script, so classes that only
+      // appear inside JavaScript strings looked unused and lost their rules:
+      // Family Access's role picker and remove button, and the cooking log's
+      // rating stars. Each is drawn here and its styling checked.
+      var host=document.createElement('div'); host.style.cssText='position:fixed;left:-9999px;top:0;';
+      host.innerHTML='<select class="access-role-btn"><option>x</option></select><button class="access-remove-btn">✕</button><button class="star-btn">★</button>';
+      document.body.appendChild(host);
+      try{
+        var sel=getComputedStyle(host.children[0]), rm=getComputedStyle(host.children[1]), st=getComputedStyle(host.children[2]);
+        if(sel.borderTopLeftRadius!=='6px') throw new Error('the Family Access role picker is unstyled');
+        if(rm.borderTopLeftRadius!=='6px' || rm.backgroundColor==='rgba(0, 0, 0, 0)') throw new Error('the Family Access remove button is unstyled');
+        if(st.fontSize!=='24px' || st.backgroundColor!=='rgba(0, 0, 0, 0)') throw new Error('the cooking log\u2019s rating stars are unstyled');
+      } finally { host.remove(); }
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing
