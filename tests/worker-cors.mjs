@@ -130,7 +130,9 @@ console.log('\nBring! recipe import page (v42):');
   const j = await made.json();
   expect('it answers with a page and Bring!\'s import link', made.status === 200 && /\/bring-recipe\/[a-f0-9]{32}$/.test(j.url || '')
     && j.deeplink === 'https://api.getbring.com/rest/bringrecipes/deeplink?url=' + encodeURIComponent(j.url) + '&source=web', JSON.stringify(j));
-  const stored = [...store.values()][0];
+  // The rate limiter shares this KV and sometimes writes its own counter first
+  // (it samples), so pick the page by its key.
+  const stored = [...store.entries()].filter(([k]) => k.startsWith('bringrecipe:')).map(([, x]) => x)[0];
   expect('it expires (15 minutes)', stored && stored.o && stored.o.expirationTtl === 900, JSON.stringify(stored && stored.o));
   const page = await worker.fetch(new Request(j.url, { method: 'GET' }), envB);
   const html = await page.text();
