@@ -231,6 +231,10 @@ found only because a test was written first and disagreed with the code.
   before sign-in. Export/Import (v36.83) remain for moving edits by hand.
   **Needs the rules published on the family project** — until then the
   central read is refused and each copy falls back to its own.
+  `tools/build.js` refuses a non-live build that names the live project —
+  EXCEPT inside `languageSource`, which it sets aside before scanning (and
+  refuses if it cannot find it). v36.88 was pushed before that exception and
+  broke the test build for one commit.
 - **WP-D — HOUSEHOLDS (v36.84, in progress).** Each household gets its own
   space instead of one `shared` collection guarded by e-mails typed into the
   rules. The HOUSEHOLDS part of `firestore.rules` (added alongside the

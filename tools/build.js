@@ -100,7 +100,13 @@ if (envName === 'live') {
   // Nothing of the live Firebase project may survive in another copy.
   const liveIds = [live.firebase.apiKey, live.firebase.projectId, live.firebase.messagingSenderId, live.firebase.appId]
     .filter(id => cfg.firebase.apiKey !== live.firebase.apiKey || id !== live.firebase.apiKey);
-  const left = liveIds.filter(id => page.indexOf(id) !== -1);
+  // …except in `languageSource` (v36.88): every copy reads its interface
+  // languages — the app's own words, public by the rules — from the family
+  // project on purpose. That one setting is left out of the scan; anything
+  // else naming the live project still refuses the build.
+  const scanned = page.replace(/languageSource: Object\.freeze\(\{[^}]*\}\)/, 'languageSource: (checked)');
+  if (scanned === page && cfg.languageSource) fail('could not find languageSource to set aside for the live-project check');
+  const left = liveIds.filter(id => scanned.indexOf(id) !== -1);
   if (left.length) fail('the live Firebase project is still named in the page: ' + left.join(', '));
   // …and what was written must read back as intended.
   const a2 = page.indexOf(START) + START.length - 1;
