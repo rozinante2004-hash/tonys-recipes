@@ -1757,6 +1757,24 @@ window.SELF_TESTS = [
         throw new Error('a founder with no display name gets no sensible name');
     } },
 
+  { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
+    test: async()=>{
+      // Tony: every translated language available to everyone from day one —
+      // the test copy and new users included, nothing to import. The family
+      // project's translations are public; other copies read them by URL.
+      ['i18nCentralIsOwn','i18nRestValue','i18nReadCentral','i18nCentralIndex','i18nReadBest'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var src=window.APP_CONFIG.languageSource;
+      if(!src||!src.projectId||!src.prefix||!src.index) throw new Error('APP_CONFIG.languageSource does not say where the languages are');
+      if(src.projectId!=='recipes-f379d') throw new Error('the central languages are not the family project\u2019s ('+src.projectId+')');
+      var v=i18nRestValue({ mapValue:{ fields:{ strings:{ mapValue:{ fields:{ Save:{ stringValue:'שמור' } } } }, count:{ integerValue:'1' },
+                                              langs:{ mapValue:{ fields:{ he:{ mapValue:{ fields:{ at:{ integerValue:'5' } } } } } } } } } });
+      if(v.strings.Save!=='שמור'||v.count!==1||v.langs.he.at!==5) throw new Error('the central answer is misread: '+JSON.stringify(v));
+      if(String(i18nLoadDict).indexOf('i18nReadBest')===-1) throw new Error('switching language does not look in the central place');
+      if(String(i18nIndexFetch).indexOf('i18nCentralIndex')===-1) throw new Error('the language picker does not list the central languages');
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing

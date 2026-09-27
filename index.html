@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.87 -->
+<!-- Tony's Recipes Collection v36.88 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -137,6 +137,16 @@
     // family — today) or 'households' (every household its own space, with
     // members, roles and invitations; the HOUSEHOLDS part of firestore.rules).
     dataLayout:          'shared',
+    // v36.88 — where EVERY copy (the family's, the test copy, the public app)
+    // reads its interface languages: one place, readable by anyone — even
+    // before signing in — so every translated language is in every picker
+    // from the first visit, with nothing to import or translate again. Only
+    // the app's admins write it (from the family's copy).
+    languageSource: Object.freeze({
+      projectId:         'recipes-f379d',
+      index:             'shared/i18n_index',
+      prefix:            'shared/i18n_'
+    }),
     features: Object.freeze({
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
       bring:    true,     // Send ingredients to the Bring! shopping list
@@ -4184,7 +4194,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.87';
+var APP_VERSION = 'v36.88';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6804,7 +6814,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.87</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.88</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7436,7 +7446,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.87</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.88</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10343,6 +10353,75 @@ function i18nPruneCaches(keep) {
   return pruned;
 }
 window.i18nPruneCaches = i18nPruneCaches; window.i18nKnownLangs = i18nKnownLangs;
+// ─── ONE PLACE FOR EVERY LANGUAGE (v36.88) ───────────────────────────────────
+// Tony: "all the translated languages should be available to everyone from day
+// one … without needing to re-translate or import anything." Translations are
+// the app's own words, not anybody's data, so they are published: the family
+// project's i18n documents may be READ by anyone (firestore.rules), and every
+// copy reads them from there with a plain request — no sign-in, no SDK, no
+// project of its own needed. The copy whose project IS the source reads them
+// the usual way when signed in.
+function i18nCentral() { return (window.APP_CONFIG && window.APP_CONFIG.languageSource) || null; }
+function i18nCentralIsOwn() {
+  var c = i18nCentral();
+  return !c || (c.projectId === window.APP_CONFIG.firebase.projectId && !window._fbEmulated);
+}
+function i18nCentralBase() {
+  var c = i18nCentral();
+  if (!c) return null;
+  var emu = window._fbEmulated && window.__FIREBASE_EMULATOR__;
+  return emu ? 'http://' + emu.host + ':' + emu.firestorePort + '/v1/projects/' + emu.projectId + '/databases/(default)/documents/'
+             : 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(c.projectId) + '/databases/(default)/documents/';
+}
+// Firestore's REST answer, turned back into plain values.
+function i18nRestValue(v) {
+  if (!v || typeof v !== 'object') return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('nullValue' in v) return null;
+  if ('timestampValue' in v) return Date.parse(v.timestampValue);
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(i18nRestValue);
+  if ('mapValue' in v) { var o = {}; var f = v.mapValue.fields || {}; Object.keys(f).forEach(function(k){ o[k] = i18nRestValue(f[k]); }); return o; }
+  return null;
+}
+async function i18nCentralGet(path) {
+  var base = i18nCentralBase();
+  if (!base || !path) return null;
+  var r = await fetch(base + path, { cache: 'no-store' });
+  if (!r.ok) return null;
+  var j = await r.json();
+  return i18nRestValue({ mapValue: { fields: (j && j.fields) || {} } });
+}
+async function i18nReadCentral(lang) {
+  try {
+    var d = await i18nCentralGet(i18nCentral().prefix + lang);
+    return (d && d.strings && typeof d.strings === 'object') ? d : null;
+  } catch(e) { return null; }
+}
+var _i18nCentralIndexed = false;
+async function i18nCentralIndex(force) {
+  if (_i18nCentralIndexed && !force) return i18nKnownLangs();
+  _i18nCentralIndexed = true;
+  try {
+    var idx = await i18nCentralGet(i18nCentral() && i18nCentral().index);
+    var langs = (idx && idx.langs) || {};
+    Object.keys(langs).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
+  } catch(e) { dlog('[i18n] the central language list could not be read', e && e.message); }
+  return i18nKnownLangs();
+}
+// The best copy of a language this device can reach: the central one first
+// wherever it is not simply this copy's own (or nobody is signed in).
+async function i18nReadBest(lang) {
+  if (!i18nCentralIsOwn() || !window._fbUser) {
+    var c = await i18nReadCentral(lang);
+    if (c) return c;
+  }
+  return (await i18nReadCloud(lang)) || (i18nCentralIsOwn() && window._fbUser ? null : await i18nReadCentral(lang));
+}
+window.i18nCentralIsOwn = i18nCentralIsOwn; window.i18nRestValue = i18nRestValue;
+window.i18nReadCentral = i18nReadCentral; window.i18nCentralIndex = i18nCentralIndex; window.i18nReadBest = i18nReadBest;
 async function i18nReadCloud(lang) {
   if (!window._fbDb || !window._fbUser) return null;
   try {
@@ -10415,6 +10494,7 @@ async function i18nIndexNote(lang, count) {
 // once (a document that does not exist costs nothing to ask about) and records
 // what it found, with `probed` so no device ever does it again.
 async function i18nIndexFetch(force) {
+  await i18nCentralIndex(force);           // v36.88 — every language, for everyone
   if (!window._fbDb || !window._fbUser) return i18nKnownLangs();
   if (_i18nIndexFetched && !force) return i18nKnownLangs();
   _i18nIndexFetched = true;
@@ -10454,7 +10534,7 @@ window.i18nSupportedLangs = i18nSupportedLangs;
 
 async function i18nLoadDict(lang) {
   if (lang === 'en') return {};
-  var cloud = await i18nReadCloud(lang);
+  var cloud = await i18nReadBest(lang);
   if (cloud) { i18nWriteCache(lang, cloud); return cloud.strings; }
   var local = i18nReadCache(lang);
   return local ? local.strings : null;
@@ -11071,7 +11151,7 @@ function toggleLangMenu() {
   renderLangMenu(); toggleDrop('langMenu');
   // The index may know about languages this device has never used; redraw
   // when it answers. Once a session.
-  if (!_i18nIndexFetched && window._fbUser) {
+  if (!_i18nCentralIndexed || (!_i18nIndexFetched && window._fbUser)) {
     i18nIndexFetch().then(function(){ renderLangMenu(); }).catch(function(){});
   }
 }
@@ -11364,7 +11444,7 @@ async function i18nExportLanguages() {
   try { await i18nIndexFetch(true); } catch(e) {}
   var codes = i18nSupportedLangs().filter(function(c){ return c !== 'en'; }), docs = {};
   for (var i = 0; i < codes.length; i++) {
-    var d = await i18nReadCloud(codes[i]);
+    var d = await i18nReadBest(codes[i]);
     if (d) docs[codes[i]] = d;
   }
   var file = i18nPackLanguages(docs, (APP_CONFIG.siteOrigin || '') + (APP_CONFIG.sitePath || ''));
@@ -24282,7 +24362,7 @@ async function backupLanguages() {
       try { await i18nIndexFetch(true); } catch(e) {}
       var codes = i18nSupportedLangs().filter(function(c){ return c !== 'en'; });
       for (var i = 0; i < codes.length; i++) {
-        var d = await i18nReadCloud(codes[i]);
+        var d = await i18nReadBest(codes[i]);
         if (d) docs[codes[i]] = d;
       }
       i18nPruneCaches(_i18nLang === 'en' ? [] : [_i18nLang]);

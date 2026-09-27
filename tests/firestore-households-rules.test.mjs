@@ -132,7 +132,9 @@ await check('only the new owner deletes it',     deleteDoc(doc(alice, 'household
 
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
-await check('signed out cannot',                    getDoc(doc(nobody, 'i18n/he')), false);
+await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);
+await check('…but cannot list them',                getDocs(collection(nobody, 'i18n')), false);
+await check('…nor write one',                       setDoc(doc(nobody, 'i18n/he'), { strings: {} }), false);
 await check('an app admin writes one',              setDoc(doc(alice, 'i18n/he'), { strings: { a: 'b' } }), true);
 await check('a household owner who is not an app admin cannot', setDoc(doc(carol, 'i18n/he'), { strings: {} }), false);
 await check('my own settings',                      setDoc(doc(bob, 'users/bob/prefs/ui'), { theme: 'dark' }), true);

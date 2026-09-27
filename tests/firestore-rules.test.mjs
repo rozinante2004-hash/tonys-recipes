@@ -12,7 +12,7 @@
 // them with the family's member list.
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, setDoc, deleteDoc } from 'firebase/firestore';
 
 const OWNER = 'owner@example.com', ADMIN = 'admin@example.com',
       WRITER = 'writer@example.com', READER = 'reader@example.com', STRANGER = 'stranger@example.com';
@@ -42,6 +42,16 @@ console.log('Reading');
 await check('a reader can read a recipe',            getDoc(doc(as(READER), 'shared/recipe_1')), true);
 await check('a stranger cannot read a recipe',       getDoc(doc(as(STRANGER), 'shared/recipe_1')), false);
 await check('signed out cannot read',                getDoc(doc(env.unauthenticatedContext().firestore(), 'shared/recipe_1')), false);
+
+console.log('Translations are public (v36.88)');
+const anon = env.unauthenticatedContext().firestore();
+await check('signed out CAN read a translation',     getDoc(doc(anon, 'shared/i18n_he')), true);
+await check('…and the language list',                getDoc(doc(anon, 'shared/i18n_index')), true);
+await check('a stranger can read a translation',     getDoc(doc(as(STRANGER), 'shared/i18n_he')), true);
+await check('…but signed out still cannot read a recipe', getDoc(doc(anon, 'shared/recipe_1')), false);
+await check('…nor the member list',                  getDoc(doc(anon, 'shared/access')), false);
+await check('…nor list the collection',              getDocs(collection(anon, 'shared')), false);
+await check('signed out cannot WRITE a translation', setDoc(doc(anon, 'shared/i18n_he'), { strings: {} }), false);
 
 console.log('Recipes');
 await check('a writer can update a recipe',         setDoc(doc(as(WRITER), 'shared/recipe_1'), { r: '{}', updatedAt: 2 }), true);

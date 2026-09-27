@@ -217,6 +217,20 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **LANGUAGES COME FROM ONE CENTRAL PLACE (v36.88).** Tony: every translated
+  language available to everyone from day one — the test copy, new users,
+  the public app — with nothing to import or re-translate.
+  `APP_CONFIG.languageSource` = the family project (`recipes-f379d`,
+  `shared/i18n_<lang>`, `shared/i18n_index`); `firestore.rules` lets ANYONE
+  `get` those documents (never list, never write; also `i18n/{lang}` in the
+  household part). `i18nReadBest(lang)`: on a copy whose project is not the
+  source, or signed out, read the central copy by plain REST
+  (`i18nReadCentral`, `i18nRestValue`) first; the family's own copy, signed
+  in, reads through the SDK as before. `i18nIndexFetch` always folds in the
+  central list (`i18nCentralIndex`), so the picker lists every language even
+  before sign-in. Export/Import (v36.83) remain for moving edits by hand.
+  **Needs the rules published on the family project** — until then the
+  central read is refused and each copy falls back to its own.
 - **WP-D — HOUSEHOLDS (v36.84, in progress).** Each household gets its own
   space instead of one `shared` collection guarded by e-mails typed into the
   rules. The HOUSEHOLDS part of `firestore.rules` (added alongside the

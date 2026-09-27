@@ -34,6 +34,13 @@ service cloud.firestore {
     // tell the two admin-only ones apart. (Rules are OR'd, so a narrower match
     // cannot take a permission back — the exception has to live in this one.)
     match /shared/{docId} {
+      // v36.88 — the interface TRANSLATIONS (i18n_*) may be read by anyone,
+      // signed in or not: they are the app's own words, not family data, and
+      // every copy of the app (the test copy, the public one) takes its
+      // languages from here. One document at a time — never a listing — and
+      // nothing else in `shared` is opened by this line.
+      allow get: if docId.matches('i18n_.*');
+
       // Read: owner + all members
       allow read: if request.auth != null &&
         request.auth.token.email in [{{READ}}];
@@ -236,7 +243,8 @@ service cloud.firestore {
     // translate what another already has. Written by the app's own admins —
     // the APP_ADMINS placeholder is filled in exactly as the member lists are.
     match /i18n/{lang} {
-      allow read: if signedIn();
+      allow get: if true;            // public, as in `shared` (v36.88)
+      allow list: if signedIn();
       allow write: if signedIn() && verified() && myEmail() in [{{APP_ADMINS}}];
     }
 

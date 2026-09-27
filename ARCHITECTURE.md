@@ -97,7 +97,7 @@ address (`authDomain`) — each copy signs in **on its own address** (§6).
 | Photos | `shared/photo_<id>` | same | IndexedDB |
 | Member list | `shared/access` (admin-only) | same | — |
 | **Households (WP-D, being introduced)** | `households/{hid}` + `members`, `recipes`, `photos`, `chats`, `state`; `pending/{hid}:{email}`, `invites/{code}`, app-wide `i18n/{lang}` — used once `dataLayout` is `'households'`; the move COPIES `shared` here | same | the household in use |
-| Interface languages | `shared/i18n_<lang>`, index `shared/i18n_index` (admin-only) | same (copied across with 🌐 → Export / Import languages) | the one language in use |
+| Interface languages | `shared/i18n_<lang>`, index `shared/i18n_index` — **the central copy for every copy and every user** (anyone may read; admins write) | reads the family project's, by plain request (v36.88) | the one language in use |
 | WhatsApp chats | `shared/chat_*` / `chatpart_*`; `whatsapp/` folder read over the GitHub API where reachable | same | — |
 | Backup record | `shared/backups` | same | last-backup stamps |
 | **Backups** | a `.json` file (download, or a chosen folder, automatically each day) with recipes, photos **and every language** (v36.83) | same | the folder handle |
