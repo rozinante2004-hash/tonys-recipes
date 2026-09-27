@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.93 -->
+<!-- Tony's Recipes Collection v36.94 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4214,7 +4214,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.93';
+var APP_VERSION = 'v36.94';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6834,7 +6834,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.93</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.94</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7466,7 +7466,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.93</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.94</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24040,8 +24040,22 @@ async function forgetBackupFolder() {
 // Write one dated snapshot into the folder and prune the old ones. Returns the
 // filename written, or throws — a caller that cannot say what happened is how a
 // backup comes to be trusted without existing.
+// v36.94 — Tony: tell the test copy's backups from the family's by the name.
+// The family's keep the name they always had; any other copy puts its own
+// name in: tonys-recipes-<copy>-backup-2026-09-27.json (the test copy: "test").
+function backupFilePrefix() {
+  var env = String((APP_CONFIG && APP_CONFIG.environment) || 'live').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return 'tonys-recipes-' + (env && env !== 'live' ? env + '-' : '') + 'backup-';
+}
+function backupFileName() { return backupFilePrefix() + new Date().toISOString().slice(0, 10) + '.json'; }
+// Only this copy's own dated files — never the other copy's, which may share the folder.
+function isOwnBackupFile(name) {
+  var p = backupFilePrefix();
+  return String(name).indexOf(p) === 0 && /^\d{4}-\d{2}-\d{2}\.json$/.test(String(name).slice(p.length));
+}
+window.backupFilePrefix = backupFilePrefix; window.backupFileName = backupFileName; window.isOwnBackupFile = isOwnBackupFile;
 async function writeBackupToFolder(handle, json) {
-  var name = 'tonys-recipes-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  var name = backupFileName();
   var fh = await handle.getFileHandle(name, { create: true });
   var w  = await fh.createWritable();
   await w.write(json);
@@ -24059,7 +24073,7 @@ async function pruneBackupFolder(handle) {
   var mine = [];
   try {
     for await (var ent of handle.entries()) {
-      if (/^tonys-recipes-backup-\d{4}-\d{2}-\d{2}\.json$/.test(ent[0])) mine.push(ent[0]);
+      if (isOwnBackupFile(ent[0])) mine.push(ent[0]);
     }
   } catch(e) { return []; }
   mine.sort();                                   // the name sorts by date
@@ -24571,8 +24585,7 @@ async function backupSave() {
     markBackupTaken();
     var blob=new Blob([json],{type:'application/json'});
     var url=URL.createObjectURL(blob); var a=document.createElement('a');
-    var date=new Date().toISOString().slice(0,10);
-    a.href=url; a.download='tonys-recipes-backup-'+date+'.json';
+    a.href=url; a.download=backupFileName();
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     familyBackupNote(false);
     toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos, '+nLangs+' languages');

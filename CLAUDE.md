@@ -1134,6 +1134,10 @@ found only because a test was written first and disagreed with the code.
   - **Pruning deletes files in someone's own folder.** It matches only the exact
     name shape the app writes (`tonys-recipes-backup-YYYY-MM-DD.json`), keeps the
     newest `BACKUP_KEEP`, and is tested against a folder holding a tax return.
+    **v36.94:** any copy but the family's puts its name in
+    (`tonys-recipes-test-backup-YYYY-MM-DD.json`, `backupFilePrefix()`), so Tony
+    can tell them apart; each copy prunes ONLY its own (`isOwnBackupFile`) — the
+    two may share one folder.
   - **Falling back must be audible.** If the folder write fails, `backupSave`
     downloads instead and says so — a file appearing somewhere the person was not
     expecting, silently, is the failure this item exists to remove. Browsers

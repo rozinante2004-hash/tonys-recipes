@@ -923,8 +923,12 @@ window.SELF_TESTS = [
       var d = fakeDir([]);
       var name = await writeBackupToFolder(d, backupJson());
       var today = new Date().toISOString().slice(0,10);
-      if(name !== 'tonys-recipes-backup-'+today+'.json')
+      if(name !== backupFilePrefix()+today+'.json')
         throw new Error('the snapshot is not named for today: '+name);
+      // v36.94 — the family's keep their name; any other copy says which it is.
+      var env=String(APP_CONFIG.environment||'live');
+      if(env==='live' ? name!=='tonys-recipes-backup-'+today+'.json' : name.indexOf('tonys-recipes-'+env+'-backup-')!==0)
+        throw new Error('the '+env+' copy names its backups '+name);
       var parsed = JSON.parse(d.files[name] || '{}');
       if(!Array.isArray(parsed.recipes) || parsed.recipes.length !== recipes.length)
         throw new Error('the file written is not a real backup ('+(parsed.recipes||[]).length+' recipes)');
@@ -934,17 +938,19 @@ window.SELF_TESTS = [
       // person's; deleting anything in it that is not ours would be unforgivable.
       var old = [];
       for(var i=1; i<=BACKUP_KEEP+4; i++)
-        old.push('tonys-recipes-backup-2020-01-' + String(i).padStart(2,'0') + '.json');
-      var mixed = old.concat(['my-tax-return.json','tonys-recipes-backup-notadate.json','holiday.jpg']);
+        old.push(backupFilePrefix()+'2020-01-' + String(i).padStart(2,'0') + '.json');
+      // The OTHER copy's backups may share the folder, and are never ours to prune.
+      var theirs=(env==='live'?'tonys-recipes-test-backup-':'tonys-recipes-backup-')+'2019-01-01.json';
+      var mixed = old.concat(['my-tax-return.json',backupFilePrefix()+'notadate.json','holiday.jpg',theirs]);
       var d2 = fakeDir(mixed);
       var dropped = await pruneBackupFolder(d2);
       if(dropped.length !== 4) throw new Error('expected 4 old snapshots to go, got '+dropped.length);
       if(dropped.join()!==old.slice(0,4).join()) throw new Error('the wrong ones were dropped: '+dropped.join());
-      ['my-tax-return.json','tonys-recipes-backup-notadate.json','holiday.jpg'].forEach(function(f){
+      ['my-tax-return.json',backupFilePrefix()+'notadate.json','holiday.jpg',theirs].forEach(function(f){
         if(d2.removed.indexOf(f)!==-1) throw new Error('pruning deleted "'+f+'", which is not ours');
       });
-      if(Object.keys(d2.files).length !== BACKUP_KEEP + 3)
-        throw new Error('after pruning the folder holds '+Object.keys(d2.files).length+' files, expected '+(BACKUP_KEEP+3));
+      if(Object.keys(d2.files).length !== BACKUP_KEEP + 4)
+        throw new Error('after pruning the folder holds '+Object.keys(d2.files).length+' files, expected '+(BACKUP_KEEP+4));
       // The newest must survive — pruning that eats the backup it just wrote is
       // worse than no pruning at all.
       var newest = old[old.length-1];
