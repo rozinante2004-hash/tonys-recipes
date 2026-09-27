@@ -1878,6 +1878,63 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'bring_combines_same_thing_to_buy', group:'Features', name:'Send to Bring!: the same ingredient, however prepared, is one line (v36.95)',
+    test: async()=>{
+      // Tony: the Pla Pao fish has lime halved, sliced and squeezed, and garlic
+      // twice — Bring! should get "4 limes" and "3 garlic cloves", not five lines.
+      // Any ingredient, any language: the grouping comes from the AI, checked here.
+      ['bringCombineFrom','bringMayCombine','bringCombineLater','bringToggleCombined'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var L=function(spec,name,i){ return { spec:spec, name:name, from:[i] }; };
+      var lines=[ L('2','שיני שום',0), L('1','ליים חצוי',1), L('1','ליים פרוס',2), L('1','שן שום קצוצה דק',3), L('2','ליים סחוטים',4), L('','סויה ללג או מלח',5) ];
+      if(!bringMayCombine(lines)) throw new Error('lime and garlic repeat, yet no combining would be asked for');
+      if(bringMayCombine([L('2','onions',0),L('1 l','water',1),L('','salt',2)])) throw new Error('a recipe with nothing in common would still cost an AI call');
+      var good={ items:[ {name:'שיני שום',amount:'3',from:[1,4]}, {name:'ליים',amount:'4',from:[2,3,5]}, {name:'x',amount:'y',from:[6]} ] };
+      var c=bringCombineFrom(lines, good);
+      if(!c || c.length!==3) throw new Error('six lines did not become three: '+JSON.stringify(c));
+      if(c[0].name!=='שיני שום'||c[0].spec!=='3'||c[1].name!=='ליים'||c[1].spec!=='4') throw new Error('the combined lines read '+JSON.stringify(c));
+      if(c[2].name!=='סויה ללג או מלח'||c[2].spec!=='') throw new Error('a line on its own lost its own words: '+JSON.stringify(c[2]));
+      // An answer that loses, repeats or invents a line is not trusted at all.
+      [ {items:[{name:'a',amount:'1',from:[1,2,3,4,5]}]},
+        {items:[{name:'a',amount:'1',from:[1,2]},{name:'b',amount:'1',from:[2,3,4,5,6]}]},
+        {items:[{name:'a',amount:'1',from:[1,2,3,4,5,6,7]}]},
+        {items:[{name:'',amount:'1',from:[1,2]},{name:'b',amount:'',from:[3,4,5,6]}]}, {nope:1}, null
+      ].forEach(function(bad,i){ if(bringCombineFrom(lines,bad)!==null) throw new Error('bad answer #'+(i+1)+' was used'); });
+      // The dialog, end to end: shown combined, sent combined, and switchable back.
+      var fix=normalizeRecipe({ id:888987, name:'Pla Pao test', servings:'2', steps:['x'], ingredients:lines.map(function(l){ return { a:l.spec, n:l.name }; }) });
+      var realR=recipes, realAI=window.aiCall, realFetch=window.fetch, realOpen=window.open, realToast=window.toast, wasOver=Object.assign({}, _featureOverride);
+      var prompts=[], sent=null, fakeWin={ location:{ href:'' }, close:function(){} };
+      try{
+        recipes=realR.concat([fix]); _featureOverride.bring=true; _featureOverride.bringDirect=false; applyFeatureFlags();
+        window.toast=function(){};
+        window.aiCall=async function(p){ prompts.push(p); return JSON.stringify(good); };
+        window.fetch=function(u,o){ sent=JSON.parse(o.body); return Promise.resolve(new Response(JSON.stringify({
+          url:'https://w.test/bring-recipe/'+'a'.repeat(32), deeplink:'https://api.getbring.com/rest/bringrecipes/deeplink?url=x&source=web' }), { status:200 })); };
+        window.open=function(){ return fakeWin; };
+        // What was unticked for ANOTHER recipe must not carry over (it did, in the first draft).
+        openBringModal(fix.id); await wait(60);
+        document.querySelectorAll('#bringIngList .bring-ing-cb').forEach(function(cb){ cb.checked=false; });
+        closeM('bringOverlay'); prompts=[];
+        openBringModal(fix.id); await wait(60);
+        if([].some.call(document.querySelectorAll('#bringIngList .bring-ing-cb'), function(cb){ return !cb.checked; }))
+          throw new Error('lines unticked last time are still unticked on opening the dialog again');
+        if(prompts.length!==1 || prompts[0].indexOf('2. 1 ליים חצוי')===-1) throw new Error('the lines were not asked about as numbered, scaled lines');
+        var rows=document.querySelectorAll('#bringIngList .bring-ing-cb');
+        if(rows.length!==3) throw new Error('the dialog shows '+rows.length+' lines, expected 3');
+        var txt=document.getElementById('bringIngList').textContent;
+        if(txt.indexOf('4 ליים')===-1 || txt.indexOf('ליים פרוס')===-1) throw new Error('the combined line or what it was made of is not shown: '+txt.slice(0,200));
+        if(!/Show as in the recipe/.test(document.getElementById('bringCombineNote').textContent)) throw new Error('there is no way back to the recipe\u2019s own lines');
+        await bringOpenImport();
+        if(!sent || sent.ingredients.join('|')!=='3 שיני שום|4 ליים|סויה ללג או מלח') throw new Error('Bring! was sent '+JSON.stringify(sent&&sent.ingredients));
+        openBringModal(fix.id); await wait(60);
+        bringToggleCombined();
+        if(document.querySelectorAll('#bringIngList .bring-ing-cb').length!==6) throw new Error('"Show as in the recipe" did not bring back the six lines');
+      } finally {
+        recipes=realR; window.aiCall=realAI; window.fetch=realFetch; window.open=realOpen; window.toast=realToast;
+        Object.keys(_featureOverride).forEach(function(k){ delete _featureOverride[k]; }); Object.assign(_featureOverride, wasOver); applyFeatureFlags();
+        closeM('bringOverlay');
+      }
+    } },
+
   { id:'i18n_languages_as_app_files', group:'UI', name:'Languages come from the app\u2019s own files unless something newer is known (v36.91)',
     test: async()=>{
       ['i18nReadStatic','i18nStaticIndex','i18nPublishRequest','i18nPublishPage'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
@@ -7904,8 +7961,12 @@ window.SELF_TESTS = [
       // ~35 KB of real features (security guards, device storage, the family
       // backup record, the AI cost line, the parallel translation lanes). The
       // go-public work's build step (WP-A) is where minification belongs.
+      // Raised to 1500 in v36.95, the same way again: v36.66–v36.95 added
+      // ~60 KB of real features (households and the move, central languages
+      // and their files, Bring!'s own import, putting a language back,
+      // combining a shopping list) and the page reached 1403 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 1400) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 1500) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

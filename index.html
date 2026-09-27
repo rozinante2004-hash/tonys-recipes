@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.94 -->
+<!-- Tony's Recipes Collection v36.95 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4214,7 +4214,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.94';
+var APP_VERSION = 'v36.95';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6331,6 +6331,11 @@ body.banner-shown .header {
   cursor: pointer;
 }
 .bring-ing-item:last-child { border-bottom: none; }
+/* v36.95 — a combined line shows what it was made of, small, underneath. */
+.bring-ing-from { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.bring-combine-note { padding: 0 20px 6px; font-size: 12px; color: var(--muted); }
+.bring-combine-toggle { background: none; border: none; padding: 0; color: var(--terracotta); text-decoration: underline;
+  font: inherit; font-weight: 600; cursor: pointer; }
 .bring-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--border);
@@ -6834,7 +6839,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.94</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.95</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7466,7 +7471,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.94</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.95</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7983,6 +7988,7 @@ body.banner-shown .header {
     <div style="padding:8px 20px 0;" id="bringTokenStatus"></div>
     <div class="bring-subtext" id="bringSubtext">Select the ingredients you need</div>
     <div id="bringScaleNote" style="padding:0 20px 6px;font-size:12px;color:var(--terracotta);font-weight:600;"></div>
+    <div id="bringCombineNote" class="bring-combine-note" aria-live="polite"></div>
     <div class="bring-ing-list" id="bringIngList"></div>
     <div class="bring-footer">
       <button class="bring-select-all" onclick="bringToggleAll()">Select all</button>
@@ -24908,19 +24914,14 @@ function openBringModal(recipeId) {
   _bringScaledAmounts = allIngredients(r).map(function(ing) {
     return scaleAmt(cvtIng(ing.a || '', unit), mult);
   });
-  // Render ingredients as checkboxes
-  var list = document.getElementById('bringIngList');
-  if (list) {
-    if (!allIngredients(r).length) {
-      list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">No ingredients found in this recipe.</div>';
-    } else {
-      list.innerHTML = allIngredients(r).map(function(ing, i) {
-        var amt = _bringScaledAmounts[i];
-        var label = (amt ? amt + ' ' : '') + ing.n;
-        return '<label class="bring-ing-item"><input type="checkbox" class="bring-ing-cb" value="'+i+'" checked><span dir="auto">'+escH(label)+'</span></label>';
-      }).join('');
-    }
-  }
+  // Render ingredients as checkboxes — one per recipe line at first; the
+  // same thing to buy is then combined into one line (v36.95).
+  _bringLines = allIngredients(r).map(function(ing, i) {
+    return { name: ing.n, spec: _bringScaledAmounts[i] || ing.a || '', from: [i] };
+  });
+  _bringCombined = null; _bringShowCombined = true;
+  bringRenderList(true);                         // a new recipe: everything ticked
+  bringCombineLater(recipeId);
   var scaleNote = document.getElementById('bringScaleNote');
   if (scaleNote) {
     scaleNote.textContent = (mult !== 1 || unit !== 'metric')
@@ -24937,6 +24938,130 @@ function openBringModal(recipeId) {
   document.getElementById('bringOverlay').classList.add('open');
 }
 
+// ─── ONE LINE PER THING TO BUY (v36.95) ──────────────────────────────────────
+// Tony: the Pla Pao fish has lime three times — halved, sliced, squeezed — and
+// Bring! got three lines. What he needs to know is "4 limes". The recipe's
+// lines are handed to the small AI model with the amounts already scaled, and
+// it says which lines are the same thing to buy and what they add up to. Only
+// its GROUPING is trusted: every line must be used exactly once, a line left
+// on its own keeps its own words, and anything else falls back to the recipe's
+// lines. It is only asked when two lines share a word (most recipes cost
+// nothing), the answer is cached by aiCall, and "Show as in the recipe"
+// switches back.
+var _bringLines = [], _bringCombined = null, _bringShowCombined = true;
+function bringEntries() { return (_bringShowCombined && _bringCombined) || _bringLines; }
+function bringRenderList(fresh) {
+  var list = document.getElementById('bringIngList');
+  if (!list) return;
+  if (!_bringLines.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">No ingredients found in this recipe.</div>';
+    return;
+  }
+  // Keep what was ticked: a combined line is ticked if any of its lines was.
+  // Never across recipes — the last recipe's ticks mean nothing here.
+  var was = {}, had = false;
+  if (!fresh) list.querySelectorAll('.bring-ing-cb').forEach(function(cb) {
+    had = true; (cb.getAttribute('data-from') || '').split(',').forEach(function(i){ if (i !== '') was[i] = was[i] || cb.checked; });
+  });
+  list.innerHTML = bringEntries().map(function(e, k) {
+    var on = !had || e.from.some(function(i){ return was[i]; });
+    var label = (e.spec ? e.spec + ' ' : '') + e.name;
+    var parts = e.from.length > 1
+      ? '<div class="bring-ing-from" dir="auto" data-no-i18n>' + escH(e.from.map(function(i){
+          var l = _bringLines[i]; return (l.spec ? l.spec + ' ' : '') + l.name; }).join(' \u00b7 ')) + '</div>'
+      : '';
+    return '<label class="bring-ing-item"><input type="checkbox" class="bring-ing-cb" value="' + k + '" data-from="' + e.from.join(',') + '"'
+      + (on ? ' checked' : '') + '><span dir="auto" data-no-i18n>' + escH(label) + parts + '</span></label>';
+  }).join('');
+  var note = document.getElementById('bringCombineNote');
+  if (note) {
+    var merged = _bringCombined ? _bringLines.length - _bringCombined.length : 0;
+    note.innerHTML = !merged ? ''
+      : _bringShowCombined
+        ? escH('Combined for shopping: ' + (_bringLines.length) + ' recipe lines \u2192 ' + _bringCombined.length + '. ')
+          + '<button type="button" class="bring-combine-toggle" onclick="bringToggleCombined()">Show as in the recipe</button>'
+        : '<button type="button" class="bring-combine-toggle" onclick="bringToggleCombined()">Combine the same ingredients</button>';
+  }
+}
+function bringToggleCombined() { _bringShowCombined = !_bringShowCombined; bringRenderList(); }
+// Two lines share a word — only then can anything combine. Cheap, and wrong
+// only in the harmless direction (a call that finds nothing to combine).
+var BRING_SKIP_WORDS = /^(fresh|dried|finely|chopped|sliced|minced|large|small|medium|about|optional|with|and|for|the|into|pieces?|cups?|tbsp|tsp|טרי|טריים|יבש|יבשים|קצוץ|קצוצה|קצוצים|פרוס|פרוסה|חצוי|דק|גס|או|של|עם|כף|כפות|כפית|כפיות|כוס|כוסות)$/i;
+function bringMayCombine(lines) {
+  var seen = {};
+  for (var i = 0; i < lines.length; i++) {
+    var words = String(lines[i].name || '').toLowerCase().split(/[^\p{L}]+/u), mine = {};
+    for (var j = 0; j < words.length; j++) {
+      var w = words[j];
+      if (w.length < 3 || BRING_SKIP_WORDS.test(w)) continue;
+      var stem = w.length > 4 ? w.slice(0, 4) : w;
+      if (mine[stem]) continue; mine[stem] = true;
+      if (seen[stem]) return true;
+      seen[stem] = true;
+    }
+  }
+  return false;
+}
+// → the combined entries, or null when nothing combines / the answer is unusable.
+function bringCombineFrom(lines, answer) {
+  var items = answer && Array.isArray(answer.items) ? answer.items : null;
+  if (!items) return null;
+  var used = {}, out = [];
+  for (var k = 0; k < items.length; k++) {
+    var it = items[k] || {}, from = Array.isArray(it.from) ? it.from : [];
+    var idx = from.map(function(n){ return Number(n) - 1; });
+    if (!idx.length) return null;
+    for (var q = 0; q < idx.length; q++) {
+      var i = idx[q];
+      if (!(i >= 0 && i < lines.length) || i !== Math.floor(i) || used[i]) return null;
+      used[i] = true;
+    }
+    idx.sort(function(a, b){ return a - b; });
+    if (idx.length === 1) { out.push(lines[idx[0]]); continue; }       // on its own: its own words
+    var name = String(it.name || '').trim();
+    if (!name) return null;
+    out.push({ name: name, spec: String(it.amount == null ? '' : it.amount).trim(), from: idx });
+  }
+  if (Object.keys(used).length !== lines.length) return null;
+  if (out.length === lines.length) return null;                         // nothing combined
+  out.sort(function(a, b){ return a.from[0] - b.from[0]; });
+  return out;
+}
+function bringCombinePrompt(lines) {
+  return 'These are the ingredient lines of one recipe, numbered, with the amounts already scaled. Make them a '
+    + 'SHOPPING list: combine the lines that are the same thing to buy, however each one is prepared or cut '
+    + '(halved, sliced, squeezed, chopped, "juice of", "zest of"...). For example 1 halved lime + 1 sliced lime '
+    + '+ 2 squeezed limes = 4 limes; 2 garlic cloves + 1 finely chopped garlic clove = 3 garlic cloves.\n'
+    + 'Do NOT combine different things to buy: lime and lime leaves, fresh and dried chillies, garlic and ginger, '
+    + 'stock and water are all different.\n'
+    + 'Add the amounts up. When they are in different units, give what to buy if it is obvious (the juice of 1 lime '
+    + 'is 1 lime); otherwise join them with " + ". Write each combined name the way a shopper would, in the same '
+    + 'language as the lines, with no preparation words. Every line number must appear exactly once; a line that '
+    + 'combines with nothing is an item of its own.\n\nLines:\n'
+    + lines.map(function(l, i){ return (i + 1) + '. ' + (l.spec ? l.spec + ' ' : '') + l.name; }).join('\n')
+    + '\n\nReturn ONLY: {"items":[{"name":"...","amount":"...","from":[1,2]}]}';
+}
+async function bringCombineLater(recipeId) {
+  var lines = _bringLines;
+  if (lines.length < 2 || !bringMayCombine(lines)) return null;
+  var note = document.getElementById('bringCombineNote');
+  if (note) note.textContent = 'Combining the same ingredients\u2026';
+  var combined = null;
+  try {
+    combined = bringCombineFrom(lines, extractJSON(await aiCall(bringCombinePrompt(lines),
+      Math.min(1500, 80 + lines.length * 40), null, AI_MODEL_SMALL)));
+  } catch(e) { dlog('[bring] could not combine', e && e.message); }
+  // The dialog may have closed, or opened on another recipe, meanwhile.
+  if (_bringRecipeId !== recipeId || _bringLines !== lines) return null;
+  _bringCombined = combined;
+  if (note) note.textContent = '';
+  bringRenderList();
+  return combined;
+}
+window.bringCombineFrom = bringCombineFrom; window.bringMayCombine = bringMayCombine;
+window.bringCombineLater = bringCombineLater; window.bringToggleCombined = bringToggleCombined;
+window.bringEntries = bringEntries;
+
 function bringToggleAll() {
   var cbs = document.querySelectorAll('.bring-ing-cb');
   var anyUnchecked = Array.from(cbs).some(function(cb){ return !cb.checked; });
@@ -24949,11 +25074,10 @@ function bringConfirmSend() {
   if (!r) return;
   var checked = document.querySelectorAll('.bring-ing-cb:checked');
   if (!checked.length) { toast('Select at least one ingredient'); return; }
-  var items = [];
+  var items = [], entries = bringEntries();
   checked.forEach(function(cb) {
-    var idx = parseInt(cb.value);
-    var ing = allIngredients(r)[idx];
-    if (ing) items.push({ name: ing.n, spec: _bringScaledAmounts[idx] || ing.a || '' });
+    var e = entries[parseInt(cb.value, 10)];
+    if (e) items.push({ name: e.name, spec: e.spec });
   });
   closeM('bringOverlay');
   sendItemsToBring(items);
@@ -24969,12 +25093,10 @@ async function bringOpenImport() {
   if (!featureOn('bring')) return featureOffNotice('bring');
   var r = findRecipeRef(_bringRecipeId);
   if (!r) return null;
-  var lines = [];
+  var lines = [], entries = bringEntries();
   document.querySelectorAll('.bring-ing-cb:checked').forEach(function(cb) {
-    var idx = parseInt(cb.value, 10), ing = allIngredients(r)[idx];
-    if (!ing) return;
-    var amt = _bringScaledAmounts[idx] || ing.a || '';
-    lines.push((amt ? amt + ' ' : '') + ing.n);
+    var e = entries[parseInt(cb.value, 10)];
+    if (e) lines.push((e.spec ? e.spec + ' ' : '') + e.name);
   });
   if (!lines.length) { toast('Select at least one ingredient'); return null; }
   // Opened inside the tap, or a phone blocks it as a pop-up; filled in below.

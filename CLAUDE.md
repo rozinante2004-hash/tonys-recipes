@@ -347,6 +347,15 @@ found only because a test was written first and disagreed with the code.
     rules-LANGUAGE edition, not ours (Tony asked, v36.92). Which release the
     rules came from is the comment `rulesStamped()` adds under it when Show
     rules fills them in (app version + date); a comment, so Firebase ignores it.
+- **BRING! GETS ONE LINE PER THING TO BUY (v36.95).** Tony: lime halved +
+  sliced + squeezed should be "4 limes", garlic ×2 "3 cloves" — any ingredient,
+  any language. The small model groups the (already scaled) lines; ONLY its
+  grouping is trusted (`bringCombineFrom`: every line exactly once, a lone line
+  keeps its own words, else the recipe's lines). Asked only when two lines share
+  a word (`bringMayCombine`), cached by aiCall; "Show as in the recipe" switches
+  back; both routes send `bringEntries()`. Trap found on the way: re-rendering
+  kept the PREVIOUS recipe's ticks — a new recipe renders `fresh`. Test:
+  `bring_combines_same_thing_to_buy`.
 - **LANGUAGES LIVE PER COPY — AND NOW IN BACKUPS (v36.83).** Each copy keeps
   its translations in its own Firebase project (`shared/i18n_<lang>`), so the
   test copy had en/he while the family's had eight, and tested a different
