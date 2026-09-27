@@ -16,6 +16,20 @@
 // origin — and must never echo one that is not allowed.
 import worker from '../cloudflare-worker.js';
 
+// The Worker samples its KV counters with Math.random, so the write-count
+// checks below were a dice roll (one failed at 47 writes, v36.92). A fixed
+// sequence (mulberry32, seed 36) still exercises the sampling but gives the
+// same count on every run.
+{
+  let s = 36;
+  Math.random = () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const ORIGIN = 'https://rozinante2004-hash.github.io';
 let failures = [];
 
