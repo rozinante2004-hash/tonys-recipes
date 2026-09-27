@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.84 -->
+<!-- Tony's Recipes Collection v36.85 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,6 +133,10 @@
     // unofficial Bring! connection, and a Gmail permission. All on here. Off,
     // a feature's buttons and menu items are hidden, its functions refuse,
     // and nothing of it runs in the background or appears in the privacy list.
+    // v36.85 (WP-D) — where the data lives: 'shared' (one collection for the
+    // family — today) or 'households' (every household its own space, with
+    // members, roles and invitations; firestore.households.rules).
+    dataLayout:          'shared',
     features: Object.freeze({
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
       bring:    true,     // Send ingredients to the Bring! shopping list
@@ -224,6 +228,12 @@
     });
   }
 </script>
+<style id="dataLayoutCss">
+  /* v36.85 — screens that belong to one data layout only (see APP_CONFIG.dataLayout). */
+  html[data-layout="households"] [data-layout-only="shared"],
+  html:not([data-layout="households"]) [data-layout-only="households"] { display: none !important; }
+</style>
+<script>document.documentElement.setAttribute('data-layout', window.APP_CONFIG.dataLayout === 'households' ? 'households' : 'shared');</script>
 <style id="featureFlagCss">
   /* v36.70 — see APP_CONFIG.features. */
   html[data-feature-off-whatsapp] [data-feature="whatsapp"],
@@ -273,6 +283,11 @@
   // passed with the wiring removed. Behaviour is testable; source text is not.
   async function signInCloudSync() {
     if (typeof loadFromFirestore !== 'function') return;
+    // v36.85 (WP-D) — in the household layout, first find (or join, or found)
+    // this person's household: every read below happens inside it.
+    if (typeof cloudLayout === 'function' && cloudLayout() === 'households') {
+      if (!await householdEnter(window._fbUser)) return;
+    }
     var localRecipeCount = recipes.length;
     var loaded = await withSyncWatchdog(loadFromFirestore(), 'read');
     if (!loaded) {
@@ -3550,6 +3565,14 @@ window.openPayments = openPayments;
 var ACCESS_STORAGE_KEY = 'tonys_access_members';
 
 function openAccessControl() {
+  if (cloudLayout() === 'households') {
+    // The members ARE the list here — fetched fresh, then drawn.
+    if (householdOf()) householdLoadMembers().then(function(){ renderAccessMembers(); householdRenderBar(); }).catch(function(){});
+    householdRenderBar();
+    renderAccessMembers();
+    document.getElementById('accessOverlay').classList.add('open');
+    return;
+  }
   // Show owner email
   var ownerEl = document.getElementById('ownerEmail');
   if(ownerEl && window._fbUser) ownerEl.textContent = window._fbUser.email || '—';
@@ -3566,7 +3589,8 @@ function getAccessMembers() {
 function saveAccessMembers(members) {
   localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(members));
   // Also save to Firestore so all family members see the same access list
-  if(window._fbDb && window._fbUser) {
+  // (the first layout only — in the household layout the members ARE the list).
+  if(window._fbDb && window._fbUser && cloudLayout() !== 'households') {
     cloudDoc('access').set({ members: members, updatedAt: Date.now() })
       .catch(function(e){ console.warn('Access save to Firestore failed:', e); });
   }
@@ -3605,6 +3629,11 @@ function addAccessMember() {
   var members = getAccessMembers();
   if(members.find(function(m){ return m.email===email; })) { toast('⚠️ This email is already added'); return; }
   var role = document.querySelector('input[name="newRole"]:checked');
+  if (cloudLayout() === 'households') {
+    document.getElementById('accessEmailInput').value = '';
+    return householdAddMember(email, role ? role.value : 'read')
+      .catch(function(e){ toast('❌ Could not add ' + email + ': ' + e.message, 8000); });
+  }
   members.push({ email: email, role: role ? role.value : 'read', addedAt: Date.now() });
   saveAccessMembers(members);
   renderAccessMembers();
@@ -3618,6 +3647,10 @@ window.addAccessMember = addAccessMember;
 
 function removeAccessMember(i) {
   var members = getAccessMembers();
+  if (cloudLayout() === 'households') {
+    if (members[i]) householdRemoveMember(members[i]).catch(function(e){ toast('\u274c ' + e.message, 8000); });
+    return;
+  }
   var removed = members.splice(i, 1);
   saveAccessMembers(members);
   renderAccessMembers();
@@ -3631,9 +3664,288 @@ window.removeAccessMember = removeAccessMember;
 
 function changeAccessRole(i, role) {
   var members = getAccessMembers();
+  if (cloudLayout() === 'households') {
+    if (members[i]) householdChangeRole(members[i], role).catch(function(e){ toast('\u274c ' + e.message, 8000); });
+    return;
+  }
   if(members[i]) { members[i].role = role; saveAccessMembers(members); updateAccessRules(); toast('📝 Role changed in the list — publish the rules below to apply it.', 6000); }
 }
 window.changeAccessRole = changeAccessRole;
+
+// ═══ HOUSEHOLDS (WP-D, v36.85) ═══════════════════════════════════════════════
+// In the household layout (APP_CONFIG.dataLayout = 'households') every
+// household has its own space, members and roles, enforced by the rules
+// (firestore.households.rules) — not by a list of addresses pasted into them.
+// At sign-in the app finds this person's household; if there is none it
+// claims a place kept for their e-mail (how the family's members arrive), or
+// founds a new one ("<name>'s Recipes"). Family Access then edits members and
+// kept places directly: nothing to publish, and it takes effect at once.
+var HOUSEHOLD_KEY = 'tonys_household';
+var JOIN_KEY = 'tonys_join_code';
+var HH_TO_ACCESS = { owner: 'admin', admin: 'admin', editor: 'write', viewer: 'read' };
+var ACCESS_TO_HH = { admin: 'admin', write: 'editor', read: 'viewer' };
+var _household = null;          // { hid, name, role, ownerUid, ownerName, ownerEmail }
+var _householdList = [];        // every household this person is in: [{hid, role}]
+function householdOf() { return _household; }
+function hhDb() { return window._fbDb; }
+function hhRef(hid) { return hhDb().collection('households').doc(hid || _cloudHid); }
+
+// An invitation arrives as …?join=CODE. It is kept (the person may need to sign
+// in first) and taken out of the address so a shared screenshot cannot leak it.
+(function captureJoinCode() {
+  try {
+    var m = /[?&]join=([A-Za-z0-9_-]{16,64})/.exec(location.search);
+    if (!m) return;
+    sessionStorage.setItem(JOIN_KEY, m[1]);
+    var clean = location.pathname + location.search.replace(/([?&])join=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash;
+    history.replaceState(null, '', clean);
+  } catch(e) {}
+})();
+
+function householdDefaultName(user) {
+  var n = String((user && (user.displayName || user.email)) || '').split(/[\s@]/)[0];
+  n = n ? n.charAt(0).toUpperCase() + n.slice(1) : 'My';
+  return n + '’s Recipes';
+}
+async function householdMemberships(user) {
+  var q = await hhDb().collectionGroup('members').where('uid', '==', user.uid).get();
+  var out = [];
+  q.forEach(function(d) { out.push({ hid: d.ref.parent.parent.id, role: (d.data() || {}).role }); });
+  return out;
+}
+function hhMemberDoc(user, role, extra) {
+  return Object.assign({ uid: user.uid, role: role, email: String(user.email || '').toLowerCase(),
+                         name: user.displayName || '', joinedAt: Date.now() }, extra || {});
+}
+// A place kept for this person's (verified) e-mail — claim every one.
+async function householdClaimKept(user) {
+  var email = String(user.email || '').toLowerCase();
+  if (!email) return 0;
+  var q = await hhDb().collection('pending').where('email', '==', email).get(), n = 0, kept = [];
+  q.forEach(function(d) { kept.push({ ref: d.ref, data: d.data() || {} }); });
+  for (var i = 0; i < kept.length; i++) {
+    try {
+      await hhRef(kept[i].data.hid).collection('members').doc(user.uid).set(hhMemberDoc(user, kept[i].data.role));
+      await kept[i].ref.delete();
+      n++;
+    } catch(e) { syncLog('error', 'Could not take up a place kept in a household', String(e && e.message).slice(0, 160)); }
+  }
+  return n;
+}
+async function householdFound(user, name) {
+  var ref = hhDb().collection('households').doc();
+  var b = hhDb().batch();
+  b.set(ref, { name: name, ownerUid: user.uid, createdAt: Date.now() });
+  b.set(ref.collection('members').doc(user.uid), hhMemberDoc(user, 'owner'));
+  await b.commit();
+  syncLog('save', 'Founded a household', { name: name });
+  return ref.id;
+}
+async function householdJoinByInvite(user, code) {
+  var inv = await hhDb().collection('invites').doc(code).get();
+  if (!inv.exists) throw new Error('This invitation does not exist, or was withdrawn.');
+  var d = inv.data() || {};
+  var exp = d.expiresAt && d.expiresAt.toMillis ? d.expiresAt.toMillis() : 0;
+  if (exp < Date.now()) throw new Error('This invitation has expired — ask for a new one.');
+  var mine = await householdMemberships(user);
+  if (mine.some(function(m){ return m.hid === d.hid; })) return d.hid;     // already in it
+  await hhRef(d.hid).collection('members').doc(user.uid).set(hhMemberDoc(user, d.role, { invite: code }));
+  return d.hid;
+}
+async function householdEnter(user) {
+  if (!user || !hhDb()) return false;
+  try {
+    var code = null;
+    try { code = sessionStorage.getItem(JOIN_KEY); } catch(e) {}
+    if (code) {
+      try {
+        var joined = await householdJoinByInvite(user, code);
+        try { localStorage.setItem(HOUSEHOLD_KEY, joined); } catch(e) {}
+        toast('✅ You have joined the household', 6000);
+      } catch(e) {
+        await askConfirm({ icon: '⚠️', title: 'Could not join', message: e.message, okLabel: 'OK' });
+      }
+      try { sessionStorage.removeItem(JOIN_KEY); } catch(e) {}
+    }
+    var list = await householdMemberships(user);
+    if (!list.length && await householdClaimKept(user)) list = await householdMemberships(user);
+    if (!list.length) list = [{ hid: await householdFound(user, householdDefaultName(user)), role: 'owner' }];
+    _householdList = list;
+    var want = null;
+    try { want = localStorage.getItem(HOUSEHOLD_KEY); } catch(e) {}
+    var pick = list.filter(function(m){ return m.hid === want; })[0]
+            || list.filter(function(m){ return m.role === 'owner'; })[0] || list[0];
+    await householdUse(pick.hid, pick.role);
+    return true;
+  } catch(e) {
+    syncLog('error', 'Could not open the household', String(e && e.message).slice(0, 160));
+    if (typeof showServiceError === 'function')
+      showServiceError('Signed in, but your household could not be opened:\n\n' + (e && e.message ? e.message : String(e))
+        + '\n\nEverything on this device is safe. Try again when the connection is better.');
+    return false;
+  }
+}
+async function householdUse(hid, role) {
+  _cloudHid = hid;
+  try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
+  var snap = await hhRef(hid).get();
+  var h = snap.exists ? (snap.data() || {}) : {};
+  _household = { hid: hid, role: role, name: h.name || '', ownerUid: h.ownerUid || '' };
+  await householdLoadMembers();
+  householdRenderBar();
+  return _household;
+}
+// Members (and, for admins, the places kept by e-mail) in the shape Family
+// Access has always drawn: {email, name, role: read|write|admin}.
+async function householdLoadMembers() {
+  var me = window._fbUser ? window._fbUser.uid : '';
+  var list = [];
+  var ms = await hhRef().collection('members').get();
+  ms.forEach(function(d) {
+    var m = d.data() || {};
+    if (m.role === 'owner') { _household.ownerName = m.name || ''; _household.ownerEmail = m.email || ''; }
+    if (m.uid === me) { _household.role = m.role; return; }
+    if (m.role === 'owner') return;
+    list.push({ email: m.email || '', name: m.name || '', role: HH_TO_ACCESS[m.role] || 'read', hhRole: m.role, uid: m.uid });
+  });
+  if (_household.role === 'owner' || _household.role === 'admin') {
+    try {
+      var ps = await hhDb().collection('pending').where('hid', '==', _cloudHid).get();
+      ps.forEach(function(d) {
+        var p = d.data() || {};
+        list.push({ email: p.email, name: '', role: HH_TO_ACCESS[p.role] || 'read', hhRole: p.role, pending: true });
+      });
+    } catch(e) {}
+  }
+  try { localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
+  return list;
+}
+function householdCanManage() { return !!(_household && (_household.role === 'owner' || _household.role === 'admin')); }
+function householdRenderBar() {
+  var bar = document.getElementById('householdBar');
+  if (!bar) return;
+  if (!_household) { bar.innerHTML = ''; return; }
+  var h = _household, others = _householdList.filter(function(m){ return m.hid !== h.hid; });
+  var roleName = { owner: '\u{1F451} Owner', admin: '\u{1F6E1} Full access', editor: '✏️ Read + Write', viewer: '\u{1F441} Read only' }[h.role] || h.role;
+  bar.innerHTML =
+      '<div class="access-row" style="background:rgba(212,168,67,0.14);border-color:var(--gold);">'
+    +   '<div class="access-avatar" style="background:var(--gold);">\u{1F3E0}</div>'
+    +   '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(h.name || 'Household') + '</div>'
+    +   '<div class="access-email">' + escH(roleName) + '</div></div>'
+    +   (householdCanManage() ? '<button class="access-role-btn" onclick="householdRename()">✏️ Rename</button>' : '')
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
+    +   (householdCanManage() ? '<button class="access-role-btn" onclick="householdInvite()">\u{1F517} Invitation link…</button>' : '')
+    +   (others.length ? '<button class="access-role-btn" onclick="householdSwitch()">\u{1F501} Switch household…</button>' : '')
+    +   (h.role !== 'owner' ? '<button class="access-remove-btn" onclick="householdLeave()">Leave this household</button>' : '')
+    + '</div>';
+  var on = document.getElementById('ownerName'), oe = document.getElementById('ownerEmail');
+  if (on) on.textContent = h.ownerName || (h.ownerEmail || '').split('@')[0] || '—';
+  if (oe) oe.textContent = h.ownerEmail || '—';
+}
+async function householdRename() {
+  if (!householdCanManage()) return;
+  var name = await askConfirm({ icon: '✏️', title: 'Name of this household', input: _household.name || '', okLabel: 'Save' });
+  if (typeof name !== 'string' || !name.trim()) return;
+  await hhRef().update({ name: name.trim().slice(0, 60) });
+  _household.name = name.trim().slice(0, 60);
+  householdRenderBar();
+  toast('Renamed');
+}
+function householdNewCode() {
+  var b = new Uint8Array(18); crypto.getRandomValues(b);
+  return Array.prototype.map.call(b, function(x){ return ('0' + x.toString(16)).slice(-2); }).join('');
+}
+async function householdInvite() {
+  if (!householdCanManage()) return;
+  var roles = _household.role === 'owner' ? ['viewer', 'editor', 'admin'] : ['viewer', 'editor'];
+  var pick = await askConfirm({ icon: '\u{1F517}', title: 'Invite someone to ' + (_household.name || 'this household'),
+    message: 'Anyone with the link can join for the next 14 days, with the role you choose.\n\n'
+      + '• Read only — sees the recipes\n• Read + Write — adds and changes them'
+      + (roles.indexOf('admin') !== -1 ? '\n• Full access — also deletes, and manages members' : ''),
+    okLabel: 'Read + Write', altLabel: 'Read only', cancelLabel: 'Cancel' });
+  var role = pick === true ? 'editor' : pick === 'alt' ? 'viewer' : null;
+  if (!role) return;
+  var code = householdNewCode();
+  await hhDb().collection('invites').doc(code).set({ hid: _cloudHid, role: role, createdBy: window._fbUser.uid,
+    expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 14 * 864e5) });
+  var url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + '?join=' + code;
+  var shared = false;
+  if (navigator.share) { try { await navigator.share({ title: _household.name || 'Recipes', text: 'Join my recipes', url: url }); shared = true; } catch(e) {} }
+  if (!shared) {
+    try { await navigator.clipboard.writeText(url); toast('\u{1F4CB} Invitation link copied — valid for 14 days', 7000); }
+    catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'Invitation link', message: url, okLabel: 'OK' }); }
+  }
+  return url;
+}
+async function householdLeave() {
+  if (!_household || _household.role === 'owner') return;
+  if (await askConfirm({ icon: '\u{1F6AA}', title: 'Leave ' + (_household.name || 'this household') + '?',
+      message: 'You will no longer see its recipes. Someone in it can invite you back.', okLabel: 'Leave', danger: true }) !== true) return;
+  await hhRef().collection('members').doc(window._fbUser.uid).delete();
+  try { localStorage.removeItem(HOUSEHOLD_KEY); } catch(e) {}
+  householdReopen();
+}
+async function householdSwitch() {
+  var others = _householdList.filter(function(m){ return m.hid !== _cloudHid; });
+  if (!others.length) return;
+  var names = [];
+  for (var i = 0; i < others.length; i++) {
+    try { var s2 = await hhRef(others[i].hid).get(); names.push((s2.data() || {}).name || others[i].hid); } catch(e) { names.push(others[i].hid); }
+  }
+  var pick = others.length === 1
+    ? (await askConfirm({ icon: '\u{1F501}', title: 'Switch to ' + names[0] + '?', message: 'This device will show that household’s recipes instead.', okLabel: 'Switch' }) === true ? 0 : -1)
+    : parseInt(await askConfirm({ icon: '\u{1F501}', title: 'Switch household',
+        message: names.map(function(n, j){ return (j + 1) + '. ' + n; }).join('\n') + '\n\nType the number:', input: '1', okLabel: 'Switch' }), 10) - 1;
+  if (!(pick >= 0 && pick < others.length)) return;
+  try { localStorage.setItem(HOUSEHOLD_KEY, others[pick].hid); } catch(e) {}
+  householdReopen();
+}
+// A different household is a different collection: what this device holds
+// belongs to the one it is leaving. Only safe with nothing unsent; then the
+// device's copy is set aside and the page starts again inside the new one.
+async function householdReopen() {
+  var unsent = (typeof _offlineQueue !== 'undefined' && _offlineQueue)
+    || Object.keys(typeof _pendingCloudDeletes === 'object' && _pendingCloudDeletes || {}).length;
+  if (unsent) { toast('There are changes on this device not yet sent \u2014 sync first, then switch.', 8000); return false; }
+  // The same things "Reset this device" clears, and for the same reasons: the
+  // recipes, the sync bookkeeping (or the next load would trust a copy of the
+  // OTHER household) and the photos (kept by recipe number, which the other
+  // household reuses for different recipes).
+  try {
+    [STORAGE_KEY, NEXTID_KEY, 'tonys_offline_queue', CLOUD_DELETES_KEY, CLOUD_META_AT_KEY, CLOUD_BASE_KEY]
+      .forEach(function(k){ localStorage.removeItem(k); });
+  } catch(e) {}
+  try { await idbClearAll(); } catch(e) {}
+  location.reload();
+  return true;
+}
+// Family Access, household layout: a place kept by e-mail (claimed at their
+// first sign-in), a role changed, or someone removed — all at once, no rules.
+async function householdAddMember(email, accessRole) {
+  var role = ACCESS_TO_HH[accessRole] || 'viewer';
+  if (role === 'admin' && _household.role !== 'owner') { toast('Only the owner can add someone with full access.'); return; }
+  await hhDb().collection('pending').doc(_cloudHid + ':' + email).set({ hid: _cloudHid, email: email, role: role });
+  await householdLoadMembers(); renderAccessMembers();
+  toast('✅ ' + email + ' can now join — the moment they sign in with that Google account.', 7000);
+}
+async function householdChangeRole(m, accessRole) {
+  var role = ACCESS_TO_HH[accessRole] || 'viewer';
+  if (m.pending) await hhDb().collection('pending').doc(_cloudHid + ':' + m.email).set({ hid: _cloudHid, email: m.email, role: role });
+  else await hhRef().collection('members').doc(m.uid).update({ role: role });
+  await householdLoadMembers(); renderAccessMembers();
+  toast('✅ Role changed');
+}
+async function householdRemoveMember(m) {
+  if (m.pending) await hhDb().collection('pending').doc(_cloudHid + ':' + m.email).delete();
+  else await hhRef().collection('members').doc(m.uid).delete();
+  await householdLoadMembers(); renderAccessMembers();
+  toast('✅ ' + m.email + ' removed');
+}
+window.householdEnter = householdEnter; window.householdUse = householdUse; window.householdOf = householdOf;
+window.householdRename = householdRename; window.householdInvite = householdInvite; window.householdLeave = householdLeave;
+window.householdSwitch = householdSwitch; window.householdDefaultName = householdDefaultName;
+window.householdLoadMembers = householdLoadMembers; window.householdAddMember = householdAddMember;
 
 function updateAccessRules() {
   var members = getAccessMembers();
@@ -3723,7 +4035,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.84';
+var APP_VERSION = 'v36.85';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6343,7 +6655,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.84</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.85</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6975,7 +7287,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.84</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.85</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10591,6 +10903,9 @@ function i18nCanEdit() {
   try {
     if (!window._fbUser || !window._fbUser.email) return false;
     var me = String(window._fbUser.email).toLowerCase();
+    // v36.85 — in the household layout the translations are app-wide and the
+    // rules let only the app's own admins write them.
+    if (typeof cloudLayout === 'function' && cloudLayout() === 'households') return isAppOwner();
     if (typeof getAccessMembers !== 'function') return false;
     var list = getAccessMembers() || [];
     // The owner is always full access, and is not necessarily in the member
@@ -17992,7 +18307,7 @@ window.photoDeletesRefused = function(){ return Object.keys(_photoDeleteRefused)
 // interface translations are app-wide (i18n/he, i18n/_index), so no household
 // pays to translate what another already has. One place decides, so switching
 // is one setting rather than forty edits (firestore.households.rules).
-var _cloudLayout = 'shared';   // 'shared' | 'households'
+var _cloudLayout = (window.APP_CONFIG.dataLayout === 'households') ? 'households' : 'shared';
 var _cloudHid = null;          // the household in use, in the household layout
 function cloudLayout() { return _cloudLayout; }
 function cloudDocPath(name) {
@@ -25175,6 +25490,12 @@ window.onHeaderScroll = onHeaderScroll;
     </div>
     <div class="modal-body" style="padding:0 16px 20px;">
 
+      <!-- v36.85 (WP-D) — the household: its name, your role, invitations. -->
+      <div data-layout-only="households" style="margin:12px 0 4px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Household</div>
+        <div id="householdBar"></div>
+      </div>
+
       <!-- Owner row -->
       <div style="margin:12px 0 8px;">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Owner</div>
@@ -25189,7 +25510,7 @@ window.onHeaderScroll = onHeaderScroll;
                  this the owner's name was catalogued like a button label and sat
                  in the dictionary as an orphan for ever — nothing translates a
                  name, and a model asked to try will transliterate it. -->
-            <div class="access-name" data-no-i18n>Tony Schvekher</div>
+            <div class="access-name" id="ownerName" data-no-i18n>Tony Schvekher</div>
             <div class="access-email" id="ownerEmail" data-no-i18n>—</div>
           </div>
           <div class="access-badge access-badge-full">Full access</div>
@@ -25216,7 +25537,12 @@ window.onHeaderScroll = onHeaderScroll;
       </div>
 
       <!-- How it works note -->
-      <div style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
+      <div data-layout-only="households" style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
+        <div style="font-size:12px;color:#2255AA;line-height:1.6;">
+          <strong>How it works:</strong> add someone's Google address and they join the moment they sign in — or send an <strong>invitation link</strong>. Everyone in the household sees the same recipes, and a change here takes effect at once: there is nothing to publish.
+        </div>
+      </div>
+      <div data-layout-only="shared" style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
         <div style="font-size:12px;color:#2255AA;line-height:1.6;">
           <strong>How it works:</strong> Family members sign in with their own Google account at the same URL: <strong data-no-i18n data-cfg-text="{siteHost}"></strong><br><br>
         All accounts read and write to the <strong>same shared recipe collection</strong> — changes sync in real-time across everyone's devices, just like your PC↔iPhone sync today.<br><br>
@@ -25230,7 +25556,7 @@ window.onHeaderScroll = onHeaderScroll;
            missed entirely. It is a primary action on this screen and is sized
            like one. Colours go through --heading/--ink rather than --warm-brown,
            which is a surface as well as a text colour and inverts in dark mode. -->
-      <div style="margin-top:14px;">
+      <div data-layout-only="shared" style="margin-top:14px;">
         <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans','Heebo',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:10px;">
           <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>

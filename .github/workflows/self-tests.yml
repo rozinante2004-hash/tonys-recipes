@@ -207,6 +207,14 @@ jobs:
           echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"auth":{"port":9099},"ui":{"enabled":false}}}' > firebase.json
           npx firebase emulators:exec --only firestore,auth --project demo-tonys "node $GITHUB_WORKSPACE/tests/e2e-sync.mjs"
 
+      # v36.85 (WP-D) — the same devices with every household in its own space:
+      # founding, places kept by e-mail, a separate newcomer, invitation links,
+      # and Family Access editing members directly.
+      - name: End-to-end sync, household layout (emulator)
+        run: |
+          cd /tmp/e2e
+          npx firebase emulators:exec --only firestore,auth --project demo-tonys "node $GITHUB_WORKSPACE/tests/e2e-sync.mjs --layout households"
+
       - name: Worker checks (CORS, origin, app key)
         run: node tests/worker-cors.mjs
 

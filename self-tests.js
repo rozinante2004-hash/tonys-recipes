@@ -1723,6 +1723,33 @@ window.SELF_TESTS = [
       } finally { host.remove(); }
     } },
 
+  { id:'wpd_where_documents_live', group:'Cloud Sync', name:'Each document lands in the right place, in both layouts (v36.85)',
+    test: async()=>{
+      // WP-D: every read and write names its document the first layout's way;
+      // cloudDocPath decides where it really is. A wrong mapping here would put
+      // a household's recipes somewhere another household — or nobody — reads.
+      ['cloudDocPath','cloudDoc','cloudRange','cloudLayout','householdDefaultName','householdEnter'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined');
+      });
+      var was=window._cloudLayout, hidWas=window._cloudHid, j=function(a){ return a.join('/'); };
+      try{
+        window._cloudLayout='shared';
+        if(j(cloudDocPath('recipe_12'))!=='shared/recipe_12' || j(cloudDocPath('meta'))!=='shared/meta')
+          throw new Error('the family layout no longer resolves to shared/<name> exactly');
+        window._cloudLayout='households'; window._cloudHid=null;
+        var threw=false; try{ cloudDocPath('recipe_1'); }catch(e){ threw=true; }
+        if(!threw) throw new Error('a household document resolved with no household chosen');
+        window._cloudHid='H1';
+        var want={ recipe_12:'households/H1/recipes/12', photo_12:'households/H1/photos/12', meta:'households/H1/state/meta',
+                   backups:'households/H1/state/backups', chat_abc:'households/H1/chats/chat_abc',
+                   chatpart_abc_2:'households/H1/chats/chatpart_abc_2', i18n_he:'i18n/he', i18n_index:'i18n/_index' };
+        Object.keys(want).forEach(function(k){ if(j(cloudDocPath(k))!==want[k]) throw new Error(k+' → '+j(cloudDocPath(k))+', expected '+want[k]); });
+      } finally { window._cloudLayout=was; window._cloudHid=hidWas; }
+      if(householdDefaultName({ displayName:'Tony Schvekher' })!=='Tony\u2019s Recipes') throw new Error('a new household is not named after its founder');
+      if(householdDefaultName({ email:'michal.dovrat@gmail.com' }).indexOf('Michal.dovrat')!==0 && householdDefaultName({ email:'michal@x.com' })!=='Michal\u2019s Recipes')
+        throw new Error('a founder with no display name gets no sensible name');
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing

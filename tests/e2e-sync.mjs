@@ -41,6 +41,28 @@ const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i > -1 ? argv[i + 1] : d; };
 let PORT = 0;                     // chosen when the local server starts
 const EMU = { host: '127.0.0.1', firestorePort: 8085, authPort: 9099, projectId: 'demo-tonys' };
+// v36.85 (WP-D) — `--layout households` runs the same checks with every
+// household in its own space (APP_CONFIG.dataLayout = 'households', rules from
+// firestore.households.rules), plus the household-only ones: places kept by
+// e-mail being taken up, a newcomer founding a separate household, and joining
+// by invitation link. The family's household is seeded as `e2e-home`.
+const LAYOUT = arg('layout', process.env.E2E_LAYOUT || 'shared');
+const HH = LAYOUT === 'households';
+let HID = null;   // the household the owner founds at first sign-in
+let SEED = null, SEED_AT = 0;
+// The household the owner founded, filled as the family's will be at
+// migration: its recipes, and a place kept for each member's address.
+async function fillHousehold(hid) {
+  await env.withSecurityRulesDisabled(async ctx => {
+    const db = ctx.firestore(), h = 'households/' + hid;
+    await fs.updateDoc(fs.doc(db, h), { name: 'E2E family' });
+    await fs.setDoc(fs.doc(db, h + '/recipes/4000'), { r: JSON.stringify(SEED), updatedAt: SEED_AT, id: 4000 });
+    await fs.setDoc(fs.doc(db, h + '/state/meta'), { nextId: 5000, ids: [4000], schema: 2, updatedAt: SEED_AT });
+    await fs.setDoc(fs.doc(db, 'pending/' + hid + ':' + WRITER), { hid, email: WRITER, role: 'editor' });
+    await fs.setDoc(fs.doc(db, 'pending/' + hid + ':' + READER), { hid, email: READER, role: 'viewer' });
+  });
+}
+const uidOnPage = d => d.page.evaluate(() => window._fbUser && window._fbUser.uid);
 
 // Dependencies come from the folder the test is run in (CI installs them there),
 // then from the repo, then from this sandbox's global install.
@@ -70,7 +92,9 @@ const READER = 'reader@example.com';
 
 // The published rules, filled in the way the app fills them.
 const q = list => list.map(e => '"' + e + '"').join(', ');
-const rules = readFileSync(path.join(repo, 'firestore.rules'), 'utf8')
+const rules = HH
+  ? readFileSync(path.join(repo, 'firestore.households.rules'), 'utf8').replace(/\{\{APP_ADMINS\}\}/g, '"' + OWNER + '"')
+  : readFileSync(path.join(repo, 'firestore.rules'), 'utf8')
   .replace(/\{\{READ\}\}/g,  q([OWNER, WRITER, READER]))
   .replace(/\{\{WRITE\}\}/g, q([OWNER, WRITER]))
   .replace(/\{\{ADMIN\}\}/g, q([OWNER]));
@@ -88,10 +112,15 @@ await env.withSecurityRulesDisabled(async ctx => {
   const t0 = Date.now() - 60000;
   const seed = { id: 4000, uid: 'e2e-seed', name: 'E2E seed stew', emoji: '🍲', category: 'Dinner', difficulty: 'Easy',
                  prep: '1 h', servings: '4', ingredients: [{ a: '1', n: 'carrot' }], steps: ['Stew.'], updatedAt: t0 };
-  await fs.setDoc(fs.doc(db, 'shared/recipe_4000'), { r: JSON.stringify(seed), updatedAt: t0, id: 4000 });
-  await fs.setDoc(fs.doc(db, 'shared/meta'), { nextId: 5000, ids: [4000], schema: 2, updatedAt: t0 });
-  await fs.setDoc(fs.doc(db, 'shared/access'), { members: [
-    { email: WRITER, role: 'write' }, { email: READER, role: 'read' } ], updatedAt: Date.now() });
+  SEED = seed; SEED_AT = t0;
+  if (HH) {
+    // Filled in once the owner has founded the household (see below).
+  } else {
+    await fs.setDoc(fs.doc(db, 'shared/recipe_4000'), { r: JSON.stringify(seed), updatedAt: t0, id: 4000 });
+    await fs.setDoc(fs.doc(db, 'shared/meta'), { nextId: 5000, ids: [4000], schema: 2, updatedAt: t0 });
+    await fs.setDoc(fs.doc(db, 'shared/access'), { members: [
+      { email: WRITER, role: 'write' }, { email: READER, role: 'read' } ], updatedAt: Date.now() });
+  }
 });
 // Reads straight from the emulator's REST API as its "owner", which bypasses
 // the rules — what is REALLY in the cloud, not what any device believes.
@@ -106,12 +135,20 @@ function fromValue(v) {
   if ('mapValue' in v) { const o = {}; Object.entries(v.mapValue.fields || {}).forEach(([k, x]) => { o[k] = fromValue(x); }); return o; }
   return null;
 }
-async function cloudDoc(id) {
-  const r = await fetch(`http://${EMU.host}:${EMU.firestorePort}/v1/projects/${EMU.projectId}/databases/(default)/documents/shared/${id}`,
+async function restDoc(docPath) {
+  const r = await fetch(`http://${EMU.host}:${EMU.firestorePort}/v1/projects/${EMU.projectId}/databases/(default)/documents/${docPath}`,
                         { headers: { Authorization: 'Bearer owner' } });
   if (r.status === 404) return null;
   const j = await r.json();
   return fromValue({ mapValue: { fields: j.fields || {} } });
+}
+// A document by its first-layout name, wherever the layout under test keeps it.
+function cloudDoc(id) {
+  if (!HH) return restDoc('shared/' + id);
+  const h = 'households/' + HID + '/';
+  if (id.startsWith('recipe_')) return restDoc(h + 'recipes/' + id.slice(7));
+  if (id.startsWith('photo_'))  return restDoc(h + 'photos/' + id.slice(6));
+  return restDoc(h + 'state/' + id);
 }
 const cloudRecipe = async id => { const d = await cloudDoc('recipe_' + id); return d && d.r ? JSON.parse(d.r) : d; };
 
@@ -144,6 +181,11 @@ const server = http.createServer((req, res) => {
   if (p === '/index.html') {
     body = body.toString('utf8').replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?connect-src )/,
       `$1http://${EMU.host}:${EMU.authPort} http://${EMU.host}:${EMU.firestorePort} `);
+    if (HH) {
+      const before = body;
+      body = body.replace(/dataLayout:(\s*)'shared'/, "dataLayout:$1'households'");
+      if (body === before) throw new Error('could not switch the page to the household layout');
+    }
   }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
   res.end(body);
@@ -157,7 +199,7 @@ const devices = [];
 
 // One device: its own browser profile (so its own localStorage and IndexedDB,
 // exactly like a second phone), signed in as `email`.
-async function device(label, email) {
+async function device(label, email, opts = {}) {
   const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1100, height: 900 } });
   const page = await ctx.newPage();
   const errors = [];
@@ -173,7 +215,7 @@ async function device(label, email) {
   await ctx.route(/accounts\.google\.com/, r => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
   await ctx.route(/workers\.dev/, r => r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"no Worker in the e2e run"}' }));
   await ctx.addInitScript(emu => { window.__FIREBASE_EMULATOR__ = emu; }, EMU);
-  await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://127.0.0.1:${PORT}/index.html${opts.query || ''}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window._fbAuth && window._fbEmulated === true, null, { timeout: 20000 });
   await page.evaluate(async (who) => {
     window._justSignedIn = true;               // the app's "just signed in", not an auto-login
@@ -183,11 +225,17 @@ async function device(label, email) {
   }, email);
   // Signed in, and the first load from the cloud has finished.
   try {
-    await page.waitForFunction(() => window._driveMode && window._fbUser && window._lastSyncOkAt, null, { timeout: 30000 });
+    if (opts.ready === 'household')        // a brand-new household has nothing to load yet
+      await page.waitForFunction(() => window._fbUser && typeof householdOf === 'function' && householdOf(), null, { timeout: 30000 });
+    else
+      await page.waitForFunction(() => window._driveMode && window._fbUser && window._lastSyncOkAt, null, { timeout: 30000 });
   } catch (e) {
     const st = await page.evaluate(() => ({ drive: !!window._driveMode, user: window._fbUser && window._fbUser.email,
       lastSync: window._lastSyncOkAt, status: (document.getElementById('dsText') || {}).textContent,
-      recent: (typeof recentErrors === 'function' ? recentErrors() : []).slice(-3).map(x => x.message) }));
+      recent: (typeof recentErrors === 'function' ? recentErrors() : []).slice(-3).map(x => x.message),
+      layout: typeof cloudLayout === 'function' ? cloudLayout() : '?',
+      household: typeof householdOf === 'function' ? householdOf() : '?',
+      log: (() => { try { return JSON.parse(localStorage.getItem('tonys_sync_log') || '[]').slice(-6).map(e => e.k + ': ' + e.m + (e.d ? ' ' + JSON.stringify(e.d).slice(0, 120) : '')); } catch (e) { return []; } })() }));
     throw new Error(label + ' never finished its first sync: ' + JSON.stringify(st) + ' — ' + errors.slice(0, 2).join(' | '));
   }
   const d = { label, email, page, ctx, errors };
@@ -211,7 +259,18 @@ const names = d => inPage(d, () => recipes.map(r => r.name));
 
 try {
   console.log('Signing in');
-  const A = await device('A (owner)', OWNER);
+  let A;
+  if (HH) {
+    A = await device('A (owner)', OWNER, { ready: 'household' });
+    const h = await inPage(A, () => householdOf());
+    ok('the owner, signing in for the first time, founds a household', h && h.role === 'owner', JSON.stringify(h));
+    HID = h.hid;
+    await fillHousehold(HID);
+    await A.page.reload({ waitUntil: 'domcontentloaded' });
+    await A.page.waitForFunction(() => window._driveMode && window._fbUser && window._lastSyncOkAt, null, { timeout: 30000 });
+  } else {
+    A = await device('A (owner)', OWNER);
+  }
   ok('the owner signs in and syncs against the emulator', true);
   const B = await device('B (writer)', WRITER);
   ok('a writer signs in on a second device', true);
@@ -310,6 +369,62 @@ try {
   await inPage(B, () => window.dispatchEvent(new Event('online')));
   ok('back online, the offline edit goes up by itself', await until(async () => ((await cloudRecipe(4000)) || {}).notes === 'written offline', 20000),
      JSON.stringify(((await cloudRecipe(4000)) || {}).notes));
+
+  if (HH) {
+    console.log('Households');
+    const wm = await restDoc('households/' + HID + '/members/' + await uidOnPage(B));
+    ok('the writer took up the place kept for them, as an editor', wm && wm.role === 'editor', JSON.stringify(wm));
+    ok('…and the kept place is gone', !(await restDoc('pending/' + HID + ':' + WRITER)));
+    const rm = await restDoc('households/' + HID + '/members/' + await uidOnPage(C));
+    ok('the reader is a viewer', rm && rm.role === 'viewer', JSON.stringify(rm));
+    ok('the owner is in the family household, as owner',
+       await inPage(A, () => { const h = householdOf(); return h && h.role === 'owner' && h.name === 'E2E family'; }));
+
+    const N = await device('N (newcomer)', 'newcomer@example.com', { ready: 'household' });
+    const nh = await inPage(N, () => householdOf());
+    ok('a newcomer founds a household of their own', nh && nh.hid !== HID && nh.role === 'owner', JSON.stringify(nh));
+    ok('…named after them', /Newcomer.s Recipes/.test(nh && nh.name || ''), nh && nh.name);
+    ok('…and sees none of the family\'s recipes', !(await names(N)).includes('E2E seed stew'), JSON.stringify(await names(N)));
+
+    const url = await inPage(A, async () => {
+      window.askConfirm = async () => true;                 // "Read + Write"
+      try { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); } catch (e) {}
+      try { navigator.clipboard.writeText = async () => {}; } catch (e) {}
+      return householdInvite();
+    });
+    const code = (/[?&]join=([A-Za-z0-9_-]+)/.exec(url || '') || [])[1];
+    ok('the owner makes an invitation link', !!code, url);
+    const J = await device('J (invited)', 'invited@example.com', { query: '?join=' + code });
+    ok('someone with the link joins the family household', await inPage(J, () => (householdOf() || {}).name === 'E2E family'));
+    ok('…as an editor, and sees the recipes', (await restDoc('households/' + HID + '/members/' + await uidOnPage(J)) || {}).role === 'editor'
+       && (await names(J)).includes('E2E seed stew'), JSON.stringify(await names(J)));
+    ok('…and the code is gone from the address', await inPage(J, () => !/join=/.test(location.href)));
+
+    console.log('Family Access, household layout');
+    await inPage(A, async () => {
+      openAccessControl();
+      document.getElementById('accessEmailInput').value = 'Aunt@Example.com';
+      document.querySelector('input[name="newRole"][value="write"]').checked = true;
+      addAccessMember();
+    });
+    ok('adding an address keeps a place for it, at once (nothing to publish)',
+       await until(async () => ((await restDoc('pending/' + HID + ':aunt@example.com')) || {}).role === 'editor'));
+    const auntIdx = await until(() => inPage(A, () => { const i = getAccessMembers().findIndex(m => m.email === 'aunt@example.com'); return i >= 0 ? i + 1 : 0; }));
+    await inPage(A, (i) => changeAccessRole(i - 1, 'read'), auntIdx);
+    ok('changing the role changes the kept place',
+       await until(async () => ((await restDoc('pending/' + HID + ':aunt@example.com')) || {}).role === 'viewer'));
+    const readerIdx = await inPage(A, (e) => getAccessMembers().findIndex(m => m.email === e), READER);
+    await inPage(A, (i) => changeAccessRole(i, 'write'), readerIdx);
+    ok('…and a member\'s role, in the household itself',
+       await until(async () => ((await restDoc('households/' + HID + '/members/' + await uidOnPage(C))) || {}).role === 'editor'));
+    const auntNow = await inPage(A, () => getAccessMembers().findIndex(m => m.email === 'aunt@example.com'));
+    await inPage(A, (i) => removeAccessMember(i), auntNow);
+    ok('removing takes the kept place away', await until(async () => !(await restDoc('pending/' + HID + ':aunt@example.com'))));
+    ok('a member cannot manage the household', await inPage(B, () => {
+      openAccessControl(); const bar = document.getElementById('householdBar').textContent;
+      return !/Invitation link|Rename/.test(bar) && /Leave this household/.test(bar);
+    }));
+  }
 
 } catch (e) {
   failures++;

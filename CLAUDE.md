@@ -230,6 +230,28 @@ found only because a test was written first and disagreed with the code.
   (`recipe_12`, `photo_12`, `meta`, `chat_…`, `i18n_he`) and resolve them for
   `_cloudLayout` — `'shared'` (today; identical paths) or `'households'`.
   Never write `collection('shared')` anywhere else again.
+  - **v36.85 — the app in the household layout** (`APP_CONFIG.dataLayout`,
+    default `'shared'`; `html[data-layout]` + `[data-layout-only]` show the
+    screens of one layout only). `signInCloudSync` → `householdEnter(user)`
+    first: an invitation (`?join=CODE`, kept in sessionStorage across the
+    sign-in and removed from the address) → memberships (collection-group
+    query on `members`, `uid == me`) → else claim places kept for my e-mail
+    (`pending`, where `email == me`) → else FOUND one ("<First name>'s
+    Recipes"). The chosen one is remembered (`tonys_household`).
+    `householdLoadMembers()` writes members (+ kept places, for admins) into
+    Family Access's old list shape, so the same screen edits them — directly,
+    nothing to publish. Invitation links: 14 days, a 36-hex-character code,
+    role viewer/editor (admin: owner only, by rules). Switching or leaving a
+    household clears what "Reset this device" clears (recipes, sync
+    bookkeeping, device photos — ids are reused across households) and
+    refuses while anything is unsent. Translations are app-wide there, so
+    `i18nCanEdit()` = the app owner.
+  - **Tested:** `tests/e2e-sync.mjs --layout households` (CI) — founding,
+    the full multi-device sync, places kept by e-mail taken up with the right
+    roles, a newcomer's separate household, an invitation link, Family
+    Access editing members and kept places, and a member unable to manage.
+    NB the Auth emulator gives each person a RANDOM uid — never seed data
+    keyed by a guessed uid; let the app found the household, then fill it.
 - **LANGUAGES LIVE PER COPY — AND NOW IN BACKUPS (v36.83).** Each copy keeps
   its translations in its own Firebase project (`shared/i18n_<lang>`), so the
   test copy had en/he while the family's had eight, and tested a different
