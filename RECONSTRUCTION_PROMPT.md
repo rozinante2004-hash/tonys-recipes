@@ -36,7 +36,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.92` — app. **Worker: v42**, deployed separately and versioned separately
+**Current version:** `v36.93` — app. **Worker: v42**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -90,8 +90,13 @@ slide‑up modal animation.
   optional) are served at `/__/auth/`: for the test copy the build fetches them into `dist/`;
   for the family's copy the **site root repo** fetches them on every deploy and weekly. Each
   project's OAuth web client lists `https://<host>/__/auth/handler` as a redirect URI.
-- **Languages** live per project (`shared/i18n_<lang>`); 🌐 → Export / Import languages moves
-  them between copies as a file, and every backup carries them (§10).
+- **Languages** are made in the family project's `shared/i18n_<lang>` (the central copy every
+  copy reads) and published as `i18n/<lang>.json` by the *Publish languages* job, which also
+  keeps each language's last 12 versions in `i18n/archive/<lang>/<time>.json` (list:
+  `i18n/archive/index.json`, v36.93). 🌐 → "↩️ Put back a language…" (owner only) lists the
+  languages, then their kept versions by date, and puts one back (its wording wins; phrases
+  added since stay) — or takes a backup / languages file. Every backup carries them (§10).
+  Export languages was removed in v36.93 (the repository does its job).
 
 ## 2. File inventory (recreate all of these)
 
@@ -102,7 +107,7 @@ slide‑up modal animation.
 | `ARCHITECTURE.md` | Deployments and connections: every component, where it lives, who deploys it, what depends on what. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v36.92"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.93"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
@@ -1269,8 +1274,8 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 > "Backup — Save" and the automatic folder backup — adds `languages`
 > (`{kind:'tonys-recipes-languages', v:1, from, langs:{code: {strings,…}}}`), read from the cloud
 > when signed in and online (a device keeps only one language), else the device's own. Restore
-> offers them after the recipes (full access only); 🌐 → Import languages accepts a backup file
-> or an exported languages file. `backupJson()` stays synchronous and without them.
+> offers them after the recipes (full access only); 🌐 → Put back a language → "From a backup or a
+> languages file" accepts a backup, an old exported file or a published `i18n/<lang>.json`. `backupJson()` stays synchronous and without them.
 
 - **Excel EXPORT was removed in v28.5** along with the QR code — both were unused and cost a
   CDN library each. Do **not** rebuild them. Excel *import* remains (`.xlsx` via SheetJS).

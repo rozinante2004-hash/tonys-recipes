@@ -2,7 +2,7 @@
 
 What runs where, who puts it there, and what depends on what. Written for Tony
 and for whoever works on the app next. It holds **no secrets**: settings are
-named, never given. Updated for **v36.88** (27 Sep 2026).
+named, never given. Updated for **v36.93** (27 Sep 2026).
 
 For *why* things are the way they are, see [`CLAUDE.md`](CLAUDE.md). For a
 full specification from which the app could be rebuilt, see
@@ -78,7 +78,7 @@ address (`authDomain`) — each copy signs in **on its own address** (§6).
 | Photos | `shared/photo_<id>` | same | IndexedDB |
 | Member list | `shared/access` (admin-only) | same | — |
 | **Households (WP-D, being introduced)** | `households/{hid}` + `members`, `recipes`, `photos`, `chats`, `state`; `pending/{hid}:{email}`, `invites/{code}`, app-wide `i18n/{lang}` — used once `dataLayout` is `'households'`; the move COPIES `shared` here | same | the household in use |
-| Interface languages | MADE in `shared/i18n_<lang>` (index `shared/i18n_index`) — the central copy (anyone may read; admins write) — and PUBLISHED as `i18n/<lang>.json` in the repo by the *Publish languages* workflow every 10 minutes (v36.91), served with each copy | the same files, and the family project's central copy when newer | the one language in use |
+| Interface languages | MADE in `shared/i18n_<lang>` (index `shared/i18n_index`) — the central copy (anyone may read; admins write) — and PUBLISHED as `i18n/<lang>.json` in the repo by the *Publish languages* workflow every 10 minutes (v36.91), served with each copy; the last 12 versions of each are kept in `i18n/archive/` for 🌐 → ↩️ Put back a language (v36.93) | the same files, and the family project's central copy when newer | the one language in use |
 | WhatsApp chats | `shared/chat_*` / `chatpart_*`; `whatsapp/` folder read over the GitHub API where reachable | same | — |
 | Backup record | `shared/backups` | same | last-backup stamps |
 | **Backups** | a `.json` file (download, or a chosen folder, automatically each day) with recipes, photos **and every language** (v36.83) | same | the folder handle |

@@ -351,7 +351,14 @@ found only because a test was written first and disagreed with the code.
   its translations in its own Firebase project (`shared/i18n_<lang>`), so the
   test copy had en/he while the family's had eight, and tested a different
   interface. 🌐 → "⬇️ Export languages (file)" / "⬆️ Import languages (file)…"
-  (full access only) move them as a `tonys-recipes-languages` JSON file.
+  (full access only) moved them as a `tonys-recipes-languages` JSON file.
+  **v36.93: Export is gone and Import became "↩️ Put back a language…"**
+  (owner only; Tony asked for a list, not a file hunt). The publishing job
+  keeps the last 12 versions of each language in `i18n/archive/` (read from
+  the app's own site — works on the work iPhone, never via GitHub); the
+  dialog lists languages, then versions by date, and MERGES (the old wording
+  wins, phrases added since stay — `i18nPutBackMerge`). "From a backup or a
+  languages file…" is the last option. Test: `i18n_put_back_a_language`.
   Tony then asked for them in backups too: `backupPayloadWithLanguages()`
   (used by "Backup — Save" AND the automatic folder backup) adds
   `languages` — read from the cloud when signed in and online (a device keeps

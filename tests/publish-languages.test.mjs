@@ -37,6 +37,9 @@ ok('it reads the central languages signed out, and writes one file each', he && 
 ok('…only the words (a non-text value is dropped)', he && he.strings.n === undefined && he.count === 2, JSON.stringify(he));
 ok('…keys sorted, so a change is a one-line difference', he && Object.keys(he.strings).join() === 'Delete,Save');
 ok('…with an index of what it published', idx && idx.langs.he && idx.langs.ru && idx.publishedAt > 0, JSON.stringify(idx));
+const arch = () => read('archive/index.json') || { langs: {} };
+ok('each language is also KEPT, with a list of kept versions (v36.93)', arch().langs.he && arch().langs.he.length === 1
+  && (read('archive/' + arch().langs.he[0].file) || { strings: {} }).strings.Save === 'שמור', JSON.stringify(arch()));
 ok('nothing else of the family\'s is ever read', !fs.readdirSync(out).some(f => /recipe/.test(f)));
 const before = fs.readFileSync(path.join(out, 'index.json'), 'utf8');
 log = run();
@@ -44,6 +47,7 @@ ok('when nothing changed it writes nothing', /nothing changed/.test(log) && fs.r
 await seed(async db => { await setDoc(doc(db, 'shared/i18n_publish'), { requestedAt: Date.now() + 1000, by: 'tony@example.com' }); });
 log = run();
 ok('"Publish languages now" in the app makes it publish again', /published 2 languages \(requested in the app\)/.test(log), log);
+ok('…without keeping a second, identical copy', arch().langs.he.length === 1 && arch().langs.ru.length === 1, JSON.stringify(arch()));
 await seed(async db => {
   await setDoc(doc(db, 'shared/i18n_he'), { strings: { Save: 'שמירה', Delete: 'מחק' }, count: 2, updatedAt: 300 });
   await setDoc(doc(db, 'shared/i18n_index'), { langs: { he: { at: 300, count: 2 } }, probed: true });
@@ -51,6 +55,23 @@ await seed(async db => {
 log = run();
 ok('a changed language is published by itself', (read('he.json') || {}).strings.Save === 'שמירה', log);
 ok('…and one no longer in the cloud is removed', !fs.existsSync(path.join(out, 'ru.json')), fs.readdirSync(out).join());
+ok('the changed language now has two versions kept, newest first', arch().langs.he.length === 2
+  && (read('archive/' + arch().langs.he[0].file) || { strings: {} }).strings.Save === 'שמירה'
+  && (read('archive/' + arch().langs.he[1].file) || { strings: {} }).strings.Save === 'שמור', JSON.stringify(arch().langs.he));
+ok('a removed language\'s kept versions stay, so it can be put back', arch().langs.ru && arch().langs.ru.length === 1
+  && fs.existsSync(path.join(out, 'archive', arch().langs.ru[0].file)));
+// Only the newest KEEP versions stay.
+for (let i = 0; i < 13; i++) {
+  await seed(async db => {
+    await setDoc(doc(db, 'shared/i18n_he'), { strings: { Save: 'שמור ' + i }, count: 1, updatedAt: 400 + i });
+    await setDoc(doc(db, 'shared/i18n_index'), { langs: { he: { at: 400 + i, count: 1 } }, probed: true });
+  });
+  run();
+  await new Promise(r => setTimeout(r, 1100));            // one kept file per second
+}
+const kept = fs.readdirSync(path.join(out, 'archive', 'he'));
+ok('at most 12 versions are kept, and the oldest files are deleted', arch().langs.he.length === 12 && kept.length === 12
+  && (read('archive/' + arch().langs.he[0].file) || { strings: {} }).strings.Save === 'שמור 12', kept.length + ' files');
 
 await env.cleanup();
 console.log(failures ? failures + ' publishing check(s) FAILED' : 'all publishing checks passed');

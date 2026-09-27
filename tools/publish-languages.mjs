@@ -16,6 +16,12 @@
  * language appeared or went, or someone pressed "Publish languages" in the
  * app (shared/i18n_publish.requestedAt is newer than the last publish).
  * Exit code 0 with nothing written is the normal case.
+ *
+ * v36.93 — it also KEEPS the last few versions of each language, beside the
+ * app, in i18n/archive/<lang>/<time>.json with a list in
+ * i18n/archive/index.json. The app's "↩️ Put back a language…" reads them from
+ * its own site, so an earlier version can be chosen from a list on any device
+ * (the work iPhone cannot open GitHub, and is never routed round that).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,15 +80,35 @@ const langs = Object.keys(idx.langs || {}).filter(c => /^[a-z]{2,3}$/.test(c) &&
 const request = (await get(prefix + 'publish')) || {};
 const had = readJson(path.join(outDir, 'index.json')) || { langs: {} };
 
+const KEEP = 12;                                   // versions kept per language
+const archDir = path.join(outDir, 'archive');
+const archIndexFile = path.join(archDir, 'index.json');
+const arch = readJson(archIndexFile) || { langs: {} };
+
 const signature = o => JSON.stringify(Object.keys(o || {}).sort().map(c => [c, (o[c] || {}).at || 0, (o[c] || {}).count || 0]));
 const requested = (request.requestedAt || 0) > (had.publishedAt || 0);
-if (!force && !requested && signature(idx.langs) === signature(had.langs)) {
+if (!force && !requested && signature(idx.langs) === signature(had.langs) && fs.existsSync(archIndexFile)) {
   console.log(`nothing changed (${langs.length} languages, last published ${had.publishedAt ? new Date(had.publishedAt).toISOString() : 'never'})`);
   process.exit(0);
 }
 
 fs.mkdirSync(outDir, { recursive: true });
 const written = {};
+const now = Date.now();
+const stamp = new Date(now).toISOString().slice(0, 19).replace(/:/g, '') + 'Z';   // 2026-09-27T205412Z
+// Keep this version unless it is word for word the newest one kept already.
+function keep(code, doc) {
+  const list = arch.langs[code] || [];
+  const newest = list[0] && readJson(path.join(archDir, list[0].file));
+  if (newest && JSON.stringify(stable(newest.strings || {})) === JSON.stringify(doc.strings)) return;
+  const file = `${code}/${stamp}.json`;
+  fs.mkdirSync(path.join(archDir, code), { recursive: true });
+  fs.writeFileSync(path.join(archDir, file), JSON.stringify(doc, null, 1) + '\n');
+  list.unshift({ file, at: doc.updatedAt, count: doc.count, savedAt: now });
+  for (const old of list.splice(KEEP)) { try { fs.unlinkSync(path.join(archDir, old.file)); } catch (e) {} }
+  arch.langs[code] = list;
+  console.log(`  ${code}: kept as ${file} (${list.length} version${list.length === 1 ? '' : 's'})`);
+}
 for (const code of langs) {
   const d = await get(prefix + code);
   if (!d || !d.strings || typeof d.strings !== 'object') { console.log(`  ${code}: no document — skipped`); continue; }
@@ -92,16 +118,20 @@ for (const code of langs) {
   if (!count) { console.log(`  ${code}: empty — skipped`); continue; }
   const doc = { lang: code, updatedAt: d.updatedAt || (idx.langs[code] || {}).at || 0, count, strings: stable(strings) };
   fs.writeFileSync(path.join(outDir, code + '.json'), JSON.stringify(doc, null, 1) + '\n');
+  keep(code, doc);
   written[code] = { at: (idx.langs[code] || {}).at || doc.updatedAt, count };
   console.log(`  ${code}: ${count} phrases`);
 }
-// A language no longer in the cloud is no longer published.
+// A language no longer in the cloud is no longer published — but its kept
+// versions stay, so it can be put back.
 for (const f of fs.readdirSync(outDir)) {
   const m = /^([a-z]{2,3})\.json$/.exec(f);
   if (m && !written[m[1]]) { fs.unlinkSync(path.join(outDir, f)); console.log(`  ${m[1]}: removed`); }
 }
+fs.mkdirSync(archDir, { recursive: true });
+fs.writeFileSync(archIndexFile, JSON.stringify({ keep: KEEP, updatedAt: now, langs: arch.langs }, null, 1) + '\n');
 fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify({
-  source: `${projectId}/${prefix}*`, publishedAt: Date.now(),
+  source: `${projectId}/${prefix}*`, publishedAt: now,
   requestedBy: requested ? (request.by || '') : '', langs: written
 }, null, 1) + '\n');
 console.log(`published ${Object.keys(written).length} languages${requested ? ' (requested in the app)' : ''}`);

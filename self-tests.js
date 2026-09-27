@@ -1681,7 +1681,7 @@ window.SELF_TESTS = [
       // The test copy had English and Hebrew while the family's had eight; the
       // translations now travel as a file. What goes in must come out, and a
       // wrong or damaged file must be refused with a sentence, not half-imported.
-      ['i18nPackLanguages','i18nUnpackLanguages','i18nExportLanguages','i18nImportLanguages'].forEach(function(f){
+      ['i18nPackLanguages','i18nUnpackLanguages','i18nImportLanguages'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined');
       });
       var he={ strings:{ 'Save':'שמור', 'Delete {1} recipes':'מחק {1} מתכונים' }, count:2, at:5 };
@@ -1700,9 +1700,76 @@ window.SELF_TESTS = [
       if(!fromBackup.langs.he) throw new Error('a backup that holds languages could not be imported as one');
       var said=''; try{ i18nUnpackLanguages(JSON.stringify({ version:1, recipes:[] })); }catch(e){ said=e.message; }
       if(!/without languages/.test(said)) throw new Error('a backup without languages was not explained: '+JSON.stringify(said));
+      // v36.93 — one language as the app publishes it will do too.
+      var single=i18nUnpackLanguages(JSON.stringify({ lang:'he', updatedAt:9, count:2, strings:he.strings }));
+      if(!single.langs.he || single.langs.he.strings['Save']!=='שמור') throw new Error('a published i18n/he.json file is not accepted');
       if(typeof backupPayloadWithLanguages!=='function') throw new Error('backups do not carry the languages');
       if(!/backupPayloadWithLanguages/.test(String(backupSave))||!/backupPayloadWithLanguages/.test(String(autoBackupIfDue)))
         throw new Error('a backup path (the button or the automatic one) still leaves the languages out');
+    } },
+
+  { id:'i18n_put_back_a_language', group:'UI', name:'A spoiled language can be put back from a list, by date (v36.93)',
+    test: async()=>{
+      // Tony: Export had nothing left to do once the languages were published
+      // as files, and Import should "open in the correct place, or provide a
+      // list of the languages". The job keeps each language's versions beside
+      // the app; the owner picks the language, then the date.
+      ['i18nPutBack','i18nPutBackMerge','i18nArchiveGet'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(typeof window.i18nExportLanguages==='function') throw new Error('Export languages is still there');
+      // The merge: the old wording wins, a phrase added since stays.
+      var m=i18nPutBackMerge({ strings:{ Save:'BAD', Delete:'מחק', New:'חדש' } }, { strings:{ Save:'שמור', Delete:'מחק', Gone:'היה', n:3 } });
+      if(m.doc.strings.Save!=='שמור' || m.doc.strings.New!=='חדש' || m.doc.strings.Gone!=='היה' || m.doc.strings.n!==undefined)
+        throw new Error('the merge gave '+JSON.stringify(m.doc.strings));
+      if(m.changed!==1 || m.back!==1 || m.newer!==1 || !(m.doc.updatedAt>0)) throw new Error('the counts said '+JSON.stringify(m));
+      var real={ user:window._fbUser, choice:window.askChoice, confirm:window.askConfirm, best:window.i18nReadBest,
+                 apply:window.i18nApplyLanguages, fetch:window._i18nArchiveFetch, toast:window.toast };
+      try{
+        window.toast=function(){};
+        // (1) Only the owner sees it in the menu; Export is gone for everyone.
+        window._fbUser={ email:'someone@example.com' }; renderLangMenu();
+        var menu=document.getElementById('langMenu');
+        var txt=function(){ return menu ? menu.textContent : ''; };
+        if(/Export languages/.test(txt())) throw new Error('the menu still offers Export languages');
+        if(/Put back a language/.test(txt())) throw new Error('someone who is not the owner is offered Put back');
+        window._fbUser={ email:APP_OWNER_EMAIL }; renderLangMenu();
+        if(menu && !/Put back a language/.test(txt())) throw new Error('the owner is not offered Put back a language');
+        // (2) The lists: language first, then the version by date.
+        var files={
+          'index.json':{ keep:12, langs:{ he:[ { file:'he/2.json', at:2, count:3, savedAt:Date.UTC(2026,8,27,21,0) },
+                                              { file:'he/1.json', at:1, count:3, savedAt:Date.UTC(2026,8,20,9,0) } ],
+                                          qq:[ { file:'qq/1.json', at:1, count:1, savedAt:1 } ] } },
+          'he/1.json':{ lang:'he', strings:{ Save:'שמור', Delete:'מחק' } } };
+        window._i18nArchiveFetch=async function(p){
+          return files[p] ? new Response(JSON.stringify(files[p]), { status:200 }) : new Response('', { status:404 });
+        };
+        var asked=[], confirmed=null, applied=null;
+        window.askChoice=async function(msg, opts){ asked.push({ msg:msg, opts:opts });
+          return asked.length===1 ? 'he' : 1; };                  // Hebrew, then the older version
+        window.askConfirm=async function(o){ confirmed=o; return true; };
+        window.i18nReadBest=async function(){ return { strings:{ Save:'BAD', Delete:'מחק', New:'חדש' } }; };
+        window.i18nApplyLanguages=async function(got){ applied=got; return { done:Object.keys(got.langs), failed:[] }; };
+        await i18nPutBack();
+        var langs=asked[0] && asked[0].opts.map(function(o){ return o.label; }).join(' | ');
+        if(!asked[0] || !/Hebrew/.test(langs) || /qq/.test(langs)) throw new Error('the language list read: '+langs);
+        if(!/backup or a languages file/.test(langs)) throw new Error('a backup file is not offered: '+langs);
+        if(!asked[1] || asked[1].opts.length!==2 || !/latest/.test(asked[1].opts[0].label)) throw new Error('the versions were not listed newest first');
+        if(!confirmed || !/1 phrase go back/.test(confirmed.message) || !/1 phrase added since/.test(confirmed.message))
+          throw new Error('the confirmation did not say what changes: '+(confirmed&&confirmed.message));
+        if(!applied || !applied.langs.he || applied.langs.he.strings.Save!=='שמור' || applied.langs.he.strings.New!=='חדש')
+          throw new Error('what was put back: '+JSON.stringify(applied));
+        // (3) Nothing kept yet: it says so, and the file route is still there.
+        files['index.json']={ langs:{} }; asked=[]; applied=null;
+        window.askChoice=async function(msg, opts){ asked.push({ msg:msg, opts:opts }); return null; };
+        await i18nPutBack();
+        if(!asked[0] || !/No earlier versions are kept yet/.test(asked[0].msg) || asked[0].opts.length!==1) throw new Error('with nothing kept it said: '+(asked[0]&&asked[0].msg));
+        // (4) Not the owner: refused.
+        window._fbUser={ email:'someone@example.com' }; asked=[];
+        if(await i18nPutBack()!==null || asked.length) throw new Error('someone who is not the owner got the lists');
+      } finally {
+        window._fbUser=real.user; window.askChoice=real.choice; window.askConfirm=real.confirm; window.i18nReadBest=real.best;
+        window.i18nApplyLanguages=real.apply; window._i18nArchiveFetch=real.fetch; window.toast=real.toast;
+        try{ renderLangMenu(); }catch(e){}
+      }
     } },
 
   { id:'css_classes_built_in_code_are_styled', group:'CSS', name:'Controls drawn by code keep their styling (v36.84)',

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.92 -->
+<!-- Tony's Recipes Collection v36.93 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4214,7 +4214,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.92';
+var APP_VERSION = 'v36.93';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6834,7 +6834,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.92</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.93</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7466,7 +7466,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.92</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.93</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11117,12 +11117,12 @@ function renderLangMenu() {
   h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
      + (i18nCanEdit()
         ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');openI18nEditor()">✏️ Edit translations…</button>'
-          // v36.83 — move the translations between copies (live ↔ test) as a file.
-          + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nExportLanguages()">⬇️ Export languages (file)</button>'
-          + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nImportLanguages()">⬆️ Import languages (file)…</button>'
           // v36.91 — the translations as files of the app, on GitHub.
           + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nPublishRequest()">🚀 Publish languages now</button>'
-        : '');
+        : '')
+     // v36.93 — export/import (v36.83) became "put back": the languages are
+     // published as files now, and what is left is undoing a spoiled one.
+     + (isAppOwner() ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nPutBack()">↩️ Put back a language…</button>' : '');
   host.innerHTML = h;
 }
 window.renderLangMenu = renderLangMenu;
@@ -11505,6 +11505,12 @@ function i18nPackLanguages(docs, from) {
 function i18nUnpackLanguages(text) {
   var o;
   try { o = JSON.parse(text); } catch(e) { throw new Error('This is not a languages file (it is not readable data).'); }
+  // One language as the app publishes it (i18n/<lang>.json, or a kept
+  // version of one, v36.93) will do too.
+  if (o && typeof o.lang === 'string' && o.strings && typeof o.strings === 'object' && !o.kind) {
+    var one = {}; one[o.lang] = o;
+    o = { kind: I18N_FILE_KIND, langs: one, from: 'i18n/' + o.lang + '.json' };
+  }
   // A backup (v36.83+) carries the same thing inside it, so either file will do.
   if (o && o.version && Array.isArray(o.recipes)) {
     if (!o.languages) throw new Error('This backup was saved without languages (before v36.83, or while offline with none on the device).');
@@ -11525,33 +11531,19 @@ function i18nUnpackLanguages(text) {
   if (!Object.keys(langs).length) throw new Error('The file holds no language this app can use.');
   return { langs: langs, skipped: skipped, from: String(o.from || '') };
 }
-async function i18nExportLanguages() {
-  if (!i18nCanEdit()) { toast('Exporting the shared translations needs full access.'); return null; }
-  try { await i18nIndexFetch(true); } catch(e) {}
-  var codes = i18nSupportedLangs().filter(function(c){ return c !== 'en'; }), docs = {};
-  for (var i = 0; i < codes.length; i++) {
-    var d = await i18nReadBest(codes[i]);
-    if (d) docs[codes[i]] = d;
-  }
-  var file = i18nPackLanguages(docs, (APP_CONFIG.siteOrigin || '') + (APP_CONFIG.sitePath || ''));
-  var n = Object.keys(file.langs).length;
-  if (!n) { toast('No translated language could be read from the cloud.'); return null; }
-  downloadBlob(new Blob([JSON.stringify(file)], { type: 'application/json' }),
-               'languages-' + (APP_CONFIG.environment || 'live') + '-' + new Date().toISOString().slice(0, 10) + '.json');
-  toast('Exported ' + n + ' language' + (n === 1 ? '' : 's'));
-  return file;
-}
 async function i18nImportLanguagesText(text) {
   if (!i18nCanEdit()) { toast('Importing shared translations needs full access.'); return null; }
   var got;
   try { got = i18nUnpackLanguages(text); } catch(e) { await askConfirm({ icon: '⚠️', title: 'Cannot import', message: e.message, okLabel: 'OK' }); return null; }
   var codes = Object.keys(got.langs);
-  var ok = await askConfirm({ icon: '🌐', title: 'Import ' + codes.length + ' language' + (codes.length === 1 ? '' : 's') + '?',
+  var ok = await askConfirm({ icon: '↩️', title: 'Put back ' + codes.length + ' language' + (codes.length === 1 ? '' : 's') + '?',
     message: codes.map(function(c){ return '• ' + i18nLangName(c) + ' — ' + got.langs[c].count + ' phrases'; }).join('\n')
       + (got.from ? '\n\nFrom: ' + got.from : '')
-      + '\n\nEach replaces this copy\u2019s translation of the same language, for everyone signed in here.',
-    okLabel: 'Import' });
+      + '\n\nThe file\u2019s wording replaces today\u2019s; phrases added since it was made stay. Everyone sees it.',
+    okLabel: 'Put back' });
   if (!ok) return null;
+  for (var i = 0; i < codes.length; i++)
+    got.langs[codes[i]] = i18nPutBackMerge(await i18nReadBest(codes[i]), got.langs[codes[i]]).doc;
   return i18nApplyLanguages(got);
 }
 async function i18nApplyLanguages(got) {
@@ -11580,8 +11572,90 @@ function i18nImportLanguages() {
   inp.click();
 }
 window.i18nPackLanguages = i18nPackLanguages; window.i18nUnpackLanguages = i18nUnpackLanguages;
-window.i18nExportLanguages = i18nExportLanguages; window.i18nImportLanguages = i18nImportLanguages;
+window.i18nImportLanguages = i18nImportLanguages;
 window.i18nImportLanguagesText = i18nImportLanguagesText; window.i18nApplyLanguages = i18nApplyLanguages;
+
+// ─── PUT BACK A LANGUAGE (v36.93) ────────────────────────────────────────────
+// Once the languages were published as files (v36.91), Export had nothing
+// left to do, and Import one thing: undoing a spoiled translation (a bad AI
+// run, a wrong edit). Tony: "make clicking it open in the correct place, or
+// provide a list of the languages". The publishing job keeps each language's
+// last 12 versions beside the app (i18n/archive/), so this is two lists — the
+// language, then the version by date — read from the app's own site: it works
+// on the work iPhone, which cannot open GitHub. A backup file still works.
+// The owner's alone.
+async function i18nArchiveGet(p) {
+  try {
+    var r = await (window._i18nArchiveFetch                  // the self-tests bring their own
+                   || function(q){ return fetch('i18n/archive/' + q, { cache: 'no-cache' }); })(p);
+    return r.ok ? await r.json() : null;
+  } catch(e) { return null; }
+}
+// The earlier version's words win; phrases added since are kept, so undoing a
+// bad edit does not turn this month's new buttons back into English.
+function i18nPutBackMerge(current, old) {
+  var cur = (current && current.strings) || {}, was = (old && old.strings) || {};
+  var strings = {}, changed = 0, back = 0, newer = 0;
+  Object.keys(cur).forEach(function(k){ strings[k] = cur[k]; if (!(k in was)) newer++; });
+  Object.keys(was).forEach(function(k){
+    if (typeof was[k] !== 'string') return;
+    if (!(k in cur)) back++; else if (cur[k] !== was[k]) changed++;
+    strings[k] = was[k];
+  });
+  return { doc: { strings: strings, count: Object.keys(strings).length, updatedAt: Date.now() },
+           changed: changed, back: back, newer: newer };
+}
+function i18nWhen(ms) {
+  try { return new Date(ms).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch(e) { return new Date(ms).toISOString().slice(0, 16).replace('T', ' '); }
+}
+async function i18nPutBack() {
+  if (!isAppOwner()) { toast('Putting back a language is for the app\u2019s owner.'); return null; }
+  var arch = await i18nArchiveGet('index.json');
+  var kept = (arch && arch.langs) || {};
+  var langs = Object.keys(kept).filter(function(c){ return I18N_LANGS[c] && c !== 'en' && (kept[c] || []).length; })
+    .sort(function(a, b){ return i18nLangName(a).localeCompare(i18nLangName(b)); });
+  var FROM_FILE = '#file';
+  var options = langs.map(function(c){
+    var n = kept[c].length;
+    return { value: c, label: i18nLangName(c) + ' \u2014 ' + n + ' version' + (n === 1 ? '' : 's') + ', newest ' + i18nWhen(kept[c][0].savedAt) };
+  });
+  options.push({ value: FROM_FILE, label: '\ud83d\udcc1 From a backup or a languages file\u2026' });
+  var code = await askChoice(langs.length
+      ? 'Which language? The app keeps the last ' + ((arch && arch.keep) || 12) + ' published versions of each.'
+      : 'No earlier versions are kept yet \u2014 they start with the next change to a language. A backup file still works.',
+    options, { icon: '\u21a9\ufe0f', title: 'Put back a language' });
+  if (code == null) return null;
+  if (code === FROM_FILE) { i18nImportLanguages(); return 'file'; }
+  var name = i18nLangName(code), list = kept[code];
+  var pick = await askChoice('Which version of ' + name + '? Newest first.', list.map(function(v, i){
+    return { value: i, label: i18nWhen(v.savedAt) + ' \u2014 ' + v.count + ' phrases' + (i === 0 ? ' (the latest)' : '') };
+  }), { icon: '\u21a9\ufe0f', title: name });
+  if (pick == null) return null;
+  var when = i18nWhen(list[pick].savedAt);
+  var old = await i18nArchiveGet(list[pick].file);
+  if (!old || !old.strings) {
+    await askConfirm({ icon: '\u26a0\ufe0f', title: 'That version could not be read',
+      message: 'The app could not load ' + name + ' as of ' + when + '. Check the connection and try again.', okLabel: 'OK' });
+    return null;
+  }
+  var m = i18nPutBackMerge(await i18nReadBest(code), old);
+  if (!m.changed && !m.back) {
+    await askConfirm({ icon: '\u2705', title: 'Nothing to put back',
+      message: name + ' today is word for word the same as on ' + when + '.', okLabel: 'OK' });
+    return 'same';
+  }
+  var ok = await askConfirm({ icon: '\u21a9\ufe0f', title: 'Put back ' + name + ' as of ' + when + '?',
+    message: m.changed + ' phrase' + (m.changed === 1 ? '' : 's') + ' go back to the earlier wording'
+      + (m.back ? '; ' + m.back + ' that went missing come back' : '') + '.'
+      + (m.newer ? '\n\n' + m.newer + ' phrase' + (m.newer === 1 ? '' : 's') + ' added since then stay as they are.' : '')
+      + '\n\nEveryone sees it. Every published version stays in this list, so this can be undone too.',
+    okLabel: 'Put back' });
+  if (ok !== true) return null;
+  var one = {}; one[code] = m.doc;
+  return i18nApplyLanguages({ langs: one });
+}
+window.i18nPutBack = i18nPutBack; window.i18nPutBackMerge = i18nPutBackMerge; window.i18nArchiveGet = i18nArchiveGet;
 
 // Install a dictionary directly. This exists for the self-test suite, which has
 // to be able to check that a translated interface still works without a paid AI
