@@ -2,7 +2,7 @@
 
 What runs where, who puts it there, and what depends on what. Written for Tony
 and for whoever works on the app next. It holds **no secrets**: settings are
-named, never given. Updated for **v36.83** (27 Sep 2026).
+named, never given. Updated for **v36.88** (27 Sep 2026).
 
 For *why* things are the way they are, see [`CLAUDE.md`](CLAUDE.md). For a
 full specification from which the app could be rebuilt, see
@@ -12,39 +12,19 @@ full specification from which the app could be rebuilt, see
 
 ## 1. The picture
 
-```mermaid
-flowchart LR
-  subgraph GH["GitHub (account rozinante2004-hash)"]
-    R1["repo tonys-recipes<br/>branches: test, main"]
-    R2["repo rozinante2004-hash.github.io<br/>(site root)"]
-    CI["GitHub Actions<br/>Self Tests · Deploy"]
-  end
-  subgraph Hosting
-    LIVE["FAMILY APP<br/>rozinante2004-hash.github.io/tonys-recipes/<br/>(GitHub Pages)"]
-    ROOT["SITE ROOT<br/>rozinante2004-hash.github.io/<br/>404 → app · /__/auth/ sign-in pages"]
-    TEST["TEST COPY<br/>tonys-recipes-test.pages.dev<br/>(Cloudflare Pages)"]
-  end
-  subgraph Cloudflare
-    W["Worker lively-bread-273a<br/>(API proxy, v41)"]
-  end
-  subgraph Firebase["Firebase / Google Cloud"]
-    FL["project recipes-f379d<br/>Auth + Firestore (family data)"]
-    FT["project tonys-recipes-test<br/>Auth + Firestore (test data)"]
-  end
-  APIS["Claude · Openverse · Pixabay · Pexels<br/>Unsplash · YouTube · Bring!"]
+![Every site, service and function of Tony's Recipes, and how they connect](docs/architecture.png)
 
-  R1 -- "main → deploy.yml" --> LIVE
-  R1 -- "test → Cloudflare build" --> TEST
-  R2 -- "deploy.yml (push + weekly)" --> ROOT
-  R1 --> CI
-  LIVE -- "sign-in pages" --> ROOT
-  LIVE --> FL
-  TEST --> FT
-  LIVE --> W
-  TEST --> W
-  W --> APIS
-  ROOT -. "files fetched from" .-> FL
-```
+*People at the top; the three websites (the family app, the site root that
+serves Google sign-in, and the orange test copy); the Worker and the services
+it calls on the left; what each device keeps on the right; both Firebase
+projects along the bottom — with the central languages every copy reads, and
+the households (WP-D) that the move copies into, dashed because they are
+built but not switched on. The code and CI are top left.*
+
+Zoomable version: [`docs/architecture.svg`](docs/architecture.svg). Source:
+[`docs/architecture.mmd`](docs/architecture.mmd) (Mermaid) — **update it with
+this document**, then redraw both images (render the `.mmd` with Mermaid in a
+browser, as `docs/README` below says).
 
 ---
 

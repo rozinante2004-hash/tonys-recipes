@@ -1,0 +1,107 @@
+flowchart TB
+  %% Tony's Recipes — every site, service and function, and how they connect (v36.88)
+  subgraph PEOPLE["👥 People & devices"]
+    direction LR
+    FAM["📱💻 Family phones & PCs<br/>(installed app or browser)"]
+    OWN["👑 Tony — owner<br/>Self Test · Deployments · rules"]
+    NEW["🆕 Visitors / new users<br/>(public, later)"]
+  end
+
+  subgraph DEVICE["📦 On each device"]
+    direction LR
+    LS["localStorage<br/>recipes · settings · one language"]
+    IDB["IndexedDB<br/>photos · AI cache"]
+    BK["💾 Backups<br/>file or chosen folder, daily<br/>recipes + photos + languages"]
+  end
+
+  subgraph SITES["🌐 Websites"]
+    direction LR
+    LIVE["🏠 FAMILY APP<br/>rozinante2004-hash.github.io/tonys-recipes/<br/>GitHub Pages · branch main"]
+    ROOT["🔑 SITE ROOT<br/>rozinante2004-hash.github.io/<br/>/__/auth/ Google sign-in pages · 404 → app"]
+    TEST["🧪 TEST COPY<br/>tonys-recipes-test.pages.dev<br/>Cloudflare Pages · branch test<br/>orange TEST marking · Bring! off"]
+  end
+
+  subgraph CODE["🗂 GitHub — code & automation"]
+    direction LR
+    REPO["repo tonys-recipes<br/>test → (Tony's OK) → main"]
+    CI["⚙️ CI — Self Tests on every push<br/>~290 checks × 4 profiles · test build<br/>rules + households rules (emulator)<br/>end-to-end sync, both layouts (emulator)<br/>Worker · contrast · phone · accessibility"]
+    RREPO["repo rozinante2004-hash.github.io<br/>weekly: fetch sign-in files"]
+  end
+
+  subgraph CF["☁️ Cloudflare"]
+    direction LR
+    W["🛡 Worker lively-bread-273a (v41)<br/>app key · allowed sites · spending limits<br/>(pasted by hand)"]
+  end
+
+  subgraph APIS["🔌 Services the Worker calls"]
+    direction LR
+    AI["🤖 Claude — import, translate,<br/>nutrition, suggestions, help"]
+    PH["🖼 Photos — Openverse · Pixabay<br/>Pexels · Unsplash"]
+    YT["▶️ YouTube · Instagram · web pages<br/>(recipe import)"]
+    BR["🛒 Bring! shopping list"]
+  end
+
+  subgraph FB["🔥 Firebase / Google Cloud"]
+    direction LR
+    FLA["project recipes-f379d — FAMILY<br/>Google sign-in (Auth)"]
+    FLD["Firestore — shared/*<br/>recipes · photos · chats · meta · backups · members"]
+    FLI["🌍 Languages — shared/i18n_*<br/>CENTRAL for every copy & user<br/>(anyone reads · admins write)"]
+    FLH["🏘 households/* — WP-D<br/>members · recipes · invites<br/>(built, not switched on)"]
+    FTA["project tonys-recipes-test — TEST<br/>Auth + Firestore (separate data)"]
+    OAUTH["OAuth clients — allowed<br/>…/__/auth/handler addresses"]
+  end
+
+  GM["✉️ Gmail — send a recipe<br/>(each person's own account)"]
+  GHAPI["GitHub API — whatsapp/ folder<br/>(not on the work iPhone)"]
+
+  FAM --> LIVE
+  OWN --> LIVE
+  OWN --> TEST
+  NEW -.-> LIVE
+  LIVE --- LS
+  LIVE --- IDB
+  LIVE --> BK
+
+  REPO -- "push main → deploy" --> LIVE
+  REPO -- "push test → build" --> TEST
+  REPO --> CI
+  RREPO --> ROOT
+
+  LIVE -- "sign-in" --> ROOT
+  ROOT --> FLA
+  TEST -- "sign-in (own address)" --> FTA
+  FLA --- OAUTH
+  LIVE --> FLD
+  LIVE --> FLI
+  TEST --> FTA
+  TEST -- "languages" --> FLI
+  NEW -.-> FLI
+  FLD -. "🏠 copy (move)" .-> FLH
+
+  LIVE --> W
+  TEST --> W
+  W --> AI
+  W --> PH
+  W --> YT
+  W --> BR
+  LIVE --> GM
+  LIVE --> GHAPI
+
+  classDef site fill:#FFF3E0,stroke:#B54708,stroke-width:2px,color:#3b2412;
+  classDef test fill:#FFE7D6,stroke:#B54708,stroke-width:3px,stroke-dasharray:6 3,color:#3b2412;
+  classDef fb fill:#FFF8E1,stroke:#E0A800,color:#3b2c00;
+  classDef cf fill:#E8F1FF,stroke:#2F6FDB,color:#10244d;
+  classDef gh fill:#EEF0F3,stroke:#555,color:#1c1c1c;
+  classDef dev fill:#EAF6EC,stroke:#2E7D32,color:#123d16;
+  classDef people fill:#F3E8FF,stroke:#7B3FC4,color:#2b1147;
+  classDef future fill:#F5F5F5,stroke:#999,stroke-dasharray:4 3,color:#444;
+  class LIVE,ROOT site
+  class TEST test
+  class FLA,FLD,FLI,FTA,OAUTH fb
+  class FLH future
+  class W,AI,PH,YT,BR cf
+  class REPO,CI,RREPO,GHAPI gh
+  class LS,IDB,BK dev
+  class FAM,OWN people
+  class NEW future
+  class GM gh
