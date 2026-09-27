@@ -95,13 +95,16 @@ if (!force && !requested && signature(idx.langs) === signature(had.langs) && fs.
 fs.mkdirSync(outDir, { recursive: true });
 const written = {};
 const now = Date.now();
-const stamp = new Date(now).toISOString().slice(0, 19).replace(/:/g, '') + 'Z';   // 2026-09-27T205412Z
+const stamp = new Date(now).toISOString().replace(/:/g, '');   // 2026-09-27T205412.345Z
 // Keep this version unless it is word for word the newest one kept already.
 function keep(code, doc) {
   const list = arch.langs[code] || [];
   const newest = list[0] && readJson(path.join(archDir, list[0].file));
   if (newest && JSON.stringify(stable(newest.strings || {})) === JSON.stringify(doc.strings)) return;
-  const file = `${code}/${stamp}.json`;
+  // Never over another kept version: two runs in the same moment (two quick
+  // "Run workflow"s) would otherwise share a name, and one would be lost.
+  let file = `${code}/${stamp}.json`;
+  for (let n = 2; list.some(v => v.file === file) || fs.existsSync(path.join(archDir, file)); n++) file = `${code}/${stamp}-${n}.json`;
   fs.mkdirSync(path.join(archDir, code), { recursive: true });
   fs.writeFileSync(path.join(archDir, file), JSON.stringify(doc, null, 1) + '\n');
   list.unshift({ file, at: doc.updatedAt, count: doc.count, savedAt: now });

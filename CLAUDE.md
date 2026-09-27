@@ -359,6 +359,8 @@ found only because a test was written first and disagreed with the code.
   dialog lists languages, then versions by date, and MERGES (the old wording
   wins, phrases added since stay — `i18nPutBackMerge`). "From a backup or a
   languages file…" is the last option. Test: `i18n_put_back_a_language`.
+  Kept files are named to the millisecond and never reuse a name (two runs in
+  one second once overwrote each other in CI).
   Tony then asked for them in backups too: `backupPayloadWithLanguages()`
   (used by "Backup — Save" AND the automatic folder backup) adds
   `languages` — read from the cloud when signed in and online (a device keeps

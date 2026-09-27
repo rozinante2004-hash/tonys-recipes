@@ -55,7 +55,8 @@ await seed(async db => {
 log = run();
 ok('a changed language is published by itself', (read('he.json') || {}).strings.Save === 'שמירה', log);
 ok('…and one no longer in the cloud is removed', !fs.existsSync(path.join(out, 'ru.json')), fs.readdirSync(out).join());
-ok('the changed language now has two versions kept, newest first', arch().langs.he.length === 2
+ok('the changed language now has two versions kept, newest first, in two files', arch().langs.he.length === 2
+  && arch().langs.he[0].file !== arch().langs.he[1].file
   && (read('archive/' + arch().langs.he[0].file) || { strings: {} }).strings.Save === 'שמירה'
   && (read('archive/' + arch().langs.he[1].file) || { strings: {} }).strings.Save === 'שמור', JSON.stringify(arch().langs.he));
 ok('a removed language\'s kept versions stay, so it can be put back', arch().langs.ru && arch().langs.ru.length === 1
@@ -66,8 +67,7 @@ for (let i = 0; i < 13; i++) {
     await setDoc(doc(db, 'shared/i18n_he'), { strings: { Save: 'שמור ' + i }, count: 1, updatedAt: 400 + i });
     await setDoc(doc(db, 'shared/i18n_index'), { langs: { he: { at: 400 + i, count: 1 } }, probed: true });
   });
-  run();
-  await new Promise(r => setTimeout(r, 1100));            // one kept file per second
+  run();                                                   // quick runs: names must still differ
 }
 const kept = fs.readdirSync(path.join(out, 'archive', 'he'));
 ok('at most 12 versions are kept, and the oldest files are deleted', arch().langs.he.length === 12 && kept.length === 12
