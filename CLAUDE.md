@@ -265,6 +265,10 @@ found only because a test was written first and disagreed with the code.
     step: `dataLayout: 'households'` (test copy first, via
     environments.json). Tested at the end of the plain e2e run: move, verify,
     re-run, switch, owner and a family member inside.
+  - **v36.87 — the household's name is the app's name** there
+    (`householdBrand()`: header `.logo` and the tab title, keeping a
+    "[TEST]" prefix; names are data, `data-no-i18n`). Tony's idea of a title
+    per user; the family's copy keeps its own title until it moves.
   - **The household rules now live IN `firestore.rules`** (after the shared
     ones; `firestore.households.rules` is gone) — one source, filled and shown
     by Family Access → Show rules (`{{APP_ADMINS}}` = the owner). Publishing
