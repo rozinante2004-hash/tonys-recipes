@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.88 -->
+<!-- Tony's Recipes Collection v36.89 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -149,7 +149,8 @@
     }),
     features: Object.freeze({
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
-      bring:    true,     // Send ingredients to the Bring! shopping list
+      bring:    true,     // Bring!: open the chosen ingredients in the person's own Bring! app (official import, v36.89)
+      bringDirect: true,  // …and send them straight to THIS household's Bring! list (token kept on the Worker)
       gmail:    true      // Send a recipe by e-mail through your Gmail
     })
   });
@@ -178,7 +179,8 @@
   window.applyFeatureFlags();
   // What a tap on a switched-off feature says — once, plainly, and nothing else.
   window.featureOffNotice = function (name) {
-    var what = { whatsapp: 'WhatsApp groups', bring: 'Bring!', gmail: 'Sending through Gmail' }[name] || name;
+    var what = { whatsapp: 'WhatsApp groups', bring: 'Bring!', gmail: 'Sending through Gmail',
+                 bringDirect: 'Sending straight to the household\u2019s Bring! list' }[name] || name;
     if (typeof toast === 'function') toast(what + ' is not available in this app.');
     return null;
   };
@@ -248,6 +250,7 @@
   /* v36.70 — see APP_CONFIG.features. */
   html[data-feature-off-whatsapp] [data-feature="whatsapp"],
   html[data-feature-off-bring]    [data-feature="bring"],
+  html[data-feature-off-bringDirect] [data-feature="bringDirect"],
   html[data-feature-off-gmail]    [data-feature="gmail"] { display: none !important; }
 </style>
 <script src="https://accounts.google.com/gsi/client" async></script>
@@ -4194,7 +4197,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.88';
+var APP_VERSION = 'v36.89';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6814,7 +6817,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.88</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.89</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6844,7 +6847,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
           <button class="drop-item" data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
-          <button class="drop-item" data-feature="bring" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
+          <button class="drop-item" data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
@@ -7446,7 +7449,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.88</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.89</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -7660,7 +7663,7 @@ body.banner-shown .header {
         <div>3️⃣ Ingredients will send automatically ✅</div>
       </div>
     </div>
-    <button data-feature="bring" onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
+    <button data-feature="bringDirect" onclick="openBringForTokenRefresh()" style="width:100%;padding:14px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;">
       🌐 Open Bring! to Refresh
     </button>
     <div id="bringTokenExpiredStatus" style="text-align:center;font-size:12px;color:var(--muted);min-height:20px;margin-bottom:8px;"></div>
@@ -7967,7 +7970,8 @@ body.banner-shown .header {
     <div class="bring-footer">
       <button class="bring-select-all" onclick="bringToggleAll()">Select all</button>
       <button class="bring-cancel-btn" onclick="closeM('bringOverlay')">Cancel</button>
-      <button class="bring-send-btn" data-feature="bring" onclick="bringConfirmSend()">Send to Bring!</button>
+      <button class="bring-send-btn" data-feature="bringDirect" onclick="bringConfirmSend()">Send to our list</button>
+      <button class="bring-send-btn" data-feature="bring" onclick="bringOpenImport()">📲 Open in Bring!</button>
     </div>
   </div>
 </div>
@@ -21293,7 +21297,7 @@ var _bringTokenStatus = null;
 var _bringTokenChecking = false;
 
 async function checkBringTokenStatus(probe){
-  if (!featureOn('bring')) return null;   // v36.70 — switched off: nothing in the background
+  if (!featureOn('bringDirect')) return null;   // v36.70 — switched off: nothing in the background
   if(_bringTokenChecking) return _bringTokenStatus;
   _bringTokenChecking = true;
   renderBringTokenStatus();
@@ -21383,7 +21387,7 @@ window.addEventListener('message',function(event){
 });
 
 function openBringAutoRefresh() {
-  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
+  if (!featureOn('bringDirect')) return featureOffNotice('bringDirect');   // v36.70
   toast('Opening Bring! relay...');
   // Open as a normal TAB, not a sized popup: a popup window has no bookmarks
   // bar, so the 🛒 bookmarklet is unclickable there — which is exactly the
@@ -21442,7 +21446,7 @@ window.buildBringBookmarklet = buildBringBookmarklet;
 // way forward" §4b calls a bug. It now always opens; the code box explains what
 // is missing instead of pretending there is a menu that would fix it.
 function showBringBookmarklet() {
-  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
+  if (!featureOn('bringDirect')) return featureOffNotice('bringDirect');   // v36.70
   var _secret = getBringTokenSecret();
   var box = document.getElementById('bringBookmarkletCode');
   var inp = document.getElementById('bringSecretInput');
@@ -21520,8 +21524,8 @@ function renderBringTokenStatus() {
 
   var buttons='<button class="bring-token-btn" style="background:#6F6A60;" onclick="event.stopPropagation();checkBringTokenStatus(true)" title="Ask the server whether the token really works">Check</button>';
   if(!isMobile() && needsRefresh){
-    buttons+='<button class="bring-token-btn" data-feature="bring" style="margin-left:4px;" onclick="event.stopPropagation();openBringAutoRefresh()">Refresh</button>'
-      +'<button class="bring-token-btn" data-feature="bring" style="background:#6F6A60;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Token help</button>';
+    buttons+='<button class="bring-token-btn" data-feature="bringDirect" style="margin-left:4px;" onclick="event.stopPropagation();openBringAutoRefresh()">Refresh</button>'
+      +'<button class="bring-token-btn" data-feature="bringDirect" style="background:#6F6A60;margin-left:4px;" onclick="event.stopPropagation();showBringBookmarklet()">Token help</button>';
   } else if(needsRefresh) {
     buttons+='<span style="font-size:11px;color:var(--muted);margin-left:4px;">Refresh on PC when needed</span>';
   }
@@ -21534,7 +21538,7 @@ function isMobile(){ return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent
 var _bringRetryItems=null; var _bringTokenPollInterval=null; var _bringTokenPollAttempts=0;
 
 function openBringForTokenRefresh() {
-  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
+  if (!featureOn('bringDirect')) return featureOffNotice('bringDirect');   // v36.70
   window.open('https://web.getbring.com','_blank');
   document.getElementById('bringTokenExpiredStatus').innerHTML='<span style="color:var(--terracotta);">⏳ Waiting... click your 🛒 bookmark on that page</span>';
   _bringTokenPollAttempts=0; clearInterval(_bringTokenPollInterval);
@@ -23988,7 +23992,8 @@ function privacyEntries() {
     (featureOn('bring') || featureOn('gmail')) ? [{
       who: [featureOn('bring') ? 'Bring!' : '', featureOn('gmail') ? 'Gmail' : ''].filter(Boolean).join(' and '),
       when: 'only if you have connected ' + (featureOn('bring') && featureOn('gmail') ? 'them' : 'it') + ', and only when you send something', on: true,
-      sends: [featureOn('bring') ? 'To Bring!: an ingredient list you chose to send.' : '',
+      sends: [featureOn('bring') ? 'To Bring!: an ingredient list you chose to send (kept on this app\u2019s server for 15 minutes, for Bring! to read).'
+                + (featureOn('bringDirect') ? ' Or straight onto the household\u2019s Bring! list.' : '') : '',
               featureOn('gmail') ? 'To Gmail: a recipe you chose to email, to the address you typed.' : '']
              .filter(Boolean).join(' ') }] : []
   );
@@ -24753,9 +24758,13 @@ function openBringModal(recipeId) {
       ? ('Sending ×' + mult + ' amounts (' + unit + ') — matching what you had scaled the recipe to')
       : '';
   }
-  renderBringTokenStatus();
-  // Refresh the real status from the Worker if we haven't looked recently.
-  if(!_bringTokenStatus || (Date.now()-(_bringTokenStatus.checkedAt||0) > 5*60*1000)) checkBringTokenStatus(false);
+  // The token's state matters only to the direct route (v36.89).
+  var tokEl = document.getElementById('bringTokenStatus');
+  if (featureOn('bringDirect')) {
+    renderBringTokenStatus();
+    // Refresh the real status from the Worker if we haven't looked recently.
+    if(!_bringTokenStatus || (Date.now()-(_bringTokenStatus.checkedAt||0) > 5*60*1000)) checkBringTokenStatus(false);
+  } else if (tokEl) tokEl.innerHTML = '';
   document.getElementById('bringOverlay').classList.add('open');
 }
 
@@ -24766,7 +24775,7 @@ function bringToggleAll() {
 }
 
 function bringConfirmSend() {
-  if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
+  if (!featureOn('bringDirect')) return featureOffNotice('bringDirect');   // v36.70
   var r = findRecipeRef(_bringRecipeId);
   if (!r) return;
   var checked = document.querySelectorAll('.bring-ing-cb:checked');
@@ -24780,6 +24789,44 @@ function bringConfirmSend() {
   closeM('bringOverlay');
   sendItemsToBring(items);
 }
+
+// ─── BRING!'S OWN IMPORT (v36.89) ────────────────────────────────────────────
+// The official, token-free way: the chosen lines go to our Worker, which keeps
+// them for 15 minutes on a page in the standard recipe format; Bring!'s import
+// link points Bring!'s servers at that page, and the person's own Bring! app
+// opens with the ingredients ready to add to whichever list they choose. No
+// token, no bookmarklet, no list id — it works for anyone with Bring!.
+async function bringOpenImport() {
+  if (!featureOn('bring')) return featureOffNotice('bring');
+  var r = findRecipeRef(_bringRecipeId);
+  if (!r) return null;
+  var lines = [];
+  document.querySelectorAll('.bring-ing-cb:checked').forEach(function(cb) {
+    var idx = parseInt(cb.value, 10), ing = allIngredients(r)[idx];
+    if (!ing) return;
+    var amt = _bringScaledAmounts[idx] || ing.a || '';
+    lines.push((amt ? amt + ' ' : '') + ing.n);
+  });
+  if (!lines.length) { toast('Select at least one ingredient'); return null; }
+  // Opened inside the tap, or a phone blocks it as a pop-up; filled in below.
+  var win = null;
+  try { win = window.open('', '_blank'); } catch(e) {}
+  try {
+    var resp = await fetch(BRING_WORKER_URL, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'bring-recipe-page', name: r.name, ingredients: lines, servings: r.servings || '' }) });
+    var data = await resp.json();
+    if (!resp.ok || !data.deeplink) throw new Error(data.error || ('the server answered ' + resp.status));
+    closeM('bringOverlay');
+    if (win) win.location.href = data.deeplink; else window.open(data.deeplink, '_blank');
+    toast('\u{1F4F2} Opening Bring! \u2014 choose the list there', 7000);
+    return data;
+  } catch(e) {
+    try { if (win) win.close(); } catch(e2) {}
+    toast('\u274c Could not hand the list to Bring!: ' + (e && e.message ? e.message : e), 9000);
+    return null;
+  }
+}
+window.bringOpenImport = bringOpenImport;
 
 // ─── TRANSLATE ───────────────────────────────────────────────────────────────
 

@@ -217,6 +217,20 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **BRING! — THE OFFICIAL, TOKEN-FREE IMPORT (v36.89, Worker v42).** Tony:
+  keep Bring! if it can be made easy to install. Bring!'s own recipe import:
+  `https://api.getbring.com/rest/bringrecipes/deeplink?url=<page>&source=web`
+  — Bring!'s servers read `<page>` (schema.org Recipe) and the Bring! app
+  opens with the ingredients. The Worker makes the page: POST action
+  `bring-recipe-page` (app key, rate limit) stores the chosen lines in
+  `BRING_KV` for 900 s under a random 32-hex code and answers `{url,
+  deeplink}`; `GET /bring-recipe/<code>` serves it (no key — Bring! has
+  none; every value escaped; noindex). `bringOpenImport()` opens a window
+  INSIDE the tap (pop-up rules), then points it at the deeplink. Two
+  switches now: **`bring`** = the button + this import (on everywhere,
+  the test copy included); **`bringDirect`** = the old token route straight
+  to the household's list (family only; off on the test copy).
+  `feat_switches_off_means_off` holds both to hidden/refuses/silent/privacy.
 - **LANGUAGES COME FROM ONE CENTRAL PLACE (v36.88).** Tony: every translated
   language available to everyone from day one — the test copy, new users,
   the public app — with nothing to import or re-translate.

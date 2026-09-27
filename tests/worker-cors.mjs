@@ -115,6 +115,44 @@ console.log('\nAI path — what actually reaches Anthropic:');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nBring! recipe import page (v42):');
+{
+  // Bring!'s official, token-free import: the app stores the ingredient lines,
+  // Bring!'s servers fetch the page, the Bring! app opens with them ready.
+  const store = new Map();
+  const kv = { get: async k => store.has(k) ? store.get(k).v : null,
+               put: async (k, v, o) => { store.set(k, { v, o }); } };
+  const envB = { APP_SHARED_KEY: 'secret-k', BRING_KV: kv };
+  const refused = await worker.fetch(post({ action: 'bring-recipe-page', name: 'x', ingredients: ['a'] }), envB);
+  expect('without the app key it is refused', refused.status === 403, `got ${refused.status}`);
+  const made = await worker.fetch(post({ action: 'bring-recipe-page', appKey: 'secret-k', name: 'Soup <b>',
+    ingredients: ['2 onions', '<script>alert(1)</script> salt', '', '  1 l   water '], servings: 4 }), envB);
+  const j = await made.json();
+  expect('it answers with a page and Bring!\'s import link', made.status === 200 && /\/bring-recipe\/[a-f0-9]{32}$/.test(j.url || '')
+    && j.deeplink === 'https://api.getbring.com/rest/bringrecipes/deeplink?url=' + encodeURIComponent(j.url) + '&source=web', JSON.stringify(j));
+  const stored = [...store.values()][0];
+  expect('it expires (15 minutes)', stored && stored.o && stored.o.expirationTtl === 900, JSON.stringify(stored && stored.o));
+  const page = await worker.fetch(new Request(j.url, { method: 'GET' }), envB);
+  const html = await page.text();
+  expect('the page is served to anyone with the code (Bring!\'s servers have no key)', page.status === 200, `got ${page.status}`);
+  expect('…as a schema.org Recipe, one line per ingredient', (html.match(/itemprop="recipeIngredient"/g) || []).length === 3
+    && html.includes('itemtype="https://schema.org/Recipe"') && html.includes('"@type":"Recipe"'), html.slice(0, 300));
+  expect('…with every value escaped', !html.includes('<script>alert') && html.includes('&lt;script&gt;') && html.includes('Soup &lt;b&gt;'), html);
+  expect('…tidied (blank lines dropped, spaces collapsed)', html.includes('>1 l water<'), html);
+  expect('…and not indexed', page.headers.get('X-Robots-Tag') === 'noindex, nofollow', page.headers.get('X-Robots-Tag'));
+  const missing = await worker.fetch(new Request('https://worker.test/bring-recipe/' + '0'.repeat(32), { method: 'GET' }), envB);
+  expect('an unknown or expired code gets nothing', missing.status === 404, `got ${missing.status}`);
+  const odd = await worker.fetch(new Request('https://worker.test/bring-recipe/../../x', { method: 'GET' }), envB);
+  expect('anything else is still just the liveness check', (await odd.text()) === 'OK', 'another path answered');
+  const empty = await worker.fetch(post({ action: 'bring-recipe-page', appKey: 'secret-k', name: 'x', ingredients: [] }), envB);
+  expect('an empty list is refused', empty.status === 400, `got ${empty.status}`);
+  const big = await worker.fetch(post({ action: 'bring-recipe-page', appKey: 'secret-k', name: 'x'.repeat(999),
+    ingredients: Array.from({ length: 500 }, (_, i) => 'item ' + i + ' ' + 'y'.repeat(999)) }), envB);
+  const bj = JSON.parse([...store.values()].pop().v);
+  expect('…and a huge one is capped (200 lines, 300 characters, name 200)', big.status === 200 && bj.ingredients.length === 200
+    && bj.ingredients[0].length === 300 && bj.name.length === 200, `${bj.ingredients.length} lines`);
+}
+
 console.log('\nfetch-url text extraction (v36.0):');
 {
   // This is what every import path is built on. Before v36.0 every tag became a

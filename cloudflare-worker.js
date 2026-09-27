@@ -1,4 +1,13 @@
-// Tony's Recipes — Cloudflare Worker v41
+// Tony's Recipes — Cloudflare Worker v42
+// v42: `bring-recipe-page` + GET /bring-recipe/<code> — Bring!'s OFFICIAL,
+//      token-free recipe import. The app stores a recipe's name and ingredient
+//      lines here for 15 minutes under a random 32-hex code, then opens Bring!'s
+//      import link with this page's address; Bring!'s servers read the page
+//      (schema.org Recipe, microdata + JSON-LD) and the Bring! app opens with
+//      the ingredients ready. Works for ANY user and their own Bring! account —
+//      no token, no bookmarklet, no list id. Needs BRING_KV (already bound).
+//      The page is plain text in a template, every value escaped, noindex,
+//      and it holds nothing but the lines the user chose to send.
 // v41: `download-store` and the `?dl=` GET are gone. They stored ANY data under
 //      ANY filename and served it back from this Worker's address — a free file
 //      host for anyone holding the public app key (proved in tests: it stored
@@ -87,7 +96,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v41';
+const WORKER_VERSION = 'v42';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -320,6 +329,31 @@ async function spendStatus(env) {
   return out;
 }
 
+// ── Bring! recipe import (v42) ────────────────────────────────────────────────
+const BRING_PAGE_TTL = 900;                   // seconds a page lives (KV expiry)
+function htmlEsc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+async function bringRecipePage(env, code) {
+  const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
+                    'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
+  if (!env.BRING_KV) return new Response('Not configured', { status: 503, headers });
+  const raw = await env.BRING_KV.get('bringrecipe:' + code);
+  if (!raw) return new Response('<!doctype html><meta charset="utf-8"><title>Expired</title><p>This shopping list has expired. Send it to Bring! again from the app.</p>',
+                                { status: 404, headers });
+  const r = JSON.parse(raw);
+  const ld = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Recipe', name: r.name,
+    recipeIngredient: r.ingredients, recipeYield: r.servings ? String(r.servings) : undefined }).replace(/</g, '\\u003c');
+  const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>' + htmlEsc(r.name) + '</title>'
+    + '<script type="application/ld+json">' + ld + '</' + 'script></head><body>'
+    + '<div itemscope itemtype="https://schema.org/Recipe"><h1 itemprop="name">' + htmlEsc(r.name) + '</h1>'
+    + (r.servings ? '<meta itemprop="recipeYield" content="' + htmlEsc(r.servings) + '">' : '')
+    + '<ul>' + r.ingredients.map(i => '<li itemprop="recipeIngredient">' + htmlEsc(i) + '</li>').join('') + '</ul></div>'
+    + '</body></html>';
+  return new Response(html, { status: 200, headers });
+}
+
 function jsonResp(data, status = 200, cors) {
   return new Response(JSON.stringify(data), {
     status,
@@ -393,8 +427,15 @@ async function handleRequest(request, env) {
       }});
     }
 
-    // GET is a liveness check and nothing else. (v41 — it used to serve files
-    // stored by the `download-store` action; see the note where that was.)
+    // v42 — the one GET that is not a liveness check: a Bring! import page,
+    // fetched by Bring!'s servers (no Origin, no app key — the 32-hex code in
+    // the address is what grants it, and it expires in 15 minutes).
+    if (request.method === 'GET') {
+      const m = /^\/bring-recipe\/([a-f0-9]{32})$/.exec(new URL(request.url).pathname);
+      if (m) return bringRecipePage(env, m[1]);
+    }
+    // Otherwise GET is a liveness check and nothing else. (v41 — it used to serve
+    // files stored by the `download-store` action; see the note where that was.)
     if (request.method === 'GET') {
       return new Response('OK', { status: 200, headers: {
         'Access-Control-Allow-Origin': (typeof origin === 'string' && origin) ? origin : 'null',
@@ -460,6 +501,24 @@ async function handleRequest(request, env) {
           bringSetToken: !!env.BRING_SETTOKEN_SECRET
         }
       }, 200, corsHeaders);
+    }
+
+    // ── bring-recipe-page (v42) ──────────────────────────────────────────────
+    // The app's ingredient lines → a page Bring!'s servers can read, and the
+    // official import link that points them at it. Behind the app key and the
+    // rate limit like everything else; only text, capped, and it expires.
+    if (body.action === 'bring-recipe-page') {
+      if (!env.BRING_KV) return jsonResp({ error: 'BRING_KV is not configured on this Worker' }, 503, corsHeaders);
+      const name = String(body.name || 'Recipe').trim().slice(0, 200) || 'Recipe';
+      const ingredients = (Array.isArray(body.ingredients) ? body.ingredients : [])
+        .map(x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim().slice(0, 300)).filter(Boolean).slice(0, 200);
+      if (!ingredients.length) return jsonResp({ error: 'No ingredients to send' }, 400, corsHeaders);
+      const servings = body.servings ? String(body.servings).slice(0, 40) : null;
+      const code = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+      await env.BRING_KV.put('bringrecipe:' + code, JSON.stringify({ name, ingredients, servings }), { expirationTtl: BRING_PAGE_TTL });
+      const url = new URL(request.url).origin + '/bring-recipe/' + code;
+      return jsonResp({ url, expiresIn: BRING_PAGE_TTL,
+        deeplink: 'https://api.getbring.com/rest/bringrecipes/deeplink?url=' + encodeURIComponent(url) + '&source=web' }, 200, corsHeaders);
     }
 
     // ── instagram-fetch ──────────────────────────────────────────────────────
@@ -993,4 +1052,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v41 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v42 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

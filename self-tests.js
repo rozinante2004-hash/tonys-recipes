@@ -1775,6 +1775,36 @@ window.SELF_TESTS = [
       if(String(i18nIndexFetch).indexOf('i18nCentralIndex')===-1) throw new Error('the language picker does not list the central languages');
     } },
 
+  { id:'bring_official_import', group:'Features', name:'Bring!\u2019s own import: the chosen lines go to Bring!, no token (v36.89)',
+    test: async()=>{
+      if(typeof bringOpenImport!=='function') throw new Error('bringOpenImport not defined');
+      var fix=normalizeRecipe({ id:888986, name:'Bring test soup', servings:'4', ingredients:[{a:'2',n:'onions'},{a:'1 l',n:'water'},{a:'',n:'salt'}], steps:['x'] });
+      var realR=recipes, realFetch=window.fetch, realOpen=window.open, realToast=window.toast, wasOver=Object.assign({}, _featureOverride);
+      var sent=null, opened=[], fakeWin={ location:{ href:'' }, close:function(){} };
+      try{
+        recipes=realR.concat([fix]); _featureOverride.bring=true; _featureOverride.bringDirect=false; applyFeatureFlags();
+        window.toast=function(){};
+        window.fetch=function(u,o){ sent=JSON.parse(o.body); return Promise.resolve(new Response(JSON.stringify({
+          url:'https://w.test/bring-recipe/'+'a'.repeat(32), deeplink:'https://api.getbring.com/rest/bringrecipes/deeplink?url=x&source=web' }), { status:200 })); };
+        window.open=function(u){ opened.push(u); return fakeWin; };
+        openBringModal(fix.id); await wait(30);
+        var direct=document.querySelector('#bringOverlay [data-feature="bringDirect"]'), official=document.querySelector('#bringOverlay [onclick^="bringOpenImport"]');
+        if(!official||getComputedStyle(official).display==='none') throw new Error('the "Open in Bring!" button is not shown');
+        if(direct&&getComputedStyle(direct).display!=='none') throw new Error('with the direct route off, "Send to our list" still shows');
+        document.querySelectorAll('.bring-ing-cb')[1].checked=false;              // leave the water out
+        var r=await bringOpenImport();
+        if(!sent||sent.action!=='bring-recipe-page') throw new Error('nothing was sent to make the page');
+        if(sent.name!=='Bring test soup'||sent.ingredients.join('|')!=='2 onions|salt') throw new Error('the wrong lines were sent: '+JSON.stringify(sent.ingredients));
+        if(opened[0]!==''||fakeWin.location.href.indexOf('https://api.getbring.com/rest/bringrecipes/deeplink?')!==0)
+          throw new Error('Bring!\u2019s link was not opened in a window made inside the tap: '+JSON.stringify(opened)+' '+fakeWin.location.href);
+        if(!r) throw new Error('the call reported failure');
+      } finally {
+        recipes=realR; window.fetch=realFetch; window.open=realOpen; window.toast=realToast;
+        Object.keys(_featureOverride).forEach(function(k){ delete _featureOverride[k]; }); Object.assign(_featureOverride, wasOver); applyFeatureFlags();
+        closeM('bringOverlay');
+      }
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing
@@ -1875,7 +1905,11 @@ window.SELF_TESTS = [
       ['featureOn','applyFeatureFlags','featureOffNotice'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       var ENTRY={
         whatsapp:{ loud:['openWaAsk','openWaLinks','openWaSetup'], quiet:['initWhatsAppSources'], word:/WhatsApp/ },
-        bring:   { loud:['openBringModal','showBringBookmarklet','openBringAutoRefresh','openBringForTokenRefresh','bringConfirmSend'], quiet:['checkBringTokenStatus'], word:/Bring!/ },
+        // v36.89 — Bring! is two switches: `bring` (the button and Bring!'s own
+        // import, safe anywhere) and `bringDirect` (straight onto the
+        // household's list, with the token kept on the Worker).
+        bring:   { loud:['openBringModal','bringOpenImport'], quiet:[], word:/Bring!/ },
+        bringDirect: { loud:['showBringBookmarklet','openBringAutoRefresh','openBringForTokenRefresh','bringConfirmSend'], quiet:['checkBringTokenStatus'], word:/Bring! list/ },
         gmail:   { loud:['openGmailSetup','sendViaGmailApi','getGmailToken'], quiet:[], word:/Gmail/ }
       };
       // (0) All on in the LIVE app — the household keeps everything. (The test
