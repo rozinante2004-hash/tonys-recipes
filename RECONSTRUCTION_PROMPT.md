@@ -6,8 +6,10 @@
 > specified."* It is written to be self‑contained: every file, data shape, external service,
 > secret placeholder, and UX behaviour is described so the app can be recreated to parity.
 >
-> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~19,300
-> lines) plus a handful of supporting files. No build step, no framework, no bundler, no npm.
+> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~25,300
+> lines) plus a handful of supporting files. No framework, no bundler, no npm dependencies in the
+> app. The family's copy IS `index.html`, served as committed; a small plain-Node build
+> (`tools/build.js`) exists only to make the **test copy** from the same file (§1a).
 > Plain ES5‑flavoured vanilla JavaScript (mostly `var`/`function`, some template literals and
 > `async/await`), inline `<style>`, and CDN `<script>` tags. Keep it that way.
 
@@ -27,8 +29,12 @@ third‑party APIs so no secret ever ships in the client. It is bilingual‑awar
 Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 
 **Live URL:** `https://rozinante2004-hash.github.io/tonys-recipes/`
-**Repo:** `https://github.com/rozinante2004-hash/tonys-recipes` (public)
+**Test copy:** `https://tonys-recipes-test.pages.dev/` (Cloudflare Pages, own Firebase project — §1a)
+**Repo:** `https://github.com/rozinante2004-hash/tonys-recipes`
+**Site root repo:** `https://github.com/rozinante2004-hash/rozinante2004-hash.github.io` — serves
+`/__/auth/` (the family app's Google sign-in pages) and a `404.html` that forwards to the app (§1a)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
+**Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
 **Current version:** `v36.83` — app. **Worker: v41**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
@@ -54,11 +60,44 @@ slide‑up modal animation.
 
 ---
 
+## 1a. Two copies, two branches, and sign-in on the app's own address (v36.72–v36.83)
+
+- **Two copies of the same `index.html`.** The **family's** (GitHub Pages, branch `main`) and a
+  **test copy** (Cloudflare Pages project `tonys-recipes-test`, production branch **`test`**,
+  build command `node tools/build.js test`, output `dist`, `NODE_VERSION=20`). Each has its own
+  Firebase project (`recipes-f379d` / `tonys-recipes-test`), so testing never touches family
+  data. The Worker serves both (`ALLOWED_ORIGINS` lists the test address).
+- **`#appConfig`** (`window.APP_CONFIG = Object.freeze({...})`) holds every deployment
+  identifier: `environment`, `firebase{}`, `workerUrl`, `workerAppKey`, `workerName`,
+  `cloudflareAccountId`, `ownerEmail`, `githubRepo`, `siteOrigin`, `sitePath`, `liveSiteUrl`,
+  `testCopy{}`, `features{whatsapp,bring,gmail}`. `tools/environments.json` lists what the
+  test copy changes; `tools/build.js` rewrites the block, refuses if any live Firebase id
+  survives, fills the CSP's Worker host, renames the manifest, swaps in `icons/test/*` (teal,
+  orange TEST band) and recolours the favicon. The **live** build must equal the source byte
+  for byte (checked in CI).
+- **A non-live copy says so everywhere:** "[TEST]" in the title, a striped orange/black
+  "⚠️ TEST COPY" strip as the header's first row (in the flow — never fixed over controls), a
+  6 px orange frame (`pointer-events:none`), and "TEST COPY" at the top of every report.
+  Bring! is switched off there (it would write to the family's real list).
+- **Delivery:** new work → `test` (CI + the test copy) → Tony tries it → `main` is
+  fast-forwarded. Small harmless fixes may go straight to `main`.
+- **Sign-in runs on each copy's OWN address** (`authDomain` = the site's host). On an iPhone,
+  Firebase's default `<project>.firebaseapp.com` sign-in fails with "missing initial state"
+  (Safari keeps that site's storage apart). Firebase's sign-in files (`handler`, `handler.js`,
+  `experiments.js`, `iframe`, `iframe.js`; `init.json` only exists with Firebase Hosting and is
+  optional) are served at `/__/auth/`: for the test copy the build fetches them into `dist/`;
+  for the family's copy the **site root repo** fetches them on every deploy and weekly. Each
+  project's OAuth web client lists `https://<host>/__/auth/handler` as a redirect URI.
+- **Languages** live per project (`shared/i18n_<lang>`); 🌐 → Export / Import languages moves
+  them between copies as a file, and every backup carries them (§10).
+
 ## 2. File inventory (recreate all of these)
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~23,400 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~25,300 lines. |
+| `self-tests.js` | The Self Test suite (§13), loaded on first use so everyday visits do not download it. |
+| `ARCHITECTURE.md` | Deployments and connections: every component, where it lives, who deploys it, what depends on what. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
 | `version.json` | `{"version": "v36.83"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
@@ -68,14 +107,17 @@ slide‑up modal animation.
 | `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
 | `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. Carries a `PAGE_BUILD` stamp, shown in the header and the results box — bump it on every edit, because this page has no update banner of its own. |
-| `setup-save-helper.sh` | One‑shot installer/autostart for the Python helper. |
 | `logo.svg` | Brand mark (brown disc, gold ring, fork + terracotta/gold flame). |
-| `icons/icon-192.png`, `icons/icon-512.png` | PWA icons. `icon-512.png` also duplicated at repo root. |
+| `icons/icon-192.png`, `icons/icon-512.png` | PWA icons. `icon-512.png` also duplicated at repo root. `icons/test/` — the test copy's (drawn by `tools/make-test-icons.mjs`). |
 | `.gitignore` | Blocks `whatsapp/*.txt` and `whatsapp/*.zip`. Not tidiness — see §2a. |
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
 | `tests/fixtures/multi-recipe-article.json` | A faithful sample of a real multi‑recipe article (ynet's chestnut round‑up) plus the AI answer it should produce. The messiness is the point — run‑on ingredients, per‑recipe sub‑headings, bylines — and it makes the whole collection pipeline testable without the network. |
 | `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler. Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
+| `tests/firestore-rules.test.mjs` | The published rules, checked on the Firestore emulator (`demo-rules`). |
+| `tests/e2e-sync.mjs` | End-to-end sync: owner, writer and reader devices signed in against the Firestore + Auth emulators, served by its own local server (emulator hosts added to the CSP), SDK from npm at the version the page loads. Only uses the emulator from localhost with a `demo-` project. |
+| `tests/axe-scan.js`, `tests/contrast-scan.js`, `tests/phone-chrome.js` | Accessibility (axe over the page and every dialog), colour contrast at phone width in both themes, and the phone header budget. |
+| `tools/build.js`, `tools/environments.json` | Build a copy (§1a). |
 | `tests/run-self-tests.js` | The headless driver for `SELF_TESTS`. Opens `#selfTestOverlay` first — see the note in its header for why that is not optional. |
 | `tools/build-upload-guide.js` | Renders `whatsapp/UPLOAD-FROM-IPHONE.md` into `whatsapp/upload-guide.html`, inlining the mock-up SVGs so the one file works offline and prints. Needs `npm i marked@14`. **Never hand-edit the generated HTML.** |
 | `tools/build-guide-mockups.py` | Draws `whatsapp/img/*.svg` — diagrams of each Shortcuts action, so the guide can be compared against at a glance. |
@@ -175,7 +217,8 @@ Rules for a rebuild:
 | **Pixabay / Pexels / Unsplash** | Food photo search / auto‑fetch (app cycles sources via "See more") | Worker secrets `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` (any subset; unset sources are skipped) |
 | **YouTube Data API** | Fetch video description for recipe extraction | Worker secret `YOUTUBE_API_KEY` |
 | **Bring!** | Push ingredients to a shopping list | Worker KV `BRING_KV` (key `accessToken`), else env `BRING_TOKEN`; plus env `BRING_API_KEY`, `BRING_LIST_UUID`, `BRING_USER_UUID` — **no Bring! values in source** |
-| **GitHub Pages** | Hosting | n/a |
+| **GitHub Pages** | Hosting — the family's copy (`tonys-recipes`) and the site root with the sign-in pages (`rozinante2004-hash.github.io`) | n/a |
+| **Cloudflare Pages** | Hosting — the test copy (`tonys-recipes-test`) | n/a |
 
 > **SECURITY — never put secrets in this file.** Worker v30 removed the previously hard-coded
 > Bring! bearer token, `X-BRING-API-KEY` and UUIDs; they now come from Worker env/KV only, so
@@ -187,7 +230,7 @@ Rules for a rebuild:
 ```js
 {
   apiKey:            "AIzaSyCZ6nFqUgUYP48fx7ngFbgym95Gy5bsfd4",
-  authDomain:        "recipes-f379d.firebaseapp.com",
+  authDomain:        "rozinante2004-hash.github.io",   // v36.81 — the site's own address (§1a)
   projectId:         "recipes-f379d",
   storageBucket:     "recipes-f379d.firebasestorage.app",
   messagingSenderId: "313792199018",
@@ -1220,6 +1263,13 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 ## 10. Import / Export / Backup
 
+> **Backups carry the languages (v36.83).** `backupPayloadWithLanguages()` — used by
+> "Backup — Save" and the automatic folder backup — adds `languages`
+> (`{kind:'tonys-recipes-languages', v:1, from, langs:{code: {strings,…}}}`), read from the cloud
+> when signed in and online (a device keeps only one language), else the device's own. Restore
+> offers them after the recipes (full access only); 🌐 → Import languages accepts a backup file
+> or an exported languages file. `backupJson()` stays synchronous and without them.
+
 - **Excel EXPORT was removed in v28.5** along with the QR code — both were unused and cost a
   CDN library each. Do **not** rebuild them. Excel *import* remains (`.xlsx` via SheetJS).
 - **`xlsx` and `mammoth` load ON DEMAND** via `loadScriptOnce()` (5.11), never from `<head>` —
@@ -1671,7 +1721,8 @@ Untrusted HTML *files* are parsed with **`DOMParser`** (inert), never `innerHTML
 
 ## 13. Built‑in Self‑Test suite (`⚙️ → 🧪 Self Test`)
 
-A first‑class feature — recreate it. `SELF_TESTS` is an array of **196 checks** in 13 groups —
+A first‑class feature — recreate it. `SELF_TESTS` (in `self-tests.js`) is an array of about
+**290 checks** (v36.83; 196 at the time of the breakdown that follows) in 13 groups —
 **Features (48), UI (28), Cloud Sync (26), WhatsApp (24), Storage (15), Import/Export (13),
 CRUD (10), Network (8), CSS (7), Core and Modals (5 each), Backup (4), Performance (3)** —
 covering (among others) IndexedDB photo round‑trip and photo‑free localStorage, the Firestore
@@ -1953,8 +2004,11 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 9. Sharing/email/Gmail/converter/print/access‑control/deployments (no QR — removed v28.5).
 10. WhatsApp group knowledge (§11c), including the Firestore chat source.
 11. PWA (`manifest.json`, `sw.js`, icons, install banners, version check) + Self‑Test suite.
-12. `.github/workflows/deploy.yml` and `self-tests.yml` (both suites plus the version-agreement
-    check); publish `firestore.rules` by hand; deploy; smoke‑test with the Self‑Test modal, then
+12. `.github/workflows/deploy.yml` and `self-tests.yml` (both suites, the version-agreement
+    check, four device profiles, the built test copy, rules + end-to-end sync on the Firebase
+    emulator, contrast/phone/axe scans); `tools/build.js` and the test copy on Cloudflare Pages;
+    the site root repo serving `/__/auth/` (§1a); publish `firestore.rules` by hand in BOTH
+    projects; deploy; smoke‑test with the Self‑Test modal, then
     walk the acceptance checklist in §16 — including the security, honesty, Worker, rules, photo
     and accessibility rows, which are the ones a rebuild is most likely to miss.
 

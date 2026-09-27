@@ -11,6 +11,10 @@ below (Ctrl+F) rather than scrolling. Sections: *What this is* · *How to verify
 work* · *Conventions* · *Decisions that must not be silently reverted* ·
 *Traps this codebase has already sprung* · *Outstanding*.
 
+- **Where everything runs:** [`ARCHITECTURE.md`](ARCHITECTURE.md) — hosting, both
+  Firebase projects, the Worker, the site-root sign-in pages, CI and the test
+  copy, and what breaks when each is down. **Keep it current** when a
+  deployment, a dashboard setting or a test job changes.
 - **Standing rules (read first):** "Nothing secret may live in `index.html`" ·
   "The Family Access list is not the permission" · the employer-managed iPhone
   (in *What this is*: never proxy GitHub through the Worker) · "NEVER send a
