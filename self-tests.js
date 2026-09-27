@@ -1837,6 +1837,17 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'rules_say_which_release', group:'Cloud Sync', name:'The rules shown for publishing say which release they came from (v36.92)',
+    test: async()=>{
+      if(typeof rulesStamped!=='function') throw new Error('rulesStamped not defined');
+      var out=rulesStamped("rules_version = '2';\nservice cloud.firestore {}");
+      var lines=out.split('\n');
+      if(lines[0]!=="rules_version = '2';") throw new Error('the rules-language line moved or changed — Firebase needs it first and exactly so');
+      if(lines[1].indexOf(APP_VERSION)===-1) throw new Error('the second line does not name the release: '+lines[1]);
+      if(!/^\/\//.test(lines[1])) throw new Error('the release line is not a comment — Firebase would reject the rules');
+      if(String(updateAccessRules).indexOf('rulesStamped(')===-1) throw new Error('Show rules does not stamp what it shows');
+    } },
+
   { id:'report_names_the_copy', group:'UI', name:'Every report says which copy of the app wrote it (v36.73)',
     test: async()=>{
       // Tony ran the Self Test on the test copy and pasted the report: nothing

@@ -343,6 +343,10 @@ found only because a test was written first and disagreed with the code.
     ones; `firestore.households.rules` is gone) — one source, filled and shown
     by Family Access → Show rules (`{{APP_ADMINS}}` = the owner). Publishing
     them is harmless before the move and required for it.
+  - **`rules_version = '2';` never changes** — it is Firebase's
+    rules-LANGUAGE edition, not ours (Tony asked, v36.92). Which release the
+    rules came from is the comment `rulesStamped()` adds under it when Show
+    rules fills them in (app version + date); a comment, so Firebase ignores it.
 - **LANGUAGES LIVE PER COPY — AND NOW IN BACKUPS (v36.83).** Each copy keeps
   its translations in its own Firebase project (`shared/i18n_<lang>`), so the
   test copy had en/he while the family's had eight, and tested a different
