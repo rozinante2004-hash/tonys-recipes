@@ -1,5 +1,5 @@
 flowchart TB
-  %% Tony's Recipes — every site, service and function, and how they connect (v36.88)
+  %% Tony's Recipes — every site, service and function, and how they connect (v36.91)
   subgraph PEOPLE["👥 People & devices"]
     direction LR
     FAM["📱💻 Family phones & PCs<br/>(installed app or browser)"]
@@ -18,7 +18,7 @@ flowchart TB
     direction LR
     LIVE["🏠 FAMILY APP<br/>rozinante2004-hash.github.io/tonys-recipes/<br/>GitHub Pages · branch main"]
     ROOT["🔑 SITE ROOT<br/>rozinante2004-hash.github.io/<br/>/__/auth/ Google sign-in pages · 404 → app"]
-    TEST["🧪 TEST COPY<br/>tonys-recipes-test.pages.dev<br/>Cloudflare Pages · branch test<br/>orange TEST marking · Bring! off"]
+    TEST["🧪 TEST COPY<br/>tonys-recipes-test.pages.dev<br/>Cloudflare Pages · branch test<br/>orange TEST marking · direct Bring! off"]
   end
 
   subgraph CODE["🗂 GitHub — code & automation"]
@@ -26,11 +26,12 @@ flowchart TB
     REPO["repo tonys-recipes<br/>test → (Tony's OK) → main"]
     CI["⚙️ CI — Self Tests on every push<br/>~290 checks × 4 profiles · test build<br/>rules + households rules (emulator)<br/>end-to-end sync, both layouts (emulator)<br/>Worker · contrast · phone · accessibility"]
     RREPO["repo rozinante2004-hash.github.io<br/>weekly: fetch sign-in files"]
+    PUB["🌍 Publish languages — every 10 min<br/>central translations → i18n/*.json<br/>(or 🚀 Publish now in the app)"]
   end
 
   subgraph CF["☁️ Cloudflare"]
     direction LR
-    W["🛡 Worker lively-bread-273a (v41)<br/>app key · allowed sites · spending limits<br/>(pasted by hand)"]
+    W["🛡 Worker lively-bread-273a (v42)<br/>app key · allowed sites · spending limits<br/>Bring! import pages · (pasted by hand)"]
   end
 
   subgraph APIS["🔌 Services the Worker calls"]
@@ -38,14 +39,14 @@ flowchart TB
     AI["🤖 Claude — import, translate,<br/>nutrition, suggestions, help"]
     PH["🖼 Photos — Openverse · Pixabay<br/>Pexels · Unsplash"]
     YT["▶️ YouTube · Instagram · web pages<br/>(recipe import)"]
-    BR["🛒 Bring! shopping list"]
+    BR["🛒 Bring! — official import (anyone)<br/>+ family list, directly"]
   end
 
   subgraph FB["🔥 Firebase / Google Cloud"]
     direction LR
     FLA["project recipes-f379d — FAMILY<br/>Google sign-in (Auth)"]
     FLD["Firestore — shared/*<br/>recipes · photos · chats · meta · backups · members"]
-    FLI["🌍 Languages — shared/i18n_*<br/>CENTRAL for every copy & user<br/>(anyone reads · admins write)"]
+    FLI["🌍 Languages — shared/i18n_*<br/>where translations are MADE<br/>(anyone reads · admins write)"]
     FLH["🏘 households/* — WP-D<br/>members · recipes · invites<br/>(built, not switched on)"]
     FTA["project tonys-recipes-test — TEST<br/>Auth + Firestore (separate data)"]
     OAUTH["OAuth clients — allowed<br/>…/__/auth/handler addresses"]
@@ -77,6 +78,8 @@ flowchart TB
   TEST -- "languages" --> FLI
   NEW -.-> FLI
   FLD -. "🏠 copy (move)" .-> FLH
+  FLI -- "read (public)" --> PUB
+  PUB -- "commit i18n files" --> REPO
 
   LIVE --> W
   TEST --> W
@@ -100,7 +103,7 @@ flowchart TB
   class FLA,FLD,FLI,FTA,OAUTH fb
   class FLH future
   class W,AI,PH,YT,BR cf
-  class REPO,CI,RREPO,GHAPI gh
+  class REPO,CI,RREPO,GHAPI,PUB gh
   class LS,IDB,BK dev
   class FAM,OWN people
   class NEW future

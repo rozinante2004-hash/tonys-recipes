@@ -1,0 +1,69 @@
+name: Publish languages
+
+# v36.91 — the interface languages, published from the central translations
+# (the family project's shared/i18n_* documents, public by the rules) into
+# i18n/*.json in this repository, so every copy of the app serves them as its
+# own files and every change is kept in history.
+#
+# Every 10 minutes it LOOKS (two small reads); it WRITES only when a language
+# changed, or someone pressed "⬆️ Publish languages" in the app (which leaves a
+# request in shared/i18n_publish — the app never talks to GitHub itself; the
+# work iPhone cannot, and the Worker is never used to get round that).
+# "Run workflow" on this page publishes at once.
+#
+# Only translation files are ever committed here. They go to `main` (the
+# family's copy, then deployed) and `test` is brought level with it, so the
+# test copy has them too and main can still be fast-forwarded to test.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Publish even if nothing seems to have changed"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: publish-languages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Read the central languages
+        run: node tools/publish-languages.mjs ${{ (github.event_name == 'workflow_dispatch' && inputs.force) && '--force' || '' }}
+
+      - name: Commit and deploy, if anything changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$(git status --porcelain -- i18n)" ]; then echo "nothing to commit"; exit 0; fi
+          git config user.name  "languages-bot"
+          git config user.email "languages-bot@users.noreply.github.com"
+          git add i18n
+          git commit -q -m "Languages: published from the app ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push origin HEAD:main
+          # The test copy gets them too; test stays ahead of (and containing) main.
+          git fetch -q origin test
+          git checkout -q -B test origin/test
+          git merge -q --no-edit main -m "Merge published languages into test"
+          git push origin test
+          # A push made with this job's token starts no other workflow, so the
+          # family app's deploy is started explicitly.
+          gh workflow run deploy.yml --ref main

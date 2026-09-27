@@ -191,6 +191,14 @@ jobs:
           cp "$GITHUB_WORKSPACE/firestore.rules" ./
           npx firebase emulators:exec --only firestore --project demo-households "node tests/firestore-households-rules.test.mjs"
 
+      # v36.91 — the job that publishes the languages into i18n/*.json, run
+      # against the emulator with the real rules (translations are public).
+      - name: Language publishing job (emulator)
+        run: |
+          cd /tmp/hh
+          cp "$GITHUB_WORKSPACE/tests/publish-languages.test.mjs" tests/
+          REPO="$GITHUB_WORKSPACE" npx firebase emulators:exec --only firestore --project demo-langs "node tests/publish-languages.test.mjs"
+
       # v36.71 (go-public WP-A step 2) — the app itself, signed in, on several
       # simulated devices, syncing through the Firestore + Auth EMULATORS
       # against the published rules. The first time the suite runs the app

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.90 -->
+<!-- Tony's Recipes Collection v36.91 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -137,6 +137,11 @@
     // family — today) or 'households' (every household its own space, with
     // members, roles and invitations; the HOUSEHOLDS part of firestore.rules).
     dataLayout:          'shared',
+    // v36.91 — the public app's name (Tony, 27 Sep 2026: "My Kitchen Notes at
+    // this stage; we can always change it later"). Each household is called
+    // "<first name>'s Kitchen Notes" until renamed. The family's copy keeps its
+    // own title.
+    brandName:           'My Kitchen Notes',
     // v36.88 — where EVERY copy (the family's, the test copy, the public app)
     // reads its interface languages: one place, readable by anyone — even
     // before signing in — so every translated language is in every picker
@@ -3717,8 +3722,8 @@ function hhRef(hid) { return hhDb().collection('households').doc(hid || _cloudHi
 
 function householdDefaultName(user) {
   var n = String((user && (user.displayName || user.email)) || '').split(/[\s@]/)[0];
-  n = n ? n.charAt(0).toUpperCase() + n.slice(1) : 'My';
-  return n + '’s Recipes';
+  var brand = String(APP_CONFIG.brandName || 'My Kitchen Notes');
+  return n ? n.charAt(0).toUpperCase() + n.slice(1) + '\u2019s ' + brand.replace(/^My\s+/i, '') : brand;
 }
 async function householdMemberships(user) {
   var q = await hhDb().collectionGroup('members').where('uid', '==', user.uid).get();
@@ -3841,7 +3846,7 @@ async function householdLoadMembers() {
 function householdBrand() {
   if (!_household || !_household.name) return;
   var el = document.querySelector('.header .logo');
-  var n = _household.name, m = /^(.*?)(Recipes)(.*)$/.exec(n);
+  var n = _household.name, m = /^(.*?)(Kitchen Notes|Recipes)(.*)$/.exec(n);
   if (el) {
     el.setAttribute('data-no-i18n', '');
     el.innerHTML = m ? escH(m[1]) + '<span>' + escH(m[2]) + '</span>' + escH(m[3]) : escH(n);
@@ -4197,7 +4202,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.90';
+var APP_VERSION = 'v36.91';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6817,7 +6822,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.90</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.91</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7449,7 +7454,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.90</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.91</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10409,25 +10414,83 @@ async function i18nReadCentral(lang) {
   } catch(e) { return null; }
 }
 var _i18nCentralIndexed = false;
+var _i18nCentralAt = {};          // lang -> when the central copy last changed (from its index)
 async function i18nCentralIndex(force) {
   if (_i18nCentralIndexed && !force) return i18nKnownLangs();
   _i18nCentralIndexed = true;
   try {
     var idx = await i18nCentralGet(i18nCentral() && i18nCentral().index);
     var langs = (idx && idx.langs) || {};
-    Object.keys(langs).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
+    Object.keys(langs).forEach(function(c){
+      if (!I18N_LANGS[c]) return;
+      i18nNoteKnown(c);
+      _i18nCentralAt[c] = (langs[c] && langs[c].at) || 0;
+    });
   } catch(e) { dlog('[i18n] the central language list could not be read', e && e.message); }
   return i18nKnownLangs();
 }
-// The best copy of a language this device can reach: the central one first
+// ─── THE LANGUAGES AS FILES OF THE APP'S OWN (v36.91) ─────────────────────────
+// Tony: have the translation files on Git. A scheduled job
+// (.github/workflows/publish-languages.yml) copies the central translations
+// into i18n/<lang>.json + i18n/index.json whenever they change, so every copy
+// serves them itself: instant, cached, offline, no database read, and every
+// change kept in history. The database stays where translations are MADE; a
+// file older than what this device knows of is passed over for the database.
+async function i18nStaticGet(name) {
+  if (window._selfTestRunning) return null;         // the tests bring their own words
+  try {
+    var r = await fetch('i18n/' + name + '.json', { cache: 'no-cache' });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { return null; }
+}
+async function i18nReadStatic(lang) {
+  var d = await i18nStaticGet(lang);
+  return (d && d.strings && typeof d.strings === 'object') ? d : null;
+}
+var _i18nStaticIndexed = false, _i18nStaticIndex = null;
+async function i18nStaticIndex(force) {
+  if (_i18nStaticIndexed && !force) return _i18nStaticIndex;
+  _i18nStaticIndexed = true;
+  _i18nStaticIndex = await i18nStaticGet('index');
+  Object.keys((_i18nStaticIndex && _i18nStaticIndex.langs) || {}).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
+  return _i18nStaticIndex;
+}
+// The best copy of a language this device can reach: the app's own file when
+// it is as new as anything this device has heard of; otherwise the central one
 // wherever it is not simply this copy's own (or nobody is signed in).
 async function i18nReadBest(lang) {
+  var st = await i18nReadStatic(lang);
+  var cached = i18nReadCache(lang);
+  var newest = Math.max(_i18nCentralAt[lang] || 0, (cached && cached.updatedAt) || 0);
+  if (st && (st.updatedAt || 0) >= newest) return st;
   if (!i18nCentralIsOwn() || !window._fbUser) {
     var c = await i18nReadCentral(lang);
     if (c) return c;
   }
-  return (await i18nReadCloud(lang)) || (i18nCentralIsOwn() && window._fbUser ? null : await i18nReadCentral(lang));
+  return (await i18nReadCloud(lang)) || (i18nCentralIsOwn() && window._fbUser ? null : await i18nReadCentral(lang)) || st;
 }
+// "⬆️ Publish languages" — leaves a request the publishing job sees within
+// about ten minutes. The app never talks to GitHub: the work iPhone cannot,
+// and the Worker is never used to get round that. On a computer, GitHub's own
+// "Run workflow" publishes at once.
+function i18nPublishPage() { return 'https://github.com/' + APP_CONFIG.githubRepo + '/actions/workflows/publish-languages.yml'; }
+async function i18nPublishRequest() {
+  if (!i18nCanEdit()) { toast('Publishing the languages needs full access.'); return null; }
+  try { await cloudDoc('i18n_publish').set({ requestedAt: Date.now(), by: (window._fbUser && window._fbUser.email) || '' }); }
+  catch(e) { toast('\u274c Could not ask for the languages to be published: ' + (e && e.message ? e.message : e), 8000); return null; }
+  var idx = await i18nStaticIndex(true);
+  var when = idx && idx.publishedAt ? new Date(idx.publishedAt).toLocaleString() : 'never';
+  var open = await askConfirm({ icon: '\u2b06\ufe0f', title: 'The languages will be published',
+    message: 'Within about ten minutes every copy of the app will serve the current translations as its own files '
+      + '(the check runs every ten minutes; it can take a little longer when GitHub is busy).\n\nLast published: ' + when
+      + '\n\nOn a computer you can publish them at once: on GitHub, press \u201cRun workflow\u201d.',
+    okLabel: 'Open GitHub', cancelLabel: 'OK' });
+  if (open === true) window.open(i18nPublishPage(), '_blank', 'noopener');
+  return true;
+}
+window.i18nReadStatic = i18nReadStatic; window.i18nStaticIndex = i18nStaticIndex;
+window.i18nPublishRequest = i18nPublishRequest; window.i18nPublishPage = i18nPublishPage;
 window.i18nCentralIsOwn = i18nCentralIsOwn; window.i18nRestValue = i18nRestValue;
 window.i18nReadCentral = i18nReadCentral; window.i18nCentralIndex = i18nCentralIndex; window.i18nReadBest = i18nReadBest;
 async function i18nReadCloud(lang) {
@@ -10502,6 +10565,7 @@ async function i18nIndexNote(lang, count) {
 // once (a document that does not exist costs nothing to ask about) and records
 // what it found, with `probed` so no device ever does it again.
 async function i18nIndexFetch(force) {
+  await i18nStaticIndex(force);            // v36.91 — the app's own files first
   await i18nCentralIndex(force);           // v36.88 — every language, for everyone
   if (!window._fbDb || !window._fbUser) return i18nKnownLangs();
   if (_i18nIndexFetched && !force) return i18nKnownLangs();
@@ -11044,6 +11108,8 @@ function renderLangMenu() {
           // v36.83 — move the translations between copies (live ↔ test) as a file.
           + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nExportLanguages()">⬇️ Export languages (file)</button>'
           + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nImportLanguages()">⬆️ Import languages (file)…</button>'
+          // v36.91 — the translations as files of the app, on GitHub.
+          + '<button class="drop-item" onclick="closeDrop(\'langMenu\');i18nPublishRequest()">🚀 Publish languages now</button>'
         : '');
   host.innerHTML = h;
 }
@@ -11159,7 +11225,7 @@ function toggleLangMenu() {
   renderLangMenu(); toggleDrop('langMenu');
   // The index may know about languages this device has never used; redraw
   // when it answers. Once a session.
-  if (!_i18nCentralIndexed || (!_i18nIndexFetched && window._fbUser)) {
+  if (!_i18nStaticIndexed || !_i18nCentralIndexed || (!_i18nIndexFetched && window._fbUser)) {
     i18nIndexFetch().then(function(){ renderLangMenu(); }).catch(function(){});
   }
 }

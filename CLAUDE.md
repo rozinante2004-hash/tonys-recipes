@@ -221,6 +221,32 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **THE LANGUAGES ARE FILES IN THE REPO, PUBLISHED BY A BOT (v36.91).** Tony:
+  "move the languages to Git sooner", plus a button for an immediate
+  publish. `.github/workflows/publish-languages.yml` runs every 10 minutes
+  (free: the repo is public) and on "Run workflow";
+  `tools/publish-languages.mjs` reads the central translations over public
+  REST (no key, no secret) and writes `i18n/<lang>.json` (keys sorted — a
+  change is a one-line diff) + `i18n/index.json`, ONLY when an index `at`
+  moved, a language came or went, or the app asked
+  (`shared/i18n_publish.requestedAt` > last `publishedAt`). It commits to
+  **`main`** (translation files only — Tony's own words, published by his
+  own action or schedule; code never reaches main without his yes), merges
+  main into **`test`**, and starts `deploy.yml` itself (a push made with the
+  job's token starts no workflow). **So `origin/test` can move under you:
+  `git pull --no-rebase origin test` before pushing to it.**
+  The app: `i18nReadBest` uses the app's own file when it is as new as
+  anything known (central index `at`, the device cache), else the database;
+  the picker also lists `i18n/index.json`. "🚀 Publish languages now" (admins)
+  writes the request — **the app never talks to GitHub, and the Worker is
+  never used to reach it** (the work iPhone blocks github.com; that is not
+  ours to route around) — and offers GitHub's Run-workflow page for an
+  instant run from a computer. No Self Test run reads the files or the
+  central copy. Tests: `tests/publish-languages.test.mjs` (emulator, CI),
+  `i18n_languages_as_app_files`.
+- **The public app's name: "My Kitchen Notes"** (`APP_CONFIG.brandName`,
+  Tony 27 Sep 2026, "at this stage"). A new household is "<first name>'s
+  Kitchen Notes". "The Recipe Tin" was rejected — too close to RecipeTin Eats.
 - **BRING! — THE OFFICIAL, TOKEN-FREE IMPORT (v36.89, Worker v42).** Tony:
   keep Bring! if it can be made easy to install. Bring!'s own recipe import:
   `https://api.getbring.com/rest/bringrecipes/deeplink?url=<page>&source=web`

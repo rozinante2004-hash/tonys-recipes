@@ -404,9 +404,9 @@ try {
     const N = await device('N (newcomer)', 'newcomer@example.com', { ready: 'household' });
     const nh = await inPage(N, () => householdOf());
     ok('a newcomer founds a household of their own', nh && nh.hid !== HID && nh.role === 'owner', JSON.stringify(nh));
-    ok('…named after them', /Newcomer.s Recipes/.test(nh && nh.name || ''), nh && nh.name);
-    ok('…and the app carries that name', await until(() => inPage(N, () => /Newcomer.s Recipes/.test(document.querySelector('.header .logo').textContent)
-       && /Newcomer.s Recipes/.test(document.title))),
+    ok('…named after them', /Newcomer.s Kitchen Notes/.test(nh && nh.name || ''), nh && nh.name);
+    ok('…and the app carries that name', await until(() => inPage(N, () => /Newcomer.s Kitchen Notes/.test(document.querySelector('.header .logo').textContent)
+       && /Newcomer.s Kitchen Notes/.test(document.title))),
        JSON.stringify(await inPage(N, () => [(document.querySelector('.header .logo') || {}).textContent, document.title])));
     ok('…and sees none of the family\'s recipes', !(await names(N)).includes('E2E seed stew'), JSON.stringify(await names(N)));
 

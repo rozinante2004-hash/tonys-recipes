@@ -1745,7 +1745,7 @@ window.SELF_TESTS = [
                    chatpart_abc_2:'households/H1/chats/chatpart_abc_2', i18n_he:'i18n/he', i18n_index:'i18n/_index' };
         Object.keys(want).forEach(function(k){ if(j(cloudDocPath(k))!==want[k]) throw new Error(k+' → '+j(cloudDocPath(k))+', expected '+want[k]); });
       } finally { window._cloudLayout=was; window._cloudHid=hidWas; }
-      if(householdDefaultName({ displayName:'Tony Schvekher' })!=='Tony\u2019s Recipes') throw new Error('a new household is not named after its founder');
+      if(householdDefaultName({ displayName:'Tony Schvekher' })!=='Tony\u2019s Kitchen Notes') throw new Error('a new household is not named after its founder and the brand: '+householdDefaultName({ displayName:'Tony Schvekher' }));
       // The move compares every copy with its original: key order must not
       // matter, a real difference must.
       if(typeof hhSame!=='function'||typeof householdMoveIn!=='function') throw new Error('the move into a household is missing');
@@ -1753,7 +1753,7 @@ window.SELF_TESTS = [
       if(hhSame({a:1,b:[1,2]},{a:1,b:[2,1]})||hhSame({r:'x'},{r:'y'})) throw new Error('a changed document counted as identical');
       if(hhKind('recipe_4')!=='recipes'||hhKind('photo_4')!=='photos'||hhKind('chatpart_a_1')!=='chats'||hhKind('i18n_he')!=='languages'||hhKind('meta')!=='other')
         throw new Error('the move\u2019s report counts documents under the wrong heading');
-      if(householdDefaultName({ email:'michal.dovrat@gmail.com' }).indexOf('Michal.dovrat')!==0 && householdDefaultName({ email:'michal@x.com' })!=='Michal\u2019s Recipes')
+      if(householdDefaultName({ email:'michal@x.com' })!=='Michal\u2019s Kitchen Notes' || householdDefaultName({})!=='My Kitchen Notes')
         throw new Error('a founder with no display name gets no sensible name');
     } },
 
@@ -1802,6 +1802,38 @@ window.SELF_TESTS = [
         recipes=realR; window.fetch=realFetch; window.open=realOpen; window.toast=realToast;
         Object.keys(_featureOverride).forEach(function(k){ delete _featureOverride[k]; }); Object.assign(_featureOverride, wasOver); applyFeatureFlags();
         closeM('bringOverlay');
+      }
+    } },
+
+  { id:'i18n_languages_as_app_files', group:'UI', name:'Languages come from the app\u2019s own files unless something newer is known (v36.91)',
+    test: async()=>{
+      ['i18nReadStatic','i18nStaticIndex','i18nPublishRequest','i18nPublishPage'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(i18nPublishPage().indexOf('https://github.com/'+APP_CONFIG.githubRepo+'/actions/workflows/publish-languages.yml')!==0) throw new Error('the Publish page is not this repository\u2019s workflow');
+      // The app never talks to GitHub: the request goes into the database.
+      if(/api\.github\.com|workers\.dev/.test(String(i18nPublishRequest))) throw new Error('Publish languages reaches GitHub from the app (or through the Worker)');
+      var realStatic=window.i18nReadStatic, realCentral=window.i18nReadCentral, realCloud=window.i18nReadCloud, atWas=Object.assign({}, _i18nCentralAt),
+          cacheWas=localStorage.getItem('tonys_i18n_zz_probe'), got=[];
+      // 'qx' — a code nothing is ever cached under (a Hebrew-interface run has he).
+      function doc(tag, at){ return { strings:{ Save:tag }, updatedAt:at }; }
+      try{
+        window.i18nReadCentral=async function(){ got.push('central'); return doc('central', 50); };
+        window.i18nReadCloud=async function(){ got.push('cloud'); return doc('cloud', 50); };
+        // (1) The file is as new as anything known: it is used, and the database is not asked.
+        window.i18nReadStatic=async function(){ return doc('file', 40); };
+        _i18nCentralAt.qx=40;
+        var a=await i18nReadBest('qx');
+        if(a.strings.Save!=='file' || got.length) throw new Error('an up-to-date file was passed over for the database ('+got.join()+')');
+        // (2) The central copy changed since the file was published: the database wins.
+        _i18nCentralAt.qx=50;
+        var b=await i18nReadBest('qx');
+        if(b.strings.Save==='file') throw new Error('a stale file was used although the central copy is newer');
+        // (3) No file at all: as before.
+        window.i18nReadStatic=async function(){ return null; };
+        got.length=0; var c=await i18nReadBest('qx');
+        if(!c || c.strings.Save==='file') throw new Error('with no file, nothing was read');
+      } finally {
+        window.i18nReadStatic=realStatic; window.i18nReadCentral=realCentral; window.i18nReadCloud=realCloud;
+        Object.keys(_i18nCentralAt).forEach(function(k){ delete _i18nCentralAt[k]; }); Object.assign(_i18nCentralAt, atWas);
       }
     } },
 

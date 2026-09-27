@@ -36,7 +36,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.90` — app. **Worker: v42**, deployed separately and versioned separately
+**Current version:** `v36.91` — app. **Worker: v42**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -51,8 +51,10 @@ same build and the mismatch survives (§4b).
 > and must not be dragged forward. Afterwards, the only remaining mentions of the old version
 > should be prose about history.
 
-**The repository is PRIVATE.** It was public for its entire life until 16 Aug 2026, so anything
-ever committed must be assumed permanently disclosed regardless of later rewriting — see §2a.
+**The repository is PUBLIC** (GitHub reported `visibility: public` on 27 Sep 2026; notes
+from 16 Aug 2026 said it had been made private — whichever it is at any moment, treat
+everything ever committed as permanently disclosed, regardless of later rewriting — see §2a).
+Nothing secret may ever be committed; the private go-public plan is kept OUT of the repo.
 
 Design language: warm, editorial. Serif display font **Playfair Display** for titles, sans
 **DM Sans** for body. Cream/brown/terracotta/gold palette. Rounded cards, soft shadows,
@@ -100,7 +102,7 @@ slide‑up modal animation.
 | `ARCHITECTURE.md` | Deployments and connections: every component, where it lives, who deploys it, what depends on what. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
-| `version.json` | `{"version": "v36.90"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
+| `version.json` | `{"version": "v36.91"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |

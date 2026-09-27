@@ -40,6 +40,7 @@ browser, as `docs/README` below says).
 | **Firebase — test** | Google, project `tonys-recipes-test` (Firestore in `me-west1`) | console: https://console.firebase.google.com/project/tonys-recipes-test | `firestore.rules` | Same, by hand. | Tony |
 | **Sign-in clients** | Google Cloud → APIs & Services → Credentials, one "Web client (auto created by Google Service)" per project | https://console.cloud.google.com/apis/credentials?project=recipes-f379d · …?project=tonys-recipes-test | — | Each lists its copy's `https://<host>/__/auth/handler` under *Authorized redirect URIs* and the host under *Authorized JavaScript origins*. | Tony |
 | **CI** | GitHub Actions in `tonys-recipes` | https://github.com/rozinante2004-hash/tonys-recipes/actions | `.github/workflows/self-tests.yml` | Runs on every push to `main` **and** `test` (§5). | Automatic |
+| **Publish languages** (v36.91) | GitHub Actions in `tonys-recipes` | https://github.com/rozinante2004-hash/tonys-recipes/actions/workflows/publish-languages.yml | `.github/workflows/publish-languages.yml`, `tools/publish-languages.mjs` | Every 10 minutes, and "Run workflow": copies the central translations into `i18n/*.json` when they changed (or the app's 🚀 button asked), commits to `main`, brings `test` level, redeploys. Translation files only. | Automatic |
 
 The **🚀 Deployments** entry in ⚙️ (owner only) links to all of these for both
 copies, built from `APP_CONFIG`.
@@ -77,7 +78,7 @@ address (`authDomain`) — each copy signs in **on its own address** (§6).
 | Photos | `shared/photo_<id>` | same | IndexedDB |
 | Member list | `shared/access` (admin-only) | same | — |
 | **Households (WP-D, being introduced)** | `households/{hid}` + `members`, `recipes`, `photos`, `chats`, `state`; `pending/{hid}:{email}`, `invites/{code}`, app-wide `i18n/{lang}` — used once `dataLayout` is `'households'`; the move COPIES `shared` here | same | the household in use |
-| Interface languages | `shared/i18n_<lang>`, index `shared/i18n_index` — **the central copy for every copy and every user** (anyone may read; admins write) | reads the family project's, by plain request (v36.88) | the one language in use |
+| Interface languages | MADE in `shared/i18n_<lang>` (index `shared/i18n_index`) — the central copy (anyone may read; admins write) — and PUBLISHED as `i18n/<lang>.json` in the repo by the *Publish languages* workflow every 10 minutes (v36.91), served with each copy | the same files, and the family project's central copy when newer | the one language in use |
 | WhatsApp chats | `shared/chat_*` / `chatpart_*`; `whatsapp/` folder read over the GitHub API where reachable | same | — |
 | Backup record | `shared/backups` | same | last-backup stamps |
 | **Backups** | a `.json` file (download, or a chosen folder, automatically each day) with recipes, photos **and every language** (v36.83) | same | the folder handle |
