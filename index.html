@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.95 -->
+<!-- Tony's Recipes Collection v36.96 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1699,10 +1699,23 @@ function _fakeFirestore(seed, opts) {
       }
     };
   }
+  // v36.96 — in the household layout the real code asks for
+  // households/<hid>/recipes/12 where the first layout asked for shared/recipe_12.
+  // The fake files both under the first layout's name, so every test reads the
+  // same in either layout (the household paths themselves are tested on the
+  // emulator, tests/e2e-sync.mjs --layout households).
+  function firstName(path, id) {
+    var m = /(?:^|\/)(recipes|photos|chats|state)$/.exec(String(path || ''));
+    if (m) return m[1] === 'recipes' ? 'recipe_' + id : m[1] === 'photos' ? 'photo_' + id : id;
+    if (path === 'i18n') return id === '_index' ? 'i18n_index' : 'i18n_' + id;
+    return id;
+  }
+  function noQuery() { throw new Error('fake Firestore has no range query'); }
   return {
     _docs: docs,
-    collection: function(){
-      return { doc: ref, where: function(){ throw new Error('fake Firestore has no range query'); } };
+    collection: function(path){
+      return { doc: function(id){ return ref(firstName(path, id)); }, where: noQuery,
+               get: function(){ return Promise.reject(new Error('fake Firestore has no collection read')); } };
     },
     runTransaction: function(fn){
       return Promise.resolve(fn({
@@ -2128,8 +2141,13 @@ async function _selfTestPark() {
   var _featuresWas = Object.assign({}, window._featureOverride || {});
   Object.keys(APP_CONFIG.features || {}).forEach(function(k){ window._featureOverride[k] = true; });
   if (typeof applyFeatureFlags === 'function') applyFeatureFlags();
+  // …and a household to name documents by (v36.96). In the household layout
+  // the cloud tests' documents live under one; before sign-in (and in CI) there
+  // is none, so the run gets a stand-in. The tests use fake databases only.
+  var _hidWas = _cloudHid;
+  if (_cloudLayout === 'households' && !_cloudHid) _cloudHid = 'self-test';
   return { langWas: _langWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
-           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas };
+           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas };
 }
 function _selfTestUnpark(p) {
   if (!p) return;
@@ -2137,6 +2155,7 @@ function _selfTestUnpark(p) {
   // swapped in its own fake and restored "the previous one" restored the
   // guard, which is why this assigns rather than trusting the chain.
   if (p.realDb) window._fbDb = p.realDb;
+  if (_cloudHid === 'self-test') _cloudHid = p.hidWas || null;
   if (_selfTestHeldWrites) {
     try { syncLog('system', _selfTestHeldWrites + ' cloud write(s) held back during the self test', ''); } catch(e) {}
   }
@@ -4095,6 +4114,11 @@ async function householdMoveIn(opts) {
     showServiceError('The move into a household stopped:\n\n' + (e && e.message ? e.message : String(e))
       + (denied ? '\n\nThis usually means the HOUSEHOLDS part of the rules is not published yet: Family Access → '
                 + 'Show Firestore security rules → copy → paste into the Firebase console → Publish. Then run it again.' : '')
+      // v36.96 — the real Firestore needs a collection-group index to find one's
+      // households; its error carries a link that creates exactly that index.
+      + (/index/i.test(String(e && e.message)) ? '\n\nFirestore needs an index for this (collection group "members", '
+                + 'field "uid"). The message above holds a link that creates it: open it, press Create, wait until it '
+                + 'says Enabled, then run this again.' : '')
       + '\n\nNothing was deleted or changed in the family’s collection; running it again is safe.');
     return null;
   }
@@ -4214,7 +4238,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.95';
+var APP_VERSION = 'v36.96';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6839,7 +6863,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.95</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.96</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7471,7 +7495,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.95</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.96</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

@@ -343,6 +343,29 @@ found only because a test was written first and disagreed with the code.
     ones; `firestore.households.rules` is gone) — one source, filled and shown
     by Family Access → Show rules (`{{APP_ADMINS}}` = the owner). Publishing
     them is harmless before the move and required for it.
+  - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
+    (v36.96).** `householdMemberships()` is a collection-GROUP query on
+    `members` by `uid`; Firestore enables single-field indexes for collection
+    scope only, so each project needs a collection-group exemption: Firestore →
+    Indexes → **Automatic** tab (was "Single field", renamed 2026) → Add
+    exemption → `members` / `uid` → Collection group, Ascending. Without it the
+    move and every household sign-in fail ("requires an index", with a link that
+    creates it). Done on tonys-recipes-test 28 Sep 2026; **the family project
+    needs it before its move.**
+  - **Rehearsal on the test copy (28 Sep 2026):** Tony copied its collection
+    (62 recipes, 56 photos, 2 languages, 2 other; 122 read back identical; no
+    other members) and `tools/environments.json` test got
+    `dataLayout: 'households'`. The in-app suite runs in either layout: the
+    shared fake Firestore files household paths under first-layout names, park
+    gives a stand-in household (`'self-test'`) when none is chosen, and six
+    tests with hand-modelled `shared/…` fakes run via `_inFirstLayout`.
+  - **BEFORE THE FAMILY MOVES — languages.** The family project is the
+    central language source (`languageSource` = `shared/i18n_*`, read by every
+    copy and by the publishing job). In the household layout translations are
+    written to app-wide `i18n/{lang}` — so after the family's switch, edits
+    would no longer reach `shared/i18n_*`. Decide first: point
+    `languageSource` (+ the job) at `i18n/*` (rules already allow public get),
+    or keep writing `shared/i18n_*` there.
   - **`rules_version = '2';` never changes** — it is Firebase's
     rules-LANGUAGE edition, not ours (Tony asked, v36.92). Which release the
     rules came from is the comment `rulesStamped()` adds under it when Show

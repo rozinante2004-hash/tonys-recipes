@@ -20,6 +20,17 @@
 // first. Do not add an entry here that index.html could not run — the whole
 // point is that the app works identically whether or not this file was fetched.
 
+// v36.96 — a few tests bring their own stand-in database, modelled on the
+// first layout's shared/… paths and queries in detail. What they test (sync
+// logic) is the same in both layouts, so on a copy running in households they
+// run in the first layout; every other test runs in the copy's own layout, and
+// the household paths themselves are tested end to end on the Firebase
+// emulator (tests/e2e-sync.mjs --layout households).
+async function _inFirstLayout(fn){
+  var was=_cloudLayout; _cloudLayout='shared';
+  try{ return await fn(); } finally{ _cloudLayout=was; }
+}
+
 window.SELF_TESTS = [
   // ── UI ELEMENTS ────────────────────────────────────────────────────────────
   { id:'ui_header',      group:'UI',      name:'Header renders',
@@ -1044,7 +1055,7 @@ window.SELF_TESTS = [
     } },
 
   { id:'safety_backup_family', group:'Backup', name:'A backup taken on the PC counts on the phone (v36.61, audit E2)',
-    test: async()=>{
+    test: ()=>_inFirstLayout(async()=>{
       ['newestBackupAt','familyBackupFetch','familyBackupNote','familyBackupRemember','backupWhereText']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       var bk=_backupRecordForTest(), realDb=window._fbDb, realUser=window._fbUser,
@@ -1130,7 +1141,7 @@ window.SELF_TESTS = [
         try{ await renderBackupPanel(); }catch(e){}
         _cloudRestoreForTest(cloudWas);   // the fake reads were counted
       }
-    } },
+    }) },
 
   { id:'safety_backup_unvouched_stamp', group:'Backup', name:'A "last backup" nothing vouches for is not believed (v36.68)',
     test: async()=>{
@@ -3539,7 +3550,7 @@ window.SELF_TESTS = [
     } },
 
   { id:'cloud_refresh_one_recipe', group:'Cloud Sync', name:'One recipe can be pulled from the cloud without a reload (5.4 §7, v35.3)',
-    test: async()=>{
+    test: ()=>_inFirstLayout(async()=>{
       // The two-device test: PC edits, phone edits and saves, PC's save is
       // refused. Correct. But closing and reopening the recipe still showed the
       // PC's version and saving failed again — nothing re-read a single document
@@ -3640,7 +3651,7 @@ window.SELF_TESTS = [
         window._fbDb=kDb; window._fbUser=kUser; window._cloudRecipeBase=kBase;
         window._cloudRecipeStamp=kStamp; window._cloudRecipeIds=kIds; window.toast=kToast;
       }
-    } },
+    }) },
 
   { id:'cloud_conflict_has_a_way_out', group:'Cloud Sync', name:'A refused save says so on reopening and offers the fix (v35.3)',
     test: async()=>{
@@ -4200,7 +4211,7 @@ window.SELF_TESTS = [
     } },
 
   { id:'cloud_photo_heal', group:'Cloud Sync', name:'A local photo fix reaches the cloud, which wins on load (5g.9)',
-    test: async()=>{
+    test: ()=>_inFirstLayout(async()=>{
       ['comparePhotosWithCloud','pushLocalPhotosToCloud','healCloudPhotos']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       if(!document.getElementById('healCloudPhotosItem')) throw new Error('no menu entry to send photos to the cloud');
@@ -4281,7 +4292,7 @@ window.SELF_TESTS = [
         window._photoCloudDiff=null;
         closeM('syncHealthOverlay');
       }
-    } },
+    }) },
 
   { id:'ui_menu_directions_true', group:'UI', name:'Every “⚙️ → X” the app prints is really in Settings (5g.10)',
     test: async()=>{
@@ -4781,7 +4792,7 @@ window.SELF_TESTS = [
     } },
 
   { id:'cloud_photo_bulk', group:'Cloud Sync', name:'Cloud photos load in one query, not one round trip each (5g.3)',
-    test: async()=>{
+    test: ()=>_inFirstLayout(async()=>{
       if(typeof readCloudPhotoDocs!=='function') throw new Error('readCloudPhotoDocs not defined');
       var realDb=window._fbDb, realFb=window.firebase;
       try{
@@ -4839,10 +4850,10 @@ window.SELF_TESTS = [
         if(!l3[0]._ph)
           throw new Error('a failed read cleared _ph — the only record that a photo exists elsewhere, so the photo would be lost for good');
       } finally { window._fbDb=realDb; window.firebase=realFb; }
-    } },
+    }) },
 
   { id:'sync_watchdog', group:'Cloud Sync', name:'A wedged sync is reported, never spun on for ever (5g.3)',
-    test: async()=>{
+    test: ()=>_inFirstLayout(async()=>{
       if(typeof withSyncWatchdog!=='function') throw new Error('withSyncWatchdog not defined');
       // A promise that settles normally must pass straight through, unchanged.
       if(await withSyncWatchdog(Promise.resolve('ok'),'read')!=='ok')
@@ -4976,10 +4987,10 @@ window.SELF_TESTS = [
         window.loadFromFirestore=realLoad5; window.saveToFirestore=realSave3;
         recipes=realRecipes3; window.toast=realToast3;
       }
-    } },
+    }) },
 
   { id:'photo_rescue', group:'Backup', name:'Photos can be restored from a backup without losing newer recipes (5g.2)',
-    test: async()=>{
+    test: ()=>_inFirstLayout(async()=>{
       ['rescueResolvePhotos','rescuePlan','openPhotoRescue','runPhotoRescue'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       if(!document.getElementById('photoRescueItem')) throw new Error('no menu entry to reach the rescue tool');
@@ -5071,7 +5082,7 @@ window.SELF_TESTS = [
         window.saveData=rSave; window.renderGrid=rGrid; window.toast=rToast;
         window.showServiceError=rErr; window._cloudPhotoStamps=rStamps; window._cloudPhotoIds=rIds;
       }
-    } },
+    }) },
 
   { id:'photo_hebrew_terms', group:'Features', name:'A Hebrew recipe name becomes a searchable English dish (5g.1)',
     test: async()=>{

@@ -13,6 +13,8 @@
     },
     "siteOrigin": "https://tonys-recipes-test.pages.dev",
     "sitePath": "/",
+    "dataLayout": "households",
+    "_why_dataLayout": "WP-D rehearsal (28 Sep 2026): the test copy runs in the household layout after Tony copied its collection into a household (Family Access → Copy this collection into a household). Its `shared` collection is untouched; setting this back to 'shared' returns to it.",
     "features": {
       "bringDirect": false
     },
