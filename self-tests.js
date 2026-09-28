@@ -2069,6 +2069,18 @@ window.SELF_TESTS = [
       } finally { window.askChoice=real.choice; if(navigator.clipboard && real.clip) navigator.clipboard.writeText=real.clip; window.toast=real.toast; }
     } },
 
+  { id:'ui_reset_not_in_header', group:'UI', name:'Resetting this device is in ⚙️, not a tap away in the header (v37.08)',
+    test: async()=>{
+      // (the ⚙️ menu itself lives in the header — only what is NOT in a menu counts)
+      var bare=[].filter.call(document.querySelectorAll('.header [onclick*="clearAllData"], .header-status [onclick*="clearAllData"]'),
+        function(el){ return !el.closest('.drop-menu'); });
+      if(bare.length) throw new Error('"Reset" is still in the header');
+      var item=document.querySelector('#settingsDrop #resetDeviceItem');
+      if(!item || (item.getAttribute('onclick')||'').indexOf('clearAllData')===-1) throw new Error('"Reset this device" is not in the ⚙️ menu');
+      // It still asks first.
+      if(String(clearAllData).indexOf('askConfirm')===-1) throw new Error('resetting the device no longer asks first');
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —

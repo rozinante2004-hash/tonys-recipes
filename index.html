@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.07 -->
+<!-- Tony's Recipes Collection v37.08 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4782,7 +4782,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.07';
+var APP_VERSION = 'v37.08';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7414,7 +7414,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.07</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.08</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7464,6 +7464,7 @@ body.banner-shown .header {
                could only be made from inside a recipe. -->
           <button class="drop-item" id="unitsMenuItem" onclick="toggleUnitPref()">📏 Units: metric</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
+          <button class="drop-item" id="resetDeviceItem" onclick="closeDrop('settingsDrop');clearAllData()">🧽 Reset this device…</button>
           <!-- v37.00 (WP-O) -->
           <button class="drop-item" onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
@@ -7541,7 +7542,8 @@ body.banner-shown .header {
   <div class="header-status" style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
     <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
     <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.72);flex:1;">Sign in to sync across devices</span>
-    <button onclick="clearAllData()" style="background:none;border:none;color:rgba(255,255,255,0.62);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;font-family:'DM Sans','Heebo',sans-serif;">Reset</button>
+    <!-- v37.08 — "Reset" moved to ⚙️ (Tony: one tap from erasing this device
+         does not belong in the header). -->
   </div>
 </div>
 
@@ -8055,7 +8057,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.07</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.08</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
