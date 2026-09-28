@@ -1891,6 +1891,15 @@ window.SELF_TESTS = [
         var said=null; window.askConfirm=async function(o){ said=o; return true; };
         var r=await accountDelete();
         if(r!==null||!said||!/Hand these over first/.test(said.title)||!/Test home/.test(said.message)) throw new Error('with others in it, deleting the account said: '+JSON.stringify(said));
+        // v37.06 — proving it is you again asks a password account for its
+        // password (hidden as typed), not for a Google sign-in.
+        if(typeof accountReauthenticate!=='function') throw new Error('accountReauthenticate not defined');
+        window.askConfirm=real.confirm; var pwAsk=askConfirm({ title:'x', input:'', inputType:'password' });
+        var pin=document.querySelector('#askOverlay #askInput'); var pinType=pin&&pin.type;
+        document.querySelector('#askOverlay #askCancel').click(); await pwAsk;
+        if(pinType!=='password') throw new Error('a password is asked for in a visible field');
+        if(String(accountReauthenticate).indexOf("'password'")===-1||String(accountReauthenticate).indexOf('EmailAuthProvider')===-1)
+          throw new Error('re-confirming a password account does not use its password');
         // v37.05 — "Delete my account" is the ⚙️ menu's LAST item, bold and red;
         // "Download all my data" has its own item (household layout only).
         var drop=document.getElementById('settingsDrop'), items=drop.querySelectorAll('button.drop-item'), last=items[items.length-1];

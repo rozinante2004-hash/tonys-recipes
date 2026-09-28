@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.05 -->
+<!-- Tony's Recipes Collection v37.06 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4227,18 +4227,20 @@ async function accountDelete(opts) {
     for (var a = 0; a < alone.length; a++) await householdWipe(alone[a].hid);
     for (var l = 0; l < leave.length; l++) await hhRef(leave[l].hid).collection('members').doc(user.uid).delete();
     progressStep(1, 'Places kept for you…');
-    var kept = await hhDb().collection('pending').where('email', '==', String(user.email || '').toLowerCase()).get(), krefs = [];
-    kept.forEach(function(d){ krefs.push(d.ref); });
-    for (var k = 0; k < krefs.length; k++) await krefs[k].delete();
+    // v37.06 — only a CONFIRMED address may search for places kept for it (the
+    // rules refuse the search otherwise: Tony's unconfirmed account stopped
+    // here, its household already gone). An unconfirmed one never took any up.
+    if (user.emailVerified !== false) {
+      var kept = await hhDb().collection('pending').where('email', '==', String(user.email || '').toLowerCase()).get(), krefs = [];
+      kept.forEach(function(d){ krefs.push(d.ref); });
+      for (var k = 0; k < krefs.length; k++) await krefs[k].delete();
+    }
     progressStep(2, 'Your sign-in…');
     try { await user.delete(); }
     catch(e) {
       if (!e || e.code !== 'auth/requires-recent-login') throw e;
       progressClose();
-      if (await askConfirm({ icon: '\u{1F510}', title: 'Sign in once more',
-          message: 'Your households are done. For your safety, Google asks you to sign in once more before the account itself is removed.',
-          okLabel: 'Sign in and finish' }) !== true) return null;
-      await user.reauthenticateWithPopup(window._fbProvider);
+      if (!await accountReauthenticate(user)) return null;
       await user.delete();
     }
     progressClose();
@@ -4255,6 +4257,30 @@ async function accountDelete(opts) {
   if (!opts.noReload) location.reload();
   return true;
 }
+// Proving it is you once more, the same way you signed in (v37.06 — it always
+// opened Google's window, which a password account cannot use).
+async function accountReauthenticate(user) {
+  var how = ((user.providerData || [])[0] || {}).providerId || 'google.com';
+  var intro = 'Your households are done. For your safety, please confirm it is you before the account itself is removed.';
+  if (how === 'password') {
+    var pw = await askConfirm({ icon: '\u{1F510}', title: 'Your password, once more', message: intro,
+      input: '', inputType: 'password', placeholder: 'Password', okLabel: 'Delete my account', danger: true });
+    if (typeof pw !== 'string' || !pw) return false;
+    await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, pw));
+    return true;
+  }
+  if (how === 'google.com' || how === 'microsoft.com' || how === 'apple.com') {
+    if (await askConfirm({ icon: '\u{1F510}', title: 'Sign in once more', message: intro, okLabel: 'Sign in and finish' }) !== true) return false;
+    var p = how === 'google.com' ? (window._fbProvider || new firebase.auth.GoogleAuthProvider()) : new firebase.auth.OAuthProvider(how);
+    await user.reauthenticateWithPopup(p);
+    return true;
+  }
+  // Signed in with an e-mailed link: a fresh sign-in is the confirmation.
+  await askConfirm({ icon: '\u{1F510}', title: 'Sign in again first', message: intro
+    + '\n\nSign out, sign in again with a new link, and then delete the account.', okLabel: 'OK' });
+  return false;
+}
+window.accountReauthenticate = accountReauthenticate;
 function accountMenu() {
   if (cloudLayout() !== 'households' || !window._fbUser) return;
   askChoice(String(window._fbUser.email || ''), [
@@ -4746,7 +4772,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.05';
+var APP_VERSION = 'v37.06';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7378,7 +7404,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.05</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.06</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8019,7 +8045,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.05</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.06</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16871,6 +16897,7 @@ function askConfirm(opts) {
       + '<div class="ask-body" dir="auto">' + escH(opts.message || '') + '</div>'
       + (opts.input !== undefined
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
+            + (opts.inputType === 'password' ? ' type="password" autocomplete="current-password"' : '')
             + ' placeholder="' + escA(opts.placeholder || '') + '">'
           : '')
       // v36.18 — an optional "don't ask again" tick. Only a caller that passes

@@ -518,6 +518,14 @@ try {
        && !(await restDoc('households/' + nHid + '/members/' + nUid)), JSON.stringify(gone));
     const acc = await inPage(N, () => accountDelete({ yes: true, noReload: true }));
     ok('…and then their account', acc === true && await inPage(N, () => !firebase.auth().currentUser), JSON.stringify(acc));
+    // v37.06 — Tony's case: an UNCONFIRMED password account deletes itself,
+    // its own household with it (the search for kept places stopped it).
+    const pwHid = await inPage(PW, () => (householdOf() || {}).hid), pwUid = await uidOnPage(PW);
+    const pwAcc = await inPage(PW, async () => { window.backupSave = async () => {}; return accountDelete({ yes: true, noReload: true }); });
+    ok('an account that is not yet confirmed can delete itself, household and all', pwAcc === true
+       && !(await restDoc('households/' + pwHid)) && !(await restDoc('households/' + pwHid + '/members/' + pwUid))
+       && await inPage(PW, () => !firebase.auth().currentUser),
+       JSON.stringify({ pwAcc, log: await inPage(PW, () => JSON.parse(localStorage.getItem('tonys_sync_log') || '[]').slice(-3).map(e => e.m + ' ' + (e.d || ''))) }));
   }
 
   if (!HH) {
