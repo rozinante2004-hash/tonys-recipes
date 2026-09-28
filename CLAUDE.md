@@ -375,6 +375,16 @@ found only because a test was written first and disagreed with the code.
     rules-LANGUAGE edition, not ours (Tony asked, v36.92). Which release the
     rules came from is the comment `rulesStamped()` adds under it when Show
     rules fills them in (app version + date); a comment, so Firebase ignores it.
+- **"SCRIPT ERROR." MEANS A CROSS-ORIGIN SCRIPT (v36.98).** Tony's report after
+  a restart of the household test copy showed two bare "Script error." lines
+  (and Firebase not restoring the session). A browser hides the message of an
+  error inside another site's script unless the tag has `crossorigin` and the
+  server sends CORS; the three Firebase `<script>` tags now carry
+  `crossorigin="anonymous"` (gstatic serves `Access-Control-Allow-Origin: *` —
+  Firebase's own ES-module imports rely on it; the service worker ignores
+  cross-origin requests, so no opaque cached copy can break it). The e2e's
+  routed SDK files send the same header. Any bare one left is labelled as
+  another site's in the log.
 - **BRING! GETS ONE LINE PER THING TO BUY (v36.95).** Tony: lime halved +
   sliced + squeezed should be "4 limes", garlic ×2 "3 cloves" — any ingredient,
   any language. The small model groups the (already scaled) lines; ONLY its

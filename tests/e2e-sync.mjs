@@ -213,7 +213,8 @@ async function device(label, email, opts = {}) {
   }
   await ctx.route(/www\.gstatic\.com\/firebasejs\/[\d.]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     const file = route.request().url().split('/').pop();
-    route.fulfill({ status: 200, contentType: 'text/javascript', body: readFileSync(path.join(sdkDir, file)) });
+    // As www.gstatic.com does: the page loads these with crossorigin (v36.98).
+    route.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(path.join(sdkDir, file)) });
   });
   await ctx.route(/accounts\.google\.com/, r => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
   await ctx.route(/workers\.dev/, r => r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"no Worker in the e2e run"}' }));
@@ -287,7 +288,7 @@ try {
       const ctx0 = await browser.newContext({ serviceWorkers: 'block' });
       const p0 = await ctx0.newPage();
       await ctx0.route(/www\.gstatic\.com\/firebasejs\/[\d.]+\/(firebase-[a-z-]+\.js)$/, (route) =>
-        route.fulfill({ status: 200, contentType: 'text/javascript', body: readFileSync(path.join(sdkDir, route.request().url().split('/').pop())) }));
+        route.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(path.join(sdkDir, route.request().url().split('/').pop())) }));
       await ctx0.route(/accounts\.google\.com|workers\.dev/, r => r.fulfill({ status: 503, body: '' }));
       await ctx0.addInitScript(emu => { window.__FIREBASE_EMULATOR__ = emu; }, EMU);
       await p0.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
