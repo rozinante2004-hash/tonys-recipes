@@ -227,6 +227,15 @@ async function device(label, email, opts = {}) {
       JSON.stringify({ sub: 'uid-' + who.replace(/\W/g, ''), email: who, email_verified: true }));
     await window._fbAuth.signInWithCredential(cred);
   }, email);
+  // v37.00 — someone new is welcomed and ASKED: their own collection (named
+  // as offered), or an invitation pasted in.
+  if (opts.welcome) {
+    await page.waitForSelector('#askOverlay #askChoices button[data-i]', { timeout: 30000 });
+    await page.click('#askOverlay #askChoices button[data-i="' + (opts.welcome === 'own' ? 0 : 1) + '"]');
+    await page.waitForSelector('#askOverlay #askInput', { timeout: 10000 });
+    if (opts.welcome !== 'own') await page.fill('#askOverlay #askInput', opts.welcome);
+    await page.click('#askOverlay #askOk');
+  }
   // Signed in, and the first load from the cloud has finished.
   try {
     if (opts.ready === 'household')        // a brand-new household has nothing to load yet
@@ -265,7 +274,7 @@ try {
   console.log('Signing in');
   let A;
   if (HH) {
-    A = await device('A (owner)', OWNER, { ready: 'household' });
+    A = await device('A (owner)', OWNER, { ready: 'household', welcome: 'own' });
     const h = await inPage(A, () => householdOf());
     ok('the owner, signing in for the first time, founds a household', h && h.role === 'owner', JSON.stringify(h));
     HID = h.hid;
@@ -409,7 +418,7 @@ try {
     ok('the owner is in the family household, as owner',
        await inPage(A, () => { const h = householdOf(); return h && h.role === 'owner' && h.name === 'E2E family'; }));
 
-    const N = await device('N (newcomer)', 'newcomer@example.com', { ready: 'household' });
+    const N = await device('N (newcomer)', 'newcomer@example.com', { ready: 'household', welcome: 'own' });
     const nh = await inPage(N, () => householdOf());
     ok('a newcomer founds a household of their own', nh && nh.hid !== HID && nh.role === 'owner', JSON.stringify(nh));
     ok('…named after them', /Newcomer.s Kitchen Notes/.test(nh && nh.name || ''), nh && nh.name);
@@ -431,6 +440,11 @@ try {
     ok('…as an editor, and sees the recipes', (await restDoc('households/' + HID + '/members/' + await uidOnPage(J)) || {}).role === 'editor'
        && (await names(J)).includes('E2E seed stew'), JSON.stringify(await names(J)));
     ok('…and the code is gone from the address', await inPage(J, () => !/join=/.test(location.href)));
+    // v37.00 — the same link, pasted into the welcome instead of opened.
+    const W = await device('W (welcomed)', 'welcomed@example.com', { ready: 'household', welcome: url });
+    ok('someone new pastes the invitation into the welcome and joins', await inPage(W, () => (householdOf() || {}).name === 'E2E family'));
+    ok('…and a new household starts empty (no examples imposed)', await inPage(N, () => recipes.length === 0 && !!document.getElementById('firstRunEmpty')),
+       JSON.stringify(await inPage(N, () => recipes.map(r => r.name))));
 
     console.log('Family Access, household layout');
     await inPage(A, async () => {

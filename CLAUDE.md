@@ -359,6 +359,21 @@ found only because a test was written first and disagreed with the code.
     place needs the household to exist (invitations cannot be listed, so they
     outlive a deleted household). Invitations offer all three roles (a list);
     Switch household is a list.
+  - **v37.00 — WP-O, the first visit (household layout only).** No household
+    is founded silently any more: `householdWelcome` asks "Start my own
+    collection" (named, default "<First>'s Kitchen Notes") or "I have an
+    invitation" (paste the link or code — `householdCodeFrom`). It waits for
+    any open ask-dialog first (#askOverlay is ONE element: a second dialog
+    would replace the first and leave its promise hanging). A new device
+    starts EMPTY (`SAMPLE_RECIPES` keeps the five examples; the empty grid
+    shows `firstRunEmptyHtml` — website / paste / photo / type, and "5
+    example recipes"). After founding: a tour offer (`startTour`, coach marks
+    on what is on screen; ⚙️ → 🧭 Take the tour). The device's language is
+    offered once before sign-in when translated (`i18nDeviceLangOffer`).
+    ⚙️ → ✉️ Send feedback (mailto `supportEmail` || owner). Self-test park
+    LENDS the examples to an empty collection for the run (dozens of tests
+    open "a recipe") and gives the empty list back after. e2e devices answer
+    the welcome (`device(..., { welcome: 'own' | <invite url> })`).
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

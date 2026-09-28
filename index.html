@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.99 -->
+<!-- Tony's Recipes Collection v37.00 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -117,6 +117,8 @@
     workerName:          'lively-bread-273a',
     cloudflareAccountId: '4dbc420100c13bf94fda83047ce0a7ac',
     ownerEmail:          'rozinante2004@gmail.com',
+    // v37.00 — where ✉️ Send feedback writes to; empty = the owner's address.
+    supportEmail:        '',
     githubRepo:          'rozinante2004-hash/tonys-recipes',
     siteOrigin:          'https://rozinante2004-hash.github.io',
     sitePath:            '/tonys-recipes/',
@@ -2146,8 +2148,18 @@ async function _selfTestPark() {
   // is none, so the run gets a stand-in. The tests use fake databases only.
   var _hidWas = _cloudHid;
   if (_cloudLayout === 'households' && !_cloudHid) _cloudHid = 'self-test';
+  // …and something to test WITH (v37.00). A new device in the household layout
+  // starts empty, and dozens of tests open, scale or print "a recipe"; an empty
+  // collection borrows the five examples for the run and is empty again after.
+  var _recipesWas = null;
+  if (!recipes.length && typeof SAMPLE_RECIPES !== 'undefined') {
+    _recipesWas = recipes;
+    recipes = JSON.parse(JSON.stringify(SAMPLE_RECIPES));
+    if (typeof renderGrid === 'function') try { renderFilters(); renderGrid(); } catch(e) {}
+  }
   return { langWas: _langWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
-           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas };
+           backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas,
+           recipesWas: _recipesWas };
 }
 function _selfTestUnpark(p) {
   if (!p) return;
@@ -2156,6 +2168,11 @@ function _selfTestUnpark(p) {
   // guard, which is why this assigns rather than trusting the chain.
   if (p.realDb) window._fbDb = p.realDb;
   if (_cloudHid === 'self-test') _cloudHid = p.hidWas || null;
+  if (p.recipesWas) {                       // the borrowed examples go back (v37.00)
+    recipes = p.recipesWas;
+    try { saveLocal(); } catch(e) {}
+    try { renderFilters(); renderGrid(); } catch(e) {}
+  }
   if (_selfTestHeldWrites) {
     try { syncLog('system', _selfTestHeldWrites + ' cloud write(s) held back during the self test', ''); } catch(e) {}
   }
@@ -3806,6 +3823,12 @@ async function householdEnter(user) {
     }
     var list = await householdMemberships(user);
     if (!list.length && await householdClaimKept(user)) list = await householdMemberships(user);
+    // v37.00 (WP-O) — someone new is ASKED: their own collection, or one they
+    // were invited to (the link pasted, when it was not opened directly).
+    if (!list.length) {
+      var got = await householdWelcome(user);
+      if (got) list = await householdMemberships(user);
+    }
     if (!list.length) list = [{ hid: await householdFound(user, householdDefaultName(user)), role: 'owner' }];
     _householdList = list;
     var want = null;
@@ -4196,6 +4219,180 @@ window.householdRename = householdRename; window.householdInvite = householdInvi
 window.householdSwitch = householdSwitch; window.householdDefaultName = householdDefaultName; window.householdBrand = householdBrand;
 window.householdLoadMembers = householdLoadMembers; window.householdAddMember = householdAddMember;
 
+// ═══ THE FIRST VISIT (WP-O, v37.00) ══════════════════════════════════════════
+// What a person who has never used the app meets, in the household layout: a
+// welcome that asks (start your own collection, or join one you were invited
+// to), an empty collection that says how to fill it — typed, pasted, from a
+// website or a photo — with the five examples offered rather than imposed, a
+// short tour, the app offered in the device's own language, and a way to
+// write to us. The family's copy (first layout) is unchanged.
+var TOUR_DONE_KEY = 'tonys_tour_done', LANG_OFFERED_KEY = 'tonys_lang_offered';
+var _hhJustFounded = false;
+// An invitation, from whatever was pasted: the whole link, or just its code.
+function householdCodeFrom(text) {
+  var t = String(text || '').trim();
+  var m = /[?&]join=([A-Za-z0-9_-]{16,64})/.exec(t);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{16,64}$/.test(t) ? t : null;
+}
+async function householdWelcome(user) {
+  // One question at a time: an open dialog (the language offer) is answered first.
+  for (var w = 0; w < 600 && document.getElementById('askOverlay'); w++) await wait(200);
+  var brand = String(APP_CONFIG.brandName || 'My Kitchen Notes');
+  for (var tries = 0; tries < 20; tries++) {
+    var v = await askChoice('Keep every recipe you love in one place — and share them with the people you cook with.', [
+      { value: 'own',  label: '\u{1F3E0} Start my own collection' },
+      { value: 'join', label: '\u{1F517} I have an invitation' }
+    ], { icon: '\u{1F44B}', title: 'Welcome to ' + brand });
+    if (v === 'join') {
+      var t = await askPrompt('Paste the invitation link you were sent (or just its code).', '',
+        { icon: '\u{1F517}', title: 'Join with an invitation', okLabel: 'Join', placeholder: 'https://…?join=…' });
+      if (typeof t !== 'string' || !t.trim()) continue;
+      var code = householdCodeFrom(t);
+      if (!code) {
+        await askConfirm({ icon: '⚠️', title: 'That is not an invitation',
+          message: 'An invitation is a link ending in “?join=” and a long code. Ask whoever invited you to send it again.', okLabel: 'OK' });
+        continue;
+      }
+      try { var hid = await householdJoinByInvite(user, code); try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
+            toast('✅ You have joined the household', 6000); return hid; }
+      catch(e) { await askConfirm({ icon: '⚠️', title: 'Could not join', message: e.message, okLabel: 'OK' }); continue; }
+    }
+    // Their own — named as they like (or, dismissed, as it always was).
+    var name = v === 'own'
+      ? await askPrompt('What should your collection be called? You can change it any time.', householdDefaultName(user),
+          { icon: '\u{1F3E0}', title: 'Your collection', okLabel: 'Start' })
+      : null;
+    var hid2 = await householdFound(user, (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 60) : householdDefaultName(user));
+    _hhJustFounded = true;
+    setTimeout(firstRunAfterFounding, 1500);
+    return hid2;
+  }
+  return null;
+}
+function firstRunAfterFounding() {
+  if (!_hhJustFounded || window._selfTestRunning) return;
+  _hhJustFounded = false;
+  try { if (localStorage.getItem(TOUR_DONE_KEY)) return; } catch(e) {}
+  askConfirm({ icon: '\u{1F9ED}', title: 'Your collection is ready',
+    message: 'A 30-second tour of where everything is?', okLabel: 'Show me', cancelLabel: 'Not now' })
+    .then(function(ok){ if (ok === true) startTour(); else { try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch(e) {} } });
+}
+function firstRunEmptyHtml() {
+  var b = 'style="display:block;width:100%;max-width:300px;margin:6px auto;padding:11px 14px;border-radius:9px;border:1px solid var(--border);'
+        + 'background:var(--card-bg);color:var(--heading);font-size:14px;font-weight:600;cursor:pointer;text-align:start;font-family:DM Sans,Heebo,sans-serif;min-height:44px;"';
+  return '<div class="empty-state" id="firstRunEmpty">'
+    + '<div style="width:72px;height:72px;border-radius:50%;background:#FFF0E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">\u{1F37D}️</div>'
+    + '<div style="font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:19px;font-weight:700;color:var(--heading);margin-bottom:8px;">Add your first recipe</div>'
+    + '<p style="font-size:13px;color:var(--muted);line-height:1.6;max-width:300px;margin:0 auto 12px;">However you have it — the app reads it and sets it out for you.</p>'
+    + '<button ' + b + ' onclick="openUrlImportModal()">\u{1F517} From a website</button>'
+    + '<button ' + b + ' onclick="openFreehandModal()">✍️ Paste the text</button>'
+    + '<button ' + b + ' onclick="openCameraImport()">\u{1F4F7} From a photo</button>'
+    + '<button ' + b + ' onclick="openAddModal(null)">✏️ Type it in</button>'
+    + '<button onclick="addSampleRecipes()" style="margin-top:10px;background:none;border:none;color:var(--terracotta);text-decoration:underline;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">\u{1F35D} Or look around with 5 example recipes</button>'
+    + '</div>';
+}
+function addSampleRecipes() {
+  var now = Date.now();
+  var added = SAMPLE_RECIPES.map(function(r, i) {
+    var c = JSON.parse(JSON.stringify(r)); c.id = nextId++; c.uid = 'sample-' + now + '-' + i; c.updatedAt = now + i;
+    return typeof normalizeRecipe === 'function' ? normalizeRecipe(c) : c;
+  });
+  recipes = recipes.concat(added);
+  saveData(); renderFilters(); renderGrid();
+  toast('\u{1F35D} ' + added.length + ' example recipes added — delete them whenever you like', 6000);
+  return added;
+}
+// The tour: a few places, each pointed at in turn. Anything not on screen (a
+// narrow phone, a switched-off feature) is skipped rather than pointed at.
+var TOUR_STEPS = [
+  { sel: '#addDrop', at: '.drop-group .btn-primary', text: 'Add a recipe here: type it, paste it, or bring it in from a website or a photo.' },
+  { sel: '#searchInput', text: 'Find any recipe by its name or an ingredient.' },
+  { sel: '#langBtn', text: 'The app in your language — pick it here.' },
+  { sel: '[onclick="openHelp()"]', text: 'Stuck? Ask a question here, in your own words.' },
+  { sel: '[onclick="toggleDrop(\'settingsDrop\')"]', text: 'Settings: share with your family (👥 Family Access), backups, and your account.' }
+];
+function tourTargets() {
+  return TOUR_STEPS.map(function(st) {
+    var el = document.querySelector(st.at || st.sel);
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    return (r.width && r.height) ? { el: el, text: st.text } : null;
+  }).filter(Boolean);
+}
+function startTour() {
+  // The header slides away on scroll, taking most of these with it: bring it
+  // back first, the way the menus do (v36.79).
+  try { if (typeof applyHeaderGeometry === 'function') { _hdrHidden = 0; applyHeaderGeometry(); } } catch(e) {}
+  var steps = tourTargets(), i = 0;
+  if (!steps.length) return 0;
+  var ov = document.createElement('div');
+  ov.id = 'tourOverlay';
+  ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Tour');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,0.45);';
+  document.body.appendChild(ov);
+  function done() {
+    ov.remove(); document.removeEventListener('keydown', onKey, true);
+    try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch(e) {}
+  }
+  function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(); } }
+  document.addEventListener('keydown', onKey, true);
+  function show() {
+    var st = steps[i], r = st.el.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    var below = r.bottom + 170 < vh, w = Math.min(300, vw - 24), left = Math.max(12, Math.min(vw - w - 12, r.left + r.width / 2 - w / 2));
+    ov.innerHTML = '<div style="position:fixed;left:' + (r.left - 4) + 'px;top:' + (r.top - 4) + 'px;width:' + (r.width + 8) + 'px;height:' + (r.height + 8)
+        + 'px;border:3px solid var(--gold);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,0.25);pointer-events:none;"></div>'
+      + '<div id="tourCard" style="position:fixed;left:' + left + 'px;' + (below ? 'top:' + (r.bottom + 12) : 'bottom:' + (vh - r.top + 12)) + 'px;width:' + w
+        + 'px;background:var(--card-bg);color:var(--ink);border-radius:12px;padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,0.3);font-family:DM Sans,Heebo,sans-serif;">'
+      +   '<div dir="auto" style="font-size:14px;line-height:1.5;margin-bottom:10px;">' + escH(st.text) + '</div>'
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+      +     '<span style="font-size:12px;color:var(--muted);">' + (i + 1) + ' / ' + steps.length + '</span>'
+      +     '<span><button id="tourSkip" class="ask-btn ghost" style="margin-inline-end:6px;">Skip</button>'
+      +     '<button id="tourNext" class="ask-btn">' + (i === steps.length - 1 ? 'Done' : 'Next') + '</button></span>'
+      +   '</div></div>';
+    ov.querySelector('#tourSkip').onclick = done;
+    ov.querySelector('#tourNext').onclick = function(){ i++; if (i >= steps.length) done(); else show(); };
+    setTimeout(function(){ var n = ov.querySelector('#tourNext'); if (n) n.focus(); }, 30);
+  }
+  show();
+  return steps.length;
+}
+// The device's own language, offered once, when the app is translated into it.
+function i18nDeviceLangOffer(deviceLangs, available) {
+  var list = (deviceLangs || []).map(function(l){ return String(l || '').toLowerCase().split('-')[0].replace(/^iw$/, 'he'); });
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] === 'en') return null;                        // English first: nothing to offer
+    if (list[i] !== 'en' && I18N_LANGS[list[i]] && (available || []).indexOf(list[i]) !== -1) return list[i];
+  }
+  return null;
+}
+async function firstRunLanguageOffer() {
+  if (window.APP_CONFIG.dataLayout !== 'households' || window._selfTestRunning) return null;
+  try { if (localStorage.getItem(I18N_LANG_KEY) || localStorage.getItem(LANG_OFFERED_KEY)) return null; } catch(e) { return null; }
+  var avail = [];
+  try { var idx = await i18nStaticIndex(); avail = Object.keys((idx && idx.langs) || {}); } catch(e) {}
+  var code = i18nDeviceLangOffer(navigator.languages || [navigator.language], avail);
+  if (!code || document.getElementById('askOverlay')) return null;
+  try { localStorage.setItem(LANG_OFFERED_KEY, code); } catch(e) {}
+  var yes = await askConfirm({ icon: '\u{1F310}', title: I18N_LANGS[code].label + '?',
+    message: 'Show the app in ' + I18N_LANGS[code].label + '? You can change it any time with 🌐.',
+    okLabel: I18N_LANGS[code].label, cancelLabel: 'English' });
+  if (yes === true) await pickLanguage(code);
+  return yes === true ? code : 'en';
+}
+function feedbackMailto() {
+  var to = APP_CONFIG.supportEmail || APP_CONFIG.ownerEmail;
+  var subject = 'Feedback — ' + (APP_CONFIG.brandName || 'My Kitchen Notes') + ' ' + APP_VERSION;
+  var body = '\n\n—\n' + (typeof appCopyLabel === 'function' ? appCopyLabel() + '\n' : '') + APP_VERSION + ' · ' + navigator.userAgent;
+  return 'mailto:' + to + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+function sendFeedback() { location.href = feedbackMailto(); }
+setTimeout(function(){ firstRunLanguageOffer().catch(function(){}); }, 1200);
+window.householdCodeFrom = householdCodeFrom; window.householdWelcome = householdWelcome; window.firstRunEmptyHtml = firstRunEmptyHtml;
+window.addSampleRecipes = addSampleRecipes; window.startTour = startTour; window.tourTargets = tourTargets;
+window.i18nDeviceLangOffer = i18nDeviceLangOffer; window.firstRunLanguageOffer = firstRunLanguageOffer;
+window.feedbackMailto = feedbackMailto; window.sendFeedback = sendFeedback; window.TOUR_STEPS = TOUR_STEPS;
+
 // ─── MOVING THE FAMILY'S COLLECTION INTO A HOUSEHOLD (WP-D, v36.86) ─────────
 // The owner's one-time step from the first layout to the household one. It
 // COPIES — everything in `shared` stays exactly where it is, so the app as it
@@ -4438,7 +4635,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.99';
+var APP_VERSION = 'v37.00';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7070,7 +7267,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.99</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.00</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7120,6 +7317,9 @@ body.banner-shown .header {
                could only be made from inside a recipe. -->
           <button class="drop-item" id="unitsMenuItem" onclick="toggleUnitPref()">📏 Units: metric</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
+          <!-- v37.00 (WP-O) -->
+          <button class="drop-item" onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
+          <button class="drop-item" onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <!-- v36.59 — owner only (applyOwnerOnlyItems). They link straight into
                the Cloudflare account, the Firebase project and Anthropic billing,
@@ -7704,7 +7904,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.99</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.00</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8261,6 +8461,10 @@ let recipes = [
    ingredients:[{a:'100g',n:'dark chocolate'},{a:'100g',n:'butter'},{a:'2',n:'eggs'},{a:'2',n:'egg yolks'},{a:'80g',n:'caster sugar'},{a:'40g',n:'flour'}],
    steps:['Melt chocolate and butter together.','Whisk eggs, yolks, and sugar until pale.','Fold in chocolate mixture and flour.','Pour into buttered ramekins.','Bake at 200°C for 12 min — centre should be soft.']},
 ];
+// v37.00 (WP-O) — the five above are EXAMPLES. In the household layout a new
+// device starts empty (a new household is somebody's own collection, and a
+// member's new device fills from the cloud); the examples are offered instead.
+const SAMPLE_RECIPES = JSON.parse(JSON.stringify(recipes));
 let nextId=10, activeCat='All', selEmoji=EMOJIS[0], pendingPhoto='', editingId=null;
 let ingTags=[], selDiets=[];
 let viewId=null, viewMult=1, viewUnit='metric';
@@ -13093,6 +13297,11 @@ function renderGrid() {
   }
   const g = document.getElementById('recipeGrid');
 
+  if (!list.length && !recipes.length && !q && !showFavOnly && typeof firstRunEmptyHtml === 'function') {
+    g.className = '';
+    g.innerHTML = firstRunEmptyHtml();      // v37.00 — a whole empty collection, not an empty filter
+    return;
+  }
   if (!list.length) {
     g.className = '';
     var emptyIcon = showFavOnly ? '\u2764\ufe0f' : q ? '\ud83d\udd0d' : '\ud83c\udf7d\ufe0f';
@@ -25780,6 +25989,7 @@ window.onHeaderScroll = onHeaderScroll;
 
 (function initApp() {
   var hasLocal = loadLocal();
+  if (!hasLocal && window.APP_CONFIG.dataLayout === 'households') recipes = [];   // v37.00 — see SAMPLE_RECIPES
   try {
     if (localStorage.getItem('tonys_offline_queue') === '1') { _offlineQueue = true; }
   } catch(e) {}

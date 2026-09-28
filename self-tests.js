@@ -1888,6 +1888,69 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'wpo_first_visit', group:'UI', name:'A first visit: welcome, an empty collection that teaches, a tour (v37.00)',
+    test: async()=>{
+      ['householdWelcome','householdCodeFrom','firstRunEmptyHtml','addSampleRecipes','startTour','i18nDeviceLangOffer','feedbackMailto','sendFeedback'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // An invitation is found in whatever was pasted.
+      var code='a'.repeat(36);
+      if(householdCodeFrom('https://x.test/app/?join='+code)!==code || householdCodeFrom('  '+code+' ')!==code
+         || householdCodeFrom('hello')!==null || householdCodeFrom('https://x.test/?join=short')!==null)
+        throw new Error('invitation links are not read right');
+      // The welcome, both ways.
+      var real={ choice:window.askChoice, prompt:window.askPrompt, confirm:window.askConfirm, join:window.householdJoinByInvite,
+                 found:window.householdFound, recipes:recipes, save:window.saveData, toast:window.toast };
+      var tourWas=null, hhWas=null; try{ tourWas=localStorage.getItem('tonys_tour_done'); hhWas=localStorage.getItem('tonys_household'); }catch(e){}
+      try{
+        window.toast=function(){};
+        window.askChoice=async function(){ return 'join'; };
+        window.askPrompt=async function(){ return 'Here it is: https://x.test/?join='+code; };
+        var joined=null; window.householdJoinByInvite=async function(u,c){ joined=c; return 'H-JOINED'; };
+        if(await householdWelcome({ uid:'u', email:'new@x.test' })!=='H-JOINED' || joined!==code) throw new Error('joining from the welcome did not use the pasted invitation');
+        var named=null; window.askChoice=async function(){ return 'own'; };
+        window.askPrompt=async function(){ return 'Our kitchen'; };
+        window.householdFound=async function(u,n){ named=n; return 'H-NEW'; };
+        if(await householdWelcome({ uid:'u', displayName:'New Person' })!=='H-NEW' || named!=='Our kitchen') throw new Error('starting a collection did not use the chosen name: '+named);
+        _hhJustFounded=false;
+        // An empty collection teaches, and the examples are offered, not imposed.
+        recipes=[]; activeCat='All'; renderGrid();
+        var empty=document.getElementById('firstRunEmpty');
+        if(!empty) throw new Error('an empty collection shows no first steps');
+        ['From a website','Paste the text','From a photo','Type it in','example recipes'].forEach(function(w){
+          if(empty.textContent.indexOf(w)===-1) throw new Error('the first steps do not offer "'+w+'"'); });
+        window.saveData=function(){};
+        var added=addSampleRecipes();
+        if(added.length!==5 || recipes.length!==5 || !recipes.some(function(r){ return /Carbonara/.test(r.name); }))
+          throw new Error('the examples were not added');
+        var ids=recipes.map(function(r){ return r.id; }); if(new Set(ids).size!==5) throw new Error('two examples share a number');
+        if(SAMPLE_RECIPES.length!==5 || SAMPLE_RECIPES[0].id!==1) throw new Error('the examples themselves were changed');
+      } finally {
+        recipes=real.recipes; window.askChoice=real.choice; window.askPrompt=real.prompt; window.askConfirm=real.confirm;
+        window.householdJoinByInvite=real.join; window.householdFound=real.found; window.saveData=real.save; window.toast=real.toast;
+        try{ if(hhWas===null) localStorage.removeItem('tonys_household'); else localStorage.setItem('tonys_household', hhWas); }catch(e){}
+        renderFilters(); renderGrid();
+      }
+      // The device's language is offered only when the app speaks it.
+      if(i18nDeviceLangOffer(['he-IL','en'],['he','ru'])!=='he' || i18nDeviceLangOffer(['iw'],['he'])!=='he'
+         || i18nDeviceLangOffer(['en-US','he'],['he'])!==null || i18nDeviceLangOffer(['fr-FR'],['he'])!==null)
+        throw new Error('the language offer picks the wrong language');
+      // The tour points at what is on screen, and ends.
+      try{
+        var n=startTour();
+        if(n<3) throw new Error('the tour found only '+n+' of its places on screen');
+        for(var k=0;k<n;k++){ var b=document.getElementById('tourNext'); if(!b) throw new Error('the tour lost its Next button at step '+(k+1)); b.click(); }
+        if(document.getElementById('tourOverlay')) throw new Error('the tour did not end');
+      } finally {
+        var t=document.getElementById('tourOverlay'); if(t) t.remove();
+        try{ if(tourWas===null) localStorage.removeItem('tonys_tour_done'); else localStorage.setItem('tonys_tour_done', tourWas); }catch(e){}
+      }
+      // Feedback reaches a person, and says which version it is about.
+      var m=feedbackMailto();
+      if(m.indexOf('mailto:'+(APP_CONFIG.supportEmail||APP_CONFIG.ownerEmail))!==0 || m.indexOf(encodeURIComponent(APP_VERSION))===-1)
+        throw new Error('the feedback link reads '+m.slice(0,120));
+      ['startTour','sendFeedback'].forEach(function(f){ if(!document.querySelector('#settingsDrop [onclick*="'+f+'"]')) throw new Error(f+' is not in the ⚙️ menu'); });
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —
