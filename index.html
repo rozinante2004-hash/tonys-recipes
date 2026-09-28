@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.03 -->
+<!-- Tony's Recipes Collection v37.04 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4682,7 +4682,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.03';
+var APP_VERSION = 'v37.04';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7314,7 +7314,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.03</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.04</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7951,7 +7951,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.03</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.04</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -20686,6 +20686,19 @@ function loginSay(text, good) {
   if (!el) { toast(text, 8000); return; }
   el.textContent = text; el.style.display = text ? 'block' : 'none';
   el.style.color = good ? 'var(--good-text, #2E7D32)' : 'var(--bad-text)';
+  // v37.04 — below an open e-mail form it can be off the bottom of the screen.
+  if (text && el.scrollIntoView) try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e) {}
+}
+// v37.04 — a button that is working says so, and the sign-in screen closes as
+// soon as the account is there (not only when the rest of sign-in has run).
+function busyButton(btn, text) {
+  if (!btn) return function(){};
+  var was = btn.textContent; btn.textContent = text; btn.disabled = true;
+  return function(){ btn.textContent = was; btn.disabled = false; };
+}
+function signedInCloseLogin() {
+  var l = document.getElementById('loginScreen'); if (l) l.style.display = 'none';
+  var f = document.getElementById('emailSignInPassword'); if (f) f.value = '';
 }
 function authReady() {
   if (typeof firebase === 'undefined' || !window._fbAuth) { loginSay('No connection to the sign-in service yet — check the connection and try again.'); return false; }
@@ -20728,15 +20741,25 @@ async function emailSignIn(mode) {
   if (mode === 'up' && v.password.length < 8) { loginSay(authErrorText({ code: 'auth/weak-password' })); return null; }
   if (!v.password) { loginSay(authErrorText({ code: 'auth/missing-password' })); return null; }
   window._justSignedIn = true;
+  // v37.04 — Tony: "Create an account did nothing". A real sign-up takes a
+  // moment and nothing on screen changed, so he pressed "Continue offline" —
+  // and the account arrived behind it. The button now says it is working, and
+  // the sign-in screen closes the moment the account is there.
+  var btn = document.querySelector('#emailSignInForm button[onclick="emailSignIn(\'' + mode + '\')"]');
+  var done = busyButton(btn, mode === 'up' ? 'Creating your account…' : 'Signing in…');
   try {
     if (mode === 'up') {
       var cred = await _fbAuth.createUserWithEmailAndPassword(v.email, v.password);
-      try { await cred.user.sendEmailVerification({ url: continueUrl() }); } catch(e) {}
-      toast('✉️ Welcome! We sent a confirmation to ' + v.email + ' — open it when you can.', 9000);
+      done(); signedInCloseLogin();
+      try { await cred.user.sendEmailVerification({ url: continueUrl() }); syncLog('auth', 'Sent the address confirmation', v.email); }
+      catch(e) { syncLog('error', 'Could not send the address confirmation', ((e && e.code) || '') + ' ' + ((e && e.message) || '')); }
+      toast('✉️ Welcome! We sent a confirmation to ' + v.email + ' — look in spam too.', 9000);
       return cred;
     }
-    return await _fbAuth.signInWithEmailAndPassword(v.email, v.password);
-  } catch(e) { authFailed(e, mode === 'up' ? 'Creating an account' : 'Sign-in with a password'); return null; }
+    var c2 = await _fbAuth.signInWithEmailAndPassword(v.email, v.password);
+    done(); signedInCloseLogin();
+    return c2;
+  } catch(e) { done(); authFailed(e, mode === 'up' ? 'Creating an account' : 'Sign-in with a password'); return null; }
 }
 async function emailResetPassword() {
   if (!signInOn('password') || !authReady()) return null;
@@ -20753,10 +20776,12 @@ async function emailSendLink() {
   if (!signInOn('emailLink') || !authReady()) return null;
   var v = emailFormValues();
   if (!emailLooksValid(v.email)) { loginSay(authErrorText({ code: 'auth/invalid-email' })); return null; }
+  var done = busyButton(document.querySelector('#emailSignInForm button[onclick="emailSendLink()"]'), 'Sending…');
   try {
     await _fbAuth.sendSignInLinkToEmail(v.email, { url: continueUrl(), handleCodeInApp: true });
+    done();
     try { localStorage.setItem(SIGNIN_EMAIL_KEY, v.email); } catch(e) {}
-    loginSay('✉️ A sign-in link is on its way to ' + v.email + '. Open it on this device.', true);
+    loginSay('✉️ A sign-in link is on its way to ' + v.email + '. Open it on this device (and look in spam too).', true);
     return true;
   } catch(e) { authFailed(e, 'Sending a sign-in link'); return null; }
 }

@@ -1969,6 +1969,7 @@ window.SELF_TESTS = [
       var real={ over:Object.assign({}, window._signInOverride), auth:window._fbAuth, fb:window.firebase, user:window._fbUser, toast:window.toast };
       var mailWas=null; try{ mailWas=localStorage.getItem('tonys_signin_email'); }catch(e){}
       var host=document.getElementById('otherSignIns'); if(!host) throw new Error('the sign-in screen has no place for the other ways');
+      var loginEl=document.getElementById('loginScreen'), loginWas=loginEl?loginEl.style.display:'';
       try{
         window.toast=function(){};
         // Switched off: only Google. Switched on: each appears.
@@ -1994,6 +1995,12 @@ window.SELF_TESTS = [
         var before=JSON.stringify(localStorage).length;
         await emailSignIn('up');
         if(calls.join()!=='create:new@example.com,verify') throw new Error('creating an account did: '+calls.join());
+        // v37.04 — the sign-in screen closes the moment the account is there,
+        // and the password field is emptied.
+        if(loginEl && loginEl.style.display!=='none') throw new Error('the sign-in screen stayed open after the account was created');
+        if(P.value) throw new Error('the password stayed in the field');
+        if(loginEl) loginEl.style.display=loginWas;
+        P.value='a long enough one';
         if(JSON.stringify(localStorage).indexOf('a long enough one')!==-1) throw new Error('the password was kept on this device');
         calls=[]; await emailSignIn('in');
         if(!/do not match/.test(err.textContent)) throw new Error('a wrong password said: '+err.textContent);
@@ -2013,6 +2020,7 @@ window.SELF_TESTS = [
         window._signInOverride=real.over; window._fbAuth=real.auth; window.firebase=real.fb; window._fbUser=real.user; window.toast=real.toast;
         try{ if(mailWas===null) localStorage.removeItem('tonys_signin_email'); else localStorage.setItem('tonys_signin_email', mailWas); }catch(e){}
         var er=document.getElementById('loginError'); if(er){ er.textContent=''; er.style.display='none'; }
+        if(loginEl) loginEl.style.display=loginWas;
         renderSignInOptions();
       }
     } },

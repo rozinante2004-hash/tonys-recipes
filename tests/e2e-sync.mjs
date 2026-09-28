@@ -449,11 +449,16 @@ try {
     const W = await device('W (welcomed)', 'welcomed@example.com', { ready: 'household', welcome: url });
     ok('someone new pastes the invitation into the welcome and joins', await inPage(W, () => (householdOf() || {}).name === 'E2E family'));
     // v37.03 — any address: a password …
-    const PW = await device('P (password)', 'pw@example.com', { ready: 'household', welcome: 'own', signIn: page => page.evaluate(async () => {
-      toggleEmailSignIn(); document.getElementById('emailSignInEmail').value = 'pw@example.com';
-      document.getElementById('emailSignInPassword').value = 'correct horse battery';
-      return !!(await emailSignIn('up'));
-    }) });
+    // Pressed the way a person does it — the buttons on the sign-in screen.
+    const PW = await device('P (password)', 'pw@example.com', { ready: 'household', welcome: 'own', signIn: async page => {
+      await page.waitForSelector('#loginScreen #emailSignInToggle', { state: 'visible', timeout: 20000 });
+      await page.click('#emailSignInToggle');
+      await page.fill('#emailSignInEmail', 'pw@example.com');
+      await page.fill('#emailSignInPassword', 'correct horse battery');
+      await page.click('#emailSignInForm button:has-text("Create an account")');
+    } });
+    ok('…and the sign-in screen gets out of the way', await inPage(PW, () => getComputedStyle(document.getElementById('loginScreen')).display === 'none'),
+       JSON.stringify(await inPage(PW, () => [getComputedStyle(document.getElementById('loginScreen')).display, (document.getElementById('loginError') || {}).textContent])));
     ok('someone signs up with any address and a password, and starts a collection',
        await inPage(PW, () => { const u = firebase.auth().currentUser; return u && u.providerData[0].providerId === 'password' && !!householdOf(); }));
     ok('…and is not yet confirmed, so no place kept for that address would open', await inPage(PW, () => firebase.auth().currentUser.emailVerified === false));
