@@ -406,6 +406,27 @@ found only because a test was written first and disagreed with the code.
     rules-LANGUAGE edition, not ours (Tony asked, v36.92). Which release the
     rules came from is the comment `rulesStamped()` adds under it when Show
     rules fills them in (app version + date); a comment, so Firebase ignores it.
+- **MORE WAYS TO SIGN IN (v37.03).** Tony: "many people may use work
+  addresses only". `APP_CONFIG.signIn` switches per copy: google, microsoft
+  (OAuthProvider 'microsoft.com', prompt=select_account — work AND personal),
+  apple (OAuthProvider 'apple.com'), password, emailLink. Family: Google only;
+  test copy: + microsoft, password, emailLink (Apple waits for a developer
+  account). Each ALSO needs enabling in Firebase → Authentication → Sign-in
+  method (else `auth/operation-not-allowed`, explained on screen). Passwords
+  are Firebase Auth's (hashed by Google) — the app never stores one (a
+  self-test checks localStorage). **An address someone typed is not theirs
+  until confirmed:** the `shared` rules now need `email_verified`
+  (`confirmed()`; Google's always are), `isAppOwner()` needs it, and
+  `householdClaimKept` does not even search for kept places for an
+  unconfirmed address (the rules refuse that query — which, before the fix,
+  stopped the whole household step for a new password account). Unconfirmed
+  users get a one-time "send the confirmation e-mail" offer that waits until
+  no other dialog is open. "Forgot password?" answers the same whether or not
+  an account exists. Email links: `completeEmailLinkSignIn` on load (the
+  address asked again if the link is opened on another device). Tests: rules
+  (unconfirmed account with a member's address refused), self-test
+  `auth_more_ways_to_sign_in`, e2e password sign-up and email link via the
+  Auth emulator's oobCodes.
 - **"SCRIPT ERROR." MEANS A CROSS-ORIGIN SCRIPT (v36.98).** Tony's report after
   a restart of the household test copy showed two bare "Script error." lines
   (and Firebase not restoring the session). A browser hides the message of an

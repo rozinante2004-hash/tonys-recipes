@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.02 -->
+<!-- Tony's Recipes Collection v37.03 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -159,8 +159,25 @@
       bring:    true,     // Bring!: open the chosen ingredients in the person's own Bring! app (official import, v36.89)
       bringDirect: true,  // …and send them straight to THIS household's Bring! list (token kept on the Worker)
       gmail:    true      // Send a recipe by e-mail through your Gmail
+    }),
+    // v37.03 — the ways to sign in on THIS copy. Each needs switching on in the
+    // Firebase console (Authentication → Sign-in method) as well, and Apple and
+    // Microsoft need their own developer setup; until then they stay off here.
+    signIn: Object.freeze({
+      google:    true,
+      microsoft: false,   // work (Microsoft 365) and personal Microsoft accounts
+      apple:     false,
+      password:  false,   // any address + a password (stored hashed by Firebase, never by the app)
+      emailLink: false    // any address, a sign-in link by e-mail, no password
     })
   });
+  window._signInOverride = {};          // tests only, like _featureOverride
+  window.signInOn = function (kind) {
+    var o = window._signInOverride;
+    if (o && Object.prototype.hasOwnProperty.call(o, kind)) return !!o[kind];
+    var s = window.APP_CONFIG.signIn || { google: true };
+    return s[kind] === true;
+  };
   // Is a feature on? A test may override it for a moment (the config itself is
   // frozen). Unknown names are OFF: a typo must not switch something on.
   window._featureOverride = {};
@@ -376,6 +393,11 @@
       window._fbProvider = _fbProvider;
 
       _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+      // v37.03 — arriving from an e-mailed sign-in link finishes signing in.
+      (function finishLink(n) {
+        if (typeof window.completeEmailLinkSignIn === 'function') window.completeEmailLinkSignIn().catch(function(){});
+        else if (n < 50) setTimeout(function(){ finishLink(n + 1); }, 100);
+      })(0);
 
       _fbDb.enablePersistence({synchronizeTabs: true}).catch(function(e) {
         if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
@@ -384,6 +406,7 @@
 
       _fbAuth.onAuthStateChanged(function(user) {
         try { syncLog('auth', user ? 'Signed in' : 'Signed out'); } catch(e) {}
+        if (user && typeof window.emailVerifyNudge === 'function') try { window.emailVerifyNudge(user); } catch(e) {}
         if (user) {
           var isAutoLogin = !window._justSignedIn;
           window._justSignedIn = false;
@@ -3777,8 +3800,13 @@ function hhMemberDoc(user, role, extra) {
 // A place kept for this person's (verified) e-mail — claim every one.
 async function householdClaimKept(user) {
   var email = String(user.email || '').toLowerCase();
-  if (!email) return 0;
-  var q = await hhDb().collection('pending').where('email', '==', email).get(), n = 0, kept = [];
+  // v37.03 — only a CONFIRMED address may look for places kept for it (the
+  // rules refuse the search otherwise, and that refusal used to stop the whole
+  // household step for anyone who signed up with a password).
+  if (!email || user.emailVerified === false) return 0;
+  var q, n = 0, kept = [];
+  try { q = await hhDb().collection('pending').where('email', '==', email).get(); }
+  catch(e) { syncLog('error', 'Could not look for places kept for this address', String(e && e.message).slice(0, 160)); return 0; }
   q.forEach(function(d) { kept.push({ ref: d.ref, data: d.data() || {} }); });
   for (var i = 0; i < kept.length; i++) {
     try {
@@ -4654,7 +4682,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.02';
+var APP_VERSION = 'v37.03';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7286,7 +7314,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.02</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.03</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7923,10 +7951,10 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.02</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.03</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
-    <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
+    <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
     <button class="google-signin-btn" id="googleSignInBtn" onclick="startGoogleSignIn()">
       <svg class="google-icon" viewBox="0 0 48 48">
         <path fill="#4285F4" d="M45.5 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h12.1c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.9 6.7-9.6 6.7-16.1z"/>
@@ -7936,6 +7964,8 @@ body.banner-shown .header {
       </svg>
       Sign in with Google
     </button>
+    <!-- v37.03 — the other ways, each shown only when switched on for this copy -->
+    <div id="otherSignIns" style="margin-top:8px;"></div>
     <div id="loginError" style="color:var(--bad-text);font-size:12px;margin-top:8px;display:none;"></div>
     <!-- v36.38 — "it just goes to Offline mode" had no next step. Every reason
          sign-in fails is invisible from inside the page unless it is asked for
@@ -11690,7 +11720,9 @@ async function copyWorkerCode() {
 window.copyWorkerCode = copyWorkerCode; window.workerCodeCheck = workerCodeCheck;
 
 function isAppOwner() {
-  try { return !!(window._fbUser && window._fbUser.email
+  // v37.03 — and CONFIRMED: an account made with the owner's address and a
+  // password proves nothing until the mailbox has confirmed it.
+  try { return !!(window._fbUser && window._fbUser.email && window._fbUser.emailVerified !== false
                   && String(window._fbUser.email).toLowerCase() === APP_OWNER_EMAIL); }
   catch(e) { return false; }
 }
@@ -20573,6 +20605,208 @@ async function startGoogleSignIn() {
   }
 }
 window.startGoogleSignIn = startGoogleSignIn;
+
+// ═══ MORE WAYS TO SIGN IN (v37.03) ═══════════════════════════════════════════
+// Tony: "many people may use work addresses only". Besides Google: Microsoft
+// (work Microsoft 365 accounts and personal ones), Apple (the App Store asks for
+// it wherever Google is offered), and any address at all — with a password, or
+// with a sign-in link sent to it. Passwords are Firebase Authentication's: kept
+// hashed by Google, never seen or stored by the app. Each way is switched on per
+// copy (APP_CONFIG.signIn) once it is set up in the Firebase console.
+// An address someone merely typed is not an address they own: the rules only
+// honour CONFIRMED ones (Google's always are), and anyone whose address is not
+// confirmed is offered the confirmation e-mail.
+var SIGNIN_EMAIL_KEY = 'tonys_signin_email';
+function authErrorText(err) {
+  var c = (err && err.code) || '';
+  return ({
+    'auth/popup-closed-by-user': 'Sign-in was cancelled.',
+    'auth/cancelled-popup-request': 'Sign-in was cancelled.',
+    'auth/popup-blocked': 'The sign-in window was blocked. Please allow pop-ups for this site.',
+    'auth/unauthorized-domain': 'This address is not allowed to sign in (Firebase → Authentication → Settings → Authorised domains).',
+    'auth/operation-not-allowed': 'This way of signing in is not switched on for this copy yet (Firebase → Authentication → Sign-in method).',
+    'auth/invalid-email': 'That does not look like an e-mail address.',
+    'auth/missing-password': 'Please type your password.',
+    'auth/weak-password': 'Please choose a longer password — at least 8 characters.',
+    'auth/email-already-in-use': 'There is already an account with this address. Sign in instead — or, if you usually use Google or Microsoft with it, use that button.',
+    'auth/invalid-credential': 'That e-mail address and password do not match.',
+    'auth/wrong-password': 'That e-mail address and password do not match.',
+    'auth/user-not-found': 'That e-mail address and password do not match.',
+    'auth/too-many-requests': 'Too many tries. Wait a few minutes, or use "Forgot password?".',
+    'auth/account-exists-with-different-credential': 'You have signed in with this address another way before (Google, Microsoft, Apple or a password). Please use that way.',
+    'auth/invalid-action-code': 'This sign-in link has expired or was already used. Ask for a new one.',
+    'auth/expired-action-code': 'This sign-in link has expired. Ask for a new one.',
+    'auth/network-request-failed': 'No connection to the sign-in service. Check the connection and try again.'
+  })[c] || ((err && err.message) || String(err));
+}
+function renderSignInOptions() {
+  var host = document.getElementById('otherSignIns');
+  if (!host) return;
+  var g = document.getElementById('googleSignInBtn');
+  if (g) g.style.display = signInOn('google') ? '' : 'none';
+  var b = 'class="google-signin-btn" style="margin-top:8px;"';
+  var h = '';
+  if (signInOn('microsoft')) h += '<button ' + b + ' id="microsoftSignInBtn" onclick="startProviderSignIn(\'microsoft\')">'
+    + '<span aria-hidden="true" style="display:inline-grid;grid-template-columns:9px 9px;gap:2px;margin-inline-end:10px;">'
+    + '<i style="width:9px;height:9px;background:#F25022"></i><i style="width:9px;height:9px;background:#7FBA00"></i>'
+    + '<i style="width:9px;height:9px;background:#00A4EF"></i><i style="width:9px;height:9px;background:#FFB900"></i></span>'
+    + 'Sign in with Microsoft <span style="font-weight:400;opacity:0.75;">&nbsp;(work or personal)</span></button>';
+  if (signInOn('apple')) h += '<button ' + b + ' id="appleSignInBtn" onclick="startProviderSignIn(\'apple\')">'
+    + '<span aria-hidden="true" style="margin-inline-end:10px;font-size:17px;"></span>Sign in with Apple</button>';
+  if (signInOn('password') || signInOn('emailLink')) {
+    h += '<button ' + b + ' id="emailSignInToggle" onclick="toggleEmailSignIn()">✉️ Use my e-mail address</button>'
+      + '<div id="emailSignInForm" style="display:none;margin-top:10px;text-align:start;">'
+      +   '<label for="emailSignInEmail" style="font-size:12px;color:var(--muted);">E-mail address</label>'
+      +   '<input id="emailSignInEmail" type="email" autocomplete="email" dir="ltr" class="ask-input" style="width:100%;box-sizing:border-box;margin:4px 0 8px;">'
+      +   (signInOn('password')
+            ? '<label for="emailSignInPassword" style="font-size:12px;color:var(--muted);">Password</label>'
+              + '<input id="emailSignInPassword" type="password" autocomplete="current-password" dir="ltr" class="ask-input" style="width:100%;box-sizing:border-box;margin:4px 0 8px;">'
+              + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+              +   '<button class="ask-btn" onclick="emailSignIn(\'in\')">Sign in</button>'
+              +   '<button class="ask-btn ghost" onclick="emailSignIn(\'up\')">Create an account</button>'
+              + '</div>'
+              + '<button onclick="emailResetPassword()" style="margin-top:6px;background:none;border:none;color:var(--terracotta);text-decoration:underline;font-size:12px;cursor:pointer;padding:0;">Forgot password?</button>'
+            : '')
+      +   (signInOn('emailLink')
+            ? '<div style="margin-top:8px;"><button class="ask-btn ghost" onclick="emailSendLink()">'
+              + (signInOn('password') ? 'No password — e-mail me a sign-in link instead' : 'E-mail me a sign-in link') + '</button></div>'
+            : '')
+      + '</div>';
+  }
+  host.innerHTML = h;
+}
+function toggleEmailSignIn() {
+  var f = document.getElementById('emailSignInForm');
+  if (!f) return;
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  if (f.style.display === 'block') { var e = document.getElementById('emailSignInEmail'); if (e) e.focus(); }
+}
+function loginSay(text, good) {
+  var el = document.getElementById('loginError');
+  if (!el) { toast(text, 8000); return; }
+  el.textContent = text; el.style.display = text ? 'block' : 'none';
+  el.style.color = good ? 'var(--good-text, #2E7D32)' : 'var(--bad-text)';
+}
+function authReady() {
+  if (typeof firebase === 'undefined' || !window._fbAuth) { loginSay('No connection to the sign-in service yet — check the connection and try again.'); return false; }
+  loginSay('');
+  var remember = document.getElementById('rememberMe');
+  if (remember && !remember.checked) _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+  return true;
+}
+function authFailed(err, what) {
+  window._justSignedIn = false;
+  _lastAuthError = (err && err.code || 'no code') + ' — ' + (err && err.message || '');
+  try { syncLog('error', what + ' failed', _lastAuthError.slice(0, 200)); } catch(e) {}
+  loginSay(authErrorText(err));
+}
+async function startProviderSignIn(kind) {
+  if (!signInOn(kind) || !authReady()) return null;
+  var p;
+  if (kind === 'microsoft') {
+    p = new firebase.auth.OAuthProvider('microsoft.com');
+    p.setCustomParameters({ prompt: 'select_account' });     // work AND personal accounts
+  } else if (kind === 'apple') {
+    p = new firebase.auth.OAuthProvider('apple.com');
+    p.addScope('email'); p.addScope('name');
+  } else return null;
+  window._justSignedIn = true;
+  try { return await _fbAuth.signInWithPopup(p); }
+  catch(e) { authFailed(e, 'Sign-in with ' + kind); return null; }
+}
+function emailFormValues() {
+  var e = ((document.getElementById('emailSignInEmail') || {}).value || '').trim().toLowerCase();
+  var p = (document.getElementById('emailSignInPassword') || {}).value || '';
+  return { email: e, password: p };
+}
+function emailLooksValid(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e || '')); }
+function continueUrl() { return APP_CONFIG.siteOrigin + APP_CONFIG.sitePath; }
+async function emailSignIn(mode) {
+  if (!signInOn('password') || !authReady()) return null;
+  var v = emailFormValues();
+  if (!emailLooksValid(v.email)) { loginSay(authErrorText({ code: 'auth/invalid-email' })); return null; }
+  if (mode === 'up' && v.password.length < 8) { loginSay(authErrorText({ code: 'auth/weak-password' })); return null; }
+  if (!v.password) { loginSay(authErrorText({ code: 'auth/missing-password' })); return null; }
+  window._justSignedIn = true;
+  try {
+    if (mode === 'up') {
+      var cred = await _fbAuth.createUserWithEmailAndPassword(v.email, v.password);
+      try { await cred.user.sendEmailVerification({ url: continueUrl() }); } catch(e) {}
+      toast('✉️ Welcome! We sent a confirmation to ' + v.email + ' — open it when you can.', 9000);
+      return cred;
+    }
+    return await _fbAuth.signInWithEmailAndPassword(v.email, v.password);
+  } catch(e) { authFailed(e, mode === 'up' ? 'Creating an account' : 'Sign-in with a password'); return null; }
+}
+async function emailResetPassword() {
+  if (!signInOn('password') || !authReady()) return null;
+  var v = emailFormValues();
+  if (!emailLooksValid(v.email)) { loginSay('Type your e-mail address above first, then press "Forgot password?" again.'); return null; }
+  try { await _fbAuth.sendPasswordResetEmail(v.email, { url: continueUrl() }); } catch(e) {
+    if (e && e.code !== 'auth/user-not-found') { authFailed(e, 'Password reset'); return null; }
+  }
+  // The same words whether or not there is an account: nobody learns which addresses have one.
+  loginSay('If there is an account for ' + v.email + ', a link to choose a new password is on its way.', true);
+  return true;
+}
+async function emailSendLink() {
+  if (!signInOn('emailLink') || !authReady()) return null;
+  var v = emailFormValues();
+  if (!emailLooksValid(v.email)) { loginSay(authErrorText({ code: 'auth/invalid-email' })); return null; }
+  try {
+    await _fbAuth.sendSignInLinkToEmail(v.email, { url: continueUrl(), handleCodeInApp: true });
+    try { localStorage.setItem(SIGNIN_EMAIL_KEY, v.email); } catch(e) {}
+    loginSay('✉️ A sign-in link is on its way to ' + v.email + '. Open it on this device.', true);
+    return true;
+  } catch(e) { authFailed(e, 'Sending a sign-in link'); return null; }
+}
+// Arriving from the sign-in link in the e-mail.
+async function completeEmailLinkSignIn() {
+  if (!window._fbAuth || !_fbAuth.isSignInWithEmailLink || !_fbAuth.isSignInWithEmailLink(location.href)) return null;
+  var email = null;
+  try { email = localStorage.getItem(SIGNIN_EMAIL_KEY); } catch(e) {}
+  if (!email) {
+    // Opened on another device than the one that asked: the address is asked
+    // for again, so a forwarded link alone is not enough to sign in.
+    email = await askPrompt('To finish signing in, type the e-mail address the link was sent to.', '', { icon: '✉️', title: 'Confirm your address', okLabel: 'Sign in' });
+    if (typeof email !== 'string' || !email.trim()) return null;
+  }
+  window._justSignedIn = true;
+  try {
+    var cred = await _fbAuth.signInWithEmailLink(email.trim().toLowerCase(), location.href);
+    try { localStorage.removeItem(SIGNIN_EMAIL_KEY); } catch(e) {}
+    history.replaceState(null, '', location.pathname);
+    return cred;
+  } catch(e) { authFailed(e, 'Sign-in with a link'); return null; }
+}
+// Signed in, but the address is not confirmed (a new password account; some
+// work accounts): offered once per account, since places kept by address and
+// the family's list both need it.
+function emailVerifyNudge(user) {
+  if (!user || !user.email || user.emailVerified !== false || window._selfTestRunning) return false;
+  var key = 'tonys_verify_offered_' + user.uid;
+  try { if (localStorage.getItem(key)) return false; localStorage.setItem(key, '1'); } catch(e) {}
+  // One dialog at a time: after the welcome and the tour offer, not over them.
+  var quiet = 0, tries = 0;
+  (function whenQuiet() {
+    if (++tries > 120) return;
+    quiet = (document.getElementById('askOverlay') || document.getElementById('tourOverlay')) ? 0 : quiet + 1;
+    if (quiet < 3) { setTimeout(whenQuiet, 1000); return; }
+    askConfirm({ icon: '✉️', title: 'Please confirm your e-mail address',
+      message: 'We have not yet confirmed that ' + user.email + ' is yours. Until you do, places kept for that address '
+        + '(and a family list that names it) cannot open for you. Invitation links work either way.',
+      okLabel: 'Send the confirmation e-mail', cancelLabel: 'Later' })
+      .then(function(ok){ if (ok === true) user.sendEmailVerification({ url: continueUrl() })
+        .then(function(){ toast('✉️ Sent to ' + user.email + ' — open it, then come back and reload the app.', 9000); })
+        .catch(function(e){ toast('❌ ' + authErrorText(e), 8000); }); });
+  })();
+  return true;
+}
+window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
+window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
+window.emailSendLink = emailSendLink; window.completeEmailLinkSignIn = completeEmailLinkSignIn; window.emailVerifyNudge = emailVerifyNudge;
+window.emailLooksValid = emailLooksValid;
+document.addEventListener('DOMContentLoaded', renderSignInOptions);
 
 // ─── LONG JOBS SHOW THEIR PROGRESS (v36.38) ──────────────────────────────────
 // Generating a language is ten AI calls and most of a minute. A toast saying

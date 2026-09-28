@@ -24,7 +24,10 @@ const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8
   .replaceAll('{{APP_ADMINS}}', q([OWNER]));
 
 const env = await initializeTestEnvironment({ projectId: 'demo-rules', firestore: { rules } });
-const as = email => env.authenticatedContext(email.split('@')[0], { email }).firestore();
+const as = email => env.authenticatedContext(email.split('@')[0], { email, email_verified: true }).firestore();
+// v37.03 — someone who made an account with a member's address and a password,
+// without confirming it (they do not own the mailbox).
+const unconfirmed = email => env.authenticatedContext('pw-' + email.split('@')[0], { email, email_verified: false }).firestore();
 let failures = 0;
 async function check(name, p, shouldPass) {
   try { await (shouldPass ? assertSucceeds(p) : assertFails(p)); console.log('  ok   ' + name); }
@@ -42,6 +45,9 @@ console.log('Reading');
 await check('a reader can read a recipe',            getDoc(doc(as(READER), 'shared/recipe_1')), true);
 await check('a stranger cannot read a recipe',       getDoc(doc(as(STRANGER), 'shared/recipe_1')), false);
 await check('signed out cannot read',                getDoc(doc(env.unauthenticatedContext().firestore(), 'shared/recipe_1')), false);
+await check('an UNCONFIRMED account with a member\'s address cannot read (v37.03)', getDoc(doc(unconfirmed(READER), 'shared/recipe_1')), false);
+await check('…nor write with an admin\'s address',    setDoc(doc(unconfirmed(ADMIN), 'shared/recipe_1'), { r: '{}', updatedAt: 9 }), false);
+await check('…nor delete with the owner\'s address',  deleteDoc(doc(unconfirmed(OWNER), 'shared/recipe_1')), false);
 
 console.log('Translations are public (v36.88)');
 const anon = env.unauthenticatedContext().firestore();

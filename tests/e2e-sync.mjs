@@ -188,6 +188,10 @@ const server = http.createServer((req, res) => {
       const before = body;
       body = body.replace(/dataLayout:(\s*)'shared'/, "dataLayout:$1'households'");
       if (body === before) throw new Error('could not switch the page to the household layout');
+      // v37.03 — and any address may sign in: a password, or a link by e-mail.
+      const b2 = body;
+      body = body.replace(/(password:\s*)false/, '$1true').replace(/(emailLink:\s*)false/, '$1true');
+      if (body === b2) throw new Error('could not switch on the other ways to sign in');
     }
   }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -221,7 +225,8 @@ async function device(label, email, opts = {}) {
   await ctx.addInitScript(emu => { window.__FIREBASE_EMULATOR__ = emu; }, EMU);
   await page.goto(`http://127.0.0.1:${PORT}/index.html${opts.query || ''}`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window._fbAuth && window._fbEmulated === true, null, { timeout: 20000 });
-  await page.evaluate(async (who) => {
+  if (opts.signIn) await opts.signIn(page);   // v37.03 — another way than Google
+  else await page.evaluate(async (who) => {
     window._justSignedIn = true;               // the app's "just signed in", not an auto-login
     const cred = firebase.auth.GoogleAuthProvider.credential(
       JSON.stringify({ sub: 'uid-' + who.replace(/\W/g, ''), email: who, email_verified: true }));
@@ -443,6 +448,26 @@ try {
     // v37.00 — the same link, pasted into the welcome instead of opened.
     const W = await device('W (welcomed)', 'welcomed@example.com', { ready: 'household', welcome: url });
     ok('someone new pastes the invitation into the welcome and joins', await inPage(W, () => (householdOf() || {}).name === 'E2E family'));
+    // v37.03 — any address: a password …
+    const PW = await device('P (password)', 'pw@example.com', { ready: 'household', welcome: 'own', signIn: page => page.evaluate(async () => {
+      toggleEmailSignIn(); document.getElementById('emailSignInEmail').value = 'pw@example.com';
+      document.getElementById('emailSignInPassword').value = 'correct horse battery';
+      return !!(await emailSignIn('up'));
+    }) });
+    ok('someone signs up with any address and a password, and starts a collection',
+       await inPage(PW, () => { const u = firebase.auth().currentUser; return u && u.providerData[0].providerId === 'password' && !!householdOf(); }));
+    ok('…and is not yet confirmed, so no place kept for that address would open', await inPage(PW, () => firebase.auth().currentUser.emailVerified === false));
+    // … or a link sent to it, opened on the same device.
+    const LK = await device('L (link)', 'link@example.com', { ready: 'household', welcome: 'own', signIn: async page => {
+      await page.evaluate(async () => { toggleEmailSignIn(); document.getElementById('emailSignInEmail').value = 'link@example.com'; return emailSendLink(); });
+      const codes = await (await fetch(`http://${EMU.host}:${EMU.authPort}/emulator/v1/projects/${EMU.projectId}/oobCodes`)).json();
+      const c = (codes.oobCodes || []).filter(x => x.email === 'link@example.com' && x.requestType === 'EMAIL_SIGNIN').pop();
+      const q = new URL(c.oobLink).searchParams;
+      await page.goto(`http://127.0.0.1:${PORT}/index.html?mode=signIn&oobCode=${q.get('oobCode')}&apiKey=${q.get('apiKey')}`, { waitUntil: 'domcontentloaded' });
+    } });
+    ok('someone signs in with a link sent to their address', await inPage(LK, () => {
+      const u = firebase.auth().currentUser; return u && u.email === 'link@example.com' && u.emailVerified === true && !!householdOf(); }));
+    ok('…and the link is gone from the address bar', await inPage(LK, () => !/oobCode/.test(location.href)));
     ok('…and a new household starts empty (no examples imposed)', await inPage(N, () => recipes.length === 0 && !!document.getElementById('firstRunEmpty')),
        JSON.stringify(await inPage(N, () => recipes.map(r => r.name))));
 

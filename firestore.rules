@@ -41,8 +41,11 @@ service cloud.firestore {
       // nothing else in `shared` is opened by this line.
       allow get: if docId.matches('i18n_.*');
 
-      // Read: owner + all members
-      allow read: if request.auth != null &&
+      // Read: owner + all members — with a CONFIRMED address (v37.03). Once
+      // an account can be made with any address and a password, an address
+      // on this list proves nothing until its owner has confirmed it; Google
+      // addresses always are, so nothing changes for anyone signed in today.
+      allow read: if request.auth != null && confirmed() &&
         request.auth.token.email in [{{READ}}];
 
       // Create + update: owner + write/admin members — EXCEPT the documents
@@ -53,7 +56,7 @@ service cloud.firestore {
       // DELETE, and allow rules are OR'd, so granting `write` here would hand
       // every write-role member deletion as well and make the `allow delete`
       // below decorative.
-      allow create, update: if request.auth != null && (
+      allow create, update: if request.auth != null && confirmed() && (
         request.auth.token.email in [{{ADMIN}}] ||
         (request.auth.token.email in [{{WRITE}}] && !adminOnlyDoc(docId)));
 
@@ -62,9 +65,10 @@ service cloud.firestore {
       // it from their own device but cannot remove the cloud documents, so it
       // reappears on their next sync. The app says so plainly rather than
       // letting it look like a bug — see flushCloudDeletes.
-      allow delete: if request.auth != null &&
+      allow delete: if request.auth != null && confirmed() &&
         request.auth.token.email in [{{ADMIN}}];
     }
+    function confirmed() { return request.auth.token.email_verified == true; }
     function adminOnlyDoc(id) {
       return id == 'access' || id.matches('i18n_.*');
     }

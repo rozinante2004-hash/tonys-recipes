@@ -1962,6 +1962,61 @@ window.SELF_TESTS = [
       ['startTour','sendFeedback'].forEach(function(f){ if(!document.querySelector('#settingsDrop [onclick*="'+f+'"]')) throw new Error(f+' is not in the ⚙️ menu'); });
     } },
 
+  { id:'auth_more_ways_to_sign_in', group:'Security', name:'Other ways to sign in: shown when switched on, and passwords never kept by the app (v37.03)',
+    test: async()=>{
+      ['signInOn','renderSignInOptions','startProviderSignIn','emailSignIn','emailResetPassword','emailSendLink','completeEmailLinkSignIn','authErrorText'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var real={ over:Object.assign({}, window._signInOverride), auth:window._fbAuth, fb:window.firebase, user:window._fbUser, toast:window.toast };
+      var mailWas=null; try{ mailWas=localStorage.getItem('tonys_signin_email'); }catch(e){}
+      var host=document.getElementById('otherSignIns'); if(!host) throw new Error('the sign-in screen has no place for the other ways');
+      try{
+        window.toast=function(){};
+        // Switched off: only Google. Switched on: each appears.
+        window._signInOverride={ google:true, microsoft:false, apple:false, password:false, emailLink:false }; renderSignInOptions();
+        if(host.querySelector('button')) throw new Error('a way that is switched off is offered: '+host.textContent);
+        window._signInOverride={ google:true, microsoft:true, apple:true, password:true, emailLink:true }; renderSignInOptions();
+        ['microsoftSignInBtn','appleSignInBtn','emailSignInToggle','emailSignInEmail','emailSignInPassword'].forEach(function(id){
+          if(!document.getElementById(id)) throw new Error(id+' is missing with every way switched on'); });
+        if(!/work or personal/.test(host.textContent)) throw new Error('Microsoft is not offered for work accounts too');
+        if(!/sign-in link/.test(host.textContent)||!/Forgot password/.test(host.textContent)) throw new Error('the e-mail choices are incomplete: '+host.textContent);
+        // The password goes to Firebase Authentication and nowhere else.
+        if(typeof window.firebase==='undefined') window.firebase={ auth:{ Auth:{ Persistence:{ SESSION:'session' } } } };
+        var calls=[], fakeUser={ uid:'pw1', email:'new@example.com', sendEmailVerification:async function(){ calls.push('verify'); } };
+        window._fbAuth={ setPersistence:function(){ return Promise.resolve(); },
+          createUserWithEmailAndPassword:async function(e,p){ calls.push('create:'+e); return { user:fakeUser }; },
+          signInWithEmailAndPassword:async function(e,p){ calls.push('signin:'+e); var er=new Error('x'); er.code='auth/invalid-credential'; throw er; },
+          sendPasswordResetEmail:async function(){ calls.push('reset'); var er=new Error('x'); er.code='auth/user-not-found'; throw er; },
+          sendSignInLinkToEmail:async function(e,o){ calls.push('link:'+e+':'+(o&&o.handleCodeInApp)); } };
+        var E=document.getElementById('emailSignInEmail'), P=document.getElementById('emailSignInPassword'), err=document.getElementById('loginError');
+        E.value='New@Example.com'; P.value='short';
+        if(await emailSignIn('up')!==null || calls.length || !/at least 8/.test(err.textContent)) throw new Error('a too-short password was sent on: '+err.textContent);
+        P.value='a long enough one';
+        var before=JSON.stringify(localStorage).length;
+        await emailSignIn('up');
+        if(calls.join()!=='create:new@example.com,verify') throw new Error('creating an account did: '+calls.join());
+        if(JSON.stringify(localStorage).indexOf('a long enough one')!==-1) throw new Error('the password was kept on this device');
+        calls=[]; await emailSignIn('in');
+        if(!/do not match/.test(err.textContent)) throw new Error('a wrong password said: '+err.textContent);
+        calls=[]; await emailResetPassword();
+        if(!/If there is an account/.test(err.textContent)) throw new Error('"Forgot password" tells whether an address has an account: '+err.textContent);
+        calls=[]; await emailSendLink();
+        if(calls.join()!=='link:new@example.com:true' || localStorage.getItem('tonys_signin_email')!=='new@example.com') throw new Error('the sign-in link: '+calls.join());
+        E.value='not an address'; calls=[];
+        await emailSendLink(); if(calls.length || !/does not look like/.test(err.textContent)) throw new Error('a bad address was sent a link');
+        // An address someone merely typed is not the owner's.
+        window._fbUser={ uid:'x', email:APP_OWNER_EMAIL, emailVerified:false };
+        if(isAppOwner()) throw new Error('an unconfirmed account with the owner’s address counts as the owner');
+        window._fbUser={ uid:'x', email:APP_OWNER_EMAIL, emailVerified:true };
+        if(!isAppOwner()) throw new Error('the confirmed owner is not the owner');
+        if(authErrorText({ code:'auth/operation-not-allowed' }).indexOf('not switched on')===-1) throw new Error('a way not set up yet is not explained');
+      } finally {
+        window._signInOverride=real.over; window._fbAuth=real.auth; window.firebase=real.fb; window._fbUser=real.user; window.toast=real.toast;
+        try{ if(mailWas===null) localStorage.removeItem('tonys_signin_email'); else localStorage.setItem('tonys_signin_email', mailWas); }catch(e){}
+        var er=document.getElementById('loginError'); if(er){ er.textContent=''; er.style.display='none'; }
+        renderSignInOptions();
+      }
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —
