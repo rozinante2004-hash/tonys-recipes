@@ -1844,6 +1844,9 @@ window.SELF_TESTS = [
       if(hhSame({a:1,b:[1,2]},{a:1,b:[2,1]})||hhSame({r:'x'},{r:'y'})) throw new Error('a changed document counted as identical');
       if(hhKind('recipe_4')!=='recipes'||hhKind('photo_4')!=='photos'||hhKind('chatpart_a_1')!=='chats'||hhKind('i18n_he')!=='languages'||hhKind('meta')!=='other')
         throw new Error('the move\u2019s report counts documents under the wrong heading');
+      if(householdDefaultName({ email:'tony.schvekher@amat.com' })!=='Tony\u2019s Kitchen Notes') throw new Error('an address gave the name '+householdDefaultName({ email:'tony.schvekher@amat.com' }));
+      if(typeof sameTypedName!=='function' || !sameTypedName("tony.schvekher's kitchen  notes ", 'Tony.schvekher\u2019s Kitchen Notes') || sameTypedName('', '') || sameTypedName('Tony', 'Tony\u2019s'))
+        throw new Error('a typed name with a straight apostrophe does not match the curly one (or anything matches)');
       if(householdDefaultName({ email:'michal@x.com' })!=='Michal\u2019s Kitchen Notes' || householdDefaultName({})!=='My Kitchen Notes')
         throw new Error('a founder with no display name gets no sensible name');
     } },
@@ -1888,9 +1891,13 @@ window.SELF_TESTS = [
         var said=null; window.askConfirm=async function(o){ said=o; return true; };
         var r=await accountDelete();
         if(r!==null||!said||!/Hand these over first/.test(said.title)||!/Test home/.test(said.message)) throw new Error('with others in it, deleting the account said: '+JSON.stringify(said));
-        // The menu entry is there, for the household layout only.
-        var item=document.querySelector('#settingsDrop [onclick*="accountMenu"]');
-        if(!item||item.getAttribute('data-layout-only')!=='households') throw new Error('"Your account" is not in the ⚙️ menu (household layout only)');
+        // v37.05 — "Delete my account" is the ⚙️ menu's LAST item, bold and red;
+        // "Download all my data" has its own item (household layout only).
+        var drop=document.getElementById('settingsDrop'), items=drop.querySelectorAll('button.drop-item'), last=items[items.length-1];
+        if(!last||last.id!=='deleteAccountItem'||last.getAttribute('data-layout-only')!=='households') throw new Error('"Delete my account" is not the last item of the ⚙️ menu');
+        if(parseInt(getComputedStyle(last).fontWeight,10)<700) throw new Error('"Delete my account" is not bold');
+        var dl=drop.querySelector('[onclick*="accountDownload"]');
+        if(!dl||dl.getAttribute('data-layout-only')!=='households') throw new Error('"Download all my data" is not in the ⚙️ menu');
       } finally {
         window._household=real.hh; _household=real.hh; _householdList=real.list; _cloudHid=real.hid; _cloudLayout=real.layout;
         window.askChoice=real.choice; window.askConfirm=real.confirm; window._fbAuth=real.auth; window._fbUser=real.user; window._fbDb=real.db;
@@ -2023,6 +2030,29 @@ window.SELF_TESTS = [
         if(loginEl) loginEl.style.display=loginWas;
         renderSignInOptions();
       }
+    } },
+
+  { id:'access_let_them_know', group:'UI', name:'Adding someone offers a ready message to send them (v37.05)',
+    test: async()=>{
+      ['letThemKnow','shareMessage','shareTargets','memberWelcomeText','signInHowText'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var txt=memberWelcomeText('aunt@example.com'), url=APP_CONFIG.siteOrigin+APP_CONFIG.sitePath;
+      if(txt.indexOf(url)===-1||txt.indexOf('aunt@example.com')===-1||!/sign in/.test(txt)) throw new Error('the message does not say where and how: '+txt);
+      var t=shareTargets({ to:'aunt@example.com', subject:'Our recipes', text:'Hi & welcome' });
+      if(t.mail!=='mailto:aunt@example.com?subject=Our%20recipes&body=Hi%20%26%20welcome') throw new Error('the e-mail link is '+t.mail);
+      if(t.wa!=='https://wa.me/?text=Hi%20%26%20welcome') throw new Error('the WhatsApp link is '+t.wa);
+      // Nothing odd can ride in on the address.
+      if(shareTargets({ to:'x@y.z?bcc=evil@e.com', text:'a' }).mail.indexOf('bcc')!==-1) throw new Error('an address with extra fields was used as it was');
+      // Both ways of adding someone offer it, and so does an invitation.
+      if(String(householdAddMember).indexOf('letThemKnow')===-1||String(addAccessMember).indexOf('letThemKnow')===-1) throw new Error('adding someone does not offer the message');
+      if(String(householdInvite).indexOf('shareMessage')===-1) throw new Error('an invitation link is not offered the same way');
+      // "Copy" copies the message itself.
+      var real={ choice:window.askChoice, clip:navigator.clipboard && navigator.clipboard.writeText, toast:window.toast }, copied=null;
+      try{
+        window.toast=function(){};
+        window.askChoice=async function(){ return 'copy'; };
+        if(navigator.clipboard) navigator.clipboard.writeText=async function(v){ copied=v; };
+        if(await shareMessage({ text:'the words' })!=='copy' || (navigator.clipboard && copied!=='the words')) throw new Error('copying gave '+JSON.stringify(copied));
+      } finally { window.askChoice=real.choice; if(navigator.clipboard && real.clip) navigator.clipboard.writeText=real.clip; window.toast=real.toast; }
     } },
 
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.04 -->
+<!-- Tony's Recipes Collection v37.05 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3722,6 +3722,7 @@ function addAccessMember() {
   // and are published BY HAND in the Firebase console, so nothing has been
   // granted yet — saying "added!" made it sound as though it had.
   toast('📝 ' + email + ' is on the list — not granted yet. Publish the rules below to apply it.', 6000);
+  letThemKnow(email, 'Send it once you have published the rules below — until then they cannot see the recipes.');
 }
 window.addAccessMember = addAccessMember;
 
@@ -3783,7 +3784,10 @@ function hhRef(hid) { return hhDb().collection('households').doc(hid || _cloudHi
 })();
 
 function householdDefaultName(user) {
-  var n = String((user && (user.displayName || user.email)) || '').split(/[\s@]/)[0];
+  // v37.05 — a first name, also from an address: tony.schvekher@… → "Tony"
+  // (it gave "Tony.schvekher's" for an account made with a password).
+  var n = user && user.displayName ? String(user.displayName).split(/\s/)[0]
+        : String((user && user.email) || '').split('@')[0].split(/[._+\-\d]/).filter(Boolean)[0] || '';
   var brand = String(APP_CONFIG.brandName || 'My Kitchen Notes');
   return n ? n.charAt(0).toUpperCase() + n.slice(1) + '\u2019s ' + brand.replace(/^My\s+/i, '') : brand;
 }
@@ -3989,12 +3993,11 @@ async function householdInvite() {
   await hhDb().collection('invites').doc(code).set({ hid: _cloudHid, role: role, createdBy: window._fbUser.uid,
     expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 14 * 864e5) });
   var url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + '?join=' + code;
-  var shared = false;
-  if (navigator.share) { try { await navigator.share({ title: _household.name || 'Recipes', text: 'Join my recipes', url: url }); shared = true; } catch(e) {} }
-  if (!shared) {
-    try { await navigator.clipboard.writeText(url); toast('\u{1F4CB} Invitation link copied — valid for 14 days', 7000); }
-    catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'Invitation link', message: url, okLabel: 'OK' }); }
-  }
+  // v37.05 — sent the way the person chooses: e-mail, WhatsApp, another app, or copied.
+  await shareMessage({ title: 'Send the invitation', intro: 'The link works for 14 days, for anyone who has it.',
+    subject: 'Join ' + (_household.name || 'our recipes'),
+    text: 'Hi! Join ' + (_household.name || 'our recipe collection') + ' \u2014 our recipes, shared.\n\n'
+      + 'Open this link and sign in (with ' + signInHowText() + '):\n' + url + '\n\nThe link works for 14 days.' });
   return url;
 }
 async function householdLeave() {
@@ -4045,7 +4048,8 @@ async function householdAddMember(email, accessRole) {
   if (role === 'admin' && _household.role !== 'owner') { toast('Only the owner can add someone with full access.'); return; }
   await hhDb().collection('pending').doc(_cloudHid + ':' + email).set({ hid: _cloudHid, email: email, role: role });
   await householdLoadMembers(); renderAccessMembers();
-  toast('✅ ' + email + ' can now join — the moment they sign in with that Google account.', 7000);
+  toast('✅ ' + email + ' can now join — the moment they sign in with that address.', 7000);
+  letThemKnow(email);
 }
 async function householdChangeRole(m, accessRole) {
   var role = ACCESS_TO_HH[accessRole] || 'viewer';
@@ -4134,6 +4138,16 @@ async function householdWipe(hid, onStep) {
   await last.commit(); n += 2;
   return n;
 }
+// v37.05 — typed names are compared the way a person means them: a keyboard's
+// straight apostrophe is the same as the curly one in "Tony’s Kitchen Notes"
+// (Tony typed the name exactly and was told it did not match), and case and
+// extra spaces do not count.
+function sameTypedName(a, b) {
+  var norm = function(x){ return String(x || '').replace(/[\u2018\u2019\u02BC\u0060\u00B4]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase(); };
+  return norm(a) === norm(b) && norm(a) !== '';
+}
+window.sameTypedName = sameTypedName;
 function householdUnsent() {
   return (typeof _offlineQueue !== 'undefined' && _offlineQueue)
     || Object.keys(typeof _pendingCloudDeletes === 'object' && _pendingCloudDeletes || {}).length;
@@ -4151,9 +4165,9 @@ async function householdDelete(opts) {
     if (go !== true && go !== 'alt') return null;
     if (go === true) await backupSave();
     var typed = await askConfirm({ icon: '⚠️', title: 'Type the household’s name to delete it',
-      message: name, input: '', placeholder: name, okLabel: 'Delete for ever', danger: true });
+      message: 'To be sure, type its name:\n\n' + name, input: '', placeholder: name, okLabel: 'Delete for ever', danger: true });
     if (typeof typed !== 'string') return null;
-    if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) { toast('The name did not match — nothing was deleted.', 7000); return null; }
+    if (!sameTypedName(typed, name)) { toast('The name did not match — nothing was deleted.', 7000); return null; }
   }
   var n;
   try {
@@ -4258,6 +4272,56 @@ window.householdEnter = householdEnter; window.householdUse = householdUse; wind
 window.householdRename = householdRename; window.householdInvite = householdInvite; window.householdLeave = householdLeave;
 window.householdSwitch = householdSwitch; window.householdDefaultName = householdDefaultName; window.householdBrand = householdBrand;
 window.householdLoadMembers = householdLoadMembers; window.householdAddMember = householdAddMember;
+
+// ─── LET THEM KNOW (v37.05) ──────────────────────────────────────────────────
+// Adding someone's address sends them nothing (Tony asked). Right after adding,
+// the app offers a ready message — from the person's OWN e-mail or WhatsApp, so
+// it arrives from someone they know instead of an address a spam filter might
+// hold back — saying where the app is and how to sign in. Invitation links are
+// sent the same way. Automatic e-mails from the app wait for our own domain.
+function signInHowText() {
+  var ways = [];
+  if (signInOn('google')) ways.push('Google');
+  if (signInOn('password') || signInOn('emailLink')) ways.push('“Use my e-mail address”');
+  return ways.length ? ways.join(' or ') : 'Google';
+}
+function memberWelcomeText(email) {
+  var url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath;
+  var hh = cloudLayout() === 'households' && _household && _household.name;
+  return 'Hi! I have added you to ' + (hh ? '“' + _household.name + '”' : 'our family recipe collection') + ' — our recipes, shared.\n\n'
+    + 'Open ' + url + ' and sign in as ' + email + ' (with ' + signInHowText() + '). You will find our recipes there.\n\n'
+    + 'On a phone you can add it to your home screen, like an app.';
+}
+// Where each choice goes. Kept apart from the opening, so it can be checked.
+function shareTargets(opts) {
+  var to = /^[^\s?&#<>"']+@[^\s?&#<>"']+$/.test(String(opts.to || '')) ? String(opts.to) : '';
+  return {
+    mail: 'mailto:' + to + '?subject=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),
+    wa: 'https://wa.me/?text=' + encodeURIComponent(opts.text || '')
+  };
+}
+async function shareMessage(opts) {
+  var options = [{ value: 'mail', label: '✉️ By e-mail' }, { value: 'wa', label: '\u{1F4AC} WhatsApp' }];
+  if (navigator.share) options.push({ value: 'share', label: '\u{1F4E4} Another app…' });
+  options.push({ value: 'copy', label: '\u{1F4CB} Copy the message' });
+  var how = await askChoice(opts.intro || '', options, { icon: '\u{1F4E3}', title: opts.title || 'Let them know' });
+  var t = shareTargets(opts);
+  if (how === 'mail') location.href = t.mail;
+  else if (how === 'wa') window.open(t.wa, '_blank', 'noopener');
+  else if (how === 'share') { try { await navigator.share({ title: opts.subject || '', text: opts.text }); } catch(e) {} }
+  else if (how === 'copy') {
+    try { await navigator.clipboard.writeText(opts.text); toast('\u{1F4CB} Copied — paste it wherever you like', 6000); }
+    catch(e) { await askConfirm({ icon: '\u{1F4CB}', title: 'The message', message: opts.text, okLabel: 'OK' }); }
+  }
+  return how || null;
+}
+function letThemKnow(email, note) {
+  return shareMessage({ to: email, title: 'Let ' + email + ' know?',
+    intro: (note ? note + '\n\n' : '') + 'Adding them sends nothing by itself. Send them a short note from you:',
+    subject: 'Our recipes', text: memberWelcomeText(email) });
+}
+window.signInHowText = signInHowText; window.memberWelcomeText = memberWelcomeText; window.shareTargets = shareTargets;
+window.shareMessage = shareMessage; window.letThemKnow = letThemKnow;
 
 // ═══ THE FIRST VISIT (WP-O, v37.00) ══════════════════════════════════════════
 // What a person who has never used the app meets, in the household layout: a
@@ -4682,7 +4746,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.04';
+var APP_VERSION = 'v37.05';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7314,7 +7378,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.04</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.05</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7343,8 +7407,8 @@ body.banner-shown .header {
           <button class="drop-item" data-feature="whatsapp" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
-          <!-- v36.99 — your data, and deleting your account (the stores require it) -->
-          <button class="drop-item" data-layout-only="households" onclick="closeDrop('settingsDrop');accountMenu()">👤 Your account</button>
+          <!-- v36.99 — your data; deleting the account is the menu's last item (v37.05) -->
+          <button class="drop-item" data-layout-only="households" onclick="closeDrop('settingsDrop');accountDownload()">⬇️ Download all my data</button>
           <button class="drop-item" data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <button class="drop-item" data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -7373,6 +7437,10 @@ body.banner-shown .header {
                with the account ID on screen: no reason to be on anyone else's. -->
           <button class="drop-item" data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
           <button class="drop-item" data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
+          <!-- v37.05 — Tony: not hidden in a dialog; the last item, bold and red. -->
+          <div data-layout-only="households" style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button class="drop-item" id="deleteAccountItem" data-layout-only="households" onclick="closeDrop('settingsDrop');accountDelete()"
+                  style="font-weight:700;color:var(--danger);">🗑 Delete my account…</button>
         </div>
       </div>
     </div>
@@ -7951,7 +8019,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.04</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.05</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
