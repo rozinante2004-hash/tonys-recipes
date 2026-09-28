@@ -75,7 +75,15 @@ function stable(obj) {
   return out;
 }
 
-const idx = (await get(indexPath)) || {};
+const idxDoc = await get(indexPath);
+// v36.97 — no index is not "no languages": the translations may be on their
+// way to a new place (i18n/_index), and publishing nothing would delete every
+// file the app serves. Change nothing until the index is there.
+if (!idxDoc || !idxDoc.langs || !Object.keys(idxDoc.langs).length) {
+  console.log(`no language list at ${indexPath} (yet) — nothing changed`);
+  process.exit(0);
+}
+const idx = idxDoc;
 const langs = Object.keys(idx.langs || {}).filter(c => /^[a-z]{2,3}$/.test(c) && c !== 'en').sort();
 const request = (await get(prefix + 'publish')) || {};
 const had = readJson(path.join(outDir, 'index.json')) || { langs: {} };

@@ -26,12 +26,20 @@ const ok = (name, cond, detail) => { if (cond) console.log('  ok   ' + name); el
 const read = f => { try { return JSON.parse(fs.readFileSync(path.join(out, f), 'utf8')); } catch (e) { return null; } };
 
 await seed(async db => {
-  await setDoc(doc(db, 'shared/i18n_he'), { strings: { Save: 'שמור', Delete: 'מחק', n: 5 }, count: 2, updatedAt: 100 });
-  await setDoc(doc(db, 'shared/i18n_ru'), { strings: { Save: 'Сохранить' }, count: 1, updatedAt: 200 });
-  await setDoc(doc(db, 'shared/i18n_index'), { langs: { he: { at: 100, count: 2 }, ru: { at: 200, count: 1 } }, probed: true });
   await setDoc(doc(db, 'shared/recipe_1'), { r: '{"name":"secret"}' });
 });
+// Before anything is there: no list, so nothing is written — and nothing deleted.
+fs.writeFileSync(path.join(out, 'keep.json'), '{}');
+fs.writeFileSync(path.join(out, 'fr.json'), '{"lang":"fr","strings":{"a":"b"}}');
 let log = run();
+ok('with no language list yet it changes nothing (v36.97)', /nothing changed/.test(log) && fs.existsSync(path.join(out, 'fr.json')), log);
+fs.unlinkSync(path.join(out, 'keep.json')); fs.unlinkSync(path.join(out, 'fr.json'));
+await seed(async db => {
+  await setDoc(doc(db, 'i18n/he'), { strings: { Save: 'שמור', Delete: 'מחק', n: 5 }, count: 2, updatedAt: 100 });
+  await setDoc(doc(db, 'i18n/ru'), { strings: { Save: 'Сохранить' }, count: 1, updatedAt: 200 });
+  await setDoc(doc(db, 'i18n/_index'), { langs: { he: { at: 100, count: 2 }, ru: { at: 200, count: 1 } }, probed: true });
+});
+log = run();
 const he = read('he.json'), idx = read('index.json');
 ok('it reads the central languages signed out, and writes one file each', he && he.strings.Save === 'שמור' && read('ru.json'), log);
 ok('…only the words (a non-text value is dropped)', he && he.strings.n === undefined && he.count === 2, JSON.stringify(he));
@@ -44,13 +52,13 @@ ok('nothing else of the family\'s is ever read', !fs.readdirSync(out).some(f => 
 const before = fs.readFileSync(path.join(out, 'index.json'), 'utf8');
 log = run();
 ok('when nothing changed it writes nothing', /nothing changed/.test(log) && fs.readFileSync(path.join(out, 'index.json'), 'utf8') === before, log);
-await seed(async db => { await setDoc(doc(db, 'shared/i18n_publish'), { requestedAt: Date.now() + 1000, by: 'tony@example.com' }); });
+await seed(async db => { await setDoc(doc(db, 'i18n/publish'), { requestedAt: Date.now() + 1000, by: 'tony@example.com' }); });
 log = run();
 ok('"Publish languages now" in the app makes it publish again', /published 2 languages \(requested in the app\)/.test(log), log);
 ok('…without keeping a second, identical copy', arch().langs.he.length === 1 && arch().langs.ru.length === 1, JSON.stringify(arch()));
 await seed(async db => {
-  await setDoc(doc(db, 'shared/i18n_he'), { strings: { Save: 'שמירה', Delete: 'מחק' }, count: 2, updatedAt: 300 });
-  await setDoc(doc(db, 'shared/i18n_index'), { langs: { he: { at: 300, count: 2 } }, probed: true });
+  await setDoc(doc(db, 'i18n/he'), { strings: { Save: 'שמירה', Delete: 'מחק' }, count: 2, updatedAt: 300 });
+  await setDoc(doc(db, 'i18n/_index'), { langs: { he: { at: 300, count: 2 } }, probed: true });
 });
 log = run();
 ok('a changed language is published by itself', (read('he.json') || {}).strings.Save === 'שמירה', log);
@@ -64,8 +72,8 @@ ok('a removed language\'s kept versions stay, so it can be put back', arch().lan
 // Only the newest KEEP versions stay.
 for (let i = 0; i < 13; i++) {
   await seed(async db => {
-    await setDoc(doc(db, 'shared/i18n_he'), { strings: { Save: 'שמור ' + i }, count: 1, updatedAt: 400 + i });
-    await setDoc(doc(db, 'shared/i18n_index'), { langs: { he: { at: 400 + i, count: 1 } }, probed: true });
+    await setDoc(doc(db, 'i18n/he'), { strings: { Save: 'שמור ' + i }, count: 1, updatedAt: 400 + i });
+    await setDoc(doc(db, 'i18n/_index'), { langs: { he: { at: 400 + i, count: 1 } }, probed: true });
   });
   run();                                                   // quick runs: names must still differ
 }

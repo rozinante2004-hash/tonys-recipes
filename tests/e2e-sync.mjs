@@ -261,24 +261,6 @@ async function tapRefreshWhenOffered(d, ms = 15000) {
 const names = d => inPage(d, () => recipes.map(r => r.name));
 
 try {
-  if (!HH) {
-    // v36.88 — every translated language, for everyone, before signing in.
-    console.log('Languages for everyone');
-    const ctx0 = await browser.newContext({ serviceWorkers: 'block' });
-    const p0 = await ctx0.newPage();
-    await ctx0.route(/www\.gstatic\.com\/firebasejs\/[\d.]+\/(firebase-[a-z-]+\.js)$/, (route) =>
-      route.fulfill({ status: 200, contentType: 'text/javascript', body: readFileSync(path.join(sdkDir, route.request().url().split('/').pop())) }));
-    await ctx0.route(/accounts\.google\.com|workers\.dev/, r => r.fulfill({ status: 503, body: '' }));
-    await ctx0.addInitScript(emu => { window.__FIREBASE_EMULATOR__ = emu; }, EMU);
-    await p0.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
-    await p0.waitForFunction(() => window._fbEmulated === true, null, { timeout: 20000 });
-    const known = await p0.evaluate(async () => { await i18nCentralIndex(true); return i18nKnownLangs(); });
-    ok('a visitor who has not signed in sees every translated language', known.includes('he'), JSON.stringify(known));
-    const heSave = await p0.evaluate(async () => { const d = await i18nLoadDict('he'); return d && d['Save']; });
-    ok('…and can switch to one, straight from the central copy', heSave === 'שמור', JSON.stringify(heSave));
-    await ctx0.close();
-  }
-
   console.log('Signing in');
   let A;
   if (HH) {
@@ -291,6 +273,31 @@ try {
     await A.page.waitForFunction(() => window._driveMode && window._fbUser && window._lastSyncOkAt, null, { timeout: 30000 });
   } else {
     A = await device('A (owner)', OWNER);
+    // v36.97 — the translations were seeded where the first layout kept them
+    // (shared/i18n_*); the owner's sign-in copies them to i18n/… (both layouts).
+    const moved = await inPage(A, () => { try { localStorage.removeItem('tonys_langs_moved'); } catch (e) {} return i18nMoveToAppWide(); });
+    const movedHe = await restDoc('i18n/he'), movedIdx = await restDoc('i18n/_index'), oldHe = await restDoc('shared/i18n_he');
+    ok('the owner\'s sign-in moves the translations to their app-wide place (v36.97)',
+      movedHe && movedHe.strings && movedHe.strings.Save === 'שמור', JSON.stringify({ moved, movedHe }));
+    ok('…the language list last', movedIdx && movedIdx.langs && movedIdx.langs.he && movedIdx.movedFrom === 'shared', JSON.stringify(movedIdx));
+    ok('…and the old copy is left as it was', oldHe && oldHe.strings && oldHe.strings.Save === 'שמור', JSON.stringify(oldHe));
+    {
+      // v36.88 — every translated language, for everyone, without signing in.
+      console.log('Languages for everyone');
+      const ctx0 = await browser.newContext({ serviceWorkers: 'block' });
+      const p0 = await ctx0.newPage();
+      await ctx0.route(/www\.gstatic\.com\/firebasejs\/[\d.]+\/(firebase-[a-z-]+\.js)$/, (route) =>
+        route.fulfill({ status: 200, contentType: 'text/javascript', body: readFileSync(path.join(sdkDir, route.request().url().split('/').pop())) }));
+      await ctx0.route(/accounts\.google\.com|workers\.dev/, r => r.fulfill({ status: 503, body: '' }));
+      await ctx0.addInitScript(emu => { window.__FIREBASE_EMULATOR__ = emu; }, EMU);
+      await p0.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
+      await p0.waitForFunction(() => window._fbEmulated === true, null, { timeout: 20000 });
+      const known = await p0.evaluate(async () => { await i18nCentralIndex(true); return i18nKnownLangs(); });
+      ok('a visitor who has not signed in sees every translated language', known.includes('he'), JSON.stringify(known));
+      const heSave = await p0.evaluate(async () => { const d = await i18nLoadDict('he'); return d && d['Save']; });
+      ok('…and can switch to one, straight from the central copy', heSave === 'שמור', JSON.stringify(heSave));
+      await ctx0.close();
+    }
   }
   ok('the owner signs in and syncs against the emulator', true);
   const B = await device('B (writer)', WRITER);

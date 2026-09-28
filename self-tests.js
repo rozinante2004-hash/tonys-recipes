@@ -1820,6 +1820,13 @@ window.SELF_TESTS = [
         window._cloudLayout='shared';
         if(j(cloudDocPath('recipe_12'))!=='shared/recipe_12' || j(cloudDocPath('meta'))!=='shared/meta')
           throw new Error('the family layout no longer resolves to shared/<name> exactly');
+        // v36.97 — the translations are in ONE place in both layouts.
+        if(j(cloudDocPath('i18n_he'))!=='i18n/he' || j(cloudDocPath('i18n_index'))!=='i18n/_index' || j(cloudDocPath('i18n_publish'))!=='i18n/publish')
+          throw new Error('in the family layout the translations are not in i18n/…: '+j(cloudDocPath('i18n_he')));
+        if(APP_CONFIG.languageSource.index!=='i18n/_index' || APP_CONFIG.languageSource.prefix!=='i18n/')
+          throw new Error('the central languages are still read from the old place');
+        if(typeof i18nMoveToAppWide!=='function' || String(householdMoveIn).indexOf("indexOf('i18n_') === 0")===-1)
+          throw new Error('the one-time move of the translations, or the household move leaving them alone, is missing');
         window._cloudLayout='households'; window._cloudHid=null;
         var threw=false; try{ cloudDocPath('recipe_1'); }catch(e){ threw=true; }
         if(!threw) throw new Error('a household document resolved with no household chosen');

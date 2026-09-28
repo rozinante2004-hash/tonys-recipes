@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.96 -->
+<!-- Tony's Recipes Collection v36.97 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -149,8 +149,8 @@
     // the app's admins write it (from the family's copy).
     languageSource: Object.freeze({
       projectId:         'recipes-f379d',
-      index:             'shared/i18n_index',
-      prefix:            'shared/i18n_'
+      index:             'i18n/_index',
+      prefix:            'i18n/'
     }),
     features: Object.freeze({
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
@@ -4033,7 +4033,7 @@ async function householdMoveIn(opts) {
   var name = opts.name;
   if (!opts.yes) {
     var go = await askConfirm({ icon: '\u{1F3E0}', title: 'Move this collection into a household?',
-      message: 'Everything the family shares — recipes, photos, chats, languages — is COPIED into a household of its own, '
+      message: 'Everything the family shares — recipes, photos, chats — is COPIED into a household of its own, '
         + 'and each copy is read back and compared. Nothing is deleted or changed where it is now, and the app keeps working as '
         + 'it does today until it is switched over.\n\nThe family’s member list becomes places kept for their addresses: '
         + 'each person takes theirs up the first time they sign in afterwards.\n\nTaking a backup first is strongly recommended.',
@@ -4067,7 +4067,12 @@ async function householdMoveIn(opts) {
     // 3. Copied, in batches kept well under Firestore's limits (500 writes,
     //    10 MiB a request) — a photo can be most of a megabyte.
     progressStep(2, 'Copying ' + docs.length + ' documents…');
-    var todo = docs.filter(function(d) { if (d.id === 'access') { report.skipped.push(d.id); return false; } return true; });
+    // Not the member list, and (v36.97) not the translations: they are
+    // app-wide already, and copying the old shared/i18n_* over them would put
+    // back whatever they said before the last edit.
+    var todo = docs.filter(function(d) {
+      if (d.id === 'access' || d.id.indexOf('i18n_') === 0) { report.skipped.push(d.id); return false; }
+      return true; });
     var batch = db.batch(), n = 0, bytes = 0;
     for (var k = 0; k < todo.length; k++) {
       var d = todo[k], sz = JSON.stringify(d.data).length;
@@ -4238,7 +4243,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.96';
+var APP_VERSION = 'v36.97';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6863,7 +6868,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.96</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.97</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7495,7 +7500,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.96</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.97</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10602,6 +10607,46 @@ async function i18nIndexNote(lang, count) {
     return true;
   } catch(e) { dlog('[i18n] could not update the language index', e && e.message); return false; }
 }
+// ─── THE TRANSLATIONS MOVE TO THEIR APP-WIDE PLACE (v36.97) ───────────────────
+// Until v36.96 the first layout kept them in shared/i18n_<lang> and the
+// household layout in i18n/<lang>. The family's project is the central source
+// every copy reads, so its move into households would have left the central
+// copy behind. Now they live in i18n/… in both layouts, and the first time the
+// app's owner signs in with this version the old documents are COPIED there
+// (the index last, so the publishing job only ever sees a complete set). The
+// old ones stay untouched. Once per project per device.
+var I18N_MOVED_KEY = 'tonys_langs_moved';
+async function i18nMoveToAppWide() {
+  var db = window._fbDb;
+  if (!db || !window._fbUser || !isAppOwner() || window._selfTestRunning) return 'skipped';
+  var project = window.APP_CONFIG.firebase.projectId;
+  try { if (localStorage.getItem(I18N_MOVED_KEY) === project) return 'done-before'; } catch(e) {}
+  function mark() { try { localStorage.setItem(I18N_MOVED_KEY, project); } catch(e) {} }
+  try {
+    if ((await db.collection('i18n').doc('_index').get()).exists) { mark(); return 'already'; }
+    var old = await db.collection('shared').doc('i18n_index').get();
+    if (!old.exists) { mark(); return 'nothing'; }
+    var idx = old.data() || {}, codes = Object.keys(idx.langs || {}).filter(function(c){ return I18N_LANGS[c] || c === 'en'; });
+    var moved = 0;
+    for (var i = 0; i < codes.length; i++) {
+      var d = await db.collection('shared').doc('i18n_' + codes[i]).get();
+      if (d.exists && d.data() && d.data().strings) { await db.collection('i18n').doc(codes[i]).set(d.data()); moved++; }
+    }
+    // The master English catalogue is not in the index; it moves too if there.
+    if (codes.indexOf('en') === -1) {
+      var en = await db.collection('shared').doc('i18n_en').get();
+      if (en.exists && en.data() && en.data().strings) { await db.collection('i18n').doc('en').set(en.data()); moved++; }
+    }
+    await db.collection('i18n').doc('_index').set(Object.assign({}, idx, { movedFrom: 'shared', movedAt: Date.now() }));
+    mark();
+    syncLog('save', 'Moved the translations to their app-wide place', { moved: moved });
+    return moved;
+  } catch(e) {
+    syncLog('error', 'Could not move the translations to their app-wide place', String(e && e.message).slice(0, 160));
+    return 'failed';
+  }
+}
+window.i18nMoveToAppWide = i18nMoveToAppWide;
 // Read once a session. An admin's device also builds the index the first time:
 // every language translated before v36.64 predates it, so it checks each one
 // once (a document that does not exist costs nothing to ask about) and records
@@ -10612,6 +10657,7 @@ async function i18nIndexFetch(force) {
   if (!window._fbDb || !window._fbUser) return i18nKnownLangs();
   if (_i18nIndexFetched && !force) return i18nKnownLangs();
   _i18nIndexFetched = true;
+  await i18nMoveToAppWide();               // v36.97 — once, the owner only
   var idx = null;
   try {
     var snap = await cloudDoc(I18N_INDEX_DOC).get();
@@ -11247,18 +11293,10 @@ window.isAppOwner = isAppOwner; window.applyOwnerOnlyItems = applyOwnerOnlyItems
 function i18nCanEdit() {
   try {
     if (!window._fbUser || !window._fbUser.email) return false;
-    var me = String(window._fbUser.email).toLowerCase();
     // v36.85 — in the household layout the translations are app-wide and the
-    // rules let only the app's own admins write them.
-    if (typeof cloudLayout === 'function' && cloudLayout() === 'households') return isAppOwner();
-    if (typeof getAccessMembers !== 'function') return false;
-    var list = getAccessMembers() || [];
-    // The owner is always full access, and is not necessarily in the member
-    // list — locking Tony out of his own translations on an empty list would be
-    // an absurd way to fail.
-    if (isAppOwner()) return true;
-    var mem = list.filter(function(m){ return String(m.email || '').toLowerCase() === me; })[0];
-    return !!(mem && mem.role === 'admin');
+    // rules let only the app's own admins write them; v36.97 — so they are in
+    // the first layout too (i18n/…, the same place), and so is who edits them.
+    return isAppOwner();
   } catch(e) { return false; }
 }
 window.i18nCanEdit = i18nCanEdit;
@@ -18733,8 +18771,11 @@ function cloudDocPath(name, layout, hid) {
   name = String(name);
   layout = layout || _cloudLayout;
   hid = hid || _cloudHid;
-  if (layout !== 'households') return ['shared', name];
+  // v36.97 — the interface translations are app-wide in BOTH layouts, so the
+  // family's move into households changes nothing about them (they were
+  // shared/i18n_* in the first layout until then; i18nMoveToAppWide copies them).
   if (name.indexOf('i18n_') === 0) return ['i18n', name === 'i18n_index' ? '_index' : name.slice(5)];
+  if (layout !== 'households') return ['shared', name];
   if (!hid) throw new Error('No household is selected yet');
   var base = 'households/' + hid + '/';
   if (name.indexOf('recipe_') === 0) return [base + 'recipes', name.slice(7)];

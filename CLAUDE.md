@@ -359,13 +359,18 @@ found only because a test was written first and disagreed with the code.
     shared fake Firestore files household paths under first-layout names, park
     gives a stand-in household (`'self-test'`) when none is chosen, and six
     tests with hand-modelled `shared/…` fakes run via `_inFirstLayout`.
-  - **BEFORE THE FAMILY MOVES — languages.** The family project is the
-    central language source (`languageSource` = `shared/i18n_*`, read by every
-    copy and by the publishing job). In the household layout translations are
-    written to app-wide `i18n/{lang}` — so after the family's switch, edits
-    would no longer reach `shared/i18n_*`. Decide first: point
-    `languageSource` (+ the job) at `i18n/*` (rules already allow public get),
-    or keep writing `shared/i18n_*` there.
+  - **v36.97 — TRANSLATIONS LIVE IN `i18n/…` IN BOTH LAYOUTS.** They were
+    `shared/i18n_*` in the first layout; the family project is the central
+    source, so its move would have left them behind. Now `cloudDocPath` sends
+    every `i18n_*` name to `i18n/{lang}` / `i18n/_index` / `i18n/publish` in
+    either layout, `languageSource` reads `i18n/…`, and `i18nMoveToAppWide()`
+    (owner, once per project per device, from `i18nIndexFetch`) COPIES the old
+    documents there, the index last; the old ones stay. The publishing job
+    changes nothing while there is no index (it would otherwise have deleted
+    every published file). The household move no longer copies `i18n_*`.
+    `i18nCanEdit()` = the app owner in both layouts (the rules' APP_ADMINS).
+    Tested: e2e (shared) seeds the OLD place and checks the move + a signed-out
+    visitor after it; publishing tests seed `i18n/…`.
   - **`rules_version = '2';` never changes** — it is Firebase's
     rules-LANGUAGE edition, not ours (Tony asked, v36.92). Which release the
     rules came from is the comment `rulesStamped()` adds under it when Show

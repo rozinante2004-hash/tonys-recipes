@@ -36,7 +36,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v36.96` — app. **Worker: v42**, deployed separately and versioned separately
+**Current version:** `v36.97` — app. **Worker: v42**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -90,7 +90,8 @@ slide‑up modal animation.
   optional) are served at `/__/auth/`: for the test copy the build fetches them into `dist/`;
   for the family's copy the **site root repo** fetches them on every deploy and weekly. Each
   project's OAuth web client lists `https://<host>/__/auth/handler` as a redirect URI.
-- **Languages** are made in the family project's `shared/i18n_<lang>` (the central copy every
+- **Languages** are made in the family project's `i18n/<lang>` (index `i18n/_index`, in both data
+  layouts since v36.97; formerly `shared/i18n_<lang>`, copied over once) — the central copy every
   copy reads) and published as `i18n/<lang>.json` by the *Publish languages* job, which also
   keeps each language's last 12 versions in `i18n/archive/<lang>/<time>.json` (list:
   `i18n/archive/index.json`, v36.93). 🌐 → "↩️ Put back a language…" (owner only) lists the
