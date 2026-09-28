@@ -130,6 +130,26 @@ console.log('Handing the household over');
 await check('alice may now step down to admin',  updateDoc(doc(alice, 'households/h1/members/alice'), { role: 'admin' }), true);
 await check('only the new owner deletes it',     deleteDoc(doc(alice, 'households/h1')), false);
 
+console.log('Deleting a household (v36.99)');
+await check('frank founds h9',                       found(frank, 'h9', 'frank'), true);
+await check('…and invites an editor',                setDoc(doc(frank, 'invites/INV-H9'), { hid: 'h9', role: 'editor', createdBy: 'frank', expiresAt: later }), true);
+await check('…and keeps a place for michal',         setDoc(doc(frank, 'pending/h9:michal@example.com'), { hid: 'h9', email: 'michal@example.com', role: 'viewer' }), true);
+await check('…and adds a recipe',                    setDoc(doc(frank, 'households/h9/recipes/1'), { r: '{}' }), true);
+await check('the owner still may not simply leave',  deleteDoc(doc(frank, 'households/h9/members/frank')), false);
+await check('the owner deletes the content',         deleteDoc(doc(frank, 'households/h9/recipes/1')), true);
+await check('…and the kept place',                   deleteDoc(doc(frank, 'pending/h9:michal@example.com')), true);
+await check('someone else cannot delete h9',         deleteDoc(doc(carol, 'households/h9')), false);
+{
+  const b = writeBatch(frank);
+  b.delete(doc(frank, 'households/h9'));
+  b.delete(doc(frank, 'households/h9/members/frank'));
+  await check('the household and the owner\'s membership go together (one batch)', b.commit(), true);
+}
+await check('a leftover invitation opens nothing',   join(carol, 'h9', 'carol', 'editor', 'INV-H9'), false);
+await check('a kept place for a deleted household opens nothing', env.withSecurityRulesDisabled(ctx =>
+            setDoc(doc(ctx.firestore(), 'pending/h9:michal@example.com'), { hid: 'h9', email: 'michal@example.com', role: 'viewer' }))
+            .then(() => join(michal, 'h9', 'michal', 'viewer')).then(() => { throw new Error('joined'); }, e => { if (String(e).indexOf('joined') !== -1) throw e; return 'refused'; }), true);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);

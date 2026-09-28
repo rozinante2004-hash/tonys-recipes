@@ -146,12 +146,14 @@ service cloud.firestore {
             (request.resource.data.role == 'owner'
               && getAfter(hh(hid)).data.ownerUid == request.auth.uid
               && !exists(hh(hid)))
-            // 2. an invitation for this household, for this role, not expired
-            || (request.resource.data.role != 'owner'
+            // 2. an invitation for this household, for this role, not expired —
+            //    and the household still there (v36.99: an invitation outlives
+            //    a deleted household, since invitations cannot be listed)
+            || (request.resource.data.role != 'owner' && exists(hh(hid))
               && validInvite(hid, request.resource.data.get('invite', ''), request.resource.data.role))
             // 3. a place kept for your (verified) e-mail — how the family's
             //    members arrive at migration, before anyone knows their uid
-            || (request.resource.data.role != 'owner' && verified()
+            || (request.resource.data.role != 'owner' && verified() && exists(hh(hid))
               && exists(/databases/$(database)/documents/pending/$(hid + ':' + myEmail()))
               && get(/databases/$(database)/documents/pending/$(hid + ':' + myEmail())).data.role == request.resource.data.role)
           );
@@ -171,7 +173,10 @@ service cloud.firestore {
         // an admin if the person is an editor or viewer.
         allow delete: if (uid == request.auth.uid && resource.data.role != 'owner')
           || (uid != request.auth.uid && resource.data.role != 'owner'
-              && (atLeast(hid, 'owner') || (atLeast(hid, 'admin') && rank(resource.data.role) <= 2)));
+              && (atLeast(hid, 'owner') || (atLeast(hid, 'admin') && rank(resource.data.role) <= 2)))
+          // v36.99 — the owner's own membership goes in the same batch that
+          // deletes the household (never while the household is still there).
+          || (uid == request.auth.uid && resource.data.role == 'owner' && !existsAfter(hh(hid)));
       }
 
       // The household's content. Editors add and change; only admins delete —

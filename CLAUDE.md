@@ -343,6 +343,22 @@ found only because a test was written first and disagreed with the code.
     ones; `firestore.households.rules` is gone) — one source, filled and shown
     by Family Access → Show rules (`{{APP_ADMINS}}` = the owner). Publishing
     them is harmless before the move and required for it.
+  - **v36.99 — hand over, delete, leave for good.** Family Access (owner):
+    "👑 Hand over…" (`householdTransfer`: one batch — new owner's role, the
+    household's `ownerUid`, the old owner to admin) and "🗑 Delete this
+    household…" (`householdDelete` → `householdWipe`: backup offered, name
+    typed; content, kept places and other members first while still a member,
+    then household + the owner's own membership in ONE batch). ⚙️ → "👤 Your
+    account" (household layout): download all my data (the backup, which now
+    names the household and its members) and `accountDelete` (refuses while
+    others are in a household you own; deletes households you own alone,
+    leaves the rest, removes your kept places, then the Auth user —
+    re-authenticating by pop-up if Google asks — and clears the device).
+    **Rules changed (needs publishing):** the owner's membership may go only
+    with the household (`!existsAfter`), and joining by invitation or kept
+    place needs the household to exist (invitations cannot be listed, so they
+    outlive a deleted household). Invitations offer all three roles (a list);
+    Switch household is a list.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

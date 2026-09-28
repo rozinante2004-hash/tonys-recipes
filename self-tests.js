@@ -1848,6 +1848,46 @@ window.SELF_TESTS = [
         throw new Error('a founder with no display name gets no sensible name');
     } },
 
+  { id:'wpd_hand_over_and_leave_for_good', group:'Cloud Sync', name:'Households: hand over, delete, and delete my account (v36.99)',
+    test: async()=>{
+      ['householdTransfer','householdDelete','householdWipe','accountDelete','accountDownload','accountMenu'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      var real={ hh:window._household, list:window._householdList, hid:window._cloudHid, layout:window._cloudLayout, choice:window.askChoice,
+                 confirm:window.askConfirm, auth:window._fbAuth, user:window._fbUser, db:window._fbDb, mem:window.householdMemberships,
+                 memOf:window.householdMembersOf };
+      try{
+        _householdList=[{hid:'H1',role:'owner'}]; _cloudHid='H1';
+        var bar=function(role){ _household={ hid:'H1', name:'Test home', role:role }; openAccessControl(); householdRenderBar();
+          var t=document.getElementById('householdBar').textContent; closeM('accessOverlay'); return t; };
+        var owner=bar('owner'), admin=bar('admin'), viewer=bar('viewer');
+        if(!/Hand over/.test(owner)||!/Delete this household/.test(owner)||/Leave this household/.test(owner))
+          throw new Error('the owner sees: '+owner);
+        if(/Hand over|Delete this household/.test(admin+viewer)) throw new Error('someone who is not the owner is offered to hand over or delete');
+        if(!/Leave this household/.test(viewer)) throw new Error('a member is not offered to leave');
+        // The invitation offers the owner all three roles, an admin two.
+        var offered=[]; window.askChoice=async function(m,o){ offered.push(o.map(function(x){ return x.value; }).join()); return null; };
+        _household.role='owner'; await householdInvite(); _household.role='admin'; await householdInvite();
+        if(offered[0]!=='viewer,editor,admin'||offered[1]!=='viewer,editor') throw new Error('the invitation offered '+JSON.stringify(offered));
+        // An account cannot be deleted while other people are in a household it owns.
+        _cloudLayout='households';
+        window._fbAuth={ currentUser:{ uid:'me', email:'me@example.com', delete:function(){ throw new Error('deleted!'); } } };
+        window._fbDb={ collection:function(){ return { doc:function(){ return { get:function(){ return Promise.resolve({ exists:true, data:function(){ return { name:'Test home' }; } }); } }; } }; } };
+        window.householdMemberships=async function(){ return [{ hid:'H1', role:'owner' }]; };
+        window.householdMembersOf=async function(){ return [{ uid:'me', role:'owner' }, { uid:'you', role:'editor' }]; };
+        var said=null; window.askConfirm=async function(o){ said=o; return true; };
+        var r=await accountDelete();
+        if(r!==null||!said||!/Hand these over first/.test(said.title)||!/Test home/.test(said.message)) throw new Error('with others in it, deleting the account said: '+JSON.stringify(said));
+        // The menu entry is there, for the household layout only.
+        var item=document.querySelector('#settingsDrop [onclick*="accountMenu"]');
+        if(!item||item.getAttribute('data-layout-only')!=='households') throw new Error('"Your account" is not in the ⚙️ menu (household layout only)');
+      } finally {
+        window._household=real.hh; _household=real.hh; _householdList=real.list; _cloudHid=real.hid; _cloudLayout=real.layout;
+        window.askChoice=real.choice; window.askConfirm=real.confirm; window._fbAuth=real.auth; window._fbUser=real.user; window._fbDb=real.db;
+        window.householdMemberships=real.mem; window.householdMembersOf=real.memOf;
+        var ov=document.getElementById('askOverlay'); if(ov) ov.remove();
+      }
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —

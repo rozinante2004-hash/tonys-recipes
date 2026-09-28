@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v36.98 -->
+<!-- Tony's Recipes Collection v36.99 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3891,6 +3891,8 @@ function householdRenderBar() {
     +   (householdCanManage() ? '<button class="access-role-btn" onclick="householdInvite()">\u{1F517} Invitation link…</button>' : '')
     +   (others.length ? '<button class="access-role-btn" onclick="householdSwitch()">\u{1F501} Switch household…</button>' : '')
     +   (h.role !== 'owner' ? '<button class="access-remove-btn" onclick="householdLeave()">Leave this household</button>' : '')
+    +   (h.role === 'owner' ? '<button class="access-role-btn" onclick="householdTransfer()">\u{1F451} Hand over…</button>'
+                            + '<button class="access-remove-btn" onclick="householdDelete()">\u{1F5D1} Delete this household…</button>' : '')
     + '</div>';
   var on = document.getElementById('ownerName'), oe = document.getElementById('ownerEmail');
   if (on) on.textContent = h.ownerName || (h.ownerEmail || '').split('@')[0] || '—';
@@ -3912,13 +3914,13 @@ function householdNewCode() {
 }
 async function householdInvite() {
   if (!householdCanManage()) return;
-  var roles = _household.role === 'owner' ? ['viewer', 'editor', 'admin'] : ['viewer', 'editor'];
-  var pick = await askConfirm({ icon: '\u{1F517}', title: 'Invite someone to ' + (_household.name || 'this household'),
-    message: 'Anyone with the link can join for the next 14 days, with the role you choose.\n\n'
-      + '• Read only — sees the recipes\n• Read + Write — adds and changes them'
-      + (roles.indexOf('admin') !== -1 ? '\n• Full access — also deletes, and manages members' : ''),
-    okLabel: 'Read + Write', altLabel: 'Read only', cancelLabel: 'Cancel' });
-  var role = pick === true ? 'editor' : pick === 'alt' ? 'viewer' : null;
+  // v36.99 — a list, so the owner's third choice (full access) is really
+  // offered; it used to be described and then missing from the buttons.
+  var options = [{ value: 'viewer', label: '\u{1F441} Read only — sees the recipes' },
+                 { value: 'editor', label: '✏️ Read + Write — adds and changes them' }];
+  if (_household.role === 'owner') options.push({ value: 'admin', label: '\u{1F6E1} Full access — also deletes, and manages members' });
+  var role = await askChoice('Anyone with the link can join for the next 14 days, with the role you choose.',
+    options, { icon: '\u{1F517}', title: 'Invite someone to ' + (_household.name || 'this household') });
   if (!role) return;
   var code = householdNewCode();
   await hhDb().collection('invites').doc(code).set({ hid: _cloudHid, role: role, createdBy: window._fbUser.uid,
@@ -3947,11 +3949,10 @@ async function householdSwitch() {
   for (var i = 0; i < others.length; i++) {
     try { var s2 = await hhRef(others[i].hid).get(); names.push((s2.data() || {}).name || others[i].hid); } catch(e) { names.push(others[i].hid); }
   }
-  var pick = others.length === 1
-    ? (await askConfirm({ icon: '\u{1F501}', title: 'Switch to ' + names[0] + '?', message: 'This device will show that household’s recipes instead.', okLabel: 'Switch' }) === true ? 0 : -1)
-    : parseInt(await askConfirm({ icon: '\u{1F501}', title: 'Switch household',
-        message: names.map(function(n, j){ return (j + 1) + '. ' + n; }).join('\n') + '\n\nType the number:', input: '1', okLabel: 'Switch' }), 10) - 1;
-  if (!(pick >= 0 && pick < others.length)) return;
+  // v36.99 — a list to tap, not a number to type.
+  var pick = await askChoice('This device will show that household’s recipes instead.',
+    names.map(function(n, j){ return { value: j, label: n }; }), { icon: '\u{1F501}', title: 'Switch household' });
+  if (pick == null || !(pick >= 0 && pick < others.length)) return;
   try { localStorage.setItem(HOUSEHOLD_KEY, others[pick].hid); } catch(e) {}
   householdReopen();
 }
@@ -3996,6 +3997,200 @@ async function householdRemoveMember(m) {
   await householdLoadMembers(); renderAccessMembers();
   toast('✅ ' + m.email + ' removed');
 }
+
+// ─── HANDING OVER, DELETING, AND LEAVING FOR GOOD (WP-D, v36.99) ─────────────
+// The owner can hand the household to another member (who becomes its owner;
+// the old owner stays, with full access), or delete it with everything in it.
+// Anyone can take all their data away as a file, and delete their account —
+// which the app stores require, and which people are entitled to. Every step
+// is one the rules allow (firestore.rules, HOUSEHOLDS): content and places
+// first, while still a member, then the household and the owner's own
+// membership in one batch.
+async function householdMembersOf(hid) {
+  var snap = await hhRef(hid).collection('members').get(), out = [];
+  snap.forEach(function(d){ var m = d.data() || {}; out.push({ uid: d.id, role: m.role, email: m.email || '', name: m.name || '' }); });
+  return out;
+}
+async function householdTransfer() {
+  if (!_household || _household.role !== 'owner' || !window._fbUser) return null;
+  var me = window._fbUser.uid, name = _household.name || 'this household';
+  var others = (await householdMembersOf(_cloudHid)).filter(function(m){ return m.uid !== me; });
+  if (!others.length) {
+    await askConfirm({ icon: '\u{1F451}', title: 'Nobody to hand it to yet',
+      message: 'Only members can become the owner. Invite someone first; once they have joined, you can hand ' + name + ' over.', okLabel: 'OK' });
+    return null;
+  }
+  var roleName = { admin: 'full access', editor: 'read + write', viewer: 'read only' };
+  var to = await askChoice('Who should own ' + name + '? They will be able to rename or delete it and manage everyone. You stay in it, with full access.',
+    others.map(function(m){ return { value: m.uid, label: (m.name || m.email) + ' — ' + (roleName[m.role] || m.role) }; }),
+    { icon: '\u{1F451}', title: 'Hand over ' + name });
+  if (!to) return null;
+  var who = others.filter(function(m){ return m.uid === to; })[0];
+  if (await askConfirm({ icon: '\u{1F451}', title: 'Hand ' + name + ' to ' + (who.name || who.email) + '?',
+      message: 'This cannot be taken back by you — only the new owner could hand it back.', okLabel: 'Hand over' }) !== true) return null;
+  var b = hhDb().batch();
+  b.update(hhRef().collection('members').doc(to), { role: 'owner' });
+  b.update(hhRef(), { ownerUid: to });
+  b.update(hhRef().collection('members').doc(me), { role: 'admin' });
+  await b.commit();
+  syncLog('save', 'Handed the household over', { to: who.email });
+  _household.role = 'admin'; _household.ownerUid = to;
+  await householdLoadMembers(); householdRenderBar();
+  if (typeof renderAccessMembers === 'function') renderAccessMembers();
+  toast('\u{1F451} ' + (who.name || who.email) + ' now owns ' + name, 7000);
+  return to;
+}
+// Everything in one household, deleted — content, kept places, members, then
+// the household with the owner's own membership. Returns how many documents went.
+async function householdWipe(hid, onStep) {
+  var db = hhDb(), me = window._fbUser.uid, n = 0;
+  async function inBatches(refs) {
+    for (var i = 0; i < refs.length; i += 400) {
+      var b = db.batch();
+      refs.slice(i, i + 400).forEach(function(r){ b.delete(r); });
+      await b.commit(); n += Math.min(400, refs.length - i);
+    }
+  }
+  var kinds = ['recipes', 'photos', 'chats', 'state'];
+  for (var k = 0; k < kinds.length; k++) {
+    if (onStep) onStep(k, 'Deleting the ' + kinds[k] + '…');
+    var snap = await hhRef(hid).collection(kinds[k]).get(), refs = [];
+    snap.forEach(function(d){ refs.push(d.ref); });
+    await inBatches(refs);
+  }
+  if (onStep) onStep(4, 'Removing the members…');
+  var ps = await db.collection('pending').where('hid', '==', hid).get(), prefs = [];
+  ps.forEach(function(d){ prefs.push(d.ref); });
+  await inBatches(prefs);
+  var ms = await hhRef(hid).collection('members').get(), mrefs = [];
+  ms.forEach(function(d){ if (d.id !== me) mrefs.push(d.ref); });
+  await inBatches(mrefs);
+  var last = db.batch();
+  last.delete(hhRef(hid));
+  last.delete(hhRef(hid).collection('members').doc(me));
+  await last.commit(); n += 2;
+  return n;
+}
+function householdUnsent() {
+  return (typeof _offlineQueue !== 'undefined' && _offlineQueue)
+    || Object.keys(typeof _pendingCloudDeletes === 'object' && _pendingCloudDeletes || {}).length;
+}
+async function householdDelete(opts) {
+  opts = opts || {};
+  if (!_household || _household.role !== 'owner' || !window._fbUser) return null;
+  var name = _household.name || 'this household', hid = _cloudHid;
+  if (householdUnsent()) { toast('There are changes on this device not yet sent — sync first.', 8000); return null; }
+  if (!opts.yes) {
+    var go = await askConfirm({ icon: '\u{1F5D1}', title: 'Delete ' + name + '?',
+      message: 'Every recipe, photo and chat in it is deleted — for everyone in it — and cannot be brought back. '
+        + 'Its members lose access.\n\nTaking a backup first is strongly recommended.',
+      okLabel: 'Back up, then continue', altLabel: 'Continue without a backup', danger: true });
+    if (go !== true && go !== 'alt') return null;
+    if (go === true) await backupSave();
+    var typed = await askConfirm({ icon: '⚠️', title: 'Type the household’s name to delete it',
+      message: name, input: '', placeholder: name, okLabel: 'Delete for ever', danger: true });
+    if (typeof typed !== 'string') return null;
+    if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) { toast('The name did not match — nothing was deleted.', 7000); return null; }
+  }
+  var n;
+  try {
+    progressOpen({ icon: '\u{1F5D1}', title: 'Deleting ' + name, total: 5, step: 'Starting…' });
+    n = await householdWipe(hid, progressStep);
+    progressClose();
+  } catch(e) {
+    progressClose();
+    syncLog('error', 'Deleting the household stopped', String(e && e.message).slice(0, 200));
+    showServiceError('Deleting the household stopped part-way:\n\n' + (e && e.message ? e.message : String(e))
+      + '\n\nWhat was deleted stays deleted; running it again finishes the job.');
+    return null;
+  }
+  syncLog('save', 'Deleted a household', { name: name, docs: n });
+  try { localStorage.removeItem(HOUSEHOLD_KEY); } catch(e) {}
+  if (!opts.noReopen) householdReopen();
+  return n;
+}
+// All of it, as a file: the recipes, photos and languages (the backup), plus
+// who is in the household and in what role.
+async function accountDownload() { return backupSave(); }
+async function accountDelete(opts) {
+  opts = opts || {};
+  var user = window._fbAuth && window._fbAuth.currentUser;
+  if (!user || cloudLayout() !== 'households') return null;
+  if (householdUnsent()) { toast('There are changes on this device not yet sent — sync first.', 8000); return null; }
+  var mine = await householdMemberships(user), alone = [], blocked = [], leave = [];
+  for (var i = 0; i < mine.length; i++) {
+    var h = mine[i], nm = h.hid;
+    try { nm = ((await hhRef(h.hid).get()).data() || {}).name || h.hid; } catch(e) {}
+    if (h.role !== 'owner') { leave.push({ hid: h.hid, name: nm }); continue; }
+    var ms = await householdMembersOf(h.hid);
+    (ms.length > 1 ? blocked : alone).push({ hid: h.hid, name: nm });
+  }
+  if (blocked.length) {
+    await askConfirm({ icon: '\u{1F451}', title: 'Hand these over first',
+      message: 'You own ' + blocked.map(function(x){ return x.name; }).join(', ') + ', and other people are in '
+        + (blocked.length === 1 ? 'it' : 'them') + '. Hand ' + (blocked.length === 1 ? 'it' : 'each') + ' over to one of them '
+        + '(Family Access → 👑 Hand over…), or delete ' + (blocked.length === 1 ? 'it' : 'them') + ', and then delete your account.',
+      okLabel: 'OK' });
+    return null;
+  }
+  if (!opts.yes) {
+    var go = await askConfirm({ icon: '⚠️', title: 'Delete your account?',
+      message: (alone.length ? 'Deleted with every recipe and photo in ' + (alone.length === 1 ? 'it' : 'them') + ': '
+                 + alone.map(function(x){ return x.name; }).join(', ') + '.\n' : '')
+        + (leave.length ? 'You leave: ' + leave.map(function(x){ return x.name; }).join(', ') + ' (their recipes stay for the others).\n' : '')
+        + '\nYour sign-in is removed, and this device is cleared. This cannot be undone.\n\nDownloading your data first is strongly recommended.',
+      okLabel: 'Download my data, then continue', altLabel: 'Continue without it', danger: true });
+    if (go !== true && go !== 'alt') return null;
+    if (go === true) await accountDownload();
+    var typed = await askConfirm({ icon: '⚠️', title: 'Type DELETE to delete your account', input: '', okLabel: 'Delete my account', danger: true });
+    if (typeof typed !== 'string' || typed.trim().toUpperCase() !== 'DELETE') { toast('Nothing was deleted.'); return null; }
+  }
+  try {
+    progressOpen({ icon: '\u{1F5D1}', title: 'Deleting your account', total: 3, step: 'Your households…' });
+    for (var a = 0; a < alone.length; a++) await householdWipe(alone[a].hid);
+    for (var l = 0; l < leave.length; l++) await hhRef(leave[l].hid).collection('members').doc(user.uid).delete();
+    progressStep(1, 'Places kept for you…');
+    var kept = await hhDb().collection('pending').where('email', '==', String(user.email || '').toLowerCase()).get(), krefs = [];
+    kept.forEach(function(d){ krefs.push(d.ref); });
+    for (var k = 0; k < krefs.length; k++) await krefs[k].delete();
+    progressStep(2, 'Your sign-in…');
+    try { await user.delete(); }
+    catch(e) {
+      if (!e || e.code !== 'auth/requires-recent-login') throw e;
+      progressClose();
+      if (await askConfirm({ icon: '\u{1F510}', title: 'Sign in once more',
+          message: 'Your households are done. For your safety, Google asks you to sign in once more before the account itself is removed.',
+          okLabel: 'Sign in and finish' }) !== true) return null;
+      await user.reauthenticateWithPopup(window._fbProvider);
+      await user.delete();
+    }
+    progressClose();
+  } catch(e) {
+    progressClose();
+    syncLog('error', 'Deleting the account stopped', String(e && e.message).slice(0, 200));
+    showServiceError('Deleting your account stopped part-way:\n\n' + (e && e.message ? e.message : String(e))
+      + '\n\nWhat was deleted stays deleted; running it again finishes the job.');
+    return null;
+  }
+  // This device, cleared: nothing of the account is left behind on it.
+  try { Object.keys(localStorage).filter(function(k){ return /^tonys_/.test(k); }).forEach(function(k){ localStorage.removeItem(k); }); } catch(e) {}
+  try { await idbClearAll(); } catch(e) {}
+  if (!opts.noReload) location.reload();
+  return true;
+}
+function accountMenu() {
+  if (cloudLayout() !== 'households' || !window._fbUser) return;
+  askChoice(String(window._fbUser.email || ''), [
+    { value: 'download', label: '⬇️ Download all my data' },
+    { value: 'delete', label: '\u{1F5D1} Delete my account…' }
+  ], { icon: '\u{1F464}', title: 'Your account' }).then(function(v){
+    if (v === 'download') accountDownload();
+    else if (v === 'delete') accountDelete();
+  });
+}
+window.householdTransfer = householdTransfer; window.householdDelete = householdDelete; window.householdWipe = householdWipe;
+window.accountDelete = accountDelete; window.accountDownload = accountDownload; window.accountMenu = accountMenu;
+window.householdMembersOf = householdMembersOf;
 window.householdEnter = householdEnter; window.householdUse = householdUse; window.householdOf = householdOf;
 window.householdRename = householdRename; window.householdInvite = householdInvite; window.householdLeave = householdLeave;
 window.householdSwitch = householdSwitch; window.householdDefaultName = householdDefaultName; window.householdBrand = householdBrand;
@@ -4243,7 +4438,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v36.98';
+var APP_VERSION = 'v36.99';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6875,7 +7070,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.98</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.99</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -6904,6 +7099,8 @@ body.banner-shown .header {
           <button class="drop-item" data-feature="whatsapp" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
           <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
+          <!-- v36.99 — your data, and deleting your account (the stores require it) -->
+          <button class="drop-item" data-layout-only="households" onclick="closeDrop('settingsDrop');accountMenu()">👤 Your account</button>
           <button class="drop-item" data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
           <button class="drop-item" data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -7507,7 +7704,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.98</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v36.99</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24599,7 +24796,15 @@ function backupPayload() {
     return rec;
   });
   var photos={}; Object.keys(photoMap).forEach(function(b64){ photos[String(photoMap[b64])]=b64; });
-  return {version:1,exportedAt:new Date().toISOString(),nextId:nextId,recipes:exportRecipes,photos:photos,settings:{viewMode:viewMode}};
+  var out={version:1,exportedAt:new Date().toISOString(),nextId:nextId,recipes:exportRecipes,photos:photos,settings:{viewMode:viewMode}};
+  // v36.99 — in the household layout, which household this is and who is in it
+  // ("download all my data" is this file).
+  if (typeof cloudLayout==='function' && cloudLayout()==='households' && _household) {
+    var people=[]; try{ people=JSON.parse(localStorage.getItem(ACCESS_STORAGE_KEY)||'[]'); }catch(e){}
+    out.household={ name:_household.name||'', myRole:_household.role||'', owner:_household.ownerEmail||'',
+      members:people.map(function(m){ return { email:m.email, role:m.hhRole||m.role, kept:!!m.pending }; }) };
+  }
+  return out;
 }
 function backupJson() { return JSON.stringify(backupPayload(), null, 2); }
 window.backupPayload = backupPayload; window.backupJson = backupJson;

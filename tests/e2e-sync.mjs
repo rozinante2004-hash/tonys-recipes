@@ -419,7 +419,7 @@ try {
     ok('…and sees none of the family\'s recipes', !(await names(N)).includes('E2E seed stew'), JSON.stringify(await names(N)));
 
     const url = await inPage(A, async () => {
-      window.askConfirm = async () => true;                 // "Read + Write"
+      window.askChoice = async () => 'editor';              // "Read + Write" (a list since v36.99)
       try { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); } catch (e) {}
       try { navigator.clipboard.writeText = async () => {}; } catch (e) {}
       return householdInvite();
@@ -456,6 +456,24 @@ try {
       openAccessControl(); const bar = document.getElementById('householdBar').textContent;
       return !/Invitation link|Rename/.test(bar) && /Leave this household/.test(bar);
     }));
+
+    // v36.99 — handing over, deleting a household, deleting an account.
+    console.log('Handing over and leaving for good');
+    const aUid = await uidOnPage(A), bUid = await uidOnPage(B);
+    await inPage(A, async (to) => { window.askChoice = async () => to; window.askConfirm = async () => true; return householdTransfer(); }, bUid);
+    const hdoc = await restDoc('households/' + HID);
+    ok('the owner hands the household to a member', hdoc && hdoc.ownerUid === bUid
+       && ((await restDoc('households/' + HID + '/members/' + bUid)) || {}).role === 'owner', JSON.stringify(hdoc));
+    ok('…and stays in it, with full access', ((await restDoc('households/' + HID + '/members/' + aUid)) || {}).role === 'admin');
+    await inPage(B, async (to) => { await householdLoadMembers(); window.askChoice = async () => to; window.askConfirm = async () => true; return householdTransfer(); }, aUid);
+    ok('…and the new owner can hand it back', ((await restDoc('households/' + HID)) || {}).ownerUid === aUid
+       && ((await restDoc('households/' + HID + '/members/' + bUid)) || {}).role === 'admin');
+    const nHid = nh.hid, nUid = await uidOnPage(N);
+    const gone = await inPage(N, async () => { window.backupSave = async () => {}; return householdDelete({ yes: true, noReopen: true }); });
+    ok('an owner deletes their household, with everything in it', gone > 0 && !(await restDoc('households/' + nHid))
+       && !(await restDoc('households/' + nHid + '/members/' + nUid)), JSON.stringify(gone));
+    const acc = await inPage(N, () => accountDelete({ yes: true, noReload: true }));
+    ok('…and then their account', acc === true && await inPage(N, () => !firebase.auth().currentUser), JSON.stringify(acc));
   }
 
   if (!HH) {
