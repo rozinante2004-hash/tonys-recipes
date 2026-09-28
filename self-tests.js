@@ -1860,6 +1860,17 @@ window.SELF_TESTS = [
         var bar=function(role){ _household={ hid:'H1', name:'Test home', role:role }; openAccessControl(); householdRenderBar();
           var t=document.getElementById('householdBar').textContent; closeM('accessOverlay'); return t; };
         var owner=bar('owner'), admin=bar('admin'), viewer=bar('viewer');
+        // v37.02 — no household open: the section says why, never stays blank.
+        _household=null; window._fbUser=null; householdRenderBar();
+        if(!/Sign in to see your household/.test(document.getElementById('householdBar').textContent)) throw new Error('signed out, the household section is blank');
+        window._fbUser={ uid:'u', email:'x@example.com' }; householdRenderBar();
+        if(!/Opening your household/.test(document.getElementById('householdBar').textContent)) throw new Error('while opening, the household section is blank');
+        window._fbUser=real.user; _household={ hid:'H1', name:'Test home', role:'owner' };
+        // v37.02 — the rules panel fills itself when shown (it stayed empty in households).
+        var rp=document.getElementById('accessRulesPanel'), rt=document.getElementById('accessRulesText');
+        rp.style.display='none'; rt.textContent=''; toggleAccessRules();
+        if(!rt.textContent) throw new Error('opening the rules panel left it empty');
+        rp.style.display='none';
         if(!/Hand over/.test(owner)||!/Delete this household/.test(owner)||/Leave this household/.test(owner))
           throw new Error('the owner sees: '+owner);
         if(/Hand over|Delete this household/.test(admin+viewer)) throw new Error('someone who is not the owner is offered to hand over or delete');

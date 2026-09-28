@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.01 -->
+<!-- Tony's Recipes Collection v37.02 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3619,6 +3619,9 @@ window.openPayments = openPayments;
 var ACCESS_STORAGE_KEY = 'tonys_access_members';
 
 function openAccessControl() {
+  // v37.02 — owner-only items follow who is signed in NOW; they were only
+  // refreshed when the ⚙️ menu opened, so the rules button could be missing.
+  if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
   if (cloudLayout() === 'households') {
     // The members ARE the list here — fetched fresh, then drawn.
     if (householdOf()) householdLoadMembers().then(function(){ renderAccessMembers(); householdRenderBar(); }).catch(function(){});
@@ -3853,6 +3856,8 @@ async function householdUse(hid, role) {
   _household = { hid: hid, role: role, name: h.name || '', ownerUid: h.ownerUid || '' };
   await householdLoadMembers();
   householdRenderBar();
+  if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
+  if (typeof renderAccessMembers === 'function') try { renderAccessMembers(); } catch(e) {}
   householdBrand();
   return _household;
 }
@@ -3900,7 +3905,14 @@ function householdCanManage() { return !!(_household && (_household.role === 'ow
 function householdRenderBar() {
   var bar = document.getElementById('householdBar');
   if (!bar) return;
-  if (!_household) { bar.innerHTML = ''; return; }
+  // v37.02 — never a blank section: say why there is no household yet.
+  if (!_household) {
+    bar.innerHTML = '<div class="access-row" style="border-style:dashed;"><div class="access-info"><div class="access-email" style="font-size:13px;">'
+      + (window._fbUser ? '\u23f3 Opening your household\u2026 (this updates by itself)'
+                        : '\u{1F511} Sign in to see your household and the people in it.')
+      + '</div></div></div>';
+    return;
+  }
   var h = _household, others = _householdList.filter(function(m){ return m.hid !== h.hid; });
   var roleName = { owner: '\u{1F451} Owner', admin: '\u{1F6E1} Full access', editor: '✏️ Read + Write', viewer: '\u{1F441} Read only' }[h.role] || h.role;
   bar.innerHTML =
@@ -4535,6 +4547,10 @@ window.householdMoveIn = householdMoveIn; window.hhSame = hhSame; window.hhKind 
 
 function updateAccessRules() {
   var members = getAccessMembers();
+  // v37.02 — in the household layout the old `shared` collection is no longer
+  // used; its part of the rules keeps only the owner (the household members are
+  // governed by the HOUSEHOLDS part, not by e-mail lists).
+  if (typeof cloudLayout === 'function' && cloudLayout() === 'households') members = [];
   var ownerUid = window._fbUser ? window._fbUser.uid : 'YOUR_UID_HERE';
   var ownerEmail = window._fbUser ? window._fbUser.email : 'your@gmail.com';
 
@@ -4625,6 +4641,9 @@ window.fetchRulesTemplate = fetchRulesTemplate;
 function toggleAccessRules() {
   var panel = document.getElementById('accessRulesPanel');
   if(panel) panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+  // v37.02 — filled when shown: in the household layout nothing else fills it,
+  // and Tony opened an empty black box.
+  if (panel && panel.style.display === 'block') updateAccessRules();
 }
 window.toggleAccessRules = toggleAccessRules;
 
@@ -4635,7 +4654,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.01';
+var APP_VERSION = 'v37.02';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7267,7 +7286,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.01</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.02</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7904,7 +7923,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.01</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.02</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in with Google to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
