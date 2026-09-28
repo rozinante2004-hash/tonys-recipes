@@ -411,7 +411,10 @@ found only because a test was written first and disagreed with the code.
   (OAuthProvider 'microsoft.com', prompt=select_account — work AND personal),
   apple (OAuthProvider 'apple.com'), password, emailLink. Family: Google only;
   test copy: + microsoft, password, emailLink (Apple waits for a developer
-  account). Each ALSO needs enabling in Firebase → Authentication → Sign-in
+  account; Tony, 28 Sep 2026: skip Microsoft AND Apple for now — Microsoft
+  needs an Entra tenant his personal Outlook account lacks (AADSTS50020), and
+  e-mail sign-in covers work addresses; Apple returns with the App Store work,
+  where it is REQUIRED alongside Google). Each ALSO needs enabling in Firebase → Authentication → Sign-in
   method (else `auth/operation-not-allowed`, explained on screen). Passwords
   are Firebase Auth's (hashed by Google) — the app never stores one (a
   self-test checks localStorage). **An address someone typed is not theirs
