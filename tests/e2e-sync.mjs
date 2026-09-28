@@ -522,6 +522,12 @@ try {
     // its own household with it (the search for kept places stopped it).
     const pwHid = await inPage(PW, () => (householdOf() || {}).hid), pwUid = await uidOnPage(PW);
     const pwAcc = await inPage(PW, async () => { window.backupSave = async () => {}; return accountDelete({ yes: true, noReload: true }); });
+    // …and gone from Firebase's own list of users, not just signed out here.
+    const users = await (await fetch(`http://${EMU.host}:${EMU.authPort}/identitytoolkit.googleapis.com/v1/projects/${EMU.projectId}/accounts:query`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' }, body: '{}' })).json();
+    const left = (users.userInfo || []).map(u => u.email);
+    ok('…and both accounts are gone from Firebase\'s list of users', !left.includes('pw@example.com') && !left.includes('newcomer@example.com') && left.includes(OWNER),
+       JSON.stringify(left));
     ok('an account that is not yet confirmed can delete itself, household and all', pwAcc === true
        && !(await restDoc('households/' + pwHid)) && !(await restDoc('households/' + pwHid + '/members/' + pwUid))
        && await inPage(PW, () => !firebase.auth().currentUser),

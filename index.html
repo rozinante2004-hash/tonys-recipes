@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.06 -->
+<!-- Tony's Recipes Collection v37.07 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4222,6 +4222,15 @@ async function accountDelete(opts) {
     var typed = await askConfirm({ icon: '⚠️', title: 'Type DELETE to delete your account', input: '', okLabel: 'Delete my account', danger: true });
     if (typeof typed !== 'string' || typed.trim().toUpperCase() !== 'DELETE') { toast('Nothing was deleted.'); return null; }
   }
+  // v37.07 — Tony: removing the account must never be a second, manual step.
+  // Firebase removes an account only shortly after a sign-in, so when the last
+  // one is not recent, it is confirmed FIRST — before anything is deleted —
+  // and the whole deletion then runs through to the account itself.
+  var signedAt = Date.parse((user.metadata && user.metadata.lastSignInTime) || '') || 0;
+  if (!opts.yes && Date.now() - signedAt > 4 * 60 * 1000) {
+    try { if (!await accountReauthenticate(user, true)) { toast('Nothing was deleted.'); return null; } }
+    catch(e) { showServiceError('Could not confirm it is you:\n\n' + authErrorText(e) + '\n\nNothing was deleted.'); return null; }
+  }
   try {
     progressOpen({ icon: '\u{1F5D1}', title: 'Deleting your account', total: 3, step: 'Your households…' });
     for (var a = 0; a < alone.length; a++) await householdWipe(alone[a].hid);
@@ -4259,9 +4268,10 @@ async function accountDelete(opts) {
 }
 // Proving it is you once more, the same way you signed in (v37.06 — it always
 // opened Google's window, which a password account cannot use).
-async function accountReauthenticate(user) {
+async function accountReauthenticate(user, before) {
   var how = ((user.providerData || [])[0] || {}).providerId || 'google.com';
-  var intro = 'Your households are done. For your safety, please confirm it is you before the account itself is removed.';
+  var intro = before ? 'For your safety, please confirm it is you. Nothing has been deleted yet.'
+                     : 'Your households are done. For your safety, please confirm it is you before the account itself is removed.';
   if (how === 'password') {
     var pw = await askConfirm({ icon: '\u{1F510}', title: 'Your password, once more', message: intro,
       input: '', inputType: 'password', placeholder: 'Password', okLabel: 'Delete my account', danger: true });
@@ -4772,7 +4782,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.06';
+var APP_VERSION = 'v37.07';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7404,7 +7414,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.06</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.07</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8045,7 +8055,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.06</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.07</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

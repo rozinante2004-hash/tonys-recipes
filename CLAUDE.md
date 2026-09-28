@@ -374,6 +374,15 @@ found only because a test was written first and disagreed with the code.
     LENDS the examples to an empty collection for the run (dozens of tests
     open "a recipe") and gives the empty list back after. e2e devices answer
     the welcome (`device(..., { welcome: 'own' | <invite url> })`).
+  - **Deleting an account is ONE process, through to Firebase's Users list
+    (v37.06–07, Tony: "I will not be able to manage hundreds of deletes
+    manually").** Order: confirm it is you FIRST when the last sign-in is over
+    4 minutes old (`accountReauthenticate(user, true)` — the password in a
+    hidden field for a password account, the matching pop-up for
+    Google/Microsoft/Apple, a fresh link-sign-in otherwise), then households,
+    then kept places (skipped for an UNCONFIRMED address — the rules refuse
+    that search, and it stopped Tony's delete half-way), then `user.delete()`.
+    The e2e checks the Auth emulator's own user list afterwards.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

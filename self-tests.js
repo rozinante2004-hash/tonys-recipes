@@ -1900,6 +1900,11 @@ window.SELF_TESTS = [
         if(pinType!=='password') throw new Error('a password is asked for in a visible field');
         if(String(accountReauthenticate).indexOf("'password'")===-1||String(accountReauthenticate).indexOf('EmailAuthProvider')===-1)
           throw new Error('re-confirming a password account does not use its password');
+        // v37.07 — it is confirmed BEFORE anything is deleted, so a delete never stops half-way.
+        var ad=String(accountDelete);
+        if(ad.indexOf('lastSignInTime')===-1 || ad.indexOf('accountReauthenticate(user, true)')===-1
+           || ad.indexOf('accountReauthenticate(user, true)') > ad.indexOf('householdWipe(alone'))
+          throw new Error('deleting an account does not confirm it is you before deleting anything');
         // v37.05 — "Delete my account" is the ⚙️ menu's LAST item, bold and red;
         // "Download all my data" has its own item (household layout only).
         var drop=document.getElementById('settingsDrop'), items=drop.querySelectorAll('button.drop-item'), last=items[items.length-1];
