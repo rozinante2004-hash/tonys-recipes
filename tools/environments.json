@@ -23,7 +23,7 @@
       "password": true,
       "emailLink": true
     },
-    "_why_signIn": "v37.03 — the test copy tries the other ways to sign in first: a password and an e-mailed link (Firebase → Authentication → Sign-in method). Microsoft is built but OFF: registering the app in Azure needs a directory (tenant) that a personal Outlook account does not have, and Tony decided (28 Sep 2026) that e-mail sign-in covers work addresses. Apple waits for an Apple Developer account.",
+    "_why_signIn": "v37.03 — the test copy tries the other ways to sign in first: a password and an e-mailed link (Firebase → Authentication → Sign-in method). Microsoft is built but OFF: registering the app in Azure needs a directory (tenant) that a personal Outlook account does not have, and e-mail sign-in covers work addresses (recommended 28 Sep 2026; Tony to confirm). Apple waits for an Apple Developer account.",
     "_why_authDomain": "Sign-in runs on the test copy's own address (v36.75; v36.78 self-hosted). On an iPhone, sign-in on tonys-recipes-test.firebaseapp.com fails with 'missing initial state'. tools/build.js fetches Firebase's sign-in files into dist/__/ because authDomain equals this copy's own host. Google must list https://tonys-recipes-test.pages.dev/__/auth/handler as an allowed redirect.",
     "manifest": {
       "name": "Tony's Recipes (test)",
