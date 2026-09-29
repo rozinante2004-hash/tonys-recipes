@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.09 -->
+<!-- Tony's Recipes Collection v37.10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3820,6 +3820,7 @@ function hhMemberDoc(user, role, extra) {
                          name: user.displayName || '', joinedAt: Date.now() }, extra || {});
 }
 // A place kept for this person's (verified) e-mail — claim every one.
+var _hhClaimedHid = null;
 async function householdClaimKept(user) {
   var email = String(user.email || '').toLowerCase();
   // v37.03 — only a CONFIRMED address may look for places kept for it (the
@@ -3827,6 +3828,7 @@ async function householdClaimKept(user) {
   // household step for anyone who signed up with a password).
   if (!email || user.emailVerified === false) return 0;
   var q, n = 0, kept = [];
+  _hhClaimedHid = null;
   try { q = await hhDb().collection('pending').where('email', '==', email).get(); }
   catch(e) { syncLog('error', 'Could not look for places kept for this address', String(e && e.message).slice(0, 160)); return 0; }
   q.forEach(function(d) { kept.push({ ref: d.ref, data: d.data() || {} }); });
@@ -3834,7 +3836,7 @@ async function householdClaimKept(user) {
     try {
       await hhRef(kept[i].data.hid).collection('members').doc(user.uid).set(hhMemberDoc(user, kept[i].data.role));
       await kept[i].ref.delete();
-      n++;
+      n++; _hhClaimedHid = kept[i].data.hid;
     } catch(e) { syncLog('error', 'Could not take up a place kept in a household', String(e && e.message).slice(0, 160)); }
   }
   return n;
@@ -3874,8 +3876,18 @@ async function householdEnter(user) {
       }
       try { sessionStorage.removeItem(JOIN_KEY); } catch(e) {}
     }
+    // v37.10 — someone confirming their address LATER, after starting a
+    // collection of their own meanwhile, is still taken into the household
+    // that kept a place for them — and it is the one opened.
+    // Back from the e-mail that confirms deleting the account: the household
+    // is not opened (it is about to go); completeEmailLinkSignIn carries on
+    // once the link's own sign-in has finished — Firebase wants that fresh.
+    if (window._resumingDelete) return false;
     var list = await householdMemberships(user);
-    if (!list.length && await householdClaimKept(user)) list = await householdMemberships(user);
+    if (await householdClaimKept(user)) {
+      list = await householdMemberships(user);
+      if (_hhClaimedHid) try { localStorage.setItem(HOUSEHOLD_KEY, _hhClaimedHid); } catch(e) {}
+    }
     // v37.00 (WP-O) — someone new is ASKED: their own collection, or one they
     // were invited to (the link pasted, when it was not opened directly).
     if (!list.length) {
@@ -4228,7 +4240,7 @@ async function accountDelete(opts) {
       okLabel: 'OK' });
     return null;
   }
-  if (!opts.yes) {
+  if (!opts.yes && !opts.resumed) {
     var go = await askConfirm({ icon: '⚠️', title: 'Delete your account?',
       message: (alone.length ? 'Deleted with every recipe and photo in ' + (alone.length === 1 ? 'it' : 'them') + ': '
                  + alone.map(function(x){ return x.name; }).join(', ') + '.\n' : '')
@@ -4245,8 +4257,17 @@ async function accountDelete(opts) {
   // one is not recent, it is confirmed FIRST — before anything is deleted —
   // and the whole deletion then runs through to the account itself.
   var signedAt = Date.parse((user.metadata && user.metadata.lastSignInTime) || '') || 0;
-  if (!opts.yes && Date.now() - signedAt > 4 * 60 * 1000) {
-    try { if (!await accountReauthenticate(user, true)) { toast('Nothing was deleted.'); return null; } }
+  if (opts.resumed) {
+    // Back from the e-mailed link: signed in afresh, one last question.
+    if (await askConfirm({ icon: '\u26a0\ufe0f', title: 'Delete your account now?',
+        message: 'You confirmed it is you. Delete ' + user.email + ' and the collections you own alone? This cannot be undone.',
+        okLabel: 'Delete my account', danger: true }) !== true) {
+      toast('Nothing was deleted.'); window._resumingDelete = false;
+      setTimeout(function(){ location.reload(); }, 1200);       // and on as usual
+      return null;
+    }
+  } else if (opts.forceReauth || (!opts.yes && Date.now() - signedAt > 4 * 60 * 1000)) {
+    try { if (!await accountReauthenticate(user, true)) { if (!opts.quiet) toast('Nothing was deleted.'); return null; } }
     catch(e) { showServiceError('Could not confirm it is you:\n\n' + authErrorText(e) + '\n\nNothing was deleted.'); return null; }
   }
   try {
@@ -4262,6 +4283,7 @@ async function accountDelete(opts) {
       kept.forEach(function(d){ krefs.push(d.ref); });
       for (var k = 0; k < krefs.length; k++) await krefs[k].delete();
     }
+    syncLog('auth', 'Deleting the account: its collections and places are done', user.email);
     progressStep(2, 'Your sign-in…');
     try { await user.delete(); }
     catch(e) {
@@ -4278,19 +4300,48 @@ async function accountDelete(opts) {
       + '\n\nWhat was deleted stays deleted; running it again finishes the job.');
     return null;
   }
-  // This device, cleared: nothing of the account is left behind on it.
-  try { Object.keys(localStorage).filter(function(k){ return /^tonys_/.test(k); }).forEach(function(k){ localStorage.removeItem(k); }); } catch(e) {}
+  syncLog('auth', 'Deleted the account, sign-in included', user.email);
+  // This device, cleared: nothing of the account is left behind on it — except
+  // the log (v37.10), which is the device's, not the account's, and is how a
+  // delete that did not finish can be understood afterwards.
+  var keepKeys = [LOG_KEY, LOG_ENABLED_KEY, LOG_DAYS_KEY, DEBUG_KEY];
+  try { Object.keys(localStorage).filter(function(k){ return /^tonys_/.test(k) && keepKeys.indexOf(k) === -1; }).forEach(function(k){ localStorage.removeItem(k); }); } catch(e) {}
   try { await idbClearAll(); } catch(e) {}
-  if (!opts.noReload) location.reload();
+  if (!opts.noReload) {
+    await askConfirm({ icon: '\u2705', title: 'Your account is deleted',
+      message: user.email + ' and everything that was only yours are gone, and this device has been cleared.', okLabel: 'OK' });
+    location.reload();
+  }
   return true;
 }
 // Proving it is you once more, the same way you signed in (v37.06 — it always
 // opened Google's window, which a password account cannot use).
+var DELETE_AFTER_LINK_KEY = 'tonys_delete_after_link';
 async function accountReauthenticate(user, before) {
   var how = ((user.providerData || [])[0] || {}).providerId || 'google.com';
   var intro = before ? 'For your safety, please confirm it is you. Nothing has been deleted yet.'
                      : 'Your households are done. For your safety, please confirm it is you before the account itself is removed.';
   if (how === 'password') {
+    // v37.10 — Tony: months later, nobody remembers the password. An e-mailed
+    // link proves it just as well: opening it signs in afresh and the
+    // deletion carries on (householdEnter, DELETE_AFTER_LINK_KEY).
+    if (signInOn('emailLink')) {
+      var way = await askChoice(intro, [
+        { value: 'link', label: '\u{1F4E7} E-mail me a confirmation link' },
+        { value: 'password', label: '\u{1F511} Type my password' }
+      ], { icon: '\u{1F510}', title: 'Confirm it is you' });
+      if (!way) return false;
+      if (way === 'link') {
+        await _fbAuth.sendSignInLinkToEmail(user.email, { url: continueUrl(), handleCodeInApp: true });
+        try { localStorage.setItem(SIGNIN_EMAIL_KEY, user.email);
+              localStorage.setItem(DELETE_AFTER_LINK_KEY, JSON.stringify({ uid: user.uid, at: Date.now() })); } catch(e) {}
+        syncLog('auth', 'Sent a link to confirm deleting the account', user.email);
+        await askConfirm({ icon: '\u{1F4E7}', title: 'Check your e-mail',
+          message: 'We sent a link to ' + user.email + ' (look in spam too). Open it on this device and the deletion carries on from there. Nothing has been deleted yet.',
+          okLabel: 'OK' });
+        return false;
+      }
+    }
     var pw = await askConfirm({ icon: '\u{1F510}', title: 'Your password, once more', message: intro,
       input: '', inputType: 'password', placeholder: 'Password', okLabel: 'Delete my account', danger: true });
     if (typeof pw !== 'string' || !pw) return false;
@@ -4403,10 +4454,26 @@ async function householdWelcome(user) {
   for (var w = 0; w < 600 && document.getElementById('askOverlay'); w++) await wait(200);
   var brand = String(APP_CONFIG.brandName || 'My Kitchen Notes');
   for (var tries = 0; tries < 20; tries++) {
-    var v = await askChoice('Keep every recipe you love in one place — and share them with the people you cook with.', [
+    // v37.10 — Tony: warn when something cannot work yet, and why. Someone
+    // whose address is not confirmed cannot be let into a household that
+    // added that address — so they are told, and offered the e-mail again.
+    var unconfirmed = user && user.emailVerified === false;
+    var choices = [
       { value: 'own',  label: '\u{1F3E0} Start my own collection' },
       { value: 'join', label: '\u{1F517} I have an invitation' }
-    ], { icon: '\u{1F44B}', title: 'Welcome to ' + brand });
+    ];
+    if (unconfirmed) choices.push({ value: 'confirm', label: '\u2709\ufe0f Someone added my address \u2014 confirm it first' });
+    var v = await askChoice('Keep every recipe you love in one place \u2014 and share them with the people you cook with.'
+      + (unconfirmed ? '\n\nWere you added to someone\u2019s collection by your address? It opens once you confirm ' + user.email
+          + ' from the e-mail we sent (look in spam too). An invitation link works right away.' : ''),
+      choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand });
+    if (v === 'confirm') {
+      await resendConfirmation();
+      await askConfirm({ icon: '\u2709\ufe0f', title: 'Then reload the app',
+        message: 'Open the e-mail sent to ' + user.email + ' (look in spam too) and press its link. Then come back and reload: '
+          + 'you will be in the collection that added you.', okLabel: 'OK' });
+      continue;
+    }
     if (v === 'join') {
       var t = await askPrompt('Paste the invitation link you were sent (or just its code).', '',
         { icon: '\u{1F517}', title: 'Join with an invitation', okLabel: 'Join', placeholder: 'https://…?join=…' });
@@ -4805,7 +4872,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.09';
+var APP_VERSION = 'v37.10';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7437,7 +7504,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.09</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.10</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7489,7 +7556,7 @@ body.banner-shown .header {
           <button class="drop-item" title="Keep a record of what the app does, to send when something goes wrong. The record stays on this device." onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
           <button class="drop-item" title="Erases THIS device's copy of the recipes and photos, then reloads. Does NOT delete anything in the cloud — signed in, your recipes come straight back." id="resetDeviceItem" onclick="closeDrop('settingsDrop');clearAllData()">🧽 Reset this device…</button>
           <!-- v37.09 — only while this address is not confirmed (refreshed when ⚙️ opens) -->
-          <button class="drop-item" title="Sends the e-mail that confirms this address is yours again. Needed only for places kept for your address." id="confirmEmailItem" style="display:none;" onclick="closeDrop('settingsDrop');resendConfirmation()">✉️ Confirm my e-mail address</button>
+          <button class="drop-item" title="Sends the e-mail that confirms this address is yours again. Needed only for places kept for your address." id="confirmEmailItem" style="display:none;font-weight:700;color:var(--terracotta);background:rgba(212,168,67,0.2);" onclick="closeDrop('settingsDrop');resendConfirmation()">✉️ Confirm my e-mail address</button>
           <!-- v37.00 (WP-O) -->
           <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
           <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
@@ -8082,7 +8149,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.09</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.10</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -20290,6 +20357,14 @@ function handleFirestoreSaveError(err) {
     return;
   }
   if (code === 'permission-denied' || msg.toLowerCase().indexOf('permission') > -1) {
+    // v37.10 — an unconfirmed address is the likeliest reason, and fixable.
+    if (window._fbUser && window._fbUser.emailVerified === false) {
+      askConfirm({ icon: '\u2709\ufe0f', title: 'Please confirm your e-mail address first',
+        message: 'The family\u2019s recipes open for ' + window._fbUser.email + ' once it is confirmed from the e-mail we sent (look in spam too). '
+          + 'Your change is safe on this device and goes up once it is.', okLabel: 'Send the e-mail again', cancelLabel: 'Later' })
+        .then(function(ok){ if (ok === true) resendConfirmation(); });
+      return;
+    }
     showServiceError('PERMISSION: The cloud write was denied by your Firestore security rules.\n\n'
       + 'Make sure your account is allowed to write to the shared collection:\n'
       + 'https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/firestore/databases/-default-/security/rules');
@@ -20926,6 +21001,10 @@ async function emailSendLink() {
 // Arriving from the sign-in link in the e-mail.
 async function completeEmailLinkSignIn() {
   if (!window._fbAuth || !_fbAuth.isSignInWithEmailLink || !_fbAuth.isSignInWithEmailLink(location.href)) return null;
+  // v37.10 — this link may be the one that confirms deleting the account.
+  var del = null;
+  try { del = JSON.parse(localStorage.getItem(DELETE_AFTER_LINK_KEY) || 'null'); } catch(e) {}
+  if (del && Date.now() - (del.at || 0) < 3600000) window._resumingDelete = true;
   var email = null;
   try { email = localStorage.getItem(SIGNIN_EMAIL_KEY); } catch(e) {}
   if (!email) {
@@ -20939,8 +21018,13 @@ async function completeEmailLinkSignIn() {
     var cred = await _fbAuth.signInWithEmailLink(email.trim().toLowerCase(), location.href);
     try { localStorage.removeItem(SIGNIN_EMAIL_KEY); } catch(e) {}
     history.replaceState(null, '', location.pathname);
+    if (window._resumingDelete) {
+      try { localStorage.removeItem(DELETE_AFTER_LINK_KEY); } catch(e) {}
+      if (del && cred && cred.user && del.uid === cred.user.uid) setTimeout(function(){ accountDelete({ resumed: true }); }, 300);
+      else window._resumingDelete = false;
+    }
     return cred;
-  } catch(e) { authFailed(e, 'Sign-in with a link'); return null; }
+  } catch(e) { window._resumingDelete = false; authFailed(e, 'Sign-in with a link'); return null; }
 }
 // Signed in, but the address is not confirmed (a new password account; some
 // work accounts): offered once per account, since places kept by address and

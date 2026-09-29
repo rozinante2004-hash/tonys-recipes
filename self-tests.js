@@ -2123,6 +2123,40 @@ window.SELF_TESTS = [
       } finally { window.getAccessMembers=realGet; window.letThemKnow=realLet; try{ renderAccessMembers(); }catch(e){} }
     } },
 
+  { id:'unconfirmed_is_told_and_offered', group:'Security', name:'An unconfirmed address is told what waits for it, and deleting needs no password (v37.10)',
+    test: async()=>{
+      var real={ choice:window.askChoice, prompt:window.askPrompt, found:window.householdFound, over:Object.assign({}, window._signInOverride), toast:window.toast };
+      var hhWas=null; try{ hhWas=localStorage.getItem('tonys_household'); }catch(e){}
+      try{
+        window.toast=function(){};
+        // The welcome says why a household that added you is not opening, and offers the e-mail.
+        var seen=null; window.askChoice=async function(m,o){ seen={ m:m, o:o.map(function(x){ return x.value; }) }; return 'own'; };
+        window.askPrompt=async function(){ return 'Mine'; }; window.householdFound=async function(){ return 'H-X'; };
+        await householdWelcome({ uid:'u', email:'new@example.com', emailVerified:false });
+        _hhJustFounded=false;
+        if(!seen || seen.o.indexOf('confirm')===-1 || !/confirm/.test(seen.m)) throw new Error('an unconfirmed person is not told: '+JSON.stringify(seen));
+        await householdWelcome({ uid:'u', email:'ok@example.com', emailVerified:true }); _hhJustFounded=false;
+        if(seen.o.indexOf('confirm')!==-1) throw new Error('a confirmed person is asked to confirm');
+        // Kept places are taken up even by someone with a collection of their own.
+        var he=String(householdEnter);
+        if(he.indexOf('!list.length && await householdClaimKept')!==-1 || he.indexOf('await householdClaimKept(user)')===-1)
+          throw new Error('a place kept for you is only taken up when you have no household');
+        // Deleting a password account: an e-mailed link as well as the password.
+        window._signInOverride=Object.assign({}, real.over, { emailLink:true });
+        var ways=null; window.askChoice=async function(m,o){ ways=o.map(function(x){ return x.value; }); return null; };
+        await accountReauthenticate({ email:'p@example.com', providerData:[{ providerId:'password' }] }, true);
+        if(!ways || ways.join()!=='link,password') throw new Error('deleting a password account offers: '+JSON.stringify(ways));
+        // The way back to confirming stands out in ⚙️.
+        var ci=document.getElementById('confirmEmailItem');
+        if(!ci || parseInt(getComputedStyle(ci).fontWeight,10)<700) throw new Error('"Confirm my e-mail address" does not stand out');
+        // What a device keeps when its account is deleted: its log.
+        if(String(accountDelete).indexOf('keepKeys')===-1) throw new Error('deleting an account throws away the log that explains it');
+      } finally {
+        window.askChoice=real.choice; window.askPrompt=real.prompt; window.householdFound=real.found; window._signInOverride=real.over; window.toast=real.toast;
+        try{ if(hhWas===null) localStorage.removeItem('tonys_household'); else localStorage.setItem('tonys_household', hhWas); }catch(e){}
+      }
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —

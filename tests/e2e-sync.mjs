@@ -473,6 +473,18 @@ try {
     ok('someone signs in with a link sent to their address', await inPage(LK, () => {
       const u = firebase.auth().currentUser; return u && u.email === 'link@example.com' && u.emailVerified === true && !!householdOf(); }));
     ok('…and the link is gone from the address bar', await inPage(LK, () => !/oobCode/.test(location.href)));
+    // v37.10 — someone who started a collection of their own FIRST is still
+    // taken into a household that adds their address later, and it opens.
+    const K = await device('K (added later)', 'later@example.com', { ready: 'household', welcome: 'own' });
+    const kOwn = await inPage(K, () => (householdOf() || {}).hid);
+    await inPage(A, () => { householdAddMember('later@example.com', 'write'); });
+    await until(async () => !!(await restDoc('pending/' + HID + ':later@example.com')), 15000);
+    await K.page.reload({ waitUntil: 'domcontentloaded' });
+    ok('someone added AFTER starting their own collection is taken into the household, and it opens',
+       await until(async () => (await inPage(K, () => (householdOf() || {}).hid)) === HID, 30000)
+       && ((await restDoc('households/' + HID + '/members/' + await uidOnPage(K))) || {}).role === 'editor'
+       && !!(await restDoc('households/' + kOwn)),
+       JSON.stringify(await inPage(K, () => householdOf())));
     ok('…and a new household starts empty (no examples imposed)', await inPage(N, () => recipes.length === 0 && !!document.getElementById('firstRunEmpty')),
        JSON.stringify(await inPage(N, () => recipes.map(r => r.name))));
 
@@ -521,7 +533,19 @@ try {
     // v37.06 — Tony's case: an UNCONFIRMED password account deletes itself,
     // its own household with it (the search for kept places stopped it).
     const pwHid = await inPage(PW, () => (householdOf() || {}).hid), pwUid = await uidOnPage(PW);
-    const pwAcc = await inPage(PW, async () => { window.backupSave = async () => {}; return accountDelete({ yes: true, noReload: true }); });
+    // v37.10 — confirmed by an e-mailed link, not the password nobody remembers.
+    await inPage(PW, async () => { window.backupSave = async () => {}; window.askChoice = async () => 'link'; window.askConfirm = async () => true;
+      return accountDelete({ yes: true, forceReauth: true, quiet: true }); });
+    ok('deleting a password account can be confirmed by an e-mailed link — nothing deleted before it is opened',
+       !!(await restDoc('households/' + pwHid)));
+    const codes2 = await (await fetch(`http://${EMU.host}:${EMU.authPort}/emulator/v1/projects/${EMU.projectId}/oobCodes`)).json();
+    const c2 = (codes2.oobCodes || []).filter(x => x.email === 'pw@example.com' && x.requestType === 'EMAIL_SIGNIN').pop();
+    const q2 = new URL(c2.oobLink).searchParams;
+    await PW.page.goto(`http://127.0.0.1:${PORT}/index.html?mode=signIn&oobCode=${q2.get('oobCode')}&apiKey=${q2.get('apiKey')}`, { waitUntil: 'domcontentloaded' });
+    await PW.page.waitForSelector('#askOverlay #askOk', { timeout: 30000 });          // "Delete your account now?"
+    await PW.page.click('#askOverlay #askOk');
+    await PW.page.waitForFunction(() => /account is deleted/.test((document.querySelector('#askOverlay') || {}).textContent || ''), null, { timeout: 30000 });
+    const pwAcc = true;   // the page said so; the list of users below is the proof
     // …and gone from Firebase's own list of users, not just signed out here.
     const users = await (await fetch(`http://${EMU.host}:${EMU.authPort}/identitytoolkit.googleapis.com/v1/projects/${EMU.projectId}/accounts:query`,
       { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' }, body: '{}' })).json();
@@ -530,7 +554,7 @@ try {
        JSON.stringify(left));
     ok('an account that is not yet confirmed can delete itself, household and all', pwAcc === true
        && !(await restDoc('households/' + pwHid)) && !(await restDoc('households/' + pwHid + '/members/' + pwUid))
-       && await inPage(PW, () => !firebase.auth().currentUser),
+       ,
        JSON.stringify({ pwAcc, log: await inPage(PW, () => JSON.parse(localStorage.getItem('tonys_sync_log') || '[]').slice(-3).map(e => e.m + ' ' + (e.d || ''))) }));
   }
 

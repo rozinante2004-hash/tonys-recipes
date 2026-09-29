@@ -383,6 +383,19 @@ found only because a test was written first and disagreed with the code.
     then kept places (skipped for an UNCONFIRMED address — the rules refuse
     that search, and it stopped Tony's delete half-way), then `user.delete()`.
     The e2e checks the Auth emulator's own user list afterwards.
+  - **v37.10 — unconfirmed addresses, told; deleting without a password.**
+    The welcome tells an unconfirmed person that a household that added their
+    address opens once they confirm (option: send the e-mail again), and
+    `householdClaimKept` now runs at EVERY sign-in (not only with no
+    household), opening the claimed one — someone who started their own
+    collection first is still taken in. A refused save in the family layout
+    by an unconfirmed address explains itself. Deleting a password account:
+    "E-mail me a confirmation link" or "Type my password"; the link signs in
+    afresh and `completeEmailLinkSignIn` resumes `accountDelete({resumed})`
+    only AFTER that sign-in (`window._resumingDelete` keeps householdEnter
+    from opening the household meanwhile; Firebase wants a fresh sign-in).
+    The device's LOG survives the account's deletion (keepKeys), each step is
+    logged, and the end says "Your account is deleted".
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection
