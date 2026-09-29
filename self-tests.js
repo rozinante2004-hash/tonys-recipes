@@ -2081,6 +2081,48 @@ window.SELF_TESTS = [
       if(String(clearAllData).indexOf('askConfirm')===-1) throw new Error('resetting the device no longer asks first');
     } },
 
+  { id:'settings_items_explain_themselves', group:'UI', name:'Every ⚙️ item says what it does — and what it does not (v37.09)',
+    test: async()=>{
+      var items=document.querySelectorAll('#settingsDrop button.drop-item');
+      if(items.length<15) throw new Error('only '+items.length+' items in the ⚙️ menu');
+      var bare=[].filter.call(items, function(b){ return !(b.getAttribute('title')||'').trim(); }).map(function(b){ return b.textContent.trim(); });
+      if(bare.length) throw new Error('no explanation on: '+bare.join(', '));
+      var reset=document.getElementById('resetDeviceItem');
+      if(!/NOT delete anything in the cloud/.test(reset.title)) throw new Error('Reset does not say what it leaves alone: '+reset.title);
+      // Try again later: the confirmation e-mail has its own item, shown only while needed.
+      var ci=document.getElementById('confirmEmailItem');
+      if(!ci || (ci.getAttribute('onclick')||'').indexOf('resendConfirmation')===-1) throw new Error('there is no way to send the confirmation again');
+      if(typeof resendConfirmation!=='function') throw new Error('resendConfirmation not defined');
+      // Help knows how to rename a household.
+      if(HELP_SYSTEM_PROMPT.indexOf('Rename')===-1 || HELP_SYSTEM_PROMPT.indexOf('Notify')===-1) throw new Error('Help does not know about renaming or notifying');
+      // Web mail, for a computer without a mail program.
+      var t=shareTargets({ to:'a@b.co', subject:'S', text:'T' });
+      if(t.gmail.indexOf('https://mail.google.com/mail/?view=cm')!==0 || t.gmail.indexOf('to=a%40b.co')===-1) throw new Error('the Gmail link is '+t.gmail);
+      if(t.outlook.indexOf('https://outlook.live.com/mail/0/deeplink/compose?to=a%40b.co')!==0) throw new Error('the Outlook link is '+t.outlook);
+      // Logging follows the copy's default until someone chooses.
+      var was=null; try{ was=localStorage.getItem(LOG_ENABLED_KEY); localStorage.removeItem(LOG_ENABLED_KEY); }catch(e){}
+      try{
+        if(logEnabled()!==!!(APP_CONFIG.diagnostics&&APP_CONFIG.diagnostics.logging)) throw new Error('logging does not follow the copy’s default');
+        localStorage.setItem(LOG_ENABLED_KEY,'0');
+        if(logEnabled()) throw new Error('switching logging off is not kept');
+      } finally { try{ if(was===null) localStorage.removeItem(LOG_ENABLED_KEY); else localStorage.setItem(LOG_ENABLED_KEY, was); }catch(e){} }
+    } },
+
+  { id:'access_notify_each_member', group:'UI', name:'Each person in Family Access has ✉️ Notify, to send the note again (v37.09)',
+    test: async()=>{
+      if(typeof notifyAccessMember!=='function') throw new Error('notifyAccessMember not defined');
+      var realGet=window.getAccessMembers, realLet=window.letThemKnow, asked=null;
+      try{
+        window.getAccessMembers=function(){ return [{ email:'aunt@example.com', role:'write' }]; };
+        window.letThemKnow=function(e){ asked=e; return Promise.resolve(null); };
+        renderAccessMembers();
+        var b=[].filter.call(document.querySelectorAll('#accessMembersList button'), function(x){ return /Notify/.test(x.textContent); })[0];
+        if(!b) throw new Error('no ✉️ Notify button next to a member');
+        b.click();
+        if(asked!=='aunt@example.com') throw new Error('Notify did not offer the note to that person: '+asked);
+      } finally { window.getAccessMembers=realGet; window.letThemKnow=realLet; try{ renderAccessMembers(); }catch(e){} }
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —
@@ -3990,9 +4032,14 @@ window.SELF_TESTS = [
         // OFF is the default, and off means nothing is written at all — not
         // "written and hidden". A log that collects while switched off is the
         // opposite of what an opt-in switch promises.
+        // v37.09 — with nothing stored, the copy's own default (off in the
+        // family's, on in the test copy); switched off, nothing at all.
         localStorage.removeItem('tonys_log_enabled');
+        if(logEnabled()!==!!(APP_CONFIG.diagnostics&&APP_CONFIG.diagnostics.logging))
+          throw new Error('with no setting stored, logging does not follow the copy\u2019s default');
+        localStorage.setItem('tonys_log_enabled','0');
         purgeSyncLog();
-        if(logEnabled()) throw new Error('logging reports enabled with no setting stored');
+        if(logEnabled()) throw new Error('logging reports enabled when switched off');
         if(syncLog('save','should not be recorded')!==false)
           throw new Error('syncLog claimed to record while switched off');
         if(readSyncLog().length) throw new Error('an event was recorded while logging was off');

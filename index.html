@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.08 -->
+<!-- Tony's Recipes Collection v37.09 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -163,6 +163,9 @@
     // v37.03 — the ways to sign in on THIS copy. Each needs switching on in the
     // Firebase console (Authentication → Sign-in method) as well, and Apple and
     // Microsoft need their own developer setup; until then they stay off here.
+    // v37.09 — logging and debugging on from the start (the test copy, so Tony
+    // can send a log of anything). A person's own choice, once made, is kept.
+    diagnostics: Object.freeze({ logging: false, debug: false }),
     signIn: Object.freeze({
       google:    true,
       microsoft: false,   // work (Microsoft 365) and personal Microsoft accounts
@@ -487,7 +490,10 @@
 // To add more debug output anywhere, just call dlog('[Tag]', ...values).
 var DEBUG_KEY = 'tonys_debug_mode';
 var _debugMode = false;
-try { _debugMode = localStorage.getItem(DEBUG_KEY) === '1'; } catch(e) {}
+try {
+  var _dbgv = localStorage.getItem(DEBUG_KEY);
+  _debugMode = _dbgv === null ? !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.debug) : _dbgv === '1';
+} catch(e) {}
 
 function dlog() {
   if (!_debugMode) return;
@@ -554,12 +560,17 @@ function formatBytes(n) {
 }
 
 function logEnabled() {
-  try { return localStorage.getItem(LOG_ENABLED_KEY) === '1'; } catch(e) { return false; }
+  try {
+    var v = localStorage.getItem(LOG_ENABLED_KEY);
+    // v37.09 — never chosen on this device: the copy's own default.
+    if (v === null) return !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.logging);
+    return v === '1';
+  } catch(e) { return false; }
 }
 function setLogEnabled(on) {
   try {
-    if (on) localStorage.setItem(LOG_ENABLED_KEY, '1');
-    else localStorage.removeItem(LOG_ENABLED_KEY);
+    // '0', not removed: switching it off is a choice, kept over the copy's default.
+    localStorage.setItem(LOG_ENABLED_KEY, on ? '1' : '0');
   } catch(e) {}
   // Switching it off leaves what was already collected — deleting someone's
   // diagnostics as a side effect of a toggle would be a surprise. Purge is a
@@ -3697,12 +3708,19 @@ function renderAccessMembers() {
       '<select class="access-role-btn" data-i18n-skip-attrs="aria-label" aria-label="Role for ' + escA(m.email) + '" onchange="changeAccessRole(' + i + ',this.value)" style="margin-right:4px;">' +
         ['read','write','admin'].map(function(r){ return '<option value="'+r+'"'+(m.role===r?' selected':'')+'>'+roleLabels[r]+'</option>'; }).join('') +
       '</select>' +
+      // v37.09 — send the note again whenever it is needed (Tony: one try is not enough)
+      '<button class="access-role-btn" title="Send ' + escA(m.email) + ' a note about the app" onclick="notifyAccessMember(' + i + ')" style="margin-right:4px;">✉️ Notify</button>' +
       '<button class="access-remove-btn" onclick="removeAccessMember(' + i + ')">✕</button>' +
       '</div>';
   }).join('');
   updateAccessRules();
 }
 
+function notifyAccessMember(i) {
+  var m = getAccessMembers()[i];
+  if (m) letThemKnow(m.email, cloudLayout() === 'households' ? '' : 'They see the recipes once the rules below are published with their address.');
+}
+window.notifyAccessMember = notifyAccessMember;
 function addAccessMember() {
   var email = (document.getElementById('accessEmailInput').value||'').trim().toLowerCase();
   if(!email || !email.includes('@')) { toast('⚠️ Please enter a valid email address'); return; }
@@ -4333,16 +4351,21 @@ function shareTargets(opts) {
   var to = /^[^\s?&#<>"']+@[^\s?&#<>"']+$/.test(String(opts.to || '')) ? String(opts.to) : '';
   return {
     mail: 'mailto:' + to + '?subject=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),
+    // v37.09 — on a computer without a mail program, mailto: does nothing at all
+    gmail: 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) + '&su=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),
+    outlook: 'https://outlook.live.com/mail/0/deeplink/compose?to=' + encodeURIComponent(to) + '&subject=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),
     wa: 'https://wa.me/?text=' + encodeURIComponent(opts.text || '')
   };
 }
 async function shareMessage(opts) {
-  var options = [{ value: 'mail', label: '✉️ By e-mail' }, { value: 'wa', label: '\u{1F4AC} WhatsApp' }];
+  var options = [{ value: 'gmail', label: '✉️ Gmail' }, { value: 'outlook', label: '✉️ Outlook' },
+                 { value: 'mail', label: '✉️ My mail app' }, { value: 'wa', label: '\u{1F4AC} WhatsApp' }];
   if (navigator.share) options.push({ value: 'share', label: '\u{1F4E4} Another app…' });
   options.push({ value: 'copy', label: '\u{1F4CB} Copy the message' });
   var how = await askChoice(opts.intro || '', options, { icon: '\u{1F4E3}', title: opts.title || 'Let them know' });
   var t = shareTargets(opts);
   if (how === 'mail') location.href = t.mail;
+  else if (how === 'gmail' || how === 'outlook') window.open(t[how], '_blank', 'noopener');
   else if (how === 'wa') window.open(t.wa, '_blank', 'noopener');
   else if (how === 'share') { try { await navigator.share({ title: opts.subject || '', text: opts.text }); } catch(e) {} }
   else if (how === 'copy') {
@@ -4353,7 +4376,7 @@ async function shareMessage(opts) {
 }
 function letThemKnow(email, note) {
   return shareMessage({ to: email, title: 'Let ' + email + ' know?',
-    intro: (note ? note + '\n\n' : '') + 'Adding them sends nothing by itself. Send them a short note from you:',
+    intro: (note ? note + '\n\n' : '') + 'The app sends nothing by itself. Send them a short note from you — it opens ready, and you press Send:',
     subject: 'Our recipes', text: memberWelcomeText(email) });
 }
 window.signInHowText = signInHowText; window.memberWelcomeText = memberWelcomeText; window.shareTargets = shareTargets;
@@ -4782,7 +4805,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.08';
+var APP_VERSION = 'v37.09';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7414,7 +7437,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.08</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.09</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7438,45 +7461,47 @@ body.banner-shown .header {
              grey on every device, meaning nothing, until Tony asked what it was. -->
         <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️</button>
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
-          <button class="drop-item" id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
-          <button class="drop-item" data-feature="whatsapp" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
+          <button class="drop-item" title="How many recipe cards fit in a row, on this device. Only changes how recipes are shown — nothing is added or removed." onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
+          <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
+          <button class="drop-item" title="Connect WhatsApp chats to find recipes in them. Nothing is ever sent to your groups." data-feature="whatsapp" onclick="closeDrop('settingsDrop');openWaSetup()">💬 WhatsApp Groups</button>
+          <button class="drop-item" title="What you have at home, so recipe ideas can use it." onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
+          <button class="drop-item" title="Who shares this collection and what each person can do: add people, invitation links, roles, renaming and handing over the household." onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
           <!-- v36.99 — your data; deleting the account is the menu's last item (v37.05) -->
-          <button class="drop-item" data-layout-only="households" onclick="closeDrop('settingsDrop');accountDownload()">⬇️ Download all my data</button>
-          <button class="drop-item" data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
-          <button class="drop-item" data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
+          <button class="drop-item" title="A file with all your recipes, photos, languages and who is in your household. Nothing is deleted or changed." data-layout-only="households" onclick="closeDrop('settingsDrop');accountDownload()">⬇️ Download all my data</button>
+          <button class="drop-item" title="Connect your Gmail so recipes can be e-mailed from the app." data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
+          <button class="drop-item" title="The connection that sends ingredients straight to the household's Bring! list." data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
-          <button class="drop-item" id="selfTestMenuItem" style="display:none;" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
+          <button class="drop-item" title="Save or restore a backup file of your recipes and photos, and set up automatic daily backups to a folder." onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
+          <button class="drop-item" title="Exactly what the app sends where (the cloud, the AI, photo searches). Read-only — changes nothing." onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
+          <button class="drop-item" title="Whether this device and the cloud agree, with a report to copy and send. Read-only — changes nothing." onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
+          <button class="drop-item" title="Checks that the app works on this device. Your recipes are not changed." id="selfTestMenuItem" style="display:none;" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
+          <button class="drop-item" title="Removes photos kept on THIS device that no recipe uses any more. Does not touch the cloud or any recipe's photo." onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
           <!-- Photo repair lives HERE, next to the orphan sweep, because that is
                where the app's own messages send you: several say ⚙️ → "Send my
                photos to the cloud". They were in the ··· More menu, so the app was
                directing Tony to a menu that did not contain the item (v34.7). -->
-          <button class="drop-item" id="healCloudPhotosItem" onclick="closeDrop('settingsDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
-          <button class="drop-item" id="photoRescueItem" onclick="closeDrop('settingsDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
-          <button class="drop-item" id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
+          <button class="drop-item" title="Uploads photos that exist only on this device, so your other devices get them too. Deletes nothing." id="healCloudPhotosItem" onclick="closeDrop('settingsDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
+          <button class="drop-item" title="Puts photos back from a backup file, without replacing recipes changed since." id="photoRescueItem" onclick="closeDrop('settingsDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
+          <button class="drop-item" title="Takes away the photos the last automatic photo search added, putting back what was there before." id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
           <!-- v36.60 — the unit choice is remembered per device since v36.51, but
                could only be made from inside a recipe. -->
-          <button class="drop-item" id="unitsMenuItem" onclick="toggleUnitPref()">📏 Units: metric</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
-          <button class="drop-item" id="resetDeviceItem" onclick="closeDrop('settingsDrop');clearAllData()">🧽 Reset this device…</button>
+          <button class="drop-item" title="Show amounts in metric or imperial on this device. The recipes themselves are not changed." id="unitsMenuItem" onclick="toggleUnitPref()">📏 Units: metric</button>
+          <button class="drop-item" title="Keep a record of what the app does, to send when something goes wrong. The record stays on this device." onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
+          <button class="drop-item" title="Erases THIS device's copy of the recipes and photos, then reloads. Does NOT delete anything in the cloud — signed in, your recipes come straight back." id="resetDeviceItem" onclick="closeDrop('settingsDrop');clearAllData()">🧽 Reset this device…</button>
+          <!-- v37.09 — only while this address is not confirmed (refreshed when ⚙️ opens) -->
+          <button class="drop-item" title="Sends the e-mail that confirms this address is yours again. Needed only for places kept for your address." id="confirmEmailItem" style="display:none;" onclick="closeDrop('settingsDrop');resendConfirmation()">✉️ Confirm my e-mail address</button>
           <!-- v37.00 (WP-O) -->
-          <button class="drop-item" onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
-          <button class="drop-item" onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
+          <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
+          <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <!-- v36.59 — owner only (applyOwnerOnlyItems). They link straight into
                the Cloudflare account, the Firebase project and Anthropic billing,
                with the account ID on screen: no reason to be on anyone else's. -->
-          <button class="drop-item" data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
-          <button class="drop-item" data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
+          <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
+          <button class="drop-item" title="Where each copy of the app runs, with links (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
           <!-- v37.05 — Tony: not hidden in a dialog; the last item, bold and red. -->
           <div data-layout-only="households" style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button class="drop-item" id="deleteAccountItem" data-layout-only="households" onclick="closeDrop('settingsDrop');accountDelete()"
+          <button class="drop-item" title="Deletes your account, and the households you own alone with all their recipes. Cannot be undone. A household shared with others must be handed over first." id="deleteAccountItem" data-layout-only="households" onclick="closeDrop('settingsDrop');accountDelete()"
                   style="font-weight:700;color:var(--danger);">🗑 Delete my account…</button>
         </div>
       </div>
@@ -8057,7 +8082,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.08</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.09</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8502,6 +8527,8 @@ body.banner-shown .header {
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Suggestions:</div>
       <span class="help-suggestion" onclick="askHelpQ('How do I add a recipe?')">How do I add a recipe?</span>
+      <span class="help-suggestion" data-layout-only="households" onclick="askHelpQ('How do I rename my collection?')">Rename my collection?</span>
+      <span class="help-suggestion" data-layout-only="households" onclick="askHelpQ('How do I invite someone to my collection?')">Invite someone?</span>
       <span class="help-suggestion" onclick="askHelpQ('Where is my data stored?')">Where is my data stored?</span>
       <span class="help-suggestion" data-feature="bring" onclick="askHelpQ('How do I send ingredients to Bring?')">How do I send to Bring?</span>
       <span class="help-suggestion" onclick="askHelpQ('How do I import from a URL?')">Import from URL?</span>
@@ -16810,7 +16837,9 @@ function dropPlacement(r, mw, mh, vw, vh) {
 window.dropPlacement = dropPlacement;
 function toggleDrop(id){
   const menu=document.getElementById(id);
-  if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') { applyOwnerOnlyItems(); renderUnitsMenuItem(); }
+  if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') { applyOwnerOnlyItems(); renderUnitsMenuItem();
+    var ci = document.getElementById('confirmEmailItem');
+    if (ci) ci.style.display = (window._fbUser && window._fbUser.email && window._fbUser.emailVerified === false) ? '' : 'none'; }
   const wasOpen=menu.classList.contains('open');
   // Close all
   _disarmDropOutside();
@@ -20858,9 +20887,11 @@ async function emailSignIn(mode) {
     if (mode === 'up') {
       var cred = await _fbAuth.createUserWithEmailAndPassword(v.email, v.password);
       done(); signedInCloseLogin();
-      try { await cred.user.sendEmailVerification({ url: continueUrl() }); syncLog('auth', 'Sent the address confirmation', v.email); }
+      var sentOk = false;
+      try { await cred.user.sendEmailVerification({ url: continueUrl() }); sentOk = true; syncLog('auth', 'Sent the address confirmation', v.email); }
       catch(e) { syncLog('error', 'Could not send the address confirmation', ((e && e.code) || '') + ' ' + ((e && e.message) || '')); }
-      toast('✉️ Welcome! We sent a confirmation to ' + v.email + ' — look in spam too.', 9000);
+      toast(sentOk ? '✉️ Welcome! We sent a confirmation to ' + v.email + ' — look in spam too.'
+                   : '✉️ Welcome! The confirmation e-mail could not be sent just now — ⚙️ → ✉️ Confirm my e-mail address tries again.', 9000);
       return cred;
     }
     var c2 = await _fbAuth.signInWithEmailAndPassword(v.email, v.password);
@@ -20934,6 +20965,30 @@ function emailVerifyNudge(user) {
   })();
   return true;
 }
+// v37.09 — Tony: "how would I try later?" — ⚙️ → ✉️ Confirm my e-mail address,
+// shown while the address is unconfirmed. Firebase allows about one a minute.
+async function resendConfirmation() {
+  var user = window._fbAuth && _fbAuth.currentUser;
+  if (!user) return null;
+  try { await user.reload(); } catch(e) {}
+  if (user.emailVerified) {
+    toast('✅ ' + user.email + ' is already confirmed — reload the app to use it.', 8000);
+    return 'confirmed';
+  }
+  try {
+    await user.sendEmailVerification({ url: continueUrl() });
+    syncLog('auth', 'Sent the address confirmation', user.email);
+    toast('✉️ Sent to ' + user.email + ' — look in spam too. Open it, then reload the app.', 9000);
+    return 'sent';
+  } catch(e) {
+    syncLog('error', 'Could not send the address confirmation', ((e && e.code) || '') + ' ' + ((e && e.message) || ''));
+    toast('❌ ' + (e && e.code === 'auth/too-many-requests'
+      ? 'Firebase allows about one of these a minute. Try again in a few minutes from ⚙️ → ✉️ Confirm my e-mail address.'
+      : authErrorText(e)), 9000);
+    return null;
+  }
+}
+window.resendConfirmation = resendConfirmation;
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
 window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
 window.emailSendLink = emailSendLink; window.completeEmailLinkSignIn = completeEmailLinkSignIn; window.emailVerifyNudge = emailVerifyNudge;
@@ -22205,6 +22260,22 @@ var HELP_SYSTEM_PROMPT = [
   "- 📏 Scaling memory: the app remembers the last serving size multiplier you used for each recipe",
   "- 🌙 Screen stay-on (Wake Lock): when you open a recipe, the screen stays on automatically so your hands can stay clean while cooking. It goes back to normal sleep when you close the recipe. Works in Chrome and Edge on Android; not supported in Safari.",
   "- ⏳ Skeleton loading: when the app first loads, animated placeholder cards appear briefly while your recipes render — no more blank white flash",
+  "",
+  "=== YOUR COLLECTION, SHARED (households) ===",
+  "- Your recipes live in a household — the name shown at the top of the app. Everyone in it sees the same recipes.",
+  "- RENAME it (and so the app's header): ⚙️ → 👥 Family Access → ✏️ Rename (the owner, or someone with full access).",
+  "- ADD SOMEONE: Family Access → type their e-mail address, choose a role, Add Member. They join the moment they sign in with that address.",
+  "- The app sends them nothing by itself: after adding, choose how to tell them (Gmail, Outlook, your mail app, WhatsApp, or copy). ✉️ Notify next to each person sends the note again.",
+  "- INVITATION LINK: Family Access → 🔗 Invitation link… — anyone with it can join for 14 days, with the role chosen.",
+  "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
+  "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
+  "",
+  "=== SIGNING IN AND YOUR ACCOUNT ===",
+  "- Sign in with Google, or with any e-mail address (a password, or a sign-in link sent to it) where that is offered.",
+  "- An address used with a password must be CONFIRMED from the e-mail sent to it; until then, places kept for that address do not open (invitation links still work). ⚙️ → ✉️ Confirm my e-mail address sends it again.",
+  "- ⚙️ → ⬇️ Download all my data saves a file with everything. ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone.",
+  "- ⚙️ → 🧽 Reset this device… erases only this device's copy; nothing in the cloud is deleted.",
+  "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",

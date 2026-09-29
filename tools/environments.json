@@ -18,6 +18,11 @@
     "features": {
       "bringDirect": false
     },
+    "diagnostics": {
+      "logging": true,
+      "debug": true
+    },
+    "_why_diagnostics": "v37.09 — Tony: logging and debugging on in the test copy, so any report he sends carries the log. His own switch, once used on a device, is kept.",
     "signIn": {
       "microsoft": false,
       "password": true,
