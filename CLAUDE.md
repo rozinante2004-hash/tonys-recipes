@@ -410,6 +410,17 @@ found only because a test was written first and disagreed with the code.
     token's claim lags. Without that, someone who confirmed and reloaded was
     not taken into the household for up to an hour. "🪵 Copy the log" is on
     the sign-in screen (after an account deletion the log was out of reach).
+  - **v37.12 — Family Access for a member; the confirmation tries again.**
+    Family Access says who is signed in (`#householdYouRow`, "Signed in as",
+    and "Your role: …" on the household card). Someone who cannot manage the
+    household (`householdCanManage()` false) sees the others read-only — no
+    role menus, ✉️ Notify, ✕ or `#accessAddForm` (the rules refused them
+    anyway). "🔗 Join with an invitation…" (`householdJoinPasted`) takes a
+    pasted link any time, not only in the first welcome. A confirmation
+    e-mail refused with `auth/too-many-requests` is sent again by itself
+    (`confirmationRetryLater`: ~1, 3, 10 minutes, while the app is open; stops
+    once confirmed). "🪵 Copy the log" on the sign-in screen shows only where
+    `APP_CONFIG.diagnostics.logging` is on — the test copy, never the family's.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

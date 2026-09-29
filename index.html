@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.11 -->
+<!-- Tony's Recipes Collection v37.12 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3691,14 +3691,26 @@ function renderAccessMembers() {
   var members = getAccessMembers();
   var el = document.getElementById('accessMembersList');
   if(!el) return;
+  // v37.12 — someone who cannot manage the household SEES who is in it; it
+  // offered them an "Add Member" form (and role menus) the rules then refused.
+  var viewOnly = cloudLayout() === 'households' && !householdCanManage();
+  var form = document.getElementById('accessAddForm'); if (form) form.style.display = viewOnly ? 'none' : '';
+  var sub = document.getElementById('accessSubtitle');
+  if (sub) sub.textContent = viewOnly ? 'Who shares this recipe collection' : 'Manage who can access your recipe collection';
   if(!members.length) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0;">No family members added yet.</div>';
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0;">'
+      + (viewOnly ? 'Nobody else has joined yet.' : 'No family members added yet.') + '</div>';
     return;
   }
   var roleLabels = { read:'👁 Read only', write:'✏️ Read + Write', admin:'🛡 Full access' };
   var roleColors  = { read:'#EEF2FF:#3451CC', write:'#EAF5E9:#2E7D32', admin:'#FFF0E8:#C1440E' };
   el.innerHTML = members.map(function(m, i) {
     var parts = (roleColors[m.role]||'#F5F5F5:#555').split(':');
+    if (viewOnly) return '<div class="access-row">' +
+      '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
+      '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
+      '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div></div>' +
+      '<div class="access-badge">' + roleLabels[m.role] + '</div></div>';
     return '<div class="access-row">' +
       '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
       // Same reason as the owner row above: names and addresses are data.
@@ -4012,12 +4024,21 @@ function householdRenderBar() {
       '<div class="access-row" style="background:rgba(212,168,67,0.14);border-color:var(--gold);">'
     +   '<div class="access-avatar" style="background:var(--gold);">\u{1F3E0}</div>'
     +   '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(h.name || 'Household') + '</div>'
-    +   '<div class="access-email">' + escH(roleName) + '</div></div>'
+    +   '<div class="access-email">Your role: ' + escH(roleName) + '</div></div>'
     +   (householdCanManage() ? '<button class="access-role-btn" onclick="householdRename()">✏️ Rename</button>' : '')
     + '</div>'
+    // v37.12 — Tony: nothing said WHO is signed in (a second account in a
+    // private window looks just like the first).
+    + (window._fbUser ? '<div id="householdYouRow" class="access-row" style="margin-top:8px;">'
+    +   '<div class="access-avatar">' + escH(String(_fbUser.displayName || _fbUser.email || '?').charAt(0).toUpperCase()) + '</div>'
+    +   '<div class="access-info"><div class="access-email" style="font-size:11px;">Signed in as</div>'
+    +   '<div class="access-name" data-no-i18n>' + escH(_fbUser.displayName || String(_fbUser.email || '').split('@')[0]) + '</div>'
+    +   '<div class="access-email" data-no-i18n>' + escH(_fbUser.email || '') + '</div></div>'
+    +   '<div class="access-badge">You</div></div>' : '')
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
     +   (householdCanManage() ? '<button class="access-role-btn" onclick="householdInvite()">\u{1F517} Invitation link…</button>' : '')
     +   (others.length ? '<button class="access-role-btn" onclick="householdSwitch()">\u{1F501} Switch household…</button>' : '')
+    +   '<button class="access-role-btn" onclick="householdJoinPasted()">\u{1F517} Join with an invitation…</button>'
     +   (h.role !== 'owner' ? '<button class="access-remove-btn" onclick="householdLeave()">Leave this household</button>' : '')
     +   (h.role === 'owner' ? '<button class="access-role-btn" onclick="householdTransfer()">\u{1F451} Hand over…</button>'
                             + '<button class="access-remove-btn" onclick="householdDelete()">\u{1F5D1} Delete this household…</button>' : '')
@@ -4026,6 +4047,24 @@ function householdRenderBar() {
   if (on) on.textContent = h.ownerName || (h.ownerEmail || '').split('@')[0] || '—';
   if (oe) oe.textContent = h.ownerEmail || '—';
 }
+// v37.12 — joining another household later, from an invitation link that
+// was sent (the welcome takes one only at the very first sign-in).
+async function householdJoinPasted() {
+  var t = await askConfirm({ icon: '\u{1F517}', title: 'Join another household',
+    message: 'Paste the invitation link you were sent (or just its code).', input: '', okLabel: 'Join' });
+  if (typeof t !== 'string' || !t.trim()) return null;
+  var code = householdCodeFrom(t);
+  if (!code) { toast('\u26a0\ufe0f That does not look like an invitation link.', 6000); return null; }
+  var hid;
+  try { hid = await householdJoinByInvite(window._fbUser, code); }
+  catch(e) { await askConfirm({ icon: '\u26a0\ufe0f', title: 'Could not join', message: e.message, okLabel: 'OK' }); return null; }
+  if (hid === _cloudHid) { toast('You are already in this household'); return hid; }
+  try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
+  toast('\u2705 You have joined the household', 6000);
+  householdReopen();
+  return hid;
+}
+window.householdJoinPasted = householdJoinPasted;
 async function householdRename() {
   if (!householdCanManage()) return;
   var name = await askConfirm({ icon: '✏️', title: 'Name of this household', input: _household.name || '', okLabel: 'Save' });
@@ -4910,7 +4949,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.11';
+var APP_VERSION = 'v37.12';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7542,7 +7581,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.11</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.12</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8187,7 +8226,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.11</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.12</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8212,7 +8251,7 @@ body.banner-shown .header {
       Why can't I sign in?
     </button>
     <!-- v37.11 — the log, even signed out (after deleting an account it was out of reach) -->
-    <button id="loginCopyLogBtn" onclick="copyLogFromLogin()"
+    <button id="loginCopyLogBtn" onclick="copyLogFromLogin()" hidden
             style="margin-top:4px;background:none;border:none;color:var(--terracotta);cursor:pointer;
                    font-size:12px;font-weight:600;text-decoration:underline;font-family:'DM Sans','Heebo',sans-serif;">
       🪵 Copy the log
@@ -21006,11 +21045,15 @@ async function emailSignIn(mode) {
     if (mode === 'up') {
       var cred = await _fbAuth.createUserWithEmailAndPassword(v.email, v.password);
       done(); signedInCloseLogin();
-      var sentOk = false;
+      var sentOk = false, again = false;
       try { await cred.user.sendEmailVerification({ url: continueUrl() }); sentOk = true; syncLog('auth', 'Sent the address confirmation', v.email); }
-      catch(e) { syncLog('error', 'Could not send the address confirmation', ((e && e.code) || '') + ' ' + ((e && e.message) || '')); }
+      catch(e) {
+        syncLog('error', 'Could not send the address confirmation', ((e && e.code) || '') + ' ' + ((e && e.message) || ''));
+        if (e && e.code === 'auth/too-many-requests') again = confirmationRetryLater(cred.user);
+      }
       toast(sentOk ? '✉️ Welcome! We sent a confirmation to ' + v.email + ' — look in spam too.'
-                   : '✉️ Welcome! The confirmation e-mail could not be sent just now — ⚙️ → ✉️ Confirm my e-mail address tries again.', 9000);
+          : again ? '✉️ Welcome! Firebase is busy — the confirmation e-mail goes out by itself in about a minute. Keep the app open.'
+                  : '✉️ Welcome! The confirmation e-mail could not be sent just now — ⚙️ → ✉️ Confirm my e-mail address tries again.', 9000);
       return cred;
     }
     var c2 = await _fbAuth.signInWithEmailAndPassword(v.email, v.password);
@@ -21111,12 +21154,41 @@ async function resendConfirmation() {
   } catch(e) {
     syncLog('error', 'Could not send the address confirmation', ((e && e.code) || '') + ' ' + ((e && e.message) || ''));
     toast('❌ ' + (e && e.code === 'auth/too-many-requests'
-      ? 'Firebase allows about one of these a minute. Try again in a few minutes from ⚙️ → ✉️ Confirm my e-mail address.'
+      ? (confirmationRetryLater(user) ? 'Firebase is busy — the app tries again by itself in about a minute. Keep it open.'
+         : 'Firebase allows about one of these a minute. Try again in a few minutes from ⚙️ → ✉️ Confirm my e-mail address.')
       : authErrorText(e)), 9000);
     return null;
   }
 }
 window.resendConfirmation = resendConfirmation;
+// v37.12 — Tony: "too many attempts" on the very first confirmation, every
+// time, while ⚙️ → Confirm a little later went through. Firebase refuses a
+// burst of these for a while; the app now tries again by itself (after about
+// a minute, then 3, then 10) while it is open — and says when it has sent it.
+var CONFIRM_RETRY_WAITS = [65e3, 180e3, 600e3];
+var _confirmRetry = null;
+function confirmationRetryLater(user, n) {
+  n = n || 0;
+  if (!user || n >= CONFIRM_RETRY_WAITS.length || _confirmRetry) return false;
+  _confirmRetry = setTimeout(async function() {
+    _confirmRetry = null;
+    var u = window._fbAuth && _fbAuth.currentUser;
+    if (!u || u.uid !== user.uid) return;
+    try { await u.reload(); } catch(e) {}
+    if (u.emailVerified) return;
+    try {
+      await u.sendEmailVerification({ url: continueUrl() });
+      syncLog('auth', 'Sent the address confirmation (tried again by itself)', u.email);
+      toast('\u2709\ufe0f Sent the confirmation to ' + u.email + ' \u2014 look in spam too.', 9000);
+    } catch(e) {
+      syncLog('error', 'Could not send the address confirmation (try ' + (n + 2) + ')', ((e && e.code) || '') + ' ' + ((e && e.message) || ''));
+      if (!(e && e.code === 'auth/too-many-requests' && confirmationRetryLater(user, n + 1)))
+        toast('\u274c The confirmation e-mail could not be sent. Try later from \u2699\ufe0f \u2192 \u2709\ufe0f Confirm my e-mail address.', 9000);
+    }
+  }, CONFIRM_RETRY_WAITS[n]);
+  return true;
+}
+window.confirmationRetryLater = confirmationRetryLater;
 function copyLogFromLogin() {
   var t = '';
   try { t = syncLogReportText(); } catch(e) { t = 'The log could not be read: ' + (e && e.message); }
@@ -21126,6 +21198,9 @@ function copyLogFromLogin() {
   return t;
 }
 window.copyLogFromLogin = copyLogFromLogin;
+// v37.12 — Tony: the test copy only, never the family's (its diagnostics are off).
+function loginLogButtonShown() { return !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.logging); }
+(function(){ var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = !loginLogButtonShown(); })();
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
 window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
 window.emailSendLink = emailSendLink; window.completeEmailLinkSignIn = completeEmailLinkSignIn; window.emailVerifyNudge = emailVerifyNudge;
@@ -27135,7 +27210,7 @@ window.onHeaderScroll = onHeaderScroll;
     </div>
     <div class="modal-header" style="margin-top:-8px;">
       <div class="modal-header-title">👥 Family Access Control</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Manage who can access your recipe collection</div>
+      <div id="accessSubtitle" style="font-size:12px;color:var(--muted);margin-top:4px;">Manage who can access your recipe collection</div>
     </div>
     <div class="modal-body" style="padding:0 16px 20px;">
 
@@ -27173,7 +27248,7 @@ window.onHeaderScroll = onHeaderScroll;
       </div>
 
       <!-- Add member form -->
-      <div style="margin-top:14px;padding:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
+      <div id="accessAddForm" style="margin-top:14px;padding:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
         <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px;">➕ Add family member</div>
         <input id="accessEmailInput" type="email" placeholder="their@gmail.com"
           style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;box-sizing:border-box;margin-bottom:8px;outline:none;" />
@@ -27188,7 +27263,7 @@ window.onHeaderScroll = onHeaderScroll;
       <!-- How it works note -->
       <div data-layout-only="households" style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
         <div style="font-size:12px;color:#2255AA;line-height:1.6;">
-          <strong>How it works:</strong> add someone's Google address and they join the moment they sign in — or send an <strong>invitation link</strong>. Everyone in the household sees the same recipes, and a change here takes effect at once: there is nothing to publish.
+          <strong>How it works:</strong> add someone's e-mail address and they join the moment they sign in — or send an <strong>invitation link</strong>. Everyone in the household sees the same recipes, and a change here takes effect at once: there is nothing to publish.
         </div>
       </div>
       <div data-layout-only="shared" style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">

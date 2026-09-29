@@ -485,6 +485,12 @@ try {
        && ((await restDoc('households/' + HID + '/members/' + await uidOnPage(K))) || {}).role === 'editor'
        && !!(await restDoc('households/' + kOwn)),
        JSON.stringify(await inPage(K, () => householdOf())));
+    // v37.12 — joining another household later, with a link pasted into Family Access.
+    const url2 = await inPage(A, async () => { window.askChoice = async () => 'viewer'; return householdInvite(); });
+    await inPage(LK, (u) => { window.askConfirm = async () => u; householdJoinPasted(); }, url2);
+    ok('someone already in a household of their own joins another with a pasted invitation, and it opens',
+       await until(async () => { try { return (await inPage(LK, () => (householdOf() || {}).hid)) === HID; } catch (e) { return false; } }, 30000),
+       JSON.stringify(await inPage(LK, () => householdOf()).catch(e => String(e))));
     // v37.11 — Tony: added to a household before confirming the address —
     // told so, and offered the e-mail; once confirmed, the place opens.
     const UC = await device('U (unconfirmed)', 'unconf@example.com', { ready: 'household', welcome: 'own', signIn: async page => {
@@ -539,6 +545,13 @@ try {
       openAccessControl(); const bar = document.getElementById('householdBar').textContent;
       return !/Invitation link|Rename/.test(bar) && /Leave this household/.test(bar);
     }));
+    // v37.12 — Tony: it did not say who is signed in, and offered "Add Member".
+    ok('…sees who is signed in, and is not offered "Add Member"', await inPage(B, (me) => {
+      const you = document.getElementById('householdYouRow');
+      return !!you && you.textContent.includes(me) && getComputedStyle(document.getElementById('accessAddForm')).display === 'none'
+        && !document.querySelector('#accessMembersList select');
+    }, WRITER), JSON.stringify(await inPage(B, () => [(document.getElementById('householdYouRow') || {}).textContent,
+        getComputedStyle(document.getElementById('accessAddForm')).display])));
 
     // v36.99 — handing over, deleting a household, deleting an account.
     console.log('Handing over and leaving for good');

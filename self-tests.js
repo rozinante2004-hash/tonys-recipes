@@ -2111,8 +2111,9 @@ window.SELF_TESTS = [
   { id:'access_notify_each_member', group:'UI', name:'Each person in Family Access has ✉️ Notify, to send the note again (v37.09)',
     test: async()=>{
       if(typeof notifyAccessMember!=='function') throw new Error('notifyAccessMember not defined');
-      var realGet=window.getAccessMembers, realLet=window.letThemKnow, asked=null;
+      var realGet=window.getAccessMembers, realLet=window.letThemKnow, realCan=window.householdCanManage, asked=null;
       try{
+        window.householdCanManage=function(){ return true; };   // v37.12 — only whoever manages is offered it
         window.getAccessMembers=function(){ return [{ email:'aunt@example.com', role:'write' }]; };
         window.letThemKnow=function(e){ asked=e; return Promise.resolve(null); };
         renderAccessMembers();
@@ -2120,7 +2121,7 @@ window.SELF_TESTS = [
         if(!b) throw new Error('no ✉️ Notify button next to a member');
         b.click();
         if(asked!=='aunt@example.com') throw new Error('Notify did not offer the note to that person: '+asked);
-      } finally { window.getAccessMembers=realGet; window.letThemKnow=realLet; try{ renderAccessMembers(); }catch(e){} }
+      } finally { window.getAccessMembers=realGet; window.letThemKnow=realLet; window.householdCanManage=realCan; try{ renderAccessMembers(); }catch(e){} }
     } },
 
   { id:'unconfirmed_is_told_and_offered', group:'Security', name:'An unconfirmed address is told what waits for it, and deleting needs no password (v37.10)',
@@ -2190,6 +2191,71 @@ window.SELF_TESTS = [
         if(typeof copyLogFromLogin!=='function') throw new Error('copyLogFromLogin missing');
       } finally {
         window.hhDb=real.db; window.askConfirm=real.confirm; window.resendConfirmation=real.resend; _hhNoticeShown=real.shown;
+      }
+    } },
+
+  { id:'access_member_sees_who_is_signed_in', group:'UI', name:'Family Access says who is signed in; a member sees, and is not offered what they cannot do (v37.12)',
+    test: async()=>{
+      var real={ hh:_household, list:_householdList, user:window._fbUser, layout:window.cloudLayout, access:null };
+      try{ real.access=localStorage.getItem(ACCESS_STORAGE_KEY); }catch(e){}
+      try{
+        window._fbUser={ uid:'me', email:'me@example.com', displayName:'Me Myself' };
+        window.cloudLayout=function(){ return 'households'; };
+        _householdList=[{ hid:'H1', role:'editor' }];
+        _household={ hid:'H1', name:'Test Kitchen', role:'editor', ownerName:'Owner', ownerEmail:'owner@example.com' };
+        localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([{ email:'sis@example.com', name:'Sis', role:'read' }]));
+        householdRenderBar(); renderAccessMembers();
+        var you=document.getElementById('householdYouRow');
+        if(!you || you.textContent.indexOf('me@example.com')===-1 || !/Signed in as/.test(you.textContent)) throw new Error('who is signed in is not said');
+        if(!/Your role/.test(document.getElementById('householdBar').textContent)) throw new Error('the role is not said to be yours');
+        var list=document.getElementById('accessMembersList');
+        if(list.textContent.indexOf('sis@example.com')===-1) throw new Error('a member does not see the others');
+        if(list.querySelector('select, .access-remove-btn')) throw new Error('a member is offered role menus or removal');
+        if(document.getElementById('accessAddForm').style.display!=='none') throw new Error('a member is offered "Add Member"');
+        if(!/householdJoinPasted/.test(document.getElementById('householdBar').innerHTML)) throw new Error('no way to join with an invitation later');
+        // The owner (or full access) manages, as before.
+        _household.role='owner'; renderAccessMembers();
+        if(!list.querySelector('select') || document.getElementById('accessAddForm').style.display==='none') throw new Error('the owner lost the controls');
+        // The first layout (the family's today) is untouched.
+        window.cloudLayout=real.layout; _household.role='editor'; renderAccessMembers();
+        if(cloudLayout()!=='households' && document.getElementById('accessAddForm').style.display==='none') throw new Error('the first layout hides the form');
+        // The log on the sign-in screen: the test copy only.
+        if(document.getElementById('loginCopyLogBtn').hidden !== !loginLogButtonShown()) throw new Error('the log button does not follow the copy');
+      } finally {
+        _household=real.hh; _householdList=real.list; window._fbUser=real.user; window.cloudLayout=real.layout;
+        try{ if(real.access===null) localStorage.removeItem(ACCESS_STORAGE_KEY); else localStorage.setItem(ACCESS_STORAGE_KEY, real.access); }catch(e){}
+        try{ householdRenderBar(); renderAccessMembers(); }catch(e){}
+      }
+    } },
+
+  { id:'confirmation_tries_again', group:'Security', name:'A confirmation e-mail Firebase refused is tried again by itself (v37.12)',
+    test: async()=>{
+      var real={ st:window.setTimeout, auth:window._fbAuth, toast:window.toast, retry:_confirmRetry };
+      var timers=[], tries=0, said=[];
+      try{
+        window.toast=function(m){ said.push(m); };
+        window.setTimeout=function(fn, ms){ timers.push({ fn:fn, ms:ms }); return 1; };
+        _confirmRetry=null;
+        var u={ uid:'u1', email:'a@example.com', emailVerified:false, reload:async function(){},
+                sendEmailVerification:async function(){ tries++; if(tries<2){ var e=new Error('busy'); e.code='auth/too-many-requests'; throw e; } } };
+        window._fbAuth={ currentUser:u };
+        if(!confirmationRetryLater(u) || timers.length!==1 || timers[0].ms<60000) throw new Error('no retry after a minute: '+JSON.stringify(timers.map(function(t){ return t.ms; })));
+        if(confirmationRetryLater(u)) throw new Error('two retries at once');
+        await timers[0].fn();
+        if(tries!==1 || timers.length!==2 || timers[1].ms<=timers[0].ms) throw new Error('refused again, not tried later: '+tries+' '+timers.length);
+        await timers[1].fn();
+        if(tries!==2 || !said.some(function(m){ return /Sent the confirmation/.test(m); })) throw new Error('sent, but not said: '+JSON.stringify(said));
+        // Confirmed meanwhile: nothing more is sent.
+        _confirmRetry=null; timers=[]; tries=0; u.emailVerified=true;
+        confirmationRetryLater(u); await timers[0].fn();
+        if(tries) throw new Error('sent to an address already confirmed');
+        // Gives up after a few, and says where to try.
+        _confirmRetry=null; said=[];
+        if(confirmationRetryLater(u, CONFIRM_RETRY_WAITS.length)) throw new Error('retries for ever');
+        if(String(emailSignIn).indexOf('confirmationRetryLater')===-1 || String(resendConfirmation).indexOf('confirmationRetryLater')===-1)
+          throw new Error('signing up or ⚙️ → Confirm does not try again');
+      } finally {
+        window.setTimeout=real.st; window._fbAuth=real.auth; window.toast=real.toast; _confirmRetry=real.retry;
       }
     } },
 
