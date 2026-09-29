@@ -153,7 +153,9 @@ service cloud.firestore {
             // 2. an invitation for this household, for this role, not expired —
             //    and the household still there (v36.99: an invitation outlives
             //    a deleted household, since invitations cannot be listed)
-            || (request.resource.data.role != 'owner' && exists(hh(hid))
+            //    v37.13 — Read only: a link can be passed on, so it never
+            //    grants writing (older links for more no longer work)
+            || (request.resource.data.role == 'viewer' && exists(hh(hid))
               && validInvite(hid, request.resource.data.get('invite', ''), request.resource.data.role))
             // 3. a place kept for your (verified) e-mail — how the family's
             //    members arrive at migration, before anyone knows their uid
@@ -205,6 +207,18 @@ service cloud.firestore {
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin');
       }
+      // v37.13 — a reader asking to add and change recipes: `requests/<uid>` =
+      // { uid, at }. Only for themselves, only while a viewer; the household's
+      // admins see them and answer (by changing the role, and removing it).
+      match /requests/{uid} {
+        allow read: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin');
+        allow create: if signedIn() && uid == request.auth.uid && isMember(hid)
+          && myRole(hid) == 'viewer'
+          && request.resource.data.keys().hasOnly(['uid', 'at'])
+          && request.resource.data.uid == uid;
+        allow update: if false;
+        allow delete: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin');
+      }
     }
 
     // A member finding their own memberships across households — the app asks
@@ -249,18 +263,17 @@ service cloud.firestore {
     }
 
     // Invitations. Anyone signed in who HAS the code may read it (that is how
-    // it is accepted); it cannot be listed. Admins invite editors and viewers;
-    // only the owner invites admins. Nobody is ever invited as owner.
+    // it is accepted); it cannot be listed. Owners and admins invite — and
+    // since v37.13 only as viewers: writing is asked for and given per person.
     match /invites/{code} {
       allow get: if signedIn();
       allow list: if false;
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['hid', 'role', 'createdBy', 'expiresAt'])
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.role in ['admin', 'editor', 'viewer']
+        && request.resource.data.role == 'viewer'           // v37.13 — links only let people read
         && request.resource.data.expiresAt is timestamp
-        && (atLeast(request.resource.data.hid, 'owner')
-            || (atLeast(request.resource.data.hid, 'admin') && request.resource.data.role != 'admin'));
+        && atLeast(request.resource.data.hid, 'admin');
       allow delete: if signedIn() && atLeast(resource.data.hid, 'admin');
     }
 

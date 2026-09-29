@@ -5,8 +5,8 @@
 //   npx firebase emulators:exec --only firestore --project demo-households \
 //     "node tests/firestore-households-rules.test.mjs"
 //
-// People: alice founds household h1; bob is invited as an editor, dave as a
-// viewer, erin as an admin; michal is the family member whose place is kept
+// People: alice founds household h1; bob, dave and erin join with her link
+// (read only) and she makes bob an editor and erin an admin; michal is the family member whose place is kept
 // by e-mail (how the family arrives at migration); carol is a stranger.
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
@@ -47,23 +47,30 @@ await check('bob cannot make himself owner of h1',            join(bob, 'h1', 'b
 await check('bob cannot read h1 before he is in it',          getDoc(doc(bob, 'households/h1')), false);
 
 console.log('Invitations');
-await check('the owner invites an editor',   setDoc(doc(alice, 'invites/INV-ED'), { hid: 'h1', role: 'editor', createdBy: 'alice', expiresAt: later }), true);
+// v37.13 — Tony: a link can be passed on, so it only ever lets people READ;
+// writing is given to a person, afterwards (or when they ask).
 await check('the owner invites a viewer',    setDoc(doc(alice, 'invites/INV-VW'), { hid: 'h1', role: 'viewer', createdBy: 'alice', expiresAt: later }), true);
-await check('the owner invites an admin',    setDoc(doc(alice, 'invites/INV-AD'), { hid: 'h1', role: 'admin',  createdBy: 'alice', expiresAt: later }), true);
+await check('…but not an editor (v37.13)',   setDoc(doc(alice, 'invites/INV-ED'), { hid: 'h1', role: 'editor', createdBy: 'alice', expiresAt: later }), false);
+await check('…nor an admin (v37.13)',        setDoc(doc(alice, 'invites/INV-AD'), { hid: 'h1', role: 'admin',  createdBy: 'alice', expiresAt: later }), false);
 await check('nobody is invited as owner',    setDoc(doc(alice, 'invites/INV-OW'), { hid: 'h1', role: 'owner',  createdBy: 'alice', expiresAt: later }), false);
-await check('a stranger cannot invite to h1', setDoc(doc(carol, 'invites/INV-C'), { hid: 'h1', role: 'editor', createdBy: 'carol', expiresAt: later }), false);
+await check('a stranger cannot invite to h1', setDoc(doc(carol, 'invites/INV-C'), { hid: 'h1', role: 'viewer', createdBy: 'carol', expiresAt: later }), false);
 await check('an old invitation, for the test', env.withSecurityRulesDisabled(ctx =>
-            setDoc(doc(ctx.firestore(), 'invites/INV-OLD'), { hid: 'h1', role: 'editor', createdBy: 'alice', expiresAt: earlier })), true);
-await check('bob joins with the editor invitation',            join(bob, 'h1', 'bob', 'editor', 'INV-ED'), true);
-await check('dave cannot use the editor invitation to be admin', join(dave, 'h1', 'dave', 'admin', 'INV-ED'), false);
-await check('dave joins with the viewer invitation',           join(dave, 'h1', 'dave', 'viewer', 'INV-VW'), true);
-await check('erin joins with the admin invitation',            join(erin, 'h1', 'erin', 'admin', 'INV-AD'), true);
-await check('an expired invitation does not work',             join(carol, 'h1', 'carol', 'editor', 'INV-OLD'), false);
+            setDoc(doc(ctx.firestore(), 'invites/INV-OLD'), { hid: 'h1', role: 'viewer', createdBy: 'alice', expiresAt: earlier })), true);
+await check('a link made before v37.13, for writing', env.withSecurityRulesDisabled(ctx =>
+            setDoc(doc(ctx.firestore(), 'invites/INV-LEG'), { hid: 'h1', role: 'editor', createdBy: 'alice', expiresAt: later })), true);
+await check('bob cannot join as an editor with the viewer link', join(bob, 'h1', 'bob', 'editor', 'INV-VW'), false);
+await check('…nor with a link made for writing before v37.13',   join(bob, 'h1', 'bob', 'editor', 'INV-LEG'), false);
+await check('bob joins with the link, as a viewer',             join(bob, 'h1', 'bob', 'viewer', 'INV-VW'), true);
+await check('dave joins with the link, as a viewer',            join(dave, 'h1', 'dave', 'viewer', 'INV-VW'), true);
+await check('erin joins with the link, as a viewer',            join(erin, 'h1', 'erin', 'viewer', 'INV-VW'), true);
+await check('the owner gives bob writing',                      updateDoc(doc(alice, 'households/h1/members/bob'), { role: 'editor' }), true);
+await check('the owner gives erin full access',                 updateDoc(doc(alice, 'households/h1/members/erin'), { role: 'admin' }), true);
+await check('an expired invitation does not work',             join(carol, 'h1', 'carol', 'viewer', 'INV-OLD'), false);
 await check('nobody joins without an invitation',              join(carol, 'h1', 'carol', 'viewer'), false);
 await check('nobody can make SOMEONE ELSE a member',           join(bob, 'h1', 'carol', 'viewer', 'INV-VW'), false);
 await check('invitations cannot be listed',                    getDocs(collection(carol, 'invites')), false);
-await check('an admin invites an editor',  setDoc(doc(erin, 'invites/INV-E2'), { hid: 'h1', role: 'editor', createdBy: 'erin', expiresAt: later }), true);
-await check('an admin cannot invite an admin', setDoc(doc(erin, 'invites/INV-E3'), { hid: 'h1', role: 'admin', createdBy: 'erin', expiresAt: later }), false);
+await check('an admin invites a viewer',   setDoc(doc(erin, 'invites/INV-E2'), { hid: 'h1', role: 'viewer', createdBy: 'erin', expiresAt: later }), true);
+await check('an admin cannot invite an editor', setDoc(doc(erin, 'invites/INV-E3'), { hid: 'h1', role: 'editor', createdBy: 'erin', expiresAt: later }), false);
 await check('an editor cannot invite',     setDoc(doc(bob, 'invites/INV-B'), { hid: 'h1', role: 'viewer', createdBy: 'bob', expiresAt: later }), false);
 
 console.log('Recipes');
@@ -83,6 +90,20 @@ await check('carol founds h2',                               found(carol, 'h2', 
 await check('carol adds a recipe to h2',                     setDoc(doc(carol, 'households/h2/recipes/9'), { r: '{}' }), true);
 await check('bob (a member of h1) cannot read h2',           getDoc(doc(bob, 'households/h2/recipes/9')), false);
 await check('carol cannot write into h1',                    setDoc(doc(carol, 'households/h1/recipes/5'), { r: '{}' }), false);
+
+console.log('Asking to write (v37.13)');
+const ask = (db, uid, extra) => setDoc(doc(db, 'households/h1/requests/' + uid), Object.assign({ uid, at: 1 }, extra || {}));
+await check('a request carries nothing else (no role to ask for)', ask(dave, 'dave', { role: 'admin' }), false);
+await check('a viewer asks to add and change recipes',   ask(dave, 'dave'), true);
+await check('…only for himself',                         ask(dave, 'carol'), false);
+await check('an editor has nothing to ask',              ask(bob, 'bob'), false);
+await check('a stranger cannot ask',                     ask(carol, 'carol'), false);
+await check('the viewer sees his own request',           getDoc(doc(dave, 'households/h1/requests/dave')), true);
+await check('an editor cannot see it',                   getDoc(doc(bob, 'households/h1/requests/dave')), false);
+await check('an admin lists the requests',               getDocs(collection(erin, 'households/h1/requests')), true);
+await check('an editor cannot list them',                getDocs(collection(bob, 'households/h1/requests')), false);
+await check('nobody changes a request',                  updateDoc(doc(dave, 'households/h1/requests/dave'), { at: 2 }), false);
+await check('an admin answers it (removes it)',          deleteDoc(doc(erin, 'households/h1/requests/dave')), true);
 
 console.log('Managing members');
 await check('an admin makes a viewer an editor',  updateDoc(doc(erin, 'households/h1/members/dave'), { role: 'editor' }), true);
@@ -132,7 +153,7 @@ await check('only the new owner deletes it',     deleteDoc(doc(alice, 'household
 
 console.log('Deleting a household (v36.99)');
 await check('frank founds h9',                       found(frank, 'h9', 'frank'), true);
-await check('…and invites an editor',                setDoc(doc(frank, 'invites/INV-H9'), { hid: 'h9', role: 'editor', createdBy: 'frank', expiresAt: later }), true);
+await check('…and invites someone',                 setDoc(doc(frank, 'invites/INV-H9'), { hid: 'h9', role: 'viewer', createdBy: 'frank', expiresAt: later }), true);
 await check('…and keeps a place for michal',         setDoc(doc(frank, 'pending/h9:michal@example.com'), { hid: 'h9', email: 'michal@example.com', role: 'viewer' }), true);
 await check('…and adds a recipe',                    setDoc(doc(frank, 'households/h9/recipes/1'), { r: '{}' }), true);
 await check('the owner still may not simply leave',  deleteDoc(doc(frank, 'households/h9/members/frank')), false);

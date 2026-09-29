@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.12 -->
+<!-- Tony's Recipes Collection v37.13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3716,7 +3716,10 @@ function renderAccessMembers() {
       // Same reason as the owner row above: names and addresses are data.
       // Escaped (v36.60) — the only unescaped data the audit's scan found.
       '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
-      '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div></div>' +
+      '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div>' +
+      (m.asks ? '<div class="access-email" style="color:var(--terracotta);font-weight:600;">\u270b asks to add and change recipes</div>' : '') + '</div>' +
+      (m.asks ? '<button class="access-role-btn" style="margin-right:4px;background:var(--gold);" onclick="householdAnswerAsk(' + i + ',true)">\u2705 Allow</button>'
+              + '<button class="access-remove-btn" style="margin-right:4px;" onclick="householdAnswerAsk(' + i + ',false)">Decline</button>' : '') +
       '<select class="access-role-btn" data-i18n-skip-attrs="aria-label" aria-label="Role for ' + escA(m.email) + '" onchange="changeAccessRole(' + i + ',this.value)" style="margin-right:4px;">' +
         ['read','write','admin'].map(function(r){ return '<option value="'+r+'"'+(m.role===r?' selected':'')+'>'+roleLabels[r]+'</option>'; }).join('') +
       '</select>' +
@@ -3741,7 +3744,7 @@ function addAccessMember() {
   var role = document.querySelector('input[name="newRole"]:checked');
   if (cloudLayout() === 'households') {
     document.getElementById('accessEmailInput').value = '';
-    return householdAddMember(email, role ? role.value : 'read')
+    return householdAddMember(email, 'read')      // v37.13 — always Read only to start
       .catch(function(e){ toast('❌ Could not add ' + email + ': ' + e.message, 8000); });
   }
   members.push({ email: email, role: role ? role.value : 'read', addedAt: Date.now() });
@@ -3979,6 +3982,16 @@ async function householdLoadMembers() {
     if (m.role === 'owner') return;
     list.push({ email: m.email || '', name: m.name || '', role: HH_TO_ACCESS[m.role] || 'read', hhRole: m.role, uid: m.uid });
   });
+  // v37.13 — who asks to add and change recipes (managers see all; a viewer, their own).
+  var asks = {};
+  _household.asked = false;
+  if (_household.role === 'owner' || _household.role === 'admin') {
+    try { (await hhRef().collection('requests').get()).forEach(function(d){ asks[d.id] = true; }); } catch(e) {}
+  } else if (_household.role === 'viewer' && me) {
+    try { _household.asked = (await hhRef().collection('requests').doc(me).get()).exists; } catch(e) {}
+  }
+  list.forEach(function(m){ if (m.uid && asks[m.uid] && m.hhRole === 'viewer') m.asks = true; });
+  householdToldOfAsks(list);
   if (_household.role === 'owner' || _household.role === 'admin') {
     try {
       var ps = await hhDb().collection('pending').where('hid', '==', _cloudHid).get();
@@ -3991,6 +4004,33 @@ async function householdLoadMembers() {
   try { localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
   return list;
 }
+var _hhAsksTold = {};
+function householdToldOfAsks(list) {
+  var who = list.filter(function(m){ return m.asks; });
+  if (!who.length || _hhAsksTold[_cloudHid] || _selfTestRunning) return;
+  _hhAsksTold[_cloudHid] = true;
+  toast('\u270b ' + (who.length === 1 ? (who[0].name || who[0].email) + ' asks' : who.length + ' people ask')
+    + ' to add and change recipes \u2014 see \u{1F465} Family Access.', 9000);
+}
+async function householdAskToWrite() {
+  if (!_household || _household.role !== 'viewer' || !window._fbUser) return false;
+  await hhRef().collection('requests').doc(_fbUser.uid).set({ uid: _fbUser.uid, at: Date.now() });
+  _household.asked = true;
+  householdRenderBar();
+  toast('\u270b Asked. ' + (_household.ownerName || 'The owner') + ' sees it in \u{1F465} Family Access, and decides.', 8000);
+  return true;
+}
+window.householdAskToWrite = householdAskToWrite;
+async function householdAnswerAsk(i, yes) {
+  var m = getAccessMembers()[i];
+  if (!m || !m.uid || !householdCanManage()) return false;
+  if (yes) await hhRef().collection('members').doc(m.uid).update({ role: 'editor' });
+  await hhRef().collection('requests').doc(m.uid).delete();
+  await householdLoadMembers(); renderAccessMembers();
+  toast(yes ? '\u2705 ' + (m.name || m.email) + ' can now add and change recipes' : 'Declined \u2014 ' + (m.name || m.email) + ' still reads the recipes', 6000);
+  return true;
+}
+window.householdAnswerAsk = householdAnswerAsk;
 // Tony's idea: the app carries the household's own name. In the household
 // layout the header and the tab say "Michal's Recipes" (or whatever the
 // household is called) instead of the family's title. Names are data: never
@@ -4039,6 +4079,8 @@ function householdRenderBar() {
     +   (householdCanManage() ? '<button class="access-role-btn" onclick="householdInvite()">\u{1F517} Invitation link…</button>' : '')
     +   (others.length ? '<button class="access-role-btn" onclick="householdSwitch()">\u{1F501} Switch household…</button>' : '')
     +   '<button class="access-role-btn" onclick="householdJoinPasted()">\u{1F517} Join with an invitation…</button>'
+    +   (h.role === 'viewer' ? (h.asked ? '<span class="access-email" style="align-self:center;">\u23f3 You asked to add and change recipes</span>'
+                                          : '<button class="access-role-btn" onclick="householdAskToWrite()">\u270b Ask to add and change recipes</button>') : '')
     +   (h.role !== 'owner' ? '<button class="access-remove-btn" onclick="householdLeave()">Leave this household</button>' : '')
     +   (h.role === 'owner' ? '<button class="access-role-btn" onclick="householdTransfer()">\u{1F451} Hand over…</button>'
                             + '<button class="access-remove-btn" onclick="householdDelete()">\u{1F5D1} Delete this household…</button>' : '')
@@ -4081,14 +4123,13 @@ function householdNewCode() {
 }
 async function householdInvite() {
   if (!householdCanManage()) return;
-  // v36.99 — a list, so the owner's third choice (full access) is really
-  // offered; it used to be described and then missing from the buttons.
-  var options = [{ value: 'viewer', label: '\u{1F441} Read only — sees the recipes' },
-                 { value: 'editor', label: '✏️ Read + Write — adds and changes them' }];
-  if (_household.role === 'owner') options.push({ value: 'admin', label: '\u{1F6E1} Full access — also deletes, and manages members' });
-  var role = await askChoice('Anyone with the link can join for the next 14 days, with the role you choose.',
-    options, { icon: '\u{1F517}', title: 'Invite someone to ' + (_household.name || 'this household') });
-  if (!role) return;
+  // v37.13 — Tony: a link can be passed on, so it only ever lets people READ.
+  // Writing is asked for and given to a person, in Family Access.
+  var role = 'viewer';
+  if (await askConfirm({ icon: '\u{1F517}', title: 'Invite someone to ' + (_household.name || 'this household'),
+      message: 'Anyone with the link can join for the next 14 days, with \u{1F441} Read only. '
+        + 'To let someone add and change recipes, choose it next to their name once they have joined — or when they ask.',
+      okLabel: 'Make the link' }) !== true) return;
   var code = householdNewCode();
   await hhDb().collection('invites').doc(code).set({ hid: _cloudHid, role: role, createdBy: window._fbUser.uid,
     expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 14 * 864e5) });
@@ -4104,6 +4145,7 @@ async function householdLeave() {
   if (!_household || _household.role === 'owner') return;
   if (await askConfirm({ icon: '\u{1F6AA}', title: 'Leave ' + (_household.name || 'this household') + '?',
       message: 'You will no longer see its recipes. Someone in it can invite you back.', okLabel: 'Leave', danger: true }) !== true) return;
+  try { await hhRef().collection('requests').doc(window._fbUser.uid).delete(); } catch(e) {}
   await hhRef().collection('members').doc(window._fbUser.uid).delete();
   try { localStorage.removeItem(HOUSEHOLD_KEY); } catch(e) {}
   householdReopen();
@@ -4157,7 +4199,10 @@ async function householdAddMember(email, accessRole) {
 async function householdChangeRole(m, accessRole) {
   var role = ACCESS_TO_HH[accessRole] || 'viewer';
   if (m.pending) await hhDb().collection('pending').doc(_cloudHid + ':' + m.email).set({ hid: _cloudHid, email: m.email, role: role });
-  else await hhRef().collection('members').doc(m.uid).update({ role: role });
+  else {
+    await hhRef().collection('members').doc(m.uid).update({ role: role });
+    if (role !== 'viewer') hhRef().collection('requests').doc(m.uid).delete().catch(function(){});
+  }
   await householdLoadMembers(); renderAccessMembers();
   toast('✅ Role changed');
 }
@@ -4233,6 +4278,9 @@ async function householdWipe(hid, onStep) {
     await inBatches(refs);
   }
   if (onStep) onStep(4, 'Removing the members…');
+  var rq = await hhRef(hid).collection('requests').get(), rrefs = [];
+  rq.forEach(function(d){ rrefs.push(d.ref); });
+  await inBatches(rrefs);
   var ps = await db.collection('pending').where('hid', '==', hid).get(), prefs = [];
   ps.forEach(function(d){ prefs.push(d.ref); });
   await inBatches(prefs);
@@ -4350,7 +4398,10 @@ async function accountDelete(opts) {
   try {
     progressOpen({ icon: '\u{1F5D1}', title: 'Deleting your account', total: 3, step: 'Your households…' });
     for (var a = 0; a < alone.length; a++) await householdWipe(alone[a].hid);
-    for (var l = 0; l < leave.length; l++) await hhRef(leave[l].hid).collection('members').doc(user.uid).delete();
+    for (var l = 0; l < leave.length; l++) {
+      try { await hhRef(leave[l].hid).collection('requests').doc(user.uid).delete(); } catch(e) {}
+      await hhRef(leave[l].hid).collection('members').doc(user.uid).delete();
+    }
     progressStep(1, 'Places kept for you…');
     // v37.06 — only a CONFIRMED address may search for places kept for it (the
     // rules refuse the search otherwise: Tony's unconfirmed account stopped
@@ -4949,7 +5000,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.12';
+var APP_VERSION = 'v37.13';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7581,7 +7632,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.12</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.13</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8226,7 +8277,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.12</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.13</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -27252,7 +27303,11 @@ window.onHeaderScroll = onHeaderScroll;
         <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px;">➕ Add family member</div>
         <input id="accessEmailInput" type="email" placeholder="their@gmail.com"
           style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;box-sizing:border-box;margin-bottom:8px;outline:none;" />
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <!-- v37.13 — Tony: joining gives Read only; writing is asked for and given. -->
+        <div data-layout-only="households" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">
+          Everyone joins with 👁 <strong>Read only</strong>. To let someone add and change recipes, choose it in the menu next to their name — or when they ask.
+        </div>
+        <div data-layout-only="shared" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
           <label class="access-role-opt"><input type="radio" name="newRole" value="read" checked> 👁 Read only</label>
           <label class="access-role-opt"><input type="radio" name="newRole" value="write"> ✏️ Read + Write</label>
           <label class="access-role-opt"><input type="radio" name="newRole" value="admin"> 🛡 Full (incl. delete)</label>

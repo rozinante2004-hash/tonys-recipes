@@ -433,7 +433,8 @@ try {
     ok('…and sees none of the family\'s recipes', !(await names(N)).includes('E2E seed stew'), JSON.stringify(await names(N)));
 
     const url = await inPage(A, async () => {
-      window.askChoice = async () => 'editor';              // "Read + Write" (a list since v36.99)
+      window.askConfirm = async () => true;                 // v37.13 — a link is Read only, no role to pick
+      window.askChoice = async () => null;                  // …and the way to send it: none (copied below)
       try { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); } catch (e) {}
       try { navigator.clipboard.writeText = async () => {}; } catch (e) {}
       return householdInvite();
@@ -442,7 +443,7 @@ try {
     ok('the owner makes an invitation link', !!code, url);
     const J = await device('J (invited)', 'invited@example.com', { query: '?join=' + code });
     ok('someone with the link joins the family household', await inPage(J, () => (householdOf() || {}).name === 'E2E family'));
-    ok('…as an editor, and sees the recipes', (await restDoc('households/' + HID + '/members/' + await uidOnPage(J)) || {}).role === 'editor'
+    ok('…with Read only (a link can be passed on — v37.13), and sees the recipes', (await restDoc('households/' + HID + '/members/' + await uidOnPage(J)) || {}).role === 'viewer'
        && (await names(J)).includes('E2E seed stew'), JSON.stringify(await names(J)));
     ok('…and the code is gone from the address', await inPage(J, () => !/join=/.test(location.href)));
     // v37.00 — the same link, pasted into the welcome instead of opened.
@@ -486,7 +487,7 @@ try {
        && !!(await restDoc('households/' + kOwn)),
        JSON.stringify(await inPage(K, () => householdOf())));
     // v37.12 — joining another household later, with a link pasted into Family Access.
-    const url2 = await inPage(A, async () => { window.askChoice = async () => 'viewer'; return householdInvite(); });
+    const url2 = await inPage(A, async () => { window.askConfirm = async () => true; window.askChoice = async () => null; return householdInvite(); });
     await inPage(LK, (u) => { window.askConfirm = async () => u; householdJoinPasted(); }, url2);
     ok('someone already in a household of their own joins another with a pasted invitation, and it opens',
        await until(async () => { try { return (await inPage(LK, () => (householdOf() || {}).hid)) === HID; } catch (e) { return false; } }, 30000),
@@ -525,15 +526,14 @@ try {
     await inPage(A, async () => {
       openAccessControl();
       document.getElementById('accessEmailInput').value = 'Aunt@Example.com';
-      document.querySelector('input[name="newRole"][value="write"]').checked = true;
       addAccessMember();
     });
-    ok('adding an address keeps a place for it, at once (nothing to publish)',
-       await until(async () => ((await restDoc('pending/' + HID + ':aunt@example.com')) || {}).role === 'editor'));
-    const auntIdx = await until(() => inPage(A, () => { const i = getAccessMembers().findIndex(m => m.email === 'aunt@example.com'); return i >= 0 ? i + 1 : 0; }));
-    await inPage(A, (i) => changeAccessRole(i - 1, 'read'), auntIdx);
-    ok('changing the role changes the kept place',
+    ok('adding an address keeps a place for it, at once, with Read only (v37.13)',
        await until(async () => ((await restDoc('pending/' + HID + ':aunt@example.com')) || {}).role === 'viewer'));
+    const auntIdx = await until(() => inPage(A, () => { const i = getAccessMembers().findIndex(m => m.email === 'aunt@example.com'); return i >= 0 ? i + 1 : 0; }));
+    await inPage(A, (i) => changeAccessRole(i - 1, 'write'), auntIdx);
+    ok('writing is given explicitly: changing the role changes the kept place',
+       await until(async () => ((await restDoc('pending/' + HID + ':aunt@example.com')) || {}).role === 'editor'));
     const readerIdx = await inPage(A, (e) => getAccessMembers().findIndex(m => m.email === e), READER);
     await inPage(A, (i) => changeAccessRole(i, 'write'), readerIdx);
     ok('…and a member\'s role, in the household itself',
@@ -552,6 +552,23 @@ try {
         && !document.querySelector('#accessMembersList select');
     }, WRITER), JSON.stringify(await inPage(B, () => [(document.getElementById('householdYouRow') || {}).textContent,
         getComputedStyle(document.getElementById('accessAddForm')).display])));
+
+    // v37.13 — Tony: writing is asked for, and given explicitly.
+    console.log('Asking to write');
+    await inPage(J, async () => { await householdLoadMembers(); openAccessControl(); });
+    ok('someone with Read only is offered to ask for writing', await until(() => inPage(J, () => /Ask to add and change recipes/.test(document.getElementById('householdBar').textContent))));
+    await inPage(J, () => householdAskToWrite());
+    const jUid = await uidOnPage(J);
+    ok('…asks', !!(await restDoc('households/' + HID + '/requests/' + jUid)));
+    ok('…and is told it is asked', await until(() => inPage(J, () => /You asked/.test(document.getElementById('householdBar').textContent))));
+    const jAt = await until(() => inPage(A, async (u) => { await householdLoadMembers(); renderAccessMembers();
+      const i = getAccessMembers().findIndex(m => m.uid === u && m.asks); return i >= 0 ? i + 1 : 0; }, jUid), 15000);
+    ok('the owner sees who asks, with Allow and Decline', !!jAt && await inPage(A, () => /asks to add and change recipes/.test(document.getElementById('accessMembersList').textContent)
+       && !!document.querySelector('#accessMembersList button[onclick^="householdAnswerAsk"]')));
+    if (jAt) await inPage(A, (i) => householdAnswerAsk(i - 1, true), jAt);
+    ok('…allows it: the person can now add and change recipes, and the request is gone',
+       await until(async () => ((await restDoc('households/' + HID + '/members/' + jUid)) || {}).role === 'editor')
+       && !(await restDoc('households/' + HID + '/requests/' + jUid)));
 
     // v36.99 — handing over, deleting a household, deleting an account.
     console.log('Handing over and leaving for good');

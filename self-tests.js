@@ -1878,10 +1878,12 @@ window.SELF_TESTS = [
           throw new Error('the owner sees: '+owner);
         if(/Hand over|Delete this household/.test(admin+viewer)) throw new Error('someone who is not the owner is offered to hand over or delete');
         if(!/Leave this household/.test(viewer)) throw new Error('a member is not offered to leave');
-        // The invitation offers the owner all three roles, an admin two.
-        var offered=[]; window.askChoice=async function(m,o){ offered.push(o.map(function(x){ return x.value; }).join()); return null; };
-        _household.role='owner'; await householdInvite(); _household.role='admin'; await householdInvite();
-        if(offered[0]!=='viewer,editor,admin'||offered[1]!=='viewer,editor') throw new Error('the invitation offered '+JSON.stringify(offered));
+        // v37.13 — an invitation link only ever lets people read: no role to pick.
+        var offered=[], told=null; window.askChoice=async function(m,o){ offered.push(o); return null; };
+        window.askConfirm=async function(o){ told=o; return null; };
+        _household.role='owner'; await householdInvite();
+        if(offered.length || !told || !/Read only/.test(told.message)) throw new Error('the invitation offers a role: '+JSON.stringify([offered, told]));
+        window.askConfirm=real.confirm;
         // An account cannot be deleted while other people are in a household it owns.
         _cloudLayout='households';
         window._fbAuth={ currentUser:{ uid:'me', email:'me@example.com', delete:function(){ throw new Error('deleted!'); } } };
@@ -2213,8 +2215,18 @@ window.SELF_TESTS = [
         if(list.querySelector('select, .access-remove-btn')) throw new Error('a member is offered role menus or removal');
         if(document.getElementById('accessAddForm').style.display!=='none') throw new Error('a member is offered "Add Member"');
         if(!/householdJoinPasted/.test(document.getElementById('householdBar').innerHTML)) throw new Error('no way to join with an invitation later');
+        // v37.13 — Read only asks for writing; asking once is enough.
+        if(/householdAskToWrite/.test(document.getElementById('householdBar').innerHTML)) throw new Error('an editor is offered to ask for writing');
+        _household.role='viewer'; _household.asked=false; householdRenderBar();
+        if(!/householdAskToWrite/.test(document.getElementById('householdBar').innerHTML)) throw new Error('Read only is not offered to ask for writing');
+        _household.asked=true; householdRenderBar();
+        if(/householdAskToWrite/.test(document.getElementById('householdBar').innerHTML) || !/You asked/.test(document.getElementById('householdBar').textContent))
+          throw new Error('asked, and offered to ask again');
+        // Someone asking is shown to whoever manages, with Allow and Decline.
+        localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([{ email:'sis@example.com', name:'Sis', role:'read', uid:'s1', hhRole:'viewer', asks:true }]));
         // The owner (or full access) manages, as before.
         _household.role='owner'; renderAccessMembers();
+        if(!list.querySelector('button[onclick^="householdAnswerAsk"]')) throw new Error('the owner is not shown who asks');
         if(!list.querySelector('select') || document.getElementById('accessAddForm').style.display==='none') throw new Error('the owner lost the controls');
         // The first layout (the family's today) is untouched.
         window.cloudLayout=real.layout; _household.role='editor'; renderAccessMembers();

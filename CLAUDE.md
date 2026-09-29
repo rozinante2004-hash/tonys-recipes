@@ -421,6 +421,19 @@ found only because a test was written first and disagreed with the code.
     (`confirmationRetryLater`: ~1, 3, 10 minutes, while the app is open; stops
     once confirmed). "🪵 Copy the log" on the sign-in screen shows only where
     `APP_CONFIG.diagnostics.logging` is on — the test copy, never the family's.
+  - **v37.13 — joining gives Read only; writing is asked for and given.**
+    Tony: nobody should be able to mess with another household's recipes by
+    joining it. Invitation links are ALWAYS viewer (the rules refuse creating
+    any other, and refuse joining with a pre-v37.13 editor/admin link); the
+    Family Access form adds an address as Read only (the role radios are
+    `data-layout-only="shared"` — the family's first layout keeps them).
+    Writing is given per person with the role menu, or on request: a viewer's
+    "✋ Ask to add and change recipes" writes `households/{hid}/requests/{uid}`
+    = {uid, at} (rules: only yourself, only while a viewer; admins list and
+    delete). Managers see "asks to add and change recipes" with ✅ Allow /
+    Decline on that row, and a toast once a session. Raising the role by the
+    menu, leaving, account deletion and `householdWipe` remove requests. The
+    move of the family keeps the family's existing roles (pending, as before).
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection
