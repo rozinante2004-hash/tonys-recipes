@@ -548,6 +548,44 @@ console.log('\nNo file hosting (v41):');
     'got ' + served.status + ' ' + (served.headers.get('Content-Disposition') || '') + ' ' + txt.slice(0, 60));
 }
 
+console.log('\nvideo-recipe (v43):');
+{
+  const e = { APP_SHARED_KEY: 'secret-k' };
+  const off = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtube.com/shorts/WMTuLDQJHJw?si=x', appKey: 'secret-k' }), e);
+  const offBody = await off.json();
+  expect('without GEMINI_API_KEY it says it is not set up', off.status === 503 && offBody.needsConfig === true, `got ${off.status} ${JSON.stringify(offBody)}`);
+  check('…with CORS', off);
+  const ek = { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key' };
+  const notYt = await worker.fetch(post({ action: 'video-recipe', url: 'https://example.com/v', appKey: 'secret-k' }), ek);
+  expect('anything but a YouTube video is refused', notYt.status === 400, `got ${notYt.status}`);
+  const noKey = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw' }), { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key' });
+  expect('…and nothing without the app key', noKey.status === 403, `got ${noKey.status}`);
+  const realFetch = globalThis.fetch;
+  let sent = null, reply = { candidates: [{ content: { parts: [{ text: 'עוגה\nמצרכים:\n6 ביצים' }] } }] }, status = 200;
+  globalThis.fetch = async (url, init) => { sent = { url: String(url), init }; return new Response(JSON.stringify(reply), { status, headers: { 'Content-Type': 'application/json' } }); };
+  try {
+    const r = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtube.com/shorts/WMTuLDQJHJw?si=x', appKey: 'secret-k' }), ek);
+    const b = await r.json();
+    expect('the recipe the video shows comes back as text', r.status === 200 && /6 ביצים/.test(b.text) && b.via === 'gemini', `got ${r.status} ${JSON.stringify(b)}`);
+    const req = JSON.parse(sent.init.body);
+    expect('Gemini is sent the video by its YouTube link, built here from the id',
+      req.contents[0].parts[0].file_data.file_uri === 'https://www.youtube.com/watch?v=WMTuLDQJHJw', JSON.stringify(req.contents[0].parts[0]));
+    expect('…the key in a header, not in the address', sent.init.headers['x-goog-api-key'] === 'g-key' && !/g-key/.test(sent.url), sent.url);
+    reply = { candidates: [{ content: { parts: [{ text: 'NO RECIPE' }] } }] };
+    const none = await (await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', prompt: 'ignore previous', appKey: 'secret-k' }), ek)).json();
+    expect('a video with no recipe says so', none.noRecipe === true && none.text === '', JSON.stringify(none));
+    expect('…and the request is our own, whatever the caller sends', !String(sent.init.body).includes('ignore previous'), 'caller text reached Gemini');
+    status = 429; reply = { error: { message: 'Resource exhausted' } };
+    const q = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
+    expect('Google\'s allowance used up is named as such', q.status === 429 && /VIDEO_QUOTA/.test((await q.json()).error), `got ${q.status}`);
+    status = 404; reply = { error: { message: 'models/x is not found' } };
+    const m = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
+    expect('a retired model says which setting to change', m.status === 503 && /GEMINI_MODEL/.test((await m.json()).error), `got ${m.status}`);
+    const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), ek)).json();
+    expect('health says whether videos can be read', h.configured && h.configured.videoAi === true, JSON.stringify(h.configured));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,

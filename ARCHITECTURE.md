@@ -60,6 +60,7 @@ Named here so they can be found; the values live only where stated.
 | `ALLOWED_ORIGINS` | Extra origins allowed to call the Worker — includes the test copy's address. |
 | `AI_DAILY_MAX`, `AI_MONTHLY_MAX`, `RATE_LIMIT` | Spending and request limits. |
 | `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY`, `YOUTUBE_API_KEY` | Photo search and video descriptions (Openverse needs none). |
+| `GEMINI_API_KEY` (optional), `GEMINI_MODEL`, `VIDEO_DAILY_MAX` | v43 — the recipe said and shown in a YouTube video, when its description has none (`video-recipe`). Keep the key's Google project without billing. |
 | `BRING_API_KEY`, `BRING_USER_UUID`, `BRING_LIST_UUID`, `BRING_COUNTRY`, `BRING_TOKEN`, `BRING_SETTOKEN_SECRET`, KV `BRING_KV` | Bring! — the household's own list, directly (`bringDirect`). Best stored as *Secret* type. KV `BRING_KV` also holds, for 15 minutes, the pages Bring!'s official import reads (v42, feature `bring`, any user, no token). |
 
 **Per-copy app settings** — `#appConfig` in `index.html` (the family's copy)

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.14 -->
+<!-- Tony's Recipes Collection v37.15 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5000,7 +5000,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.14';
+var APP_VERSION = 'v37.15';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7632,7 +7632,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.14</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.15</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8277,7 +8277,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.14</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.15</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17951,7 +17951,11 @@ async function runUrlImport() {
     // A YouTube key or quota fault is a fault, and says so (importFailureHtml);
     // an empty description, or Facebook's wall, is where the fallback helps.
     var ourFault = videoPost === 'youtube' && attempts.some(function(a){ return /^server:/.test(a); });
-    if (videoPost && !ourFault) { syncLog('import', 'No readable text from ' + videoPost, { url: url, why: attempts.join('; ') }); showVideoRecipeFallback(url, videoPost); return; }
+    if (videoPost && !ourFault) {
+      syncLog('import', 'No readable text from ' + videoPost, { url: url, why: attempts.join('; ') });
+      if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
+      showVideoRecipeFallback(url, videoPost, _videoAiWhy); return;
+    }
     res.innerHTML = importFailureHtml(url, attempts);
     return;
   }
@@ -18001,7 +18005,8 @@ async function runUrlImport() {
     var msg = (err && err.message) || String(err);
     syncLog('error', 'URL import failed', msg.slice(0, 300));
     if (/no recipe found|not a recipe/i.test(msg)) {
-      if (videoPost) showVideoRecipeFallback(url, videoPost);
+      if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
+      if (videoPost) showVideoRecipeFallback(url, videoPost, _videoAiWhy);
       else showSaveAsVideoBookmark(url, '', '🎥');
     } else {
       res.innerHTML = '<div class="explore-result" style="color:var(--danger);">'
@@ -18012,6 +18017,47 @@ async function runUrlImport() {
   }
 }
 
+
+// v37.15 — Tony: the recipe SAID and SHOWN in a YouTube video, when its
+// description has none (a Short, typically). The Worker (v43) has Google's
+// Gemini watch the video and write the recipe out; that text is then read like
+// any page. Without the Worker's key (or on an older Worker) this quietly
+// returns false and the "paste / screenshots" answer is shown as before.
+var _videoAiWhy = '';
+async function youtubeRecipeFromVideo(url, res) {
+  _videoAiWhy = '';
+  res.innerHTML = spinner('\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)');
+  var d = null, st = 0;
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'video-recipe', url: url }) });
+    st = r.status;
+    try { d = await r.json(); } catch(e) {}
+  } catch(e) { syncLog('error', 'Reading the video: the server could not be reached', String(e && e.message)); return false; }
+  if (!d || !d.text) {
+    // Not set up (or an older Worker) is not news to the person importing;
+    // anything else is said, so an odd answer has an explanation.
+    if (d && d.noRecipe) _videoAiWhy = 'The video itself was watched too, and no recipe was found in it.';
+    else if (d && d.error && !d.needsConfig && st !== 400) _videoAiWhy = 'Reading the video itself did not work this time: ' + String(d.error).slice(0, 200);
+    syncLog('import', 'Reading the video gave no recipe', { status: st, why: d && (d.error || (d.noRecipe ? 'no recipe' : '')) });
+    return false;
+  }
+  res.innerHTML = spinner('Extracting recipe\u2026');
+  try {
+    var parsed = await extractRecipesFromText(d.text, 'a recipe written out from a cooking video');
+    if (!parsed || parsed.error) throw new Error((parsed && parsed.error) || 'no recipe found');
+    var built = buildImportFromParsed(parsed, url);
+    if (built.kind === 'none') throw new Error('no recipe found');
+    built.recipe._fromVideo = true;
+    syncLog('import', 'Recipe read from the video itself', { url: url.slice(0, 120), model: d.model || '' });
+    applyParsedRecipe(built.recipe, 'urlImportResult', 'urlImportOverlay');
+    return true;
+  } catch(e) {
+    _videoAiWhy = 'The video was read, but no recipe could be made of it.';
+    syncLog('import', 'The text read from the video held no recipe', String(e && e.message).slice(0, 160));
+    return false;
+  }
+}
+window.youtubeRecipeFromVideo = youtubeRecipeFromVideo;
 
 function spinner(msg) {
   return '<div class="explore-loading"><div class="ai-spinner"></div><br>' + msg + '</div>';
@@ -18049,6 +18095,10 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
     + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + escH(parsed.category||'') + ' &middot; ' + escH(parsed.difficulty||'') + ' &middot; ' + escH(parsed.prep||'') + ' &middot; ' + escH(parsed.servings||'') + '</div>'
     + '<div class="translate-section-label">Ingredients</div>' + ingsHtml
     + '<div class="translate-section-label" style="margin-top:14px;">Method</div>' + stepsHtml
+    // v37.15 — written out by an AI that watched the video: check the amounts.
+    + (parsed._fromVideo ? '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
+        + 'font-size:12px;color:#3451CC;line-height:1.5;margin-top:10px;">\u25b6\ufe0f Read from the video itself (what is said and shown). '
+        + 'Check the amounts before you add it.</div>' : '')
     + '</div>'
     + origPhotoHtml
     + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encodedParsed + ',&quot;' + overlayId + '&quot;)">&#10003; Add to My Collection</button>';
@@ -18097,6 +18147,11 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
       + '<strong>' + escH(String(parsed._viaProxy)) + '</strong>, not your own server. If anything below '
       + 'looks wrong, that is the first thing to suspect.</div>'
     : '';
+  // v37.15 — written out from the video by an AI that watched it: amounts
+  // spoken quickly are the likeliest slip.
+  if (parsed._fromVideo) relay += '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:#3451CC;line-height:1.5;margin-top:10px;">\u25b6\ufe0f Read from the video itself (what is said and shown). '
+      + 'Check the amounts before you import it.</div>';
   var missed = parsed._partial
     ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
       + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">⚠️ <strong>'
@@ -26438,7 +26493,7 @@ window.showInstagramCaptionFallback = showInstagramCaptionFallback;
 // v37.14 — a recipe in a Facebook post or reel, or said and shown in a YouTube
 // video: the app cannot watch a video, and Facebook shows nothing to anyone
 // not signed in to it. Say which, and offer what does work — never a dead end.
-function showVideoRecipeFallback(url, kind) {
+function showVideoRecipeFallback(url, kind, why) {
   var res = document.getElementById('urlImportResult');
   if (!res) return;
   var fb = kind === 'facebook';
@@ -26449,7 +26504,8 @@ function showVideoRecipeFallback(url, kind) {
     + (fb ? '<strong>\u{1F4D8} Facebook shows its posts only to people signed in to it.</strong><br>'
           + 'So the app cannot read this one \u2014 and a recipe in a reel is often only spoken or shown in the video.'
           : '<strong>\u25b6\ufe0f The recipe is in the video, not in its description.</strong><br>'
-          + 'The app reads a video\u2019s written description; this one has no recipe in it, and the app cannot watch the video itself.')
+          + 'The app reads a video\u2019s written description, and this one has no recipe in it.')
+    + (why ? '<div style="margin-top:8px;font-size:13px;">' + escH(why) + '</div>' : '')
     + '<div style="margin-top:10px;font-size:13px;">What works:</div>'
     + '<ul style="margin:4px 0 0;padding-inline-start:20px;font-size:13px;">'
     + '<li>' + (fb ? 'Open it, tap the text under the reel to show all of it, copy it, and paste it here.' : 'If the recipe is in a comment, copy it and paste it here.') + '</li>'
@@ -27121,6 +27177,21 @@ window.onHeaderScroll = onHeaderScroll;
           </div>
         </div>
         <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com" target="_blank" rel="noopener noreferrer" class="payment-link">Console ↗</a>
+      </div>
+
+      <!-- v37.15 — Gemini: the recipe said and shown in a YouTube video -->
+      <div class="payment-card">
+        <div class="payment-icon" style="background:#EEF2FF;">🎬</div>
+        <div class="payment-body">
+          <div class="payment-name">Google Gemini API <span class="payment-badge free">Free Quota</span></div>
+          <div class="payment-desc">Watches a YouTube video whose description has no recipe, and writes out the recipe it says and shows. Optional (Worker key GEMINI_API_KEY). Keep its project without billing, and it can never cost anything.</div>
+          <div class="payment-meta">
+            <span class="payment-cost free">$0 / month</span>
+            <span class="payment-divider">·</span>
+            <span style="color:var(--muted);font-size:12px;">Via Google AI Studio</span>
+          </div>
+        </div>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="payment-link">Keys ↗</a>
       </div>
 
       <!-- Bring! -->

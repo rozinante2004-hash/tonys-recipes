@@ -1,4 +1,11 @@
-// Tony's Recipes — Cloudflare Worker v42
+// Tony's Recipes — Cloudflare Worker v43
+// v43: `video-recipe` — the recipe SAID and SHOWN in a YouTube video, not only
+//      what its description says (a Short rarely has the recipe written down).
+//      Google's Gemini takes a public YouTube link directly and writes the
+//      recipe out as text; the app then reads that text as it reads any page.
+//      YouTube only: the action takes a video id and builds the link itself,
+//      with a fixed request — it is never a general way to reach Gemini. Needs
+//      GEMINI_API_KEY (see VIDEO RECIPES below); its own daily ceiling.
 // v42: `bring-recipe-page` + GET /bring-recipe/<code> — Bring!'s OFFICIAL,
 //      token-free recipe import. The app stores a recipe's name and ingredient
 //      lines here for 15 minutes under a random 32-hex code, then opens Bring!'s
@@ -88,6 +95,16 @@
 // commit publicly. The token that used to be hard-coded here is still in git
 // history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
 //
+// ── VIDEO RECIPES (v43, optional) ────────────────────────────────────────────
+//   GEMINI_API_KEY  – a key from https://aistudio.google.com/apikey . Leave the
+//                     key's project WITHOUT billing: Google's free allowance
+//                     then simply refuses once it is used up, so a leaked app
+//                     key can never turn into a bill.
+//   GEMINI_MODEL    – optional; the model that watches the video
+//                     (default below). Change it if Google retires that one.
+//   VIDEO_DAILY_MAX – optional; videos per UTC day, all callers (60).
+// Without the key, the app keeps its "paste the text / screenshots" answer.
+//
 // ── SPEND CEILINGS (v39, optional) ───────────────────────────────────────────
 // Both have working defaults, so neither has to be set:
 //   AI_DAILY_MAX    – Anthropic calls allowed per UTC day, all callers (300)
@@ -96,7 +113,17 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v42';
+const WORKER_VERSION = 'v43';
+const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
+const VIDEO_DAILY_DEFAULT = 60;
+const VIDEO_RECIPE_PROMPT =
+  'This is a cooking video. Write down its recipe from everything in it: what is said, '
+  + 'the text shown on screen, the video\'s description, and what is done. Give the name '
+  + 'of the dish, every ingredient with its amount, and the steps in order (and for a '
+  + 'recipe in parts, each part with its own ingredients and steps). Keep the video\'s own '
+  + 'language — do not translate. Where an amount is neither said nor shown, write the '
+  + 'ingredient without one: never guess a quantity. Plain text only. If there is no '
+  + 'recipe in the video, answer exactly: NO RECIPE';
 const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
 
 function bringHeaders(env) {
@@ -235,7 +262,7 @@ async function kvCount(kv, key, ttlSec, sample) {
 async function rateLimited(request, env, action) {
   const kv = env.BRING_KV;
   // The AI path (no action) is the expensive one; browsing photos is cheap.
-  const costly = !action || action === 'ai' || action === 'instagram-fetch';
+  const costly = !action || action === 'ai' || action === 'instagram-fetch' || action === 'video-recipe';
   // Narrower than `costly`: instagram-fetch is slow but it does not spend
   // Anthropic credits, so it must not eat into the AI ceilings.
   const aiSpend = !action || action === 'ai';
@@ -497,6 +524,7 @@ async function handleRequest(request, env) {
           pexels: !!env.PEXELS_API_KEY,
           unsplash: !!env.UNSPLASH_ACCESS_KEY,
           youtube: !!env.YOUTUBE_API_KEY,
+          videoAi: !!env.GEMINI_API_KEY,
           bringToken: !!(env.BRING_KV || env.BRING_TOKEN),
           bringSetToken: !!env.BRING_SETTOKEN_SECRET
         }
@@ -585,6 +613,65 @@ async function handleRequest(request, env) {
         error: 'Instagram did not return a caption for this post. Copy the caption and paste it into the free-hand importer instead.',
         unavailable: true,
       }, 404);
+    }
+
+    // ── video-recipe (v43) ───────────────────────────────────────────────────
+    if (body.action === 'video-recipe') {
+      const ytId = extractYouTubeId(String(body.url || ''));
+      if (!ytId) return jsonResp({ error: 'Only a YouTube video can be read this way.' }, 400);
+      const key = env.GEMINI_API_KEY;
+      if (!key) {
+        return jsonResp({ error: 'VIDEO_AI: reading recipes from videos is not set up on the server (GEMINI_API_KEY).',
+          needsConfig: true }, 503);
+      }
+      // Its own daily ceiling, across all callers — Gemini's free allowance is
+      // the real limit, this only keeps one busy day from using all of it.
+      const kv = env.BRING_KV;
+      if (kv) {
+        const vMax = parseInt(env.VIDEO_DAILY_MAX || '', 10) || VIDEO_DAILY_DEFAULT;
+        try {
+          const vDay = await kvCount(kv, 'rl:vid:' + utcDayKey(Date.now()), 60 * 60 * 48, 1);
+          if (vDay.used >= vMax) {
+            return jsonResp({ error: 'VIDEO_CAP: this Worker\'s daily ceiling for reading videos has been reached ('
+              + vDay.used + '/' + vMax + '). Raise VIDEO_DAILY_MAX, or try again tomorrow.', rateLimited: true }, 429);
+          }
+          await vDay.credit();
+        } catch (e) { /* unmetered is acceptable here: no billing on the key (see VIDEO RECIPES) */ }
+      }
+      const model = String(env.GEMINI_MODEL || GEMINI_MODEL_DEFAULT).replace(/[^a-zA-Z0-9._-]/g, '');
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { file_data: { file_uri: 'https://www.youtube.com/watch?v=' + ytId } },
+              { text: VIDEO_RECIPE_PROMPT },
+            ] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+          }),
+          signal: AbortSignal.timeout(110000),
+        });
+        let data = null;
+        try { data = await r.json(); } catch (e) {}
+        if (!r.ok) {
+          const msg = (data && data.error && data.error.message) || ('HTTP ' + r.status);
+          if (r.status === 429) return jsonResp({ error: 'VIDEO_QUOTA: Google\'s free allowance for reading videos is used up for now. Try again later.', rateLimited: true }, 429);
+          if (r.status === 404) return jsonResp({ error: 'VIDEO_MODEL: Gemini has no model "' + model + '" — set GEMINI_MODEL in the Worker\'s variables.', needsConfig: true }, 503);
+          if (r.status === 400 && /api key/i.test(msg)) return jsonResp({ error: 'VIDEO_KEY: the GEMINI_API_KEY was refused by Google.', needsConfig: true }, 503);
+          return jsonResp({ error: 'The video could not be read: ' + msg.slice(0, 300) }, 502);
+        }
+        const cand = data && data.candidates && data.candidates[0];
+        const text = ((cand && cand.content && cand.content.parts) || [])
+          .map(p => p && p.text || '').join('').trim();
+        if (!text) {
+          return jsonResp({ error: 'The video could not be read' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.' }, 502);
+        }
+        const none = /^NO RECIPE\.?$/i.test(text);
+        return jsonResp({ text: none ? '' : text.slice(0, 20000), noRecipe: none, isYouTube: true, videoId: ytId, via: 'gemini', model });
+      } catch (err) {
+        return jsonResp({ error: 'The video could not be read: ' + (err && err.name === 'TimeoutError' ? 'it took too long' : (err && err.message) || 'failed') }, 504);
+      }
     }
 
     if (body.action === 'fetch-url') {
@@ -1052,4 +1139,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v42 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v43 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

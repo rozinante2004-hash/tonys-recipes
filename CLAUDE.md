@@ -443,8 +443,21 @@ found only because a test was written first and disagreed with the code.
     ends in `showVideoRecipeFallback(url, 'facebook'|'youtube')`: why, plus
     📋 Paste the text, 📷 Import screenshots, ↗ Open it, 🔖 Just bookmark it.
     A YouTube key/quota fault (a `server:` attempt) still reports the fault.
-    Not done (proposed to Tony): creator's comments / linked recipe page via
-    the Worker; an AI that watches YouTube videos (Gemini, a new key).
+  - **v37.15 + Worker v43 — a YouTube video's recipe, read from the video.**
+    Tony chose the Gemini route. Worker action `video-recipe` {url}: YouTube
+    only (the id is extracted and the watch link rebuilt — never a general
+    Gemini proxy), fixed prompt (`VIDEO_RECIPE_PROMPT`: said + shown +
+    description, original language, no guessed amounts, "NO RECIPE"), key in
+    the `x-goog-api-key` header, `GEMINI_MODEL` (default gemini-2.5-flash),
+    its own `VIDEO_DAILY_MAX` (60) plus the costly per-minute limit; health
+    reports `configured.videoAi`. The key's Google project is meant to have
+    NO billing, so a leaked app key cannot become a bill. App:
+    `youtubeRecipeFromVideo` runs when a YouTube description gives no recipe
+    (short text or "no recipe found"), feeds the text to
+    `extractRecipesFromText`, and the preview says "Read from the video
+    itself — check the amounts". Not set up / older Worker → the v37.14
+    fallback, silently; any other failure is one line in that fallback.
+    Facebook stays paste/screenshots (signed-in only; no route that works).
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

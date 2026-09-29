@@ -534,14 +534,14 @@ window.SELF_TESTS = [
       if(v!=='Shared recipe text for extraction') throw new Error('openFreehandModal did not accept prefilled text — text shares would arrive empty');
     }
   },
-  { id:'import_facebook_and_video_say_what_works', group:'Import/Export', name:'A Facebook post or a recipe-less video says why, and what works (v37.14)',
+  { id:'import_facebook_and_video_say_what_works', group:'Import/Export', name:'A Facebook post or a recipe-less video says why, and what works; a video can be watched (v37.14, v37.15)',
     test: async()=>{
       var real={ fetch:window.fetch, consent:window.proxyConsent, extract:window.extractRecipesFromText, log:window.syncLog };
       var inp=document.getElementById('urlImportInput'), was=inp.value, res=document.getElementById('urlImportResult'), relays=0, reply=null;
       try{
         window.syncLog=function(){};
         window.proxyConsent=async function(){ relays++; return false; };
-        window.fetch=async function(){ return reply(); };
+        window.fetch=async function(u, init){ return reply(u, init || {}); };
         window.extractRecipesFromText=async function(){ return { error:'no recipe found' }; };
         if(!isFacebookUrl('https://www.facebook.com/share/r/1AkSMeYV4w/') || !isFacebookUrl('https://fb.watch/abc/') || isFacebookUrl('https://example.com/facebook.com/'))
           throw new Error('Facebook links are not recognised');
@@ -560,6 +560,25 @@ window.SELF_TESTS = [
         inp.value='https://youtube.com/shorts/WMTuLDQJHJw?si=x'; await runUrlImport();
         var yt=document.getElementById('videoRecipeFallback');
         if(relays || !yt || !/in the video/.test(yt.textContent)) throw new Error('YouTube: '+res.textContent.slice(0,200));
+        // v37.15 — with the Worker able to watch it, the recipe the video SHOWS is read.
+        var asked=[];
+        reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked.push(b.action);
+          return b.action==='video-recipe'
+            ? { ok:true, status:200, json:async function(){ return { text:'Chocolate cake\n6 eggs\n1 cup sugar\nBake at 160C for an hour.', via:'gemini' }; } }
+            : { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
+        window.extractRecipesFromText=async function(t){ return /6 eggs/.test(t)
+          ? { name:'Chocolate cake', ingredients:[{a:'6',n:'eggs'},{a:'1 cup',n:'sugar'}], steps:['Bake at 160C for an hour.'] }
+          : { error:'no recipe found' }; };
+        await runUrlImport();
+        if(asked.indexOf('video-recipe')===-1) throw new Error('the video itself was not asked for: '+JSON.stringify(asked));
+        if(!/Chocolate cake/.test(res.textContent) || !/Read from the video itself/.test(res.textContent)) throw new Error('the recipe from the video: '+res.textContent.slice(0,200));
+        // No recipe in the video either: said, and the ways that work are offered.
+        reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          return b.action==='video-recipe'
+            ? { ok:true, status:200, json:async function(){ return { text:'', noRecipe:true }; } }
+            : { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
+        await runUrlImport();
+        if(!document.getElementById('videoRecipeFallback') || !/no recipe was found in it/.test(res.textContent)) throw new Error('a video with no recipe: '+res.textContent.slice(0,200));
         // …but a YouTube key or quota fault is a fault, not "the recipe is in the video".
         reply=function(){ return { ok:false, status:500, json:async function(){ return { error:'YOUTUBE_QUOTA: exceeded', isYouTube:true }; } }; };
         await runUrlImport();
