@@ -534,6 +534,42 @@ window.SELF_TESTS = [
       if(v!=='Shared recipe text for extraction') throw new Error('openFreehandModal did not accept prefilled text — text shares would arrive empty');
     }
   },
+  { id:'import_facebook_and_video_say_what_works', group:'Import/Export', name:'A Facebook post or a recipe-less video says why, and what works (v37.14)',
+    test: async()=>{
+      var real={ fetch:window.fetch, consent:window.proxyConsent, extract:window.extractRecipesFromText, log:window.syncLog };
+      var inp=document.getElementById('urlImportInput'), was=inp.value, res=document.getElementById('urlImportResult'), relays=0, reply=null;
+      try{
+        window.syncLog=function(){};
+        window.proxyConsent=async function(){ relays++; return false; };
+        window.fetch=async function(){ return reply(); };
+        window.extractRecipesFromText=async function(){ return { error:'no recipe found' }; };
+        if(!isFacebookUrl('https://www.facebook.com/share/r/1AkSMeYV4w/') || !isFacebookUrl('https://fb.watch/abc/') || isFacebookUrl('https://example.com/facebook.com/'))
+          throw new Error('Facebook links are not recognised');
+        // Facebook refuses the server: no relay, and the way forward is offered.
+        reply=function(){ return { ok:false, status:502, json:async function(){ return { error:'HTTP 403' }; } }; };
+        inp.value='https://www.facebook.com/share/r/1AkSMeYV4w/'; await runUrlImport();
+        if(relays) throw new Error('a Facebook link was sent to a relay');
+        var fb=document.getElementById('videoRecipeFallback');
+        if(!fb || !/signed in/.test(fb.textContent) || !/Paste the text/.test(fb.textContent) || !/Import screenshots/.test(fb.textContent)) throw new Error('Facebook: '+res.textContent.slice(0,200));
+        // Facebook's sign-in page read as text: no recipe in it, the same answer.
+        reply=function(){ return { ok:true, json:async function(){ return { text:'Log in to Facebook to see this. '.repeat(8) }; } }; };
+        await runUrlImport();
+        if(!document.getElementById('videoRecipeFallback')) throw new Error('Facebook sign-in page: '+res.textContent.slice(0,200));
+        // A YouTube description with no recipe: said so, no relay.
+        reply=function(){ return { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
+        inp.value='https://youtube.com/shorts/WMTuLDQJHJw?si=x'; await runUrlImport();
+        var yt=document.getElementById('videoRecipeFallback');
+        if(relays || !yt || !/in the video/.test(yt.textContent)) throw new Error('YouTube: '+res.textContent.slice(0,200));
+        // …but a YouTube key or quota fault is a fault, not "the recipe is in the video".
+        reply=function(){ return { ok:false, status:500, json:async function(){ return { error:'YOUTUBE_QUOTA: exceeded', isYouTube:true }; } }; };
+        await runUrlImport();
+        if(document.getElementById('videoRecipeFallback')) throw new Error('a YouTube quota fault is blamed on the video');
+      } finally {
+        window.fetch=real.fetch; window.proxyConsent=real.consent; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
+        inp.value=was; res.innerHTML='';
+      }
+    } },
+
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
     test: async()=>{
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');

@@ -434,6 +434,17 @@ found only because a test was written first and disagreed with the code.
     Decline on that row, and a toast once a session. Raising the role by the
     menu, leaving, account deletion and `householdWipe` remove requests. The
     move of the family keeps the family's existing roles (pending, as before).
+  - **v37.14 — Facebook links, and videos whose recipe is only in the video.**
+    Facebook shows posts only to people signed in to it, so neither the
+    Worker nor a relay can read a post or reel; YouTube import reads only the
+    video's DESCRIPTION (Data API), and a Short's recipe is usually spoken or
+    shown. `isFacebookUrl`; for Facebook and YouTube links the page is never
+    sent to third-party relays (useless there), and "no text" or "no recipe"
+    ends in `showVideoRecipeFallback(url, 'facebook'|'youtube')`: why, plus
+    📋 Paste the text, 📷 Import screenshots, ↗ Open it, 🔖 Just bookmark it.
+    A YouTube key/quota fault (a `server:` attempt) still reports the fault.
+    Not done (proposed to Tony): creator's comments / linked recipe page via
+    the Worker; an AI that watches YouTube videos (Gemini, a new key).
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection
