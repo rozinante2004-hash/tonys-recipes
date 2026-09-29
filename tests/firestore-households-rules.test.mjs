@@ -150,6 +150,17 @@ await check('a kept place for a deleted household opens nothing', env.withSecuri
             setDoc(doc(ctx.firestore(), 'pending/h9:michal@example.com'), { hid: 'h9', email: 'michal@example.com', role: 'viewer' }))
             .then(() => join(michal, 'h9', 'michal', 'viewer')).then(() => { throw new Error('joined'); }, e => { if (String(e).indexOf('joined') !== -1) throw e; return 'refused'; }), true);
 
+console.log('A word for an unconfirmed address (v37.11)');
+await check('an admin leaves a notice for an address',       setDoc(doc(alice, 'pendingNotice/newbie@example.com'), { email: 'newbie@example.com', hid: 'h1', at: 1 }), true);
+await check('a stranger cannot leave one for h1',             setDoc(doc(carol, 'pendingNotice/x@example.com'), { email: 'x@example.com', hid: 'h1', at: 1 }), false);
+await check('…nor a notice under another address\'s name',     setDoc(doc(alice, 'pendingNotice/a@example.com'), { email: 'b@example.com', hid: 'h1', at: 1 }), false);
+const newbieUnconfirmed = env.authenticatedContext('newbie', { email: 'newbie@example.com', email_verified: false }).firestore();
+await check('the address reads its notice even unconfirmed', getDoc(doc(newbieUnconfirmed, 'pendingNotice/newbie@example.com')), true);
+await check('nobody else reads it',                           getDoc(doc(carol, 'pendingNotice/newbie@example.com')), false);
+await check('notices cannot be listed',                       getDocs(collection(newbieUnconfirmed, 'pendingNotice')), false);
+await check('…but the kept place itself stays closed to it',  getDocs(query(collection(newbieUnconfirmed, 'pending'), where('email', '==', 'newbie@example.com'))), false);
+await check('the address removes its own notice',             deleteDoc(doc(newbieUnconfirmed, 'pendingNotice/newbie@example.com')), true);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);

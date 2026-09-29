@@ -485,6 +485,33 @@ try {
        && ((await restDoc('households/' + HID + '/members/' + await uidOnPage(K))) || {}).role === 'editor'
        && !!(await restDoc('households/' + kOwn)),
        JSON.stringify(await inPage(K, () => householdOf())));
+    // v37.11 — Tony: added to a household before confirming the address —
+    // told so, and offered the e-mail; once confirmed, the place opens.
+    const UC = await device('U (unconfirmed)', 'unconf@example.com', { ready: 'household', welcome: 'own', signIn: async page => {
+      await page.evaluate(async () => { toggleEmailSignIn(); document.getElementById('emailSignInEmail').value = 'unconf@example.com';
+        document.getElementById('emailSignInPassword').value = 'correct horse battery'; return emailSignIn('up'); });
+    } });
+    await inPage(A, () => { householdAddMember('unconf@example.com', 'write'); });
+    ok('adding an unconfirmed address leaves a word for it (no household named)',
+       await until(async () => { const n = await restDoc('pendingNotice/unconf@example.com'); return !!(n && n.hid === HID); }, 15000));
+    await UC.page.reload({ waitUntil: 'domcontentloaded' });
+    const told = await until(() => inPage(UC, () => /added to a recipe collection/.test((document.getElementById('askOverlay') || {}).textContent || '')), 30000);
+    ok('…who is told at their next visit, and offered the confirmation e-mail', told
+       && await inPage(UC, () => /confirmation/i.test((document.getElementById('askOk') || {}).textContent || '')),
+       JSON.stringify(await inPage(UC, () => (document.getElementById('askOverlay') || {}).textContent)));
+    if (told) await UC.page.click('#askOverlay #askCancel');
+    ok('…and not yet taken in', (await inPage(UC, () => (householdOf() || {}).hid)) !== HID);
+    const ucUid = await uidOnPage(UC);
+    await fetch(`http://${EMU.host}:${EMU.authPort}/identitytoolkit.googleapis.com/v1/projects/${EMU.projectId}/accounts:update`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
+        body: JSON.stringify({ localId: ucUid, emailVerified: true }) });
+    await UC.page.reload({ waitUntil: 'domcontentloaded' });
+    ok('once the address is confirmed, the next visit opens the household that kept the place',
+       await until(async () => (await inPage(UC, () => (householdOf() || {}).hid)) === HID, 30000)
+       && ((await restDoc('households/' + HID + '/members/' + ucUid)) || {}).role === 'editor',
+       JSON.stringify(await inPage(UC, () => [householdOf(), firebase.auth().currentUser.emailVerified,
+         JSON.parse(localStorage.getItem('tonys_sync_log') || '[]').slice(-8).map(e => e.m + ' ' + JSON.stringify(e.d || '').slice(0, 140))])));
+    ok('…and the word left for it is gone', await until(async () => !(await restDoc('pendingNotice/unconf@example.com')), 15000));
     ok('…and a new household starts empty (no examples imposed)', await inPage(N, () => recipes.length === 0 && !!document.getElementById('firstRunEmpty')),
        JSON.stringify(await inPage(N, () => recipes.map(r => r.name))));
 

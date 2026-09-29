@@ -396,6 +396,20 @@ found only because a test was written first and disagreed with the code.
     from opening the household meanwhile; Firebase wants a fresh sign-in).
     The device's LOG survives the account's deletion (keepKeys), each step is
     logged, and the end says "Your account is deleted".
+  - **v37.11 — a word for an unconfirmed address.** `householdAddMember`
+    also writes `pendingNotice/{email}` = {email, hid, at} (rules: only the
+    address's own signed-in account may GET it — confirmed or not — never
+    list; an admin of `hid` writes/deletes it). `householdUnconfirmedNotice`
+    shows it once a session: "You have been added to a recipe collection" +
+    "Send the confirmation e-mail". It deliberately does NOT say who or which
+    household — an unconfirmed address may not be the signed-in person's own.
+    Removing the kept place or claiming it deletes the notice.
+    **Firebase refreshes the ACCOUNT at page load but not the ID TOKEN** the
+    rules read (`email_verified` stays false up to an hour after confirming);
+    `householdEnter` reloads the user and forces `getIdToken(true)` when the
+    token's claim lags. Without that, someone who confirmed and reloaded was
+    not taken into the household for up to an hour. "🪵 Copy the log" is on
+    the sign-in screen (after an account deletion the log was out of reach).
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

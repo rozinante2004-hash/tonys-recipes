@@ -232,6 +232,22 @@ service cloud.firestore {
         (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
     }
 
+    // v37.11 — a word for an address that is NOT confirmed yet: that a place
+    // is kept for it — nothing about where or by whom, since the person signed
+    // in with it may not own the mailbox. `pendingNotice/<email>` = { email,
+    // hid, at }. Only whoever signs in with that address reads it; a
+    // household's admins leave it (with their places) and may remove it.
+    match /pendingNotice/{email} {
+      allow get: if signedIn() && request.auth.token.email != null && email == myEmail();
+      allow list: if false;
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['email', 'hid', 'at'])
+        && request.resource.data.email == email
+        && atLeast(request.resource.data.hid, 'admin');
+      allow delete: if signedIn() && ((request.auth.token.email != null && email == myEmail())
+        || atLeast(resource.data.hid, 'admin'));
+    }
+
     // Invitations. Anyone signed in who HAS the code may read it (that is how
     // it is accepted); it cannot be listed. Admins invite editors and viewers;
     // only the owner invites admins. Nobody is ever invited as owner.

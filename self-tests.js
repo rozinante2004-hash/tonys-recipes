@@ -2157,6 +2157,42 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'unconfirmed_hears_of_kept_place', group:'Security', name:'Someone added before confirming is told, and offered the e-mail (v37.11)',
+    test: async()=>{
+      var real={ db:window.hhDb, confirm:window.askConfirm, resend:window.resendConfirmation, shown:_hhNoticeShown };
+      try{
+        var asked=null, sent=0, has=true;
+        window.hhDb=function(){ return { collection:function(c){ return { doc:function(id){ return { get:async function(){
+          if(c!=='pendingNotice') throw new Error('looked in '+c); return { exists:has && id==='new@example.com' }; } }; } }; } }; };
+        window.askConfirm=async function(o){ asked=o; return true; };
+        window.resendConfirmation=async function(){ sent++; return true; };
+        _hhNoticeShown=false;
+        var r=await householdUnconfirmedNotice({ uid:'u', email:'New@Example.com', emailVerified:false });
+        if(r!==true || !asked) throw new Error('the notice was not shown');
+        if(!/added/i.test(asked.title) || !/confirm/i.test(asked.okLabel)) throw new Error('the notice does not say it: '+JSON.stringify(asked));
+        if(sent!==1) throw new Error('saying yes did not send the confirmation e-mail');
+        // Once a session — not at every reload of the household.
+        asked=null; await householdUnconfirmedNotice({ uid:'u', email:'new@example.com', emailVerified:false });
+        if(asked) throw new Error('the notice is shown twice in one session');
+        // Nothing kept, nothing said.
+        _hhNoticeShown=false; has=false; asked=null;
+        if(await householdUnconfirmedNotice({ uid:'u', email:'new@example.com', emailVerified:false }) || asked) throw new Error('a notice with nothing kept');
+        // It never names who added them — the address may not be this person's own.
+        if(/ownerName|addedBy|displayName/.test(String(householdUnconfirmedNotice))) throw new Error('the notice names the household');
+        // Coming back after confirming: the account is asked afresh, so the place opens now.
+        var he=String(householdEnter);
+        if(he.indexOf('user.reload()')===-1 || he.indexOf('getIdToken(true)')===-1 || he.indexOf('householdUnconfirmedNotice(user)')===-1) throw new Error('householdEnter does not refresh or tell');
+        // Adding someone leaves the word for them; taking the place up clears it.
+        if(String(householdAddMember).indexOf("'pendingNotice'")===-1) throw new Error('adding a member leaves no word');
+        if(String(householdClaimKept).indexOf("'pendingNotice'")===-1) throw new Error('the word outlives the place');
+        // The log can be copied from the sign-in screen too.
+        if(!document.getElementById('loginCopyLogBtn')) throw new Error('no way to copy the log when signed out');
+        if(typeof copyLogFromLogin!=='function') throw new Error('copyLogFromLogin missing');
+      } finally {
+        window.hhDb=real.db; window.askConfirm=real.confirm; window.resendConfirmation=real.resend; _hhNoticeShown=real.shown;
+      }
+    } },
+
   { id:'i18n_languages_central_for_everyone', group:'UI', name:'Every copy takes its languages from one central place (v36.88)',
     test: async()=>{
       // Tony: every translated language available to everyone from day one —

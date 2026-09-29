@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.10 -->
+<!-- Tony's Recipes Collection v37.11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3821,6 +3821,27 @@ function hhMemberDoc(user, role, extra) {
 }
 // A place kept for this person's (verified) e-mail — claim every one.
 var _hhClaimedHid = null;
+// v37.11 — Tony: someone added to a household before confirming their address
+// should hear of it. The notice says only THAT a place is kept — not who or
+// where: an unconfirmed address may not be the signed-in person's own.
+var _hhNoticeShown = false;
+async function householdUnconfirmedNotice(user) {
+  if (_hhNoticeShown) return false;
+  var email = String(user.email || '').toLowerCase();
+  if (!email) return false;
+  var n = null;
+  try { n = await hhDb().collection('pendingNotice').doc(email).get(); } catch(e) { return false; }
+  if (!n || !n.exists) return false;
+  _hhNoticeShown = true;
+  for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);
+  var ok = await askConfirm({ icon: '\u{1F4EC}', title: 'You have been added to a recipe collection',
+    message: 'Someone added ' + email + ' to their recipe collection. It opens for you once this address is confirmed '
+      + '— from the e-mail we send you (look in spam too). Then come back and reload the app.',
+    okLabel: 'Send the confirmation e-mail', cancelLabel: 'Later' });
+  if (ok === true) await resendConfirmation();
+  return true;
+}
+window.householdUnconfirmedNotice = householdUnconfirmedNotice;
 async function householdClaimKept(user) {
   var email = String(user.email || '').toLowerCase();
   // v37.03 — only a CONFIRMED address may look for places kept for it (the
@@ -3832,6 +3853,7 @@ async function householdClaimKept(user) {
   try { q = await hhDb().collection('pending').where('email', '==', email).get(); }
   catch(e) { syncLog('error', 'Could not look for places kept for this address', String(e && e.message).slice(0, 160)); return 0; }
   q.forEach(function(d) { kept.push({ ref: d.ref, data: d.data() || {} }); });
+  if (kept.length) hhDb().collection('pendingNotice').doc(email).delete().catch(function(){});
   for (var i = 0; i < kept.length; i++) {
     try {
       await hhRef(kept[i].data.hid).collection('members').doc(user.uid).set(hhMemberDoc(user, kept[i].data.role));
@@ -3883,6 +3905,15 @@ async function householdEnter(user) {
     // is not opened (it is about to go); completeEmailLinkSignIn carries on
     // once the link's own sign-in has finished — Firebase wants that fresh.
     if (window._resumingDelete) return false;
+    // v37.11 — back from confirming the address: Firebase may keep the old,
+    // unconfirmed copy of the account, and keeps the token the rules read for
+    // up to an hour (it refreshes the account at page load, NOT the token).
+    // Ask afresh, so a place kept for it opens NOW.
+    if (user.emailVerified === false) { try { await user.reload(); } catch(e) {} }
+    if (user.emailVerified) {
+      try { var tok = await user.getIdTokenResult(); if (tok && tok.claims && tok.claims.email_verified === false) await user.getIdToken(true); } catch(e) {}
+    }
+    if (user.emailVerified === false && !_selfTestRunning) await householdUnconfirmedNotice(user);
     var list = await householdMemberships(user);
     if (await householdClaimKept(user)) {
       list = await householdMemberships(user);
@@ -4077,6 +4108,9 @@ async function householdAddMember(email, accessRole) {
   var role = ACCESS_TO_HH[accessRole] || 'viewer';
   if (role === 'admin' && _household.role !== 'owner') { toast('Only the owner can add someone with full access.'); return; }
   await hhDb().collection('pending').doc(_cloudHid + ':' + email).set({ hid: _cloudHid, email: email, role: role });
+  // v37.11 — and a word for that address, readable even before it is confirmed.
+  hhDb().collection('pendingNotice').doc(email).set({ email: email, hid: _cloudHid, at: Date.now() })
+    .catch(function(e){ dlog('[household] notice not left', e && e.message); });
   await householdLoadMembers(); renderAccessMembers();
   toast('✅ ' + email + ' can now join — the moment they sign in with that address.', 7000);
   letThemKnow(email);
@@ -4089,7 +4123,11 @@ async function householdChangeRole(m, accessRole) {
   toast('✅ Role changed');
 }
 async function householdRemoveMember(m) {
-  if (m.pending) await hhDb().collection('pending').doc(_cloudHid + ':' + m.email).delete();
+  if (m.pending) {
+    await hhDb().collection('pending').doc(_cloudHid + ':' + m.email).delete();
+    try { var nt = await hhDb().collection('pendingNotice').doc(m.email).get();
+          if (nt.exists && (nt.data() || {}).hid === _cloudHid) await nt.ref.delete(); } catch(e) {}
+  }
   else await hhRef().collection('members').doc(m.uid).delete();
   await householdLoadMembers(); renderAccessMembers();
   toast('✅ ' + m.email + ' removed');
@@ -4872,7 +4910,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.10';
+var APP_VERSION = 'v37.11';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7504,7 +7542,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.10</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.11</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8149,7 +8187,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.10</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.11</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8172,6 +8210,12 @@ body.banner-shown .header {
             style="margin-top:10px;background:none;border:none;color:var(--terracotta);cursor:pointer;
                    font-size:12px;font-weight:600;text-decoration:underline;font-family:'DM Sans','Heebo',sans-serif;">
       Why can't I sign in?
+    </button>
+    <!-- v37.11 — the log, even signed out (after deleting an account it was out of reach) -->
+    <button id="loginCopyLogBtn" onclick="copyLogFromLogin()"
+            style="margin-top:4px;background:none;border:none;color:var(--terracotta);cursor:pointer;
+                   font-size:12px;font-weight:600;text-decoration:underline;font-family:'DM Sans','Heebo',sans-serif;">
+      🪵 Copy the log
     </button>
     <div id="signInDiag" style="display:none;margin-top:10px;text-align:start;font-size:11.5px;
          line-height:1.6;color:var(--ink);background:var(--warn-bg);border:1px solid var(--gold);
@@ -21073,6 +21117,15 @@ async function resendConfirmation() {
   }
 }
 window.resendConfirmation = resendConfirmation;
+function copyLogFromLogin() {
+  var t = '';
+  try { t = syncLogReportText(); } catch(e) { t = 'The log could not be read: ' + (e && e.message); }
+  var shown = function() { askConfirm({ icon: '\u{1FAB5}', title: 'The log', message: t.slice(0, 4000), okLabel: 'OK' }); };
+  try { navigator.clipboard.writeText(t).then(function(){ toast('\u{1F4CB} The log is copied \u2014 paste it wherever you are asking for help'); }, shown); }
+  catch(e) { shown(); }
+  return t;
+}
+window.copyLogFromLogin = copyLogFromLogin;
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
 window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
 window.emailSendLink = emailSendLink; window.completeEmailLinkSignIn = completeEmailLinkSignIn; window.emailVerifyNudge = emailVerifyNudge;
