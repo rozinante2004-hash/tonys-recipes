@@ -552,6 +552,23 @@ found only because a test was written first and disagreed with the code.
     `tests/extension.mjs` (real Chromium, extension installed, imitation
     feed + reel; CI step). Web Store listing, permission reasons and privacy
     policy: `extension/STORE.md`, `extension/PRIVACY.md`.
+  - **Extension 1.1 — Instagram and TikTok too** (Tony). `content.js` has a
+    SITES table: Facebook (top-level role=article, data-ad(-comet)-preview
+    message), Instagram (top-level <article>, caption in <h1>, comments are
+    `ul li`, a bare "more"/"עוד" clicked ONLY inside the caption's box),
+    TikTok (`data-e2e` recommend-list-item-container / browse-video-desc).
+    Test and family builds coexist in Chrome (different names, folders).
+  - **v37.23 + Worker v47 — a Facebook LINK alone.** Tony: "no sane mobile user
+    will jump through hoops". Worker `facebook-fetch`: follows a share link
+    to its post (never a login page), then Facebook's official oEmbed
+    (`oembed_video`/`oembed_post`, `FB_APP_TOKEN` if Meta asks), then the
+    public embed page (`plugins/post.php`/`video.php`); honest User-Agent,
+    facebook addresses only, `tried[]` when nothing. UNTESTED against the
+    real Facebook (blocked from the sandbox). App: runUrlImport asks it first
+    for Facebook links (≥ 40 chars is enough for a post); `#urlPasteBtn` →
+    `pasteLinkAndImport()` (a link → import at once; recipe text → the text
+    reader; bookmark code refused); a link SHARED into the app (Android share
+    target) imports at once.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

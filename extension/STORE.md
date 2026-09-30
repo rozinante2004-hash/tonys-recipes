@@ -1,15 +1,15 @@
-# Chrome Web Store — “My Kitchen Notes — Save recipes from Facebook”
+# Chrome Web Store — “My Kitchen Notes — Save recipes from Facebook, Instagram & TikTok”
 
 Everything the Web Store asks for when the extension is published (at go-public,
 Tony's decision). Build the package with `node tools/build-extension.mjs live`
 → `dist-extension/my-kitchen-notes-extension.zip`.
 
 ## Listing
-- **Name:** My Kitchen Notes — Save recipes from Facebook
+- **Name:** My Kitchen Notes — Save recipes from Facebook, Instagram & TikTok
 - **Category:** Productivity (or Lifestyle → Food & drink)
-- **Short description (≤132):** Adds a “Save recipe” button under Facebook posts: one click sends the post’s recipe to My Kitchen Notes.
+- **Short description (≤132):** A “Save recipe” button under Facebook, Instagram and TikTok posts: one click sends the recipe to My Kitchen Notes.
 - **Description:**
-  Found a recipe in a Facebook post or reel? Click “📘 Save recipe to My Kitchen Notes” under it.
+  Found a recipe in a Facebook, Instagram or TikTok post or reel? Click “📘 Save recipe to My Kitchen Notes” under it.
   The extension opens the post’s “See more”, takes the post’s own text — never the comments — and opens
   My Kitchen Notes with it, where it becomes a recipe: ingredients, steps, and the post as its source.
   The toolbar button does the same on any page: select the recipe’s text, or let it take the page’s main text.
@@ -23,11 +23,11 @@ Send the text of a recipe the user is looking at (a Facebook post, or a selectio
 My Kitchen Notes recipe collection, at the user’s click.
 
 ## Permissions — why each is needed
-- **Content script on facebook.com:** to show the “Save recipe” button under posts and, when clicked, read
-  that post’s text. Runs only on Facebook.
+- **Content script on facebook.com, instagram.com and tiktok.com:** to show the “Save recipe” button under
+  posts and, when clicked, read that post’s text. Runs only on those three sites.
 - **activeTab + scripting:** the toolbar button reads the selected text on the page the user is on, only when
   the user clicks it.
-- No host permissions beyond Facebook; no remote code; no analytics.
+- No host permissions beyond those three sites; no remote code; no analytics.
 
 ## Data use (the Web Store’s form)
 - Collects: **website content** (the text of the post the user chooses), **only on the user’s click**, used only

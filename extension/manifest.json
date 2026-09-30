@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "My Kitchen Notes — Save recipes from Facebook",
+  "name": "My Kitchen Notes — Save recipes from Facebook, Instagram & TikTok",
   "short_name": "My Kitchen Notes",
-  "version": "1.0.0",
-  "description": "Adds a “Save recipe” button under Facebook posts: one click sends the post’s text to your My Kitchen Notes collection.",
+  "version": "1.1.0",
+  "description": "Adds a “Save recipe” button under Facebook, Instagram and TikTok posts: one click sends the post’s text to your My Kitchen Notes collection.",
   "icons": {
     "16": "icons/16.png",
     "32": "icons/32.png",
@@ -30,7 +30,9 @@
       "matches": [
         "https://www.facebook.com/*",
         "https://web.facebook.com/*",
-        "https://m.facebook.com/*"
+        "https://m.facebook.com/*",
+        "https://www.instagram.com/*",
+        "https://www.tiktok.com/*"
       ],
       "js": [
         "config.js",

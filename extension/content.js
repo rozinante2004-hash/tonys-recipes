@@ -1,36 +1,80 @@
-// A "📘 Save recipe" button under every Facebook post that has text, and a
-// floating one on a reel or video page. Clicking it opens the post's "See
-// more", takes the post's own text — never the comments — and opens My
-// Kitchen Notes with it. It reads nothing until clicked, and sends nothing
-// anywhere: the text travels after '#' in the app's address, which no server
-// receives.
+// A "📘 Save recipe" button under every post that has text — Facebook,
+// Instagram and TikTok on the web — and a floating one on a single reel or
+// video page. Clicking it opens the post's "See more", takes the post's own
+// text (never the comments) and opens My Kitchen Notes with it. It reads
+// nothing until clicked, and sends nothing anywhere: the text travels after
+// '#' in the app's address, which no server receives.
 (function () {
   if (window.__mknLoaded) return;
   window.__mknLoaded = true;
   var LABEL = '📘 Save recipe to ' + MKN_APP_NAME;
-  var MESSAGE = '[data-ad-preview="message"],[data-ad-comet-preview="message"]';
+  var host = location.hostname;
 
-  function topArticles() {
-    return Array.prototype.filter.call(document.querySelectorAll('[role="article"]'), function (a) {
-      return !(a.parentElement && a.parentElement.closest('[role="article"]'));   // posts, not comments
-    });
-  }
-  // The post's own text: Facebook marks it; otherwise the longest text block
-  // that is not inside a comment.
-  function postText(post) {
-    var m = post.querySelector(MESSAGE);
-    if (m && m.innerText.trim()) return mknCleanText(m.innerText);
+  // ── Each site: where its posts are, where a post's own text is, and which
+  //    page shows a single reel or video.
+  var SITES = {
+    facebook: {
+      posts: function () {
+        return Array.prototype.filter.call(document.querySelectorAll('[role="article"]'), function (a) {
+          return !(a.parentElement && a.parentElement.closest('[role="article"]'));     // posts, not comments
+        });
+      },
+      marked: '[data-ad-preview="message"],[data-ad-comet-preview="message"]',
+      isComment: function (e, post) { var inner = e.closest('[role="article"]'); return inner && inner !== post; },
+      single: /\/(reel|watch|videos|share\/r|share\/v)\b/,
+      link: 'a[href*="/posts/"],a[href*="/reel/"],a[href*="/videos/"],a[href*="/permalink"],a[href*="story_fbid"]',
+    },
+    instagram: {
+      posts: function () {
+        return Array.prototype.filter.call(document.querySelectorAll('article'), function (a) {
+          return !(a.parentElement && a.parentElement.closest('article'));
+        });
+      },
+      marked: 'h1',                                                   // Instagram puts the caption in an <h1>
+      isComment: function (e) { return !!e.closest('ul li'); },      // comments are list items
+      single: /\/(reel|reels|p|tv)\//,
+      link: 'a[href*="/p/"],a[href*="/reel/"]',
+      more: /^(more|… ?more|עוד|… ?עוד)$/i,                          // only inside the caption
+    },
+    tiktok: {
+      posts: function () { return Array.prototype.slice.call(document.querySelectorAll('[data-e2e="recommend-list-item-container"]')); },
+      marked: '[data-e2e="browse-video-desc"],[data-e2e="video-desc"]',
+      isComment: function (e) { return !!e.closest('[data-e2e*="comment"]'); },
+      single: /\/video\//,
+      link: 'a[href*="/video/"]',
+    },
+  };
+  var site = /instagram\.com$/.test(host) ? SITES.instagram : /tiktok\.com$/.test(host) ? SITES.tiktok : SITES.facebook;
+
+  function postText(scope) {
+    var m = scope.querySelector(site.marked);
+    if (m && m.innerText.trim().length >= 20) return mknCleanText(m.innerText);
     var best = '';
-    post.querySelectorAll('[dir="auto"]').forEach(function (e) {
-      var inner = e.closest('[role="article"]');
-      if (inner && inner !== post) return;                                      // a comment
+    scope.querySelectorAll('[dir="auto"],span,h1').forEach(function (e) {
+      if (site.isComment(e, scope) || e.closest('[role="navigation"],[role="banner"],nav,header button')) return;
       var t = (e.innerText || '').trim();
       if (t.length > best.length && t.length < 20000) best = t;
     });
+    if (best.length < 40 && scope === document) {
+      var og = document.querySelector('meta[property="og:description"]');
+      if (og && og.content) best = og.content;
+    }
     return mknCleanText(best);
   }
+  function expand(scope) {
+    var n = mknSeeMore(scope);
+    if (site.more) {                                                  // a bare "more" — inside the caption only
+      var cap = scope.querySelector(site.marked);
+      var box = cap ? cap.parentElement : null;
+      if (box) box.querySelectorAll('[role="button"],span,div,button').forEach(function (e) {
+        var t = (e.textContent || '').trim();
+        if (t.length < 10 && site.more.test(t) && e.offsetParent) { e.click(); n++; }
+      });
+    }
+    return n;
+  }
   function postLink(post) {
-    var a = post && post.querySelector('a[href*="/posts/"],a[href*="/reel/"],a[href*="/videos/"],a[href*="/permalink"],a[href*="story_fbid"]');
+    var a = post && post.querySelector(site.link);
     return a ? a.href.replace(/[?&]__cft__[^#]*/, '') : location.href;
   }
   async function save(btn, post) {
@@ -42,28 +86,12 @@
       var text = '';
       if (sel.length >= 40) text = mknCleanText(sel);
       else {
-        for (var i = 0; i < 4 && mknSeeMore(post || document); i++) await new Promise(function (r) { setTimeout(r, 600); });
-        text = post ? postText(post) : pageText();
+        for (var i = 0; i < 4 && expand(post || document); i++) await new Promise(function (r) { setTimeout(r, 600); });
+        text = postText(post || document);
       }
       if (text.length < 20) { alert('No text found in this post. Select the recipe text, then press the button again.'); return; }
       mknOpenApp(MKN_APP, text, post ? postLink(post) : location.href);
     } finally { btn.disabled = false; btn.textContent = was; }
-  }
-  // A reel or video page: its caption, wherever Facebook put it.
-  function pageText() {
-    var m = document.querySelector(MESSAGE);
-    if (m && m.innerText.trim()) return mknCleanText(m.innerText);
-    var best = '';
-    document.querySelectorAll('[dir="auto"]').forEach(function (e) {
-      if (e.closest('[role="article"] [role="article"]') || e.closest('[role="navigation"],[role="banner"]')) return;
-      var t = (e.innerText || '').trim();
-      if (t.length > best.length && t.length < 20000 && e.offsetParent) best = t;
-    });
-    if (best.length < 40) {
-      var og = document.querySelector('meta[property="og:description"]');
-      if (og && og.content) best = og.content;
-    }
-    return mknCleanText(best);
   }
   function button(onClick, extra) {
     var b = document.createElement('button');
@@ -74,23 +102,23 @@
     return b;
   }
   function decorate() {
-    topArticles().forEach(function (post) {
+    var posts = site.posts();
+    posts.forEach(function (post) {
       if (post.getAttribute('data-mkn')) return;
-      var m = post.querySelector(MESSAGE);
-      var anchor = m || null;
-      if (!anchor) {                         // no marked text: only posts with a real block of it
+      var anchor = post.querySelector(site.marked);
+      if (!anchor || !anchor.innerText.trim()) {                        // no marked text: only a real block of it
         var t = postText(post);
         if (t.length < 60) return;
-        anchor = Array.prototype.filter.call(post.querySelectorAll('[dir="auto"]'), function (e) {
-          return (e.innerText || '').trim() && t.indexOf((e.innerText || '').trim().slice(0, 40)) === 0;
+        anchor = Array.prototype.filter.call(post.querySelectorAll('[dir="auto"],span,h1'), function (e) {
+          var s = (e.innerText || '').trim();
+          return s && !site.isComment(e, post) && t.indexOf(s.slice(0, 40)) === 0;
         })[0];
         if (!anchor) return;
       }
       post.setAttribute('data-mkn', '1');
-      var b = button(function (btn) { save(btn, post); });
-      anchor.insertAdjacentElement('afterend', b);
+      anchor.insertAdjacentElement('afterend', button(function (btn) { save(btn, post); }));
     });
-    var single = /\/(reel|watch|videos|share\/r|share\/v)\b/.test(location.pathname) && !topArticles().length;
+    var single = site.single.test(location.pathname) && !posts.length;
     var f = document.querySelector('.mkn-float');
     if (single && !f) document.body.appendChild(button(function (btn) { save(btn, null); }, 'mkn-float'));
     if (!single && f) f.remove();

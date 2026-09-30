@@ -1,4 +1,14 @@
-// Tony's Recipes — Cloudflare Worker v46
+// Tony's Recipes — Cloudflare Worker v47
+// v47: `facebook-fetch` — a public Facebook post's text from its LINK, through
+//      Facebook's own public routes, so a phone needs only "Copy link": (1) a
+//      share link (/share/r/…, fb.watch) is followed to the post it points
+//      at; (2) Facebook's official oEmbed (oembed_post / oembed_video) — the
+//      embed code websites use, whose quote holds the post's text; with
+//      FB_APP_TOKEN (app-id|client-token) when Meta asks for one; (3) the
+//      public embed page (plugins/post.php, plugins/video.php) that a website
+//      shows in its iframe. No login, no pretending to be anyone: the same
+//      honest User-Agent as every fetch here. Public posts only. Facebook
+//      addresses only — never a way to fetch anything else.
 // v46: Google busy is not the end. Tony's next try: "This model is currently
 //      experiencing high demand". On busy / overloaded / rate-limited, the
 //      Worker waits a moment and asks again, then moves to the next model
@@ -134,7 +144,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v46';
+const WORKER_VERSION = 'v47';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -660,6 +670,13 @@ async function handleRequest(request, env) {
       const capped = await videoDailyCap(env);
       if (capped) return capped;
       return await geminiRecipe(env, { file_uri: 'https://www.youtube.com/watch?v=' + ytId }, { isYouTube: true, videoId: ytId });
+    }
+
+    // ── facebook-fetch (v47) ─────────────────────────────────────────────────
+    if (body.action === 'facebook-fetch') {
+      const u = String(body.url || '');
+      if (!isFacebookAddress(u)) return jsonResp({ error: 'Only a Facebook address can be read this way.' }, 400);
+      return jsonResp(await facebookFetch(env, u));
     }
 
     if (body.action === 'fetch-url') {
@@ -1314,6 +1331,70 @@ async function videoFileRecipe(request, env) {
   }
 }
 
+// ─── FACEBOOK (v47) ──────────────────────────────────────────────────────────
+const FB_UA = { 'User-Agent': 'Mozilla/5.0 (compatible; recipe-importer/1.0)', 'Accept-Language': 'he,en;q=0.9' };
+function isFacebookAddress(u) { return /^https:\/\/([a-z0-9-]+\.)?(facebook\.com|fb\.watch)\//i.test(String(u || '')); }
+function htmlText(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&#x27;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (m, n) => String.fromCodePoint(+n))
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/[ \t\u00a0]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+// Lines of Facebook's own furniture, which are not the post.
+const FB_CHROME = /^(facebook|log in|sign up|create new account|forgotten (account|password)\??|see more|see less|like|comment|share|follow|watch|reels?|\d+[kKmM]? (likes?|comments?|shares?|views?)|·|…)$/i;
+function fbPostText(t) {
+  return String(t || '').split('\n').map(l => l.trim()).filter(l => l && !FB_CHROME.test(l)).join('\n')
+    .replace(/\n?Posted by [\s\S]*$/i, '').trim();
+}
+async function facebookFetch(env, url) {
+  const tried = [];
+  // 1. A share link → the post it points at (no login pages).
+  for (let i = 0; i < 4 && /\/share\/|fb\.watch|\/l\.php/.test(url); i++) {
+    let r;
+    try { r = await fetch(url, { redirect: 'manual', headers: FB_UA, signal: AbortSignal.timeout(10000) }); } catch (e) { tried.push('share link: ' + e.message); break; }
+    const loc = r.headers.get('location');
+    if (!loc) { tried.push('share link: no redirect (' + r.status + ')'); break; }
+    const next = new URL(loc, url).href;
+    if (!isFacebookAddress(next) || /\/login|checkpoint/.test(next)) { tried.push('share link: leads to a login page'); break; }
+    url = next;
+  }
+  const clean = url.replace(/[?&](__cft__|__tn__|mibextid|rdid|share_url|sfnsn|s)=[^&#]*/g, '').replace(/[?&]$/, '');
+  const video = /\/(reel|videos|watch)\b|fb\.watch/.test(clean);
+  // 2. Facebook's official oEmbed.
+  const token = env.FB_APP_TOKEN ? '&access_token=' + encodeURIComponent(env.FB_APP_TOKEN) : '';
+  for (const kind of (video ? ['oembed_video', 'oembed_post'] : ['oembed_post', 'oembed_video'])) {
+    try {
+      const r = await fetch(`https://graph.facebook.com/v23.0/${kind}?omitscript=true&url=${encodeURIComponent(clean)}${token}`,
+        { headers: FB_UA, signal: AbortSignal.timeout(10000) });
+      let d = null; try { d = await r.json(); } catch (e) {}
+      if (!r.ok || !d) { tried.push(kind + ': ' + ((d && d.error && d.error.message) || ('HTTP ' + r.status)).slice(0, 140)); continue; }
+      const quote = (String(d.html || '').match(/<blockquote[\s\S]*?<\/blockquote>/i) || [''])[0];
+      const text = fbPostText(htmlText(quote || d.html || ''));
+      if (text.length >= 60) return { text: text.slice(0, 20000), via: kind, url: clean, author: d.author_name || '' };
+      tried.push(kind + ': no text in the embed');
+    } catch (e) { tried.push(kind + ': ' + e.message); }
+  }
+  // 3. The public embed page, as a website's iframe shows it.
+  for (const plugin of (video ? ['video', 'post'] : ['post', 'video'])) {
+    try {
+      const r = await fetch(`https://www.facebook.com/plugins/${plugin}.php?href=${encodeURIComponent(clean)}&show_text=true&width=500`,
+        { headers: Object.assign({ Accept: 'text/html' }, FB_UA), signal: AbortSignal.timeout(12000) });
+      if (!r.ok) { tried.push('embed ' + plugin + ': HTTP ' + r.status); continue; }
+      const html = await r.text();
+      const body = (html.match(/<body[\s\S]*<\/body>/i) || [html])[0];
+      const text = fbPostText(htmlText(body));
+      if (text.length >= 60) return { text: text.slice(0, 20000), via: 'embed-' + plugin, url: clean };
+      tried.push('embed ' + plugin + ': no text');
+    } catch (e) { tried.push('embed ' + plugin + ': ' + e.message); }
+  }
+  return { text: '', url: clean, tried };
+}
+
 export default {
   async fetch(request, env) {
     const cors = corsFor(request, env);
@@ -1331,4 +1412,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v46 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v47 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

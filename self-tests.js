@@ -731,6 +731,39 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_facebook_link_alone', group:'Import/Export', name:'A Facebook link alone brings its text; 📋 Paste imports a copied link in one tap (v37.23)',
+    test: async()=>{
+      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog, run:window.runUrlImport, clip:navigator.clipboard && navigator.clipboard.readText };
+      var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[];
+      try{
+        window.syncLog=function(){};
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked.push(b.action);
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'Layer cake\nמצרכים:\n6 ביצים\nכוס סוכר\nכוס שמן\nאופן הכנה: טורפים ביצים וסוכר', via:'oembed_video' }; } };
+          return { ok:false, status:502, json:async function(){ return { error:'HTTP 403' }; } }; };
+        window.extractRecipesFromText=async function(t){ return /6 ביצים/.test(t) ? { name:'Layer cake', ingredients:[{a:'6',n:'ביצים'}], steps:['טורפים'] } : { error:'no recipe found' }; };
+        inp.value='https://www.facebook.com/share/r/1AkSMeYV4w/';
+        await runUrlImport();
+        if(asked[0]!=='facebook-fetch') throw new Error('the Facebook link was not read through the server first: '+JSON.stringify(asked));
+        if(!/Layer cake/.test(res.textContent)) throw new Error('the post\'s text did not become a recipe: '+res.textContent.slice(0,200));
+        // 📋 Paste: a copied link is pasted and imported at once.
+        if(!document.getElementById('urlPasteBtn')) throw new Error('no 📋 Paste next to the link');
+        var ran=0; window.runUrlImport=function(){ ran++; };
+        try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return 'https://www.facebook.com/share/r/1AkSMeYV4w/?mibextid=wwXIfr'; }, configurable:true }); }catch(e){}
+        inp.value='';
+        await pasteLinkAndImport();
+        if(ran!==1 || !/facebook\.com\/share\/r\/1AkSMeYV4w/.test(inp.value)) throw new Error('a copied link was not pasted and imported: '+JSON.stringify([ran, inp.value]));
+        // …the bookmark's code is not a link.
+        ran=0;
+        try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return facebookBookmarkletCode(); }, configurable:true }); }catch(e){}
+        await pasteLinkAndImport();
+        if(ran) throw new Error('the bookmark code was imported as a link');
+      } finally {
+        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log; window.runUrlImport=real.run;
+        try{ if(real.clip) Object.defineProperty(navigator.clipboard, 'readText', { value: real.clip, configurable:true }); }catch(e){}
+        inp.value=''; res.innerHTML='';
+      }
+    } },
+
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
     test: async()=>{
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');

@@ -648,6 +648,41 @@ console.log('\nGoogle busy is not the end (v46):');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nfacebook-fetch (v47):');
+{
+  const ek = { APP_SHARED_KEY: 'secret-k' };
+  const notFb = await worker.fetch(post({ action: 'facebook-fetch', url: 'https://example.com/x', appKey: 'secret-k' }), ek);
+  expect('only a Facebook address is read', notFb.status === 400, `got ${notFb.status}`);
+  const realFetch = globalThis.fetch;
+  const asked = [];
+  let oembedOk = true;
+  const CAP = '🍫 העוגה הוויראלית – שכבות שוקולד ומוס אגוזי לוז<br />מצרכים:<br />• 6 ביצים<br />• כוס סוכר<br />• כוס שמן<br />• מיכל שמנת מתוקה';
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url); asked.push({ u, h: init.headers || {} });
+    if (/\/share\/r\//.test(u)) return new Response('', { status: 302, headers: { location: 'https://www.facebook.com/reel/777/?mibextid=abc&rdid=x' } });
+    if (/oembed_video/.test(u)) return oembedOk
+      ? new Response(JSON.stringify({ author_name: 'patisselir', html: '<div class="fb-video"><blockquote cite="x" class="fb-xfbml-parse-ignore"><p>' + CAP + '</p>Posted by <a href="#">patisselir</a> on Monday</blockquote></div>' }), { status: 200 })
+      : new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+    if (/oembed_post/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+    if (/plugins\/video\.php/.test(u)) return new Response('<html><body><div>Facebook</div><div>Log in</div><div dir="auto">Hazelnut mousse: 120 g dark chocolate, 120 g milk chocolate, 300 g cream. Melt, chill and whip.</div><span>See more</span></body></html>', { status: 200 });
+    return new Response('nope', { status: 404 });
+  };
+  try {
+    let b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/share/r/1AkSMeYV4w/', appKey: 'secret-k' }), ek)).json();
+    expect('a share link is followed to its reel, tracking removed', b.url === 'https://www.facebook.com/reel/777/', JSON.stringify(b.url));
+    expect('the official embed gives the post\'s text, lines kept, "Posted by" left out',
+      b.via === 'oembed_video' && /מצרכים:\n• 6 ביצים\n• כוס סוכר/.test(b.text) && !/Posted by/.test(b.text), JSON.stringify(b));
+    expect('…with an honest User-Agent', asked.every(a => /recipe-importer/.test(a.h['User-Agent'] || '')), JSON.stringify(asked.map(a => a.h['User-Agent'])));
+    oembedOk = false;
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/777', appKey: 'secret-k' }), ek)).json();
+    expect('without the embed, the public embed page, Facebook\'s own words left out',
+      b.via === 'embed-video' && /^Hazelnut mousse/.test(b.text) && !/Log in|See more/.test(b.text), JSON.stringify(b));
+    globalThis.fetch = async () => new Response('', { status: 404 });
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/777', appKey: 'secret-k' }), ek)).json();
+    expect('nothing readable: empty text, and each attempt said', b.text === '' && Array.isArray(b.tried) && b.tried.length >= 3, JSON.stringify(b));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nvideo-file (v44):');
 {
   const vpost = (bytes, type, headers = {}, origin = ORIGIN) => new Request('https://worker.test/?action=video-file', {

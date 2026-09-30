@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.22 -->
+<!-- Tony's Recipes Collection v37.23 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1670,7 +1670,7 @@ function handleShareTarget() {
       toast('\u{1F4D8} The text from Facebook is in \u2014 press \u{1F916} Parse & Import Recipe', 8000);
       return;
     }
-    if (directUrl) { openUrlImportModal(directUrl); return; }
+    if (directUrl) { openUrlImportModal(directUrl); runUrlImport(); return; }   // v37.23 — shared on purpose: go
     if (hasRecipeText && typeof openFreehandModal === 'function') { openFreehandModal(textBlob); return; }
     if (anyUrl && /^https?:\/\//i.test(anyUrl)) { openUrlImportModal(anyUrl); return; }
 
@@ -5014,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.22';
+var APP_VERSION = 'v37.23';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.22</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.23</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8263,8 +8263,13 @@ body.banner-shown .header {
       <div class="form-group">
         <label class="form-label">Recipe page URL</label>
         <!-- v37.21 — Tony: Enter does what the button does -->
-        <input class="form-input" id="urlImportInput" type="url" enterkeyhint="go" placeholder="https://www.example.com/recipe/chocolate-cake"
+        <div style="display:flex;gap:8px;">
+        <input class="form-input" id="urlImportInput" type="url" enterkeyhint="go" placeholder="https://www.example.com/recipe/chocolate-cake" style="flex:1;min-width:0;"
           onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();runUrlImport();}">
+        <!-- v37.23 — after "Copy link" in Facebook (or anywhere): one tap -->
+        <button type="button" id="urlPasteBtn" onclick="pasteLinkAndImport()" title="Paste the link you copied, and import it"
+          style="flex-shrink:0;padding:0 14px;min-height:44px;border-radius:8px;border:1px solid var(--terracotta);background:var(--card-bg);color:var(--terracotta);font-weight:600;font-size:14px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Paste</button>
+        </div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Works with most recipe sites: AllRecipes, BBC Good Food, Food Network, Yummly, cooking blogs, and more.</div>
       <button class="btn-submit" onclick="runUrlImport()">🔍 Fetch &amp; Import Recipe</button>
@@ -8293,7 +8298,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.22</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.23</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17880,7 +17885,24 @@ async function runUrlImport() {
   // fallback, is exactly the kind of confident-and-wrong error this app treats
   // as a bug — and it sent Tony hunting a site that was working fine.
   var attempts = [];
-  try {
+  // v37.23 — Tony: "no sane mobile user will jump through hoops". A public
+  // Facebook post's text, from its LINK alone (Worker v47: the official embed,
+  // then the public embed page). A phone then needs only Share → Copy link.
+  if (isFacebookUrl(url)) {
+    res.innerHTML = spinner('\u{1F4D8} Reading the Facebook post\u2026');
+    try {
+      var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
+      var fd = null; try { fd = await fr.json(); } catch(e) {}
+      if (fd && fd.text && fd.text.length >= 60) {
+        pageText = fd.text;
+        syncLog('import', 'Facebook post read from its link', { via: fd.via, chars: fd.text.length });
+      } else {
+        attempts.push('facebook: ' + ((fd && fd.tried && fd.tried.join('; ')) || (fd && fd.error) || ('the server answered ' + fr.status)));
+        syncLog('import', 'Facebook post not readable from its link', { why: attempts[attempts.length - 1].slice(0, 300) });
+      }
+    } catch(e) { attempts.push('facebook: ' + (e && e.message)); }
+  }
+  if (!pageText) try {
     const fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
       headers: workerHeaders(),
@@ -17969,7 +17991,9 @@ async function runUrlImport() {
   }
 
   // ── Step 3: Extract recipe from page text via Claude ──────────────────────
-  if (!pageText || pageText.length < 100) {
+  // (A Facebook post the server read is the post itself, not a page with
+  // furniture around it — a short one can still be a whole recipe.)
+  if (!pageText || pageText.length < (videoPost === 'facebook' ? 40 : 100)) {
     // A YouTube key or quota fault is a fault, and says so (importFailureHtml);
     // an empty description, or Facebook's wall, is where the fallback helps.
     var ourFault = videoPost === 'youtube' && attempts.some(function(a){ return /^server:/.test(a); });
@@ -26698,6 +26722,27 @@ async function importCopiedText(sourceUrl) {
   return true;
 }
 window.importCopiedText = importCopiedText;
+// v37.23 — Tony: a phone user copies a link in Facebook ("Share → Copy link")
+// and should need ONE tap here. A link is imported at once; recipe text that
+// was copied instead goes to the text reader; the bookmark's code is refused.
+async function pasteLinkAndImport() {
+  var t = '';
+  try { t = await navigator.clipboard.readText(); } catch(e) {}
+  t = String(t || '').trim();
+  if (!t) { toast('Nothing to paste \u2014 copy the link first (in Facebook: Share \u2192 Copy link).', 7000); return false; }
+  if (isBookmarkCode(t)) { toast('That is the bookmark\u2019s code, not a link \u2014 copy the post\u2019s link instead.', 8000); return false; }
+  var link = extractSharedUrl('', t, '', '');
+  var words = t.replace(/https?:\/\/\S+/g, '').trim();
+  if (link && words.length < 40) {
+    document.getElementById('urlImportInput').value = link;
+    runUrlImport();
+    return true;
+  }
+  if (words.length >= 40) { closeM('urlImportOverlay'); openFreehandModal(t, link || ''); runFreehandImport(); return true; }
+  toast('What you copied is not a link or a recipe.', 6000);
+  return false;
+}
+window.pasteLinkAndImport = pasteLinkAndImport;
 // v37.18 — Tony: Facebook reels whose recipe is only IN the video. Facebook
 // shows reels only to people signed in, and Gemini takes only YouTube links —
 // so the video itself is given: a screen recording, or a saved clip. The Worker
