@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.18 -->
+<!-- Tony's Recipes Collection v37.19 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5014,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.18';
+var APP_VERSION = 'v37.19';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.18</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.19</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8291,7 +8291,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.18</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.19</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17971,7 +17971,7 @@ async function runUrlImport() {
     if (videoPost && !ourFault) {
       syncLog('import', 'No readable text from ' + videoPost, { url: url, why: attempts.join('; ') });
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
-      showVideoRecipeFallback(url, videoPost, _videoAiWhy); return;
+      showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy : ''); return;
     }
     res.innerHTML = importFailureHtml(url, attempts);
     return;
@@ -18023,7 +18023,7 @@ async function runUrlImport() {
     syncLog('error', 'URL import failed', msg.slice(0, 300));
     if (/no recipe found|not a recipe/i.test(msg)) {
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
-      if (videoPost) showVideoRecipeFallback(url, videoPost, _videoAiWhy);
+      if (videoPost) showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy : '');
       else showSaveAsVideoBookmark(url, '', '🎥');
     } else {
       res.innerHTML = '<div class="explore-result" style="color:var(--danger);">'
@@ -18055,6 +18055,7 @@ async function youtubeRecipeFromVideo(url, res) {
     // Tony saw only the fallback). Only an older Worker, which does not know
     // the action at all, stays silent.
     if (d && d.noRecipe) _videoAiWhy = 'The video itself was watched too, and no recipe was found in it.';
+    else if (d && d.busy) _videoAiWhy = 'Google\u2019s video reader is busy right now \u2014 press \u{1F50D} Fetch & Import again in a minute or two.';
     else if (d && d.error && !/unknown action/i.test(String(d.error))) _videoAiWhy = 'Reading the video itself did not work: ' + String(d.error).replace(/^[A-Z_]+: /, '').slice(0, 220);
     else if (!d) _videoAiWhy = 'Reading the video itself did not work: the server answered ' + st + '.';
     syncLog('import', 'Reading the video gave no recipe', { status: st, why: d && (d.error || (d.noRecipe ? 'no recipe' : '')) });
@@ -26604,6 +26605,7 @@ async function importRecipeVideo(event) {
   if (!d || !d.text) {
     syncLog('import', 'Reading a video gave no recipe', { status: st, why: d && (d.error || (d.noRecipe ? 'no recipe' : '')) });
     if (d && d.noRecipe) return sayWhy('The video was watched, and no recipe was found in it.');
+    if (d && d.busy) return sayWhy('Google\u2019s video reader is busy right now. Try the same video again in a minute or two.');
     return sayWhy('The video could not be read: ' + String((d && d.error) || ('the server answered ' + st)).replace(/^[A-Z_]+: /, '').slice(0, 240));
   }
   res.innerHTML = spinner('Extracting recipe\u2026');

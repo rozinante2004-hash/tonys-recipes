@@ -495,6 +495,15 @@ found only because a test was written first and disagreed with the code.
     generateContent (not image/tts/live/embedding/lite unless nothing else),
     retries once, and keeps it in KV `gemini:model` for a day (GEMINI_MODEL,
     when set, is always used as given). Google's message is in every error.
+  - **Worker v46 / app v37.19 — Google busy is not the end.** Tony's next try:
+    "This model is currently experiencing high demand" (503 UNAVAILABLE).
+    `geminiRecipe` now loops (≤ 4 asks): busy (`geminiBusy`: 500/503/429 or
+    overload words) → once more on the same model after 2.5 s (not for 429),
+    then `nextGeminiModel` (ranked list, KV `gemini:models`, from
+    `rankGeminiModels`) — free limits are per model. All busy → `VIDEO_BUSY`
+    with `busy:true` (a 429 left with no other model stays VIDEO_QUOTA). App:
+    busy is said as "busy right now, try again in a minute or two"; the
+    Facebook fallback no longer shows the reason left over from a YouTube try.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

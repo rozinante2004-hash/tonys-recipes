@@ -620,6 +620,34 @@ console.log('\nGemini model found, not assumed (v45):');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nGoogle busy is not the end (v46):');
+{
+  const kvStore = { 'gemini:model': 'gemini-3.5-flash', 'gemini:models': JSON.stringify(['gemini-3.5-flash', 'gemini-3.0-flash', 'gemini-3.5-flash-lite']) };
+  const kv = { get: async k => kvStore[k] || null, put: async (k, v) => { kvStore[k] = v; } };
+  const ek = { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key', BRING_KV: kv };
+  const realFetch = globalThis.fetch;
+  const asked = [];
+  let busyFor = new Set(['gemini-3.5-flash']);
+  globalThis.fetch = async (url) => {
+    const m = /models\/([^:]+):generateContent$/.exec(String(url));
+    if (m) { asked.push(m[1]);
+      if (busyFor.has(m[1])) return new Response(JSON.stringify({ error: { code: 503, message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', status: 'UNAVAILABLE' } }), { status: 503 });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Cake\n6 eggs' }] } }] }), { status: 200 }); }
+    return new Response('{}', { status: 404 });
+  };
+  try {
+    let r = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
+    let b = await r.json();
+    expect('busy: asked again, then the next model answers', r.status === 200 && b.model === 'gemini-3.0-flash'
+      && asked.join() === 'gemini-3.5-flash,gemini-3.5-flash,gemini-3.0-flash', `got ${r.status} ${JSON.stringify(b)} asked ${asked}`);
+    asked.length = 0; busyFor = new Set(['gemini-3.5-flash', 'gemini-3.0-flash', 'gemini-3.5-flash-lite']);
+    r = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
+    b = await r.json();
+    expect('all busy: said as busy, try again shortly — at most four asks', r.status === 503 && b.busy === true && /VIDEO_BUSY/.test(b.error) && asked.length <= 4,
+      `got ${r.status} ${JSON.stringify(b)} asked ${asked}`);
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nvideo-file (v44):');
 {
   const vpost = (bytes, type, headers = {}, origin = ORIGIN) => new Request('https://worker.test/?action=video-file', {

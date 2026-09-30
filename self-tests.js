@@ -579,6 +579,18 @@ window.SELF_TESTS = [
             : { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
         await runUrlImport();
         if(!document.getElementById('videoRecipeFallback') || !/no recipe was found in it/.test(res.textContent)) throw new Error('a video with no recipe: '+res.textContent.slice(0,200));
+        // v37.19 — Google busy: said as busy, and a Facebook link afterwards does
+        // not repeat what the YouTube one said.
+        reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          return b.action==='video-recipe'
+            ? { ok:false, status:503, json:async function(){ return { error:'VIDEO_BUSY: busy', busy:true }; } }
+            : { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
+        await runUrlImport();
+        if(!/busy right now/.test(res.textContent)) throw new Error('Google busy: '+res.textContent.slice(0,200));
+        reply=function(){ return { ok:false, status:502, json:async function(){ return { error:'HTTP 403' }; } }; };
+        inp.value='https://www.facebook.com/share/r/1AkSMeYV4w/'; await runUrlImport();
+        if(/busy right now/.test(res.textContent)) throw new Error('the Facebook answer repeats the YouTube one');
+        inp.value='https://youtube.com/shorts/WMTuLDQJHJw?si=x';
         // …but a YouTube key or quota fault is a fault, not "the recipe is in the video".
         reply=function(){ return { ok:false, status:500, json:async function(){ return { error:'YOUTUBE_QUOTA: exceeded', isYouTube:true }; } }; };
         await runUrlImport();

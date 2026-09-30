@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v45
+// Tony's Recipes — Cloudflare Worker v46
+// v46: Google busy is not the end. Tony's next try: "This model is currently
+//      experiencing high demand". On busy / overloaded / rate-limited, the
+//      Worker waits a moment and asks again, then moves to the next model
+//      this key may use (Google's free limits are per model) — at most four
+//      asks in all. If every one is busy, it says so as "busy, try again in a
+//      minute", not as a fault.
 // v45: the Gemini model is found, not assumed. Tony's first try answered
 //      "no model gemini-2.5-flash" — Google retires model names. When the
 //      model asked for does not exist, the Worker asks Google which models
@@ -128,7 +134,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v45';
+const WORKER_VERSION = 'v46';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1140,6 +1146,17 @@ function pickGeminiModel(list) {
   ok.sort((a, b) => score(b) - score(a));
   return ok[0] || '';
 }
+function rankGeminiModels(list) {
+  const out = [];
+  let rest = (list || []).slice();
+  for (let i = 0; i < 6; i++) {
+    const m = pickGeminiModel(rest);
+    if (!m) break;
+    out.push(m);
+    rest = rest.filter(x => String(x && x.name).replace(/^models\//, '') !== m);
+  }
+  return out;
+}
 // Ask Google which models this key may use; remember the pick for a day.
 async function findGeminiModel(env) {
   let all = [], page = '';
@@ -1152,9 +1169,28 @@ async function findGeminiModel(env) {
     if (!d.nextPageToken) break;
     page = d.nextPageToken;
   }
-  const m = pickGeminiModel(all);
-  if (m && env.BRING_KV) { try { await env.BRING_KV.put('gemini:model', m, { expirationTtl: 86400 }); } catch (e) {} }
+  const ranked = rankGeminiModels(all);
+  const m = ranked[0] || '';
+  if (m && env.BRING_KV) {
+    try { await env.BRING_KV.put('gemini:model', m, { expirationTtl: 86400 });
+          await env.BRING_KV.put('gemini:models', JSON.stringify(ranked), { expirationTtl: 86400 }); } catch (e) {}
+  }
+  _geminiRanked = ranked;
   return m;
+}
+let _geminiRanked = null;
+// v46 — the next model to try when one is busy: the ranked list (remembered,
+// or asked for once), minus those already tried.
+async function nextGeminiModel(env, tried) {
+  let ranked = null;
+  if (env.BRING_KV) { try { ranked = JSON.parse(await env.BRING_KV.get('gemini:models') || 'null'); } catch (e) {} }
+  if (!ranked || !ranked.length) ranked = _geminiRanked;
+  if (!ranked || !ranked.length) { try { await findGeminiModel(env); ranked = _geminiRanked; } catch (e) {} }
+  return (ranked || []).find(m => !tried.includes(m)) || '';
+}
+function geminiBusy(status, msg) {
+  return status === 503 || status === 500 || status === 429
+    || /overload|high demand|unavailable|try again later|resource.?exhausted/i.test(String(msg || ''));
 }
 // Google's answer, in words this app's owner can act on.
 function geminiFault(status, msg, model) {
@@ -1166,37 +1202,54 @@ function geminiFault(status, msg, model) {
 }
 // One fixed request: the video (a YouTube link, or a file uploaded here) and
 // VIDEO_RECIPE_PROMPT. Nothing the caller sends reaches Gemini but the video.
-async function geminiRecipe(env, fileData, extra, retried) {
-  const model = retried || await geminiModelNow(env);
-  try {
-    const r = await fetch(`${GEMINI_API}/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [{ parts: [ { file_data: fileData }, { text: VIDEO_RECIPE_PROMPT } ] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
-      }),
-      signal: AbortSignal.timeout(110000),
-    });
-    let data = null;
-    try { data = await r.json(); } catch (e) {}
-    if (!r.ok) {
-      // v45 — that model is gone (or not for this key): find one, try once more.
-      if (r.status === 404 && !retried) {
-        let found = '';
-        try { found = await findGeminiModel(env); } catch (e) {}
-        if (found && found !== model) return await geminiRecipe(env, fileData, extra, found);
-      }
-      return geminiFault(r.status, (data && data.error && data.error.message) || ('HTTP ' + r.status), model);
+async function geminiRecipe(env, fileData, extra) {
+  let model = await geminiModelNow(env);
+  const tried = [];
+  let lost = false;
+  for (let ask = 0; ask < 4; ask++) {
+    tried.push(model);
+    let r, data = null;
+    try {
+      r = await fetch(`${GEMINI_API}/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ parts: [ { file_data: fileData }, { text: VIDEO_RECIPE_PROMPT } ] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+        }),
+        signal: AbortSignal.timeout(110000),
+      });
+      try { data = await r.json(); } catch (e) {}
+    } catch (err) {
+      return jsonResp({ error: 'The video could not be read: ' + (err && err.name === 'TimeoutError' ? 'it took too long' : (err && err.message) || 'failed') }, 504);
     }
-    const cand = data && data.candidates && data.candidates[0];
-    const text = ((cand && cand.content && cand.content.parts) || []).map(p => p && p.text || '').join('').trim();
-    if (!text) return jsonResp({ error: 'The video could not be read' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.' }, 502);
-    const none = /^NO RECIPE\.?$/i.test(text);
-    return jsonResp(Object.assign({ text: none ? '' : text.slice(0, 20000), noRecipe: none, via: 'gemini', model }, extra || {}));
-  } catch (err) {
-    return jsonResp({ error: 'The video could not be read: ' + (err && err.name === 'TimeoutError' ? 'it took too long' : (err && err.message) || 'failed') }, 504);
+    if (r.ok) {
+      const cand = data && data.candidates && data.candidates[0];
+      const text = ((cand && cand.content && cand.content.parts) || []).map(p => p && p.text || '').join('').trim();
+      if (!text) return jsonResp({ error: 'The video could not be read' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.' }, 502);
+      const none = /^NO RECIPE\.?$/i.test(text);
+      return jsonResp(Object.assign({ text: none ? '' : text.slice(0, 20000), noRecipe: none, via: 'gemini', model }, extra || {}));
+    }
+    const msg = (data && data.error && data.error.message) || ('HTTP ' + r.status);
+    // v45 — that model is gone (or not for this key): find one, try again.
+    if (r.status === 404 && !lost) {
+      lost = true;
+      let found = '';
+      try { found = await findGeminiModel(env); } catch (e) {}
+      if (found && !tried.includes(found)) { model = found; continue; }
+      return geminiFault(r.status, msg, model);
+    }
+    // v46 — busy: once more on the same model after a pause, then the next one.
+    if (geminiBusy(r.status, msg)) {
+      if (ask === 0 && r.status !== 429) { await new Promise(res => setTimeout(res, 2500)); tried.pop(); continue; }
+      const next = await nextGeminiModel(env, tried);
+      if (next) { model = next; continue; }
+      if (r.status === 429) return geminiFault(r.status, msg, model);   // the allowance, not a spike
+      return jsonResp({ error: 'VIDEO_BUSY: Google\'s video reader is busy right now (' + String(msg).slice(0, 120) + '). Try again in a minute or two.', busy: true, rateLimited: true }, 503);
+    }
+    return geminiFault(r.status, msg, model);
   }
+  return jsonResp({ error: 'VIDEO_BUSY: Google\'s video reader is busy right now. Try again in a minute or two.', busy: true, rateLimited: true }, 503);
 }
 // v44 — a video file: checked, uploaded to Gemini's Files API, read, deleted.
 async function videoFileRecipe(request, env) {
@@ -1278,4 +1331,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v45 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v46 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
