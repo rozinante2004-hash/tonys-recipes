@@ -738,7 +738,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'import_facebook_link_alone', group:'Import/Export', name:'A Facebook link alone brings its text; 📋 Paste imports a copied link in one tap (v37.23)',
+  { id:'import_facebook_link_alone', group:'Import/Export', name:'A Facebook link alone brings its text; 📋 Paste imports a copied link in one tap (v37.23, v37.26)',
     test: async()=>{
       var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog, run:window.runUrlImport, clip:navigator.clipboard && navigator.clipboard.readText };
       var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[];
@@ -759,6 +759,26 @@ window.SELF_TESTS = [
         inp.value='';
         await pasteLinkAndImport();
         if(ran!==1 || !/facebook\.com\/share\/r\/1AkSMeYV4w/.test(inp.value)) throw new Error('a copied link was not pasted and imported: '+JSON.stringify([ran, inp.value]));
+        // v37.26 — Facebook's "Copy link" leaves a LINK, not text (Tony's iPhone: "nothing to paste").
+        var realRead=navigator.clipboard.read;
+        try{
+          Object.defineProperty(navigator.clipboard, 'read', { value: async function(){ return [{ types:['text/uri-list'], getType: async function(){ return new Blob(['https://www.facebook.com/reel/1234567\n'], { type:'text/uri-list' }); } }]; }, configurable:true });
+          Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return ''; }, configurable:true });
+          ran=0; inp.value='';
+          await pasteLinkAndImport();
+          if(ran!==1 || inp.value!=='https://www.facebook.com/reel/1234567') throw new Error('a copied LINK was not pasted: '+JSON.stringify([ran, inp.value]));
+          // Nothing the phone will hand over: the box is ready, nothing imported.
+          Object.defineProperty(navigator.clipboard, 'read', { value: async function(){ throw new Error('NotAllowed'); }, configurable:true });
+          openUrlImportModal('');
+          ran=0; inp.value='';
+          await pasteLinkAndImport();
+          if(ran || document.activeElement!==inp) throw new Error('with nothing to read, the box was not made ready: '+JSON.stringify([ran, document.activeElement && document.activeElement.id]));
+          // …and a link pasted into it by hand imports by itself.
+          inp.value='https://www.facebook.com/reel/7654321';
+          inp.dispatchEvent(new Event('paste', { bubbles:true }));
+          await new Promise(function(r){ setTimeout(r, 200); });
+          if(ran!==1) throw new Error('a link pasted into the box did not import by itself');
+        } finally { try{ closeM('urlImportOverlay'); }catch(e){} try{ Object.defineProperty(navigator.clipboard, 'read', { value: realRead, configurable:true }); }catch(e){} }
         // …the bookmark's code is not a link.
         ran=0;
         try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return facebookBookmarkletCode(); }, configurable:true }); }catch(e){}

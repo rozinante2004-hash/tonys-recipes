@@ -596,6 +596,16 @@ found only because a test was written first and disagreed with the code.
     several → a collection of those; ONE → an ordinary recipe (category and
     source from the collection); none → button disabled. Test:
     `import_pick_from_several`.
+  - **v37.26 — Paste on the iPhone; why a Facebook link failed.** Tony's
+    iPhone: 📋 Paste said "nothing to paste" though the link was copied —
+    Facebook's Copy link leaves a LINK (text/uri-list), and only readText was
+    asked. `readClipboardForImport()` asks `clipboard.read()` for
+    text/uri-list, text/plain, text/html, then readText; nothing → the box is
+    focused and selected ("tap the box and choose Paste"), and a link pasted
+    into `#urlImportInput` by hand (`onpaste` → `urlBoxPasted`) imports by
+    itself. The Facebook fallback now shows the Worker's `tried[]` ("Why the
+    link alone did not work: …"). His first real try of Worker v47 on a reel
+    failed — reason unknown until this shows it.
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
     `main` fast-forwarded to `test`. The family owner's next sign-in copies

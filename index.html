@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.25 -->
+<!-- Tony's Recipes Collection v37.26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5024,7 +5024,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.25';
+var APP_VERSION = 'v37.26';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7656,7 +7656,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.25</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.26</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8275,7 +8275,7 @@ body.banner-shown .header {
         <!-- v37.21 — Tony: Enter does what the button does -->
         <div style="display:flex;gap:8px;">
         <input class="form-input" id="urlImportInput" type="url" enterkeyhint="go" placeholder="https://www.example.com/recipe/chocolate-cake" style="flex:1;min-width:0;"
-          onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();runUrlImport();}">
+          onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();runUrlImport();}" onpaste="urlBoxPasted()">
         <!-- v37.23 — after "Copy link" in Facebook (or anywhere): one tap -->
         <button type="button" id="urlPasteBtn" onclick="pasteLinkAndImport()" title="Paste the link you copied, and import it"
           style="flex-shrink:0;padding:0 14px;min-height:44px;border-radius:8px;border:1px solid var(--terracotta);background:var(--card-bg);color:var(--terracotta);font-weight:600;font-size:14px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Paste</button>
@@ -8308,7 +8308,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.25</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.26</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18007,10 +18007,11 @@ async function runUrlImport() {
     // A YouTube key or quota fault is a fault, and says so (importFailureHtml);
     // an empty description, or Facebook's wall, is where the fallback helps.
     var ourFault = videoPost === 'youtube' && attempts.some(function(a){ return /^server:/.test(a); });
+    var fbWhy = videoPost === 'facebook' ? attempts.filter(function(a){ return /^facebook:/.test(a); }).join(' ').replace(/^facebook:\s*/, '') : '';
     if (videoPost && !ourFault) {
       syncLog('import', 'No readable text from ' + videoPost, { url: url, why: attempts.join('; ') });
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
-      showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy : ''); return;
+      showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy : (fbWhy ? 'Why the link alone did not work: ' + fbWhy.slice(0, 300) : '')); return;
     }
     res.innerHTML = importFailureHtml(url, attempts);
     return;
@@ -26777,11 +26778,48 @@ window.importCopiedText = importCopiedText;
 // v37.23 — Tony: a phone user copies a link in Facebook ("Share → Copy link")
 // and should need ONE tap here. A link is imported at once; recipe text that
 // was copied instead goes to the text reader; the bookmark's code is refused.
+// v37.26 — Tony's iPhone: "Paste" found nothing, though the link WAS copied.
+// Facebook's "Copy link" puts a LINK on the clipboard, not text, and only text
+// was asked for. Ask for both; if the phone still hands nothing over, put the
+// cursor in the box — a link pasted there imports by itself.
+async function readClipboardForImport() {
+  try {
+    if (navigator.clipboard && navigator.clipboard.read) {
+      var items = await navigator.clipboard.read();
+      for (var i = 0; i < items.length; i++) {
+        var types = items[i].types || [];
+        for (var k of ['text/uri-list', 'text/plain', 'text/html']) {
+          if (types.indexOf(k) === -1) continue;
+          var t = await (await items[i].getType(k)).text();
+          if (k === 'text/html') t = (new DOMParser().parseFromString(t, 'text/html').body || {}).textContent || '';
+          if (k === 'text/uri-list') t = t.split(/\r?\n/).filter(function(l){ return l && l[0] !== '#'; })[0] || '';
+          if (String(t).trim()) return String(t).trim();
+        }
+      }
+    }
+  } catch(e) {}
+  try { return String((await navigator.clipboard.readText()) || '').trim(); } catch(e) {}
+  return '';
+}
+window.readClipboardForImport = readClipboardForImport;
+function urlBoxPasteHere() {
+  var inp = document.getElementById('urlImportInput');
+  if (!inp) return;
+  inp.focus(); inp.select();
+  toast('Tap the box and choose Paste \u2014 the import starts by itself.', 8000);
+}
+// A link pasted into the box (by hand) imports at once.
+function urlBoxPasted() {
+  setTimeout(function() {
+    var inp = document.getElementById('urlImportInput');
+    var v = String(inp && inp.value || '').trim();
+    if (/^https?:\/\/\S+$/i.test(v)) runUrlImport();
+  }, 60);
+}
+window.urlBoxPasted = urlBoxPasted;
 async function pasteLinkAndImport() {
-  var t = '';
-  try { t = await navigator.clipboard.readText(); } catch(e) {}
-  t = String(t || '').trim();
-  if (!t) { toast('Nothing to paste \u2014 copy the link first (in Facebook: Share \u2192 Copy link).', 7000); return false; }
+  var t = await readClipboardForImport();
+  if (!t) { urlBoxPasteHere(); return false; }
   if (isBookmarkCode(t)) { toast('That is the bookmark\u2019s code, not a link \u2014 copy the post\u2019s link instead.', 8000); return false; }
   var link = extractSharedUrl('', t, '', '');
   var words = t.replace(/https?:\/\/\S+/g, '').trim();
