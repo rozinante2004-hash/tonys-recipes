@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v44
+// Tony's Recipes — Cloudflare Worker v45
+// v45: the Gemini model is found, not assumed. Tony's first try answered
+//      "no model gemini-2.5-flash" — Google retires model names. When the
+//      model asked for does not exist, the Worker asks Google which models
+//      THIS key may use, picks the newest general "flash" one, remembers it
+//      for a day (KV) and tries again. GEMINI_MODEL still wins when set and
+//      real. Google's own words are passed on in every error.
 // v44: `video-file` — a VIDEO the person gives the app (a screen recording of a
 //      Facebook reel, a saved TikTok, a clip sent on WhatsApp): Facebook shows
 //      reels only to people signed in, and Gemini takes only YouTube LINKS, so
@@ -122,7 +128,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v44';
+const WORKER_VERSION = 'v45';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1115,18 +1121,53 @@ async function videoDailyCap(env) {
   return null;
 }
 function geminiModel(env) { return String(env.GEMINI_MODEL || GEMINI_MODEL_DEFAULT).replace(/[^a-zA-Z0-9._-]/g, ''); }
+// v45 — which model to use: the one remembered (found earlier), else the
+// configured/default name.
+async function geminiModelNow(env) {
+  if (!env.GEMINI_MODEL && env.BRING_KV) {
+    try { const m = await env.BRING_KV.get('gemini:model'); if (m) return m; } catch (e) {}
+  }
+  return geminiModel(env);
+}
+// The newest general "flash" model this key may use to read video.
+function pickGeminiModel(list) {
+  const ok = (list || []).filter(m => m && m.name && (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name).replace(/^models\//, ''))
+    .filter(n => /^gemini-/.test(n) && !/(image|tts|audio|live|embed|vision|thinking|exp|learnlm|robotics|computer|native)/i.test(n));
+  const ver = n => { const v = /gemini-(\d+(?:\.\d+)?)/.exec(n); return v ? parseFloat(v[1]) : 0; };
+  const score = n => ver(n) * 100 + (/flash/.test(n) && !/lite/.test(n) ? 30 : /flash-lite/.test(n) ? 20 : /pro/.test(n) ? 10 : 0)
+    + (/latest$/.test(n) ? 2 : 0) - (/preview|\d{2}-\d{2}$|-\d{3}$/.test(n) ? 1 : 0);
+  ok.sort((a, b) => score(b) - score(a));
+  return ok[0] || '';
+}
+// Ask Google which models this key may use; remember the pick for a day.
+async function findGeminiModel(env) {
+  let all = [], page = '';
+  for (let i = 0; i < 5; i++) {
+    const r = await fetch(`${GEMINI_API}/v1beta/models?pageSize=200` + (page ? '&pageToken=' + encodeURIComponent(page) : ''),
+      { headers: { 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(15000) });
+    if (!r.ok) return '';
+    const d = await r.json();
+    all = all.concat(d.models || []);
+    if (!d.nextPageToken) break;
+    page = d.nextPageToken;
+  }
+  const m = pickGeminiModel(all);
+  if (m && env.BRING_KV) { try { await env.BRING_KV.put('gemini:model', m, { expirationTtl: 86400 }); } catch (e) {} }
+  return m;
+}
 // Google's answer, in words this app's owner can act on.
 function geminiFault(status, msg, model) {
   if (status === 429) return jsonResp({ error: 'VIDEO_QUOTA: Google\'s free allowance for reading videos is used up for now. Try again later.', rateLimited: true }, 429);
-  if (status === 404) return jsonResp({ error: 'VIDEO_MODEL: Gemini has no model "' + model + '" — set GEMINI_MODEL in the Worker\'s variables.', needsConfig: true }, 503);
+  if (status === 404) return jsonResp({ error: 'VIDEO_MODEL: Gemini has no model "' + model + '" for this key, and none could be found to use instead (' + String(msg).slice(0, 160) + ').', needsConfig: true }, 503);
   if ((status === 400 || status === 401 || status === 403) && /api key|api_key|credential|permission|unauth/i.test(msg))
     return jsonResp({ error: 'VIDEO_KEY: the GEMINI_API_KEY was refused by Google (' + String(msg).slice(0, 160) + ').', needsConfig: true }, 503);
   return jsonResp({ error: 'The video could not be read: ' + String(msg).slice(0, 300) }, 502);
 }
 // One fixed request: the video (a YouTube link, or a file uploaded here) and
 // VIDEO_RECIPE_PROMPT. Nothing the caller sends reaches Gemini but the video.
-async function geminiRecipe(env, fileData, extra) {
-  const model = geminiModel(env);
+async function geminiRecipe(env, fileData, extra, retried) {
+  const model = retried || await geminiModelNow(env);
   try {
     const r = await fetch(`${GEMINI_API}/v1beta/models/${model}:generateContent`, {
       method: 'POST',
@@ -1139,7 +1180,15 @@ async function geminiRecipe(env, fileData, extra) {
     });
     let data = null;
     try { data = await r.json(); } catch (e) {}
-    if (!r.ok) return geminiFault(r.status, (data && data.error && data.error.message) || ('HTTP ' + r.status), model);
+    if (!r.ok) {
+      // v45 — that model is gone (or not for this key): find one, try once more.
+      if (r.status === 404 && !retried) {
+        let found = '';
+        try { found = await findGeminiModel(env); } catch (e) {}
+        if (found && found !== model) return await geminiRecipe(env, fileData, extra, found);
+      }
+      return geminiFault(r.status, (data && data.error && data.error.message) || ('HTTP ' + r.status), model);
+    }
     const cand = data && data.candidates && data.candidates[0];
     const text = ((cand && cand.content && cand.content.parts) || []).map(p => p && p.text || '').join('').trim();
     if (!text) return jsonResp({ error: 'The video could not be read' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.' }, 502);
@@ -1165,7 +1214,7 @@ async function videoFileRecipe(request, env) {
   if (bytes.byteLength > maxMb * 1048576) return jsonResp({ error: 'VIDEO_TOO_BIG: the video is larger than ' + maxMb + ' MB. Record just the part with the recipe, or a lower quality.', tooBig: true }, 413);
   const capped = await videoDailyCap(env);
   if (capped) return capped;
-  const model = geminiModel(env);
+  const model = await geminiModelNow(env);
   let fileName = '';
   try {
     // 1. Start a resumable upload; Google answers with where to send the bytes.
@@ -1229,4 +1278,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v44 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v45 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

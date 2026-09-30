@@ -487,6 +487,14 @@ found only because a test was written first and disagreed with the code.
     Facebook/YouTube fallback ("🎬 Import the video"); the size is checked
     before sending; every failure is said, with "Another video" / "Paste".
     Page budget raised to 1600 KB (1501 KB reached).
+  - **Worker v45 — the Gemini model is found, not assumed.** Tony's first
+    real try: `VIDEO_MODEL: Gemini has no model "gemini-2.5-flash"` (Google
+    retires names; his key is a new-style `AQ.` key). On a 404 from
+    generateContent the Worker lists `/v1beta/models` with the key,
+    `pickGeminiModel` takes the newest general flash model supporting
+    generateContent (not image/tts/live/embedding/lite unless nothing else),
+    retries once, and keeps it in KV `gemini:model` for a day (GEMINI_MODEL,
+    when set, is always used as given). Google's message is in every error.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

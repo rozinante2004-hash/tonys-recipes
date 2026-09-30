@@ -580,9 +580,43 @@ console.log('\nvideo-recipe (v43):');
     expect('Google\'s allowance used up is named as such', q.status === 429 && /VIDEO_QUOTA/.test((await q.json()).error), `got ${q.status}`);
     status = 404; reply = { error: { message: 'models/x is not found' } };
     const m = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
-    expect('a retired model says which setting to change', m.status === 503 && /GEMINI_MODEL/.test((await m.json()).error), `got ${m.status}`);
+    expect('a missing model, with nothing to use instead, says so', m.status === 503 && /VIDEO_MODEL/.test((await m.json()).error), `got ${m.status}`);
     const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), ek)).json();
     expect('health says whether videos can be read', h.configured && h.configured.videoAi === true, JSON.stringify(h.configured));
+  } finally { globalThis.fetch = realFetch; }
+}
+
+console.log('\nGemini model found, not assumed (v45):');
+{
+  const kvStore = {};
+  const kv = { get: async k => kvStore[k] || null, put: async (k, v) => { kvStore[k] = v; } };
+  const ek = { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key', BRING_KV: kv };
+  const realFetch = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (/\/v1beta\/models\?/.test(u)) return new Response(JSON.stringify({ models: [
+      { name: 'models/gemini-3.0-flash-lite', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3.5-flash', supportedGenerationMethods: ['generateContent', 'countTokens'] },
+      { name: 'models/gemini-3.5-flash-image', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3.5-pro', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/text-embedding-9', supportedGenerationMethods: ['embedContent'] },
+      { name: 'models/gemini-3.5-flash-live', supportedGenerationMethods: ['bidiGenerateContent'] } ] }), { status: 200 });
+    const m = /models\/([^:]+):generateContent$/.exec(u);
+    if (m) { asked.push(m[1]);
+      if (m[1] === 'gemini-2.5-flash') return new Response(JSON.stringify({ error: { message: 'models/gemini-2.5-flash is not found for API version v1beta' } }), { status: 404 });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Cake\n6 eggs' }] } }] }), { status: 200 }); }
+    return new Response('{}', { status: 404 });
+  };
+  try {
+    const r = await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
+    const b = await r.json();
+    expect('a retired model: the Worker finds the newest flash model this key may use, and reads the video',
+      r.status === 200 && b.model === 'gemini-3.5-flash' && asked.join() === 'gemini-2.5-flash,gemini-3.5-flash', `got ${r.status} ${JSON.stringify(b)} asked ${asked}`);
+    expect('…and remembers it', kvStore['gemini:model'] === 'gemini-3.5-flash', JSON.stringify(kvStore));
+    asked.length = 0;
+    await worker.fetch(post({ action: 'video-recipe', url: 'https://youtu.be/WMTuLDQJHJw', appKey: 'secret-k' }), ek);
+    expect('…so the next video goes straight to it', asked.join() === 'gemini-3.5-flash', asked.join());
   } finally { globalThis.fetch = realFetch; }
 }
 
