@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.20 -->
+<!-- Tony's Recipes Collection v37.21 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5014,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.20';
+var APP_VERSION = 'v37.21';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.20</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.21</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8262,7 +8262,9 @@ body.banner-shown .header {
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Recipe page URL</label>
-        <input class="form-input" id="urlImportInput" type="url" placeholder="https://www.example.com/recipe/chocolate-cake">
+        <!-- v37.21 — Tony: Enter does what the button does -->
+        <input class="form-input" id="urlImportInput" type="url" enterkeyhint="go" placeholder="https://www.example.com/recipe/chocolate-cake"
+          onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();runUrlImport();}">
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Works with most recipe sites: AllRecipes, BBC Good Food, Food Network, Yummly, cooking blogs, and more.</div>
       <button class="btn-submit" onclick="runUrlImport()">🔍 Fetch &amp; Import Recipe</button>
@@ -8291,7 +8293,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.20</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.21</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8378,7 +8380,7 @@ body.banner-shown .header {
 
 <!-- CAMERA / PHOTO IMPORT -->
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processCameraImage(event)">
-<input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processCameraImage(event)">
+<input type="file" id="galleryInput" accept="image/*" multiple style="display:none" onchange="processCameraImage(event)">
 <!-- v37.18 — a recipe video: a screen recording of a Facebook reel, a saved clip -->
 <input type="file" id="videoRecipeInput" accept="video/*" style="display:none" onchange="importRecipeVideo(event)">
 
@@ -21786,6 +21788,11 @@ function openCameraImport() {
 }
 
 async function processCameraImage(event) {
+  // v37.21 — several screenshots of one post (a long caption, scrolled) are
+  // read together into ONE recipe. Tony: phones often show text they will not
+  // let you copy — a screenshot always works.
+  var many = Array.prototype.slice.call((event.target && event.target.files) || []);
+  if (many.length > 1) { event.target.value = ''; return processScreenshots(many); }
   const file = event.target.files[0];
   if (!file) return;
   const res = document.getElementById('cameraResult');
@@ -21835,6 +21842,70 @@ async function processCameraImage(event) {
   reader.readAsDataURL(file);
   event.target.value = '';
 }
+
+var SHOTS_MAX = 8;
+var _shotSourceUrl = '';
+function pickScreenshots(sourceUrl) {
+  _shotSourceUrl = sourceUrl || '';
+  try { closeM('urlImportOverlay'); } catch(e) {}
+  var inp = document.getElementById('galleryInput');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+window.pickScreenshots = pickScreenshots;
+function readFileAsDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload = function(e) { resolve(e.target.result); };
+    r.onerror = function() { reject(new Error('The picture could not be read.')); };
+    r.readAsDataURL(file);
+  });
+}
+async function processScreenshots(files) {
+  var res = document.getElementById('cameraResult');
+  document.getElementById('cameraResultOverlay').classList.add('open');
+  var imgEl = document.getElementById('cameraPreviewImg');
+  if (files.length > SHOTS_MAX) toast('Only the first ' + SHOTS_MAX + ' screenshots are read.', 6000);
+  files = files.slice(0, SHOTS_MAX);
+  var parts = [], first = '';
+  try {
+    for (var i = 0; i < files.length; i++) {
+      res.innerHTML = spinner('Reading screenshot ' + (i + 1) + ' of ' + files.length + '\u2026');
+      var url = await readFileAsDataUrl(files[i]);
+      if (!i) { first = url; imgEl.src = url; imgEl.style.display = 'block'; }
+      var small = await resizeImageForVision(url, 2500, 0.95);
+      var r1 = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ model: AI_MODEL, max_tokens: 1500, messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: small.split(',')[1] } },
+          { type: 'text', text: 'Transcribe ALL text visible in this screenshot word for word in the original language. Watch for similar Hebrew letters. Do NOT translate. Leave out app buttons, menus, likes and comment counts. If unclear write [?].' }
+        ] }] }) });
+      if (!r1.ok) throw new Error('Worker error ' + r1.status);
+      var d1 = await r1.json();
+      parts.push(((d1.content || []).map(function(b){ return b.text || ''; }).join('\n')).trim());
+    }
+    var joined = parts.map(function(t, j){ return '[Screenshot ' + (j + 1) + ']\n' + t; }).join('\n\n');
+    res.innerHTML = '<div class="explore-result" style="background:#f5f0ea;border:1px solid #e0d5c5;margin-bottom:12px;">'
+      + '<strong style="font-size:12px;color:var(--muted);">What Claude read from ' + files.length + ' screenshots:</strong>'
+      + '<div style="font-size:13px;margin-top:6px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">' + escH(joined) + '</div></div>'
+      + spinner('Putting the recipe together\u2026');
+    var r2 = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ model: AI_MODEL, max_tokens: 3000, messages: [{ role: 'user', content:
+        'These are consecutive screenshots of ONE recipe post, in order; text where two screenshots overlap appears twice \u2014 use it once. '
+        + 'Extract the recipe. Keep the original language. Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. '
+        + 'If there is no recipe return {"error":"no recipe"}. Screenshots:\n\n' + joined }] }) });
+    if (!r2.ok) throw new Error('Worker error ' + r2.status);
+    var d2 = await r2.json();
+    var parsed = extractJSON((d2.content || []).map(function(b){ return b.text || ''; }).join('\n'));
+    if (parsed.error) { res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>No recipe found in these screenshots.</strong></div>'; return false; }
+    if (_shotSourceUrl) parsed.source = _shotSourceUrl;
+    syncLog('import', 'Recipe read from ' + files.length + ' screenshots', { source: _shotSourceUrl.slice(0, 120) });
+    applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay', first);
+    return true;
+  } catch(err) {
+    res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>Error:</strong> ' + escH(err.message) + '</div>';
+    return false;
+  } finally { _shotSourceUrl = ''; }
+}
+window.processScreenshots = processScreenshots;
 
 function resizeImageForVision(dataUrl, maxDim, quality) {
   return new Promise(function(resolve) {
@@ -26522,6 +26593,13 @@ function showVideoRecipeFallback(url, kind, why) {
   var fb = kind === 'facebook';
   var btn = 'padding:11px 16px;min-height:44px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;';
   var plain = btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);';
+  var primary = btn + 'background:var(--terracotta-fill);color:#fff;border:none;';
+  // v37.21 — a phone leads with screenshots (Facebook often shows text it will
+  // not let you copy); a computer with the bookmark it has set up.
+  var phone = false;
+  try { phone = window.matchMedia && matchMedia('(pointer: coarse)').matches; } catch(e) {}
+  var first = fb ? (phone ? 'shots' : 'bookmark') : 'paste';
+  var shotsBtn = function(style) { return '<button onclick="pickScreenshots(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + style + '">\u{1F4F7} Import screenshots</button>'; };
   res.innerHTML =
       '<div id="videoRecipeFallback" style="background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:14px;font-size:14px;line-height:1.6;color:var(--ink);">'
     + (fb ? '<strong>\u{1F4D8} Facebook shows its posts only to people signed in to it.</strong><br>'
@@ -26531,16 +26609,23 @@ function showVideoRecipeFallback(url, kind, why) {
     + (why ? '<div style="margin-top:8px;font-size:13px;">' + escH(why) + '</div>' : '')
     + '<div style="margin-top:10px;font-size:13px;">What works:</div>'
     + '<ul style="margin:4px 0 0;padding-inline-start:20px;font-size:13px;">'
-    + '<li>' + (fb ? 'In Facebook, tap \u201cSee more\u201d under the post, long-press the text and Copy \u2014 then press \u{1F4CB} Paste what I copied.' : 'If the recipe is in a comment, copy it, then press \u{1F4CB} Paste what I copied.') + '</li>'
-    + (fb ? '<li>In a browser (Safari, or on a computer): the \u{1F4D8} bookmark takes the text straight from the Facebook page.</li>' : '')
-    + '<li>The recipe is only in the video? Screen-record it (or save it), then press \u{1F3AC} Import the video.</li>'
-    + '<li>Or take screenshots where the ingredients and steps are shown, and import them as photos.</li>'
+    + (fb && phone
+        ? '<li><strong>Screenshots</strong> \u2014 in Facebook tap \u201cSee more\u201d, take screenshots of the text (scroll between them if it is long), then press \u{1F4F7} Import screenshots and pick them all. Nothing to copy.</li>'
+          + '<li>If Facebook lets you copy the text: copy it, then press \u{1F4CB} Paste what I copied.</li>'
+        : fb
+        ? '<li>On the Facebook page, click your \u201cSend to My Kitchen Notes\u201d bookmark (set it up once: \u{1F4D8} The Facebook bookmark).</li>'
+          + '<li>Or select the post\u2019s text, copy it, then press \u{1F4CB} Paste what I copied.</li>'
+        : '<li>If the recipe is in a comment, copy it, then press \u{1F4CB} Paste what I copied.</li>'
+          + '<li>Or take screenshots where the ingredients and steps are shown, and press \u{1F4F7} Import screenshots.</li>')
+    + '<li>The recipe is only spoken or shown in the video? Screen-record it (or save it), then press \u{1F3AC} Import the video.</li>'
     + '</ul>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-    + '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;">\u{1F4CB} Paste what I copied</button>'
+    + (first === 'shots' ? shotsBtn(primary) : '')
+    + (first === 'bookmark' ? '<button onclick="showFacebookBookmarklet()" style="' + primary + '">\u{1F4D8} The Facebook bookmark</button>' : '')
+    + '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + (first === 'paste' ? primary : plain) + '">\u{1F4CB} Paste what I copied</button>'
+    + (first !== 'shots' ? shotsBtn(plain) : '')
     + '<button onclick="pickRecipeVideo(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + plain + '">\u{1F3AC} Import the video</button>'
-    + (fb ? '<button onclick="showFacebookBookmarklet()" style="' + plain + '">\u{1F4D8} The Facebook bookmark</button>' : '')
-    + '<button onclick="closeM(\'urlImportOverlay\');openCameraImport()" style="' + plain + '">\u{1F4F7} Import screenshots</button>'
+    + (fb && first !== 'bookmark' ? '<button onclick="showFacebookBookmarklet()" style="' + plain + '">\u{1F4D8} The Facebook bookmark</button>' : '')
     + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="' + plain + 'display:inline-flex;align-items:center;text-decoration:none;">\u2197 Open it</a>'
     + '<button onclick="showSaveAsVideoBookmark(' + JSON.stringify(url).replace(/"/g, '&quot;') + ', \'\', \'\u{1F3A5}\')" style="' + plain + '">\u{1F516} Just bookmark it</button>'
     + '</div></div>';

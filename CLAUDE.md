@@ -516,6 +516,16 @@ found only because a test was written first and disagreed with the code.
     signed-in page; browsers forbid one site reading another with your login,
     and a Facebook login on our server is off the table (account takeover if
     leaked; Facebook's terms). Graph API reads only Pages you manage.
+  - **v37.21 — Enter imports; screenshots, several at once.** `#urlImportInput`
+    Enter (not while composing) = runUrlImport. `#galleryInput` is `multiple`;
+    more than one picture → `processScreenshots(files)` (≤ SHOTS_MAX 8): each
+    transcribed (app/menu chrome left out), then ONE extraction told they are
+    consecutive screenshots with overlaps; `pickScreenshots(url)` keeps the
+    post as the recipe's source. `showVideoRecipeFallback` is device-aware:
+    `(pointer: coarse)` → Facebook leads with 📷 Import screenshots (phones
+    show text they will not let you copy); a computer → 📘 bookmark first.
+    No web page can add a bookmark (browsers removed that); a browser
+    extension could be a one-click toolbar button — offered, not built.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

@@ -686,6 +686,49 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_enter_and_screenshots', group:'Import/Export', name:'Enter imports a pasted link; several screenshots become one recipe; a phone leads with screenshots (v37.21)',
+    test: async()=>{
+      var real={ run:window.runUrlImport, fetch:window.fetch, apply:window.applyParsedRecipe, mm:window.matchMedia, log:window.syncLog };
+      try{
+        window.syncLog=function(){};
+        // Enter in the link box does what the button does.
+        var ran=0; window.runUrlImport=function(){ ran++; };
+        var inp=document.getElementById('urlImportInput');
+        inp.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true }));
+        window.runUrlImport=real.run;
+        if(ran!==1) throw new Error('Enter did not start the import');
+        // Several screenshots: each read, then ONE recipe from all of them.
+        if(!document.getElementById('galleryInput').multiple) throw new Error('the gallery takes one picture only');
+        var calls=[], applied=null;
+        window.fetch=async function(u, init){ var b=JSON.parse(init.body); calls.push(b);
+          var isImg=Array.isArray(b.messages[0].content);
+          return { ok:true, json:async function(){ return { content:[{ text: isImg ? ('text of shot '+calls.length) : '{"name":"Layer cake","ingredients":[{"a":"6","n":"eggs"}],"steps":["Bake"]}' }] }; } }; };
+        window.applyParsedRecipe=function(p){ applied=p; };
+        var px=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), function(c){ return c.charCodeAt(0); });
+        var shot=function(n){ return new File([px], n+'.png', { type:'image/png' }); };
+        _shotSourceUrl='https://www.facebook.com/reel/1';
+        await processScreenshots([shot('a'), shot('b'), shot('c')]);
+        var imgCalls=calls.filter(function(b){ return Array.isArray(b.messages[0].content); });
+        if(imgCalls.length!==3) throw new Error('not every screenshot was read: '+imgCalls.length);
+        var last=calls[calls.length-1].messages[0].content;
+        if(typeof last!=='string' || !/Screenshot 3/.test(last) || !/overlap/.test(last)) throw new Error('the screenshots were not put together as one');
+        if(!applied || applied.name!=='Layer cake' || applied.source!=='https://www.facebook.com/reel/1') throw new Error('one recipe from the screenshots: '+JSON.stringify(applied));
+        closeM('cameraResultOverlay');
+        // A phone leads with screenshots on a Facebook link; a computer with the bookmark.
+        window.matchMedia=function(q){ return { matches: /coarse/.test(q) }; };
+        showVideoRecipeFallback('https://www.facebook.com/share/r/X/', 'facebook', '');
+        var firstBtn=document.querySelector('#videoRecipeFallback button');
+        if(!firstBtn || !/Import screenshots/.test(firstBtn.textContent)) throw new Error('on a phone the first choice is: '+(firstBtn && firstBtn.textContent));
+        window.matchMedia=function(){ return { matches:false }; };
+        showVideoRecipeFallback('https://www.facebook.com/share/r/X/', 'facebook', '');
+        firstBtn=document.querySelector('#videoRecipeFallback button');
+        if(!firstBtn || !/Facebook bookmark/.test(firstBtn.textContent)) throw new Error('on a computer the first choice is: '+(firstBtn && firstBtn.textContent));
+      } finally {
+        window.runUrlImport=real.run; window.fetch=real.fetch; window.applyParsedRecipe=real.apply; window.matchMedia=real.mm; window.syncLog=real.log;
+        _shotSourceUrl=''; var r=document.getElementById('urlImportResult'); if(r) r.innerHTML='';
+      }
+    } },
+
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
     test: async()=>{
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');
