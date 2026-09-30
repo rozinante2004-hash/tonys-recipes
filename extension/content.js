@@ -8,6 +8,11 @@
   if (window.__mknLoaded) return;
   window.__mknLoaded = true;
   var LABEL = '📘 Save recipe to ' + MKN_APP_NAME;
+  // Each build marks the posts it has done with its OWN tag: the family and
+  // test builds side by side each put their button under every post (1.2 —
+  // one tag for both let whichever came first stop the other).
+  var TAG = (typeof MKN_TAG === 'string' && MKN_TAG) || 'live';
+  var MARK = 'data-mkn-' + TAG, FLOAT = 'mkn-float-' + TAG;
   var host = location.hostname;
 
   // ── Each site: where its posts are, where a post's own text is, and which
@@ -104,7 +109,7 @@
   function decorate() {
     var posts = site.posts();
     posts.forEach(function (post) {
-      if (post.getAttribute('data-mkn')) return;
+      if (post.getAttribute(MARK)) return;
       var anchor = post.querySelector(site.marked);
       if (!anchor || !anchor.innerText.trim()) {                        // no marked text: only a real block of it
         var t = postText(post);
@@ -115,12 +120,12 @@
         })[0];
         if (!anchor) return;
       }
-      post.setAttribute('data-mkn', '1');
+      post.setAttribute(MARK, '1');
       anchor.insertAdjacentElement('afterend', button(function (btn) { save(btn, post); }));
     });
     var single = site.single.test(location.pathname) && !posts.length;
-    var f = document.querySelector('.mkn-float');
-    if (single && !f) document.body.appendChild(button(function (btn) { save(btn, null); }, 'mkn-float'));
+    var f = document.querySelector('.' + FLOAT);
+    if (single && !f) document.body.appendChild(button(function (btn) { save(btn, null); }, 'mkn-float ' + FLOAT));
     if (!single && f) f.remove();
   }
   var pending = false;

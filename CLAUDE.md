@@ -558,6 +558,25 @@ found only because a test was written first and disagreed with the code.
     `ul li`, a bare "more"/"עוד" clicked ONLY inside the caption's box),
     TikTok (`data-e2e` recommend-list-item-container / browse-video-desc).
     Test and family builds coexist in Chrome (different names, folders).
+  - **Extension 1.2 + v37.24 — any website; both builds side by side.** Tony
+    had both installed and saw only the TEST button: both builds marked posts
+    `data-mkn`, so the first stopped the other. Now `MKN_TAG` (written by the
+    build: live/test) → `data-mkn-<tag>` and `.mkn-float-<tag>` (test's float
+    sits 48px higher). "Many sites, new ones daily" → the toolbar button
+    (Alt+Shift+S, `commands._execute_action`) and a right-click menu
+    (`contextMenus`: "Save recipe" on page/selection; "Import this link" on a
+    link → the app's `?url=`) read `mknTakeFromPage()`: selection ≥ 40 chars,
+    else the page's schema.org Recipe JSON-LD (`@graph`, type arrays,
+    HowToSection → "Name:" + numbered steps, ISO durations → "1 h 5 min"),
+    else article/main/body text. No new host permissions. App v37.24:
+    `handleShareTarget` — text that came in `#share-text` (extension or
+    bookmark) WINS over the address and is parsed at once
+    (`runFreehandImport`), from any site. Test: both builds loaded together
+    (18 checks).
+  - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
+    `main` fast-forwarded to `test`. The family owner's next sign-in copies
+    the translations to `i18n/` (v36.97); the family project's rules should
+    be republished from the family app (Family Access → Show rules).
   - **v37.23 + Worker v47 — a Facebook LINK alone.** Tony: "no sane mobile user
     will jump through hoops". Worker `facebook-fetch`: follows a share link
     to its post (never a login page), then Facebook's official oEmbed

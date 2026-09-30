@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.23 -->
+<!-- Tony's Recipes Collection v37.24 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1624,9 +1624,10 @@ function handleShareTarget() {
   var sharedTitle = params.get('title') || '';
   // v37.17 — the 📘 bookmark sends a Facebook post's text after '#', which no
   // server ever sees (and which has no length limit worth the name).
-  var hp = null;
+  var hp = null, fromBrowser = false;
   try { hp = new URLSearchParams(String(window.location.hash || '').replace(/^#/, '')); } catch(e) {}
   if (hp && hp.get('share-text')) {
+    fromBrowser = true;          // v37.24 — sent by the extension or the bookmark
     sharedText = hp.get('share-text');
     sharedUrl  = sharedUrl || hp.get('share-url') || '';
   }
@@ -1655,6 +1656,15 @@ function handleShareTarget() {
   var hasRecipeText = textNoUrl.length >= 40; // long enough to be a recipe, not a title/author
 
   setTimeout(function() {
+    // v37.24 — text the extension or the bookmark took from the page in front
+    // of the person is what they saw: it wins over re-fetching the address (a
+    // site may block our server, or need a login), and it is read at once.
+    if (fromBrowser && hasRecipeText && typeof openFreehandModal === 'function') {
+      openFreehandModal(textBlob, directUrl);
+      toast('\u{1F4D8} Reading the recipe you sent\u2026', 5000);
+      runFreehandImport();
+      return;
+    }
     // 5f.1 — sharing from Instagram often carries the caption in `text` AND the
     // post URL in `url`. The URL is the weaker of the two: Instagram will not
     // give us the caption over the API, so following the link throws away the
@@ -5014,7 +5024,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.23';
+var APP_VERSION = 'v37.24';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7656,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.23</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.24</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8298,7 +8308,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.23</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.24</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

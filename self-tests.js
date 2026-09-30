@@ -648,6 +648,13 @@ window.SELF_TESTS = [
         await new Promise(function(r){ setTimeout(r, 800); });
         if(!opened || opened.t!==cap || opened.src!=='https://www.facebook.com/reel/1') throw new Error('the text sent by the bookmark: '+JSON.stringify(opened));
         if(/share-text/.test(location.href)) throw new Error('the text stays in the address bar');
+        if(ran<1) throw new Error('the text sent by the bookmark was not read at once');
+        // v37.24 — from ANY site, the text the extension sent wins over the address.
+        opened=null; ran=0;
+        history.replaceState(null, '', location.pathname + '#share-text=' + encodeURIComponent('Lemon drizzle cake\nIngredients:\n- 225 g butter\n- 4 eggs\nMethod:\n1. Beat.') + '&share-url=' + encodeURIComponent('https://recipes.example/lemon'));
+        handleShareTarget();
+        await new Promise(function(r){ setTimeout(r, 800); });
+        if(!opened || !/225 g butter/.test(opened.t) || opened.src!=='https://recipes.example/lemon' || ran!==1) throw new Error('text from a recipe site was not read: '+JSON.stringify([opened, ran]));
       } finally {
         window.openFreehandModal=real.open; window.runFreehandImport=real.run; window.toast=real.toast;
         try{ if(real.clip) Object.defineProperty(navigator.clipboard, 'readText', { value: real.clip, configurable:true }); }catch(e){}

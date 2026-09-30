@@ -1,18 +1,19 @@
-# Chrome Web Store — “My Kitchen Notes — Save recipes from Facebook, Instagram & TikTok”
+# Chrome Web Store — “My Kitchen Notes — Save recipes from any site”
 
 Everything the Web Store asks for when the extension is published (at go-public,
 Tony's decision). Build the package with `node tools/build-extension.mjs live`
 → `dist-extension/my-kitchen-notes-extension.zip`.
 
 ## Listing
-- **Name:** My Kitchen Notes — Save recipes from Facebook, Instagram & TikTok
+- **Name:** My Kitchen Notes — Save recipes from any site
 - **Category:** Productivity (or Lifestyle → Food & drink)
-- **Short description (≤132):** A “Save recipe” button under Facebook, Instagram and TikTok posts: one click sends the recipe to My Kitchen Notes.
+- **Short description (≤132):** Save recipes from any website, and from Facebook, Instagram and TikTok posts, into My Kitchen Notes in one click.
 - **Description:**
   Found a recipe in a Facebook, Instagram or TikTok post or reel? Click “📘 Save recipe to My Kitchen Notes” under it.
   The extension opens the post’s “See more”, takes the post’s own text — never the comments — and opens
   My Kitchen Notes with it, where it becomes a recipe: ingredients, steps, and the post as its source.
-  The toolbar button does the same on any page: select the recipe’s text, or let it take the page’s main text.
+  On any other website, the toolbar button (Alt+Shift+S) or the right-click menu sends the recipe: the one the page
+  publishes for search engines, or the text you selected. Right-click a link to import that page instead.
   Nothing is read until you click. Nothing is sent to us or to anyone else — the text goes straight to your
   own collection in your browser.
 - **Screenshots (1280×800):** a Facebook post with the button under it; the app's import preview.
@@ -25,8 +26,9 @@ My Kitchen Notes recipe collection, at the user’s click.
 ## Permissions — why each is needed
 - **Content script on facebook.com, instagram.com and tiktok.com:** to show the “Save recipe” button under
   posts and, when clicked, read that post’s text. Runs only on those three sites.
-- **activeTab + scripting:** the toolbar button reads the selected text on the page the user is on, only when
-  the user clicks it.
+- **activeTab + scripting:** the toolbar button, its shortcut and the right-click menu read the recipe on the page
+  the user is on, only when the user asks.
+- **contextMenus:** the “Save recipe” / “Import this link” entries in the right-click menu.
 - No host permissions beyond those three sites; no remote code; no analytics.
 
 ## Data use (the Web Store’s form)

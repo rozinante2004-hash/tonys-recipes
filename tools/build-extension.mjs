@@ -39,7 +39,8 @@ for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.jo
 fs.writeFileSync(path.join(out, 'config.js'),
   '// Written by tools/build-extension.mjs (' + which + ').\n'
   + 'var MKN_APP = ' + JSON.stringify(app) + ';\n'
-  + 'var MKN_APP_NAME = ' + JSON.stringify('My Kitchen Notes' + (which === 'test' ? ' (TEST)' : '')) + ';\n');
+  + 'var MKN_APP_NAME = ' + JSON.stringify('My Kitchen Notes' + (which === 'test' ? ' (TEST)' : '')) + ';\n'
+  + 'var MKN_TAG = ' + JSON.stringify(which) + ';\n');
 if (which === 'test') {
   const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
   m.name = m.name + ' (TEST)';
