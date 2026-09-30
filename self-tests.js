@@ -771,6 +771,36 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_pick_from_several', group:'Import/Export', name:'Several recipes in one page: all ticked, untick the ones not wanted (v37.25)',
+    test: async()=>{
+      var real={ confirm:window.confirmImportParsed };
+      var box=document.createElement('div'); box.id='collPickTest'; document.body.appendChild(box);
+      var got=[];
+      try{
+        window.confirmImportParsed=function(p){ got.push(p); return Promise.resolve(); };
+        var mk=function(n){ return { name:n, ingredients:[{a:'1',n:'x'}], steps:['y'] }; };
+        applyParsedCollection({ name:'Shawarma page', category:'Dinner', source:'https://www.instagram.com/p/X/', parts:[mk('Shawarma'), mk('Pickled onion'), mk('White cabbage')] }, 'collPickTest', 'freehandOverlay');
+        var picks=box.querySelectorAll('.coll-pick'), btn=box.querySelector('.coll-add-btn');
+        if(picks.length!==3 || Array.prototype.some.call(picks, function(c){ return !c.checked; })) throw new Error('every recipe is not ticked to start with');
+        if(!/Add all 3/.test(btn.textContent)) throw new Error('button: '+btn.textContent);
+        await confirmImportPicked('collPickTest');
+        if(got[0].parts.length!==3) throw new Error('all ticked did not keep all');
+        // Untick one: the other two, as a collection.
+        picks[1].checked=false; collectionPickChanged('collPickTest');
+        if(!/Add the 2 selected/.test(btn.textContent)) throw new Error('button after unticking one: '+btn.textContent);
+        await confirmImportPicked('collPickTest');
+        if(got[1].parts.map(function(p){ return p.name; }).join()!=='Shawarma,White cabbage') throw new Error('kept: '+JSON.stringify(got[1].parts.map(function(p){ return p.name; })));
+        // One left: an ordinary recipe, with the page as its source.
+        picks[2].checked=false; collectionPickChanged('collPickTest');
+        if(!/Add the selected recipe/.test(btn.textContent)) throw new Error('button with one: '+btn.textContent);
+        await confirmImportPicked('collPickTest');
+        if(got[2].parts || got[2].name!=='Shawarma' || got[2].source!=='https://www.instagram.com/p/X/' || got[2].category!=='Dinner') throw new Error('one kept: '+JSON.stringify(got[2]));
+        // None: nothing to add.
+        picks[0].checked=false; collectionPickChanged('collPickTest');
+        if(!btn.disabled) throw new Error('with none ticked the button still adds');
+      } finally { window.confirmImportParsed=real.confirm; box.remove(); }
+    } },
+
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
     test: async()=>{
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');

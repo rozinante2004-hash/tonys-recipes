@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.24 -->
+<!-- Tony's Recipes Collection v37.25 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5024,7 +5024,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.24';
+var APP_VERSION = 'v37.25';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7656,7 +7656,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.24</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.25</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8308,7 +8308,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.24</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.25</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18171,9 +18171,14 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
   parsed.parts = parts;
   if (originalPhoto) parsed._originalPhoto = originalPhoto;
 
+  // v37.25 — Tony: a page with several recipes; keep only the ones wanted.
+  // Every one ticked to start with; untick what should not be saved.
+  _collPreview[resultDivId] = { parsed: parsed, overlayId: overlayId };
   var rows = parts.map(function(p, idx) {
-    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;'
+    return '<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;cursor:pointer;'
       + (idx ? 'border-top:1px solid var(--border);' : '') + '">'
+      + '<input type="checkbox" class="coll-pick" data-i="' + idx + '" checked onchange="collectionPickChanged(\'' + resultDivId + '\')"'
+      + ' aria-label="Keep ' + escA(p.name || ('recipe ' + (idx + 1))) + '" style="flex-shrink:0;width:20px;height:20px;margin:1px 0 0;accent-color:var(--terracotta);">'
       + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--terracotta);'
       + 'color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">'
       + (idx + 1) + '</div>'
@@ -18183,7 +18188,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
       + p.ingredients.length + ' ingredients · ' + p.steps.length + ' steps'
       + (p.by ? ' · ' + escH(p.by) : '')
       + (p.servings ? ' · serves ' + escH(p.servings) : '')
-      + '</div></div></div>';
+      + '</div></div></label>';
   }).join('');
 
   // A recipe with steps but no ingredients (or the reverse) is usually where the
@@ -18225,7 +18230,6 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
       + 'the page text may have been cut short. Import anyway and fill the gaps, or try again.</div>'
     : '';
 
-  var encoded = JSON.stringify(parsed).replace(/"/g,'&quot;');
   document.getElementById(resultDivId).innerHTML =
     '<div class="translate-block" style="margin-top:12px;">'
     + '<div class="translate-block-title" dir="auto">📚 ' + escH(parsed.name || 'Collection') + '</div>'
@@ -18236,10 +18240,48 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
     + '<div style="margin-top:8px;">' + rows + '</div>'
     + relay + cut + missed + warn
     + '</div>'
-    + '<button class="save-translation-btn" onclick="confirmImportParsed(' + encoded + ',&quot;' + overlayId + '&quot;)">'
+    + '<button class="save-translation-btn coll-add-btn" onclick="confirmImportPicked(\'' + resultDivId + '\')">'
     + '&#10003; Add all ' + parts.length + ' as one collection</button>';
 }
 window.applyParsedCollection = applyParsedCollection;
+var _collPreview = {};
+function collectionPicked(resultDivId) {
+  var box = document.getElementById(resultDivId);
+  return Array.prototype.filter.call(box ? box.querySelectorAll('.coll-pick') : [], function(c){ return c.checked; })
+    .map(function(c){ return +c.getAttribute('data-i'); });
+}
+function collectionPickChanged(resultDivId) {
+  var box = document.getElementById(resultDivId), btn = box && box.querySelector('.coll-add-btn');
+  var p = _collPreview[resultDivId];
+  if (!btn || !p) return;
+  var n = collectionPicked(resultDivId).length, all = p.parsed.parts.length;
+  btn.disabled = n === 0;
+  btn.style.opacity = n ? '' : '0.5';
+  btn.innerHTML = n === 0 ? 'Tick the recipes to keep'
+    : n === all ? '&#10003; Add all ' + all + ' as one collection'
+    : n === 1 ? '&#10003; Add the selected recipe'
+    : '&#10003; Add the ' + n + ' selected as one collection';
+}
+window.collectionPickChanged = collectionPickChanged;
+// Only the ticked ones: all → the collection as it was read; several → a
+// collection of those; one → an ordinary recipe of its own.
+function confirmImportPicked(resultDivId) {
+  var p = _collPreview[resultDivId];
+  if (!p) return Promise.resolve();
+  var picked = collectionPicked(resultDivId), parts = p.parsed.parts;
+  if (!picked.length) { toast('Tick at least one recipe to keep.'); return Promise.resolve(); }
+  if (picked.length === parts.length) return confirmImportParsed(p.parsed, p.overlayId);
+  if (picked.length === 1) {
+    var one = Object.assign({}, parts[picked[0]]);
+    one.category = one.category || p.parsed.category;
+    one.source = one.source || p.parsed.source || '';
+    if (p.parsed._originalPhoto) one._originalPhoto = p.parsed._originalPhoto;
+    return confirmImportParsed(one, p.overlayId);
+  }
+  var some = Object.assign({}, p.parsed, { parts: picked.map(function(i){ return parts[i]; }) });
+  return confirmImportParsed(some, p.overlayId);
+}
+window.confirmImportPicked = confirmImportPicked;
 
 function showOriginalPhotoPreview(btn) {
   var box = btn.nextElementSibling;

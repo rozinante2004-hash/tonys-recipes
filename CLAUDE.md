@@ -588,6 +588,14 @@ found only because a test was written first and disagreed with the code.
     the background opens the app with `chrome.tabs.create` (no pop-up
     blocker). Test: an imitation reels feed with the old reel above, the next
     below and a stale summary (21 checks).
+  - **v37.25 — several recipes in one page: pick which to keep.** Tony: all
+    ticked by default, untick the unwanted. `applyParsedCollection` rows are
+    `<label>` + `.coll-pick` checkboxes; the parsed collection is kept in
+    `_collPreview[resultDivId]` (no longer JSON in an onclick);
+    `.coll-add-btn` → `confirmImportPicked(resultDivId)`: all → as read;
+    several → a collection of those; ONE → an ordinary recipe (category and
+    source from the collection); none → button disabled. Test:
+    `import_pick_from_several`.
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
     `main` fast-forwarded to `test`. The family owner's next sign-in copies
