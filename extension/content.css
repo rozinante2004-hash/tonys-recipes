@@ -1,0 +1,11 @@
+.mkn-save {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 8px 12px 4px; padding: 7px 12px;
+  border: 1px solid #c1440e; border-radius: 18px;
+  background: #fff8f3; color: #c1440e;
+  font: 600 13px/1.2 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  cursor: pointer;
+}
+.mkn-save:hover { background: #c1440e; color: #fff; }
+.mkn-save[disabled] { opacity: .6; cursor: default; }
+.mkn-float { position: fixed; left: 16px; bottom: 16px; z-index: 2147483000; margin: 0; box-shadow: 0 4px 14px rgba(0,0,0,.25); }

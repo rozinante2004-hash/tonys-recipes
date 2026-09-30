@@ -537,6 +537,21 @@ found only because a test was written first and disagreed with the code.
     (parts, tips, title) — shown so a misread word can be fixed. Also used
     for ONE screenshot picked via 📷 Import screenshots (`_shotMode`); the
     📷 Scan-a-Recipe camera path is unchanged.
+  - **Browser extension 1.0 — "📘 Save recipe" under every Facebook post.**
+    Tony: build it for everyone (goes live at go-public), keep the draggable
+    bookmark meanwhile. `extension/` (MV3: content script on facebook.com
+    only; toolbar button via activeTab+scripting; no storage, no network of
+    its own). Buttons go under top-level `role="article"` posts (comments are
+    nested articles — skipped) after Facebook's `data-ad(-comet)-preview=
+    "message"`, or under the longest text block; a floating button on
+    reel/watch/share pages. Click: opens See more (never a bare "More"/"עוד"),
+    takes the post text (or a selection), opens the app with
+    `#share-text=…&share-url=` (post permalink, `__cft__` stripped).
+    `node tools/build-extension.mjs live|test` → `dist-extension/` (ignored)
+    + zip; the test build says (TEST) and sends to the test copy. Tested by
+    `tests/extension.mjs` (real Chromium, extension installed, imitation
+    feed + reel; CI step). Web Store listing, permission reasons and privacy
+    policy: `extension/STORE.md`, `extension/PRIVACY.md`.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

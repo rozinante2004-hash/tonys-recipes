@@ -18,3 +18,4 @@ whatsapp/*.zip
 
 # v36.72 — tools/build.js output; built by CI and Cloudflare Pages, never committed
 dist/
+dist-extension/

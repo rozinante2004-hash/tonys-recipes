@@ -226,6 +226,14 @@ jobs:
       - name: Worker checks (CORS, origin, app key)
         run: node tests/worker-cors.mjs
 
+      # extension 1.0 — the "Save recipes from Facebook" extension, installed in a real
+      # Chromium, against an imitation Facebook feed and reel page.
+      - name: Browser extension (Save recipe under Facebook posts)
+        run: |
+          node tools/build-extension.mjs live
+          node tools/build-extension.mjs test
+          node tests/extension.mjs
+
       # v36.14 — Tony's Meal menu rendered #F2EDE6 text on a hard-coded white
       # panel (1.16:1) and nothing in the suite could see it, because the panel
       # is MOBILE ONLY and every check ran at desktop width. This opens every

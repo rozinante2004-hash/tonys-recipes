@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "My Kitchen Notes — Save recipes from Facebook",
+  "short_name": "My Kitchen Notes",
+  "version": "1.0.0",
+  "description": "Adds a “Save recipe” button under Facebook posts: one click sends the post’s text to your My Kitchen Notes collection.",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "action": {
+    "default_title": "Send this page’s recipe to My Kitchen Notes",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://web.facebook.com/*",
+        "https://m.facebook.com/*"
+      ],
+      "js": [
+        "config.js",
+        "shared.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
