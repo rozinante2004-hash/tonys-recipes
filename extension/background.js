@@ -3,18 +3,28 @@
 // embeds for search engines, else the selected text, else the page's main
 // text. Right-clicking a LINK sends that link for the app to import. Runs only
 // when clicked (activeTab).
-importScripts('config.js');
+importScripts('config.js', 'shared.js');
 async function mknSendFromTab(tab) {
   if (!tab || !tab.id) return;
-  await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['config.js', 'shared.js'] });
-  await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: async function () {
-    if (!String(getSelection() || '').trim()) {
-      for (var i = 0; i < 4 && mknSeeMore(document); i++) await new Promise(function (r) { setTimeout(r, 600); });
-    }
-    var text = mknTakeFromPage();
-    if (text.length < 40) { alert('No recipe text found here. Select the recipe text, then try again.'); return; }
-    mknOpenApp(MKN_APP, text, location.href);
-  } });
+  var got = null;
+  // Facebook, Instagram, TikTok: our script there reads the post ON SCREEN (1.3).
+  try { got = await chrome.tabs.sendMessage(tab.id, { mkn: 'take' }); } catch (e) {}
+  if (!got) {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['config.js', 'shared.js'] });
+    var res = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: async function () {
+      if (!String(getSelection() || '').trim()) {
+        for (var i = 0; i < 4 && mknSeeMore(document, true); i++) await new Promise(function (r) { setTimeout(r, 600); });
+      }
+      return { text: mknTakeFromPage(), url: location.href };
+    } });
+    got = res && res[0] && res[0].result;
+  }
+  if (!got || !got.text || got.text.length < 40) {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: function () { alert('No recipe text found here. Select the recipe text, then try again.'); } });
+    return;
+  }
+  // Opened by the extension itself, so no pop-up blocker can stop it.
+  chrome.tabs.create({ url: mknAppAddress(MKN_APP, got.text, got.url), index: tab.index + 1 });
 }
 chrome.action.onClicked.addListener(mknSendFromTab);
 chrome.runtime.onInstalled.addListener(function () {

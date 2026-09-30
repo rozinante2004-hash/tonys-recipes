@@ -2,12 +2,33 @@
 // (background.js injects the same function). Nothing leaves the browser except
 // by opening the app with the text after '#' — a part of an address that no
 // server ever receives.
-function mknSeeMore(root) {
+// On screen now — a feed (Instagram's reels above all) keeps the posts you
+// scrolled past, and the next ones, in the page (1.3).
+function mknOnScreen(e) {
+  var r = e.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+}
+function mknFromCentre(e) {
+  var r = e.getBoundingClientRect();
+  return Math.abs((r.top + r.bottom) / 2 - innerHeight / 2) + Math.abs((r.left + r.right) / 2 - innerWidth / 2) / 4;
+}
+// A page's summary line (og:description) — only when it is about THIS page:
+// a site that changes pages without reloading (Instagram, Facebook) leaves
+// the first page's there (Tony got a challah from long ago, 1.3).
+function mknOwnSummary() {
+  var og = document.querySelector('meta[property="og:description"]');
+  if (!og || !og.content) return '';
+  var u = document.querySelector('meta[property="og:url"]'), here = location.pathname.replace(/\/+$/, '');
+  if (!u || !u.content) return '';
+  try { if (new URL(u.content, location.href).pathname.replace(/\/+$/, '') !== here) return ''; } catch (e) { return ''; }
+  return og.content;
+}
+function mknSeeMore(root, onScreenOnly) {
   var M = /^(see more|show more|… ?see more|הצג עוד|ראה עוד|ראי עוד)$/i;
   var n = 0;
   (root || document).querySelectorAll('[role="button"],div[dir="auto"] span,a').forEach(function (e) {
     var t = (e.textContent || '').trim();
-    if (t.length < 16 && M.test(t) && e.offsetParent) { e.click(); n++; }
+    if (t.length < 16 && M.test(t) && e.offsetParent && (!onScreenOnly || mknOnScreen(e))) { e.click(); n++; }
   });
   return n;
 }
@@ -17,10 +38,10 @@ function mknCleanText(s) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
-function mknOpenApp(app, text, url) {
-  var a = app.replace(/#.*$/, '');
-  window.open(a + '#share-text=' + encodeURIComponent(text) + '&share-url=' + encodeURIComponent(url || location.href), '_blank');
+function mknAppAddress(app, text, url) {
+  return app.replace(/#.*$/, '') + '#share-text=' + encodeURIComponent(text) + '&share-url=' + encodeURIComponent(url || location.href);
 }
+function mknOpenApp(app, text, url) { window.open(mknAppAddress(app, text, url), '_blank'); }
 
 // ── Any website (extension 1.2) ──────────────────────────────────────────────
 // Almost every recipe site embeds its recipe for search engines (schema.org

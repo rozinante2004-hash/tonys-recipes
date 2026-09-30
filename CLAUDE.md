@@ -573,6 +573,22 @@ found only because a test was written first and disagreed with the code.
     bookmark) WINS over the address and is parsed at once
     (`runFreehandImport`), from any site. Test: both builds loaded together
     (18 checks).
+  - **Extension 1.3 — the reel ON SCREEN.** Tony, on an Instagram reels page
+    (…/reels/DaS-2PjBkJ9/, aglio e olio), got a challah from long ago. Two
+    faults: a feed keeps the reels scrolled past (and the next ones) in the
+    page, and `postText(document)` took the FIRST caption anywhere; then the
+    og:description fallback, which a site that changes pages without
+    reloading never updates. Now for the whole page only on-screen
+    candidates count, nearest the middle first (`mknOnScreen`,
+    `mknFromCentre`); "See more" / Instagram's bare "more" only on screen and
+    only where it ends a caption (never a nav/header "More");
+    `mknOwnSummary()` uses og:description only when og:url is THIS page. The
+    toolbar button / right-click on FB/IG/TikTok ask the content script
+    (`chrome.tabs.sendMessage({mkn:'take'})` → `collect(centralPost())`), and
+    the background opens the app with `chrome.tabs.create` (no pop-up
+    blocker). Test: an imitation reels feed with the old reel above, the next
+    below and a stale summary (21 checks).
+  - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
     `main` fast-forwarded to `test`. The family owner's next sign-in copies
     the translations to `i18n/` (v36.97); the family project's rules should

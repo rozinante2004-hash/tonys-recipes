@@ -60,6 +60,21 @@ const tiktok = `<!doctype html><meta charset=utf-8><body>
 <div data-e2e="browse-video-desc">Easy focaccia: 500 g flour, 400 ml water, 10 g salt, 7 g yeast. Rest overnight, bake at 230°C for 25 minutes.</div>
 <div data-e2e="comment-list"><span>So good!!! Tried it yesterday and my family loved it, thank you for sharing</span></div>`;
 
+// Instagram's reels feed (1.3): the reel scrolled past (a challah) is still in
+// the page above the screen, the next one below, and the page's summary line
+// is from the first reel the tab ever opened. Only the one ON SCREEN counts.
+const AGLIO = 'Michelin star aglio e olio 🍝\nIngredients: 200 g spaghetti, 6 cloves garlic, 80 ml olive oil, chilli flakes, parsley.\nMethod: toast the garlic slowly, toss with the pasta and a ladle of pasta water.';
+const reels = `<!doctype html><meta charset=utf-8>
+<meta property="og:url" content="https://www.instagram.com/reel/OLDCHALLAH/">
+<meta property="og:description" content="חלות שנשארות טריות לאורך זמן — 1 ק״ג קמח, 2 ביצים, שמרים, סוכר, שמן. לשים, להתפיח ולאפות.">
+<body style="margin:0"><nav><a href="/">Instagram</a><span role="button">More</span></nav>
+<main>
+ <div class="reel" style="position:absolute;top:-1400px;height:900px"><span dir="auto">חלות שנשארות טריות לאורך זמן — 1 ק״ג קמח, 2 ביצים, שמרים, סוכר, שמן. לשים, להתפיח ולאפות.</span></div>
+ <div class="reel" style="position:absolute;top:60px;height:600px"><span dir="auto" id="ag">Michelin star aglio e olio 🍝 Ingredients: 200 g spaghetti… <span role="button" id="agmore">more</span></span></div>
+ <div class="reel" style="position:absolute;top:1400px;height:900px"><span dir="auto">Next reel: chocolate chip cookies with 250 g butter, 200 g sugar, 2 eggs, 300 g flour and a lot of chocolate.</span></div>
+</main>
+<script>document.getElementById('agmore').onclick=function(){ document.getElementById('ag').innerText=${JSON.stringify('X')}.replace('X', 'AGLIO_PLACEHOLDER'); };</script>`.replace('AGLIO_PLACEHOLDER', AGLIO.replace(/\n/g, '\\n'));
+
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mkn-ext-'));
 const ctx = await playwright.chromium.launchPersistentContext(profile, {
   channel: 'chromium', headless: true,
@@ -68,7 +83,8 @@ const ctx = await playwright.chromium.launchPersistentContext(profile, {
 try {
   await ctx.route('https://www.facebook.com/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8',
     body: /\/reel\//.test(r.request().url()) ? reel : feed }));
-  await ctx.route('https://www.instagram.com/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: insta }));
+  await ctx.route('https://www.instagram.com/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8',
+    body: /\/reels\//.test(r.request().url()) ? reels : insta }));
   await ctx.route('https://www.tiktok.com/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: tiktok }));
   await ctx.route(APP + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
   await ctx.route(APP_LIVE + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>family app</title>' }));
@@ -116,6 +132,36 @@ try {
      h5.get('share-text') === IGFULL && /instagram\.com\/p\/ABC123/.test(h5.get('share-url') || ''), JSON.stringify([h5.get('share-text'), h5.get('share-url')]));
   ok('…and the site\'s own "More" menu was never clicked', await page.evaluate(() => !!document.querySelector('nav [role="button"]')));
   await op5.close();
+
+  // Instagram's reels feed: the reel ON SCREEN, never the one scrolled past or
+  // the page's stale summary (Tony: an old challah instead of aglio e olio).
+  await page.goto('https://www.instagram.com/reels/DaS-2PjBkJ9/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.mkn-float-test', { timeout: 15000 }).catch(() => {});
+  const [op7] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('.mkn-float-test')]);
+  const t7 = new URLSearchParams(op7.url().split('#')[1] || '').get('share-text') || '';
+  ok('Instagram reels: the reel on screen, "more" opened — not the one scrolled past, nor the page\'s old summary',
+     t7 === AGLIO && !/חלות/.test(t7) && !/cookies/.test(t7), JSON.stringify(t7.slice(0, 120)));
+  ok('…and the menu called More was never clicked', await page.evaluate(() => !!document.querySelector('nav [role="button"]')));
+  await op7.close();
+  // The toolbar button on the same page asks the extension's own script there.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.mkn-float-test', { timeout: 15000 }).catch(() => {});
+  let sw = null;
+  for (const w of ctx.serviceWorkers()) { try { if (await w.evaluate(() => MKN_TAG) === 'test') sw = w; } catch (e) {} }
+  await page.bringToFront();
+  if (!sw) ok('the TEST build\'s background is running', false);
+  else {
+    // (The tab the extension opens goes to the real app, which this sandbox
+    // cannot reach: record the address it is asked to open instead.)
+    const u8 = await sw.evaluate(async () => {
+      let asked = null; const real = chrome.tabs.create;
+      chrome.tabs.create = async o => { asked = o.url; };
+      try { const ts = await chrome.tabs.query({ active: true }); await mknSendFromTab(ts[0]); } finally { chrome.tabs.create = real; }
+      return asked;
+    });
+    const t8 = new URLSearchParams(String(u8 || '').split('#')[1] || '').get('share-text') || '';
+    ok('…the toolbar button sends the same reel, opened by the extension itself', String(u8).startsWith(APP) && t8 === AGLIO, String(u8).slice(0, 160));
+  }
 
   // TikTok: a video page gets the floating button; it sends the description.
   await page.goto('https://www.tiktok.com/@baker/video/7300000000', { waitUntil: 'domcontentloaded' });
