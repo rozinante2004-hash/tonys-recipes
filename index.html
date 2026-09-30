@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.21 -->
+<!-- Tony's Recipes Collection v37.22 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5014,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.21';
+var APP_VERSION = 'v37.22';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.21</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.22</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8293,7 +8293,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.21</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.22</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -21792,7 +21792,9 @@ async function processCameraImage(event) {
   // read together into ONE recipe. Tony: phones often show text they will not
   // let you copy — a screenshot always works.
   var many = Array.prototype.slice.call((event.target && event.target.files) || []);
-  if (many.length > 1) { event.target.value = ''; return processScreenshots(many); }
+  // v37.22 — screenshots (several, or one picked through 📷 Import screenshots)
+  // go through the same recipe reader as pasted text.
+  if (many.length > 1 || (many.length && _shotMode)) { event.target.value = ''; return processScreenshots(many); }
   const file = event.target.files[0];
   if (!file) return;
   const res = document.getElementById('cameraResult');
@@ -21844,9 +21846,10 @@ async function processCameraImage(event) {
 }
 
 var SHOTS_MAX = 8;
-var _shotSourceUrl = '';
+var _shotSourceUrl = '', _shotMode = false;
 function pickScreenshots(sourceUrl) {
   _shotSourceUrl = sourceUrl || '';
+  _shotMode = true;
   try { closeM('urlImportOverlay'); } catch(e) {}
   var inp = document.getElementById('galleryInput');
   if (inp) { inp.value = ''; inp.click(); }
@@ -21860,50 +21863,79 @@ function readFileAsDataUrl(file) {
     r.readAsDataURL(file);
   });
 }
+// v37.22 — Tony compared a Facebook post imported as text on the PC (a
+// three-layer cake, every part, the right title) with the same post from
+// screenshots (flattened, and a note — "פייטה = שיברי וופל גלידה" — taken for
+// the title). The screenshots went through the old one-list photo reader. Now
+// they are only TRANSCRIBED here; the text, overlaps removed, goes through the
+// very same reader as pasted text (parts, tips, title) — and is shown, so a
+// misread word can be fixed before it is imported.
+function shotLinesKey(l) { return String(l || '').replace(/[\s\u200e\u200f\u2022•·*\-–—]+/g, ' ').trim().toLowerCase(); }
+function joinShotTexts(texts) {
+  var out = [];
+  texts.forEach(function(t) {
+    var lines = String(t || '').split(/\r?\n/);
+    // The largest run of lines that ends the text so far and starts this one.
+    var best = 0, max = Math.min(out.length, lines.length);
+    for (var k = max; k > 0; k--) {
+      var ok = true;
+      for (var i = 0; i < k && ok; i++) if (shotLinesKey(out[out.length - k + i]) !== shotLinesKey(lines[i])) ok = false;
+      if (ok && shotLinesKey(lines.slice(0, k).join(' '))) { best = k; break; }
+    }
+    out = out.concat(lines.slice(best));
+  });
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+window.joinShotTexts = joinShotTexts;
+var SHOT_TRANSCRIBE_PROMPT = 'This is a screenshot of a social-media post or a recipe page. Transcribe the text of the post itself, '
+  + 'word for word, in its original language and reading order, keeping its line breaks, bullets and numbering. '
+  + 'Leave out everything that is the app, not the post: buttons, menus, "See more"/"See less", names of people who liked or commented, '
+  + 'counts, the time, and comments. Watch for similar Hebrew letters. Do NOT translate or summarise. If a word is unclear write [?]. '
+  + 'Answer with the transcription only.';
 async function processScreenshots(files) {
   var res = document.getElementById('cameraResult');
   document.getElementById('cameraResultOverlay').classList.add('open');
   var imgEl = document.getElementById('cameraPreviewImg');
   if (files.length > SHOTS_MAX) toast('Only the first ' + SHOTS_MAX + ' screenshots are read.', 6000);
   files = files.slice(0, SHOTS_MAX);
-  var parts = [], first = '';
+  var source = _shotSourceUrl, texts = [];
+  _shotSourceUrl = ''; _shotMode = false;
   try {
     for (var i = 0; i < files.length; i++) {
       res.innerHTML = spinner('Reading screenshot ' + (i + 1) + ' of ' + files.length + '\u2026');
       var url = await readFileAsDataUrl(files[i]);
-      if (!i) { first = url; imgEl.src = url; imgEl.style.display = 'block'; }
+      if (!i) { imgEl.src = url; imgEl.style.display = 'block'; }
       var small = await resizeImageForVision(url, 2500, 0.95);
       var r1 = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-        body: workerBody({ model: AI_MODEL, max_tokens: 1500, messages: [{ role: 'user', content: [
+        body: workerBody({ model: AI_MODEL, max_tokens: 2500, messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: small.split(',')[1] } },
-          { type: 'text', text: 'Transcribe ALL text visible in this screenshot word for word in the original language. Watch for similar Hebrew letters. Do NOT translate. Leave out app buttons, menus, likes and comment counts. If unclear write [?].' }
+          { type: 'text', text: SHOT_TRANSCRIBE_PROMPT }
         ] }] }) });
       if (!r1.ok) throw new Error('Worker error ' + r1.status);
       var d1 = await r1.json();
-      parts.push(((d1.content || []).map(function(b){ return b.text || ''; }).join('\n')).trim());
+      texts.push(((d1.content || []).map(function(b){ return b.text || ''; }).join('\n')).trim());
     }
-    var joined = parts.map(function(t, j){ return '[Screenshot ' + (j + 1) + ']\n' + t; }).join('\n\n');
-    res.innerHTML = '<div class="explore-result" style="background:#f5f0ea;border:1px solid #e0d5c5;margin-bottom:12px;">'
-      + '<strong style="font-size:12px;color:var(--muted);">What Claude read from ' + files.length + ' screenshots:</strong>'
-      + '<div style="font-size:13px;margin-top:6px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">' + escH(joined) + '</div></div>'
-      + spinner('Putting the recipe together\u2026');
-    var r2 = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-      body: workerBody({ model: AI_MODEL, max_tokens: 3000, messages: [{ role: 'user', content:
-        'These are consecutive screenshots of ONE recipe post, in order; text where two screenshots overlap appears twice \u2014 use it once. '
-        + 'Extract the recipe. Keep the original language. Return ONLY JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"","ingredients":[{"a":"","n":""}],"steps":[""]}. '
-        + 'If there is no recipe return {"error":"no recipe"}. Screenshots:\n\n' + joined }] }) });
-    if (!r2.ok) throw new Error('Worker error ' + r2.status);
-    var d2 = await r2.json();
-    var parsed = extractJSON((d2.content || []).map(function(b){ return b.text || ''; }).join('\n'));
-    if (parsed.error) { res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>No recipe found in these screenshots.</strong></div>'; return false; }
-    if (_shotSourceUrl) parsed.source = _shotSourceUrl;
-    syncLog('import', 'Recipe read from ' + files.length + ' screenshots', { source: _shotSourceUrl.slice(0, 120) });
-    applyParsedRecipe(parsed, 'cameraResult', 'cameraResultOverlay', first);
+    var joined = joinShotTexts(texts);
+    if (joined.replace(/\s/g, '').length < 20) {
+      res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>No text could be read from these screenshots.</strong></div>';
+      return false;
+    }
+    syncLog('import', 'Read ' + files.length + ' screenshot(s): ' + joined.length + ' chars', { source: source.slice(0, 120) });
+    closeM('cameraResultOverlay');
+    // The same road as pasted text — and the text is there to check.
+    openFreehandModal(joined, source);
+    var fr = document.getElementById('freehandResult');
+    await runFreehandImport();
+    if (fr && !/Could not parse/.test(fr.textContent)) {
+      fr.insertAdjacentHTML('afterbegin', '<div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px;">'
+        + '\u{1F4F7} Read from ' + files.length + ' screenshot' + (files.length > 1 ? 's' : '') + '. The text above is what was read \u2014 '
+        + 'if a word is wrong, fix it and press \u{1F916} Parse &amp; Import Recipe again.</div>');
+    }
     return true;
   } catch(err) {
     res.innerHTML = '<div class="explore-result" style="color:var(--danger);"><strong>Error:</strong> ' + escH(err.message) + '</div>';
     return false;
-  } finally { _shotSourceUrl = ''; }
+  }
 }
 window.processScreenshots = processScreenshots;
 

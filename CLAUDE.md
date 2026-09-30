@@ -526,6 +526,17 @@ found only because a test was written first and disagreed with the code.
     show text they will not let you copy); a computer → 📘 bookmark first.
     No web page can add a bookmark (browsers removed that); a browser
     extension could be a one-click toolbar button — offered, not built.
+  - **v37.22 — screenshots are read like pasted text.** Tony compared the
+    same Facebook cake: pasted on the PC (3 layers, right title) vs from
+    screenshots (flattened; the note "פייטה = שיברי וופל גלידה" became the
+    title). Screenshots went through the old flat photo prompt. Now
+    `processScreenshots` only TRANSCRIBES (`SHOT_TRANSCRIBE_PROMPT`: the post
+    only, line breaks kept, no app chrome/comments), `joinShotTexts` drops
+    lines repeated where consecutive screenshots overlap, and the text goes
+    to `openFreehandModal` + `runFreehandImport` — the pasted-text reader
+    (parts, tips, title) — shown so a misread word can be fixed. Also used
+    for ONE screenshot picked via 📷 Import screenshots (`_shotMode`); the
+    📷 Scan-a-Recipe camera path is unchanged.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

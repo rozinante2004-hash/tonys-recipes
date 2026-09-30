@@ -686,7 +686,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'import_enter_and_screenshots', group:'Import/Export', name:'Enter imports a pasted link; several screenshots become one recipe; a phone leads with screenshots (v37.21)',
+  { id:'import_enter_and_screenshots', group:'Import/Export', name:'Enter imports a pasted link; screenshots are read like pasted text; a phone leads with screenshots (v37.21, v37.22)',
     test: async()=>{
       var real={ run:window.runUrlImport, fetch:window.fetch, apply:window.applyParsedRecipe, mm:window.matchMedia, log:window.syncLog };
       try{
@@ -697,22 +697,24 @@ window.SELF_TESTS = [
         inp.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true }));
         window.runUrlImport=real.run;
         if(ran!==1) throw new Error('Enter did not start the import');
-        // Several screenshots: each read, then ONE recipe from all of them.
+        // Several screenshots: each transcribed, overlaps removed, and the text
+        // read by the SAME reader as pasted text (v37.22 — parts, tips, title).
         if(!document.getElementById('galleryInput').multiple) throw new Error('the gallery takes one picture only');
-        var calls=[], applied=null;
+        var j=joinShotTexts(['שכבה שנייה\nמצרכים:\n• 120 גרם שוקולד מריר\n• 120 גרם שוקולד חלב', '• 120 גרם שוקולד חלב\n• 100 גרם ממרח\nאופן הכנה:']);
+        if(j.split('120 גרם שוקולד חלב').length!==2 || !/100 גרם ממרח/.test(j)) throw new Error('overlapping lines were not counted once: '+JSON.stringify(j));
+        var calls=[], opened=null, parsedRuns=0, realOpen=window.openFreehandModal, realRun=window.runFreehandImport;
         window.fetch=async function(u, init){ var b=JSON.parse(init.body); calls.push(b);
-          var isImg=Array.isArray(b.messages[0].content);
-          return { ok:true, json:async function(){ return { content:[{ text: isImg ? ('text of shot '+calls.length) : '{"name":"Layer cake","ingredients":[{"a":"6","n":"eggs"}],"steps":["Bake"]}' }] }; } }; };
-        window.applyParsedRecipe=function(p){ applied=p; };
+          return { ok:true, json:async function(){ return { content:[{ text:'line of shot '+calls.length+' with enough words to count' }] }; } }; };
+        window.openFreehandModal=function(t, src){ opened={ t:t, src:src }; };
+        window.runFreehandImport=async function(){ parsedRuns++; };
         var px=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), function(c){ return c.charCodeAt(0); });
         var shot=function(n){ return new File([px], n+'.png', { type:'image/png' }); };
         _shotSourceUrl='https://www.facebook.com/reel/1';
-        await processScreenshots([shot('a'), shot('b'), shot('c')]);
-        var imgCalls=calls.filter(function(b){ return Array.isArray(b.messages[0].content); });
-        if(imgCalls.length!==3) throw new Error('not every screenshot was read: '+imgCalls.length);
-        var last=calls[calls.length-1].messages[0].content;
-        if(typeof last!=='string' || !/Screenshot 3/.test(last) || !/overlap/.test(last)) throw new Error('the screenshots were not put together as one');
-        if(!applied || applied.name!=='Layer cake' || applied.source!=='https://www.facebook.com/reel/1') throw new Error('one recipe from the screenshots: '+JSON.stringify(applied));
+        try { await processScreenshots([shot('a'), shot('b'), shot('c')]); }
+        finally { window.openFreehandModal=realOpen; window.runFreehandImport=realRun; }
+        if(calls.length!==3 || !calls.every(function(b){ return Array.isArray(b.messages[0].content); })) throw new Error('not every screenshot was transcribed: '+calls.length);
+        if(!opened || !/shot 1/.test(opened.t) || !/shot 3/.test(opened.t) || opened.src!=='https://www.facebook.com/reel/1' || parsedRuns!==1)
+          throw new Error('the screenshots\' text did not go to the recipe reader: '+JSON.stringify([opened, parsedRuns]));
         closeM('cameraResultOverlay');
         // A phone leads with screenshots on a Facebook link; a computer with the bookmark.
         window.matchMedia=function(q){ return { matches: /coarse/.test(q) }; };
@@ -724,7 +726,7 @@ window.SELF_TESTS = [
         firstBtn=document.querySelector('#videoRecipeFallback button');
         if(!firstBtn || !/Facebook bookmark/.test(firstBtn.textContent)) throw new Error('on a computer the first choice is: '+(firstBtn && firstBtn.textContent));
       } finally {
-        window.runUrlImport=real.run; window.fetch=real.fetch; window.applyParsedRecipe=real.apply; window.matchMedia=real.mm; window.syncLog=real.log;
+        window.runUrlImport=real.run; window.fetch=real.fetch; window.applyParsedRecipe=real.apply; window.matchMedia=real.mm; _shotMode=false; window.syncLog=real.log;
         _shotSourceUrl=''; var r=document.getElementById('urlImportResult'); if(r) r.innerHTML='';
       }
     } },
