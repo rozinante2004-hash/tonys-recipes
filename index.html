@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.16 -->
+<!-- Tony's Recipes Collection v37.17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1622,6 +1622,14 @@ function handleShareTarget() {
   var sharedUrl   = params.get('url') || params.get('share-target') || '';
   var sharedText  = params.get('text') || '';
   var sharedTitle = params.get('title') || '';
+  // v37.17 — the 📘 bookmark sends a Facebook post's text after '#', which no
+  // server ever sees (and which has no length limit worth the name).
+  var hp = null;
+  try { hp = new URLSearchParams(String(window.location.hash || '').replace(/^#/, '')); } catch(e) {}
+  if (hp && hp.get('share-text')) {
+    sharedText = hp.get('share-text');
+    sharedUrl  = sharedUrl || hp.get('share-url') || '';
+  }
 
   if (!sharedUrl && !sharedText && !sharedTitle) return;
 
@@ -1652,8 +1660,14 @@ function handleShareTarget() {
     // give us the caption over the API, so following the link throws away the
     // one copy of the recipe we were actually handed. Text wins for Instagram.
     if (directUrl && /instagram\.com/i.test(directUrl) && hasRecipeText && typeof openFreehandModal === 'function') {
-      openFreehandModal(textBlob);
+      openFreehandModal(textBlob, directUrl);
       toast('📸 Using the caption you shared — Instagram won\'t give it to us any other way');
+      return;
+    }
+    // v37.17 — the same for Facebook: its text only exists on the signed-in page.
+    if (directUrl && isFacebookUrl(directUrl) && hasRecipeText && typeof openFreehandModal === 'function') {
+      openFreehandModal(textBlob, directUrl);
+      toast('\u{1F4D8} The text from Facebook is in \u2014 press \u{1F916} Parse & Import Recipe', 8000);
       return;
     }
     if (directUrl) { openUrlImportModal(directUrl); return; }
@@ -5000,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.16';
+var APP_VERSION = 'v37.17';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7632,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.16</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.17</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8277,7 +8291,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.16</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.17</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -26510,17 +26524,73 @@ function showVideoRecipeFallback(url, kind, why) {
     + (why ? '<div style="margin-top:8px;font-size:13px;">' + escH(why) + '</div>' : '')
     + '<div style="margin-top:10px;font-size:13px;">What works:</div>'
     + '<ul style="margin:4px 0 0;padding-inline-start:20px;font-size:13px;">'
-    + '<li>' + (fb ? 'Open it, tap the text under the reel to show all of it, copy it, and paste it here.' : 'If the recipe is in a comment, copy it and paste it here.') + '</li>'
+    + '<li>' + (fb ? 'In Facebook, tap \u201cSee more\u201d under the post, long-press the text and Copy \u2014 then press \u{1F4CB} Paste what I copied.' : 'If the recipe is in a comment, copy it, then press \u{1F4CB} Paste what I copied.') + '</li>'
+    + (fb ? '<li>In a browser (Safari, or on a computer): the \u{1F4D8} bookmark takes the text straight from the Facebook page.</li>' : '')
     + '<li>Take screenshots where the ingredients and steps are shown, and import them as photos.</li>'
     + '</ul>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-    + '<button onclick="closeAllModalsThenFreehand()" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;">\u{1F4CB} Paste the text</button>'
+    + '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;">\u{1F4CB} Paste what I copied</button>'
+    + (fb ? '<button onclick="showFacebookBookmarklet()" style="' + plain + '">\u{1F4D8} The Facebook bookmark</button>' : '')
     + '<button onclick="closeM(\'urlImportOverlay\');openCameraImport()" style="' + plain + '">\u{1F4F7} Import screenshots</button>'
     + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="' + plain + 'display:inline-flex;align-items:center;text-decoration:none;">\u2197 Open it</a>'
     + '<button onclick="showSaveAsVideoBookmark(' + JSON.stringify(url).replace(/"/g, '&quot;') + ', \'\', \'\u{1F3A5}\')" style="' + plain + '">\u{1F516} Just bookmark it</button>'
     + '</div></div>';
 }
 window.showVideoRecipeFallback = showVideoRecipeFallback;
+// v37.17 — Tony: "the text is right there under the reel". It is, on HIS
+// signed-in screen — so it is taken from there: copied in Facebook, and read
+// here from the clipboard in one tap (iPhone asks "Paste?" once).
+async function importCopiedText(sourceUrl) {
+  var t = '';
+  try { t = await navigator.clipboard.readText(); } catch(e) {}
+  var words = String(t || '').replace(/https?:\/\/\S+/g, '').trim();
+  ['urlImportOverlay', 'exploreOverlay', 'suggestOverlay'].forEach(function(id){ var el = document.getElementById(id); if (el) el.classList.remove('open'); });
+  openFreehandModal(words.length >= 40 ? t : '', sourceUrl || '');
+  if (words.length < 40) {
+    toast(t ? 'What was copied is only a link \u2014 copy the TEXT under the post (tap \u201cSee more\u201d first), or paste it here.'
+            : 'Paste the recipe text into the box (long-press \u2192 Paste).', 9000);
+    return false;
+  }
+  runFreehandImport();
+  return true;
+}
+window.importCopiedText = importCopiedText;
+// A bookmark that runs ON the Facebook page, in the person's own signed-in
+// browser: opens "See more", takes the post's text (or whatever is selected),
+// and opens this app with it after '#'. Nothing of Facebook's reaches our
+// server, and no login leaves the browser. Facebook changes its page often, so
+// selecting the text first is the sure way, and is said so.
+function facebookBookmarkletCode() {
+  var app = String(APP_CONFIG.siteOrigin || '') + String(APP_CONFIG.sitePath || '/');
+  var js = "(async()=>{const A=" + JSON.stringify(app) + ";const W=m=>new Promise(r=>setTimeout(r,m));"
+    + "const M=/^(see more|show more|\u2026 ?see more|\u05d4\u05e6\u05d2 \u05e2\u05d5\u05d3|\u05e8\u05d0\u05d4 \u05e2\u05d5\u05d3|\u05e8\u05d0\u05d9 \u05e2\u05d5\u05d3)$/i;"
+    + "for(let i=0;i<4;i++){let n=0;for(const e of document.querySelectorAll('[role=button],span,div,a')){const t=(e.textContent||'').trim();"
+    + "if(t.length<16&&M.test(t)&&e.offsetParent){e.click();n++;}}if(!n)break;await W(600);}"
+    + "let s=String(getSelection()||'').trim();"
+    + "if(s.length<40){let b='';for(const e of document.querySelectorAll('[dir=auto]')){const t=(e.innerText||'').trim();"
+    + "if(t.length>b.length&&t.length<20000&&e.offsetParent)b=t;}s=b;}"
+    + "if(s.length<40){const m=document.querySelector('meta[property=\"og:description\"]');s=m?m.content:'';}"
+    + "s=s.replace(/\\s*(see less|show less|\u05d4\u05e6\u05d2 \u05e4\u05d7\u05d5\u05ea|\u05e8\u05d0\u05d4 \u05e4\u05d7\u05d5\u05ea)\\s*$/i,'');"
+    + "if(s.length<40){alert('No recipe text found here. Open the post or reel itself \u2014 or select its text \u2014 and try again.');return;}"
+    + "window.open(A+'#share-text='+encodeURIComponent(s)+'&share-url='+encodeURIComponent(location.href),'_blank');})();";
+  return 'javascript:' + js;
+}
+window.facebookBookmarkletCode = facebookBookmarkletCode;
+async function showFacebookBookmarklet() {
+  var code = facebookBookmarkletCode();
+  var ok = await askConfirm({ icon: '\u{1F4D8}', title: 'Send to My Kitchen Notes \u2014 a bookmark for Facebook',
+    message: 'For Facebook in a browser (Safari, or on a computer). Set it up once:\n\n'
+      + '1. Press \u201cCopy the bookmark\u201d below.\n'
+      + '2. Bookmark any page, then edit that bookmark: name it \u201cSend to My Kitchen Notes\u201d and paste what you copied as its address.\n'
+      + '3. On a Facebook post or reel, open the bookmark. It opens \u201cSee more\u201d, takes the text, and opens this app with it.\n\n'
+      + 'If it picks the wrong text, select the recipe text first, then open the bookmark. It runs in your own browser, on your own Facebook page \u2014 your login never leaves it.',
+    okLabel: 'Copy the bookmark', cancelLabel: 'Close' });
+  if (ok !== true) return false;
+  try { await navigator.clipboard.writeText(code); toast('\u{1F4CB} Copied \u2014 now paste it as a bookmark\u2019s address', 8000); }
+  catch(e) { await askConfirm({ icon: '\u{1F4D8}', title: 'Copy this as the bookmark\u2019s address', message: code, okLabel: 'Done' }); }
+  return true;
+}
+window.showFacebookBookmarklet = showFacebookBookmarklet;
 
 function showSaveAsVideoBookmark(url, suggestedName, emoji) {
   var res = document.getElementById('urlImportResult');

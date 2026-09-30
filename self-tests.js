@@ -550,7 +550,7 @@ window.SELF_TESTS = [
         inp.value='https://www.facebook.com/share/r/1AkSMeYV4w/'; await runUrlImport();
         if(relays) throw new Error('a Facebook link was sent to a relay');
         var fb=document.getElementById('videoRecipeFallback');
-        if(!fb || !/signed in/.test(fb.textContent) || !/Paste the text/.test(fb.textContent) || !/Import screenshots/.test(fb.textContent)) throw new Error('Facebook: '+res.textContent.slice(0,200));
+        if(!fb || !/signed in/.test(fb.textContent) || !/Paste what I copied/.test(fb.textContent) || !/Facebook bookmark/.test(fb.textContent) || !/Import screenshots/.test(fb.textContent)) throw new Error('Facebook: '+res.textContent.slice(0,200));
         // Facebook's sign-in page read as text: no recipe in it, the same answer.
         reply=function(){ return { ok:true, json:async function(){ return { text:'Log in to Facebook to see this. '.repeat(8) }; } }; };
         await runUrlImport();
@@ -586,6 +586,44 @@ window.SELF_TESTS = [
       } finally {
         window.fetch=real.fetch; window.proxyConsent=real.consent; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
         inp.value=was; res.innerHTML='';
+      }
+    } },
+
+  { id:'import_facebook_text_from_own_page', group:'Import/Export', name:'A Facebook post\'s text comes in: pasted in one tap, or sent by the 📘 bookmark (v37.17)',
+    test: async()=>{
+      var real={ open:window.openFreehandModal, run:window.runFreehandImport, toast:window.toast, clip:navigator.clipboard && navigator.clipboard.readText, hash:location.hash, href:location.href };
+      var opened=null, ran=0;
+      var cap='🍫 העוגה הוויראלית\nמצרכים:\n• 6 ביצים\n• כוס סוכר\n• כוס שמן\nאופן הכנה: טורפים ביצים וסוכר';
+      try{
+        window.toast=function(){};
+        window.openFreehandModal=function(t, src){ opened={ t:t, src:src }; };
+        window.runFreehandImport=function(){ ran++; };
+        // 1. Copied in Facebook, pasted here in one tap — and read at once.
+        try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return cap; }, configurable:true }); }catch(e){ navigator.clipboard.readText=async function(){ return cap; }; }
+        await importCopiedText('https://www.facebook.com/share/r/X/');
+        if(!opened || opened.t!==cap || opened.src!=='https://www.facebook.com/share/r/X/' || ran!==1) throw new Error('pasting what was copied: '+JSON.stringify([opened, ran]));
+        // …only a link copied: the box opens empty and it says what to copy.
+        opened=null; ran=0;
+        try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return 'https://www.facebook.com/share/r/X/'; }, configurable:true }); }catch(e){}
+        await importCopiedText('');
+        if(!opened || opened.t!=='' || ran) throw new Error('a copied link was imported as a recipe');
+        // 2. The bookmark: runs on the Facebook page, opens this app with the text after '#'.
+        var code=facebookBookmarkletCode();
+        if(code.indexOf('javascript:')!==0) throw new Error('not a bookmark');
+        var app=String(APP_CONFIG.siteOrigin)+String(APP_CONFIG.sitePath);
+        if(code.indexOf(JSON.stringify(app))===-1) throw new Error('the bookmark does not open this app');
+        if(/%[0-9A-F]{2}/i.test(code)) throw new Error('a % in a bookmark address is decoded by the browser');
+        // …and the app takes it from there (the text never reaches a server).
+        opened=null;
+        history.replaceState(null, '', location.pathname + '#share-text=' + encodeURIComponent(cap) + '&share-url=' + encodeURIComponent('https://www.facebook.com/reel/1'));
+        handleShareTarget();
+        await new Promise(function(r){ setTimeout(r, 800); });
+        if(!opened || opened.t!==cap || opened.src!=='https://www.facebook.com/reel/1') throw new Error('the text sent by the bookmark: '+JSON.stringify(opened));
+        if(/share-text/.test(location.href)) throw new Error('the text stays in the address bar');
+      } finally {
+        window.openFreehandModal=real.open; window.runFreehandImport=real.run; window.toast=real.toast;
+        try{ if(real.clip) Object.defineProperty(navigator.clipboard, 'readText', { value: real.clip, configurable:true }); }catch(e){}
+        try{ history.replaceState(null, '', real.href); }catch(e){}
       }
     } },
 

@@ -458,6 +458,22 @@ found only because a test was written first and disagreed with the code.
     itself — check the amounts". Not set up / older Worker → the v37.14
     fallback, silently; any other failure is one line in that fallback.
     Facebook stays paste/screenshots (signed-in only; no route that works).
+  - **v37.17 — a Facebook post's text, taken from Tony's own signed-in page.**
+    Tony: "use my credentials". Never by storing a Facebook login or cookie on
+    the Worker (anyone breaking in would own his Facebook account; automated
+    access breaks Facebook's terms) — the text is taken where his login
+    already is. (1) `importCopiedText(url)`: "📋 Paste what I copied" reads the
+    clipboard (iPhone asks "Paste?") straight into free-hand + Parse; a copied
+    LINK is refused with what to copy. (2) `facebookBookmarkletCode()` /
+    `showFacebookBookmarklet()`: a bookmark run ON the Facebook page (Safari or
+    a computer): clicks "See more"/"הצג עוד" (never a bare "More"), takes the
+    selection, else the longest visible `[dir=auto]` text, else og:description,
+    and opens the app with `#share-text=…&share-url=…` — after '#', so no
+    server sees it and no URL-length limit bites. `handleShareTarget` reads
+    that fragment; a Facebook link + text goes to free-hand WITH the source
+    (like Instagram). No '%' may appear in the bookmark (browsers decode it).
+    Tried in Chromium against a mock page (see more expanded, comments left
+    out, selection wins); NOT against real Facebook, blocked from the sandbox.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection
