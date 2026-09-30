@@ -550,7 +550,7 @@ window.SELF_TESTS = [
         inp.value='https://www.facebook.com/share/r/1AkSMeYV4w/'; await runUrlImport();
         if(relays) throw new Error('a Facebook link was sent to a relay');
         var fb=document.getElementById('videoRecipeFallback');
-        if(!fb || !/signed in/.test(fb.textContent) || !/Paste what I copied/.test(fb.textContent) || !/Facebook bookmark/.test(fb.textContent) || !/Import screenshots/.test(fb.textContent)) throw new Error('Facebook: '+res.textContent.slice(0,200));
+        if(!fb || !/signed in/.test(fb.textContent) || !/Paste what I copied/.test(fb.textContent) || !/Facebook bookmark/.test(fb.textContent) || !/Import screenshots/.test(fb.textContent) || !/Import the video/.test(fb.textContent)) throw new Error('Facebook: '+res.textContent.slice(0,200));
         // Facebook's sign-in page read as text: no recipe in it, the same answer.
         reply=function(){ return { ok:true, json:async function(){ return { text:'Log in to Facebook to see this. '.repeat(8) }; } }; };
         await runUrlImport();
@@ -624,6 +624,37 @@ window.SELF_TESTS = [
         window.openFreehandModal=real.open; window.runFreehandImport=real.run; window.toast=real.toast;
         try{ if(real.clip) Object.defineProperty(navigator.clipboard, 'readText', { value: real.clip, configurable:true }); }catch(e){}
         try{ history.replaceState(null, '', real.href); }catch(e){}
+      }
+    } },
+
+  { id:'import_recipe_video_file', group:'Import/Export', name:'A recipe video (a screen recording of a reel) is read into a recipe (v37.18)',
+    test: async()=>{
+      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
+      var res=document.getElementById('urlImportResult'), sent=null, reply=null;
+      var fileOf=function(mb, type){ var f=new File([new Uint8Array(16)], 'rec.mov', { type:type||'video/quicktime' }); if(mb) Object.defineProperty(f, 'size', { value: mb*1048576 }); return f; };
+      try{
+        window.syncLog=function(){};
+        if(!document.querySelector('#cameraChoiceOverlay button[onclick*="pickRecipeVideo"]')) throw new Error('no video choice beside the photo ones');
+        window.fetch=async function(u, init){ sent={ u:String(u), init:init }; return reply(); };
+        window.extractRecipesFromText=async function(t){ return /6 eggs/.test(t) ? { name:'Hazelnut cake', ingredients:[{a:'6',n:'eggs'}], steps:['Bake.'] } : { error:'no recipe found' }; };
+        reply=function(){ return { status:200, json:async function(){ return { text:'Hazelnut cake\n6 eggs\nBake.', via:'gemini', fromFile:true }; } }; };
+        _videoSourceUrl='https://www.facebook.com/reel/1';
+        await importRecipeVideo({ target:{ files:[fileOf(0)] } });
+        if(!sent || !/\?action=video-file$/.test(sent.u) || sent.init.headers['X-App-Key']!==WORKER_APP_KEY || !(sent.init.body instanceof Blob)) throw new Error('the video was not sent to the Worker as a file: '+JSON.stringify(sent && sent.u));
+        if(!/Hazelnut cake/.test(res.textContent) || !/Read from the video itself/.test(res.textContent)) throw new Error('the recipe from the video: '+res.textContent.slice(0,200));
+        // Too big: said before anything is sent.
+        sent=null; await importRecipeVideo({ target:{ files:[fileOf(VIDEO_MAX_MB+5)] } });
+        if(sent || !/the most is/.test(res.textContent)) throw new Error('an oversized video: '+res.textContent.slice(0,160));
+        // No recipe in it, or a fault: said, with the next thing to try.
+        reply=function(){ return { status:200, json:async function(){ return { text:'', noRecipe:true }; } }; };
+        await importRecipeVideo({ target:{ files:[fileOf(0)] } });
+        if(!/no recipe was found/.test(res.textContent) || !/Another video/.test(res.textContent)) throw new Error('a video with no recipe: '+res.textContent.slice(0,160));
+        reply=function(){ return { status:503, json:async function(){ return { error:'VIDEO_KEY: the GEMINI_API_KEY was refused by Google (x).', needsConfig:true }; } }; };
+        await importRecipeVideo({ target:{ files:[fileOf(0)] } });
+        if(!/refused by Google/.test(res.textContent)) throw new Error('a key fault is not said: '+res.textContent.slice(0,160));
+      } finally {
+        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log; _videoSourceUrl='';
+        res.innerHTML=''; try{ closeM('urlImportOverlay'); }catch(e){}
       }
     } },
 
@@ -8504,8 +8535,12 @@ window.SELF_TESTS = [
       // ~60 KB of real features (households and the move, central languages
       // and their files, Bring!'s own import, putting a language back,
       // combining a shopping list) and the page reached 1403 KB.
+      // Raised to 1600 in v37.18, the same way: v36.96–v37.18 added ~100 KB
+      // of real features (households for everyone: first run, sign-in by
+      // password and link, deleting an account, asking to write; reading
+      // recipes from Facebook text and from videos) and it reached 1501 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 1500) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 1600) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

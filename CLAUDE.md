@@ -474,6 +474,19 @@ found only because a test was written first and disagreed with the code.
     (like Instagram). No '%' may appear in the bookmark (browsers decode it).
     Tried in Chromium against a mock page (see more expanded, comments left
     out, selection wins); NOT against real Facebook, blocked from the sandbox.
+  - **v37.18 + Worker v44 — a recipe VIDEO file (a screen recording of a
+    reel).** Gemini takes only YouTube LINKS, and Facebook shows reels only to
+    people signed in, so the video itself is given. `?action=video-file`, POST
+    body = the video, app key in `X-App-Key` (not JSON), same origin check and
+    rate limit, `VIDEO_MAX_MB` (50), same daily ceiling as `video-recipe`
+    (`videoDailyCap`). Worker: resumable upload to Gemini's Files API, wait
+    for ACTIVE (≤ ~80 s), `geminiRecipe` (shared with v43, the same fixed
+    prompt), then DELETE the file from Google in `finally`. QuickTime (an
+    iPhone screen recording) is sent as `video/mov`. App: `pickRecipeVideo` /
+    `importRecipeVideo` — from 📷 Scan a Recipe ("🎬 A video") and from the
+    Facebook/YouTube fallback ("🎬 Import the video"); the size is checked
+    before sending; every failure is said, with "Another video" / "Paste".
+    Page budget raised to 1600 KB (1501 KB reached).
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v43
+// Tony's Recipes — Cloudflare Worker v44
+// v44: `video-file` — a VIDEO the person gives the app (a screen recording of a
+//      Facebook reel, a saved TikTok, a clip sent on WhatsApp): Facebook shows
+//      reels only to people signed in, and Gemini takes only YouTube LINKS, so
+//      the video itself is what can be read. POST ?action=video-file with the
+//      video as the body (the app key in X-App-Key, as the body is not JSON).
+//      Capped (VIDEO_MAX_MB, 50), uploaded to Gemini's Files API, read with the
+//      same fixed request as v43, and DELETED from Google straight after. Same
+//      daily ceiling as video-recipe.
 // v43: `video-recipe` — the recipe SAID and SHOWN in a YouTube video, not only
 //      what its description says (a Short rarely has the recipe written down).
 //      Google's Gemini takes a public YouTube link directly and writes the
@@ -103,6 +111,7 @@
 //   GEMINI_MODEL    – optional; the model that watches the video
 //                     (default below). Change it if Google retires that one.
 //   VIDEO_DAILY_MAX – optional; videos per UTC day, all callers (60).
+//   VIDEO_MAX_MB    – optional; the largest video file accepted (50).
 // Without the key, the app keeps its "paste the text / screenshots" answer.
 //
 // ── SPEND CEILINGS (v39, optional) ───────────────────────────────────────────
@@ -113,7 +122,9 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v43';
+const WORKER_VERSION = 'v44';
+const VIDEO_MAX_MB_DEFAULT = 50;
+const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
 const VIDEO_DAILY_DEFAULT = 60;
 const VIDEO_RECIPE_PROMPT =
@@ -477,6 +488,15 @@ async function handleRequest(request, env) {
       return jsonResp({ error: 'FORBIDDEN: this Worker only serves Tony\'s Recipes.' }, 403, corsHeaders);
     }
 
+    // v44 — a video file: the body is the video, so the app key comes in the
+    // X-App-Key header. Same origin check (above), key, and rate limit.
+    if (new URL(request.url).searchParams.get('action') === 'video-file') {
+      if (!appKeyOk(request, env, null)) return jsonResp({ error: 'FORBIDDEN: missing or wrong app key.' }, 403, corsHeaders);
+      const limitedV = await rateLimited(request, env, 'video-recipe');
+      if (limitedV) return limitedV;
+      return await videoFileRecipe(request, env);
+    }
+
     let body;
     try { body = JSON.parse(await request.text()); }
     catch(e) { return jsonResp({ error: 'Invalid JSON' }, 400, corsHeaders); }
@@ -619,59 +639,15 @@ async function handleRequest(request, env) {
     if (body.action === 'video-recipe') {
       const ytId = extractYouTubeId(String(body.url || ''));
       if (!ytId) return jsonResp({ error: 'Only a YouTube video can be read this way.' }, 400);
-      const key = env.GEMINI_API_KEY;
-      if (!key) {
+      if (!env.GEMINI_API_KEY) {
         return jsonResp({ error: 'VIDEO_AI: reading recipes from videos is not set up on the server (GEMINI_API_KEY).',
           needsConfig: true }, 503);
       }
       // Its own daily ceiling, across all callers — Gemini's free allowance is
       // the real limit, this only keeps one busy day from using all of it.
-      const kv = env.BRING_KV;
-      if (kv) {
-        const vMax = parseInt(env.VIDEO_DAILY_MAX || '', 10) || VIDEO_DAILY_DEFAULT;
-        try {
-          const vDay = await kvCount(kv, 'rl:vid:' + utcDayKey(Date.now()), 60 * 60 * 48, 1);
-          if (vDay.used >= vMax) {
-            return jsonResp({ error: 'VIDEO_CAP: this Worker\'s daily ceiling for reading videos has been reached ('
-              + vDay.used + '/' + vMax + '). Raise VIDEO_DAILY_MAX, or try again tomorrow.', rateLimited: true }, 429);
-          }
-          await vDay.credit();
-        } catch (e) { /* unmetered is acceptable here: no billing on the key (see VIDEO RECIPES) */ }
-      }
-      const model = String(env.GEMINI_MODEL || GEMINI_MODEL_DEFAULT).replace(/[^a-zA-Z0-9._-]/g, '');
-      try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-          body: JSON.stringify({
-            contents: [{ parts: [
-              { file_data: { file_uri: 'https://www.youtube.com/watch?v=' + ytId } },
-              { text: VIDEO_RECIPE_PROMPT },
-            ] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
-          }),
-          signal: AbortSignal.timeout(110000),
-        });
-        let data = null;
-        try { data = await r.json(); } catch (e) {}
-        if (!r.ok) {
-          const msg = (data && data.error && data.error.message) || ('HTTP ' + r.status);
-          if (r.status === 429) return jsonResp({ error: 'VIDEO_QUOTA: Google\'s free allowance for reading videos is used up for now. Try again later.', rateLimited: true }, 429);
-          if (r.status === 404) return jsonResp({ error: 'VIDEO_MODEL: Gemini has no model "' + model + '" — set GEMINI_MODEL in the Worker\'s variables.', needsConfig: true }, 503);
-          if (r.status === 400 && /api key/i.test(msg)) return jsonResp({ error: 'VIDEO_KEY: the GEMINI_API_KEY was refused by Google.', needsConfig: true }, 503);
-          return jsonResp({ error: 'The video could not be read: ' + msg.slice(0, 300) }, 502);
-        }
-        const cand = data && data.candidates && data.candidates[0];
-        const text = ((cand && cand.content && cand.content.parts) || [])
-          .map(p => p && p.text || '').join('').trim();
-        if (!text) {
-          return jsonResp({ error: 'The video could not be read' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.' }, 502);
-        }
-        const none = /^NO RECIPE\.?$/i.test(text);
-        return jsonResp({ text: none ? '' : text.slice(0, 20000), noRecipe: none, isYouTube: true, videoId: ytId, via: 'gemini', model });
-      } catch (err) {
-        return jsonResp({ error: 'The video could not be read: ' + (err && err.name === 'TimeoutError' ? 'it took too long' : (err && err.message) || 'failed') }, 504);
-      }
+      const capped = await videoDailyCap(env);
+      if (capped) return capped;
+      return await geminiRecipe(env, { file_uri: 'https://www.youtube.com/watch?v=' + ytId }, { isYouTube: true, videoId: ytId });
     }
 
     if (body.action === 'fetch-url') {
@@ -1122,6 +1098,120 @@ async function handleRequest(request, env) {
     } catch(err) { return jsonResp({ error: err.message }, 500); }
 }
 
+// ─── VIDEO RECIPES (v43, v44) ────────────────────────────────────────────────
+// The daily ceiling both video actions share. null = go ahead.
+async function videoDailyCap(env) {
+  const kv = env.BRING_KV;
+  if (!kv) return null;
+  const vMax = parseInt(env.VIDEO_DAILY_MAX || '', 10) || VIDEO_DAILY_DEFAULT;
+  try {
+    const vDay = await kvCount(kv, 'rl:vid:' + utcDayKey(Date.now()), 60 * 60 * 48, 1);
+    if (vDay.used >= vMax) {
+      return jsonResp({ error: 'VIDEO_CAP: this Worker\'s daily ceiling for reading videos has been reached ('
+        + vDay.used + '/' + vMax + '). Raise VIDEO_DAILY_MAX, or try again tomorrow.', rateLimited: true }, 429);
+    }
+    await vDay.credit();
+  } catch (e) { /* unmetered is acceptable here: no billing on the key (see VIDEO RECIPES) */ }
+  return null;
+}
+function geminiModel(env) { return String(env.GEMINI_MODEL || GEMINI_MODEL_DEFAULT).replace(/[^a-zA-Z0-9._-]/g, ''); }
+// Google's answer, in words this app's owner can act on.
+function geminiFault(status, msg, model) {
+  if (status === 429) return jsonResp({ error: 'VIDEO_QUOTA: Google\'s free allowance for reading videos is used up for now. Try again later.', rateLimited: true }, 429);
+  if (status === 404) return jsonResp({ error: 'VIDEO_MODEL: Gemini has no model "' + model + '" — set GEMINI_MODEL in the Worker\'s variables.', needsConfig: true }, 503);
+  if ((status === 400 || status === 401 || status === 403) && /api key|api_key|credential|permission|unauth/i.test(msg))
+    return jsonResp({ error: 'VIDEO_KEY: the GEMINI_API_KEY was refused by Google (' + String(msg).slice(0, 160) + ').', needsConfig: true }, 503);
+  return jsonResp({ error: 'The video could not be read: ' + String(msg).slice(0, 300) }, 502);
+}
+// One fixed request: the video (a YouTube link, or a file uploaded here) and
+// VIDEO_RECIPE_PROMPT. Nothing the caller sends reaches Gemini but the video.
+async function geminiRecipe(env, fileData, extra) {
+  const model = geminiModel(env);
+  try {
+    const r = await fetch(`${GEMINI_API}/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        contents: [{ parts: [ { file_data: fileData }, { text: VIDEO_RECIPE_PROMPT } ] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+      }),
+      signal: AbortSignal.timeout(110000),
+    });
+    let data = null;
+    try { data = await r.json(); } catch (e) {}
+    if (!r.ok) return geminiFault(r.status, (data && data.error && data.error.message) || ('HTTP ' + r.status), model);
+    const cand = data && data.candidates && data.candidates[0];
+    const text = ((cand && cand.content && cand.content.parts) || []).map(p => p && p.text || '').join('').trim();
+    if (!text) return jsonResp({ error: 'The video could not be read' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.' }, 502);
+    const none = /^NO RECIPE\.?$/i.test(text);
+    return jsonResp(Object.assign({ text: none ? '' : text.slice(0, 20000), noRecipe: none, via: 'gemini', model }, extra || {}));
+  } catch (err) {
+    return jsonResp({ error: 'The video could not be read: ' + (err && err.name === 'TimeoutError' ? 'it took too long' : (err && err.message) || 'failed') }, 504);
+  }
+}
+// v44 — a video file: checked, uploaded to Gemini's Files API, read, deleted.
+async function videoFileRecipe(request, env) {
+  const key = env.GEMINI_API_KEY;
+  if (!key) return jsonResp({ error: 'VIDEO_AI: reading recipes from videos is not set up on the server (GEMINI_API_KEY).', needsConfig: true }, 503);
+  let type = String(request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  if (!/^video\/[a-z0-9.+-]+$/.test(type)) return jsonResp({ error: 'That is not a video file.' }, 415);
+  // An iPhone screen recording is QuickTime; Gemini calls that type video/mov.
+  if (type === 'video/quicktime') type = 'video/mov';
+  const maxMb = parseInt(env.VIDEO_MAX_MB || '', 10) || VIDEO_MAX_MB_DEFAULT;
+  const declared = parseInt(request.headers.get('Content-Length') || '', 10);
+  if (declared > maxMb * 1048576) return jsonResp({ error: 'VIDEO_TOO_BIG: the video is larger than ' + maxMb + ' MB. Record just the part with the recipe, or a lower quality.', tooBig: true }, 413);
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength) return jsonResp({ error: 'The video arrived empty.' }, 400);
+  if (bytes.byteLength > maxMb * 1048576) return jsonResp({ error: 'VIDEO_TOO_BIG: the video is larger than ' + maxMb + ' MB. Record just the part with the recipe, or a lower quality.', tooBig: true }, 413);
+  const capped = await videoDailyCap(env);
+  if (capped) return capped;
+  const model = geminiModel(env);
+  let fileName = '';
+  try {
+    // 1. Start a resumable upload; Google answers with where to send the bytes.
+    const start = await fetch(`${GEMINI_API}/upload/v1beta/files`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': key, 'X-Goog-Upload-Protocol': 'resumable', 'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Header-Content-Length': String(bytes.byteLength), 'X-Goog-Upload-Header-Content-Type': type,
+        'Content-Type': 'application/json' },
+      body: JSON.stringify({ file: { display_name: 'recipe-video' } }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const uploadUrl = start.headers.get('x-goog-upload-url');
+    if (!start.ok || !uploadUrl) {
+      let d = null; try { d = await start.json(); } catch (e) {}
+      return geminiFault(start.status, (d && d.error && d.error.message) || ('upload refused, HTTP ' + start.status), model);
+    }
+    // 2. The bytes, in one go.
+    const up = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { 'Content-Length': String(bytes.byteLength), 'X-Goog-Upload-Offset': '0', 'X-Goog-Upload-Command': 'upload, finalize' },
+      body: bytes,
+      signal: AbortSignal.timeout(90000),
+    });
+    let info = null; try { info = await up.json(); } catch (e) {}
+    const file = info && info.file;
+    if (!up.ok || !file || !file.name) return geminiFault(up.status, (info && info.error && info.error.message) || 'the upload did not finish', model);
+    fileName = file.name;
+    // 3. Google prepares a video before it can be read; wait for it (≤ ~80 s).
+    let state = file.state, uri = file.uri, mime = file.mimeType || type;
+    for (let i = 0; i < 40 && state === 'PROCESSING'; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const g = await fetch(`${GEMINI_API}/v1beta/${fileName}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
+      let gd = null; try { gd = await g.json(); } catch (e) {}
+      if (gd) { state = gd.state || state; uri = gd.uri || uri; mime = gd.mimeType || mime; }
+    }
+    if (state !== 'ACTIVE') return jsonResp({ error: 'The video could not be read: Google ' + (state === 'FAILED' ? 'could not process it' : 'took too long to prepare it') + '.' }, 502);
+    // 4. Read it, with the same fixed request as a YouTube video.
+    return await geminiRecipe(env, { mime_type: mime, file_uri: uri }, { fromFile: true });
+  } catch (err) {
+    return jsonResp({ error: 'The video could not be read: ' + (err && err.name === 'TimeoutError' ? 'it took too long' : (err && err.message) || 'failed') }, 504);
+  } finally {
+    // 5. Not kept at Google: deleted as soon as it has been read (or failed).
+    if (fileName) { try { await fetch(`${GEMINI_API}/v1beta/${fileName}`, { method: 'DELETE', headers: { 'x-goog-api-key': key } }); } catch (e) {} }
+  }
+}
+
 export default {
   async fetch(request, env) {
     const cors = corsFor(request, env);
@@ -1139,4 +1229,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v43 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v44 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

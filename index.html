@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.17 -->
+<!-- Tony's Recipes Collection v37.18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5014,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.17';
+var APP_VERSION = 'v37.18';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.17</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.18</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8291,7 +8291,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.17</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.18</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -8379,6 +8379,8 @@ body.banner-shown .header {
 <!-- CAMERA / PHOTO IMPORT -->
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processCameraImage(event)">
 <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processCameraImage(event)">
+<!-- v37.18 — a recipe video: a screen recording of a Facebook reel, a saved clip -->
+<input type="file" id="videoRecipeInput" accept="video/*" style="display:none" onchange="importRecipeVideo(event)">
 
 <div class="modal-overlay" id="cameraChoiceOverlay" onclick="bgClose(event,'cameraChoiceOverlay')">
   <div class="modal" style="max-width:380px;">
@@ -8390,6 +8392,7 @@ body.banner-shown .header {
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">
       <button class="btn-submit" style="margin-top:0;" onclick="closeM('cameraChoiceOverlay');document.getElementById('cameraInput').click()">📸 Take a photo now</button>
       <button class="btn-submit" style="margin-top:0;background:var(--warm-brown);" onclick="closeM('cameraChoiceOverlay');document.getElementById('galleryInput').click()">🖼️ Choose from gallery</button>
+      <button class="btn-submit" style="margin-top:0;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="closeM('cameraChoiceOverlay');pickRecipeVideo('')">🎬 A video — e.g. a screen recording of a reel</button>
     </div>
   </div>
 </div>
@@ -26526,10 +26529,12 @@ function showVideoRecipeFallback(url, kind, why) {
     + '<ul style="margin:4px 0 0;padding-inline-start:20px;font-size:13px;">'
     + '<li>' + (fb ? 'In Facebook, tap \u201cSee more\u201d under the post, long-press the text and Copy \u2014 then press \u{1F4CB} Paste what I copied.' : 'If the recipe is in a comment, copy it, then press \u{1F4CB} Paste what I copied.') + '</li>'
     + (fb ? '<li>In a browser (Safari, or on a computer): the \u{1F4D8} bookmark takes the text straight from the Facebook page.</li>' : '')
-    + '<li>Take screenshots where the ingredients and steps are shown, and import them as photos.</li>'
+    + '<li>The recipe is only in the video? Screen-record it (or save it), then press \u{1F3AC} Import the video.</li>'
+    + '<li>Or take screenshots where the ingredients and steps are shown, and import them as photos.</li>'
     + '</ul>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
     + '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;">\u{1F4CB} Paste what I copied</button>'
+    + '<button onclick="pickRecipeVideo(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + plain + '">\u{1F3AC} Import the video</button>'
     + (fb ? '<button onclick="showFacebookBookmarklet()" style="' + plain + '">\u{1F4D8} The Facebook bookmark</button>' : '')
     + '<button onclick="closeM(\'urlImportOverlay\');openCameraImport()" style="' + plain + '">\u{1F4F7} Import screenshots</button>'
     + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="' + plain + 'display:inline-flex;align-items:center;text-decoration:none;">\u2197 Open it</a>'
@@ -26555,6 +26560,67 @@ async function importCopiedText(sourceUrl) {
   return true;
 }
 window.importCopiedText = importCopiedText;
+// v37.18 — Tony: Facebook reels whose recipe is only IN the video. Facebook
+// shows reels only to people signed in, and Gemini takes only YouTube links —
+// so the video itself is given: a screen recording, or a saved clip. The Worker
+// (v44) hands it to Gemini, which writes out what is said and shown, and then
+// deletes it from Google. It is read like any other text from there.
+var VIDEO_MAX_MB = 50;
+var _videoSourceUrl = '';
+function pickRecipeVideo(sourceUrl) {
+  _videoSourceUrl = sourceUrl || '';
+  var inp = document.getElementById('videoRecipeInput');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+window.pickRecipeVideo = pickRecipeVideo;
+async function importRecipeVideo(event) {
+  var file = event && event.target && event.target.files && event.target.files[0];
+  if (!file) return false;
+  var overlay = document.getElementById('urlImportOverlay');
+  if (!overlay.classList.contains('open')) openUrlImportModal(_videoSourceUrl);
+  var res = document.getElementById('urlImportResult');
+  var mb = file.size / 1048576;
+  var sayWhy = function(why) {
+    res.innerHTML = '<div style="background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:14px;font-size:14px;line-height:1.6;color:var(--ink);">'
+      + '<strong>\u{1F3AC} ' + escH(why) + '</strong>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+      + '<button onclick="pickRecipeVideo(' + JSON.stringify(_videoSourceUrl).replace(/"/g, '&quot;') + ')" style="padding:11px 16px;min-height:44px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:var(--terracotta-fill);color:#fff;border:none;">\u{1F3AC} Another video</button>'
+      + '<button onclick="importCopiedText(' + JSON.stringify(_videoSourceUrl).replace(/"/g, '&quot;') + ')" style="padding:11px 16px;min-height:44px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);">\u{1F4CB} Paste what I copied</button>'
+      + '</div></div>';
+    return false;
+  };
+  if (mb > VIDEO_MAX_MB) return sayWhy('This video is ' + Math.round(mb) + ' MB \u2014 the most is ' + VIDEO_MAX_MB + ' MB. Record just the part with the recipe.');
+  res.innerHTML = spinner('\u{1F3AC} Sending the video (' + (mb < 1 ? '<1' : Math.round(mb)) + ' MB)\u2026 then watching it for the recipe. This can take a minute or two.');
+  var d = null, st = 0;
+  try {
+    var r = await fetch(WORKER_ENDPOINT + '?action=video-file', { method: 'POST',
+      headers: { 'Content-Type': file.type || 'video/mp4', 'X-App-Key': WORKER_APP_KEY }, body: file });
+    st = r.status;
+    try { d = await r.json(); } catch(e) {}
+  } catch(e) {
+    syncLog('error', 'Reading a video: the server could not be reached', String(e && e.message));
+    return sayWhy('The video could not be sent: ' + ((e && e.message) || 'network error') + '.');
+  }
+  if (!d || !d.text) {
+    syncLog('import', 'Reading a video gave no recipe', { status: st, why: d && (d.error || (d.noRecipe ? 'no recipe' : '')) });
+    if (d && d.noRecipe) return sayWhy('The video was watched, and no recipe was found in it.');
+    return sayWhy('The video could not be read: ' + String((d && d.error) || ('the server answered ' + st)).replace(/^[A-Z_]+: /, '').slice(0, 240));
+  }
+  res.innerHTML = spinner('Extracting recipe\u2026');
+  try {
+    var parsed = await extractRecipesFromText(d.text, 'a recipe written out from a cooking video');
+    if (!parsed || parsed.error) throw new Error((parsed && parsed.error) || 'no recipe found');
+    var built = buildImportFromParsed(parsed, _videoSourceUrl || '');
+    if (built.kind === 'none') throw new Error('no recipe found');
+    built.recipe._fromVideo = true;
+    syncLog('import', 'Recipe read from a video file', { mb: Math.round(mb * 10) / 10, model: d.model || '' });
+    applyParsedRecipe(built.recipe, 'urlImportResult', 'urlImportOverlay');
+    return true;
+  } catch(e) {
+    return sayWhy('The video was read, but no recipe could be made of it.');
+  }
+}
+window.importRecipeVideo = importRecipeVideo;
 // A bookmark that runs ON the Facebook page, in the person's own signed-in
 // browser: opens "See more", takes the post's text (or whatever is selected),
 // and opens this app with it after '#'. Nothing of Facebook's reaches our

@@ -586,6 +586,54 @@ console.log('\nvideo-recipe (v43):');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nvideo-file (v44):');
+{
+  const vpost = (bytes, type, headers = {}, origin = ORIGIN) => new Request('https://worker.test/?action=video-file', {
+    method: 'POST', headers: { 'Content-Type': type, 'Origin': origin, 'Content-Length': String(bytes.length), ...headers }, body: bytes });
+  const vid = new Uint8Array(3000).fill(7);
+  const ek = { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key' };
+  const noKey = await worker.fetch(vpost(vid, 'video/mp4'), ek);
+  expect('a video without the app key is refused', noKey.status === 403, `got ${noKey.status}`);
+  const foreign = await worker.fetch(vpost(vid, 'video/mp4', { 'X-App-Key': 'secret-k' }, 'https://evil.example'), ek);
+  expect('…and from another site', foreign.status === 403, `got ${foreign.status}`);
+  const notVideo = await worker.fetch(vpost(vid, 'text/html', { 'X-App-Key': 'secret-k' }), ek);
+  expect('only a video file is taken', notVideo.status === 415, `got ${notVideo.status}`);
+  const big = await worker.fetch(vpost(new Uint8Array(1100000), 'video/mp4', { 'X-App-Key': 'secret-k' }), Object.assign({ VIDEO_MAX_MB: '1' }, ek));
+  expect('a video over the size cap is refused, saying so', big.status === 413 && (await big.json()).tooBig === true, `got ${big.status}`);
+  const off = await worker.fetch(vpost(vid, 'video/mp4', { 'X-App-Key': 'secret-k' }), { APP_SHARED_KEY: 'secret-k' });
+  expect('without GEMINI_API_KEY it says it is not set up', off.status === 503 && (await off.json()).needsConfig === true, `got ${off.status}`);
+  check('…with CORS', off);
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  let polls = 0;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url); calls.push({ u, m: init.method || 'GET', h: init.headers || {}, b: init.body });
+    if (/upload\/v1beta\/files$/.test(u)) return new Response('{}', { status: 200, headers: { 'x-goog-upload-url': 'https://upload.example/u/1' } });
+    if (u === 'https://upload.example/u/1') return new Response(JSON.stringify({ file: { name: 'files/abc', uri: 'https://g.example/files/abc', state: 'PROCESSING', mimeType: 'video/mp4' } }), { status: 200 });
+    if (/v1beta\/files\/abc$/.test(u) && (init.method || 'GET') === 'GET') { polls++; return new Response(JSON.stringify({ name: 'files/abc', state: 'ACTIVE', uri: 'https://g.example/files/abc', mimeType: 'video/mp4' }), { status: 200 }); }
+    if (/v1beta\/files\/abc$/.test(u) && init.method === 'DELETE') return new Response('{}', { status: 200 });
+    if (/:generateContent$/.test(u)) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'עוגה\nמצרכים:\n6 ביצים' }] } }] }), { status: 200 });
+    return new Response('{}', { status: 404 });
+  };
+  try {
+    const r = await worker.fetch(vpost(vid, 'video/mp4', { 'X-App-Key': 'secret-k' }), ek);
+    const b = await r.json();
+    expect('a video file is read into the recipe it shows', r.status === 200 && /6 ביצים/.test(b.text) && b.fromFile === true, `got ${r.status} ${JSON.stringify(b)}`);
+    const upBody = calls.find(c => c.u === 'https://upload.example/u/1');
+    expect('…the whole video was uploaded to Google', upBody && upBody.b && upBody.b.byteLength === vid.length, JSON.stringify(upBody && upBody.b && upBody.b.byteLength));
+    expect('…after Google said it was ready', polls >= 1, 'no wait for ACTIVE');
+    const gen = calls.find(c => /:generateContent$/.test(c.u));
+    const parts = JSON.parse(gen.b).contents[0].parts;
+    expect('…read with the fixed request, by its uploaded address', parts[0].file_data.file_uri === 'https://g.example/files/abc' && /NO RECIPE/.test(parts[1].text), JSON.stringify(parts[0]));
+    expect('…and deleted from Google straight after', calls.some(c => c.m === 'DELETE' && /files\/abc$/.test(c.u)), 'no DELETE');
+    expect('…the key always in a header, never in an address', calls.every(c => !/g-key/.test(c.u)), 'key in a URL');
+    calls.length = 0;
+    await worker.fetch(vpost(vid, 'video/quicktime', { 'X-App-Key': 'secret-k' }), ek);
+    const st = calls.find(c => /upload\/v1beta\/files$/.test(c.u));
+    expect('an iPhone screen recording (QuickTime) goes to Google as video/mov', st && st.h['X-Goog-Upload-Header-Content-Type'] === 'video/mov', JSON.stringify(st && st.h));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nBring! set-token secret:');
 const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,
