@@ -601,7 +601,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'import_facebook_text_from_own_page', group:'Import/Export', name:'A Facebook post\'s text comes in: pasted in one tap, or sent by the 📘 bookmark (v37.17)',
+  { id:'import_facebook_text_from_own_page', group:'Import/Export', name:'A Facebook post\'s text comes in: pasted in one tap, or sent by the 📘 bookmark (v37.17, v37.20)',
     test: async()=>{
       var real={ open:window.openFreehandModal, run:window.runFreehandImport, toast:window.toast, clip:navigator.clipboard && navigator.clipboard.readText, hash:location.hash, href:location.href };
       var opened=null, ran=0;
@@ -619,6 +619,22 @@ window.SELF_TESTS = [
         try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return 'https://www.facebook.com/share/r/X/'; }, configurable:true }); }catch(e){}
         await importCopiedText('');
         if(!opened || opened.t!=='' || ran) throw new Error('a copied link was imported as a recipe');
+        // v37.20 — Tony pasted the bookmark's own code: recognised, never imported.
+        opened=null; ran=0;
+        var realAsk=window.askConfirm, told=null; window.askConfirm=async function(o){ told=o; return true; };
+        try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return facebookBookmarkletCode(); }, configurable:true }); }catch(e){}
+        await importCopiedText('');
+        window.askConfirm=realAsk;
+        if(opened || ran || !told || !/bookmark/.test(told.title)) throw new Error('the bookmark code was taken for a recipe: '+JSON.stringify([opened, ran, told && told.title]));
+        document.getElementById('freehandText').value=facebookBookmarkletCode();
+        await real.run();
+        if(!/not a recipe/.test(document.getElementById('freehandResult').textContent)) throw new Error('the recipe box parsed the bookmark code');
+        document.getElementById('freehandText').value=''; document.getElementById('freehandResult').innerHTML='';
+        // …and on a computer the bookmark is a button to DRAG to the bookmarks bar.
+        var shown=showFacebookBookmarklet();
+        var drag=document.getElementById('fbBookmarkDrag');
+        if(!drag || drag.getAttribute('href').indexOf('javascript:')!==0) throw new Error('no bookmark button to drag');
+        document.getElementById('askCancel').click(); await shown;
         // 2. The bookmark: runs on the Facebook page, opens this app with the text after '#'.
         var code=facebookBookmarkletCode();
         if(code.indexOf('javascript:')!==0) throw new Error('not a bookmark');

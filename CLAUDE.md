@@ -504,6 +504,18 @@ found only because a test was written first and disagreed with the code.
     with `busy:true` (a 429 left with no other model stays VIDEO_QUOTA). App:
     busy is said as "busy right now, try again in a minute or two"; the
     Facebook fallback no longer shows the reason left over from a YouTube try.
+  - **v37.20 — the bookmark's code is not a recipe.** Tony pressed "Copy the
+    bookmark", then "📋 Paste what I copied" — and the code went to the AI as
+    a recipe. `isBookmarkCode` (starts `javascript:`, or carries
+    `#share-text=`) is refused by `importCopiedText` and `runFreehandImport`
+    with what to copy instead. `showFacebookBookmarklet` now puts a
+    DRAGGABLE "📘 Send to My Kitchen Notes" link (`#fbBookmarkDrag`, click =
+    toast, not run) into the dialog for computers; copying the code is for
+    Safari on an iPhone, and says it goes into a bookmark's ADDRESS.
+    Why Facebook needs the person at all: the text exists only on their
+    signed-in page; browsers forbid one site reading another with your login,
+    and a Facebook login on our server is off the table (account takeover if
+    leaked; Facebook's terms). Graph API reads only Pages you manage.
   - **THE REAL FIRESTORE NEEDS AN INDEX THE EMULATOR NEVER ASKS FOR
     (v36.96).** `householdMemberships()` is a collection-GROUP query on
     `members` by `uid`; Firestore enables single-field indexes for collection

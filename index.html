@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.19 -->
+<!-- Tony's Recipes Collection v37.20 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5014,7 +5014,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.19';
+var APP_VERSION = 'v37.20';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7646,7 +7646,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.19</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.20</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8291,7 +8291,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.19</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.20</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17549,6 +17549,9 @@ async function runFreehandImport() {
   const text = document.getElementById('freehandText').value.trim();
   if (!text) { toast('Please paste a recipe first'); return; }
   const res = document.getElementById('freehandResult');
+  // v37.20 — Tony pasted the 📘 bookmark's code here (it was what he had last
+  // copied). It is not a recipe, and the AI was asked to find one in it.
+  if (isBookmarkCode(text)) { res.innerHTML = bookmarkCodeNotRecipeHtml(); return; }
   res.innerHTML = `<div class="explore-loading"><div class="ai-spinner"></div><br>Parsing recipe…</div>`;
 
   try {
@@ -26546,9 +26549,26 @@ window.showVideoRecipeFallback = showVideoRecipeFallback;
 // v37.17 — Tony: "the text is right there under the reel". It is, on HIS
 // signed-in screen — so it is taken from there: copied in Facebook, and read
 // here from the clipboard in one tap (iPhone asks "Paste?" once).
+// v37.20 — the 📘 bookmark's own code, copied to become a bookmark, is the
+// likeliest wrong thing on the clipboard. Recognised, and said so.
+function isBookmarkCode(t) { return /^\s*javascript:/i.test(String(t || '')) || /#share-text=/.test(String(t || '').slice(0, 2000)); }
+window.isBookmarkCode = isBookmarkCode;
+function bookmarkCodeNotRecipeHtml() {
+  return '<div style="background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.6;color:var(--ink);">'
+    + '<strong>\u{1F4D8} That is the Facebook bookmark\u2019s code, not a recipe.</strong><br>'
+    + 'It goes into a bookmark (see \u{1F4D8} The Facebook bookmark). To import the reel: in Facebook tap \u201cSee more\u201d, '
+    + 'select the post\u2019s text and copy it \u2014 then paste that here.</div>';
+}
 async function importCopiedText(sourceUrl) {
   var t = '';
   try { t = await navigator.clipboard.readText(); } catch(e) {}
+  if (isBookmarkCode(t)) {
+    await askConfirm({ icon: '\u{1F4D8}', title: 'That is the bookmark\u2019s code, not a recipe',
+      message: 'What you copied last is the Facebook bookmark\u2019s code \u2014 it belongs in a bookmark, not here.\n\n'
+        + 'To import the reel: in Facebook tap \u201cSee more\u201d under it, select the text and copy it, then press \u{1F4CB} Paste what I copied again.',
+      okLabel: 'OK', cancelLabel: 'Close' });
+    return false;
+  }
   var words = String(t || '').replace(/https?:\/\/\S+/g, '').trim();
   ['urlImportOverlay', 'exploreOverlay', 'suggestOverlay'].forEach(function(id){ var el = document.getElementById(id); if (el) el.classList.remove('open'); });
   openFreehandModal(words.length >= 40 ? t : '', sourceUrl || '');
@@ -26646,15 +26666,37 @@ function facebookBookmarkletCode() {
 window.facebookBookmarkletCode = facebookBookmarkletCode;
 async function showFacebookBookmarklet() {
   var code = facebookBookmarkletCode();
-  var ok = await askConfirm({ icon: '\u{1F4D8}', title: 'Send to My Kitchen Notes \u2014 a bookmark for Facebook',
-    message: 'For Facebook in a browser (Safari, or on a computer). Set it up once:\n\n'
-      + '1. Press \u201cCopy the bookmark\u201d below.\n'
-      + '2. Bookmark any page, then edit that bookmark: name it \u201cSend to My Kitchen Notes\u201d and paste what you copied as its address.\n'
-      + '3. On a Facebook post or reel, open the bookmark. It opens \u201cSee more\u201d, takes the text, and opens this app with it.\n\n'
-      + 'If it picks the wrong text, select the recipe text first, then open the bookmark. It runs in your own browser, on your own Facebook page \u2014 your login never leaves it.',
-    okLabel: 'Copy the bookmark', cancelLabel: 'Close' });
+  // v37.20 — Tony copied the code and pasted it into the recipe box. On a
+  // computer there is nothing to copy: the button is DRAGGED to the bookmarks
+  // bar. Copying the code is for Safari on an iPhone only, and says where it goes.
+  var asked = askConfirm({ icon: '\u{1F4D8}', title: 'Send to My Kitchen Notes \u2014 a bookmark for Facebook',
+    message: 'On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). '
+      + 'Then, on a Facebook post or reel, click that bookmark: it opens \u201cSee more\u201d, takes the text and opens this app with it.\n\n'
+      + 'On an iPhone (Safari): press \u201cCopy the bookmark code\u201d, bookmark any page, edit that bookmark and paste the code as its ADDRESS.\n\n'
+      + 'The code is not a recipe \u2014 never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.',
+    okLabel: 'Copy the bookmark code', cancelLabel: 'Close' });
+  var body = document.querySelector('#askOverlay .ask-body');
+  if (body) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'text-align:center;margin:14px 0 4px;';
+    var a = document.createElement('a');
+    a.id = 'fbBookmarkDrag';
+    a.href = code;
+    a.textContent = '\u{1F4D8} Send to My Kitchen Notes';
+    a.title = 'Drag me to your bookmarks bar';
+    a.style.cssText = 'display:inline-block;padding:10px 16px;border-radius:8px;background:var(--terracotta-fill);color:#fff;'
+      + 'font-weight:600;text-decoration:none;cursor:grab;border:2px dashed rgba(255,255,255,0.6);';
+    a.onclick = function(e) { e.preventDefault(); toast('Drag this button onto your bookmarks bar \u2014 clicking it here does nothing.', 6000); };
+    wrap.appendChild(a);
+    var hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11.5px;color:var(--muted);margin-top:4px;';
+    hint.textContent = '\u2191 drag this to the bookmarks bar';
+    wrap.appendChild(hint);
+    body.appendChild(wrap);
+  }
+  var ok = await asked;
   if (ok !== true) return false;
-  try { await navigator.clipboard.writeText(code); toast('\u{1F4CB} Copied \u2014 now paste it as a bookmark\u2019s address', 8000); }
+  try { await navigator.clipboard.writeText(code); toast('\u{1F4CB} Copied \u2014 paste it as a bookmark\u2019s ADDRESS (not into the recipe box)', 9000); }
   catch(e) { await askConfirm({ icon: '\u{1F4D8}', title: 'Copy this as the bookmark\u2019s address', message: code, okLabel: 'Done' }); }
   return true;
 }
