@@ -681,6 +681,16 @@ found only because a test was written first and disagreed with the code.
     whole-caption reason goes FIRST in `tried`. App: busy is waited out once
     by itself (`VIDEO_BUSY_WAIT_MS`, 20 s) before it is said; the box says
     "Facebook showed only the start, and the rest was not found (why)".
+  - **v37.33 — a shared link ran an OLD app (service worker).** Tony's run
+    after deploying v37.32 reported "App v37.30" and the 17:07 link
+    (`?mibextid=ZZyLBr`). sw.js filed the app document under its WHOLE
+    address, query included, so every `/?url=<link>` had its own cached copy,
+    and sharing the same reel again served the version that first opened it —
+    no fix could ever reach a link shared before it. sw.js (cache v9) now
+    files the app under its plain path only, and a request WITH a query (a
+    shared link — a fresh action) goes network-first, the cache only offline.
+    `tests/sw-probe.js` reports what was served and under which keys;
+    `sw_serves_only_the_app_shell` checks it (fails on the old sw.js — run).
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

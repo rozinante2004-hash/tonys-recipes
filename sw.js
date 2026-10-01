@@ -3,7 +3,7 @@
 // version.json is never cached, and the in-app update banner is what tells the
 // user a newer version has landed — see the note on the fetch handler below.
 
-const CACHE_NAME = 'tonys-recipes-v8';
+const CACHE_NAME = 'tonys-recipes-v9';   // v9 (app v37.33): drops v8's copies filed under ?url=… addresses
 // v5 (app v36.72) — WHERE the app lives is no longer written in: it is the
 // folder this worker was registered for. The live site is served from
 // /tonys-recipes/ (so nothing changes there); the test copy from the root of its
@@ -97,15 +97,26 @@ self.addEventListener('fetch', function(event) {
   // update banner when they differ. So a user on a stale copy is TOLD, rather
   // than left to wonder — and the fresh copy is already downloaded by then, so
   // tapping Update Now is instant.
+  //
+  // v37.33 — ONE copy of the app, filed under its plain address. It used to be
+  // filed under the WHOLE address, query included, so a link shared into the
+  // app (`/?url=<the reel>`) got a copy of its own: sharing the same reel again
+  // served the app version that first opened it. Tony's v37.32 run came back
+  // as v37.30, from a share at 17:07 — and a fix could never reach a link
+  // shared before it. And a shared link is a fresh action, not a re-open: it
+  // goes to the network FIRST (the cache only when offline), so what runs the
+  // import is always the newest app.
   if (isAppDocument(event.request.url)) {
+    var key = swPath(event.request.url);
+    var shared = /\?./.test(event.request.url);
     event.respondWith(
-      caches.match(event.request).then(function(cached) {
+      caches.match(key).then(function(cached) {
         var network = fetch(event.request)
           .then(function(response) {
             if (response && response.ok) {
               var clone = response.clone();
               caches.open(CACHE_NAME).then(function(cache) {
-                cache.put(event.request, clone);
+                cache.put(key, clone);
               });
             }
             return response;
@@ -117,6 +128,8 @@ self.addEventListener('fetch', function(event) {
           });
         // Cached copy now if we have one, and the network copy lands in the
         // cache for next time. First ever visit falls through to the network.
+        // A shared link waits for the network (falling back to the cache).
+        if (shared) return network.then(function(r) { return (r && r.ok) ? r : (cached || r); });
         return cached || network;
       })
     );

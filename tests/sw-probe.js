@@ -49,15 +49,16 @@ function install(name, value) {
 async function claims(url, destination) {
   if (typeof captured.fetch !== 'function') return null;
 
-  var responded = false, fetched = false;
+  var responded = false, fetched = false, served = null, keys = [];
   var cachedHit = { ok: true, clone: function() { return this; }, _fake: 'cached' };
+  var networkHit = { ok: true, clone: function() { return this; }, _fake: 'network' };
 
   var realFetch = self.fetch;
   var realCaches = self.caches;
-  install('fetch', function() { fetched = true; return Promise.resolve(cachedHit); });
+  install('fetch', function() { fetched = true; return Promise.resolve(networkHit); });
   install('caches', {
-    match: function() { return Promise.resolve(cachedHit); },
-    open: function() { return Promise.resolve({ put: function() { return Promise.resolve(); },
+    match: function(k) { keys.push(String(k && k.url || k)); return Promise.resolve(cachedHit); },
+    open: function() { return Promise.resolve({ put: function(k) { keys.push(String(k && k.url || k)); return Promise.resolve(); },
                                                 addAll: function() { return Promise.resolve(); } }); },
     keys: function() { return Promise.resolve([]); },
     delete: function() { return Promise.resolve(true); }
@@ -66,7 +67,7 @@ async function claims(url, destination) {
   try {
     var event = {
       request: { url: url, destination: destination || '', mode: 'navigate' },
-      respondWith: function(p) { responded = true; if (p && p.catch) p.catch(function() {}); },
+      respondWith: function(p) { responded = true; if (p && p.then) p.then(function(r) { served = r && r._fake; }, function() {}); },
       waitUntil: function() {}
     };
     try { captured.fetch(event); }
@@ -79,7 +80,7 @@ async function claims(url, destination) {
     install('fetch', realFetch);
     install('caches', realCaches);
   }
-  return { responded: responded, revalidated: fetched };
+  return { responded: responded, revalidated: fetched, served: served, keys: keys };
 }
 
 realAdd('message', function(e) {

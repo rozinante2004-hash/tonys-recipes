@@ -7547,7 +7547,7 @@ window.SELF_TESTS = [
         throw new Error('Update Now would empty the cache while offline, leaving a blank app');
     } },
 
-  { id:'sw_serves_only_the_app_shell', group:'UI', name:'The service worker caches the app and nothing else (v34.9)',
+  { id:'sw_serves_only_the_app_shell', group:'UI', name:'The service worker caches the app and nothing else; a shared link runs in the newest app (v34.9, v37.33)',
     test: async()=>{
       // sw.js used to claim every html page in scope, because
       // `event.request.destination === 'document'` matches all of them. So
@@ -7570,7 +7570,8 @@ window.SELF_TESTS = [
             { url:'https://x/tonys-recipes/index.html',        destination:'document' },
             { url:'https://x/tonys-recipes/icons/icon-192.png',destination:'image'    },
             { url:'https://x/tonys-recipes/filename-test.html',destination:'document' },
-            { url:'https://x/tonys-recipes/tests/sw-probe.js', destination:'script'   }
+            { url:'https://x/tonys-recipes/tests/sw-probe.js', destination:'script'   },
+            { url:'https://x/tonys-recipes/?url=https%3A%2F%2Fwww.facebook.com%2Freel%2F1', destination:'document' }
           ]});
         });
         if(reply.loadError) throw new Error('sw.js would not load: ' + reply.loadError);
@@ -7595,6 +7596,12 @@ window.SELF_TESTS = [
         // Anything else must pass straight through to the network.
         if(r[3].responded) throw new Error('filename-test.html is served by the worker, so a fixed copy cannot reach the user');
         if(r[4].responded) throw new Error('an arbitrary file under /tonys-recipes/ is pinned in the worker cache on first fetch');
+        // v37.33 — a link shared into the app: the NEWEST app runs it (network
+        // first), and the one copy is kept under the plain address — never a
+        // copy per shared link (Tony's repeat share came back as v37.30).
+        if(!r[5].responded || r[5].served!=='network') throw new Error('a shared link is not opened in the newest app: '+JSON.stringify(r[5]));
+        if(!r[5].keys.length || r[5].keys.some(function(k){ return /\?/.test(k); })) throw new Error('the app is filed under a shared link\'s address: '+JSON.stringify(r[5].keys));
+        if(r[0].served!=='cached') throw new Error('a plain open no longer paints from the cache first: '+JSON.stringify(r[0]));
       } finally { probe.terminate(); }
     } },
 
