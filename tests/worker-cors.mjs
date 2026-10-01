@@ -683,6 +683,41 @@ console.log('\nfacebook-fetch (v47):');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nthe cascade (v48):');
+{
+  const ek = { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key' };
+  const realFetch = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url); asked.push(u);
+    if (/instagram_oembed|api\.instagram\.com\/oembed/.test(u)) return new Response(JSON.stringify({ title: '', author_name: 'chef', html: '<blockquote>View this post on Instagram</blockquote>' }), { status: 200 });
+    if (/\/embed\/captioned\//.test(u)) return new Response('<html><body><div class="Caption"><a class="CaptionUsername" href="#">chef</a><br>Shakshuka for two: 4 eggs, 2 tomatoes, 1 pepper. Fry, add, cover 6 minutes.<div class="CaptionComments">View all 12 comments</div></div><script>{"video_url":"https:\\/\\/scontent.cdninstagram.com\\/v\\/abc.mp4?x=1\\u0026y=2"}</script></body></html>', { status: 200 });
+    if (/plugins\/video\.php/.test(u)) return new Response('<html><body><div>Facebook</div><script>{"browser_native_hd_url":"https:\\/\\/video.xx.fbcdn.net\\/v\\/reel.mp4?a=1"}</script></body></html>', { status: 200 });
+    if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+    if (/fbcdn\.net\/v\/reel\.mp4/.test(u)) return new Response(new Uint8Array(2000), { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': '2000' } });
+    if (/upload\/v1beta\/files$/.test(u)) return new Response('{}', { status: 200, headers: { 'x-goog-upload-url': 'https://upload.example/u/9' } });
+    if (u === 'https://upload.example/u/9') return new Response(JSON.stringify({ file: { name: 'files/r9', uri: 'https://g.example/files/r9', state: 'ACTIVE', mimeType: 'video/mp4' } }), { status: 200 });
+    if (/:generateContent$/.test(u)) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Aglio e olio\n200 g spaghetti' }] } }] }), { status: 200 });
+    if (/files\/r9$/.test(u)) return new Response('{}', { status: 200 });
+    return new Response('', { status: 404 });
+  };
+  try {
+    let b = await (await worker.fetch(post({ action: 'instagram-fetch', shortcode: 'ABC123', appKey: 'secret-k' }), ek)).json();
+    expect('Instagram: no caption in the official embed → the captioned embed page, username left out',
+      b.via === 'embed-captioned' && /^Shakshuka for two/.test(b.text) && !/chef|View all/.test(b.text), JSON.stringify(b));
+    expect('…with the post\'s video address, unescaped', b.videoUrl === 'https://scontent.cdninstagram.com/v/abc.mp4?x=1&y=2', b.videoUrl);
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/777', appKey: 'secret-k' }), ek)).json();
+    expect('Facebook: no words, but the reel\'s video address from the public embed page', b.text === '' && b.videoUrl === 'https://video.xx.fbcdn.net/v/reel.mp4?a=1', JSON.stringify(b));
+    const bad = await worker.fetch(post({ action: 'video-from-url', url: 'https://evil.example/x.mp4', appKey: 'secret-k' }), ek);
+    expect('video-from-url: only Facebook\'s and Instagram\'s video servers', bad.status === 400, `got ${bad.status}`);
+    const bad2 = await worker.fetch(post({ action: 'video-from-url', url: 'https://fbcdn.net.evil.example/x.mp4', appKey: 'secret-k' }), ek);
+    expect('…not a look-alike address', bad2.status === 400, `got ${bad2.status}`);
+    asked.length = 0;
+    b = await (await worker.fetch(post({ action: 'video-from-url', url: 'https://video.xx.fbcdn.net/v/reel.mp4?a=1', appKey: 'secret-k' }), ek)).json();
+    expect('…the reel\'s video is read into its recipe, and deleted from Google after', /200 g spaghetti/.test(b.text) && asked.some(u => /files\/r9$/.test(u)), JSON.stringify(b));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nvideo-file (v44):');
 {
   const vpost = (bytes, type, headers = {}, origin = ORIGIN) => new Request('https://worker.test/?action=video-file', {

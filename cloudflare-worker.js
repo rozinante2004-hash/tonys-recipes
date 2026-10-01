@@ -1,4 +1,13 @@
-// Tony's Recipes — Cloudflare Worker v47
+// Tony's Recipes — Cloudflare Worker v48
+// v48: THE CASCADE (Tony: try everything yourself, ask the person last).
+//      - instagram-fetch: when the official embed gives no caption, the
+//        public captioned-embed page (/p/<code>/embed/captioned/) — and the
+//        post's video address, when the page carries one.
+//      - facebook-fetch: the public embed page's video address too.
+//      - `video-from-url`: a reel's VIDEO read by Gemini when its words hold no
+//        recipe — downloaded here ONLY from Facebook's and Instagram's own
+//        video servers (fbcdn.net, cdninstagram.com), size-capped, uploaded to
+//        Gemini, read with the fixed request, deleted.
 // v47: `facebook-fetch` — a public Facebook post's text from its LINK, through
 //      Facebook's own public routes, so a phone needs only "Copy link": (1) a
 //      share link (/share/r/…, fb.watch) is followed to the post it points
@@ -144,7 +153,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v47';
+const WORKER_VERSION = 'v48';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -295,7 +304,7 @@ async function kvCount(kv, key, ttlSec, sample) {
 async function rateLimited(request, env, action) {
   const kv = env.BRING_KV;
   // The AI path (no action) is the expensive one; browsing photos is cheap.
-  const costly = !action || action === 'ai' || action === 'instagram-fetch' || action === 'video-recipe';
+  const costly = !action || action === 'ai' || action === 'instagram-fetch' || action === 'video-recipe' || action === 'video-from-url';
   // Narrower than `costly`: instagram-fetch is slow but it does not spend
   // Anthropic credits, so it must not eat into the AI ceilings.
   const aiSpend = !action || action === 'ai';
@@ -604,6 +613,7 @@ async function handleRequest(request, env) {
       // is often "we got the post, not the words", and the app is told so via
       // `partial` rather than being left to guess.
       const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+      let igPartial = null;
       const endpoints = [
         `https://graph.facebook.com/v23.0/instagram_oembed?omitscript=true&url=${encodeURIComponent(postUrl)}`,
         `https://graph.facebook.com/v20.0/instagram_oembed?omitscript=true&url=${encodeURIComponent(postUrl)}`,
@@ -641,6 +651,7 @@ async function handleRequest(request, env) {
             .trim();
           const caption = title.length >= cleaned.length ? title : cleaned;
           const text = [caption, author ? 'By: ' + author : ''].filter(Boolean).join('\n\n');
+          if (caption.trim().length < 40) { igPartial = { title, author, thumbnail: data.thumbnail_url || '' }; break; }   // v48 → the captioned embed
           return jsonResp({
             title, author, text,
             thumbnail: data.thumbnail_url || '',
@@ -650,10 +661,29 @@ async function handleRequest(request, env) {
           });
         } catch(e) { /* try the next endpoint */ }
       }
+      // v48 — the public captioned-embed page (what a website's embed shows):
+      // the caption, and the video's address for when the words hold no recipe.
+      let igVideo = '';
+      try {
+        const r = await fetch(`https://www.instagram.com/p/${encodeURIComponent(shortcode)}/embed/captioned/`,
+          { headers: Object.assign({ Accept: 'text/html' }, FB_UA), signal: AbortSignal.timeout(10000) });
+        if (r.ok) {
+          const html = await r.text();
+          igVideo = videoUrlIn(html);
+          const cap = (html.match(/<div[^>]+class="[^"]*\bCaption\b[^"]*"[^>]*>([\s\S]*?)<div[^>]+class="[^"]*\bCaptionComments\b/i)
+                   || html.match(/<div[^>]+class="[^"]*\bCaption\b[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) || [])[1] || '';
+          const text = htmlText(cap.replace(/<a[^>]+class="[^"]*\bCaptionUsername\b[^"]*"[^>]*>[\s\S]*?<\/a>/i, ''))
+            .replace(/^(View all \d+ comments|View this post on Instagram)$/gim, '').trim();
+          if (text.length >= 40) return jsonResp({ title: (igPartial && igPartial.title) || '', author: (igPartial && igPartial.author) || '',
+            text, via: 'embed-captioned', videoUrl: igVideo, partial: false });
+        }
+      } catch (e) { /* nothing more to try here */ }
       // 404 rather than 500: this is "no caption available", not a broken Worker.
       return jsonResp({
-        error: 'Instagram did not return a caption for this post. Copy the caption and paste it into the free-hand importer instead.',
-        unavailable: true,
+        error: 'Instagram did not return a caption for this post.',
+        unavailable: true, videoUrl: igVideo,
+        title: (igPartial && igPartial.title) || '', author: (igPartial && igPartial.author) || '',
+        partial: !!igPartial,
       }, 404);
     }
 
@@ -670,6 +700,11 @@ async function handleRequest(request, env) {
       const capped = await videoDailyCap(env);
       if (capped) return capped;
       return await geminiRecipe(env, { file_uri: 'https://www.youtube.com/watch?v=' + ytId }, { isYouTube: true, videoId: ytId });
+    }
+
+    // ── video-from-url (v48) ─────────────────────────────────────────────────
+    if (body.action === 'video-from-url') {
+      return await videoFromUrl(env, String(body.url || ''));
     }
 
     // ── facebook-fetch (v47) ─────────────────────────────────────────────────
@@ -1282,6 +1317,12 @@ async function videoFileRecipe(request, env) {
   const bytes = await request.arrayBuffer();
   if (!bytes.byteLength) return jsonResp({ error: 'The video arrived empty.' }, 400);
   if (bytes.byteLength > maxMb * 1048576) return jsonResp({ error: 'VIDEO_TOO_BIG: the video is larger than ' + maxMb + ' MB. Record just the part with the recipe, or a lower quality.', tooBig: true }, 413);
+  return await videoBytesRecipe(env, bytes, type);
+}
+// v48 — the upload/read/delete, shared by a file sent by the app and a reel's
+// video fetched from Facebook's or Instagram's video servers.
+async function videoBytesRecipe(env, bytes, type) {
+  const key = env.GEMINI_API_KEY;
   const capped = await videoDailyCap(env);
   if (capped) return capped;
   const model = await geminiModelNow(env);
@@ -1329,6 +1370,46 @@ async function videoFileRecipe(request, env) {
     // 5. Not kept at Google: deleted as soon as it has been read (or failed).
     if (fileName) { try { await fetch(`${GEMINI_API}/v1beta/${fileName}`, { method: 'DELETE', headers: { 'x-goog-api-key': key } }); } catch (e) {} }
   }
+}
+
+// ─── A REEL'S VIDEO (v48) ────────────────────────────────────────────────────
+// Only the platforms' own video servers — this must never become a way to make
+// the Worker download anything from anywhere.
+function isPlatformVideo(u) {
+  try {
+    const x = new URL(u);
+    return x.protocol === 'https:' && /(^|\.)(fbcdn\.net|cdninstagram\.com)$/i.test(x.hostname);
+  } catch (e) { return false; }
+}
+// A video address inside a public embed page (escaped JSON or a <video> tag).
+function videoUrlIn(html) {
+  const h = String(html || '');
+  const pats = [/"(?:browser_native_hd_url|playable_url_quality_hd|hd_src|video_url|browser_native_sd_url|playable_url|sd_src)"\s*:\s*"([^"]+)"/,
+                /<video[^>]+src="([^"]+)"/i, /<source[^>]+src="([^"]+)"/i];
+  for (const re of pats) {
+    const m = re.exec(h);
+    if (!m) continue;
+    let u = m[1].replace(/\\\//g, '/').replace(/\\u0025/gi, '%').replace(/\\u0026/gi, '&').replace(/&amp;/g, '&');
+    if (isPlatformVideo(u)) return u;
+  }
+  return '';
+}
+async function videoFromUrl(env, u) {
+  if (!env.GEMINI_API_KEY) return jsonResp({ error: 'VIDEO_AI: reading recipes from videos is not set up on the server (GEMINI_API_KEY).', needsConfig: true }, 503);
+  if (!isPlatformVideo(u)) return jsonResp({ error: 'Only a video on Facebook\'s or Instagram\'s own video servers can be read this way.' }, 400);
+  const maxMb = parseInt(env.VIDEO_MAX_MB || '', 10) || VIDEO_MAX_MB_DEFAULT;
+  let r;
+  try { r = await fetch(u, { headers: FB_UA, signal: AbortSignal.timeout(30000) }); }
+  catch (e) { return jsonResp({ error: 'The video could not be fetched: ' + e.message }, 502); }
+  if (!r.ok) return jsonResp({ error: 'The video could not be fetched (HTTP ' + r.status + ').' }, 502);
+  const len = parseInt(r.headers.get('content-length') || '', 10);
+  if (len > maxMb * 1048576) return jsonResp({ error: 'VIDEO_TOO_BIG: the video is larger than ' + maxMb + ' MB.', tooBig: true }, 413);
+  let type = String(r.headers.get('content-type') || 'video/mp4').split(';')[0].trim().toLowerCase();
+  if (!/^video\//.test(type)) type = 'video/mp4';
+  const bytes = await r.arrayBuffer();
+  if (!bytes.byteLength) return jsonResp({ error: 'The video came back empty.' }, 502);
+  if (bytes.byteLength > maxMb * 1048576) return jsonResp({ error: 'VIDEO_TOO_BIG: the video is larger than ' + maxMb + ' MB.', tooBig: true }, 413);
+  return await videoBytesRecipe(env, bytes, type);
 }
 
 // ─── FACEBOOK (v47) ──────────────────────────────────────────────────────────
@@ -1379,20 +1460,23 @@ async function facebookFetch(env, url) {
       tried.push(kind + ': no text in the embed');
     } catch (e) { tried.push(kind + ': ' + e.message); }
   }
-  // 3. The public embed page, as a website's iframe shows it.
+  // 3. The public embed page, as a website's iframe shows it — its text, and
+  //    (v48) the video's address, for when the words hold no recipe.
+  let videoUrl = '';
   for (const plugin of (video ? ['video', 'post'] : ['post', 'video'])) {
     try {
       const r = await fetch(`https://www.facebook.com/plugins/${plugin}.php?href=${encodeURIComponent(clean)}&show_text=true&width=500`,
         { headers: Object.assign({ Accept: 'text/html' }, FB_UA), signal: AbortSignal.timeout(12000) });
       if (!r.ok) { tried.push('embed ' + plugin + ': HTTP ' + r.status); continue; }
       const html = await r.text();
+      videoUrl = videoUrl || videoUrlIn(html);
       const body = (html.match(/<body[\s\S]*<\/body>/i) || [html])[0];
       const text = fbPostText(htmlText(body));
-      if (text.length >= 60) return { text: text.slice(0, 20000), via: 'embed-' + plugin, url: clean };
+      if (text.length >= 60) return { text: text.slice(0, 20000), via: 'embed-' + plugin, url: clean, videoUrl };
       tried.push('embed ' + plugin + ': no text');
     } catch (e) { tried.push('embed ' + plugin + ': ' + e.message); }
   }
-  return { text: '', url: clean, tried };
+  return { text: '', url: clean, tried, videoUrl };
 }
 
 export default {
@@ -1412,4 +1496,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v47 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v48 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.26 -->
+<!-- Tony's Recipes Collection v37.27 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1028,7 +1028,7 @@ function renderLoggingPanel() {
      + 'When a page cannot be fetched by your own server, the import can go through a public relay. '
      + 'Those relays see the address you are importing and choose what text comes back. '
      + (_pc === 'always'
-        ? 'You chose not to be asked again — untick this to be asked each time.'
+        ? 'They are used without asking (the app tries everything before bothering you) — untick this to be asked each time.'
         : 'You are asked each time.')
      + ' <strong>This setting is per device.</strong></div></div>';
 
@@ -5024,7 +5024,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.26';
+var APP_VERSION = 'v37.27';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7656,7 +7656,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.26</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.27</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8308,7 +8308,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.26</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.27</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17619,11 +17619,11 @@ function isFacebookUrl(url) {
 }
 window.isFacebookUrl = isFacebookUrl;
 function isInstagramUrl(url) {
-  return /instagram\.com\/(reel|p|tv)\//.test(url);
+  return /instagram\.com\/(reels?|p|tv)\//.test(url);
 }
 
 function extractInstagramId(url) {
-  var m = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
+  var m = url.match(/instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/);   // v37.27 — /reels/ too
   return m ? m[1] : null;
 }
 
@@ -17740,12 +17740,15 @@ window.extractRecipesFromLinks = extractRecipesFromLinks;
 var _pageViaProxy = '';      // which relay supplied the text, if any
 var _lastProxyHost = '';
 var PROXY_CONSENT_KEY = 'tonys_proxy_consent';
+// v37.27 — THE CASCADE (Tony): relays are tried WITHOUT asking, unless the
+// person chose to be asked (the privacy panel). The preview still names the
+// relay a recipe came through. Unset = 'always'; 'ask' is stored when chosen.
 function proxyConsentState() {
-  try { return localStorage.getItem(PROXY_CONSENT_KEY) || 'ask'; } catch(e) { return 'ask'; }
+  try { return localStorage.getItem(PROXY_CONSENT_KEY) || 'always'; } catch(e) { return 'always'; }
 }
 function setProxyConsent(v) {
   try {
-    if (v === 'ask') localStorage.removeItem(PROXY_CONSENT_KEY);
+    if (v === 'always') localStorage.removeItem(PROXY_CONSENT_KEY);
     else localStorage.setItem(PROXY_CONSENT_KEY, v);
   } catch(e) {}
 }
@@ -17826,6 +17829,7 @@ async function runUrlImport() {
   const res = document.getElementById('urlImportResult');
 
   var _importSourceUrl = url;
+  var _fbVideoUrl = '';
 
   if (isYouTubeUrl(url)) {
     res.innerHTML = '<div style="text-align:center;padding:20px;">'
@@ -17853,31 +17857,24 @@ async function runUrlImport() {
       // was never enough to be a recipe — it let "View this post on Instagram"
       // through to Claude, which then invented one.
       if (igData.text && igData.text.trim().length >= 40 && !igData.partial) {
-        // Use the caption text as page content — skip normal fetch
+        // v37.27 — the caption goes through the same reader as pasted text
+        // (parts, tips, the post's title), not a one-list prompt.
         res.innerHTML = spinner('Extracting recipe from caption...');
-        const igPrompt = 'Extract the recipe from this Instagram post caption. '
-          + 'Keep the original language — do NOT translate. '
-          + 'Return ONLY valid JSON: {"name":"","category":"Dinner","difficulty":"Easy","prep":"","servings":"",'
-          + '"ingredients":[{"a":"amount","n":"ingredient"}],"steps":["step 1"]}. '
-          + 'Return {"error":"no recipe found"} if no recipe is in the caption. '
-          + 'Caption:\n\n' + igData.text;
         try {
-          const igRaw = await aiCall(igPrompt, 2000);
-          const igParsed = extractJSON(igRaw);
-          if (igParsed.error) throw new Error(igParsed.error);
-          igParsed.source = url;
-          applyParsedRecipe(igParsed, 'urlImportResult', 'urlImportOverlay');
+          var igParsed = await extractRecipesFromText(igData.text, 'an Instagram post caption');
+          if (!igParsed || igParsed.error) throw new Error((igParsed && igParsed.error) || 'no recipe found');
+          var igBuilt = buildImportFromParsed(igParsed, url);
+          if (igBuilt.kind === 'none') throw new Error('no recipe found');
+          applyParsedRecipe(igBuilt.recipe, 'urlImportResult', 'urlImportOverlay');
+          return;
         } catch(igErr) {
-          // Caption exists but no recipe — offer video bookmark
-          showSaveAsVideoBookmark(url, igData.title || 'Instagram post', '🎥');
+          syncLog('import', 'Instagram caption held no recipe', String(igErr && igErr.message).slice(0, 120));
         }
-        return;
-      } else {
-        // No caption came back. Say why, and give a way forward — a bookmark
-        // alone is a dead end, and Tony treats a dead end as a bug.
-        showInstagramCaptionFallback(url, igData);
-        return;
       }
+      // THE CASCADE — no recipe in the words: the reel's video, then the person.
+      if (await recipeFromReelVideo(url, igData && igData.videoUrl, res)) return;
+      showInstagramCaptionFallback(url, igData);
+      return;
     } catch(igErr) {
       showInstagramCaptionFallback(url, null);
       return;
@@ -17903,6 +17900,7 @@ async function runUrlImport() {
     try {
       var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
       var fd = null; try { fd = await fr.json(); } catch(e) {}
+      _fbVideoUrl = (fd && fd.videoUrl) || '';
       if (fd && fd.text && fd.text.length >= 60) {
         pageText = fd.text;
         syncLog('import', 'Facebook post read from its link', { via: fd.via, chars: fd.text.length });
@@ -18011,7 +18009,10 @@ async function runUrlImport() {
     if (videoPost && !ourFault) {
       syncLog('import', 'No readable text from ' + videoPost, { url: url, why: attempts.join('; ') });
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
-      showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy : (fbWhy ? 'Why the link alone did not work: ' + fbWhy.slice(0, 300) : '')); return;
+      // THE CASCADE — a Facebook post with no words we could read: its video.
+      if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res)) return;
+      showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy
+        : [fbWhy ? 'Why the link alone did not work: ' + fbWhy.slice(0, 300) : '', _fbVideoUrl ? _videoAiWhy : ''].filter(Boolean).join(' ')); return;
     }
     res.innerHTML = importFailureHtml(url, attempts);
     return;
@@ -18063,7 +18064,9 @@ async function runUrlImport() {
     syncLog('error', 'URL import failed', msg.slice(0, 300));
     if (/no recipe found|not a recipe/i.test(msg)) {
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
-      if (videoPost) showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy : '');
+      // THE CASCADE — the Facebook post's words hold no recipe: its video.
+      if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res)) return;
+      if (videoPost) showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' || _fbVideoUrl ? _videoAiWhy : '');
       else showSaveAsVideoBookmark(url, '', '🎥');
     } else {
       res.innerHTML = '<div class="explore-result" style="color:var(--danger);">'
@@ -18081,12 +18084,15 @@ async function runUrlImport() {
 // any page. Without the Worker's key (or on an older Worker) this quietly
 // returns false and the "paste / screenshots" answer is shown as before.
 var _videoAiWhy = '';
-async function youtubeRecipeFromVideo(url, res) {
+// v37.27 — the same for a Facebook or Instagram reel's video (Worker v48
+// fetches it from the platform's own video server): `ask` is what the Worker
+// is asked; a YouTube video is asked for by its link.
+async function youtubeRecipeFromVideo(url, res, ask) {
   _videoAiWhy = '';
   res.innerHTML = spinner('\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)');
   var d = null, st = 0;
   try {
-    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'video-recipe', url: url }) });
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody(ask || { action: 'video-recipe', url: url }) });
     st = r.status;
     try { d = await r.json(); } catch(e) {}
   } catch(e) { syncLog('error', 'Reading the video: the server could not be reached', String(e && e.message)); return false; }
@@ -18118,6 +18124,13 @@ async function youtubeRecipeFromVideo(url, res) {
   }
 }
 window.youtubeRecipeFromVideo = youtubeRecipeFromVideo;
+// THE CASCADE (Tony, 1 Oct 2026): when a post's words hold no recipe, its
+// video is read — without asking.
+function recipeFromReelVideo(sourceUrl, videoUrl, res) {
+  if (!videoUrl) return Promise.resolve(false);
+  return youtubeRecipeFromVideo(sourceUrl, res, { action: 'video-from-url', url: videoUrl });
+}
+window.recipeFromReelVideo = recipeFromReelVideo;
 
 function spinner(msg) {
   return '<div class="explore-loading"><div class="ai-spinner"></div><br>' + msg + '</div>';
@@ -26711,32 +26724,36 @@ function showVideoRecipeFallback(url, kind, why) {
   var shotsBtn = function(style) { return '<button onclick="pickScreenshots(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + style + '">\u{1F4F7} Import screenshots</button>'; };
   res.innerHTML =
       '<div id="videoRecipeFallback" style="background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:14px;font-size:14px;line-height:1.6;color:var(--ink);">'
-    + (fb ? '<strong>\u{1F4D8} Facebook shows its posts only to people signed in to it.</strong><br>'
-          + 'So the app cannot read this one \u2014 and a recipe in a reel is often only spoken or shown in the video.'
+    + (fb ? '<strong>\u{1F4D8} This post\u2019s recipe could not be read on its own.</strong><br>'
+          + 'Its words and its video were tried; Facebook shows some posts only to people signed in to it.'
           : '<strong>\u25b6\ufe0f The recipe is in the video, not in its description.</strong><br>'
           + 'The app reads a video\u2019s written description, and this one has no recipe in it.')
     + (why ? '<div style="margin-top:8px;font-size:13px;">' + escH(why) + '</div>' : '')
-    + '<div style="margin-top:10px;font-size:13px;">What works:</div>'
-    + '<ul style="margin:4px 0 0;padding-inline-start:20px;font-size:13px;">'
-    + (fb && phone
-        ? '<li><strong>Screenshots</strong> \u2014 in Facebook tap \u201cSee more\u201d, take screenshots of the text (scroll between them if it is long), then press \u{1F4F7} Import screenshots and pick them all. Nothing to copy.</li>'
-          + '<li>If Facebook lets you copy the text: copy it, then press \u{1F4CB} Paste what I copied.</li>'
-        : fb
-        ? '<li>On the Facebook page, click your \u201cSend to My Kitchen Notes\u201d bookmark (set it up once: \u{1F4D8} The Facebook bookmark).</li>'
-          + '<li>Or select the post\u2019s text, copy it, then press \u{1F4CB} Paste what I copied.</li>'
-        : '<li>If the recipe is in a comment, copy it, then press \u{1F4CB} Paste what I copied.</li>'
-          + '<li>Or take screenshots where the ingredients and steps are shown, and press \u{1F4F7} Import screenshots.</li>')
-    + '<li>The recipe is only spoken or shown in the video? Screen-record it (or save it), then press \u{1F3AC} Import the video.</li>'
-    + '</ul>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+    // v37.27 — THE CASCADE: by the time this shows, the words and the video
+    // were both tried. ONE thing to do; the rest folded away.
+    + '<div style="margin-top:10px;font-size:13px;">'
+    + (first === 'shots' ? 'In Facebook tap \u201cSee more\u201d, take screenshots of the text, and pick them here:'
+       : first === 'bookmark' ? 'On the Facebook page, click your \u201cSend to My Kitchen Notes\u201d button (or bookmark):'
+       : 'Copy the recipe\u2019s text, then:') + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'
     + (first === 'shots' ? shotsBtn(primary) : '')
     + (first === 'bookmark' ? '<button onclick="showFacebookBookmarklet()" style="' + primary + '">\u{1F4D8} The Facebook bookmark</button>' : '')
-    + '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + (first === 'paste' ? primary : plain) + '">\u{1F4CB} Paste what I copied</button>'
+    + (first === 'paste' ? '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + primary + '">\u{1F4CB} Paste what I copied</button>' : '')
+    + '</div>'
+    + '<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:13px;color:var(--muted);">Other ways</summary>'
+    + '<ul style="margin:6px 0 0;padding-inline-start:20px;font-size:13px;">'
+    + '<li>If the text can be copied: copy it, then \u{1F4CB} Paste what I copied.</li>'
+    + '<li>Screenshots of the text: \u{1F4F7} Import screenshots, pick them all.</li>'
+    + '<li>The recipe only spoken or shown: screen-record it, then \u{1F3AC} Import the video.</li>'
+    + '</ul>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'
+    + (first !== 'paste' ? '<button onclick="importCopiedText(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + plain + '">\u{1F4CB} Paste what I copied</button>' : '')
     + (first !== 'shots' ? shotsBtn(plain) : '')
     + '<button onclick="pickRecipeVideo(' + JSON.stringify(url).replace(/"/g, '&quot;') + ')" style="' + plain + '">\u{1F3AC} Import the video</button>'
     + (fb && first !== 'bookmark' ? '<button onclick="showFacebookBookmarklet()" style="' + plain + '">\u{1F4D8} The Facebook bookmark</button>' : '')
     + '<a href="' + escA(url) + '" target="_blank" rel="noopener noreferrer" style="' + plain + 'display:inline-flex;align-items:center;text-decoration:none;">\u2197 Open it</a>'
     + '<button onclick="showSaveAsVideoBookmark(' + JSON.stringify(url).replace(/"/g, '&quot;') + ', \'\', \'\u{1F3A5}\')" style="' + plain + '">\u{1F516} Just bookmark it</button>'
+    + '</div></details>'
     + '</div></div>';
 }
 window.showVideoRecipeFallback = showVideoRecipeFallback;

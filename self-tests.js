@@ -821,6 +821,35 @@ window.SELF_TESTS = [
       } finally { window.confirmImportParsed=real.confirm; box.remove(); }
     } },
 
+  { id:'import_cascade_reads_the_video', group:'Import/Export', name:'THE CASCADE: no recipe in a post\'s words → its video is read, nothing asked (v37.27)',
+    test: async()=>{
+      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog, ask:window.askConfirm, choice:window.askChoice };
+      var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[], questions=0;
+      try{
+        window.syncLog=function(){};
+        window.askConfirm=function(){ questions++; return Promise.resolve(false); };
+        window.askChoice=function(){ questions++; return Promise.resolve(null); };
+        window.extractRecipesFromText=async function(t){ return /200 g spaghetti/.test(t) ? { name:'Aglio e olio', ingredients:[{a:'200 g',n:'spaghetti'}], steps:['Toss.'] } : { error:'no recipe found' }; };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked.push(b.action);
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'', videoUrl:'https://video.xx.fbcdn.net/v/reel.mp4', tried:['oembed_video: Requires an access token'] }; } };
+          if(b.action==='instagram-fetch') return { ok:true, status:200, json:async function(){ return { text:'Best pasta ever!!! Follow for more recipes like this one every week 🍝🍝🍝', videoUrl:'https://scontent.cdninstagram.com/v/a.mp4' }; } };
+          if(b.action==='video-from-url') return { ok:true, status:200, json:async function(){ return { text:'Aglio e olio\n200 g spaghetti', via:'gemini' }; } };
+          return { ok:false, status:502, json:async function(){ return { error:'HTTP 403' }; } }; };
+        // Facebook: no words → the reel's video.
+        inp.value='https://www.facebook.com/reel/777'; await runUrlImport();
+        if(asked.indexOf('video-from-url')===-1) throw new Error('Facebook: the reel\'s video was not tried: '+JSON.stringify(asked));
+        if(!/Aglio e olio/.test(res.textContent) || !/Read from the video itself/.test(res.textContent)) throw new Error('Facebook: '+res.textContent.slice(0,160));
+        // Instagram: a caption with no recipe → the reel's video.
+        asked=[]; inp.value='https://www.instagram.com/reels/ABC123/'; await runUrlImport();   // /reels/, as Tony's link
+        if(asked.join()!=='instagram-fetch,video-from-url') throw new Error('Instagram: '+JSON.stringify(asked));
+        if(!/Aglio e olio/.test(res.textContent)) throw new Error('Instagram: '+res.textContent.slice(0,160));
+        if(questions) throw new Error('the person was asked something on the way ('+questions+')');
+      } finally {
+        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log; window.askConfirm=real.ask; window.askChoice=real.choice;
+        inp.value=''; res.innerHTML='';
+      }
+    } },
+
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
     test: async()=>{
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');
@@ -8563,16 +8592,19 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'sec_proxy_needs_consent', group:'Network', name:'A relay never sees a URL without consent (v36.18)',
+  { id:'sec_proxy_needs_consent', group:'Network', name:'Relays are tried without asking, unless the person chose to be asked (v36.18, v37.27)',
     test: async()=>{
       ['proxyConsent','proxyConsentState','setProxyConsent'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       var prev = proxyConsentState();
       var realAsk = window.askConfirm;
       try{
-        // Default is ASK, not allow. A fresh device must not silently relay.
+        // v37.27 — THE CASCADE: the default is to try relays WITHOUT asking.
+        localStorage.removeItem(PROXY_CONSENT_KEY);
+        if(proxyConsentState()!=='always') throw new Error('a fresh device still asks before trying a relay');
+        // Someone who chose to be asked IS asked.
         setProxyConsent('ask');
-        if(proxyConsentState()!=='ask') throw new Error('the default is not "ask"');
+        if(proxyConsentState()!=='ask') throw new Error('the choice to be asked is not kept');
 
         // Declining means no.
         var shown = null;

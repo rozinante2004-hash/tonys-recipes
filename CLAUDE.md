@@ -206,6 +206,7 @@ found only because a test was written first and disagreed with the code.
 
 | Decision | Why |
 |---|---|
+| **THE CASCADE: try everything yourself; ask the person LAST (Tony, 1 Oct 2026).** | "The less options the user gets, the higher the chances they will use the application." Every flow is a fallback cascade that runs WITHOUT the person: if the recipe is easily retrievable, take it; if not, do the next thing that might work (another route, the embed, the video itself) — automatically, without a choice or a confirmation in between. Only when every route has failed is the person asked, and then with ONE clear thing to do (the other options tucked away). This is the guideline for ALL user interactions, not only imports: a new feature that offers a menu of options where the app could have tried them in order is wrong. |
 | **No Cook Mode.** Removed in v27.7. | Tony wants the whole recipe visible at once. Do not reintroduce a step-at-a-time view. |
 | **`history` always travels; there is ONE cloud shape.** | 3 revisions take a recipe from 1.7 KB → 6.2 KB, which mattered only for the legacy single `shared/recipes` document (capacity ~610 → ~170). That document is deleted and `slimRecipeForCloud`'s `keepHistory` flag was removed in v32.2 — it takes **one** parameter now. Do not reintroduce a second shape or a flag that silently drops a field. |
 | **Voice is disabled on iOS.** | iOS defines `webkitSpeechRecognition` but cannot honour `continuous`; an unguarded `onend → start()` froze the whole app. Restarts must stay deferred and capped. |
@@ -606,6 +607,24 @@ found only because a test was written first and disagreed with the code.
     itself. The Facebook fallback now shows the Worker's `tried[]` ("Why the
     link alone did not work: …"). His first real try of Worker v47 on a reel
     failed — reason unknown until this shows it.
+  - **v37.27 + Worker v48 — THE CASCADE applied to imports** (see Decisions).
+    Facebook: facebook-fetch text → (no text, or no recipe in it) the reel's
+    video (`videoUrl` from the public embed page) → the person. Instagram:
+    official oEmbed → (no caption) `/p/<code>/embed/captioned/` (caption,
+    `videoUrl`) → the caption through `extractRecipesFromText` (no longer a
+    one-list prompt) → (no recipe) the video → the person. Worker
+    `video-from-url` downloads ONLY from fbcdn.net / cdninstagram.com
+    (`isPlatformVideo`, look-alikes refused), size-capped, then
+    `videoBytesRecipe` (shared with video-file). App: `recipeFromReelVideo`
+    reuses `youtubeRecipeFromVideo(url, res, ask)`. Relays are tried WITHOUT
+    asking by default (`proxyConsentState` unset = 'always'; 'ask' stored
+    when the person chooses it in the privacy panel). The last-resort screen
+    shows ONE action (phone: screenshots; computer: the Facebook button or
+    bookmark), the rest under "Other ways". `/reels/` (plural) links are
+    Instagram links now (`isInstagramUrl`, `extractInstagramId`) — Tony's
+    aglio e olio link was one and skipped the Instagram route. Tests:
+    `import_cascade_reads_the_video` (no question asked on the way), 6 Worker
+    checks.
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
     `main` fast-forwarded to `test`. The family owner's next sign-in copies
