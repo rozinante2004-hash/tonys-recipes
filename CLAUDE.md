@@ -673,6 +673,14 @@ found only because a test was written first and disagreed with the code.
     only the start… found at <site>" (`#fromWebNote`, `_fromWeb`) and logs
     the site and the Worker's `tried`. Tests:
     `import_facebook_whole_caption_from_web`, 5 Worker checks.
+  - **v37.32 + Worker v52.** Tony's v51 run: the reason the rest of the
+    caption was not found fell past the log's 300 chars (it was pushed LAST),
+    and Google answered VIDEO_BUSY for the video. Worker v52: `fbCanonical`
+    (a post's plain address — the Share-menu link carried
+    `referral_source=…&original_uri=…`, sent on to Google as is); the
+    whole-caption reason goes FIRST in `tried`. App: busy is waited out once
+    by itself (`VIDEO_BUSY_WAIT_MS`, 20 s) before it is said; the box says
+    "Facebook showed only the start, and the rest was not found (why)".
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

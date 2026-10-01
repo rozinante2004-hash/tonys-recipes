@@ -581,12 +581,16 @@ window.SELF_TESTS = [
         if(!document.getElementById('videoRecipeFallback') || !/no recipe was found in it/.test(res.textContent)) throw new Error('a video with no recipe: '+res.textContent.slice(0,200));
         // v37.19 — Google busy: said as busy, and a Facebook link afterwards does
         // not repeat what the YouTube one said.
+        // v37.32 — busy is waited out once, by itself, before it is said.
+        var realWait=window.VIDEO_BUSY_WAIT_MS, vAsks=0; window.VIDEO_BUSY_WAIT_MS=10;
         reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.action==='video-recipe') vAsks++;
           return b.action==='video-recipe'
             ? { ok:false, status:503, json:async function(){ return { error:'VIDEO_BUSY: busy', busy:true }; } }
             : { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
-        await runUrlImport();
+        try{ await runUrlImport(); } finally { window.VIDEO_BUSY_WAIT_MS=realWait; }
         if(!/busy right now/.test(res.textContent)) throw new Error('Google busy: '+res.textContent.slice(0,200));
+        if(vAsks!==2) throw new Error('busy was not asked again by itself, once: '+vAsks);
         reply=function(){ return { ok:false, status:502, json:async function(){ return { error:'HTTP 403' }; } }; };
         inp.value='https://www.facebook.com/share/r/1AkSMeYV4w/'; await runUrlImport();
         if(/busy right now/.test(res.textContent)) throw new Error('the Facebook answer repeats the YouTube one');

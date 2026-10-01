@@ -686,7 +686,7 @@ console.log('\nfacebook-fetch (v47):');
     asked.length = 0;
     globalThis.fetch = async (url, init = {}) => {
       const u = String(url); asked.push({ u, h: init.headers || {} });
-      if (u === 'https://www.facebook.com/reel/888') return new Response(pageHtml, { status: 200 });
+      if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
       if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
       return new Response('', { status: 404 });
     };
@@ -713,7 +713,7 @@ console.log('\nfacebook-fetch (v47):');
     const gk = Object.assign({}, ek, { GEMINI_API_KEY: 'g-key', GEMINI_MODEL: 'gemini-test' });
     globalThis.fetch = async (url, init = {}) => {
       const u = String(url); asked.push({ u, h: init.headers || {} });
-      if (u === 'https://www.facebook.com/reel/888') return new Response(pageHtml, { status: 200 });
+      if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
       if (/:generateContent$/.test(u)) { gemAsked.push(JSON.parse(init.body)); return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: gem.text }] }, groundingMetadata: { groundingChunks: gem.chunks } }] }), { status: 200 }); }
       if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
       return new Response('', { status: 404 });
@@ -729,7 +729,10 @@ console.log('\nfacebook-fetch (v47):');
     expect('…and so is one Google cannot say where it read', b.via === 'page' && b.tried.some(t => /named no page/.test(t)), JSON.stringify(b).slice(0, 300));
     gem = { text: 'NOT FOUND', chunks: [] };
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
-    expect('…not found: the preview, and why', b.via === 'page' && b.tried.some(t => /did not find it/.test(t)), JSON.stringify(b).slice(0, 300));
+    expect('…not found: the preview, and why — said first', b.via === 'page' && /^whole caption: Google did not find it/.test(b.tried[0]), JSON.stringify(b).slice(0, 300));
+    gemAsked = []; gem = { text: FULL, chunks: [{ web: { uri: 'https://www.instagram.com/p/XYZ/' } }] };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://m.facebook.com/reel/888/?referral_source=external_deeplink&original_uri=https://www.facebook.com/&mibextid=Z', appKey: 'secret-k' }), gk)).json();
+    expect('v52: the post\'s plain address, Facebook\'s tracking left out — also to Google', b.url === 'https://www.facebook.com/reel/888/' && !/referral|original_uri/.test(gemAsked[0].contents[0].parts[0].text), JSON.stringify(b.url));
   } finally { globalThis.fetch = realFetch; }
 }
 

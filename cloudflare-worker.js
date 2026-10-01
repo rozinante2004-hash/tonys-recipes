@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v51
+// Tony's Recipes — Cloudflare Worker v52
+// v52: a Facebook post's address is cut down to what names the post
+//      (`fbCanonical`) before anything is fetched or Google is asked; and why
+//      the whole caption was not found is said FIRST, where the log keeps it.
 // v51: the WHOLE caption of a Facebook post, when Facebook gives only its
 //      first ~200 characters (Tony's layered-cake reel: cut mid-sentence,
 //      before the recipe; the page's data did not carry the rest). Gemini is
@@ -169,7 +172,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v51';
+const WORKER_VERSION = 'v52';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1542,6 +1545,18 @@ function fbPostText(t) {
   return String(t || '').split('\n').map(l => l.trim()).filter(l => l && !FB_CHROME.test(l)).join('\n')
     .replace(/\n?Posted by [\s\S]*$/i, '').trim();
 }
+// v52 — a post's plain address: Facebook's tracking (referral_source,
+// original_uri, mibextid, …) dropped, only what names the post kept. Tony's
+// link from the Share menu carried "?referral_source=external_deeplink&
+// original_uri=https://www.facebook.com/", which went on to Google as is.
+function fbCanonical(u) {
+  let x;
+  try { x = new URL(u); } catch (e) { return u; }
+  const keep = { '/watch': ['v'], '/watch/': ['v'], '/permalink.php': ['story_fbid', 'id'], '/story.php': ['story_fbid', 'id'], '/photo.php': ['fbid'], '/photo': ['fbid'], '/photo/': ['fbid'] }[x.pathname] || [];
+  const q = keep.filter(k => x.searchParams.get(k)).map(k => k + '=' + encodeURIComponent(x.searchParams.get(k))).join('&');
+  const host = /(^|\.)fb\.watch$/i.test(x.hostname) ? x.hostname : 'www.facebook.com';
+  return 'https://' + host + x.pathname + (q ? '?' + q : '');
+}
 async function facebookFetch(env, url) {
   const tried = [];
   // 1. A share link → the post it points at (no login pages).
@@ -1554,7 +1569,7 @@ async function facebookFetch(env, url) {
     if (!isFacebookAddress(next) || /\/login|checkpoint/.test(next)) { tried.push('share link: leads to a login page'); break; }
     url = next;
   }
-  const clean = url.replace(/[?&](__cft__|__tn__|mibextid|rdid|share_url|sfnsn|s)=[^&#]*/g, '').replace(/[?&]$/, '');
+  const clean = fbCanonical(url);
   const video = /\/(reel|videos|watch)\b|fb\.watch/.test(clean);
   // 2. Facebook's official oEmbed.
   const token = env.FB_APP_TOKEN ? '&access_token=' + encodeURIComponent(env.FB_APP_TOKEN) : '';
@@ -1593,7 +1608,7 @@ async function facebookFetch(env, url) {
       if (desc.length >= 60 && desc.length < 400 && !(msg && desc === msg)) {
         const full = await geminiFullCaption(env, clean, desc);
         if (full.text) return { text: full.text.slice(0, 20000), via: 'web-caption', url: clean, title, videoUrl, sources: full.sources, sourceNames: full.sourceNames, preview: desc };
-        if (full.why) tried.push('whole caption: ' + full.why);
+        if (full.why) tried.unshift('whole caption: ' + full.why);   // first: the log keeps only so much
       }
       if (desc.length >= 60) return { text: desc.slice(0, 20000), via: msg && desc === msg ? 'page-data' : 'page', url: clean, title, videoUrl, tried };
       caption = desc;
@@ -1635,4 +1650,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v51 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v52 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.31 -->
+<!-- Tony's Recipes Collection v37.32 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5027,7 +5027,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.31';
+var APP_VERSION = 'v37.32';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7659,7 +7659,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.31</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.32</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8313,7 +8313,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.31</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.32</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17853,7 +17853,7 @@ async function runUrlImport() {
   const res = document.getElementById('urlImportResult');
 
   var _importSourceUrl = url;
-  var _fbVideoUrl = '', _fbCaption = '', _fbFromWeb = '';
+  var _fbVideoUrl = '', _fbCaption = '', _fbFromWeb = '', _fbRestWhy = '';
 
   if (isYouTubeUrl(url)) {
     res.innerHTML = '<div style="text-align:center;padding:20px;">'
@@ -17928,6 +17928,8 @@ async function runUrlImport() {
       _fbCaption = (fd && (fd.text || fd.caption)) || '';   // v37.30 — said in the box when it holds no recipe
       // v37.31 — Facebook gave only the start; the whole caption was found by
       // Google (Worker v51) at this address. Said on the recipe.
+      // v37.32 — why the rest of a cut-off caption was not found (Worker v52 says it first).
+      _fbRestWhy = ((fd && fd.tried) || []).filter(function(t){ return /^whole caption: /.test(t); }).map(function(t){ return t.replace(/^whole caption: /, ''); })[0] || '';
       _fbFromWeb = (fd && fd.via === 'web-caption' && fd.sources && /^https:\/\//.test(fd.sources[0] || '')) ? { url: fd.sources[0], name: (fd.sourceNames && fd.sourceNames[0]) || webHost(fd.sources[0]) } : '';
       if (fd && fd.text && fd.text.length >= 60) {
         pageText = fd.text;
@@ -18102,6 +18104,7 @@ async function runUrlImport() {
       // menu ended here with none, and nothing to go on.
       if (videoPost) showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy
         : 'The post\u2019s words were read but hold no recipe' + (_fbCaption ? ': \u201c' + _fbCaption.replace(/\s+/g, ' ').slice(0, 160) + (_fbCaption.length > 160 ? '\u2026' : '') + '\u201d. ' : '. ')
+          + (_fbRestWhy ? 'Facebook showed only the start, and the rest was not found (' + _fbRestWhy + '). ' : '')
           + (_fbVideoUrl ? _videoAiWhy : 'Facebook gave no address for its video.'));
       else showSaveAsVideoBookmark(url, '', '🎥');
     } else {
@@ -18123,15 +18126,27 @@ var _videoAiWhy = '';
 // v37.27 — the same for a Facebook or Instagram reel's video (Worker v48
 // fetches it from the platform's own video server): `ask` is what the Worker
 // is asked; a YouTube video is asked for by its link.
+// v37.32 — THE CASCADE: Google busy is waited out once, by itself, before
+// anything is said (Tony's reel: "busy — press Fetch again in a minute").
+var VIDEO_BUSY_WAIT_MS = 20000;
 async function youtubeRecipeFromVideo(url, res, ask, lead) {
   _videoAiWhy = '';
-  res.innerHTML = spinner((lead ? escH(lead) + '<br>' : '') + '\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)');
   var d = null, st = 0;
-  try {
-    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody(ask || { action: 'video-recipe', url: url }) });
-    st = r.status;
-    try { d = await r.json(); } catch(e) {}
-  } catch(e) { syncLog('error', 'Reading the video: the server could not be reached', String(e && e.message)); return false; }
+  for (var attempt = 0; attempt < 2; attempt++) {
+    res.innerHTML = spinner((lead ? escH(lead) + '<br>' : '') + (attempt
+      ? '\u23f3 Google was busy \u2014 asking again\u2026'
+      : '\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)'));
+    d = null; st = 0;
+    try {
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody(ask || { action: 'video-recipe', url: url }) });
+      st = r.status;
+      try { d = await r.json(); } catch(e) {}
+    } catch(e) { syncLog('error', 'Reading the video: the server could not be reached', String(e && e.message)); return false; }
+    if (!(d && d.busy) || attempt) break;
+    syncLog('import', 'Google busy reading the video \u2014 waiting, then asking again', { status: st });
+    res.innerHTML = spinner((lead ? escH(lead) + '<br>' : '') + '\u23f3 Google is busy \u2014 trying again in ' + Math.round(VIDEO_BUSY_WAIT_MS / 1000) + ' seconds\u2026');
+    await new Promise(function(r2){ setTimeout(r2, VIDEO_BUSY_WAIT_MS); });
+  }
   if (!d || !d.text) {
     // v37.16 — every reason is said (a key Google refused was kept quiet, and
     // Tony saw only the fallback). Only an older Worker, which does not know
