@@ -733,6 +733,39 @@ console.log('\nfacebook-fetch (v47):');
     gemAsked = []; gem = { text: FULL, chunks: [{ web: { uri: 'https://www.instagram.com/p/XYZ/' } }] };
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://m.facebook.com/reel/888/?referral_source=external_deeplink&original_uri=https://www.facebook.com/&mibextid=Z', appKey: 'secret-k' }), gk)).json();
     expect('v52: the post\'s plain address, Facebook\'s tracking left out — also to Google', b.url === 'https://www.facebook.com/reel/888/' && !/referral|original_uri/.test(gemAsked[0].contents[0].parts[0].text), JSON.stringify(b.url));
+    // v53 — Google refuses its web search; the other ways, then Claude.
+    let gemTools = [], claudeAsked = [], gemReply, claudeReply;
+    const ck = Object.assign({}, gk, { ANTHROPIC_API_KEY: 'a-key' });
+    globalThis.fetch = async (url, init = {}) => {
+      const u = String(url);
+      if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
+      if (/:generateContent$/.test(u)) { const b = JSON.parse(init.body); gemTools.push(JSON.stringify(b.tools)); return gemReply(b); }
+      if (u === 'https://api.anthropic.com/v1/messages') { const b = JSON.parse(init.body); claudeAsked.push(b); return claudeReply(b, claudeAsked.length); }
+      if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+      return new Response('', { status: 404 });
+    };
+    gemReply = b => JSON.stringify(b.tools) === '[{"google_search":{}}]'
+      ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: FULL }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://www.instagram.com/p/Q/', title: 'instagram.com' } }] } }] }), { status: 200 })
+      : new Response(JSON.stringify({ error: { message: 'Quota exceeded for url_context' } }), { status: 429 });
+    claudeReply = () => new Response('{}', { status: 500 });
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
+    expect('v53: Google refuses one way of looking → the next way, on its own', b.via === 'web-caption' && b.by === 'google' && gemTools[0] === '[{"url_context":{}},{"google_search":{}}]' && gemTools[1] === '[{"google_search":{}}]' && !claudeAsked.length, JSON.stringify([b.via, gemTools]));
+    gemReply = () => new Response(JSON.stringify({ error: { message: 'Resource has been exhausted (e.g. check quota).' } }), { status: 429 });
+    claudeReply = (body, n) => n === 1
+      ? new Response(JSON.stringify({ stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'x' } }] }), { status: 200 })
+      : new Response(JSON.stringify({ stop_reason: 'end_turn', content: [
+          { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'x' } },
+          { type: 'web_search_tool_result', tool_use_id: 's1', content: [{ type: 'web_search_result', url: 'https://www.instagram.com/p/Q/', title: 'Instagram' }] },
+          { type: 'text', text: FULL, citations: [{ type: 'web_search_result_location', url: 'https://www.instagram.com/p/Q/', title: 'Instagram', cited_text: 'x' }] }] }), { status: 200 });
+    gemTools = []; claudeAsked = [];
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
+    expect('…Google cannot at all → Claude searches the web for it, checked the same way', b.via === 'web-caption' && b.by === 'claude' && /מצרכים:\n• 6 ביצים/.test(b.text) && b.sourceNames[0] === 'instagram.com', JSON.stringify(b).slice(0, 300));
+    expect('…Claude\'s web search and page opening, the app\'s model, no sampling settings', claudeAsked[0].model === 'claude-sonnet-5' && claudeAsked[0].tools.map(t => t.type).join() === 'web_search_20260209,web_fetch_20260209' && !('temperature' in claudeAsked[0]), JSON.stringify(claudeAsked[0]).slice(0, 300));
+    expect('…a paused search is sent back as is, and resumes', claudeAsked.length === 2 && claudeAsked[1].messages.length === 2 && claudeAsked[1].messages[1].role === 'assistant', JSON.stringify(claudeAsked.map(c => c.messages.length)));
+    expect('…Google tried every way, a few times at most', gemTools.length >= 3 && gemTools.length <= 6, String(gemTools.length));
+    claudeReply = () => new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: START + ' ' + 'ועוד המון מילים שהמודל המציא בעצמו בלי שום מקור, מצרכים: קמח, סוכר, ביצים ושמן' }] }), { status: 200 });
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
+    expect('…Claude\'s text with no page behind it is refused; Google\'s real answer is said', b.via === 'page' && /^whole caption: Google answered 429 Resource has been exhausted.*; Claude named no page/.test(b.tried[0]), b.tried && b.tried[0]);
   } finally { globalThis.fetch = realFetch; }
 }
 

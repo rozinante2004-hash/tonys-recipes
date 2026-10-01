@@ -699,6 +699,19 @@ found only because a test was written first and disagreed with the code.
     link (sessionStorage `mkn_share_update`), then imports. Update Now, with
     a URL import open, comes back to it (`?url=` put back before reloading).
     Test: `share_updates_the_app_first`.
+  - **v37.35 + Worker v53 — Google's real answer, and Claude when Google
+    cannot.** The first clean v37.34 run said "whole caption: Google is busy"
+    while the same model read the video a minute later: Google's WEB SEARCH
+    was refused (likely its own allowance) and v51/52 called every refusal
+    "busy". `geminiFullCaption` now tries each way of looking on its own
+    (url_context+google_search, google_search, url_context), keeps Google's
+    actual status + message, stops at a real answer. Then `claudeFullCaption`:
+    `claude-sonnet-5` (the app's AI_MODEL) with `web_search_20260209` +
+    `web_fetch_20260209`, `pause_turn` resumed (the paused turn sent back as
+    is), text after the last tool result; sources = citations, fetched pages,
+    search results. `acceptCaption` is shared: starts with the post's words,
+    40+ letters longer, a page named. Not counted in the app's AI spend line
+    (Worker-side, ≈1–2¢ a lookup). The log carries `by` (google/claude).
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
