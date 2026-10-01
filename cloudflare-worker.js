@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v48
+// Tony's Recipes — Cloudflare Worker v49
+// v49: facebook-fetch also reads the post's OWN page (same honest User-Agent):
+//      its preview tags — og:description is the caption a link preview shows —
+//      and the video's address (og:video or the page's own video fields), before
+//      the embed pages. Tony's first reel from the iPhone Share menu was not
+//      readable through the embeds alone.
 // v48: THE CASCADE (Tony: try everything yourself, ask the person last).
 //      - instagram-fetch: when the official embed gives no caption, the
 //        public captioned-embed page (/p/<code>/embed/captioned/) — and the
@@ -153,7 +158,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v48';
+const WORKER_VERSION = 'v49';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1394,6 +1399,20 @@ function videoUrlIn(html) {
   }
   return '';
 }
+// v49 — a <meta property|name="…" content="…"> value, either attribute order.
+function metaIn(html, prop) {
+  const p = prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp('<meta[^>]+(?:property|name)=["\']' + p + '["\'][^>]*content="([^"]*)"', 'i').exec(html)
+         || new RegExp('<meta[^>]+content="([^"]*)"[^>]*(?:property|name)=["\']' + p + '["\']', 'i').exec(html);
+  return m ? m[1] : '';
+}
+function ogVideoIn(html) {
+  for (const p of ['og:video:secure_url', 'og:video:url', 'og:video']) {
+    const u = metaIn(html, p).replace(/&amp;/g, '&');
+    if (isPlatformVideo(u)) return u;
+  }
+  return '';
+}
 async function videoFromUrl(env, u) {
   if (!env.GEMINI_API_KEY) return jsonResp({ error: 'VIDEO_AI: reading recipes from videos is not set up on the server (GEMINI_API_KEY).', needsConfig: true }, 503);
   if (!isPlatformVideo(u)) return jsonResp({ error: 'Only a video on Facebook\'s or Instagram\'s own video servers can be read this way.' }, 400);
@@ -1460,9 +1479,25 @@ async function facebookFetch(env, url) {
       tried.push(kind + ': no text in the embed');
     } catch (e) { tried.push(kind + ': ' + e.message); }
   }
-  // 3. The public embed page, as a website's iframe shows it — its text, and
-  //    (v48) the video's address, for when the words hold no recipe.
+  // 3. (v49) The post's own page — its preview tags (og:description is the
+  //    caption that a link preview shows) and the video's address.
   let videoUrl = '';
+  try {
+    const r = await fetch(clean, { headers: Object.assign({ Accept: 'text/html' }, FB_UA), redirect: 'follow', signal: AbortSignal.timeout(12000) });
+    if (!r.ok) tried.push('page: HTTP ' + r.status);
+    else if (/\/login|checkpoint/.test(r.url || '')) tried.push('page: leads to a login page');
+    else {
+      const html = await r.text();
+      videoUrl = videoUrlIn(html) || ogVideoIn(html);
+      let desc = fbPostText(htmlText(metaIn(html, 'og:description') || metaIn(html, 'description')));
+      if (/log ?in(to)? (to )?facebook|on facebook\.?$|see posts, photos and more/i.test(desc)) desc = '';   // the login wall's own words
+      const title = htmlText(metaIn(html, 'og:title'));
+      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: 'page', url: clean, title, videoUrl };
+      tried.push('page: ' + (desc ? 'caption too short' : 'no caption') + (videoUrl ? ', video found' : ', no video'));
+    }
+  } catch (e) { tried.push('page: ' + e.message); }
+  // 4. The public embed page, as a website's iframe shows it — its text, and
+  //    (v48) the video's address, for when the words hold no recipe.
   for (const plugin of (video ? ['video', 'post'] : ['post', 'video'])) {
     try {
       const r = await fetch(`https://www.facebook.com/plugins/${plugin}.php?href=${encodeURIComponent(clean)}&show_text=true&width=500`,
@@ -1496,4 +1531,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v48 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v49 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

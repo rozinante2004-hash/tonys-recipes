@@ -636,6 +636,20 @@ found only because a test was written first and disagreed with the code.
     imports at once too. iOS 27's "Describe a Shortcut" (Apple Intelligence,
     WWDC 2026) makes building easier but each person would still build it —
     the iCloud link is the one-tap route.
+  - **v37.29 + Worker v49 — the first reel through the Share menu.** Tony's
+    shortcut worked (shared from WhatsApp on his work iPhone, no Facebook app)
+    but the reel was not read, and the box gave NO reason: the general
+    `fetch-url` got Facebook's login page, the AI rightly found no recipe in
+    it, and the Facebook reader's reason was lost. Now: no `fetch-url` for
+    Facebook at all; the fallback always says why (the reader's `tried`, "no
+    address for its video", or "words read but hold no recipe"). Worker v49:
+    `facebook-fetch` also reads the post's OWN page (same honest UA, as v47
+    decided — never posing as Facebook's crawler): `og:description` as the
+    caption (the login wall's own words refused), `og:video*` / the page's
+    video fields as the video. iOS 26.7 shortcut facts: no Details in the ⌄
+    menu; "Show in Share Sheet" by tapping the blue Input → Shortcut Input →
+    "Receive … from Nowhere" → tick Share Sheet; no Done, the ‹ back saves.
+    Tests: `import_facebook_unreadable_says_why`, 3 Worker checks.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

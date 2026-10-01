@@ -680,6 +680,22 @@ console.log('\nfacebook-fetch (v47):');
     globalThis.fetch = async () => new Response('', { status: 404 });
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/777', appKey: 'secret-k' }), ek)).json();
     expect('nothing readable: empty text, and each attempt said', b.text === '' && Array.isArray(b.tried) && b.tried.length >= 3, JSON.stringify(b));
+    // v49 — the post's own page: its preview caption and its video.
+    let pageHtml = '<html><head><meta property="og:title" content="Pistachio cake" /><meta property="og:description" content="Pistachio cake: 3 eggs, 1 cup sugar, 1 cup ground pistachios, 1/2 cup oil. Bake 35 minutes at 180&#064;C." />'
+      + '<meta property="og:video:secure_url" content="https://video.xx.fbcdn.net/v/p.mp4?a=1&amp;b=2" /></head><body></body></html>';
+    asked.length = 0;
+    globalThis.fetch = async (url, init = {}) => {
+      const u = String(url); asked.push({ u, h: init.headers || {} });
+      if (u === 'https://www.facebook.com/reel/888') return new Response(pageHtml, { status: 200 });
+      if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+      return new Response('', { status: 404 });
+    };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
+    expect('v49: the post\'s own page gives its caption and its video', b.via === 'page' && /^Pistachio cake: 3 eggs/.test(b.text) && b.videoUrl === 'https://video.xx.fbcdn.net/v/p.mp4?a=1&b=2', JSON.stringify(b));
+    expect('…with the same honest User-Agent', asked.every(a => /recipe-importer/.test(a.h['User-Agent'] || '')), JSON.stringify(asked.map(a => a.h['User-Agent'])));
+    pageHtml = '<html><head><meta property="og:description" content="Log in to Facebook to start sharing and connecting with your friends, family and people you know." /></head></html>';
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
+    expect('…the login wall\'s own words are not taken for a caption', b.text === '' && b.tried.some(t => /^page: no caption/.test(t)), JSON.stringify(b));
   } finally { globalThis.fetch = realFetch; }
 }
 

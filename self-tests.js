@@ -850,6 +850,35 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_facebook_unreadable_says_why', group:'Import/Export', name:'A Facebook reel nothing could read: no login page taken for its words, and the reason is shown (v37.29)',
+    test: async()=>{
+      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
+      var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[];
+      try{
+        window.syncLog=function(){};
+        window.extractRecipesFromText=async function(){ return { error:'no recipe found' }; };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked.push(b.action);
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'', tried:['oembed_video: Requires an access token','page: leads to a login page','embed video: no text'] }; } };
+          if(b.action==='fetch-url') return { ok:true, status:200, json:async function(){ return { text:'Log in to Facebook. Email address or phone number. Password. Forgotten account? Create new account. Not now.' }; } };
+          return { ok:false, status:502, json:async function(){ return {}; } }; };
+        inp.value='https://www.facebook.com/reel/1234567'; await runUrlImport();
+        if(asked.indexOf('fetch-url')!==-1) throw new Error('Facebook\'s login page was fetched as if it were the post: '+JSON.stringify(asked));
+        var box=document.getElementById('videoRecipeFallback');
+        if(!box) throw new Error('no fallback: '+res.textContent.slice(0,160));
+        if(!/page: leads to a login page/.test(box.textContent) || !/no address for its video/.test(box.textContent)) throw new Error('the reason is not shown: '+box.textContent.slice(0,300));
+        // Words read but no recipe in them, and no video: said so too.
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'What a lovely evening with friends, thank you all for coming and for the wonderful food!', via:'page' }; } };
+          return { ok:false, status:502, json:async function(){ return {}; } }; };
+        await runUrlImport();
+        box=document.getElementById('videoRecipeFallback');
+        if(!box || !/hold no recipe/.test(box.textContent)) throw new Error('words without a recipe: '+res.textContent.slice(0,300));
+      } finally {
+        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
+        inp.value=''; res.innerHTML='';
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu (v37.28)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
