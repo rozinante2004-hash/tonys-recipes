@@ -1,4 +1,6 @@
-// Tony's Recipes — Cloudflare Worker v53
+// Tony's Recipes — Cloudflare Worker v54
+// v54: the whole-caption search — Google "high demand" twice moves to Google's
+//      next model (v53 gave up on that way of looking instead).
 // v53: the rest of a cut-off Facebook caption — Tony's v52 run said only
 //      "Google is busy", yet the same model read the video a minute later:
 //      Google's web search was refused, and every refusal was called "busy".
@@ -179,7 +181,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v53';
+const WORKER_VERSION = 'v54';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1490,7 +1492,13 @@ async function geminiFullCaption(env, url, start) {
       const msg = (d && d.error && d.error.message) || ('HTTP ' + r.status);
       last = r.status + ' ' + String(msg).slice(0, 140);
       if (r.status === 404) { const n = await nextGeminiModel(env, models); if (n) { model = n; models.push(n); continue; } break; }
-      if ((r.status === 503 || r.status === 500) && a === 0) { await new Promise(res => setTimeout(res, 2500)); continue; }
+      if (r.status === 503 || r.status === 500) {
+        if (a === 0) { await new Promise(res => setTimeout(res, 2500)); continue; }
+        // v54 — still in high demand: Google's next model, same way of looking.
+        const n = await nextGeminiModel(env, models);
+        if (n && calls < 6) { model = n; models.push(n); a = -1; continue; }
+        break;
+      }
       break;   // 429 / 400 / 403: most likely this way of looking — try the next one
     }
   }
@@ -1712,4 +1720,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v53 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v54 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

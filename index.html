@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.35 -->
+<!-- Tony's Recipes Collection v37.36 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5057,7 +5057,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.35';
+var APP_VERSION = 'v37.36';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7689,7 +7689,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.35</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.36</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8343,7 +8343,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.35</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.36</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17950,7 +17950,7 @@ async function runUrlImport() {
   // Facebook post's text, from its LINK alone (Worker v47: the official embed,
   // then the public embed page). A phone then needs only Share → Copy link.
   if (isFacebookUrl(url)) {
-    res.innerHTML = spinner('\u{1F4D8} Reading the Facebook post\u2026');
+    res.innerHTML = spinner('\u{1F4D8} Reading the Facebook post\u2026<br><span style="font-size:12px;">If Facebook shows only its start, the rest is looked for on the web \u2014 this can take a minute.</span>');
     try {
       var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
       var fd = null; try { fd = await fr.json(); } catch(e) {}
@@ -17960,6 +17960,8 @@ async function runUrlImport() {
       // Google (Worker v51) at this address. Said on the recipe.
       // v37.32 — why the rest of a cut-off caption was not found (Worker v52 says it first).
       _fbRestWhy = ((fd && fd.tried) || []).filter(function(t){ return /^whole caption: /.test(t); }).map(function(t){ return t.replace(/^whole caption: /, ''); })[0] || '';
+      // v37.36 — on a line of its own: after the quoted words it was cut off.
+      if (_fbRestWhy) syncLog('import', 'Facebook showed only the start; the rest was not found', _fbRestWhy);
       _fbFromWeb = (fd && fd.via === 'web-caption' && fd.sources && /^https:\/\//.test(fd.sources[0] || '')) ? { url: fd.sources[0], name: (fd.sourceNames && fd.sourceNames[0]) || webHost(fd.sources[0]) } : '';
       if (fd && fd.text && fd.text.length >= 60) {
         pageText = fd.text;

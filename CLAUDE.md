@@ -712,6 +712,11 @@ found only because a test was written first and disagreed with the code.
     search results. `acceptCaption` is shared: starts with the post's words,
     40+ letters longer, a page named. Not counted in the app's AI spend line
     (Worker-side, ≈1–2¢ a lookup). The log carries `by` (google/claude).
+  - **v37.36 + Worker v54.** v53 run: Google really was in high demand
+    (503), and Claude's reason was cut off after the quoted words (300-char
+    log entry). The reason now has its own log line ("Facebook showed only
+    the start; the rest was not found"); Google 503 twice → its next model
+    (`a = -1`, at most 6 calls); the spinner says the web is being searched.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

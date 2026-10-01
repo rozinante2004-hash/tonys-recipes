@@ -766,6 +766,20 @@ console.log('\nfacebook-fetch (v47):');
     claudeReply = () => new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: START + ' ' + 'ועוד המון מילים שהמודל המציא בעצמו בלי שום מקור, מצרכים: קמח, סוכר, ביצים ושמן' }] }), { status: 200 });
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
     expect('…Claude\'s text with no page behind it is refused; Google\'s real answer is said', b.via === 'page' && /^whole caption: Google answered 429 Resource has been exhausted.*; Claude named no page/.test(b.tried[0]), b.tried && b.tried[0]);
+    // v54 — Google in high demand twice → its next model, same way of looking.
+    let gemModels = [];
+    globalThis.fetch = async (url, init = {}) => {
+      const u = String(url);
+      if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
+      if (/\/v1beta\/models\?/.test(u)) return new Response(JSON.stringify({ models: [{ name: 'models/gemini-9-flash', supportedGenerationMethods: ['generateContent'] }] }), { status: 200 });
+      const m = /models\/([^:]+):generateContent$/.exec(u);
+      if (m) { gemModels.push(m[1]); return m[1] !== 'gemini-test'
+        ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: FULL }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://www.instagram.com/p/Q/', title: 'instagram.com' } }] } }] }), { status: 200 })
+        : new Response(JSON.stringify({ error: { message: 'This model is currently experiencing high demand.' } }), { status: 503 }); }
+      return new Response('', { status: 404 });
+    };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
+    expect('v54: Google in high demand twice → its next model', b.via === 'web-caption' && gemModels.length === 3 && gemModels[0] === 'gemini-test' && gemModels[1] === 'gemini-test' && gemModels[2] !== 'gemini-test', JSON.stringify([b.via, gemModels]));
   } finally { globalThis.fetch = realFetch; }
 }
 
