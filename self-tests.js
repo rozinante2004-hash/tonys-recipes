@@ -879,6 +879,29 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_facebook_whole_caption_from_web', group:'Import/Export', name:'Facebook showed only the start: the whole caption Google found is used, and where it was found is said (v37.31)',
+    test: async()=>{
+      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
+      var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[];
+      try{
+        window.syncLog=function(){};
+        window.extractRecipesFromText=async function(t){ return /6 ביצים/.test(t) ? { name:'העוגה הוויראלית', ingredients:[{a:'6',n:'ביצים'}], steps:['טורפים'] } : { error:'no recipe found' }; };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked.push(b.action);
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'העוגה הוויראלית – שכבות שוקולד, מוס אגוזי לוז ופייטה קראנץ׳\nמצרכים:\n6 ביצים\nכוס סוכר\nכוס שמן', via:'web-caption',
+            sources:['https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc'], sourceNames:['instagram.com'], videoUrl:'https://video.xx.fbcdn.net/v/r.mp4' }; } };
+          return { ok:false, status:502, json:async function(){ return {}; } }; };
+        inp.value='https://www.facebook.com/reel/1287081419887804'; await runUrlImport();
+        if(asked.indexOf('video-from-url')!==-1) throw new Error('the video was watched although the words held the recipe');
+        var note=document.getElementById('fromWebNote');
+        if(!/העוגה הוויראלית/.test(res.textContent) || !note) throw new Error('no recipe, or not said where its words came from: '+res.textContent.slice(0,200));
+        var a=note.querySelector('a');
+        if(!a || a.textContent!=='instagram.com' || a.getAttribute('href')!=='https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc') throw new Error('the source link: '+note.innerHTML.slice(0,300));
+      } finally {
+        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
+        inp.value=''; res.innerHTML='';
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu (v37.28)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');

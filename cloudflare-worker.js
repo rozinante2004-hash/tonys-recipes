@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v50
+// Tony's Recipes — Cloudflare Worker v51
+// v51: the WHOLE caption of a Facebook post, when Facebook gives only its
+//      first ~200 characters (Tony's layered-cake reel: cut mid-sentence,
+//      before the recipe; the page's data did not carry the rest). Gemini is
+//      asked to find it — opening the post, or searching the web for its
+//      opening words — and its answer is used only if it starts with those
+//      words, is longer than the preview, and Google names where it read it.
 // v50: the WHOLE caption from a Facebook post's own page — its data's
 //      "message" text — not only the preview's og:description, which is cut
 //      short ("…") before the recipe. Tony: "it did not get to the text first".
@@ -163,7 +169,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v50';
+const WORKER_VERSION = 'v51';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1411,6 +1417,69 @@ function metaIn(html, prop) {
          || new RegExp('<meta[^>]+content="([^"]*)"[^>]*(?:property|name)=["\']' + p + '["\']', 'i').exec(html);
   return m ? m[1] : '';
 }
+// v51 — a post's WHOLE caption, when Facebook gives us only the first ~200
+// characters: Gemini opens the post (URL context) or searches the web for its
+// opening words (Google Search) — the same post is often on Instagram or a
+// blog. Taken only when it starts with the words we already have, is longer,
+// and Google says where it read it: never a caption the model wrote itself.
+const FULL_CAPTION_PROMPT = (url, start) =>
+  'A public Facebook post at ' + url + ' has a caption that begins exactly:\n\n«' + start + '»\n\n'
+  + 'Find this post\'s FULL caption: open the address, or search the web for its opening words '
+  + '(the same post is often published on Instagram, TikTok or a blog by the same author). '
+  + 'Reply with the full caption copied exactly as written, in its original language, and nothing else. '
+  + 'Never write, complete or guess any part of it yourself. If you cannot find the full caption '
+  + 'written somewhere, reply exactly: NOT FOUND';
+function captionKey(t) { return String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+async function geminiFullCaption(env, url, start) {
+  if (!env.GEMINI_API_KEY) return { text: '', why: 'not set up (GEMINI_API_KEY)' };
+  if (await videoDailyCap(env)) return { text: '', why: 'the daily ceiling is reached' };
+  let model = await geminiModelNow(env);
+  const tried = [];
+  for (let ask = 0; ask < 3; ask++) {
+    tried.push(model);
+    let r, d = null;
+    try {
+      r = await fetch(`${GEMINI_API}/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: FULL_CAPTION_PROMPT(url, start) }] }],
+          tools: [{ url_context: {} }, { google_search: {} }],
+          generationConfig: { temperature: 0, maxOutputTokens: 4096 },
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+      try { d = await r.json(); } catch (e) {}
+    } catch (e) { return { text: '', why: (e && e.name === 'TimeoutError') ? 'Google took too long' : 'Google could not be reached' }; }
+    if (!r.ok) {
+      const msg = (d && d.error && d.error.message) || ('HTTP ' + r.status);
+      if (geminiBusy(r.status, msg) || r.status === 404) {
+        const next = await nextGeminiModel(env, tried);
+        if (next) { model = next; continue; }
+      }
+      return { text: '', why: 'Google answered ' + String(msg).slice(0, 120) };
+    }
+    const cand = d && d.candidates && d.candidates[0];
+    const text = ((cand && cand.content && cand.content.parts) || []).map(p => p && p.text || '').join('').trim()
+      .replace(/^```[a-z]*\n?|\n?```$/g, '').replace(/^[«"“]|[»"”]$/g, '').trim();
+    const gm = (cand && cand.groundingMetadata) || {};
+    // Pages opened directly first; then search results (Google's own redirect
+    // links, so their site names are kept alongside).
+    const opened = ((cand && cand.urlContextMetadata && cand.urlContextMetadata.urlMetadata) || [])
+      .filter(u => u && /SUCCESS/i.test(String(u.urlRetrievalStatus || ''))).map(u => u.retrievedUrl).filter(u => /^https:\/\//.test(u || ''));
+    const found = (gm.groundingChunks || []).map(c => c && c.web).filter(w => w && /^https:\/\//.test(w.uri || ''));
+    const sources = opened.concat(found.map(w => w.uri));
+    const sourceNames = opened.map(u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })
+      .concat(found.map(w => String(w.title || '').slice(0, 80)));
+    if (!text || /^NOT FOUND\.?$/i.test(text)) return { text: '', why: 'Google did not find it' };
+    const k = captionKey(text), s0 = captionKey(start).slice(0, 40);
+    if (!s0 || k.indexOf(s0) !== 0) return { text: '', why: 'what Google found is not this post' };
+    if (k.length < captionKey(start).length + 40) return { text: '', why: 'nothing more than the preview was found' };
+    if (!sources.length) return { text: '', why: 'Google named no page it read it from' };
+    return { text, sources: sources.slice(0, 5), sourceNames: sourceNames.slice(0, 5), model };
+  }
+  return { text: '', why: 'Google is busy' };
+}
 // v50 — a post's own words in the page's data: "message":{…"text":"…"}.
 // The longest one is the post (a reel page carries only its own caption).
 function fbMessageIn(html) {
@@ -1518,7 +1587,15 @@ async function facebookFetch(env, url) {
       const msg = fbMessageIn(html);
       if (msg.length > desc.replace(/(\.\.\.|…)$/, '').length) desc = msg;
       const title = htmlText(metaIn(html, 'og:title'));
-      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: msg && desc === msg ? 'page-data' : 'page', url: clean, title, videoUrl };
+      // v51 — a preview caption is cut off (~200 chars, mid-sentence) before
+      // the recipe. Google is asked for the whole of it, checked against
+      // the words we already have.
+      if (desc.length >= 60 && desc.length < 400 && !(msg && desc === msg)) {
+        const full = await geminiFullCaption(env, clean, desc);
+        if (full.text) return { text: full.text.slice(0, 20000), via: 'web-caption', url: clean, title, videoUrl, sources: full.sources, sourceNames: full.sourceNames, preview: desc };
+        if (full.why) tried.push('whole caption: ' + full.why);
+      }
+      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: msg && desc === msg ? 'page-data' : 'page', url: clean, title, videoUrl, tried };
       caption = desc;
       tried.push('page: ' + (desc ? 'caption too short' : 'no caption') + (videoUrl ? ', video found' : ', no video'));
     }
@@ -1558,4 +1635,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v50 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v51 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

@@ -658,6 +658,21 @@ found only because a test was written first and disagreed with the code.
     returns a too-short caption as `caption`. The app says what became of the
     words before "Watching the video" (`lead`), quotes the words in the box
     when they hold no recipe (`_fbCaption`), and logs their first 160 chars.
+  - **v37.31 + Worker v51 — the rest of a cut-off caption, from Google.** The
+    v37.30 log settled it: Facebook gives our server the layered-cake reel's
+    caption only to 202 chars ("…נראית כמו מקונדיטוריה, אבל"), and the page's
+    data does not carry the rest (no `page-data`); the video alone gave
+    ingredients without amounts ("a miserable recipe"). Worker v51
+    `geminiFullCaption`: when the caption is 60–400 chars, Gemini (tools
+    `url_context` + `google_search`) is asked for the post's full caption,
+    verbatim; used ONLY if it starts with the words we have (`captionKey`,
+    first 40 letters), is ≥40 letters longer, and Google names a page it read
+    (urlContext SUCCESS or groundingChunks) — never text the model wrote. It
+    shares the video daily ceiling. Returns `via: 'web-caption'`, `sources`,
+    `sourceNames`, `preview`. The app says on the recipe "Facebook showed
+    only the start… found at <site>" (`#fromWebNote`, `_fromWeb`) and logs
+    the site and the Worker's `tried`. Tests:
+    `import_facebook_whole_caption_from_web`, 5 Worker checks.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

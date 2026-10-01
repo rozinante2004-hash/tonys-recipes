@@ -705,6 +705,31 @@ console.log('\nfacebook-fetch (v47):');
     pageHtml = '<html><head><meta property="og:description" content="So good 😍" /><meta property="og:video" content="https://video.xx.fbcdn.net/v/p.mp4" /></head></html>';
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
     expect('…a caption too short to be a recipe is still said, with the video', b.text === '' && b.caption === 'So good 😍' && b.videoUrl === 'https://video.xx.fbcdn.net/v/p.mp4', JSON.stringify(b));
+    // v51 — Facebook gives only the first ~200 characters: Google is asked for the rest.
+    const START = '🍫✨ העוגה הוויראלית – שכבות שוקולד, מוס אגוזי לוז ופייטה קראנץ׳ ✨🍫 עוגת החלומות שכולם מדברים עליה — רכה, עשירה, קראנצ׳ית, ונמסה בפה. נראית כמו מקונדיטוריה, אבל';
+    const FULL = START + ' קלה להכנה!\nמצרכים:\n• 6 ביצים\n• כוס סוכר\n• כוס שמן\n• 200 גרם שוקולד מריר\n• 250 מ״ל שמנת מתוקה\nאופן ההכנה: טורפים ביצים וסוכר, מוסיפים שמן ושוקולד מומס, אופים 30 דקות.';
+    pageHtml = '<html><head><meta property="og:description" content="' + START + '" /></head></html>';
+    let gem = { text: FULL, chunks: [{ web: { uri: 'https://www.instagram.com/p/XYZ/' } }] }, gemAsked = [];
+    const gk = Object.assign({}, ek, { GEMINI_API_KEY: 'g-key', GEMINI_MODEL: 'gemini-test' });
+    globalThis.fetch = async (url, init = {}) => {
+      const u = String(url); asked.push({ u, h: init.headers || {} });
+      if (u === 'https://www.facebook.com/reel/888') return new Response(pageHtml, { status: 200 });
+      if (/:generateContent$/.test(u)) { gemAsked.push(JSON.parse(init.body)); return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: gem.text }] }, groundingMetadata: { groundingChunks: gem.chunks } }] }), { status: 200 }); }
+      if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+      return new Response('', { status: 404 });
+    };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
+    expect('v51: a cut-off caption → its whole text, found by Google, with where it was read', b.via === 'web-caption' && /מצרכים:\n• 6 ביצים/.test(b.text) && b.sources[0] === 'https://www.instagram.com/p/XYZ/' && b.preview === START, JSON.stringify(b).slice(0, 300));
+    expect('…Google may open the post and search the web, with the opening words', gemAsked[0] && JSON.stringify(gemAsked[0].tools) === '[{"url_context":{}},{"google_search":{}}]' && gemAsked[0].contents[0].parts[0].text.includes(START) && gemAsked[0].contents[0].parts[0].text.includes('https://www.facebook.com/reel/888'), JSON.stringify(gemAsked[0]).slice(0, 300));
+    gem = { text: 'עוגת שוקולד פשוטה\nמצרכים: 3 ביצים, כוס סוכר, כוס קמח, חצי כוס שמן, קקאו. אופים 30 דקות בחום בינוני ומגישים.', chunks: [{ web: { uri: 'https://blog.example/x' } }] };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
+    expect('…a text that does not start with the post\'s own words is refused', b.via === 'page' && b.text === START && b.tried.some(t => /not this post/.test(t)), JSON.stringify(b).slice(0, 300));
+    gem = { text: FULL, chunks: [] };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
+    expect('…and so is one Google cannot say where it read', b.via === 'page' && b.tried.some(t => /named no page/.test(t)), JSON.stringify(b).slice(0, 300));
+    gem = { text: 'NOT FOUND', chunks: [] };
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
+    expect('…not found: the preview, and why', b.via === 'page' && b.tried.some(t => /did not find it/.test(t)), JSON.stringify(b).slice(0, 300));
   } finally { globalThis.fetch = realFetch; }
 }
 
