@@ -727,6 +727,11 @@ found only because a test was written first and disagreed with the code.
     way to the post's own recipe — 📷 Import screenshots. On a computer the
     extension reads the signed-in page and is the full answer. Test:
     `import_cut_caption_video_says_so`.
+  - **Worker v56.** v55 run: Google 503, Claude used all 70 s — over a
+    minute's wait for "not found", then the video. `CAPTION_SEARCH_MS` =
+    30 s for the whole caption search (Google and Claude share one
+    deadline); Claude uses the quick `web_search_20250305`, 2 uses, no
+    web_fetch (the 20260209 tools' filtering step is the slow part).
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

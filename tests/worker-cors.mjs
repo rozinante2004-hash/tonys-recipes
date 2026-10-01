@@ -760,7 +760,7 @@ console.log('\nfacebook-fetch (v47):');
     gemTools = []; claudeAsked = [];
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
     expect('…Google cannot at all → Claude searches the web for it, checked the same way', b.via === 'web-caption' && b.by === 'claude' && /מצרכים:\n• 6 ביצים/.test(b.text) && b.sourceNames[0] === 'instagram.com', JSON.stringify(b).slice(0, 300));
-    expect('…Claude\'s web search and page opening, the app\'s model, no sampling settings', claudeAsked[0].model === 'claude-sonnet-5' && claudeAsked[0].tools.map(t => t.type).join() === 'web_search_20260209,web_fetch_20260209' && !('temperature' in claudeAsked[0]), JSON.stringify(claudeAsked[0]).slice(0, 300));
+    expect('…Claude\'s quick web search, the app\'s model, no sampling settings', claudeAsked[0].model === 'claude-sonnet-5' && claudeAsked[0].tools.map(t => t.type).join() === 'web_search_20250305' && !('temperature' in claudeAsked[0]), JSON.stringify(claudeAsked[0]).slice(0, 300));
     expect('…a paused search is sent back as is, and resumes', claudeAsked.length === 2 && claudeAsked[1].messages.length === 2 && claudeAsked[1].messages[1].role === 'assistant', JSON.stringify(claudeAsked.map(c => c.messages.length)));
     expect('…Google tried every way, a few times at most', gemTools.length >= 3 && gemTools.length <= 6, String(gemTools.length));
     claudeReply = () => new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: START + ' ' + 'ועוד המון מילים שהמודל המציא בעצמו בלי שום מקור, מצרכים: קמח, סוכר, ביצים ושמן' }] }), { status: 200 });

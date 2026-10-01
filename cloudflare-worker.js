@@ -1,4 +1,6 @@
-// Tony's Recipes — Cloudflare Worker v55
+// Tony's Recipes — Cloudflare Worker v56
+// v56: the whole search for a cut-off caption has 30 s in all (Google and
+//      Claude alike); Claude uses the quick web search, twice at most.
 // v55: Google and Claude look for a cut-off caption AT ONCE (v54: Google said
 //      "not found", then Claude ran out its 90 s — two minutes in all); Claude
 //      stops when Google's answer passes, and has 70 s and fewer searches.
@@ -184,7 +186,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v55';
+const WORKER_VERSION = 'v56';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1455,7 +1457,11 @@ function acceptCaption(text, start, sources) {
   if (!sources.length) return { why: 'named no page it read it from' };
   return { text };
 }
-async function geminiFullCaption(env, url, start) {
+// v56 — how long the whole search for a cut-off caption may take. Tony waited
+// over a minute twice for "not found"; the video is read after it.
+const CAPTION_SEARCH_MS = 30000;
+async function geminiFullCaption(env, url, start, until) {
+  until = until || Date.now() + CAPTION_SEARCH_MS;
   if (!env.GEMINI_API_KEY) return { text: '', why: 'not set up (GEMINI_API_KEY)' };
   if (await videoDailyCap(env)) return { text: '', why: 'the daily ceiling is reached' };
   // v53 — Google may refuse its web search (its own allowance) while it still
@@ -1466,6 +1472,7 @@ async function geminiFullCaption(env, url, start) {
   const models = [model];
   for (const tools of toolSets) {
     for (let a = 0; a < 2 && calls < 6; a++) {
+      if (Date.now() > until - 1500) return { text: '', why: 'Google ran out of time' + (last ? ' (' + last + ')' : '') };
       calls++;
       let r, d = null;
       try {
@@ -1474,7 +1481,7 @@ async function geminiFullCaption(env, url, start) {
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
           body: JSON.stringify({ contents: [{ parts: [{ text: FULL_CAPTION_PROMPT(url, start) }] }], tools,
                                  generationConfig: { temperature: 0, maxOutputTokens: 4096 } }),
-          signal: AbortSignal.timeout(45000),
+          signal: AbortSignal.timeout(Math.max(1000, until - Date.now())),
         });
         try { d = await r.json(); } catch (e) {}
       } catch (e) { last = (e && e.name === 'TimeoutError') ? 'took too long' : 'could not be reached'; break; }
@@ -1511,12 +1518,13 @@ async function geminiFullCaption(env, url, start) {
 // pages it finds). The same checks as Google's answer; the sources are the
 // pages Claude cited, opened, or found.
 const CLAUDE_CAPTION_MODEL = 'claude-sonnet-5';   // the app's AI_MODEL
-async function claudeFullCaption(env, url, start, stop) {
+async function claudeFullCaption(env, url, start, stop, until) {
   if (!env.ANTHROPIC_API_KEY) return { text: '', why: 'not set up (ANTHROPIC_API_KEY)' };
   const messages = [{ role: 'user', content: FULL_CAPTION_PROMPT(url, start) }];
-  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 },
-                 { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 2 }];
-  const until = Date.now() + 70000;   // v55 — one budget for all its turns
+  // v56 — the quick search: the basic web search (no filtering step) and no
+  // page opening — v55's thorough one used all 70 s and found nothing.
+  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }];
+  until = until || Date.now() + CAPTION_SEARCH_MS;
   let d = null;
   for (let turn = 0; turn < 3; turn++) {
     let r;
@@ -1682,8 +1690,9 @@ async function facebookFetch(env, url) {
         // v55 — both look at once (v54 took two minutes, one after the other);
         // Claude is stopped as soon as Google's answer passes the checks.
         const stopClaude = new AbortController();
-        const claudeP = claudeFullCaption(env, clean, desc, stopClaude.signal);
-        let full = await geminiFullCaption(env, clean, desc), why = full.why || '';
+        const until = Date.now() + CAPTION_SEARCH_MS;   // v56 — one deadline for both
+        const claudeP = claudeFullCaption(env, clean, desc, stopClaude.signal, until);
+        let full = await geminiFullCaption(env, clean, desc, until), why = full.why || '';
         if (full.text) { stopClaude.abort(); claudeP.catch(() => {}); }
         else { const c = await claudeP; if (c.text) full = c; else why += (why ? '; ' : '') + c.why; }
         if (full.text) return { text: full.text.slice(0, 20000), via: 'web-caption', by: full.by, url: clean, title, videoUrl, sources: full.sources, sourceNames: full.sourceNames, preview: desc };
@@ -1729,4 +1738,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v55 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v56 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
