@@ -850,6 +850,35 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu (v37.28)',
+    test: async()=>{
+      var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
+      var a=document.getElementById('iosShortcutOffer');
+      try{
+        if(!a) throw new Error('no offer in the import window');
+        window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)', configurable:true });
+        openUrlImportModal('');
+        if(a.style.display==='none' || a.getAttribute('href')!=='https://www.icloud.com/shortcuts/abc123') throw new Error('an iPhone is not offered the shortcut');
+        window._iosShortcutOverride='https://evil.example/x';
+        openUrlImportModal('');
+        if(a.style.display!=='none') throw new Error('a link that is not an iCloud shortcut is offered');
+        window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', configurable:true });
+        Object.defineProperty(navigator, 'maxTouchPoints', { value:0, configurable:true });
+        openUrlImportModal('');
+        if(a.style.display!=='none') throw new Error('a computer is offered the iPhone shortcut');
+        window._iosShortcutOverride='';
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)', configurable:true });
+        openUrlImportModal('');
+        if(a.style.display!=='none') throw new Error('offered with no shortcut link set');
+      } finally {
+        delete window._iosShortcutOverride;
+        try{ delete navigator.userAgent; delete navigator.maxTouchPoints; }catch(e){}
+        try{ closeM('urlImportOverlay'); }catch(e){}
+      }
+    } },
+
   { id:'import_camera',   group:'Import/Export', name:'Camera import function exists',
     test: async()=>{
       if(typeof openCameraImport!=='function') throw new Error('openCameraImport not defined');

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.27 -->
+<!-- Tony's Recipes Collection v37.28 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,6 +119,9 @@
     ownerEmail:          'rozinante2004@gmail.com',
     // v37.00 — where ✉️ Send feedback writes to; empty = the owner's address.
     supportEmail:        '',
+    // v37.28 — the iCloud link of the "Save to My Kitchen Notes" shortcut for
+    // THIS copy (Tony builds it once and shares it); empty = no offer shown.
+    iosShortcutUrl:      '',
     githubRepo:          'rozinante2004-hash/tonys-recipes',
     siteOrigin:          'https://rozinante2004-hash.github.io',
     sitePath:            '/tonys-recipes/',
@@ -1682,7 +1685,7 @@ function handleShareTarget() {
     }
     if (directUrl) { openUrlImportModal(directUrl); runUrlImport(); return; }   // v37.23 — shared on purpose: go
     if (hasRecipeText && typeof openFreehandModal === 'function') { openFreehandModal(textBlob); return; }
-    if (anyUrl && /^https?:\/\//i.test(anyUrl)) { openUrlImportModal(anyUrl); return; }
+    if (anyUrl && /^https?:\/\//i.test(anyUrl)) { openUrlImportModal(anyUrl); runUrlImport(); return; }   // v37.28 — the cascade: go
 
     // Nothing usable — open the URL box empty (never paste a title/author) and show
     // exactly what arrived so the cause is obvious.
@@ -5024,7 +5027,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.27';
+var APP_VERSION = 'v37.28';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7656,7 +7659,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.27</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.28</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8282,6 +8285,8 @@ body.banner-shown .header {
         </div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Works with most recipe sites: AllRecipes, BBC Good Food, Food Network, Yummly, cooking blogs, and more.</div>
+      <!-- v37.28 — on an iPhone: one tap puts "Save to My Kitchen Notes" in the Share menu -->
+      <a id="iosShortcutOffer" href="#" target="_blank" rel="noopener noreferrer" style="display:none;margin:0 0 10px;padding:10px 12px;border-radius:10px;border:1px dashed var(--terracotta);color:var(--terracotta);font-size:13px;font-weight:600;text-decoration:none;line-height:1.45;">📱 Add “Save to My Kitchen Notes” to your iPhone’s Share menu — one tap, then Share → Save from Facebook, Instagram or any app.</a>
       <button class="btn-submit" onclick="runUrlImport()">🔍 Fetch &amp; Import Recipe</button>
       <div id="urlImportResult"></div>
     </div>
@@ -8308,7 +8313,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.27</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.28</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17599,7 +17604,26 @@ async function runFreehandImport() {
 // ═══════════════════════════════════
 // URL IMPORT
 // ═══════════════════════════════════
+// v37.28 — the iPhone's Share menu, set up by one tap on a shared iCloud
+// shortcut (no building it: Tony builds it once for everyone).
+function isIPhoneLike() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function iosShortcutUrl() {
+  var u = (window._iosShortcutOverride !== undefined ? window._iosShortcutOverride : (window.APP_CONFIG && APP_CONFIG.iosShortcutUrl)) || '';
+  return /^https:\/\/(www\.)?icloud\.com\/shortcuts\//.test(u) ? u : '';
+}
+function showIosShortcutOffer() {
+  var a = document.getElementById('iosShortcutOffer');
+  if (!a) return false;
+  var u = iosShortcutUrl(), on = !!(u && isIPhoneLike());
+  a.style.display = on ? 'block' : 'none';
+  if (on) a.href = u;
+  return on;
+}
+window.isIPhoneLike = isIPhoneLike; window.iosShortcutUrl = iosShortcutUrl; window.showIosShortcutOffer = showIosShortcutOffer;
 function openUrlImportModal(prefillUrl) {
+  showIosShortcutOffer();
   document.getElementById('urlImportInput').value = prefillUrl || '';
   document.getElementById('urlImportResult').innerHTML = '';
   // Cleared on every open, like openFreehandModal does: a raised z-index left

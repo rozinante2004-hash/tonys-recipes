@@ -626,6 +626,17 @@ found only because a test was written first and disagreed with the code.
     aglio e olio link was one and skipped the Instagram route. Tests:
     `import_cascade_reads_the_video` (no question asked on the way), 6 Worker
     checks.
+  - **v37.28 — the iPhone Share menu by one tap.** Tony: no user can be
+    expected to build a shortcut. Tony builds "Save to My Kitchen Notes" ONCE
+    (Get URLs from Input → first item → URL Encode → Text `<app>/?url=` +
+    encoded → Open URLs; Show in Share Sheet) and shares its iCloud link;
+    `APP_CONFIG.iosShortcutUrl` (per copy; only https://www.icloud.com/
+    shortcuts/… is accepted) shows `#iosShortcutOffer` in the import window,
+    on iPhones only (`isIPhoneLike`). A link found inside shared TEXT now
+    imports at once too. iOS 27's "Describe a Shortcut" (Apple Intelligence,
+    WWDC 2026) makes building easier but each person would still build it —
+    the iCloud link is the one-tap route.
+  - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
     `main` fast-forwarded to `test`. The family owner's next sign-in copies
