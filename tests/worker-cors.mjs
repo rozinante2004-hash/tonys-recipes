@@ -797,6 +797,34 @@ console.log('\nfacebook-fetch (v47):');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nthe Facebook reading test (v57):');
+{
+  const ek = { APP_SHARED_KEY: 'secret-k' };
+  const realFetch = globalThis.fetch;
+  const PREV = 'The viral cake everyone is talking about: soft, rich, crunchy, melting in the mouth. Looks like it came from a patisserie, but';
+  const WHOLE = PREV + ' it is easy to make at home!\\nIngredients:\\n6 eggs\\n1 cup sugar\\n1 cup oil\\n200 g dark chocolate\\nBake 30 minutes at 180C.';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u === 'https://www.facebook.com/reel/555/') return new Response('<html><head><meta property="og:description" content="' + PREV + '" /></head><body>Log in</body></html>', { status: 200 });
+    if (u === 'https://m.facebook.com/reel/555/') return new Response('<html><body><script>{"x":{"text":"' + WHOLE + '"}}</script></body></html>', { status: 200 });
+    if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+    return new Response('', { status: 404 });
+  };
+  try {
+    const r = await (await worker.fetch(post({ action: 'fb-probe', url: 'https://www.facebook.com/reel/555/?mibextid=x', appKey: 'secret-k' }), ek)).json();
+    const by = n => r.rows.find(x => x.route === n) || {};
+    expect('every server route is tried and graded', r.rows.length === 7 && r.preview === PREV, JSON.stringify(r.rows.map(x => x.route)));
+    expect('…the post page: preview only', by('server: the post page').grade === 'preview', JSON.stringify(by('server: the post page')));
+    expect('…a page whose data holds the whole text: WHOLE', by('server: mobile site').grade === 'whole' && /180C\.$/.test(by('server: mobile site').tail), JSON.stringify(by('server: mobile site')));
+    expect('…an official embed refused: nothing, and why', by('server: official embed (oembed_video)').grade === 'nothing' && /access token/.test(by('server: official embed (oembed_video)').note), JSON.stringify(by('server: official embed (oembed_video)')));
+    const ph = await (await worker.fetch(post({ action: 'fb-probe-html', url: 'https://www.facebook.com/reel/555/', from: 'shortcut fetch', preview: PREV, appKey: 'secret-k',
+      html: '<html><body><div dir="auto">' + WHOLE.replace(/\\n/g, '<br>') + '</div></body></html>', plain: true }), ek)).text();
+    expect('a page from the phone is graded, in plain words for the shortcut', /^WHOLE TEXT — phone: shortcut fetch/.test(ph) && /Show the phone's result/.test(ph), ph.slice(0, 200));
+    const noKey = await worker.fetch(post({ action: 'fb-probe-html', html: 'x' }), ek);
+    expect('…and only with the app key', noKey.status === 403, String(noKey.status));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log('\nthe cascade (v48):');
 {
   const ek = { APP_SHARED_KEY: 'secret-k', GEMINI_API_KEY: 'g-key' };

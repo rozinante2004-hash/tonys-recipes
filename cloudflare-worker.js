@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v56
+// Tony's Recipes — Cloudflare Worker v57
+// v57: THE FACEBOOK READING TEST — `fb-probe` tries every server route to a
+//      post's text (its page, the mobile site, the watch page, both embed
+//      pages, both official embeds, and — asked for — Google's and Claude's
+//      web search) and grades each: whole text, preview only, nothing.
+//      `fb-probe-html` grades a page fetched or read ON THE PHONE (posted by a
+//      test shortcut) and keeps the last for a day; `fb-probe-last` returns it.
 // v56: the whole search for a cut-off caption has 30 s in all (Google and
 //      Claude alike); Claude uses the quick web search, twice at most.
 // v55: Google and Claude look for a cut-off caption AT ONCE (v54: Google said
@@ -186,7 +192,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v56';
+const WORKER_VERSION = 'v57';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -741,6 +747,25 @@ async function handleRequest(request, env) {
     }
 
     // ── facebook-fetch (v47) ─────────────────────────────────────────────────
+    // ── the Facebook reading test (v57) — diagnostic, the test copy's 🔬 ────────
+    if (body.action === 'fb-probe') {
+      const u = String(body.url || '');
+      if (!isFacebookAddress(u)) return jsonResp({ error: 'Only a Facebook address can be tested.' }, 400);
+      return jsonResp(await fbProbe(env, u, !!body.web));
+    }
+    if (body.action === 'fb-probe-html') {
+      const out = await fbProbeHtml(env, body);
+      // The shortcut shows the answer as it comes: plain words read best there.
+      if (body.plain) return new Response(probeReportText({ rows: [out.row] }) + '\n\nNow open the test in the app and press "Show the phone\'s result".',
+        { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      return jsonResp(out);
+    }
+    if (body.action === 'fb-probe-last') {
+      let v = null;
+      if (env.BRING_KV) { try { v = JSON.parse(await env.BRING_KV.get('probe:last') || 'null'); } catch (e) {} }
+      return jsonResp(v || { none: true });
+    }
+
     if (body.action === 'facebook-fetch') {
       const u = String(body.url || '');
       if (!isFacebookAddress(u)) return jsonResp({ error: 'Only a Facebook address can be read this way.' }, 400);
@@ -1721,6 +1746,112 @@ async function facebookFetch(env, url) {
   return { text: '', url: clean, tried, videoUrl, caption };
 }
 
+// ─── THE FACEBOOK READING TEST (v57) ─────────────────────────────────────────
+// Tony: "think of several ways to get to the text and design a test to check
+// all of them". Each route is graded the same way against the preview Facebook
+// gives everyone (~200 characters): WHOLE text, PREVIEW only, or NOTHING.
+// Diagnostic only — nothing here imports a recipe.
+function probeGrade(text, preview) {
+  const t = String(text || '').trim();
+  if (!t) return 'nothing';
+  const k = captionKey(t), p = captionKey(preview || '');
+  if (p && k.length >= p.length + 40 && k.indexOf(p.slice(0, 30)) !== -1) return 'whole';
+  if (p && k.indexOf(p.slice(0, 30)) !== -1) return 'preview';
+  return t.length >= 300 ? 'other' : 'preview';
+}
+// The best candidate for the post's text in a page: its preview tags, its
+// data's "message" text, any string in its data that starts like the preview,
+// and the page's visible words from where the preview starts.
+function probeBestText(html, preview) {
+  const h = String(html || '');
+  const cands = [];
+  const og = htmlText(metaIn(h, 'og:description') || metaIn(h, 'description'));
+  if (og) cands.push({ how: 'og:description', text: og });
+  const msg = fbMessageIn(h);
+  if (msg) cands.push({ how: 'page data (message)', text: msg });
+  const p30 = captionKey(preview || og).slice(0, 30);
+  if (p30) {
+    const re = /"((?:[^"\\]|\\.){80,})"/g;
+    let m, n = 0;
+    while ((m = re.exec(h)) && n < 4000) {
+      n++;
+      let s = '';
+      try { s = JSON.parse('"' + m[1] + '"'); } catch (e) { continue; }
+      if (captionKey(s).indexOf(p30) !== -1) cands.push({ how: 'page data (string)', text: s });
+    }
+    const body = htmlText((h.match(/<body[\s\S]*<\/body>/i) || [h])[0]);
+    const words = String(preview || og).trim().slice(0, 24);
+    const at = words ? body.indexOf(words) : -1;
+    if (at !== -1) cands.push({ how: 'visible words', text: body.slice(at, at + 6000) });
+  }
+  cands.sort((a, b) => captionKey(b.text).length - captionKey(a.text).length);
+  return cands[0] || { how: '', text: '' };
+}
+function probeRow(route, status, best, preview, note) {
+  const t = String((best && best.text) || '').replace(/\s+/g, ' ').trim();
+  return { route, status: status || 0, grade: probeGrade(t, preview), chars: t.length, how: (best && best.how) || '',
+           head: t.slice(0, 70), tail: t.length > 140 ? t.slice(-70) : '', note: note || '' };
+}
+async function probeFetch(u, extra) {
+  try {
+    const r = await fetch(u, Object.assign({ headers: Object.assign({ Accept: 'text/html' }, FB_UA), redirect: 'follow', signal: AbortSignal.timeout(12000) }, extra || {}));
+    const html = await r.text();
+    return { status: r.status, html, final: r.url || u };
+  } catch (e) { return { status: 0, html: '', note: e.message }; }
+}
+async function fbProbe(env, url, web) {
+  const clean = fbCanonical(url);
+  const id = (/\/(?:reel|videos)\/(\d+)/.exec(clean) || /[?&]v=(\d+)/.exec(clean) || [])[1] || '';
+  const rows = [];
+  const s1 = await probeFetch(clean);
+  const preview = htmlText(metaIn(s1.html, 'og:description') || '');
+  const page = (label, res) => {
+    const login = /\/login|checkpoint/.test(res.final || '');
+    rows.push(probeRow(label, res.status, login ? null : probeBestText(res.html, preview), preview,
+      login ? 'sent to a login page' : (res.note || (res.html ? Math.round(res.html.length / 1024) + ' KB page' : ''))));
+  };
+  page('server: the post page', s1);
+  page('server: mobile site', await probeFetch(clean.replace('://www.facebook.com/', '://m.facebook.com/')));
+  if (id) page('server: watch page', await probeFetch('https://www.facebook.com/watch/?v=' + id));
+  for (const plugin of ['video', 'post'])
+    page('server: embed (' + plugin + ')', await probeFetch(`https://www.facebook.com/plugins/${plugin}.php?href=${encodeURIComponent(clean)}&show_text=true&width=500`));
+  for (const kind of ['oembed_video', 'oembed_post']) {
+    const token = env.FB_APP_TOKEN ? '&access_token=' + encodeURIComponent(env.FB_APP_TOKEN) : '';
+    try {
+      const r = await fetch(`https://graph.facebook.com/v23.0/${kind}?omitscript=true&url=${encodeURIComponent(clean)}${token}`, { headers: FB_UA, signal: AbortSignal.timeout(10000) });
+      let d = null; try { d = await r.json(); } catch (e) {}
+      const quote = (String((d && d.html) || '').match(/<blockquote[\s\S]*?<\/blockquote>/i) || [''])[0];
+      rows.push(probeRow('server: official embed (' + kind + ')', r.status, { how: 'embed quote', text: fbPostText(htmlText(quote)) }, preview,
+        (d && d.error && d.error.message) ? String(d.error.message).slice(0, 90) : (token ? '' : 'no FB_APP_TOKEN')));
+    } catch (e) { rows.push(probeRow('server: official embed (' + kind + ')', 0, null, preview, e.message)); }
+  }
+  if (web && preview) {
+    const until = Date.now() + CAPTION_SEARCH_MS;
+    const [g, c] = await Promise.all([geminiFullCaption(env, clean, preview, until), claudeFullCaption(env, clean, preview, null, until)]);
+    rows.push(probeRow('web: Google search', 0, { how: (g.sourceNames || [])[0] || '', text: g.text }, preview, g.why || ''));
+    rows.push(probeRow('web: Claude search', 0, { how: (c.sourceNames || [])[0] || '', text: c.text }, preview, c.why || ''));
+  }
+  return { url: clean, preview, rows };
+}
+// A page fetched or read ON THE PHONE (the test shortcut posts it here).
+// The last one is kept a day so the app's test can show it.
+async function fbProbeHtml(env, body) {
+  const html = String(body.html || '').slice(0, 6 * 1048576);
+  const text = String(body.text || '').slice(0, 200000);
+  const preview = String(body.preview || '') || htmlText(metaIn(html, 'og:description') || '');
+  const best = html ? probeBestText(html, preview) : { how: 'page text', text };
+  const row = probeRow('phone: ' + String(body.from || 'shortcut').slice(0, 40), 200, best, preview,
+    html ? Math.round(html.length / 1024) + ' KB page' : (text ? text.length + ' chars of text' : 'nothing was sent'));
+  const out = { at: new Date().toISOString(), url: String(body.url || '').slice(0, 300), preview, row };
+  if (env.BRING_KV) { try { await env.BRING_KV.put('probe:last', JSON.stringify(out), { expirationTtl: 86400 }); } catch (e) {} }
+  return out;
+}
+function probeReportText(r) {
+  const mark = { whole: 'WHOLE TEXT', preview: 'preview only', nothing: 'nothing', other: 'other text' };
+  return r.rows.map(x => mark[x.grade] + ' — ' + x.route + (x.chars ? ' (' + x.chars + ' chars' + (x.how ? ', ' + x.how : '') + ')' : '')
+    + (x.note ? ' — ' + x.note : '') + (x.grade === 'whole' ? '\n   …' + x.tail : '')).join('\n');
+}
+
 export default {
   async fetch(request, env) {
     const cors = corsFor(request, env);
@@ -1738,4 +1869,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v56 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v57 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

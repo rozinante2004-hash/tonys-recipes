@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.37 -->
+<!-- Tony's Recipes Collection v37.38 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1658,6 +1658,7 @@ function handleShareTarget() {
   try { hp = new URLSearchParams(String(window.location.hash || '').replace(/^#/, '')); } catch(e) {}
   if (hp && hp.get('share-text')) {
     fromBrowser = true;          // v37.24 — sent by the extension or the bookmark
+    try { fbProbeNoteBookmark(hp.get('share-text'), hp.get('share-url')); } catch(e) {}   // v37.38 — for 🔬
     sharedText = hp.get('share-text');
     sharedUrl  = sharedUrl || hp.get('share-url') || '';
   }
@@ -5057,7 +5058,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.37';
+var APP_VERSION = 'v37.38';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7689,7 +7690,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.37</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.38</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7745,6 +7746,8 @@ body.banner-shown .header {
           <!-- v37.00 (WP-O) -->
           <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
           <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
+          <!-- v37.38 — test copy only (shown by applyTestOnlyItems) -->
+          <button class="drop-item" id="fbProbeItem" hidden title="Every way to a Facebook post's text, tried and graded" onclick="closeDrop('settingsDrop');openFbProbe()">🔬 Facebook reading test</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <!-- v36.59 — owner only (applyOwnerOnlyItems). They link straight into
                the Cloudflare account, the Firebase project and Anthropic billing,
@@ -8343,7 +8346,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.37</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.38</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17951,6 +17954,7 @@ async function runUrlImport() {
   // Facebook post's text, from its LINK alone (Worker v47: the official embed,
   // then the public embed page). A phone then needs only Share → Copy link.
   if (isFacebookUrl(url)) {
+    _lastFbImportUrl = url;   // v37.38 — the 🔬 test starts from it
     res.innerHTML = spinner('\u{1F4D8} Reading the Facebook post\u2026<br><span style="font-size:12px;">If Facebook shows only its start, the rest is looked for on the web \u2014 this can take a minute.</span>');
     try {
       var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
@@ -21536,6 +21540,7 @@ window.copyLogFromLogin = copyLogFromLogin;
 // v37.12 — Tony: the test copy only, never the family's (its diagnostics are off).
 function loginLogButtonShown() { return !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.logging); }
 (function(){ var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = !loginLogButtonShown(); })();
+(function(){ var b = document.getElementById('fbProbeItem'); if (b) b.hidden = String(APP_CONFIG.environment || 'live') === 'live'; })();   // v37.38
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
 window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
 window.emailSendLink = emailSendLink; window.completeEmailLinkSignIn = completeEmailLinkSignIn; window.emailVerifyNudge = emailVerifyNudge;
@@ -27023,6 +27028,123 @@ window.importRecipeVideo = importRecipeVideo;
 // and opens this app with it after '#'. Nothing of Facebook's reaches our
 // server, and no login leaves the browser. Facebook changes its page often, so
 // selecting the text first is the sure way, and is said so.
+// ─── 🔬 THE FACEBOOK READING TEST (v37.38, test copy only) ──────────────────
+// Tony: "think of several ways to get to the text and design a test to check
+// all of them". Every route to a Facebook post's text, tried on ONE post and
+// graded alike — the whole text, the preview only (~200 characters, what
+// Facebook gives everyone), or nothing — then one report to send on.
+var FB_PROBE_KEY = 'mkn_fb_probe';
+var _lastFbImportUrl = '';
+function fbProbeState() { try { return JSON.parse(localStorage.getItem(FB_PROBE_KEY) || '{}') || {}; } catch(e) { return {}; } }
+function fbProbeSave(patch) {
+  var s = fbProbeState(); Object.keys(patch).forEach(function(k){ s[k] = patch[k]; });
+  try { localStorage.setItem(FB_PROBE_KEY, JSON.stringify(s)); } catch(e) {}
+  return s;
+}
+var FB_PROBE_MARK = { whole: '✅ WHOLE TEXT', preview: '⚠️ preview only', nothing: '❌ nothing', other: '❓ other text' };
+function fbProbeRowText(x) {
+  return FB_PROBE_MARK[x.grade] + ' — ' + x.route + (x.chars ? ' (' + x.chars + ' chars' + (x.how ? ', ' + x.how : '') + ')' : '')
+    + (x.note ? ' — ' + x.note : '') + (x.grade === 'whole' && x.tail ? '\n     …' + x.tail : '');
+}
+// The bookmark's text, when it arrives (handleShareTarget): kept for the test.
+function fbProbeNoteBookmark(text, url) {
+  if (!/facebook\.com|fb\.watch/i.test(String(url || ''))) return;
+  var t = String(text || '').replace(/\s+/g, ' ').trim();
+  fbProbeSave({ bookmark: { at: new Date().toISOString(), url: String(url).slice(0, 200), chars: t.length, head: t.slice(0, 70), tail: t.length > 140 ? t.slice(-70) : '' } });
+}
+function fbProbeReport() {
+  var s = fbProbeState(), L = [];
+  L.push('FACEBOOK READING TEST — ' + APP_VERSION + ' — ' + new Date().toISOString());
+  L.push('Post: ' + (s.url || '(none)'));
+  if (s.server) {
+    L.push('Preview Facebook gives everyone: ' + (s.server.preview ? s.server.preview.length + ' chars' : 'none'));
+    L.push(''); L.push('FROM OUR SERVER (' + s.server.at + ')');
+    s.server.rows.forEach(function(x){ L.push('  ' + fbProbeRowText(x)); });
+  } else L.push('\nFROM OUR SERVER: not run');
+  L.push(''); L.push('ON THE PHONE');
+  L.push('  Safari shows: ' + (s.safari || 'not answered'));
+  L.push('  Phone fetch (test shortcut): ' + (s.phone ? fbProbeRowText(s.phone.row) + ' (' + s.phone.at + ')' : 'not run'));
+  L.push('  Bookmark on the phone: ' + (s.bookmark ? s.bookmark.chars + ' chars — “' + s.bookmark.head + '…' + (s.bookmark.tail || '') + '” (' + s.bookmark.at + ')' : 'not run'));
+  return L.join('\n');
+}
+function fbProbeRender() {
+  var box = document.getElementById('fbProbeResults');
+  if (box) box.textContent = fbProbeReport();
+}
+async function fbProbeRunServer(web) {
+  var url = (document.getElementById('fbProbeUrl') || {}).value || '';
+  url = url.trim();
+  if (!isFacebookUrl(url)) { toast('Paste a Facebook post or reel link first'); return; }
+  fbProbeSave({ url: url });
+  var box = document.getElementById('fbProbeResults');
+  if (box) box.textContent = 'Trying every route from our server…' + (web ? ' (with the web searches: up to 40 seconds)' : '');
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'fb-probe', url: url, web: !!web }) });
+    var d = await r.json();
+    if (!d || !d.rows) throw new Error((d && d.error) || ('the server answered ' + r.status));
+    fbProbeSave({ server: { at: new Date().toISOString(), preview: d.preview || '', rows: d.rows } });
+  } catch(e) { toast('The server test did not run: ' + (e && e.message)); }
+  fbProbeRender();
+}
+async function fbProbePhoneResult() {
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'fb-probe-last' }) });
+    var d = await r.json();
+    if (!d || d.none || !d.row) { toast('No result from the test shortcut yet — run it first (step 2)'); return; }
+    fbProbeSave({ phone: { at: d.at, row: d.row } });
+  } catch(e) { toast('Could not fetch the phone’s result: ' + (e && e.message)); }
+  fbProbeRender();
+}
+function fbProbeCopy(text, what) {
+  try { navigator.clipboard.writeText(text).then(function(){ toast('\u{1F4CB} ' + what + ' copied'); }, function(){ showServiceError(what + ':\n\n' + text); }); }
+  catch(e) { showServiceError(what + ':\n\n' + text); }
+}
+function openFbProbe() {
+  var s = fbProbeState();
+  var url = s.url || _lastFbImportUrl || '';
+  var prev = document.getElementById('fbProbeOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'fbProbeOverlay'; ov.className = 'modal-overlay';
+  ov.style.cssText = 'display:flex;z-index:1250;';
+  var btn = 'padding:9px 12px;min-height:40px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin:4px 6px 4px 0;font-family:\'DM Sans\',\'Heebo\',sans-serif;';
+  var primary = btn + 'background:var(--terracotta-fill);color:#fff;border:none;';
+  var plain = btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);';
+  var h = function(t){ return '<div style="font-weight:700;margin:14px 0 4px;color:var(--heading);">' + t + '</div>'; };
+  var p = function(t){ return '<div style="font-size:13px;line-height:1.55;margin:2px 0;">' + t + '</div>'; };
+  ov.innerHTML = '<div class="ask-card" style="max-width:560px;max-height:88vh;overflow:auto;text-align:start;">'
+    + '<div class="ask-title">\u{1F52C} Facebook reading test</div>'
+    + p('Every way to a post’s text, tried on one post. Each is graded: the whole text, the preview only, or nothing.')
+    + '<input id="fbProbeUrl" class="ask-input" dir="ltr" placeholder="https://www.facebook.com/reel/…" value="' + escA(url) + '">'
+    + h('1. From our server')
+    + '<button style="' + primary + '" onclick="fbProbeRunServer(false)">▶ Run the server tests</button>'
+    + '<button style="' + plain + '" onclick="fbProbeRunServer(true)">▶ …with Google and Claude web search</button>'
+    + h('2. On this phone')
+    + p('<b>a. Safari.</b> Open the post in Safari (not signed in to Facebook). Tap “See more” if it is there. What shows?')
+    + '<a href="' + escA(url || '#') + '" target="_blank" rel="noopener noreferrer" style="' + plain + 'display:inline-block;text-decoration:none;">↗ Open the post</a>'
+    + '<button style="' + plain + '" onclick="fbProbeSave({safari:\'the WHOLE recipe text\'});fbProbeRender()">The whole recipe</button>'
+    + '<button style="' + plain + '" onclick="fbProbeSave({safari:\'only the start\'});fbProbeRender()">Only the start</button>'
+    + '<button style="' + plain + '" onclick="fbProbeSave({safari:\'a sign-in page, no text\'});fbProbeRender()">A sign-in page</button>'
+    + p('<b>b. The phone fetches the page itself</b> — a test shortcut (steps in the chat). It needs these two:')
+    + '<button style="' + plain + '" onclick="fbProbeCopy(WORKER_ENDPOINT, \'The server address\')">\u{1F4CB} Server address</button>'
+    + '<button style="' + plain + '" onclick="fbProbeCopy(String(WORKER_APP_KEY||\'\'), \'The app key\')">\u{1F4CB} App key</button>'
+    + '<button style="' + primary + '" onclick="fbProbePhoneResult()">Show the phone’s result</button>'
+    + p('<b>c. The \u{1F4D8} bookmark on this phone.</b> Bookmark any page in Safari, edit it, paste this as its address. Then on the post in Safari open Bookmarks and tap it.')
+    + '<button style="' + plain + '" onclick="fbProbeCopy(facebookBookmarkletCode(), \'The bookmark code\')">\u{1F4CB} Copy the bookmark code</button>'
+    + h('Results')
+    + '<pre id="fbProbeResults" dir="auto" style="white-space:pre-wrap;font-size:11.5px;line-height:1.5;background:var(--warn-bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin:4px 0;"></pre>'
+    + '<div class="ask-actions">'
+    + '<button class="ask-btn" onclick="fbProbeCopy(fbProbeReport(), \'The report\')">\u{1F4CB} Copy the report</button>'
+    + '<button class="ask-btn ghost" onclick="fbProbeSave({server:null,phone:null,bookmark:null,safari:null});fbProbeRender()">Start over</button>'
+    + '<button class="ask-btn ghost" onclick="document.getElementById(\'fbProbeOverlay\').remove()">Close</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  fbProbeRender();
+}
+window.openFbProbe = openFbProbe; window.fbProbeRunServer = fbProbeRunServer; window.fbProbePhoneResult = fbProbePhoneResult;
+window.fbProbeReport = fbProbeReport; window.fbProbeSave = fbProbeSave; window.fbProbeRender = fbProbeRender; window.fbProbeCopy = fbProbeCopy;
+window.fbProbeNoteBookmark = fbProbeNoteBookmark; window.fbProbeState = fbProbeState;
+
 function facebookBookmarkletCode() {
   var app = String(APP_CONFIG.siteOrigin || '') + String(APP_CONFIG.sitePath || '/');
   var js = "(async()=>{const A=" + JSON.stringify(app) + ";const W=m=>new Promise(r=>setTimeout(r,m));"

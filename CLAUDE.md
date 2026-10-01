@@ -732,6 +732,20 @@ found only because a test was written first and disagreed with the code.
     30 s for the whole caption search (Google and Claude share one
     deadline); Claude uses the quick `web_search_20250305`, 2 uses, no
     web_fetch (the 20260209 tools' filtering step is the slow part).
+  - **v37.38 + Worker v57 — 🔬 the Facebook reading test.** Tony: "you are
+    grasping at straws … think of several ways to get to the text and design
+    a test to check all of them". Facebook sends a data-centre server only a
+    ~200-char preview; the text must likely come from the PHONE. One test,
+    one post, every route graded alike (`probeGrade`: whole / preview /
+    nothing, against the preview's `captionKey`): SERVER (`fb-probe`) — the
+    post page, the mobile site, the watch page, both embed pages, both
+    official embeds, optionally Google's and Claude's web search; PHONE —
+    (a) Safari's view (Tony answers), (b) the phone fetching the page itself
+    through a test shortcut that posts the HTML to `fb-probe-html` (kept a
+    day in KV `probe:last`, shown by `fb-probe-last`), (c) the 📘 bookmark in
+    phone Safari (its text noted by `fbProbeNoteBookmark`). Settings →
+    🔬 Facebook reading test, test copy only; "Copy the report". Tests:
+    `fb_reading_test`, 6 Worker checks. The winning route becomes the import.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

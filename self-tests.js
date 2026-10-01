@@ -965,6 +965,43 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'fb_reading_test', group:'Import/Export', name:'🔬 Facebook reading test: test copy only; every route graded into one report (v37.38)',
+    test: async()=>{
+      var item=document.getElementById('fbProbeItem');
+      var live=String(APP_CONFIG.environment||'live')==='live';
+      if(!item) throw new Error('no 🔬 item in Settings');
+      if(live!==item.hidden) throw new Error(live ? 'the family app shows the Facebook reading test' : 'the test copy hides the Facebook reading test');
+      var real={ fetch:window.fetch, toast:window.toast }, saved=null;
+      try{ saved=localStorage.getItem(FB_PROBE_KEY); }catch(e){}
+      try{
+        window.toast=function(){};
+        localStorage.removeItem(FB_PROBE_KEY);
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.action==='fb-probe') return { status:200, json:async function(){ return { preview:'x'.repeat(202), rows:[
+            { route:'server: the post page', grade:'preview', chars:202, how:'og:description', note:'' },
+            { route:'server: mobile site', grade:'whole', chars:900, how:'page data (string)', tail:'Bake 30 minutes.', note:'' } ] }; } };
+          if(b.action==='fb-probe-last') return { status:200, json:async function(){ return { at:'2026-10-02T00:00:00Z', row:{ route:'phone: shortcut fetch', grade:'whole', chars:950, how:'visible words', tail:'Serve cold.' } }; } };
+          return { status:404, json:async function(){ return {}; } }; };
+        openFbProbe();
+        document.getElementById('fbProbeUrl').value='https://www.facebook.com/reel/1287081419887804/';
+        await fbProbeRunServer(false);
+        await fbProbePhoneResult();
+        fbProbeSave({ safari:'only the start' });
+        fbProbeNoteBookmark('The viral cake: 6 eggs, a cup of sugar, a cup of oil and 200 g of dark chocolate. Bake 30 minutes.', 'https://www.facebook.com/reel/1287081419887804/');
+        fbProbeNoteBookmark('not facebook', 'https://example.com/');   // only a Facebook post is kept
+        var rep=fbProbeReport();
+        ['WHOLE TEXT — server: mobile site','preview only — server: the post page','Safari shows: only the start','Phone fetch (test shortcut): ✅ WHOLE TEXT — phone: shortcut fetch','Bookmark on the phone: 98 chars — “The viral cake']
+          .forEach(function(w){ if(rep.indexOf(w)===-1) throw new Error('the report lacks "'+w+'":\n'+rep); });
+        fbProbeRender();
+        var body=function(t){ return String(t).split('\n').slice(1).join('\n'); };   // the first line carries the time
+        if(body(document.getElementById('fbProbeResults').textContent)!==body(fbProbeReport())) throw new Error('the screen does not show the report');
+      } finally {
+        window.fetch=real.fetch; window.toast=real.toast;
+        var ov=document.getElementById('fbProbeOverlay'); if(ov) ov.remove();
+        try{ if(saved===null) localStorage.removeItem(FB_PROBE_KEY); else localStorage.setItem(FB_PROBE_KEY, saved); }catch(e){}
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu (v37.28)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
