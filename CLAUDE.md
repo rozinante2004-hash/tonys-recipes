@@ -691,6 +691,14 @@ found only because a test was written first and disagreed with the code.
     shared link — a fresh action) goes network-first, the cache only offline.
     `tests/sw-probe.js` reports what was served and under which keys;
     `sw_serves_only_the_app_shell` checks it (fails on the old sw.js — run).
+  - **v37.34 — a shared link never asks "update?".** Tony: "Later" ran the
+    old version, "Update" lost the import — "I'm not sure how to win this".
+    `newestAppThen(href, go)`: opened by a shared link, the app checks
+    version.json (4 s at most); a newer one → it updates by itself (SW
+    update, caches cleared) and comes back to the SAME shared link, once per
+    link (sessionStorage `mkn_share_update`), then imports. Update Now, with
+    a URL import open, comes back to it (`?url=` put back before reloading).
+    Test: `share_updates_the_app_first`.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

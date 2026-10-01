@@ -666,6 +666,35 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'share_updates_the_app_first', group:'Import/Export', name:'A link shared into an older app: the app updates itself and imports the same link — nothing asked (v37.34)',
+    test: async()=>{
+      var real={ fetch:window.fetch, log:window.syncLog, toast:window.toast };
+      var went=null, ran=0, server='v99.0', href='https://x.example/?url=https%3A%2F%2Fwww.facebook.com%2Freel%2F1';
+      try{
+        window.syncLog=function(){}; window.toast=function(){};
+        window._navigateForTest=function(u){ went=u; };
+        window.fetch=async function(u){ if(/version\.json/.test(String(u))) return { json:async function(){ return { version:server }; } }; return real.fetch.apply(window, arguments); };
+        try{ sessionStorage.removeItem(SHARE_UPDATE_KEY); }catch(e){}
+        // Newer on the server: update, and come back to the SAME shared link.
+        newestAppThen(href, function(){ ran++; });
+        await new Promise(function(r){ setTimeout(r, 500); });
+        if(went!==href || ran) throw new Error('an older app did not update first and return to the link: '+JSON.stringify([went, ran]));
+        // Back from that reload (say the deploy is still in flight): imported, not updated again.
+        went=null;
+        newestAppThen(href, function(){ ran++; });
+        await new Promise(function(r){ setTimeout(r, 900); });
+        if(went || ran!==1) throw new Error('a second update for the same link, or no import: '+JSON.stringify([went, ran]));
+        // The newest already: straight to the import.
+        server=APP_VERSION; ran=0;
+        newestAppThen(href, function(){ ran++; });
+        await new Promise(function(r){ setTimeout(r, 700); });
+        if(went || ran!==1) throw new Error('the newest app did not import at once: '+JSON.stringify([went, ran]));
+      } finally {
+        window.fetch=real.fetch; window.syncLog=real.log; window.toast=real.toast; delete window._navigateForTest;
+        try{ sessionStorage.removeItem(SHARE_UPDATE_KEY); }catch(e){}
+      }
+    } },
+
   { id:'import_recipe_video_file', group:'Import/Export', name:'A recipe video (a screen recording of a reel) is read into a recipe (v37.18)',
     test: async()=>{
       var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };

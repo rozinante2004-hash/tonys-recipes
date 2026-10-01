@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.33 -->
+<!-- Tony's Recipes Collection v37.34 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1618,6 +1618,33 @@ function extractSharedUrl(sharedUrl, sharedText, sharedTitle, rawSearch) {
 }
 window.extractSharedUrl = extractSharedUrl;
 
+// v37.34 — opened by a shared link while a newer version is on the server:
+// update first (once), and come back to the same shared link in the new app.
+// Offline, unreadable, or already tried for this link → carry on as is.
+var SHARE_UPDATE_KEY = 'mkn_share_update';
+function newestAppThen(href, go) {
+  var tried = '';
+  try { tried = sessionStorage.getItem(SHARE_UPDATE_KEY) || ''; sessionStorage.removeItem(SHARE_UPDATE_KEY); } catch(e) {}
+  if (tried === href || !navigator.onLine) { setTimeout(go, 600); return; }
+  var done = false, finish = function(){ if (!done) { done = true; setTimeout(go, 300); } };
+  var timer = setTimeout(finish, 4000);   // a slow check never holds the import up for long
+  fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.json(); })
+    .then(async function(d) {
+      if (done) return;
+      if (!(d && versionIsNewer(d.version, APP_VERSION))) { clearTimeout(timer); return finish(); }
+      clearTimeout(timer); done = true;
+      try { sessionStorage.setItem(SHARE_UPDATE_KEY, href); } catch(e) {}
+      syncLog('load', 'Opened by a shared link on an older app \u2014 updating first', { running: APP_VERSION, server: d.version });
+      if (typeof toast === 'function') toast('\u23f3 Getting the newest version of the app first\u2026', 4000);
+      try { var reg = await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); } catch(e) {}
+      try { if (window.caches && caches.keys) { var ks = await caches.keys(); await Promise.all(ks.map(function(k){ return caches.delete(k); })); } } catch(e) {}
+      (window._navigateForTest || function(u){ window.location.replace(u); })(href);
+    })
+    .catch(function(){ clearTimeout(timer); finish(); });
+}
+window.newestAppThen = newestAppThen;
+
 function handleShareTarget() {
   var params    = new URLSearchParams(window.location.search);
   var rawSearch = window.location.search || '';
@@ -1636,6 +1663,7 @@ function handleShareTarget() {
   }
 
   if (!sharedUrl && !sharedText && !sharedTitle) return;
+  var sharedHref = window.location.href;   // v37.34 — to come back to, in a newer app
 
   // Remove query params from browser URL without reloading
   try { window.history.replaceState({}, '', window.location.pathname); } catch(e) {}
@@ -1658,7 +1686,9 @@ function handleShareTarget() {
   var textNoUrl = (textBlob || '').replace(/https?:\/\/[^\s]+/g, '').trim();
   var hasRecipeText = textNoUrl.length >= 40; // long enough to be a recipe, not a title/author
 
-  setTimeout(function() {
+  // v37.34 — THE CASCADE: something shared is imported by the NEWEST app,
+  // without asking. Tony: "Later" ran the old version, "Update" lost the import.
+  newestAppThen(sharedHref, function() {
     // v37.24 — text the extension or the bookmark took from the page in front
     // of the person is what they saw: it wins over re-fetching the address (a
     // site may block our server, or need a login), and it is read at once.
@@ -1701,7 +1731,7 @@ function handleShareTarget() {
       + 'To fix: in that app tap <strong>Share → Copy Link</strong> and paste it above, or open the recipe in a browser and share from there.'
       + '<div style="margin-top:8px;font-size:11px;color:var(--muted);word-break:break-all;">Received — ' + escH(got.join('  |  ').slice(0,240)) + '</div>'
       + '</div>';
-  }, 600);
+  });
 }
 window.handleShareTarget = handleShareTarget;
 
@@ -5027,7 +5057,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.33';
+var APP_VERSION = 'v37.34';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7659,7 +7689,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.33</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.34</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8313,7 +8343,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.33</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.34</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -21902,6 +21932,12 @@ async function swUpdateNow() {
     return;
   }
   try { if (reg) await reg.update(); } catch(e) {}
+  // v37.34 — an import in progress comes back with the reload, in the new app.
+  try {
+    var ov = document.getElementById('urlImportOverlay'), ui = document.getElementById('urlImportInput');
+    if (ov && ov.classList.contains('open') && ui && /^https?:\/\//i.test(ui.value.trim()))
+      window.history.replaceState({}, '', window.location.pathname + '?url=' + encodeURIComponent(ui.value.trim()));
+  } catch(e) {}
   try {
     if (window.caches && caches.keys) {
       var keys = await caches.keys();
