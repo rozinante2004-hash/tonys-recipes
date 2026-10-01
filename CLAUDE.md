@@ -650,6 +650,14 @@ found only because a test was written first and disagreed with the code.
     menu; "Show in Share Sheet" by tapping the blue Input → Shortcut Input →
     "Receive … from Nowhere" → tick Share Sheet; no Done, the ‹ back saves.
     Tests: `import_facebook_unreadable_says_why`, 3 Worker checks.
+  - **v37.30 + Worker v50 — the whole caption.** Tony's log (reel
+    1287081419887804): the words WERE read first — `via: page`, 202 chars —
+    but og:description is the preview, cut short before the recipe; the video
+    held none either. Worker v50 takes the post's whole caption from the
+    page's own data (`fbMessageIn`: the longest `"message":{…"text":…}`), and
+    returns a too-short caption as `caption`. The app says what became of the
+    words before "Watching the video" (`lead`), quotes the words in the box
+    when they hold no recipe (`_fbCaption`), and logs their first 160 chars.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

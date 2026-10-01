@@ -850,7 +850,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'import_facebook_unreadable_says_why', group:'Import/Export', name:'A Facebook reel nothing could read: no login page taken for its words, and the reason is shown (v37.29)',
+  { id:'import_facebook_unreadable_says_why', group:'Import/Export', name:'A Facebook reel nothing could read: no login page taken for its words, and the reason is shown, the words quoted (v37.29, v37.30)',
     test: async()=>{
       var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
       var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[];
@@ -872,7 +872,7 @@ window.SELF_TESTS = [
           return { ok:false, status:502, json:async function(){ return {}; } }; };
         await runUrlImport();
         box=document.getElementById('videoRecipeFallback');
-        if(!box || !/hold no recipe/.test(box.textContent)) throw new Error('words without a recipe: '+res.textContent.slice(0,300));
+        if(!box || !/hold no recipe: \u201cWhat a lovely evening/.test(box.textContent)) throw new Error('words without a recipe are not quoted: '+res.textContent.slice(0,300));
       } finally {
         window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
         inp.value=''; res.innerHTML='';

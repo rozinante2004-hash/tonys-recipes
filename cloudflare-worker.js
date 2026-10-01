@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v49
+// Tony's Recipes — Cloudflare Worker v50
+// v50: the WHOLE caption from a Facebook post's own page — its data's
+//      "message" text — not only the preview's og:description, which is cut
+//      short ("…") before the recipe. Tony: "it did not get to the text first".
+//      A caption too short to be a recipe is still returned (`caption`), so
+//      the app can say what it found.
 // v49: facebook-fetch also reads the post's OWN page (same honest User-Agent):
 //      its preview tags — og:description is the caption a link preview shows —
 //      and the video's address (og:video or the page's own video fields), before
@@ -158,7 +163,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v49';
+const WORKER_VERSION = 'v50';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1406,6 +1411,23 @@ function metaIn(html, prop) {
          || new RegExp('<meta[^>]+content="([^"]*)"[^>]*(?:property|name)=["\']' + p + '["\']', 'i').exec(html);
   return m ? m[1] : '';
 }
+// v50 — a post's own words in the page's data: "message":{…"text":"…"}.
+// The longest one is the post (a reel page carries only its own caption).
+function fbMessageIn(html) {
+  const h = String(html || '');
+  let best = '';
+  const re = /"message":\{/g;
+  let m;
+  while ((m = re.exec(h))) {
+    const t = /"text":"((?:[^"\\]|\\.)*)"/.exec(h.slice(m.index, m.index + 6000));
+    if (!t) continue;
+    let s = '';
+    try { s = JSON.parse('"' + t[1] + '"'); } catch (e) { continue; }
+    s = fbPostText(s.replace(/\r/g, ''));
+    if (s.length > best.length) best = s;
+  }
+  return best;
+}
 function ogVideoIn(html) {
   for (const p of ['og:video:secure_url', 'og:video:url', 'og:video']) {
     const u = metaIn(html, p).replace(/&amp;/g, '&');
@@ -1481,7 +1503,7 @@ async function facebookFetch(env, url) {
   }
   // 3. (v49) The post's own page — its preview tags (og:description is the
   //    caption that a link preview shows) and the video's address.
-  let videoUrl = '';
+  let videoUrl = '', caption = '';
   try {
     const r = await fetch(clean, { headers: Object.assign({ Accept: 'text/html' }, FB_UA), redirect: 'follow', signal: AbortSignal.timeout(12000) });
     if (!r.ok) tried.push('page: HTTP ' + r.status);
@@ -1491,8 +1513,13 @@ async function facebookFetch(env, url) {
       videoUrl = videoUrlIn(html) || ogVideoIn(html);
       let desc = fbPostText(htmlText(metaIn(html, 'og:description') || metaIn(html, 'description')));
       if (/log ?in(to)? (to )?facebook|on facebook\.?$|see posts, photos and more/i.test(desc)) desc = '';   // the login wall's own words
+      // v50 — the WHOLE caption, from the page's own data: a preview's
+      // og:description is cut short ("…"), and the recipe is in the rest.
+      const msg = fbMessageIn(html);
+      if (msg.length > desc.replace(/(\.\.\.|…)$/, '').length) desc = msg;
       const title = htmlText(metaIn(html, 'og:title'));
-      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: 'page', url: clean, title, videoUrl };
+      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: msg && desc === msg ? 'page-data' : 'page', url: clean, title, videoUrl };
+      caption = desc;
       tried.push('page: ' + (desc ? 'caption too short' : 'no caption') + (videoUrl ? ', video found' : ', no video'));
     }
   } catch (e) { tried.push('page: ' + e.message); }
@@ -1511,7 +1538,7 @@ async function facebookFetch(env, url) {
       tried.push('embed ' + plugin + ': no text');
     } catch (e) { tried.push('embed ' + plugin + ': ' + e.message); }
   }
-  return { text: '', url: clean, tried, videoUrl };
+  return { text: '', url: clean, tried, videoUrl, caption };
 }
 
 export default {
@@ -1531,4 +1558,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v49 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v50 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

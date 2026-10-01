@@ -696,6 +696,15 @@ console.log('\nfacebook-fetch (v47):');
     pageHtml = '<html><head><meta property="og:description" content="Log in to Facebook to start sharing and connecting with your friends, family and people you know." /></head></html>';
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
     expect('…the login wall\'s own words are not taken for a caption', b.text === '' && b.tried.some(t => /^page: no caption/.test(t)), JSON.stringify(b));
+    // v50 — the preview is cut short; the page's data holds the whole caption.
+    pageHtml = '<html><head><meta property="og:description" content="Pistachio cake that everyone asks me for, here is how I make it..." /></head><body><script type="application/json">'
+      + '{"story":{"message":{"ranges":[],"text":"Pistachio cake that everyone asks me for, here is how I make it\\n\\u05de\\u05e6\\u05e8\\u05db\\u05d9\\u05dd:\\n3 eggs\\n1 cup sugar\\n1 cup ground pistachios\\nBake 35 minutes at 180\\u00b0C"}},'
+      + '"comment":{"message":{"text":"Yum!"}}}</script></body></html>';
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
+    expect('v50: the whole caption from the page\'s data, not the cut-short preview', b.via === 'page-data' && /מצרכים:\n3 eggs\n1 cup sugar/.test(b.text) && /180°C$/.test(b.text), JSON.stringify(b));
+    pageHtml = '<html><head><meta property="og:description" content="So good 😍" /><meta property="og:video" content="https://video.xx.fbcdn.net/v/p.mp4" /></head></html>';
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
+    expect('…a caption too short to be a recipe is still said, with the video', b.text === '' && b.caption === 'So good 😍' && b.videoUrl === 'https://video.xx.fbcdn.net/v/p.mp4', JSON.stringify(b));
   } finally { globalThis.fetch = realFetch; }
 }
 

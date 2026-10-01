@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.29 -->
+<!-- Tony's Recipes Collection v37.30 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5027,7 +5027,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.29';
+var APP_VERSION = 'v37.30';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7659,7 +7659,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.29</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.30</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8313,7 +8313,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.29</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.30</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17853,7 +17853,7 @@ async function runUrlImport() {
   const res = document.getElementById('urlImportResult');
 
   var _importSourceUrl = url;
-  var _fbVideoUrl = '';
+  var _fbVideoUrl = '', _fbCaption = '';
 
   if (isYouTubeUrl(url)) {
     res.innerHTML = '<div style="text-align:center;padding:20px;">'
@@ -17925,9 +17925,10 @@ async function runUrlImport() {
       var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
       var fd = null; try { fd = await fr.json(); } catch(e) {}
       _fbVideoUrl = (fd && fd.videoUrl) || '';
+      _fbCaption = (fd && (fd.text || fd.caption)) || '';   // v37.30 — said in the box when it holds no recipe
       if (fd && fd.text && fd.text.length >= 60) {
         pageText = fd.text;
-        syncLog('import', 'Facebook post read from its link', { via: fd.via, chars: fd.text.length });
+        syncLog('import', 'Facebook post read from its link', { via: fd.via, chars: fd.text.length, start: fd.text.replace(/\s+/g, ' ').slice(0, 160) });
       } else {
         attempts.push('facebook: ' + ((fd && fd.tried && fd.tried.join('; ')) || (fd && fd.error) || ('the server answered ' + fr.status)));
         syncLog('import', 'Facebook post not readable from its link', { why: attempts[attempts.length - 1].slice(0, 300) });
@@ -18037,7 +18038,7 @@ async function runUrlImport() {
       syncLog('import', 'No readable text from ' + videoPost, { url: url, why: attempts.join('; ') });
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
       // THE CASCADE — a Facebook post with no words we could read: its video.
-      if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res)) return;
+      if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res, '\u{1F4D8} Facebook gave none of the post\u2019s words \u2014 now its video.')) return;
       showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy
         : [fbWhy ? 'Why the link alone did not work: ' + fbWhy.slice(0, 300) : '', _fbVideoUrl ? _videoAiWhy : 'Facebook gave no address for its video.'].filter(Boolean).join(' ')); return;
     }
@@ -18092,11 +18093,12 @@ async function runUrlImport() {
     if (/no recipe found|not a recipe/i.test(msg)) {
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
       // THE CASCADE — the Facebook post's words hold no recipe: its video.
-      if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res)) return;
+      if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res, '\u{1F4D8} The post\u2019s words hold no recipe \u2014 now its video.')) return;
       // v37.29 — the reason is always said: Tony's first reel from the Share
       // menu ended here with none, and nothing to go on.
       if (videoPost) showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy
-        : 'The post\u2019s words were read but hold no recipe. ' + (_fbVideoUrl ? _videoAiWhy : 'Facebook gave no address for its video.'));
+        : 'The post\u2019s words were read but hold no recipe' + (_fbCaption ? ': \u201c' + _fbCaption.replace(/\s+/g, ' ').slice(0, 160) + (_fbCaption.length > 160 ? '\u2026' : '') + '\u201d. ' : '. ')
+          + (_fbVideoUrl ? _videoAiWhy : 'Facebook gave no address for its video.'));
       else showSaveAsVideoBookmark(url, '', '🎥');
     } else {
       res.innerHTML = '<div class="explore-result" style="color:var(--danger);">'
@@ -18117,9 +18119,9 @@ var _videoAiWhy = '';
 // v37.27 — the same for a Facebook or Instagram reel's video (Worker v48
 // fetches it from the platform's own video server): `ask` is what the Worker
 // is asked; a YouTube video is asked for by its link.
-async function youtubeRecipeFromVideo(url, res, ask) {
+async function youtubeRecipeFromVideo(url, res, ask, lead) {
   _videoAiWhy = '';
-  res.innerHTML = spinner('\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)');
+  res.innerHTML = spinner((lead ? escH(lead) + '<br>' : '') + '\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)');
   var d = null, st = 0;
   try {
     var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody(ask || { action: 'video-recipe', url: url }) });
@@ -18156,9 +18158,11 @@ async function youtubeRecipeFromVideo(url, res, ask) {
 window.youtubeRecipeFromVideo = youtubeRecipeFromVideo;
 // THE CASCADE (Tony, 1 Oct 2026): when a post's words hold no recipe, its
 // video is read — without asking.
-function recipeFromReelVideo(sourceUrl, videoUrl, res) {
+// v37.30 — `lead` says first what became of the words (Tony: "it did not get
+// to the text first" — it had; the message did not say so).
+function recipeFromReelVideo(sourceUrl, videoUrl, res, lead) {
   if (!videoUrl) return Promise.resolve(false);
-  return youtubeRecipeFromVideo(sourceUrl, res, { action: 'video-from-url', url: videoUrl });
+  return youtubeRecipeFromVideo(sourceUrl, res, { action: 'video-from-url', url: videoUrl }, lead);
 }
 window.recipeFromReelVideo = recipeFromReelVideo;
 
