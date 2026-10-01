@@ -935,6 +935,36 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_cut_caption_video_says_so', group:'Import/Export', name:'The post\'s text cut off and found nowhere else: the recipe from the video says so, and offers screenshots (v37.37)',
+    test: async()=>{
+      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
+      var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult');
+      try{
+        window.syncLog=function(){};
+        window.extractRecipesFromText=async function(t){ return /200 g/.test(t) ? { name:'Layer cake', ingredients:[{a:'200 g',n:'chocolate'}], steps:['Melt.'] } : { error:'no recipe found' }; };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'The viral cake everyone is talking about: soft, rich, crunchy, melting in the mouth. Looks like it came from a patisserie, but', via:'page',
+            videoUrl:'https://video.xx.fbcdn.net/v/r.mp4', tried:['whole caption: Google did not find it; Claude took too long','share link: no redirect (200)'] }; } };
+          if(b.action==='video-from-url') return { ok:true, status:200, json:async function(){ return { text:'Layer cake\n200 g chocolate', via:'gemini' }; } };
+          return { ok:false, status:502, json:async function(){ return {}; } }; };
+        inp.value='https://www.facebook.com/reel/1287081419887804'; await runUrlImport();
+        var note=document.getElementById('captionCutNote');
+        if(!/Layer cake/.test(res.textContent) || !note) throw new Error('the video recipe does not say the post\'s text was cut off: '+res.textContent.slice(0,200));
+        var btn=note.querySelector('button');
+        if(!btn || !/pickScreenshots/.test(btn.getAttribute('onclick')||'') || !/1287081419887804/.test(btn.getAttribute('onclick'))) throw new Error('no screenshots offer for this post: '+note.innerHTML.slice(0,300));
+        // A reel whose words were whole (nothing cut off): no such note.
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'Best pasta ever!!! Follow for more recipes like this one every week, see you soon', via:'page', videoUrl:'https://video.xx.fbcdn.net/v/r.mp4' }; } };
+          if(b.action==='video-from-url') return { ok:true, status:200, json:async function(){ return { text:'Layer cake\n200 g chocolate', via:'gemini' }; } };
+          return { ok:false, status:502, json:async function(){ return {}; } }; };
+        await runUrlImport();
+        if(document.getElementById('captionCutNote')) throw new Error('the note shows when nothing was cut off');
+      } finally {
+        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
+        inp.value=''; res.innerHTML='';
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu (v37.28)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');

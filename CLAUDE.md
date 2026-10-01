@@ -717,6 +717,16 @@ found only because a test was written first and disagreed with the code.
     log entry). The reason now has its own log line ("Facebook showed only
     the start; the rest was not found"); Google 503 twice → its next model
     (`a = -1`, at most 6 calls); the spinner says the web is being searched.
+  - **v37.37 + Worker v55 — the answer for the cake reel.** v54 run: "Google
+    did not find it; Claude took too long" — the post's text past its first
+    202 chars is on Facebook only, behind sign-in; no server reaches it, and
+    the open web does not have it. Worker v55: Google and Claude look AT ONCE
+    (AbortController stops Claude when Google's answer passes; Claude 70 s,
+    3 searches + 2 fetches). App: a recipe read from the video after the text
+    was cut off says so (`#captionCutNote`, `_captionCut`) and offers the one
+    way to the post's own recipe — 📷 Import screenshots. On a computer the
+    extension reads the signed-in page and is the full answer. Test:
+    `import_cut_caption_video_says_so`.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

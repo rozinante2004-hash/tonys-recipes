@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v54
+// Tony's Recipes — Cloudflare Worker v55
+// v55: Google and Claude look for a cut-off caption AT ONCE (v54: Google said
+//      "not found", then Claude ran out its 90 s — two minutes in all); Claude
+//      stops when Google's answer passes, and has 70 s and fewer searches.
 // v54: the whole-caption search — Google "high demand" twice moves to Google's
 //      next model (v53 gave up on that way of looking instead).
 // v53: the rest of a cut-off Facebook caption — Tony's v52 run said only
@@ -181,7 +184,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v54';
+const WORKER_VERSION = 'v55';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1508,11 +1511,12 @@ async function geminiFullCaption(env, url, start) {
 // pages it finds). The same checks as Google's answer; the sources are the
 // pages Claude cited, opened, or found.
 const CLAUDE_CAPTION_MODEL = 'claude-sonnet-5';   // the app's AI_MODEL
-async function claudeFullCaption(env, url, start) {
+async function claudeFullCaption(env, url, start, stop) {
   if (!env.ANTHROPIC_API_KEY) return { text: '', why: 'not set up (ANTHROPIC_API_KEY)' };
   const messages = [{ role: 'user', content: FULL_CAPTION_PROMPT(url, start) }];
-  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 },
-                 { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 4 }];
+  const tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 },
+                 { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 2 }];
+  const until = Date.now() + 70000;   // v55 — one budget for all its turns
   let d = null;
   for (let turn = 0; turn < 3; turn++) {
     let r;
@@ -1521,10 +1525,10 @@ async function claudeFullCaption(env, url, start) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({ model: CLAUDE_CAPTION_MODEL, max_tokens: 8000, tools, messages }),
-        signal: AbortSignal.timeout(90000),
+        signal: stop ? AbortSignal.any([stop, AbortSignal.timeout(Math.max(1000, until - Date.now()))]) : AbortSignal.timeout(Math.max(1000, until - Date.now())),
       });
       d = null; try { d = await r.json(); } catch (e) {}
-    } catch (e) { return { text: '', why: 'Claude ' + ((e && e.name === 'TimeoutError') ? 'took too long' : 'could not be reached') }; }
+    } catch (e) { return { text: '', why: 'Claude ' + ((e && e.name === 'TimeoutError') ? 'took too long' : (e && e.name === 'AbortError') ? 'was stopped' : 'could not be reached') }; }
     if (!r.ok) return { text: '', why: 'Claude answered ' + r.status + ' ' + String((d && d.error && d.error.message) || '').slice(0, 120) };
     // The server's search loop paused: send the turn back as is, and it resumes.
     if (d && d.stop_reason === 'pause_turn') { messages.push({ role: 'assistant', content: d.content }); continue; }
@@ -1675,8 +1679,13 @@ async function facebookFetch(env, url) {
       // the recipe. Google is asked for the whole of it, checked against
       // the words we already have.
       if (desc.length >= 60 && desc.length < 400 && !(msg && desc === msg)) {
+        // v55 — both look at once (v54 took two minutes, one after the other);
+        // Claude is stopped as soon as Google's answer passes the checks.
+        const stopClaude = new AbortController();
+        const claudeP = claudeFullCaption(env, clean, desc, stopClaude.signal);
         let full = await geminiFullCaption(env, clean, desc), why = full.why || '';
-        if (!full.text) { const c = await claudeFullCaption(env, clean, desc); if (c.text) full = c; else why += (why ? '; ' : '') + c.why; }
+        if (full.text) { stopClaude.abort(); claudeP.catch(() => {}); }
+        else { const c = await claudeP; if (c.text) full = c; else why += (why ? '; ' : '') + c.why; }
         if (full.text) return { text: full.text.slice(0, 20000), via: 'web-caption', by: full.by, url: clean, title, videoUrl, sources: full.sources, sourceNames: full.sourceNames, preview: desc };
         if (why) tried.unshift('whole caption: ' + why);   // first: the log keeps only so much
       }
@@ -1720,4 +1729,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v54 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v55 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

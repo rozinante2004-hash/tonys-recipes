@@ -749,7 +749,7 @@ console.log('\nfacebook-fetch (v47):');
       : new Response(JSON.stringify({ error: { message: 'Quota exceeded for url_context' } }), { status: 429 });
     claudeReply = () => new Response('{}', { status: 500 });
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
-    expect('v53: Google refuses one way of looking → the next way, on its own', b.via === 'web-caption' && b.by === 'google' && gemTools[0] === '[{"url_context":{}},{"google_search":{}}]' && gemTools[1] === '[{"google_search":{}}]' && !claudeAsked.length, JSON.stringify([b.via, gemTools]));
+    expect('v53: Google refuses one way of looking → the next way, on its own', b.via === 'web-caption' && b.by === 'google' && gemTools[0] === '[{"url_context":{}},{"google_search":{}}]' && gemTools[1] === '[{"google_search":{}}]', JSON.stringify([b.via, gemTools]));
     gemReply = () => new Response(JSON.stringify({ error: { message: 'Resource has been exhausted (e.g. check quota).' } }), { status: 429 });
     claudeReply = (body, n) => n === 1
       ? new Response(JSON.stringify({ stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'x' } }] }), { status: 200 })
@@ -766,6 +766,20 @@ console.log('\nfacebook-fetch (v47):');
     claudeReply = () => new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: START + ' ' + 'ועוד המון מילים שהמודל המציא בעצמו בלי שום מקור, מצרכים: קמח, סוכר, ביצים ושמן' }] }), { status: 200 });
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
     expect('…Claude\'s text with no page behind it is refused; Google\'s real answer is said', b.via === 'page' && /^whole caption: Google answered 429 Resource has been exhausted.*; Claude named no page/.test(b.tried[0]), b.tried && b.tried[0]);
+    // v55 — both look at once; Claude is stopped when Google's answer passes.
+    let claudeStopped = false;
+    claudeReply = () => new Response('{}', { status: 500 });
+    const realF55 = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => {
+      if (String(url) === 'https://api.anthropic.com/v1/messages')
+        return new Promise((res, rej) => { init.signal.addEventListener('abort', () => { claudeStopped = true; rej(Object.assign(new Error('aborted'), { name: 'AbortError' })); }); });
+      return realF55(url, init);
+    };
+    gemReply = () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: FULL }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://www.instagram.com/p/Q/', title: 'instagram.com' } }] } }] }), { status: 200 });
+    const t55 = Date.now();
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
+    expect('v55: Google and Claude look at once — Claude stopped when Google finds it', b.by === 'google' && claudeStopped && Date.now() - t55 < 5000, JSON.stringify([b.by, claudeStopped, Date.now() - t55]));
+    globalThis.fetch = realF55;
     // v54 — Google in high demand twice → its next model, same way of looking.
     let gemModels = [];
     globalThis.fetch = async (url, init = {}) => {
