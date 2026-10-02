@@ -1,8 +1,17 @@
 // Builds the "Save recipes from Facebook" browser extension (extension 1.0, after app v37.22) for one
-// copy of the app, as a folder and a .zip ready for the Chrome Web Store.
+// copy of the app, as a folder and a .zip ready for the browsers' stores.
 //
-//   node tools/build-extension.mjs live   → dist-extension/live/ + my-kitchen-notes-extension.zip
-//   node tools/build-extension.mjs test   → dist-extension/test/ + my-kitchen-notes-extension-TEST.zip
+//   node tools/build-extension.mjs live   → dist-extension/live/ + my-kitchen-notes-extension.zip            (Chrome, Edge, Brave, Opera, Vivaldi)
+//                                            dist-extension/live-firefox/ + my-kitchen-notes-extension-firefox.zip (Firefox)
+//   node tools/build-extension.mjs test   → the same with -TEST
+//
+// 1.4 (app v37.46) — Tony: "the same extension for other common browsers like
+// Edge", installed "as easy and simple as possible". Every Chromium browser runs
+// the Chrome package as is (Edge's store takes the same zip); Firefox needs its
+// background scripts listed (it has no extension service worker) and an add-on
+// id. The Chromium zip is also written to downloads/ (committed) so the app can
+// offer it before the stores list it; the zips are byte-for-byte reproducible,
+// and CI fails if downloads/ is not what the source builds.
 //
 // The only difference is where "Save recipe" sends the text: the family app
 // (and later the public one) or the test copy. The test build says TEST in its
@@ -36,6 +45,13 @@ for (const f of fs.readdirSync(src)) {
 }
 for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.join(src, 'icons', f), path.join(out, 'icons', f));
 
+// The app's own pages: where appmark.js says the extension is installed.
+{
+  const mp = path.join(out, 'manifest.json');
+  const m0 = JSON.parse(fs.readFileSync(mp, 'utf8'));
+  m0.content_scripts.forEach(cs => { cs.matches = cs.matches.map(x => x === 'APP_PAGES' ? app + '*' : x); });
+  fs.writeFileSync(mp, JSON.stringify(m0, null, 2) + '\n');
+}
 fs.writeFileSync(path.join(out, 'config.js'),
   '// Written by tools/build-extension.mjs (' + which + ').\n'
   + 'var MKN_APP = ' + JSON.stringify(app) + ';\n'
@@ -47,7 +63,36 @@ if (which === 'test') {
   m.short_name = 'MKN (TEST)';
   fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(m, null, 2) + '\n');
 }
-const zip = path.join(repo, 'dist-extension', 'my-kitchen-notes-extension' + (which === 'test' ? '-TEST' : '') + '.zip');
-fs.rmSync(zip, { force: true });
-execFileSync('zip', ['-qr', zip, '.'], { cwd: out });
-console.log('built the extension (' + which + ') → ' + path.relative(repo, out) + ' and ' + path.relative(repo, zip) + ' — sends recipes to ' + app);
+// Reproducible zips: fixed times, files in a fixed order, no extra attributes.
+function zipDir(dir, zipPath) {
+  const files = [];
+  (function walk(d, rel) { for (const f of fs.readdirSync(d).sort()) { const p = path.join(d, f), r = rel ? rel + '/' + f : f; if (fs.statSync(p).isDirectory()) walk(p, r); else files.push(r); } })(dir, '');
+  const t = new Date('2026-01-01T00:00:00Z');
+  files.forEach(f => fs.utimesSync(path.join(dir, f), t, t));
+  fs.rmSync(zipPath, { force: true });
+  execFileSync('zip', ['-q', '-X', '-D', zipPath].concat(files), { cwd: dir, env: Object.assign({}, process.env, { TZ: 'UTC' }) });
+}
+const tag = which === 'test' ? '-TEST' : '';
+const zip = path.join(repo, 'dist-extension', 'my-kitchen-notes-extension' + tag + '.zip');
+zipDir(out, zip);
+
+// Firefox: the same files; its manifest lists the background scripts and names the add-on.
+const ffOut = out + '-firefox';
+fs.rmSync(ffOut, { recursive: true, force: true });
+fs.cpSync(out, ffOut, { recursive: true });
+{
+  const mp = path.join(ffOut, 'manifest.json');
+  const m = JSON.parse(fs.readFileSync(mp, 'utf8'));
+  m.background = { scripts: ['config.js', 'shared.js', 'background.js'] };
+  m.browser_specific_settings = { gecko: { id: 'my-kitchen-notes' + (which === 'test' ? '-test' : '') + '@rozinante2004-hash.github.io', strict_min_version: '121.0' } };
+  if (m.options_page) { m.options_ui = { page: m.options_page, open_in_tab: true }; delete m.options_page; }
+  fs.writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
+}
+const ffZip = path.join(repo, 'dist-extension', 'my-kitchen-notes-extension-firefox' + tag + '.zip');
+zipDir(ffOut, ffZip);
+
+// The download the app offers until the stores list it (Chrome, Edge and the rest).
+fs.mkdirSync(path.join(repo, 'downloads'), { recursive: true });
+fs.copyFileSync(zip, path.join(repo, 'downloads', 'my-kitchen-notes-extension' + tag + '.zip'));
+console.log('built the extension (' + which + ') → ' + path.relative(repo, out) + ', ' + path.relative(repo, ffOut)
+  + ', downloads/my-kitchen-notes-extension' + tag + '.zip — sends recipes to ' + app);

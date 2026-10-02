@@ -3,7 +3,9 @@
 // embeds for search engines, else the selected text, else the page's main
 // text. Right-clicking a LINK sends that link for the app to import. Runs only
 // when clicked (activeTab).
-importScripts('config.js', 'shared.js');
+// Chrome/Edge run this as a service worker and load the two files here; Firefox
+// lists all three in its manifest (1.4), so they are already loaded there.
+if (typeof importScripts === 'function' && typeof MKN_APP === 'undefined') importScripts('config.js', 'shared.js');
 async function mknSendFromTab(tab) {
   if (!tab || !tab.id) return;
   var got = null;

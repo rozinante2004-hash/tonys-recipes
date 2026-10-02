@@ -35,8 +35,8 @@ My Kitchen Notes recipe collection, at the user’s click.
 - Collects: **website content** (the text of the post the user chooses), **only on the user’s click**, used only
   to hand it to the user’s own recipe collection. Not sold, not transferred to third parties, not used for
   anything else. The extension makes no network requests of its own.
-- Privacy policy URL: host `extension/PRIVACY.md` as a page on the app’s site (e.g. `…/privacy-extension.html`)
-  when publishing.
+- Privacy policy URL: https://rozinante2004-hash.github.io/tonys-recipes/privacy-extension.html (generated from
+  `extension/PRIVACY.md`, v37.46).
 
 ## Before publishing
 - A Chrome Web Store developer account (one-time US$5), in the name that will own the public app.
@@ -47,3 +47,19 @@ My Kitchen Notes recipe collection, at the user’s click.
   `data-ad-preview="message"` / `data-ad-comet-preview="message"` marks, with a fallback to the post's longest
   text; `tests/extension.mjs` covers these against an imitation page. Check it on the real Facebook before
   each release.
+
+## Other browsers (1.4, app v37.46)
+`node tools/build-extension.mjs live` builds both packages:
+- **Chrome, Brave, Opera, Vivaldi:** `dist-extension/my-kitchen-notes-extension.zip` → the Chrome Web Store
+  (one-time US$5 developer account). Brave and Vivaldi install from the Chrome Web Store as they are.
+- **Edge:** the SAME zip → Microsoft Edge Add-ons, through Partner Center (free developer account). The listing
+  text, screenshots, privacy URL and permission reasons above all carry over.
+- **Firefox:** `dist-extension/my-kitchen-notes-extension-firefox.zip` → addons.mozilla.org (free account). Its
+  manifest lists the background scripts (Firefox has no extension service worker) and names the add-on
+  (`my-kitchen-notes@rozinante2004-hash.github.io`). Mozilla signs it; an unsigned Firefox extension cannot
+  stay installed, so there is no download route for Firefox — only the store.
+- **Safari:** needs converting with Xcode on a Mac (`xcrun safari-web-extension-converter`) and the Apple
+  Developer Program (US$99/year); it ships as a Mac app. Not built yet.
+- **When a store lists it:** put its page address in `APP_CONFIG.extensionStores` (index.html; the test copy's in
+  tools/environments.json). The app's 🧩 dialog then shows one “Add to …” button in that browser instead of the
+  download and three steps.

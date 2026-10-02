@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.45 -->
+<!-- Tony's Recipes Collection v37.46 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -122,6 +122,13 @@
     // v37.28 — the iCloud link of the "Save to My Kitchen Notes" shortcut for
     // THIS copy (Tony builds it once and shares it); empty = no offer shown.
     iosShortcutUrl:      'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6',   // v37.40 — Tony's family shortcut (2 Oct 2026)
+    // v37.46 — the extension's page in each browser's store, once published
+    // (empty = not listed yet: the app offers the download instead).
+    extensionStores: Object.freeze({
+      chrome:            '',
+      edge:              '',
+      firefox:           ''
+    }),
     githubRepo:          'rozinante2004-hash/tonys-recipes',
     siteOrigin:          'https://rozinante2004-hash.github.io',
     sitePath:            '/tonys-recipes/',
@@ -5082,7 +5089,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.45';
+var APP_VERSION = 'v37.46';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7719,7 +7726,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.45</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.46</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7776,6 +7783,8 @@ body.banner-shown .header {
           <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
           <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
           <!-- v37.38 — test copy only (shown by applyTestOnlyItems) -->
+          <!-- v37.46 — computers only (shown by the script below the menu) -->
+          <button class="drop-item" id="extensionItem" hidden title="A Save-recipe button in your browser: under Facebook, Instagram and TikTok posts, and on any recipe site" onclick="closeDrop('settingsDrop');openExtensionOffer()">🧩 Save-recipe button for your browser</button>
           <button class="drop-item" id="fbProbeItem" hidden title="Every way to a Facebook post's text, tried and graded" onclick="closeDrop('settingsDrop');openFbProbe()">🔬 Facebook reading test</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <!-- v36.59 — owner only (applyOwnerOnlyItems). They link straight into
@@ -8382,7 +8391,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.45</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.46</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -21577,6 +21586,7 @@ window.copyLogFromLogin = copyLogFromLogin;
 function loginLogButtonShown() { return !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.logging); }
 (function(){ var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = !loginLogButtonShown(); })();
 (function(){ var b = document.getElementById('fbProbeItem'); if (b) b.hidden = String(APP_CONFIG.environment || 'live') === 'live'; })();   // v37.38
+setTimeout(function(){ try { var b = document.getElementById('extensionItem'); if (b) b.hidden = !extIsComputer(); } catch(e) {} }, 0);   // v37.46
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
 window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
 window.emailSendLink = emailSendLink; window.completeEmailLinkSignIn = completeEmailLinkSignIn; window.emailVerifyNudge = emailVerifyNudge;
@@ -27187,6 +27197,71 @@ function openFbProbe() {
 window.openFbProbe = openFbProbe; window.fbProbeRunServer = fbProbeRunServer;
 window.fbProbeReport = fbProbeReport; window.fbProbeSave = fbProbeSave; window.fbProbeRender = fbProbeRender; window.fbProbeCopy = fbProbeCopy;
 window.fbProbeState = fbProbeState;
+
+
+// ─── 🧩 THE BROWSER EXTENSION, OFFERED (v37.46) ──────────────────────────────
+// Tony: "add to the menu the option of adding the Chrome extension … the same
+// extension for other common browsers like Edge … as easy and simple as
+// possible". One item, on computers; the dialog says what it is for and gives
+// THIS browser's one action: its store's "Add" when the extension is listed
+// there (APP_CONFIG.extensionStores), else — Chrome, Edge, Brave, Opera,
+// Vivaldi — the download and three steps. Already installed (the extension
+// marks the app's own page, extension 1.4): it says so instead.
+function extIsComputer() {
+  var ua = navigator.userAgent || '';
+  return !isIPhoneLike() && !/Android|Mobile/i.test(ua);
+}
+function extBrowser() {
+  var ua = navigator.userAgent || '';
+  if (/Edg\//.test(ua)) return 'edge';
+  if (/Firefox\//.test(ua)) return 'firefox';
+  if (/OPR\//.test(ua)) return 'opera';
+  if (navigator.brave) return 'brave';
+  if (/Vivaldi\//.test(ua)) return 'vivaldi';
+  if (/Chrome\//.test(ua)) return 'chrome';
+  if (/Safari\//.test(ua)) return 'safari';
+  return 'other';
+}
+var EXT_BROWSER_NAME = { chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', opera: 'Opera', brave: 'Brave', vivaldi: 'Vivaldi', safari: 'Safari', other: 'this browser' };
+function extTag() { return String(APP_CONFIG.environment || 'live') === 'live' ? 'live' : 'test'; }
+function extInstalledVersion() { return document.documentElement.getAttribute('data-mkn-extension-' + extTag()) || ''; }
+function extStoreUrl(b) {
+  var st = window._extStoresOverride || APP_CONFIG.extensionStores || {};
+  var u = b === 'edge' ? st.edge : b === 'firefox' ? st.firefox : /^(chrome|brave|vivaldi|opera)$/.test(b) ? st.chrome : '';
+  return /^https:\/\//.test(u || '') ? u : '';
+}
+function extDownloadUrl() { return 'downloads/my-kitchen-notes-extension' + (extTag() === 'live' ? '' : '-TEST') + '.zip'; }
+function openExtensionOffer() {
+  var b = extBrowser(), name = EXT_BROWSER_NAME[b] || 'this browser', store = extStoreUrl(b), have = extInstalledVersion();
+  var chromium = /^(chrome|edge|brave|opera|vivaldi)$/.test(b);
+  var prev = document.getElementById('extOfferOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'extOfferOverlay'; ov.className = 'modal-overlay'; ov.style.cssText = 'display:flex;z-index:1250;';
+  var btn = 'display:inline-block;padding:11px 16px;min-height:44px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;font-family:\'DM Sans\',\'Heebo\',sans-serif;';
+  var primary = btn + 'background:var(--terracotta-fill);color:#fff;border:none;';
+  var what = '<div style="font-size:13.5px;line-height:1.6;margin:4px 0 12px;">Adds a <b>\u{1F4D8} Save recipe</b> button under Facebook, Instagram and TikTok posts, and a button in ' + escH(name)
+    + '’s toolbar that sends the recipe from any website — straight into this app, with no copying or pasting.</div>';
+  var body;
+  if (have) body = '<div style="font-size:14px;font-weight:600;color:var(--ok-text,#2e7d32);">✅ It is already installed in ' + escH(name) + ' (version ' + escH(have) + ').</div>'
+      + '<div style="font-size:13px;line-height:1.6;margin-top:6px;">On a Facebook, Instagram or TikTok post, press <b>\u{1F4D8} Save recipe</b> under it. On any other recipe site, press the toolbar button, or Alt+Shift+S.</div>';
+  else if (store) body = '<a id="extStoreLink" href="' + escA(store) + '" target="_blank" rel="noopener noreferrer" style="' + primary + '">➕ Add to ' + escH(name) + '</a>'
+      + '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' + escH(name) + ' asks you to confirm — that is all.</div>';
+  else if (chromium) {
+    var page = b + '://extensions';
+    body = '<ol style="font-size:13.5px;line-height:1.7;margin:0;padding-inline-start:20px;">'
+      + '<li><a id="extDownloadLink" href="' + escA(extDownloadUrl()) + '" download style="' + primary + 'padding:7px 12px;min-height:0;">⬇ Download it</a> — then double-click the file to unzip it.</li>'
+      + '<li>Open <b dir="ltr">' + escH(page) + '</b> in ' + escH(name) + ' <button type="button" onclick="fbProbeCopy(\'' + page + '\', \'The address\')" style="font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u{1F4CB} Copy</button> and switch on <b>Developer mode</b> (top right).</li>'
+      + '<li>Press <b>Load unpacked</b> and choose the unzipped folder.</li></ol>'
+      + '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Once it is in the ' + escH(name) + ' store this becomes a single button.</div>';
+  } else body = '<div style="font-size:13.5px;line-height:1.6;">The button is coming to ' + escH(name) + '. For now it works in Chrome and Edge.</div>';
+  ov.innerHTML = '<div class="ask-card" style="max-width:520px;text-align:start;">'
+    + '<div class="ask-title">\u{1F9E9} Save-recipe button for ' + escH(name) + '</div>' + what + body
+    + '<div class="ask-actions"><button class="ask-btn ghost" onclick="document.getElementById(\'extOfferOverlay\').remove()">Close</button></div></div>';
+  document.body.appendChild(ov);
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+}
+window.openExtensionOffer = openExtensionOffer; window.extBrowser = extBrowser; window.extIsComputer = extIsComputer;
+window.extInstalledVersion = extInstalledVersion; window.extStoreUrl = extStoreUrl;
 
 function facebookBookmarkletCode() {
   var app = String(APP_CONFIG.siteOrigin || '') + String(APP_CONFIG.sitePath || '/');

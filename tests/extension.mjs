@@ -187,6 +187,18 @@ try {
        && /Servings: 8/.test(any) && /Prep: 20 min/.test(any) && /Cook: 1 h 5 min/.test(any) && !/grandmother/.test(any), JSON.stringify(any));
   await page.evaluate(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('main')); getSelection().removeAllRanges(); getSelection().addRange(r); });
   ok('…but what the person selected wins', /grandmother/.test(await page.evaluate(() => mknTakeFromPage())));
+
+  // 1.4 — on the app's own pages, each build says it is installed (the app then
+  // stops offering it); on any other site it writes nothing.
+  await page.goto(APP, { waitUntil: 'load' });
+  await page.waitForTimeout(300);
+  const markTest = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-test'), document.documentElement.getAttribute('data-mkn-extension-live')]);
+  await page.goto(APP_LIVE, { waitUntil: 'load' });
+  await page.waitForTimeout(300);
+  const markLive = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
+  ok('1.4: on each app\'s own page, that build says it is installed — and only that one', markTest[0] === '1.4.0' && !markTest[1] && markLive[0] === '1.4.0' && !markLive[1], JSON.stringify([markTest, markLive]));
+  await page.goto('https://recipes.example/lemon-drizzle', { waitUntil: 'load' });
+  ok('…and nothing on any other site', !(await page.evaluate(() => [...document.documentElement.attributes].some(a => /^data-mkn-extension/.test(a.name)))));
 } finally {
   await ctx.close();
   fs.rmSync(profile, { recursive: true, force: true });

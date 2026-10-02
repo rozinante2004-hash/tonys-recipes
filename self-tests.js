@@ -1058,6 +1058,44 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'extension_offer', group:'UI', name:'🧩 The browser extension: offered on computers, one action for this browser (v37.46)',
+    test: async()=>{
+      var item=document.getElementById('extensionItem'), tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test';
+      var setUA=function(u){ Object.defineProperty(navigator, 'userAgent', { value:u, configurable:true }); };
+      var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+      var EDGE=CHROME+' Edg/140.0', FF='Mozilla/5.0 (Windows NT 10.0; rv:140.0) Gecko/20100101 Firefox/140.0';
+      var dlg=function(){ return document.getElementById('extOfferOverlay'); };
+      try{
+        if(!item) throw new Error('no 🧩 item in Settings');
+        setUA(CHROME); if(!extIsComputer()) throw new Error('a computer is not recognised');
+        setUA('Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)'); if(extIsComputer()) throw new Error('an iPhone is offered the extension');
+        setUA('Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile'); if(extIsComputer()) throw new Error('an Android phone is offered the extension');
+        // Not in any store yet: Chrome gets the download and three steps.
+        setUA(CHROME); window._extStoresOverride={};
+        openExtensionOffer();
+        var d=dlg(), dl=d && d.querySelector('#extDownloadLink');
+        if(!dl || dl.getAttribute('href')!=='downloads/my-kitchen-notes-extension'+(tag==='live'?'':'-TEST')+'.zip') throw new Error('Chrome is not offered this copy\'s download: '+(dl&&dl.getAttribute('href')));
+        if(!/chrome:\/\/extensions/.test(d.textContent) || !/Load unpacked/.test(d.textContent) || !/Save recipe/.test(d.textContent)) throw new Error('the steps or what it is for are missing');
+        // Edge: its own page in the steps.
+        setUA(EDGE); openExtensionOffer();
+        if(!/edge:\/\/extensions/.test(dlg().textContent)) throw new Error('Edge is told the Chrome page');
+        // Listed in the store: ONE button, no steps.
+        window._extStoresOverride={ edge:'https://microsoftedge.microsoft.com/addons/detail/x' }; openExtensionOffer();
+        var st=dlg().querySelector('#extStoreLink');
+        if(!st || st.getAttribute('href')!=='https://microsoftedge.microsoft.com/addons/detail/x' || !/Add to Edge/.test(st.textContent) || dlg().querySelector('#extDownloadLink')) throw new Error('a listed extension is not one button');
+        // Firefox, not listed: no Chrome download offered to it.
+        setUA(FF); window._extStoresOverride={}; openExtensionOffer();
+        if(dlg().querySelector('#extDownloadLink') || !/coming to Firefox/.test(dlg().textContent)) throw new Error('Firefox is offered the Chrome package');
+        // Installed already: it says so, and offers nothing.
+        setUA(CHROME); document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.4.0'); openExtensionOffer();
+        if(!/already installed/.test(dlg().textContent) || dlg().querySelector('#extDownloadLink,#extStoreLink')) throw new Error('an installed extension is offered again');
+      } finally {
+        delete window._extStoresOverride; document.documentElement.removeAttribute('data-mkn-extension-'+tag);
+        try{ delete navigator.userAgent; }catch(e){}
+        var o=dlg(); if(o) o.remove();
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');

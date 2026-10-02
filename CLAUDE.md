@@ -791,6 +791,27 @@ found only because a test was written first and disagreed with the code.
     (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
     once installed (`appinstalled`). Not yet tried on a real Android phone.
     Test: `import_android_share_menu_offer`.
+  - **v37.46 + extension 1.4 — the extension for every browser, from the
+    app's menu.** Tony: "add to the menu the option of adding the Chrome
+    extension … the same extension for other common browsers like Edge …
+    as easy and simple as possible". Build: `tools/build-extension.mjs
+    live|test` makes the Chromium package (Chrome, Edge, Brave, Opera,
+    Vivaldi — Edge's store takes the same zip) AND a Firefox one
+    (`<which>-firefox/`: background.scripts, gecko id, options_ui);
+    reproducible zips (fixed times, sorted, -X -D); the Chromium zip is
+    committed in downloads/ and CI fails if it is stale. Extension 1.4:
+    background.js guards importScripts (Firefox lists the files); appmark.js
+    on the copy's OWN pages sets `data-mkn-extension-<live|test>` = version.
+    App: ⚙️ → 🧩 "Save-recipe button for your browser" (computers only,
+    `extIsComputer`): says what it is for, then ONE action for THIS browser
+    (`extBrowser`): installed → says so; store link in
+    `APP_CONFIG.extensionStores` → "Add to <browser>"; Chromium without one →
+    download + 3 steps (`<browser>://extensions`, Developer mode, Load
+    unpacked); Firefox/Safari unlisted → "coming". privacy-extension.html
+    (from extension/PRIVACY.md) for the stores. Simplest install = the
+    stores: Chrome Web Store (US$5 once), Edge Add-ons (free), AMO (free) —
+    Tony's accounts; then the links go in extensionStores. Tests:
+    `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.45 (3 Oct 2026, Tony's yes, CI green on
     ed47bb5).** With v37.44 (the Share-menu wording). Tony confirmed help now
     answers in Hebrew with the right button names. Two help suggestions stay

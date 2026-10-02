@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "My Kitchen Notes — Save recipes from any site",
   "short_name": "My Kitchen Notes",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Save recipes from any website — and a “Save recipe” button under Facebook, Instagram and TikTok posts — into your My Kitchen Notes collection.",
   "icons": {
     "16": "icons/16.png",
@@ -44,6 +44,16 @@
         "content.css"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "APP_PAGES"
+      ],
+      "js": [
+        "config.js",
+        "appmark.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "commands": {

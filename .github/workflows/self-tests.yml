@@ -233,6 +233,8 @@ jobs:
           node tools/build-extension.mjs live
           node tools/build-extension.mjs test
           node tests/extension.mjs
+          # 1.4 — the zips the app offers for download are what this source builds.
+          git diff --exit-code --stat downloads/ || { echo "downloads/ is stale: run node tools/build-extension.mjs live && test, and commit downloads/"; exit 1; }
 
       # v36.14 — Tony's Meal menu rendered #F2EDE6 text on a hard-coded white
       # panel (1.16:1) and nothing in the suite could see it, because the panel
