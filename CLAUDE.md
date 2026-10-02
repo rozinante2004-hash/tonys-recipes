@@ -783,6 +783,14 @@ found only because a test was written first and disagreed with the code.
     second line) — a filled one competed with Fetch & Import (looked at in
     light and dark, 390 px). Tony tested: the test shortcut installs from
     the link, and works from Instagram too.
+  - **v37.42 — Android's Share menu.** Tony: "what about Android users?" An
+    INSTALLED web app is listed in Android's own Share menu (manifest
+    `share_target`, GET ?url=&text=&title= → handleShareTarget, the same
+    import), so Android needs no shortcut. `#androidShareOffer` in the import
+    window, shown while Chrome says the app can be installed
+    (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
+    once installed (`appinstalled`). Not yet tried on a real Android phone.
+    Test: `import_android_share_menu_offer`.
   - **Released to the family app: v37.40 (2 Oct 2026, Tony's yes, CI green —
     run 275 on 7d75032).** The family's own shortcut link goes live.
   - **Released to the family app: v37.39 (2 Oct 2026, Tony's yes, CI green —

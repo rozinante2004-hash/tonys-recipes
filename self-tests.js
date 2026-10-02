@@ -976,6 +976,27 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'import_android_share_menu_offer', group:'Import/Export', name:'On Android, one tap installs the app into the Share menu (v37.42)',
+    test: async()=>{
+      var b=document.getElementById('androidShareOffer'), realEv=window._pwaInstallEvent, prompted=0;
+      try{
+        if(!b) throw new Error('no Android offer in the import window');
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36', configurable:true });
+        _pwaInstallEvent=null; openUrlImportModal('');
+        if(b.style.display!=='none') throw new Error('offered although the app cannot be installed (or is installed)');
+        _pwaInstallEvent={ prompt:function(){ prompted++; }, userChoice:Promise.resolve({ outcome:'accepted' }) };
+        openUrlImportModal('');
+        if(b.style.display==='none') throw new Error('an installable Android phone is not offered the Share menu');
+        if(document.getElementById('iosShortcutOffer').style.display!=='none') throw new Error('Android is offered the iPhone shortcut');
+        b.click(); await new Promise(function(r){ setTimeout(r, 50); });
+        if(prompted!==1 || b.style.display!=='none') throw new Error('one tap did not ask Android to install: '+prompted);
+      } finally {
+        _pwaInstallEvent=realEv;
+        try{ delete navigator.userAgent; }catch(e){}
+        try{ closeM('urlImportOverlay'); }catch(e){}
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
