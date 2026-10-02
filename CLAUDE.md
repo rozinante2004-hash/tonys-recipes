@@ -768,6 +768,11 @@ found only because a test was written first and disagreed with the code.
     fallbacks, the video as last resort, Google-busy retry, newest app for
     shared links, and 🔬 with the server routes. A preview-only caption now
     comes back `cut: true` and drives `#captionCutNote` (`_fbCut`).
+  - **Released to the family app: v37.39 (2 Oct 2026, Tony's yes, CI green —
+    run 272 on 1db9b27).** `main` fast-forwarded to `test`. Brings v37.28–
+    v37.39: the iPhone Share-menu shortcut support (no iCloud link set yet),
+    a shared link runs the newest app, the whole Facebook caption from the
+    page's data (Worker v59, already live for both), the clean-up.
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**
