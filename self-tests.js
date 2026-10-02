@@ -997,6 +997,28 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'first_run_share_menu_offer', group:'UI', name:'A new person is offered the phone\'s Share menu first, as one tap (v37.43)',
+    test: async()=>{
+      var realEv=window._pwaInstallEvent;
+      try{
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)', configurable:true });
+        window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
+        var box=document.createElement('div'); box.innerHTML=firstRunEmptyHtml();
+        var a=box.querySelector('#firstRunShareOffer');
+        if(!a || a.tagName!=='A' || a.getAttribute('href')!=='https://www.icloud.com/shortcuts/abc123') throw new Error('an iPhone is not offered the shortcut first');
+        if(box.querySelector('#firstRunEmpty').firstElementChild && box.innerHTML.indexOf('firstRunShareOffer') > box.innerHTML.indexOf('From a website')) throw new Error('the offer is not first');
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile', configurable:true });
+        _pwaInstallEvent={ prompt:function(){}, userChoice:Promise.resolve({ outcome:'dismissed' }) };
+        box.innerHTML=firstRunEmptyHtml();
+        if(!box.querySelector('button#firstRunShareOffer')) throw new Error('an installable Android phone is not offered the Share menu first');
+        _pwaInstallEvent=null; box.innerHTML=firstRunEmptyHtml();
+        if(box.querySelector('#firstRunShareOffer')) throw new Error('offered with nothing to install');
+      } finally {
+        _pwaInstallEvent=realEv; delete window._iosShortcutOverride;
+        try{ delete navigator.userAgent; }catch(e){}
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');

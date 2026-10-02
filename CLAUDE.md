@@ -791,6 +791,15 @@ found only because a test was written first and disagreed with the code.
     (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
     once installed (`appinstalled`). Not yet tried on a real Android phone.
     Test: `import_android_share_menu_offer`.
+  - **v37.43 — the Share menu offered first to a new person.** Tony: "can we
+    force the installation of the shortcut without asking the user?" No:
+    neither iOS (Apple's "Add Shortcut" screen) nor Android Chrome (its
+    install prompt) lets a page add anything to the Share menu without the
+    person's tap; only a native store app gets a Share entry by installing
+    it. So `firstRunShareOfferHtml()` puts the one-tap offer FIRST in the
+    empty-collection welcome (`#firstRunShareOffer`: iPhone → the copy's
+    iCloud link; installable Android → `androidShareInstall`). Test:
+    `first_run_share_menu_offer`.
   - **Released to the family app: v37.40 (2 Oct 2026, Tony's yes, CI green —
     run 275 on 7d75032).** The family's own shortcut link goes live.
   - **Released to the family app: v37.39 (2 Oct 2026, Tony's yes, CI green —
