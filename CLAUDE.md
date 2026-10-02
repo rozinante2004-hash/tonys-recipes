@@ -791,6 +791,9 @@ found only because a test was written first and disagreed with the code.
     (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
     once installed (`appinstalled`). Not yet tried on a real Android phone.
     Test: `import_android_share_menu_offer`.
+  - **Released to the family app: v37.42 (2 Oct 2026, Tony's yes, CI green —
+    run 278 on a4e5e17).** The Share-menu button (v37.41) and Android's
+    Share menu (v37.42). v37.43 waits for the next release.
   - **v37.43 — the Share menu offered first to a new person.** Tony: "can we
     force the installation of the shortcut without asking the user?" No:
     neither iOS (Apple's "Add Shortcut" screen) nor Android Chrome (its
