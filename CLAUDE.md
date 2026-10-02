@@ -756,6 +756,18 @@ found only because a test was written first and disagreed with the code.
     (`probeBestText`), via `page-data`. The web search stays behind it but
     is no longer reached for such posts. Lesson: test every route on the
     real post first, then build — not one guess per deploy.
+  - **v37.39 + Worker v59 — clean-up (Tony: "clean up the unnecessary
+    components").** Removed: the web search for a cut-off caption (Worker
+    `geminiFullCaption`, `claudeFullCaption`, `acceptCaption`,
+    `FULL_CAPTION_PROMPT`, `CAPTION_SEARCH_MS`, `via: 'web-caption'`; app
+    `_fbFromWeb`, `#fromWebNote`, `webHost`, `_fbRestWhy` and its log line,
+    the "looked for on the web" wait text); the 🔬 test's phone routes
+    (`fb-probe-html`, `fb-probe-last`, KV `probe:last`; app Safari answer,
+    test-shortcut result, `fbProbeNoteBookmark`) and its web-search button.
+    Kept: page-data caption (v58), `fbCanonical`, oEmbed/embeds as cheap
+    fallbacks, the video as last resort, Google-busy retry, newest app for
+    shared links, and 🔬 with the server routes. A preview-only caption now
+    comes back `cut: true` and drives `#captionCutNote` (`_fbCut`).
   - **Released to the family app: v37.27 (1 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.24 (30 Sep 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.23 (30 Sep 2026, Tony's yes, CI green).**

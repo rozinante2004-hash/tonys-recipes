@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v58
+// Tony's Recipes — Cloudflare Worker v59
+// v59: CLEAN-UP after v58 found the text in the page's own data. Gone: the
+//      web search for the rest of a cut-off caption (v51–v56: Gemini and
+//      Claude, never found it, cost a minute's wait), and the reading test's
+//      phone endpoints (`fb-probe-html`, `fb-probe-last`, KV probe:last). The
+//      test keeps its server routes (`fb-probe`). A preview-only caption now
+//      comes back with `cut: true` instead of a search's reasons.
 // v58: THE FIX the 🔬 test found — a reel's own page, fetched by this Worker,
 //      holds its WHOLE caption in the page's data (2,067 chars for Tony's
 //      cake reel, not 202) as a plain string, not under "message". facebook-
@@ -197,7 +203,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v58';
+const WORKER_VERSION = 'v59';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -756,21 +762,8 @@ async function handleRequest(request, env) {
     if (body.action === 'fb-probe') {
       const u = String(body.url || '');
       if (!isFacebookAddress(u)) return jsonResp({ error: 'Only a Facebook address can be tested.' }, 400);
-      return jsonResp(await fbProbe(env, u, !!body.web));
+      return jsonResp(await fbProbe(env, u));
     }
-    if (body.action === 'fb-probe-html') {
-      const out = await fbProbeHtml(env, body);
-      // The shortcut shows the answer as it comes: plain words read best there.
-      if (body.plain) return new Response(probeReportText({ rows: [out.row] }) + '\n\nNow open the test in the app and press "Show the phone\'s result".',
-        { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-      return jsonResp(out);
-    }
-    if (body.action === 'fb-probe-last') {
-      let v = null;
-      if (env.BRING_KV) { try { v = JSON.parse(await env.BRING_KV.get('probe:last') || 'null'); } catch (e) {} }
-      return jsonResp(v || { none: true });
-    }
-
     if (body.action === 'facebook-fetch') {
       const u = String(body.url || '');
       if (!isFacebookAddress(u)) return jsonResp({ error: 'Only a Facebook address can be read this way.' }, 400);
@@ -1464,136 +1457,8 @@ function metaIn(html, prop) {
          || new RegExp('<meta[^>]+content="([^"]*)"[^>]*(?:property|name)=["\']' + p + '["\']', 'i').exec(html);
   return m ? m[1] : '';
 }
-// v51 — a post's WHOLE caption, when Facebook gives us only the first ~200
-// characters: Gemini opens the post (URL context) or searches the web for its
-// opening words (Google Search) — the same post is often on Instagram or a
-// blog. Taken only when it starts with the words we already have, is longer,
-// and Google says where it read it: never a caption the model wrote itself.
-const FULL_CAPTION_PROMPT = (url, start) =>
-  'A public Facebook post at ' + url + ' has a caption that begins exactly:\n\n«' + start + '»\n\n'
-  + 'Find this post\'s FULL caption: open the address, or search the web for its opening words '
-  + '(the same post is often published on Instagram, TikTok or a blog by the same author). '
-  + 'Reply with the full caption copied exactly as written, in its original language, and nothing else. '
-  + 'Never write, complete or guess any part of it yourself. If you cannot find the full caption '
-  + 'written somewhere, reply exactly: NOT FOUND';
+// Letters and digits only, lower-case: how two texts are compared.
 function captionKey(t) { return String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
-// The checks every found caption must pass, whoever found it.
-function acceptCaption(text, start, sources) {
-  text = String(text || '').trim().replace(/^```[a-z]*\n?|\n?```$/g, '').replace(/^[«"“]|[»"”]$/g, '').trim();
-  if (!text || /^NOT FOUND\.?$/i.test(text)) return { why: 'did not find it' };
-  const k = captionKey(text), s0 = captionKey(start).slice(0, 40);
-  if (!s0 || k.indexOf(s0) !== 0) return { why: 'what was found is not this post' };
-  if (k.length < captionKey(start).length + 40) return { why: 'nothing more than the preview was found' };
-  if (!sources.length) return { why: 'named no page it read it from' };
-  return { text };
-}
-// v56 — how long the whole search for a cut-off caption may take. Tony waited
-// over a minute twice for "not found"; the video is read after it.
-const CAPTION_SEARCH_MS = 30000;
-async function geminiFullCaption(env, url, start, until) {
-  until = until || Date.now() + CAPTION_SEARCH_MS;
-  if (!env.GEMINI_API_KEY) return { text: '', why: 'not set up (GEMINI_API_KEY)' };
-  if (await videoDailyCap(env)) return { text: '', why: 'the daily ceiling is reached' };
-  // v53 — Google may refuse its web search (its own allowance) while it still
-  // reads videos: each way of looking is tried on its own, and what Google
-  // actually answered is kept — v52 turned every refusal into "busy".
-  const toolSets = [[{ url_context: {} }, { google_search: {} }], [{ google_search: {} }], [{ url_context: {} }]];
-  let model = await geminiModelNow(env), last = '', calls = 0;
-  const models = [model];
-  for (const tools of toolSets) {
-    for (let a = 0; a < 2 && calls < 6; a++) {
-      if (Date.now() > until - 1500) return { text: '', why: 'Google ran out of time' + (last ? ' (' + last + ')' : '') };
-      calls++;
-      let r, d = null;
-      try {
-        r = await fetch(`${GEMINI_API}/v1beta/models/${model}:generateContent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-          body: JSON.stringify({ contents: [{ parts: [{ text: FULL_CAPTION_PROMPT(url, start) }] }], tools,
-                                 generationConfig: { temperature: 0, maxOutputTokens: 4096 } }),
-          signal: AbortSignal.timeout(Math.max(1000, until - Date.now())),
-        });
-        try { d = await r.json(); } catch (e) {}
-      } catch (e) { last = (e && e.name === 'TimeoutError') ? 'took too long' : 'could not be reached'; break; }
-      if (r.ok) {
-        const cand = d && d.candidates && d.candidates[0];
-        const text = ((cand && cand.content && cand.content.parts) || []).map(p => p && p.text || '').join('');
-        const gm = (cand && cand.groundingMetadata) || {};
-        const opened = ((cand && cand.urlContextMetadata && cand.urlContextMetadata.urlMetadata) || [])
-          .filter(u => u && /SUCCESS/i.test(String(u.urlRetrievalStatus || ''))).map(u => u.retrievedUrl).filter(u => /^https:\/\//.test(u || ''));
-        const found = (gm.groundingChunks || []).map(c => c && c.web).filter(w => w && /^https:\/\//.test(w.uri || ''));
-        const sources = opened.concat(found.map(w => w.uri));
-        const sourceNames = opened.map(u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })
-          .concat(found.map(w => String(w.title || '').slice(0, 80)));
-        const ok = acceptCaption(text, start, sources);
-        if (ok.text) return { text: ok.text, sources: sources.slice(0, 5), sourceNames: sourceNames.slice(0, 5), model, by: 'google' };
-        return { text: '', why: 'Google ' + ok.why };   // a real answer: no point asking again
-      }
-      const msg = (d && d.error && d.error.message) || ('HTTP ' + r.status);
-      last = r.status + ' ' + String(msg).slice(0, 140);
-      if (r.status === 404) { const n = await nextGeminiModel(env, models); if (n) { model = n; models.push(n); continue; } break; }
-      if (r.status === 503 || r.status === 500) {
-        if (a === 0) { await new Promise(res => setTimeout(res, 2500)); continue; }
-        // v54 — still in high demand: Google's next model, same way of looking.
-        const n = await nextGeminiModel(env, models);
-        if (n && calls < 6) { model = n; models.push(n); a = -1; continue; }
-        break;
-      }
-      break;   // 429 / 400 / 403: most likely this way of looking — try the next one
-    }
-  }
-  return { text: '', why: 'Google answered ' + (last || 'nothing') };
-}
-// v53 — when Google cannot, Claude looks: its own web search (and opening the
-// pages it finds). The same checks as Google's answer; the sources are the
-// pages Claude cited, opened, or found.
-const CLAUDE_CAPTION_MODEL = 'claude-sonnet-5';   // the app's AI_MODEL
-async function claudeFullCaption(env, url, start, stop, until) {
-  if (!env.ANTHROPIC_API_KEY) return { text: '', why: 'not set up (ANTHROPIC_API_KEY)' };
-  const messages = [{ role: 'user', content: FULL_CAPTION_PROMPT(url, start) }];
-  // v56 — the quick search: the basic web search (no filtering step) and no
-  // page opening — v55's thorough one used all 70 s and found nothing.
-  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }];
-  until = until || Date.now() + CAPTION_SEARCH_MS;
-  let d = null;
-  for (let turn = 0; turn < 3; turn++) {
-    let r;
-    try {
-      r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: CLAUDE_CAPTION_MODEL, max_tokens: 8000, tools, messages }),
-        signal: stop ? AbortSignal.any([stop, AbortSignal.timeout(Math.max(1000, until - Date.now()))]) : AbortSignal.timeout(Math.max(1000, until - Date.now())),
-      });
-      d = null; try { d = await r.json(); } catch (e) {}
-    } catch (e) { return { text: '', why: 'Claude ' + ((e && e.name === 'TimeoutError') ? 'took too long' : (e && e.name === 'AbortError') ? 'was stopped' : 'could not be reached') }; }
-    if (!r.ok) return { text: '', why: 'Claude answered ' + r.status + ' ' + String((d && d.error && d.error.message) || '').slice(0, 120) };
-    // The server's search loop paused: send the turn back as is, and it resumes.
-    if (d && d.stop_reason === 'pause_turn') { messages.push({ role: 'assistant', content: d.content }); continue; }
-    break;
-  }
-  if (!d || !Array.isArray(d.content)) return { text: '', why: 'Claude gave no answer' };
-  if (d.stop_reason === 'refusal') return { text: '', why: 'Claude declined' };
-  const blocks = d.content;
-  // The answer is the text after the last tool result.
-  let lastTool = -1;
-  blocks.forEach((b, i) => { if (b && /_tool_result$/.test(b.type || '')) lastTool = i; });
-  const text = blocks.slice(lastTool + 1).filter(b => b && b.type === 'text').map(b => b.text || '').join('');
-  const cited = [], fetched = [], searched = [];
-  blocks.forEach(b => {
-    if (!b) return;
-    (b.citations || []).forEach(c => { if (c && /^https:\/\//.test(c.url || '')) cited.push({ url: c.url, name: c.title || '' }); });
-    if (b.type === 'web_fetch_tool_result' && b.content && b.content.type === 'web_fetch_result' && /^https:\/\//.test(b.content.url || ''))
-      fetched.push({ url: b.content.url, name: '' });
-    if (b.type === 'web_search_tool_result' && Array.isArray(b.content))
-      b.content.forEach(s => { if (s && /^https:\/\//.test(s.url || '')) searched.push({ url: s.url, name: s.title || '' }); });
-  });
-  const all = cited.concat(fetched, searched);
-  const ok = acceptCaption(text, start, all);
-  if (!ok.text) return { text: '', why: 'Claude ' + ok.why };
-  const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
-  return { text: ok.text, sources: all.slice(0, 5).map(s => s.url), sourceNames: all.slice(0, 5).map(s => host(s.url) || s.name), by: 'claude' };
-}
 // v50 — a post's own words in the page's data: "message":{…"text":"…"}.
 // The longest one is the post (a reel page carries only its own caption).
 function fbMessageIn(html) {
@@ -1721,22 +1586,11 @@ async function facebookFetch(env, url) {
       }
       if (msg.length > desc.replace(/(\.\.\.|…)$/, '').length) desc = msg;
       const title = htmlText(metaIn(html, 'og:title'));
-      // v51 — a preview caption is cut off (~200 chars, mid-sentence) before
-      // the recipe. Google is asked for the whole of it, checked against
-      // the words we already have.
-      if (desc.length >= 60 && desc.length < 400 && !(msg && desc === msg)) {
-        // v55 — both look at once (v54 took two minutes, one after the other);
-        // Claude is stopped as soon as Google's answer passes the checks.
-        const stopClaude = new AbortController();
-        const until = Date.now() + CAPTION_SEARCH_MS;   // v56 — one deadline for both
-        const claudeP = claudeFullCaption(env, clean, desc, stopClaude.signal, until);
-        let full = await geminiFullCaption(env, clean, desc, until), why = full.why || '';
-        if (full.text) { stopClaude.abort(); claudeP.catch(() => {}); }
-        else { const c = await claudeP; if (c.text) full = c; else why += (why ? '; ' : '') + c.why; }
-        if (full.text) return { text: full.text.slice(0, 20000), via: 'web-caption', by: full.by, url: clean, title, videoUrl, sources: full.sources, sourceNames: full.sourceNames, preview: desc };
-        if (why) tried.unshift('whole caption: ' + why);   // first: the log keeps only so much
-      }
-      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: msg && desc === msg ? 'page-data' : 'page', url: clean, title, videoUrl, tried };
+      // Only the preview (~200 chars, cut mid-sentence) and nothing longer in
+      // the data: `cut` lets the app say so if it falls back to the video.
+      const whole = !!(msg && desc === msg);
+      if (desc.length >= 60) return { text: desc.slice(0, 20000), via: whole ? 'page-data' : 'page', url: clean, title, videoUrl, tried,
+                                      cut: !whole && desc.length < 400 };
       caption = desc;
       tried.push('page: ' + (desc ? 'caption too short' : 'no caption') + (videoUrl ? ', video found' : ', no video'));
     }
@@ -1812,7 +1666,7 @@ async function probeFetch(u, extra) {
     return { status: r.status, html, final: r.url || u };
   } catch (e) { return { status: 0, html: '', note: e.message }; }
 }
-async function fbProbe(env, url, web) {
+async function fbProbe(env, url) {
   const clean = fbCanonical(url);
   const id = (/\/(?:reel|videos)\/(\d+)/.exec(clean) || /[?&]v=(\d+)/.exec(clean) || [])[1] || '';
   const rows = [];
@@ -1838,31 +1692,7 @@ async function fbProbe(env, url, web) {
         (d && d.error && d.error.message) ? String(d.error.message).slice(0, 90) : (token ? '' : 'no FB_APP_TOKEN')));
     } catch (e) { rows.push(probeRow('server: official embed (' + kind + ')', 0, null, preview, e.message)); }
   }
-  if (web && preview) {
-    const until = Date.now() + CAPTION_SEARCH_MS;
-    const [g, c] = await Promise.all([geminiFullCaption(env, clean, preview, until), claudeFullCaption(env, clean, preview, null, until)]);
-    rows.push(probeRow('web: Google search', 0, { how: (g.sourceNames || [])[0] || '', text: g.text }, preview, g.why || ''));
-    rows.push(probeRow('web: Claude search', 0, { how: (c.sourceNames || [])[0] || '', text: c.text }, preview, c.why || ''));
-  }
   return { url: clean, preview, rows };
-}
-// A page fetched or read ON THE PHONE (the test shortcut posts it here).
-// The last one is kept a day so the app's test can show it.
-async function fbProbeHtml(env, body) {
-  const html = String(body.html || '').slice(0, 6 * 1048576);
-  const text = String(body.text || '').slice(0, 200000);
-  const preview = String(body.preview || '') || htmlText(metaIn(html, 'og:description') || '');
-  const best = html ? probeBestText(html, preview) : { how: 'page text', text };
-  const row = probeRow('phone: ' + String(body.from || 'shortcut').slice(0, 40), 200, best, preview,
-    html ? Math.round(html.length / 1024) + ' KB page' : (text ? text.length + ' chars of text' : 'nothing was sent'));
-  const out = { at: new Date().toISOString(), url: String(body.url || '').slice(0, 300), preview, row };
-  if (env.BRING_KV) { try { await env.BRING_KV.put('probe:last', JSON.stringify(out), { expirationTtl: 86400 }); } catch (e) {} }
-  return out;
-}
-function probeReportText(r) {
-  const mark = { whole: 'WHOLE TEXT', preview: 'preview only', nothing: 'nothing', other: 'other text' };
-  return r.rows.map(x => mark[x.grade] + ' — ' + x.route + (x.chars ? ' (' + x.chars + ' chars' + (x.how ? ', ' + x.how : '') + ')' : '')
-    + (x.note ? ' — ' + x.note : '') + (x.grade === 'whole' ? '\n   …' + x.tail : '')).join('\n');
 }
 
 export default {
@@ -1882,4 +1712,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v58 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v59 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

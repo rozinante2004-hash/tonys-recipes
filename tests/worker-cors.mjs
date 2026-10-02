@@ -705,99 +705,25 @@ console.log('\nfacebook-fetch (v47):');
     pageHtml = '<html><head><meta property="og:description" content="So good 😍" /><meta property="og:video" content="https://video.xx.fbcdn.net/v/p.mp4" /></head></html>';
     b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ek)).json();
     expect('…a caption too short to be a recipe is still said, with the video', b.text === '' && b.caption === 'So good 😍' && b.videoUrl === 'https://video.xx.fbcdn.net/v/p.mp4', JSON.stringify(b));
-    // v51 — Facebook gives only the first ~200 characters: Google is asked for the rest.
+    // v59 — only the preview, nothing longer in the data: said as cut off.
     const START = '🍫✨ העוגה הוויראלית – שכבות שוקולד, מוס אגוזי לוז ופייטה קראנץ׳ ✨🍫 עוגת החלומות שכולם מדברים עליה — רכה, עשירה, קראנצ׳ית, ונמסה בפה. נראית כמו מקונדיטוריה, אבל';
-    const FULL = START + ' קלה להכנה!\nמצרכים:\n• 6 ביצים\n• כוס סוכר\n• כוס שמן\n• 200 גרם שוקולד מריר\n• 250 מ״ל שמנת מתוקה\nאופן ההכנה: טורפים ביצים וסוכר, מוסיפים שמן ושוקולד מומס, אופים 30 דקות.';
     pageHtml = '<html><head><meta property="og:description" content="' + START + '" /></head></html>';
-    let gem = { text: FULL, chunks: [{ web: { uri: 'https://www.instagram.com/p/XYZ/' } }] }, gemAsked = [];
-    const gk = Object.assign({}, ek, { GEMINI_API_KEY: 'g-key', GEMINI_MODEL: 'gemini-test' });
-    globalThis.fetch = async (url, init = {}) => {
-      const u = String(url); asked.push({ u, h: init.headers || {} });
-      if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
-      if (/:generateContent$/.test(u)) { gemAsked.push(JSON.parse(init.body)); return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: gem.text }] }, groundingMetadata: { groundingChunks: gem.chunks } }] }), { status: 200 }); }
-      if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
-      return new Response('', { status: 404 });
-    };
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
-    expect('v51: a cut-off caption → its whole text, found by Google, with where it was read', b.via === 'web-caption' && /מצרכים:\n• 6 ביצים/.test(b.text) && b.sources[0] === 'https://www.instagram.com/p/XYZ/' && b.preview === START, JSON.stringify(b).slice(0, 300));
-    expect('…Google may open the post and search the web, with the opening words', gemAsked[0] && JSON.stringify(gemAsked[0].tools) === '[{"url_context":{}},{"google_search":{}}]' && gemAsked[0].contents[0].parts[0].text.includes(START) && gemAsked[0].contents[0].parts[0].text.includes('https://www.facebook.com/reel/888'), JSON.stringify(gemAsked[0]).slice(0, 300));
-    gem = { text: 'עוגת שוקולד פשוטה\nמצרכים: 3 ביצים, כוס סוכר, כוס קמח, חצי כוס שמן, קקאו. אופים 30 דקות בחום בינוני ומגישים.', chunks: [{ web: { uri: 'https://blog.example/x' } }] };
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
-    expect('…a text that does not start with the post\'s own words is refused', b.via === 'page' && b.text === START && b.tried.some(t => /not this post/.test(t)), JSON.stringify(b).slice(0, 300));
-    gem = { text: FULL, chunks: [] };
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
-    expect('…and so is one Google cannot say where it read', b.via === 'page' && b.tried.some(t => /named no page/.test(t)), JSON.stringify(b).slice(0, 300));
-    gem = { text: 'NOT FOUND', chunks: [] };
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
-    expect('…not found: the preview, and why — said first', b.via === 'page' && /^whole caption: Google did not find it/.test(b.tried[0]), JSON.stringify(b).slice(0, 300));
-    gemAsked = []; gem = { text: FULL, chunks: [{ web: { uri: 'https://www.instagram.com/p/XYZ/' } }] };
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://m.facebook.com/reel/888/?referral_source=external_deeplink&original_uri=https://www.facebook.com/&mibextid=Z', appKey: 'secret-k' }), gk)).json();
-    expect('v52: the post\'s plain address, Facebook\'s tracking left out — also to Google', b.url === 'https://www.facebook.com/reel/888/' && !/referral|original_uri/.test(gemAsked[0].contents[0].parts[0].text), JSON.stringify(b.url));
-    // v53 — Google refuses its web search; the other ways, then Claude.
-    let gemTools = [], claudeAsked = [], gemReply, claudeReply;
-    const ck = Object.assign({}, gk, { ANTHROPIC_API_KEY: 'a-key' });
     globalThis.fetch = async (url, init = {}) => {
       const u = String(url);
       if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
-      if (/:generateContent$/.test(u)) { const b = JSON.parse(init.body); gemTools.push(JSON.stringify(b.tools)); return gemReply(b); }
-      if (u === 'https://api.anthropic.com/v1/messages') { const b = JSON.parse(init.body); claudeAsked.push(b); return claudeReply(b, claudeAsked.length); }
+      if (/generativelanguage|anthropic/.test(u)) throw new Error('the web was searched');
       if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
       return new Response('', { status: 404 });
     };
-    gemReply = b => JSON.stringify(b.tools) === '[{"google_search":{}}]'
-      ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: FULL }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://www.instagram.com/p/Q/', title: 'instagram.com' } }] } }] }), { status: 200 })
-      : new Response(JSON.stringify({ error: { message: 'Quota exceeded for url_context' } }), { status: 429 });
-    claudeReply = () => new Response('{}', { status: 500 });
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
-    expect('v53: Google refuses one way of looking → the next way, on its own', b.via === 'web-caption' && b.by === 'google' && gemTools[0] === '[{"url_context":{}},{"google_search":{}}]' && gemTools[1] === '[{"google_search":{}}]', JSON.stringify([b.via, gemTools]));
-    gemReply = () => new Response(JSON.stringify({ error: { message: 'Resource has been exhausted (e.g. check quota).' } }), { status: 429 });
-    claudeReply = (body, n) => n === 1
-      ? new Response(JSON.stringify({ stop_reason: 'pause_turn', content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'x' } }] }), { status: 200 })
-      : new Response(JSON.stringify({ stop_reason: 'end_turn', content: [
-          { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'x' } },
-          { type: 'web_search_tool_result', tool_use_id: 's1', content: [{ type: 'web_search_result', url: 'https://www.instagram.com/p/Q/', title: 'Instagram' }] },
-          { type: 'text', text: FULL, citations: [{ type: 'web_search_result_location', url: 'https://www.instagram.com/p/Q/', title: 'Instagram', cited_text: 'x' }] }] }), { status: 200 });
-    gemTools = []; claudeAsked = [];
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
-    expect('…Google cannot at all → Claude searches the web for it, checked the same way', b.via === 'web-caption' && b.by === 'claude' && /מצרכים:\n• 6 ביצים/.test(b.text) && b.sourceNames[0] === 'instagram.com', JSON.stringify(b).slice(0, 300));
-    expect('…Claude\'s quick web search, the app\'s model, no sampling settings', claudeAsked[0].model === 'claude-sonnet-5' && claudeAsked[0].tools.map(t => t.type).join() === 'web_search_20250305' && !('temperature' in claudeAsked[0]), JSON.stringify(claudeAsked[0]).slice(0, 300));
-    expect('…a paused search is sent back as is, and resumes', claudeAsked.length === 2 && claudeAsked[1].messages.length === 2 && claudeAsked[1].messages[1].role === 'assistant', JSON.stringify(claudeAsked.map(c => c.messages.length)));
-    expect('…Google tried every way, a few times at most', gemTools.length >= 3 && gemTools.length <= 6, String(gemTools.length));
-    claudeReply = () => new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: START + ' ' + 'ועוד המון מילים שהמודל המציא בעצמו בלי שום מקור, מצרכים: קמח, סוכר, ביצים ושמן' }] }), { status: 200 });
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
-    expect('…Claude\'s text with no page behind it is refused; Google\'s real answer is said', b.via === 'page' && /^whole caption: Google answered 429 Resource has been exhausted.*; Claude named no page/.test(b.tried[0]), b.tried && b.tried[0]);
-    // v55 — both look at once; Claude is stopped when Google's answer passes.
-    let claudeStopped = false;
-    claudeReply = () => new Response('{}', { status: 500 });
-    const realF55 = globalThis.fetch;
-    globalThis.fetch = async (url, init = {}) => {
-      if (String(url) === 'https://api.anthropic.com/v1/messages')
-        return new Promise((res, rej) => { init.signal.addEventListener('abort', () => { claudeStopped = true; rej(Object.assign(new Error('aborted'), { name: 'AbortError' })); }); });
-      return realF55(url, init);
-    };
-    gemReply = () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: FULL }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://www.instagram.com/p/Q/', title: 'instagram.com' } }] } }] }), { status: 200 });
-    const t55 = Date.now();
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), ck)).json();
-    expect('v55: Google and Claude look at once — Claude stopped when Google finds it', b.by === 'google' && claudeStopped && Date.now() - t55 < 5000, JSON.stringify([b.by, claudeStopped, Date.now() - t55]));
-    globalThis.fetch = realF55;
-    // v54 — Google in high demand twice → its next model, same way of looking.
-    let gemModels = [];
-    globalThis.fetch = async (url, init = {}) => {
-      const u = String(url);
-      if (/^https:\/\/www\.facebook\.com\/reel\/888\/?$/.test(u)) return new Response(pageHtml, { status: 200 });
-      if (/\/v1beta\/models\?/.test(u)) return new Response(JSON.stringify({ models: [{ name: 'models/gemini-9-flash', supportedGenerationMethods: ['generateContent'] }] }), { status: 200 });
-      const m = /models\/([^:]+):generateContent$/.exec(u);
-      if (m) { gemModels.push(m[1]); return m[1] !== 'gemini-test'
-        ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: FULL }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://www.instagram.com/p/Q/', title: 'instagram.com' } }] } }] }), { status: 200 })
-        : new Response(JSON.stringify({ error: { message: 'This model is currently experiencing high demand.' } }), { status: 503 }); }
-      return new Response('', { status: 404 });
-    };
-    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), gk)).json();
-    expect('v54: Google in high demand twice → its next model', b.via === 'web-caption' && gemModels.length === 3 && gemModels[0] === 'gemini-test' && gemModels[1] === 'gemini-test' && gemModels[2] !== 'gemini-test', JSON.stringify([b.via, gemModels]));
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/888', appKey: 'secret-k' }), Object.assign({ GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }, ek))).json();
+    expect('v59: only the preview — said as cut off, and the web is not searched', b.via === 'page' && b.cut === true && b.text === START, JSON.stringify(b).slice(0, 300));
+    // v52 — a post's plain address, Facebook's tracking left out.
+    b = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://m.facebook.com/reel/888/?referral_source=external_deeplink&original_uri=https://www.facebook.com/&mibextid=Z', appKey: 'secret-k' }), ek)).json();
+    expect('v52: the post\'s plain address, Facebook\'s tracking left out', b.url === 'https://www.facebook.com/reel/888/', JSON.stringify(b.url));
   } finally { globalThis.fetch = realFetch; }
 }
 
-console.log('\nthe Facebook reading test (v57):');
+console.log('\nthe Facebook reading test (v57, v59):');
 {
   const ek = { APP_SHARED_KEY: 'secret-k' };
   const realFetch = globalThis.fetch;
@@ -827,11 +753,8 @@ console.log('\nthe Facebook reading test (v57):');
     const ff = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/555/', appKey: 'secret-k' }), Object.assign({ GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }, ek))).json();
     expect('v58: facebook-fetch takes the whole caption from the page\'s data — no web search', ff.via === 'page-data' && /Ingredients:\n6 eggs/.test(ff.text) && /180C\.$/.test(ff.text), JSON.stringify(ff).slice(0, 300));
     expect('…an official embed refused: nothing, and why', by('server: official embed (oembed_video)').grade === 'nothing' && /access token/.test(by('server: official embed (oembed_video)').note), JSON.stringify(by('server: official embed (oembed_video)')));
-    const ph = await (await worker.fetch(post({ action: 'fb-probe-html', url: 'https://www.facebook.com/reel/555/', from: 'shortcut fetch', preview: PREV, appKey: 'secret-k',
-      html: '<html><body><div dir="auto">' + WHOLE.replace(/\\n/g, '<br>') + '</div></body></html>', plain: true }), ek)).text();
-    expect('a page from the phone is graded, in plain words for the shortcut', /^WHOLE TEXT — phone: shortcut fetch/.test(ph) && /Show the phone's result/.test(ph), ph.slice(0, 200));
-    const noKey = await worker.fetch(post({ action: 'fb-probe-html', html: 'x' }), ek);
-    expect('…and only with the app key', noKey.status === 403, String(noKey.status));
+    const gone = await (await worker.fetch(post({ action: 'fb-probe-html', html: 'x', appKey: 'secret-k' }), ek)).json();
+    expect('v59: the phone endpoints are gone', !gone.row, JSON.stringify(gone).slice(0, 120));
   } finally { globalThis.fetch = realFetch; }
 }
 

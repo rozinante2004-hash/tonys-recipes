@@ -912,30 +912,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'import_facebook_whole_caption_from_web', group:'Import/Export', name:'Facebook showed only the start: the whole caption Google found is used, and where it was found is said (v37.31)',
-    test: async()=>{
-      var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
-      var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult'), asked=[];
-      try{
-        window.syncLog=function(){};
-        window.extractRecipesFromText=async function(t){ return /6 ביצים/.test(t) ? { name:'העוגה הוויראלית', ingredients:[{a:'6',n:'ביצים'}], steps:['טורפים'] } : { error:'no recipe found' }; };
-        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked.push(b.action);
-          if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'העוגה הוויראלית – שכבות שוקולד, מוס אגוזי לוז ופייטה קראנץ׳\nמצרכים:\n6 ביצים\nכוס סוכר\nכוס שמן', via:'web-caption',
-            sources:['https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc'], sourceNames:['instagram.com'], videoUrl:'https://video.xx.fbcdn.net/v/r.mp4' }; } };
-          return { ok:false, status:502, json:async function(){ return {}; } }; };
-        inp.value='https://www.facebook.com/reel/1287081419887804'; await runUrlImport();
-        if(asked.indexOf('video-from-url')!==-1) throw new Error('the video was watched although the words held the recipe');
-        var note=document.getElementById('fromWebNote');
-        if(!/העוגה הוויראלית/.test(res.textContent) || !note) throw new Error('no recipe, or not said where its words came from: '+res.textContent.slice(0,200));
-        var a=note.querySelector('a');
-        if(!a || a.textContent!=='instagram.com' || a.getAttribute('href')!=='https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc') throw new Error('the source link: '+note.innerHTML.slice(0,300));
-      } finally {
-        window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
-        inp.value=''; res.innerHTML='';
-      }
-    } },
-
-  { id:'import_cut_caption_video_says_so', group:'Import/Export', name:'The post\'s text cut off and found nowhere else: the recipe from the video says so, and offers screenshots (v37.37)',
+  { id:'import_cut_caption_video_says_so', group:'Import/Export', name:'Only Facebook\'s preview of the post\'s text: the recipe from the video says so, and offers screenshots (v37.37, v37.39)',
     test: async()=>{
       var real={ fetch:window.fetch, extract:window.extractRecipesFromText, log:window.syncLog };
       var inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult');
@@ -944,7 +921,7 @@ window.SELF_TESTS = [
         window.extractRecipesFromText=async function(t){ return /200 g/.test(t) ? { name:'Layer cake', ingredients:[{a:'200 g',n:'chocolate'}], steps:['Melt.'] } : { error:'no recipe found' }; };
         window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
           if(b.action==='facebook-fetch') return { ok:true, status:200, json:async function(){ return { text:'The viral cake everyone is talking about: soft, rich, crunchy, melting in the mouth. Looks like it came from a patisserie, but', via:'page',
-            videoUrl:'https://video.xx.fbcdn.net/v/r.mp4', tried:['whole caption: Google did not find it; Claude took too long','share link: no redirect (200)'] }; } };
+            videoUrl:'https://video.xx.fbcdn.net/v/r.mp4', cut:true }; } };
           if(b.action==='video-from-url') return { ok:true, status:200, json:async function(){ return { text:'Layer cake\n200 g chocolate', via:'gemini' }; } };
           return { ok:false, status:502, json:async function(){ return {}; } }; };
         inp.value='https://www.facebook.com/reel/1287081419887804'; await runUrlImport();
@@ -965,36 +942,33 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'fb_reading_test', group:'Import/Export', name:'🔬 Facebook reading test: test copy only; every route graded into one report (v37.38)',
+  { id:'fb_reading_test', group:'Import/Export', name:'🔬 Facebook reading test: test copy only; every server route graded into one report (v37.38, v37.39)',
     test: async()=>{
       var item=document.getElementById('fbProbeItem');
       var live=String(APP_CONFIG.environment||'live')==='live';
       if(!item) throw new Error('no 🔬 item in Settings');
       if(live!==item.hidden) throw new Error(live ? 'the family app shows the Facebook reading test' : 'the test copy hides the Facebook reading test');
-      var real={ fetch:window.fetch, toast:window.toast }, saved=null;
+      var real={ fetch:window.fetch, toast:window.toast }, saved=null, asked=null;
       try{ saved=localStorage.getItem(FB_PROBE_KEY); }catch(e){}
       try{
         window.toast=function(){};
         localStorage.removeItem(FB_PROBE_KEY);
-        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked=b;
           if(b.action==='fb-probe') return { status:200, json:async function(){ return { preview:'x'.repeat(202), rows:[
-            { route:'server: the post page', grade:'preview', chars:202, how:'og:description', note:'' },
-            { route:'server: mobile site', grade:'whole', chars:900, how:'page data (string)', tail:'Bake 30 minutes.', note:'' } ] }; } };
-          if(b.action==='fb-probe-last') return { status:200, json:async function(){ return { at:'2026-10-02T00:00:00Z', row:{ route:'phone: shortcut fetch', grade:'whole', chars:950, how:'visible words', tail:'Serve cold.' } }; } };
+            { route:'server: the post page', grade:'whole', chars:2067, how:'page data (string)', tail:'אתם לא חוזרים אחורה!', note:'841 KB page' },
+            { route:'server: mobile site', grade:'nothing', chars:0, how:'', note:'19 KB page' } ] }; } };
           return { status:404, json:async function(){ return {}; } }; };
         openFbProbe();
+        if(document.querySelector('#fbProbeOverlay [onclick*="PhoneResult"], #fbProbeOverlay [onclick*="safari"]')) throw new Error('the phone steps are still there');
         document.getElementById('fbProbeUrl').value='https://www.facebook.com/reel/1287081419887804/';
-        await fbProbeRunServer(false);
-        await fbProbePhoneResult();
-        fbProbeSave({ safari:'only the start' });
-        fbProbeNoteBookmark('The viral cake: 6 eggs, a cup of sugar, a cup of oil and 200 g of dark chocolate. Bake 30 minutes.', 'https://www.facebook.com/reel/1287081419887804/');
-        fbProbeNoteBookmark('not facebook', 'https://example.com/');   // only a Facebook post is kept
+        await fbProbeRunServer();
+        if(!asked || asked.action!=='fb-probe' || 'web' in asked) throw new Error('the test asked: '+JSON.stringify(asked));
         var rep=fbProbeReport();
-        ['WHOLE TEXT — server: mobile site','preview only — server: the post page','Safari shows: only the start','Phone fetch (test shortcut): ✅ WHOLE TEXT — phone: shortcut fetch','Bookmark on the phone: 98 chars — “The viral cake']
+        ['✅ WHOLE TEXT — server: the post page (2067 chars, page data (string))','❌ nothing — server: mobile site']
           .forEach(function(w){ if(rep.indexOf(w)===-1) throw new Error('the report lacks "'+w+'":\n'+rep); });
-        fbProbeRender();
+        if(/ON THE PHONE/.test(rep)) throw new Error('the report still has the phone section');
         var body=function(t){ return String(t).split('\n').slice(1).join('\n'); };   // the first line carries the time
-        if(body(document.getElementById('fbProbeResults').textContent)!==body(fbProbeReport())) throw new Error('the screen does not show the report');
+        if(body(document.getElementById('fbProbeResults').textContent)!==body(rep)) throw new Error('the screen does not show the report');
       } finally {
         window.fetch=real.fetch; window.toast=real.toast;
         var ov=document.getElementById('fbProbeOverlay'); if(ov) ov.remove();
