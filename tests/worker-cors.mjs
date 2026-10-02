@@ -816,6 +816,16 @@ console.log('\nthe Facebook reading test (v57):');
     expect('every server route is tried and graded', r.rows.length === 7 && r.preview === PREV, JSON.stringify(r.rows.map(x => x.route)));
     expect('…the post page: preview only', by('server: the post page').grade === 'preview', JSON.stringify(by('server: the post page')));
     expect('…a page whose data holds the whole text: WHOLE', by('server: mobile site').grade === 'whole' && /180C\.$/.test(by('server: mobile site').tail), JSON.stringify(by('server: mobile site')));
+    // v58 — the import takes it too: the whole caption from a data string.
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      if (u === 'https://www.facebook.com/reel/555/') return new Response('<html><head><meta property="og:description" content="' + PREV + '" /></head><body><script>{"a":{"b":"' + WHOLE + '"}}</script></body></html>', { status: 200 });
+      if (/graph\.facebook\.com/.test(u)) return new Response(JSON.stringify({ error: { message: 'Requires an access token' } }), { status: 400 });
+      if (/generativelanguage|anthropic/.test(u)) throw new Error('the web was searched although the page held the text');
+      return new Response('', { status: 404 });
+    };
+    const ff = await (await worker.fetch(post({ action: 'facebook-fetch', url: 'https://www.facebook.com/reel/555/', appKey: 'secret-k' }), Object.assign({ GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }, ek))).json();
+    expect('v58: facebook-fetch takes the whole caption from the page\'s data — no web search', ff.via === 'page-data' && /Ingredients:\n6 eggs/.test(ff.text) && /180C\.$/.test(ff.text), JSON.stringify(ff).slice(0, 300));
     expect('…an official embed refused: nothing, and why', by('server: official embed (oembed_video)').grade === 'nothing' && /access token/.test(by('server: official embed (oembed_video)').note), JSON.stringify(by('server: official embed (oembed_video)')));
     const ph = await (await worker.fetch(post({ action: 'fb-probe-html', url: 'https://www.facebook.com/reel/555/', from: 'shortcut fetch', preview: PREV, appKey: 'secret-k',
       html: '<html><body><div dir="auto">' + WHOLE.replace(/\\n/g, '<br>') + '</div></body></html>', plain: true }), ek)).text();

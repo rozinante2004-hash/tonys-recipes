@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v57
+// Tony's Recipes — Cloudflare Worker v58
+// v58: THE FIX the 🔬 test found — a reel's own page, fetched by this Worker,
+//      holds its WHOLE caption in the page's data (2,067 chars for Tony's
+//      cake reel, not 202) as a plain string, not under "message". facebook-
+//      fetch now takes the longest data string carrying the preview's opening
+//      words (`probeBestText`), so the web search is no longer reached.
 // v57: THE FACEBOOK READING TEST — `fb-probe` tries every server route to a
 //      post's text (its page, the mobile site, the watch page, both embed
 //      pages, both official embeds, and — asked for — Google's and Claude's
@@ -192,7 +197,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v57';
+const WORKER_VERSION = 'v58';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1705,7 +1710,15 @@ async function facebookFetch(env, url) {
       if (/log ?in(to)? (to )?facebook|on facebook\.?$|see posts, photos and more/i.test(desc)) desc = '';   // the login wall's own words
       // v50 — the WHOLE caption, from the page's own data: a preview's
       // og:description is cut short ("…"), and the recipe is in the rest.
-      const msg = fbMessageIn(html);
+      let msg = fbMessageIn(html);
+      // v58 — the 🔬 test found it: the page's data DOES hold the whole caption
+      // (2,067 chars for Tony's cake reel), just not under "message". Any
+      // string in the data that carries the preview's opening words, the
+      // longest — the same scan the test graded "whole text".
+      if (desc) {
+        const data = probeBestText(html, desc);
+        if (/^page data/.test(data.how) && captionKey(data.text).length > captionKey(msg).length) msg = fbPostText(data.text);
+      }
       if (msg.length > desc.replace(/(\.\.\.|…)$/, '').length) desc = msg;
       const title = htmlText(metaIn(html, 'og:title'));
       // v51 — a preview caption is cut off (~200 chars, mid-sentence) before
@@ -1771,7 +1784,7 @@ function probeBestText(html, preview) {
   if (msg) cands.push({ how: 'page data (message)', text: msg });
   const p30 = captionKey(preview || og).slice(0, 30);
   if (p30) {
-    const re = /"((?:[^"\\]|\\.){80,})"/g;
+    const re = /[:,\[]\s*"((?:[^"\\]|\\.){80,})"/g;   // a value in the data, not an HTML attribute
     let m, n = 0;
     while ((m = re.exec(h)) && n < 4000) {
       n++;
@@ -1869,4 +1882,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v57 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v58 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
