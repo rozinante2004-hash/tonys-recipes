@@ -768,6 +768,15 @@ found only because a test was written first and disagreed with the code.
     fallbacks, the video as last resort, Google-busy retry, newest app for
     shared links, and 🔬 with the server routes. A preview-only caption now
     comes back `cut: true` and drives `#captionCutNote` (`_fbCut`).
+  - **v37.40 — the shortcut links.** Tony's iCloud links (2 Oct 2026): test
+    `…/411eaddfe44243a180cbafdcc0638bdf` in tools/environments.json (test),
+    family `…/439a17a812d446aeab0ecdfd8a7a5cd6` in index.html APP_CONFIG —
+    the iPhone-only "Add to Share menu" link now shows in each copy's import
+    window. `import_ios_share_menu_offer` checks each copy offers its own.
+    BUILD ORDER: `node tools/build.js live` ALSO writes dist/ — build live
+    FIRST, then `SKIP_AUTH_HELPERS=1 node tools/build.js test`, or port 8872
+    serves the live page (it did from v37.29 to v37.39; CI tests both builds
+    separately, so nothing shipped untested).
   - **Released to the family app: v37.39 (2 Oct 2026, Tony's yes, CI green —
     run 272 on 1db9b27).** `main` fast-forwarded to `test`. Brings v37.28–
     v37.39: the iPhone Share-menu shortcut support (no iCloud link set yet),

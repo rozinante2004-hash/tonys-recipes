@@ -976,12 +976,18 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu (v37.28)',
+  { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
       var a=document.getElementById('iosShortcutOffer');
       try{
         if(!a) throw new Error('no offer in the import window');
+        // v37.40 — each copy offers its OWN shortcut (Tony's links, 2 Oct 2026).
+        delete window._iosShortcutOverride;
+        var own = String(APP_CONFIG.environment||'live')==='live'
+          ? 'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6'
+          : 'https://www.icloud.com/shortcuts/411eaddfe44243a180cbafdcc0638bdf';
+        if(iosShortcutUrl()!==own) throw new Error('this copy offers the wrong shortcut: '+iosShortcutUrl());
         window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
         Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)', configurable:true });
         openUrlImportModal('');
