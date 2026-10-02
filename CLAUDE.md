@@ -791,6 +791,9 @@ found only because a test was written first and disagreed with the code.
     (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
     once installed (`appinstalled`). Not yet tried on a real Android phone.
     Test: `import_android_share_menu_offer`.
+  - **Released to the family app: v37.43 (3 Oct 2026, Tony's yes, CI green —
+    run 281 on c7f54f3).** The Share-menu offer first in the welcome.
+    v37.44 (the new wording) waits for the next release.
   - **v37.44 — the Share-menu offers say what they are for.** Tony: "📱 Add
     to my iPhone's Share menu" does not tell the person the benefit. Both
     offers (import window, first-run welcome) now read "📱 Save recipes
