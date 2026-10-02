@@ -777,6 +777,14 @@ found only because a test was written first and disagreed with the code.
     FIRST, then `SKIP_AUTH_HELPERS=1 node tools/build.js test`, or port 8872
     serves the live page (it did from v37.29 to v37.39; CI tests both builds
     separately, so nothing shipped untested).
+  - **v37.41 — the Share-menu offer is a button.** Tony: it "looks like a
+    comment circled by a dotted line". Now an outlined button like 📋 Paste
+    (solid border, bold title "📱 Add to my iPhone's Share menu", a muted
+    second line) — a filled one competed with Fetch & Import (looked at in
+    light and dark, 390 px). Tony tested: the test shortcut installs from
+    the link, and works from Instagram too.
+  - **Released to the family app: v37.40 (2 Oct 2026, Tony's yes, CI green —
+    run 275 on 7d75032).** The family's own shortcut link goes live.
   - **Released to the family app: v37.39 (2 Oct 2026, Tony's yes, CI green —
     run 272 on 1db9b27).** `main` fast-forwarded to `test`. Brings v37.28–
     v37.39: the iPhone Share-menu shortcut support (no iCloud link set yet),
