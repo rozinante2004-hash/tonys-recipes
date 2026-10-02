@@ -1019,6 +1019,45 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'select_bar_compact', group:'UI', name:'The selection bar: count and Cancel on one line, the actions in an even grid (v37.45)',
+    test: async()=>{
+      var bar=document.getElementById('selectBar');
+      var head=bar && bar.querySelector('.sel-head'), grid=bar && bar.querySelector('.sel-grid');
+      if(!head || !grid) throw new Error('no header line or no grid');
+      if(!head.querySelector('#selectedCount') || !/cancelSelectMode/.test((head.querySelector('button')||{}).getAttribute ? head.querySelector('button').getAttribute('onclick') : '')) throw new Error('the count and Cancel are not on the header line');
+      var acts=grid.querySelectorAll('button');
+      if(acts.length!==7) throw new Error('expected 7 actions in the grid, found '+acts.length);
+      toggleSelectMode();
+      try{
+        if(getComputedStyle(grid).display!=='grid') throw new Error('the actions are not laid out as a grid');
+        if(getComputedStyle(bar).flexDirection!=='column') throw new Error('the bar is not header-then-grid');
+      } finally { cancelSelectMode(); }
+    } },
+
+  { id:'help_in_the_persons_language', group:'UI', name:'Help answers in the person\'s language, naming buttons as they see them (v37.45)',
+    test: async()=>{
+      var real={ ai:window.aiCall, lang:_i18nLang, dict:_i18nDict }, sent=null;
+      try{
+        _i18nLang='he'; _i18nDict={ '+ Add Recipe ▾':'+ הוספת מתכון ▾', '✏️ Fill in manually':'✏️ מילוי ידני', 'Unrelated words nowhere in help':'x', 'How do I add a recipe?':'איך מוסיפים מתכון?' };
+        _helpGlossary={ lang:'', text:'' };
+        window.aiCall=async function(q, max, x, model, sys){ sent={ q:q, sys:sys }; return '# הוספת מתכון\nלחצו על **+ הוספת מתכון ▾** ובחרו **✏️ מילוי ידני**'; };
+        openHelp(); askHelpQ('How do I add a recipe?');
+        await new Promise(function(r){ setTimeout(r, 50); });
+        if(!sent) throw new Error('help did not ask');
+        if(document.getElementById('helpInput').value!=='איך מוסיפים מתכון?') throw new Error('a suggestion is asked in English: '+document.getElementById('helpInput').value);
+        if(!/Answer in Hebrew/.test(sent.sys)) throw new Error('not asked to answer in Hebrew');
+        if(sent.sys.indexOf('+ Add Recipe ▾ → + הוספת מתכון ▾')===-1 || sent.sys.indexOf('✏️ Fill in manually → ✏️ מילוי ידני')===-1) throw new Error('the labels as the person sees them were not given');
+        if(sent.sys.indexOf('Unrelated words nowhere in help')!==-1) throw new Error('labels help never mentions were sent too');
+        var ans=document.getElementById('helpAnswer');
+        if(!ans.querySelector('strong') || /\*\*|^#/.test(ans.textContent)) throw new Error('the answer shows ** or # marks: '+ans.textContent.slice(0,120));
+        // English: the help text alone.
+        _i18nLang='en'; if(helpSystemPrompt()!==HELP_SYSTEM_PROMPT) throw new Error('English help is changed');
+      } finally {
+        window.aiCall=real.ai; _i18nLang=real.lang; _i18nDict=real.dict; _helpGlossary={ lang:'', text:'' };
+        try{ closeM('helpOverlay'); }catch(e){}
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
@@ -9155,7 +9194,7 @@ window.SELF_TESTS = [
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       if(src.indexOf("'System: '+HELP_SYSTEM_PROMPT") !== -1 || src.indexOf('"System: "+HELP_SYSTEM_PROMPT') !== -1)
         throw new Error('the help assistant still splices its instructions into the user turn');
-      var uses = (src.match(/AI_MODEL_SMALL,\s*HELP_SYSTEM_PROMPT/g) || []).length;
+      var uses = (src.match(/AI_MODEL_SMALL,\s*(?:HELP_SYSTEM_PROMPT|helpSystemPrompt\(\))/g) || []).length;   // v37.45 — with the person's language
       if(uses < 2) throw new Error('only '+uses+' help call site passes the instructions as a system block — expected 2');
     } },
 

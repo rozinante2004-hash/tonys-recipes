@@ -791,6 +791,19 @@ found only because a test was written first and disagreed with the code.
     (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
     once installed (`appinstalled`). Not yet tried on a real Android phone.
     Test: `import_android_share_menu_offer`.
+  - **v37.45 — two of Tony's UI asks.** (1) The selection bar took ~430 px
+    on a phone, buttons in ragged right-aligned rows: now the count and
+    ✕ Cancel on one line (`.sel-head`) and the seven actions in an even grid
+    (`.sel-grid`, auto-fit minmax(80px), four across on a phone, ~150 px in
+    all); labels unchanged so their translations hold. (2) Help answered with
+    ENGLISH button names whatever the interface language: `helpSystemPrompt()`
+    adds, for a non-English interface, "answer in <language>, name every
+    button exactly as labelled" + `helpGlossary()` — every entry of the active
+    dictionary whose label (emoji/▾ stripped, `helpLabelCore`) occurs in
+    HELP_SYSTEM_PROMPT, "English → as seen". Suggestions are asked in the
+    person's words; the answer's **bold** / # marks render (`helpLineHtml`),
+    and AI text carries data-no-i18n. Tests: `select_bar_compact`,
+    `help_in_the_persons_language`.
   - **Released to the family app: v37.43 (3 Oct 2026, Tony's yes, CI green —
     run 281 on c7f54f3).** The Share-menu offer first in the welcome.
     v37.44 (the new wording) waits for the next release.
