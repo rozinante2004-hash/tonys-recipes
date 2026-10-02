@@ -791,6 +791,11 @@ found only because a test was written first and disagreed with the code.
     (`_pwaInstallEvent`, not on iPhones): one tap → `pwaInstall()`. Hidden
     once installed (`appinstalled`). Not yet tried on a real Android phone.
     Test: `import_android_share_menu_offer`.
+  - **Released to the family app: v37.45 (3 Oct 2026, Tony's yes, CI green on
+    ed47bb5).** With v37.44 (the Share-menu wording). Tony confirmed help now
+    answers in Hebrew with the right button names. Two help suggestions stay
+    English until he runs 🌐 → "… still in English — finish it" (owner, writes
+    the shared translations; can't be done from here).
   - **v37.45 — two of Tony's UI asks.** (1) The selection bar took ~430 px
     on a phone, buttons in ragged right-aligned rows: now the count and
     ✕ Cancel on one line (`.sel-head`) and the seven actions in an even grid
