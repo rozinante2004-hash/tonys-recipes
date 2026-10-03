@@ -815,6 +815,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.56 — THE FAMILY'S COPY RUNS IN HOUSEHOLDS** (`dataLayout:
+    'households'` in index.html's #appConfig; Tony, 3 Oct 2026: "we can safely
+    move the family app to a household"). Released to main only AFTER Tony
+    ran Family Access → 🏠 Copy this collection into a household on the family
+    app (v37.54/55, still first layout) with the new rules published there.
+    `shared` stays untouched; 'shared' returns to it. tests/e2e-sync.mjs now
+    SETS the layout either way (it assumed the family default was 'shared').
   - **v37.55 — rules not yet published ≠ an error.** Tony's test log showed
     "Could not give the household its identifier: Missing or insufficient
     permissions" on every open (the test copy's rules predate v37.49).

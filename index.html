@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.55 -->
+<!-- Tony's Recipes Collection v37.56 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,7 +148,11 @@
     // v36.85 (WP-D) — where the data lives: 'shared' (one collection for the
     // family — today) or 'households' (every household its own space, with
     // members, roles and invitations; the HOUSEHOLDS part of firestore.rules).
-    dataLayout:          'shared',
+    // v37.56 — Tony, 3 Oct 2026: "we can safely move the family app to a
+    // household". Released only AFTER he copied the family's collection into
+    // its household (Family Access → 🏠 Copy this collection into a household);
+    // `shared` stays untouched, and 'shared' here returns to it.
+    dataLayout:          'households',
     // v36.91 — the public app's name (Tony, 27 Sep 2026: "My Kitchen Notes at
     // this stage; we can always change it later"). Each household is called
     // "<first name>'s Kitchen Notes" until renamed. The family's copy keeps its
@@ -5656,7 +5660,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.55';
+var APP_VERSION = 'v37.56';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8293,7 +8297,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.55</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.56</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8976,7 +8980,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.55</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.56</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

@@ -184,10 +184,11 @@ const server = http.createServer((req, res) => {
   if (p === '/index.html') {
     body = body.toString('utf8').replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?connect-src )/,
       `$1http://${EMU.host}:${EMU.authPort} http://${EMU.host}:${EMU.firestorePort} `);
+    // v37.56 — the family's copy runs in households now, so the layout is SET
+    // either way (the move test still starts in the first layout).
+    if (!/dataLayout:\s*'(shared|households)'/.test(body)) throw new Error('could not find the page\'s data layout');
+    body = body.replace(/dataLayout:(\s*)'(shared|households)'/, "dataLayout:$1'" + (SERVE_HH ? 'households' : 'shared') + "'");
     if (SERVE_HH) {
-      const before = body;
-      body = body.replace(/dataLayout:(\s*)'shared'/, "dataLayout:$1'households'");
-      if (body === before) throw new Error('could not switch the page to the household layout');
       // v37.03 — and any address may sign in: a password, or a link by e-mail.
       const b2 = body;
       body = body.replace(/(password:\s*)false/, '$1true').replace(/(emailLink:\s*)false/, '$1true');
