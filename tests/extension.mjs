@@ -23,6 +23,7 @@ if (!playwright) { console.error('Could not require("playwright")'); process.exi
 // under every post.
 const ext = path.join(repo, 'dist-extension', 'test'), extLive = path.join(repo, 'dist-extension', 'live');
 for (const d of [ext, extLive]) if (!fs.existsSync(path.join(d, 'manifest.json'))) { console.error('build both first: node tools/build-extension.mjs test / live'); process.exit(2); }
+const VERSION = JSON.parse(fs.readFileSync(path.join(repo, 'extension', 'manifest.json'), 'utf8')).version;
 const appOf = d => (/MKN_APP = "([^"]+)"/.exec(fs.readFileSync(path.join(d, 'config.js'), 'utf8')) || [])[1];
 const APP = appOf(ext), APP_LIVE = appOf(extLive);
 
@@ -94,6 +95,15 @@ try {
   const where = await page.evaluate(() => Array.from(document.querySelectorAll('.mkn-save')).map(b => (b.closest('[role="article"]') && b.closest('[role="article"]').id || '(none)') + (/TEST/.test(b.textContent) ? ':test' : ':family')));
   ok('both builds: a button each under every post with text', ['p1:test', 'p1:family', 'p3:test', 'p3:family'].every(w => where.includes(w)), JSON.stringify(where));
   ok('…not under a comment, nor under a post with no text', where.length === 4 && !where.some(w => /^p2/.test(w)), JSON.stringify(where));
+  // 1.5 — the app's logo; the words come out on hover.
+  const look = await page.evaluate(() => { const b = document.querySelector('#p1 .mkn-save.mkn-test'); const l = b && b.querySelector('.mkn-label');
+    return b && { img: !!b.querySelector('img.mkn-ico[src^="chrome-extension://"]'), w: l.getBoundingClientRect().width, aria: b.getAttribute('aria-label') }; });
+  ok('1.5: the button is the app\'s logo, its words folded away', look && look.img && look.w < 2 && /Save recipe to My Kitchen Notes \(TEST\)/.test(look.aria), JSON.stringify(look));
+  await page.hover('#p1 .mkn-save.mkn-test');
+  await page.waitForTimeout(400);
+  const wOpen = await page.evaluate(() => document.querySelector('#p1 .mkn-save.mkn-test .mkn-label').getBoundingClientRect().width);
+  ok('…and they slide out on hover', wOpen > 80, String(wOpen));
+  await page.mouse.move(0, 0);
   ok('…placed under the post\'s text', await page.evaluate(() => { const m = document.querySelector('#p1 [data-ad-comet-preview="message"]'); return !!m && !!m.nextElementSibling && m.nextElementSibling.classList.contains('mkn-save'); }));
   const [opFam] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('#p1 .mkn-save:not(:has-text("TEST"))')]);
   ok('the family build\'s button sends to the family app', opFam.url().startsWith(APP_LIVE) && /share-text=/.test(opFam.url()), opFam.url().slice(0, 80));
@@ -196,7 +206,7 @@ try {
   await page.goto(APP_LIVE, { waitUntil: 'load' });
   await page.waitForTimeout(300);
   const markLive = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
-  ok('1.4: on each app\'s own page, that build says it is installed — and only that one', markTest[0] === '1.4.0' && !markTest[1] && markLive[0] === '1.4.0' && !markLive[1], JSON.stringify([markTest, markLive]));
+  ok('1.4: on each app\'s own page, that build says it is installed — and only that one', markTest[0] === VERSION && !markTest[1] && markLive[0] === VERSION && !markLive[1], JSON.stringify([markTest, markLive]));
   await page.goto('https://recipes.example/lemon-drizzle', { waitUntil: 'load' });
   ok('…and nothing on any other site', !(await page.evaluate(() => [...document.documentElement.attributes].some(a => /^data-mkn-extension/.test(a.name)))));
 } finally {

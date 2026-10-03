@@ -814,6 +814,21 @@ found only because a test was written first and disagreed with the code.
     `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
+  - **v37.50 + extension 1.5 — easier to install, quieter on the page.**
+    Tony: link to chrome://extensions instead of copying it (impossible: no
+    page may open or link a chrome:// page — the copy step now says "paste it
+    into a new tab's address bar" and why); automate the unzip and remember
+    the folder: Chrome/Edge's File System Access — "📁 Put it in a folder"
+    (`extSaveToFolder`): the person picks a folder (startIn documents), the app
+    unzips downloads/…zip (JSZip from cdnjs, `CDN_JSZIP`) into "My Kitchen
+    Notes extension[ (TEST)]" there, remembers the handle in IndexedDB
+    (`mkn_ext`/kv `folder-<tag>`) and names it in step 3; later "↻ Put the
+    newest version there" rewrites it in place. Developer mode / Load
+    unpacked cannot be automated by any page — only a store install skips
+    them. Extension 1.5: the button is the app's round logo
+    (web_accessible_resources icons/32.png); the words slide out on hover /
+    keyboard focus / a first tap on touch screens; the test build has a teal
+    ring. Tests: `extension_into_a_folder`, 2 extension checks.
   - **v37.49 — household identifiers (design step 1).** `MKN-XXXX-XXXX`
     (`hhNewCode`, 31 chars, no O/0/I/1/L), reserved in top-level
     `codes/<code>` = {hid, at} in the SAME batch that gives it

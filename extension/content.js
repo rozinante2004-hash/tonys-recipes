@@ -7,7 +7,7 @@
 (function () {
   if (window.__mknLoaded) return;
   window.__mknLoaded = true;
-  var LABEL = '📘 Save recipe to ' + MKN_APP_NAME;
+  var LABEL = 'Save recipe to ' + MKN_APP_NAME;
   // Each build marks the posts it has done with its OWN tag: the family and
   // test builds side by side each put their button under every post (1.2 —
   // one tag for both let whichever came first stop the other).
@@ -109,13 +109,14 @@
   }
   async function save(btn, post) {
     btn.disabled = true;
-    var was = btn.textContent;
-    btn.textContent = '⏳ Taking the text…';
+    var label = btn.querySelector('.mkn-label') || btn, was = label.textContent;
+    label.textContent = '⏳ Taking the text…';
+    btn.classList.add('open');
     try {
       var got = await collect(post);
       if (got.text.length < 20) { alert('No text found in this post. Select the recipe text, then press the button again.'); return; }
       mknOpenApp(MKN_APP, got.text, got.url);
-    } finally { btn.disabled = false; btn.textContent = was; }
+    } finally { btn.disabled = false; label.textContent = was; btn.classList.remove('open'); }
   }
   // The toolbar button / right-click menu on these sites ask this script, so
   // they read the post on screen the same way (1.3); the extension opens the app.
@@ -124,12 +125,25 @@
     collect(centralPost()).then(function (got) { reply(got); }, function () { reply(null); });
     return true;
   });
+  // 1.5 — Tony: the app's logo only; the words slide out on hover (or a first
+  // tap on a touch screen), and a click saves as before.
+  var NO_HOVER = !!(window.matchMedia && matchMedia('(hover: none)').matches);
   function button(onClick, extra) {
     var b = document.createElement('button');
     b.type = 'button';
-    b.className = 'mkn-save' + (extra ? ' ' + extra : '');
-    b.textContent = LABEL;
-    b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); onClick(b); });
+    b.className = 'mkn-save mkn-' + TAG + (extra ? ' ' + extra : '');
+    b.title = LABEL;
+    b.setAttribute('aria-label', LABEL);
+    var img = document.createElement('img');
+    img.className = 'mkn-ico'; img.alt = ''; img.src = chrome.runtime.getURL('icons/32.png');
+    var span = document.createElement('span');
+    span.className = 'mkn-label'; span.textContent = LABEL;
+    b.appendChild(img); b.appendChild(span);
+    b.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (NO_HOVER && !b.classList.contains('open')) { b.classList.add('open'); return; }
+      onClick(b);
+    });
     return b;
   }
   function decorate() {

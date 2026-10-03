@@ -1073,8 +1073,10 @@ window.SELF_TESTS = [
         // Not in any store yet: Chrome gets the download and three steps.
         setUA(CHROME); window._extStoresOverride={};
         openExtensionOffer();
-        var d=dlg(), dl=d && d.querySelector('#extDownloadLink');
+        var d=dlg(), dl=d && d.querySelector('a[download]');
         if(!dl || dl.getAttribute('href')!=='downloads/my-kitchen-notes-extension'+(tag==='live'?'':'-TEST')+'.zip') throw new Error('Chrome is not offered this copy\'s download: '+(dl&&dl.getAttribute('href')));
+        if(typeof window.showDirectoryPicker==='function' && !d.querySelector('#extFolderBtn')) throw new Error('Chrome is not offered to put it in a folder');
+        if(!/new tab/.test(d.textContent)) throw new Error('the copy step does not say where to paste');
         if(!/chrome:\/\/extensions/.test(d.textContent) || !/Load unpacked/.test(d.textContent) || !/Save recipe/.test(d.textContent)) throw new Error('the steps or what it is for are missing');
         // Edge: its own page in the steps.
         setUA(EDGE); openExtensionOffer();
@@ -1082,13 +1084,13 @@ window.SELF_TESTS = [
         // Listed in the store: ONE button, no steps.
         window._extStoresOverride={ edge:'https://microsoftedge.microsoft.com/addons/detail/x' }; openExtensionOffer();
         var st=dlg().querySelector('#extStoreLink');
-        if(!st || st.getAttribute('href')!=='https://microsoftedge.microsoft.com/addons/detail/x' || !/Add to Edge/.test(st.textContent) || dlg().querySelector('#extDownloadLink')) throw new Error('a listed extension is not one button');
+        if(!st || st.getAttribute('href')!=='https://microsoftedge.microsoft.com/addons/detail/x' || !/Add to Edge/.test(st.textContent) || dlg().querySelector('a[download],#extFolderBtn')) throw new Error('a listed extension is not one button');
         // Firefox, not listed: no Chrome download offered to it.
         setUA(FF); window._extStoresOverride={}; openExtensionOffer();
-        if(dlg().querySelector('#extDownloadLink') || !/coming to Firefox/.test(dlg().textContent)) throw new Error('Firefox is offered the Chrome package');
+        if(dlg().querySelector('a[download],#extFolderBtn') || !/coming to Firefox/.test(dlg().textContent)) throw new Error('Firefox is offered the Chrome package');
         // Installed already: it says so, and offers nothing.
         setUA(CHROME); document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.4.0'); openExtensionOffer();
-        if(!/already installed/.test(dlg().textContent) || dlg().querySelector('#extDownloadLink,#extStoreLink')) throw new Error('an installed extension is offered again');
+        if(!/already installed/.test(dlg().textContent) || dlg().querySelector('a[download],#extFolderBtn,#extStoreLink')) throw new Error('an installed extension is offered again');
       } finally {
         delete window._extStoresOverride; document.documentElement.removeAttribute('data-mkn-extension-'+tag);
         try{ delete navigator.userAgent; }catch(e){}
@@ -1173,6 +1175,39 @@ window.SELF_TESTS = [
       } finally {
         window._household=realHh; window.hhSetAppRequests=realSet; window.askConfirm=realAsk;
         var o=document.getElementById('askOverlay'); if(o) o.remove(); hhRenderAppRequests();
+      }
+    } },
+
+  { id:'extension_into_a_folder', group:'UI', name:'🧩 The extension is unzipped into a folder the person picks, and the folder remembered (v37.50)',
+    test: async()=>{
+      var real={ pick:window.showDirectoryPicker, zip:window.JSZip, fetch:window.fetch, folder:window._extFolder, toast:window.toast };
+      var files={}, mkDir=function(path){ return { name:path.split('/').pop(), kind:'directory',
+        getDirectoryHandle:async function(n){ return mkDir(path+'/'+n); },
+        getFileHandle:async function(n){ var key=path+'/'+n; return { createWritable:async function(){ return { write:async function(d){ files[key]=d.length; }, close:async function(){} }; } }; },
+        queryPermission:async function(){ return 'granted'; } }; };
+      try{
+        window.toast=function(){};
+        window.showDirectoryPicker=async function(){ return mkDir('Documents'); };
+        window.JSZip={ loadAsync:async function(){ var f=function(n){ return { dir:false, async:async function(){ return new Uint8Array(n); } }; };
+          return { files:{ 'manifest.json':f(10), 'icons/':{ dir:true }, 'icons/32.png':f(20), 'content.js':f(30) } }; } };
+        window.fetch=async function(u){ if(/downloads\/my-kitchen-notes-extension/.test(String(u))) return { arrayBuffer:async function(){ return new ArrayBuffer(4); } }; return real.fetch.apply(window, arguments); };
+        window._extFolder=null;
+        var n=await extSaveToFolder(false);
+        var dirName='Documents/'+EXT_FOLDER_NAME();
+        if(n!==3 || files[dirName+'/manifest.json']!==10 || files[dirName+'/icons/32.png']!==20) throw new Error('not unzipped into the folder: '+JSON.stringify(files));
+        if(!window._extFolder || window._extFolder.where!=='Documents › '+EXT_FOLDER_NAME()) throw new Error('the folder is not remembered: '+JSON.stringify(window._extFolder&&window._extFolder.where));
+        var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+        Object.defineProperty(navigator, 'userAgent', { value:CHROME, configurable:true });
+        var tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test'; document.documentElement.removeAttribute('data-mkn-extension-'+tag);
+        window._extStoresOverride={}; openExtensionOffer();
+        var t=document.getElementById('extOfferOverlay').textContent;
+        if(t.indexOf('Documents › '+EXT_FOLDER_NAME())===-1 || !/Put the newest version there/.test(t)) throw new Error('the dialog does not name the folder: '+t.slice(0,300));
+        files={}; if(await extSaveToFolder(true)!==3 || !files['Documents/'+EXT_FOLDER_NAME()+'/content.js']) throw new Error('the newest version was not written in place');
+      } finally {
+        window.showDirectoryPicker=real.pick; if(real.zip) window.JSZip=real.zip; else delete window.JSZip; window.fetch=real.fetch; window._extFolder=real.folder; window.toast=real.toast;
+        delete window._extStoresOverride; try{ delete navigator.userAgent; }catch(e){}
+        var o=document.getElementById('extOfferOverlay'); if(o) o.remove();
+        try{ await extIdbSet('folder-'+(String(APP_CONFIG.environment||'live')==='live'?'live':'test'), real.folder); }catch(e){}
       }
     } },
 

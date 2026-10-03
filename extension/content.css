@@ -1,12 +1,24 @@
+/* 1.5 — the app's logo; the words slide out on hover, keyboard focus, or a first tap. */
 .mkn-save {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin: 8px 12px 4px; padding: 7px 12px;
-  border: 1px solid #c1440e; border-radius: 18px;
+  display: inline-flex; align-items: center; gap: 0;
+  margin: 8px 12px 4px; padding: 3px;
+  border: 1px solid #c1440e; border-radius: 20px;
   background: #fff8f3; color: #c1440e;
   font: 600 13px/1.2 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  cursor: pointer;
+  cursor: pointer; vertical-align: middle;
+  transition: background .15s, box-shadow .15s;
 }
-.mkn-save:hover { background: #c1440e; color: #fff; }
+.mkn-save .mkn-ico { width: 26px; height: 26px; border-radius: 50%; flex: none; display: block; }
+.mkn-save .mkn-label {
+  max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0; margin: 0;
+  transition: max-width .25s ease, opacity .2s ease, margin .25s ease;
+}
+.mkn-save:hover .mkn-label, .mkn-save:focus-visible .mkn-label, .mkn-save.open .mkn-label {
+  max-width: 360px; opacity: 1; margin: 0 10px 0 7px;
+}
+.mkn-save:hover { box-shadow: 0 2px 8px rgba(193,68,14,.25); }
 .mkn-save[disabled] { opacity: .6; cursor: default; }
+/* The test build's button: a teal ring, so the two can be told apart. */
+.mkn-save.mkn-test .mkn-ico { box-shadow: 0 0 0 2px #1F6F78; }
 .mkn-float { position: fixed; left: 16px; bottom: 16px; z-index: 2147483000; margin: 0; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .mkn-float-test { bottom: 64px; }
