@@ -94,5 +94,9 @@ zipDir(ffOut, ffZip);
 // The download the app offers until the stores list it (Chrome, Edge and the rest).
 fs.mkdirSync(path.join(repo, 'downloads'), { recursive: true });
 fs.copyFileSync(zip, path.join(repo, 'downloads', 'my-kitchen-notes-extension' + tag + '.zip'));
+// 1.5 (app v37.51) — which version the downloads hold: the app compares it with
+// the version the installed extension reports, and asks to update when newer.
+fs.writeFileSync(path.join(repo, 'downloads', 'extension-version.json'),
+  JSON.stringify({ version: JSON.parse(fs.readFileSync(path.join(src, 'manifest.json'), 'utf8')).version }) + '\n');
 console.log('built the extension (' + which + ') → ' + path.relative(repo, out) + ', ' + path.relative(repo, ffOut)
   + ', downloads/my-kitchen-notes-extension' + tag + '.zip — sends recipes to ' + app);

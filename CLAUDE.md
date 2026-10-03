@@ -814,6 +814,19 @@ found only because a test was written first and disagreed with the code.
     `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
+  - **v37.51 — "a new version of the Save-recipe button".** Tony: whenever
+    the extension changes, people must know to update it and to remove the
+    old one (no page can). tools/build-extension.mjs writes
+    downloads/extension-version.json; the app reads it (`extLoadLatest`, 8 s
+    after load) and, on a computer whose installed extension (the 1.4+
+    marker) is older (`verCmp`), shows the popup ONCE per new version
+    (`mkn_ext_update_seen_<v>`, `maybeOfferExtensionUpdate`); "Update it"
+    opens 🧩, which for an older install gives the update steps: the
+    remembered folder → "↻ Put the new version in …" then ↻ Reload on the
+    extensions page; otherwise a new folder/zip, Remove the old entry, Load
+    unpacked; and "if you see two My Kitchen Notes, remove the older".
+    Installs before 1.4 cannot be detected (no marker). Test:
+    `extension_update_prompt`.
   - **v37.50 + extension 1.5 — easier to install, quieter on the page.**
     Tony: link to chrome://extensions instead of copying it (impossible: no
     page may open or link a chrome:// page — the copy step now says "paste it

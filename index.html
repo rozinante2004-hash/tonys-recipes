@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.50 -->
+<!-- Tony's Recipes Collection v37.51 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5190,7 +5190,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.50';
+var APP_VERSION = 'v37.51';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7827,7 +7827,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.50</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.51</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8503,7 +8503,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.50</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.51</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -27355,7 +27355,23 @@ function openExtensionOffer() {
   var what = '<div style="font-size:13.5px;line-height:1.6;margin:4px 0 12px;">Adds a <b>\u{1F4D8} Save recipe</b> button under Facebook, Instagram and TikTok posts, and a button in ' + escH(name)
     + '’s toolbar that sends the recipe from any website — straight into this app, with no copying or pasting.</div>';
   var body;
-  if (have) body = '<div style="font-size:14px;font-weight:600;color:var(--ok-text,#2e7d32);">✅ It is already installed in ' + escH(name) + ' (version ' + escH(have) + ').</div>'
+  var latest = _extLatest, older = !!(have && latest && verCmp(latest, have) > 0);
+  if (older && /^(chrome|edge|brave|opera|vivaldi)$/.test(b) && !store) {
+    // v37.51 — Tony: whenever the extension changes, people must know to update
+    // it — and to remove the old one, which no page can do for them.
+    var pg = b + '://extensions', sv = window._extFolder || null, hasPicker = typeof window.showDirectoryPicker === 'function';
+    body = '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">\u{1F195} Version ' + escH(latest) + ' is ready \u2014 you have ' + escH(have) + '.</div>'
+      + '<ol style="font-size:13.5px;line-height:1.7;margin:0;padding-inline-start:20px;">'
+      + (sv && hasPicker
+          ? '<li><button type="button" id="extUpdateHere" onclick="extSaveToFolder(true)" style="' + primary + 'padding:7px 12px;min-height:0;">\u21BB Put the new version in ' + escH(sv.where) + '</button></li>'
+            + '<li><button type="button" onclick="fbProbeCopy(\'' + pg + '\', \'The address\')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u{1F4CB} Copy <span dir="ltr">' + escH(pg) + '</span></button> and paste it into a new tab\u2019s address bar; on <b>My Kitchen Notes</b> press <b>\u21BB</b> (Reload).</li>'
+          : (hasPicker
+              ? '<li><button type="button" id="extFolderBtn" onclick="extSaveToFolder(false)" style="' + primary + 'padding:7px 12px;min-height:0;">\u{1F4C1} Put the new version in a folder</button> <a href="' + escA(extDownloadUrl()) + '" download style="font-size:12px;color:var(--muted);">or download the zip</a></li>'
+              : '<li><a href="' + escA(extDownloadUrl()) + '" download style="' + primary + 'padding:7px 12px;min-height:0;">\u2B07 Download the new version</a> \u2014 then unzip it.</li>')
+            + '<li><button type="button" onclick="fbProbeCopy(\'' + pg + '\', \'The address\')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u{1F4CB} Copy <span dir="ltr">' + escH(pg) + '</span></button> and paste it into a new tab\u2019s address bar. <b>Remove</b> the old My Kitchen Notes there, then press <b>Load unpacked</b> and choose the new folder.</li>')
+      + '</ol><div style="font-size:12px;color:var(--muted);margin-top:8px;">If you see two My Kitchen Notes on that page, remove the one with the older version number \u2014 the page cannot do that for you.</div>';
+  }
+  else if (have) body = '<div style="font-size:14px;font-weight:600;color:var(--ok-text,#2e7d32);">✅ It is already installed in ' + escH(name) + ' (version ' + escH(have) + ').</div>'
       + '<div style="font-size:13px;line-height:1.6;margin-top:6px;">On a Facebook, Instagram or TikTok post, press <b>\u{1F4D8} Save recipe</b> under it. On any other recipe site, press the toolbar button, or Alt+Shift+S.</div>';
   else if (store) body = '<a id="extStoreLink" href="' + escA(store) + '" target="_blank" rel="noopener noreferrer" style="' + primary + '">➕ Add to ' + escH(name) + '</a>'
       + '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' + escH(name) + ' asks you to confirm — that is all.</div>';
@@ -27435,6 +27451,40 @@ async function extSaveToFolder(again) {
   }
 }
 window.extSaveToFolder = extSaveToFolder;
+// v37.51 — the newest extension version (the build writes it beside the zips),
+// and, once per new version on this device, a word that it is ready.
+var _extLatest = '';
+function verCmp(a, b) {
+  var x = String(a || '').split('.'), y = String(b || '').split('.');
+  for (var i = 0; i < Math.max(x.length, y.length); i++) { var d = (parseInt(x[i], 10) || 0) - (parseInt(y[i], 10) || 0); if (d) return d > 0 ? 1 : -1; }
+  return 0;
+}
+async function extLoadLatest() {
+  try { var r = await fetch('downloads/extension-version.json', { cache: 'no-cache' }); var d = await r.json(); _extLatest = String((d && d.version) || ''); } catch(e) {}
+  return _extLatest;
+}
+var EXT_UPDATE_SEEN = 'mkn_ext_update_seen_';
+function maybeOfferExtensionUpdate(tries) {
+  tries = tries || 0;
+  if (navigator.webdriver && !window._deviceOfferForce) return false;
+  if (!extIsComputer()) return false;
+  var have = extInstalledVersion();
+  if (!have || !_extLatest || verCmp(_extLatest, have) <= 0) return false;
+  try { if (localStorage.getItem(EXT_UPDATE_SEEN + _extLatest)) return false; } catch(e) { return false; }
+  if (!window._deviceOfferForce && document.querySelector('#askOverlay, .modal-overlay.open, #deviceOfferOverlay, #tourOverlay, #extOfferOverlay')) {
+    if (tries < 6) setTimeout(function(){ maybeOfferExtensionUpdate(tries + 1); }, 10000);
+    return false;
+  }
+  try { localStorage.setItem(EXT_UPDATE_SEEN + _extLatest, String(Date.now())); } catch(e) {}
+  var ov = deviceOfferDialog('computer', true);
+  var t = ov.querySelector('.ask-title'), body = ov.querySelector('.ask-title + div'), go = ov.querySelector('#deviceOfferGo');
+  if (t) t.textContent = '\u{1F9E9} A new version of the Save-recipe button';
+  if (body) body.textContent = 'Version ' + _extLatest + ' is ready \u2014 you have ' + have + '. Updating takes a minute, and keeps the button working on Facebook, Instagram and TikTok.';
+  if (go) go.textContent = 'Update it';
+  return 'update';
+}
+setTimeout(function(){ extLoadLatest().then(function(){ try { maybeOfferExtensionUpdate(0); } catch(e) {} }); }, 8000);
+window.verCmp = verCmp; window.extLoadLatest = extLoadLatest; window.maybeOfferExtensionUpdate = maybeOfferExtensionUpdate;
 window.openExtensionOffer = openExtensionOffer; window.extBrowser = extBrowser; window.extIsComputer = extIsComputer;
 window.extInstalledVersion = extInstalledVersion; window.extStoreUrl = extStoreUrl;
 

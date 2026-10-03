@@ -1211,6 +1211,38 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'extension_update_prompt', group:'UI', name:'🧩 A newer extension: asked to update once per version, told to remove the old one (v37.51)',
+    test: async()=>{
+      if(verCmp('1.10.0','1.9.9')!==1 || verCmp('1.5','1.5.0')!==0 || verCmp('1.4.0','1.5.0')!==-1) throw new Error('version comparison');
+      var tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test';
+      var real={ latest:_extLatest, folder:window._extFolder };
+      var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+      var dlg=function(id){ return document.getElementById(id); };
+      try{
+        Object.defineProperty(navigator, 'userAgent', { value:CHROME, configurable:true });
+        window._deviceOfferForce=true; _extLatest='9.9.0'; localStorage.removeItem(EXT_UPDATE_SEEN+'9.9.0');
+        document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.5.0');
+        if(maybeOfferExtensionUpdate(9)!=='update') throw new Error('a newer version is not offered');
+        var t=dlg('deviceOfferOverlay').textContent;
+        if(!/new version of the Save-recipe button/.test(t) || !/9\.9\.0/.test(t) || !/1\.5\.0/.test(t)) throw new Error('the offer does not say which versions: '+t.slice(0,200));
+        dlg('deviceOfferOverlay').remove();
+        if(maybeOfferExtensionUpdate(9)!==false) throw new Error('offered twice for the same version');
+        window._extStoresOverride={}; window._extFolder=null; openExtensionOffer();
+        t=dlg('extOfferOverlay').textContent;
+        if(!/Version 9\.9\.0 is ready/.test(t) || !/Remove/.test(t) || !/older version number/.test(t)) throw new Error('the dialog does not say to update and remove the old one: '+t.slice(0,300));
+        window._extFolder={ where:'Documents › My Kitchen Notes extension' }; openExtensionOffer();
+        if(typeof window.showDirectoryPicker==='function' && !dlg('extUpdateHere')) throw new Error('the remembered folder is not offered for the update');
+        document.documentElement.setAttribute('data-mkn-extension-'+tag, '9.9.0'); openExtensionOffer();
+        if(!/already installed/.test(dlg('extOfferOverlay').textContent)) throw new Error('an up-to-date extension is asked to update');
+        if(maybeOfferExtensionUpdate(9)!==false) throw new Error('an up-to-date extension is offered an update');
+      } finally {
+        _extLatest=real.latest; window._extFolder=real.folder; delete window._deviceOfferForce; delete window._extStoresOverride;
+        document.documentElement.removeAttribute('data-mkn-extension-'+tag); localStorage.removeItem(EXT_UPDATE_SEEN+'9.9.0');
+        try{ delete navigator.userAgent; }catch(e){}
+        ['deviceOfferOverlay','extOfferOverlay'].forEach(function(id){ var o=dlg(id); if(o) o.remove(); });
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
