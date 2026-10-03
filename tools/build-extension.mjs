@@ -49,6 +49,10 @@ for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.jo
 {
   const mp = path.join(out, 'manifest.json');
   const m0 = JSON.parse(fs.readFileSync(mp, 'utf8'));
+  // The Chrome Web Store refuses a description over 132 characters (Tony's
+  // first upload, 1.6) — say so here, not at the store.
+  if (m0.description.length > 132) throw new Error('manifest description is ' + m0.description.length + ' characters; the Chrome Web Store allows 132');
+  if (m0.name.length + ' (TEST)'.length > 75) throw new Error('manifest name too long for the store (75)');
   m0.content_scripts.forEach(cs => { cs.matches = cs.matches.map(x => x === 'APP_PAGES' ? app + '*' : x); });
   fs.writeFileSync(mp, JSON.stringify(m0, null, 2) + '\n');
 }
