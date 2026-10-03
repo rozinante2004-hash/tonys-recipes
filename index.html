@@ -4410,7 +4410,7 @@ function openLinkedRecipe(i) {
     + '<div class="modal-hero" style="background:' + escA(r.bg) + ';">'
     +   (src ? '<img src="' + escA(src) + '" alt="">' : '<span class="emoji-over">' + escH(r.emoji) + '</span>') + '</div>'
     + '<div class="modal-content' + (recipeIsRTL(r) ? ' rtl-recipe' : '') + '">'
-    +   '<div id="linkedFrom" style="background:#EEF6FF;border:1px solid #C0D8F0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--ink);">'
+    +   '<div id="linkedFrom" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--ink);">'
     +     '\u{1F91D} <span>From</span> <b data-no-i18n>' + escH(hhLinkName(l)) + '</b> · <span>read-only: you can look and cook, not change it.</span></div>'
     +   '<div class="modal-category">' + escH(r.category) + '</div>'
     +   '<div class="modal-title" dir="auto" data-no-i18n>' + escH(r.name) + '</div>'
