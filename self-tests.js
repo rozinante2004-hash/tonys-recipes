@@ -1178,6 +1178,14 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'rules_behind_is_not_an_error', group:'Sharing', name:'Rules not yet published: noted once and the owner is led to them, not logged as an error on every open (v37.55)',
+    test: async()=>{
+      if(hhRulesBehind({ code:'permission-denied', message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('a refusal by the rules is not recognised');
+      if(hhRulesBehind({ message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('the wording alone is not recognised');
+      if(hhRulesBehind({ code:'unavailable', message:'offline' }, 'test note')!==false) throw new Error('any error is taken for the rules');
+      if(document.getElementById('askOverlay')) throw new Error('the self test was interrupted by the offer');
+    } },
+
   { id:'linked_households', group:'Sharing', name:'🤝 Households link: asked by identifier or any member\'s e-mail, accepted, rejected or put off; each sees the other\'s recipes read-only (v37.53)',
     test: async()=>{
       if(JSON.stringify(hhLinkTarget(' mkn 7q4k 2f9p '))!=='{"code":"MKN-7Q4K-2F9P"}') throw new Error('an identifier typed loosely is not understood');

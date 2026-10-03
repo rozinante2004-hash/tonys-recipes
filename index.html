@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.54 -->
+<!-- Tony's Recipes Collection v37.55 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4038,6 +4038,37 @@ async function toggleAppRequests() {
   toast(next ? '\u{1F91D} Link requests through the app are allowed' : '\u{1F91D} Link requests through the app are blocked');
   return true;
 }
+// v37.55 — Tony's log said "Could not give the household its identifier:
+// Missing or insufficient permissions" on every open: the copy's database
+// rules predate the feature. Not an error to report — a step only the app's
+// owner can take (publishing rules is by hand on purpose). Noted once in the
+// log, and the owner is taken to the rules, once per version.
+function hhRulesBehind(e, note) {
+  var denied = e && (e.code === 'permission-denied' || /insufficient permissions/i.test(String(e.message || '')));
+  if (!denied) return false;
+  if (!_rulesNoted) { _rulesNoted = true; syncLog('system', note); }
+  hhOfferRulesPublish();
+  return true;
+}
+var _rulesNoted = false, _rulesOffered = false;
+async function hhOfferRulesPublish() {
+  if (_rulesOffered || _selfTestRunning || typeof isAppOwner !== 'function' || !isAppOwner()) return false;
+  var k = 'mkn_rules_offer_' + APP_VERSION;
+  try { if (localStorage.getItem(k)) return false; localStorage.setItem(k, '1'); } catch(e) { return false; }
+  _rulesOffered = true;
+  for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);
+  var ok = await askConfirm({ icon: '\u{1F527}', title: 'The database rules need publishing',
+    message: 'This version has features the database does not allow yet (your household\u2019s identifier, linking with other households). '
+      + 'Copy the new rules and paste them into Firebase \u2014 a minute, once.',
+    okLabel: 'Show me the rules', cancelLabel: 'Later' });
+  if (ok !== true) return false;
+  openAccessControl();
+  var panel = document.getElementById('accessRulesPanel');
+  if (panel && panel.style.display === 'none') toggleAccessRules();
+  setTimeout(function(){ if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300);
+  return true;
+}
+window.hhRulesBehind = hhRulesBehind; window.hhOfferRulesPublish = hhOfferRulesPublish;
 function hhSetAppRequests(v) { return hhRef().update({ appRequests: !!v }); }
 window.hhNewCode = hhNewCode; window.hhEnsureCode = hhEnsureCode; window.openMyIdentifier = openMyIdentifier;
 window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetAppRequests; window.hhRenderAppRequests = hhRenderAppRequests;
@@ -4535,7 +4566,10 @@ async function householdUse(hid, role) {
   _household = { hid: hid, role: role, name: h.name || '', ownerUid: h.ownerUid || '',
                  code: h.code || '', appRequests: h.appRequests !== false };   // v37.49
   await householdLoadMembers();
-  try { await hhEnsureCode(); } catch(e) { syncLog('error', 'Could not give the household its identifier', String(e && e.message).slice(0, 160)); }
+  try { await hhEnsureCode(); } catch(e) {
+    if (!hhRulesBehind(e, 'The household gets its identifier once the new database rules are published'))
+      syncLog('error', 'Could not give the household its identifier', String(e && e.message).slice(0, 160));
+  }
   hhRenderAppRequests();
   await hhLoadLinks();                                           // v37.53
   if (hhLinks().length) hhSetHome();
@@ -5622,7 +5656,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.54';
+var APP_VERSION = 'v37.55';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8259,7 +8293,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.54</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.55</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8942,7 +8976,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.54</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.55</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

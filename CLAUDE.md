@@ -815,6 +815,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.55 — rules not yet published ≠ an error.** Tony's test log showed
+    "Could not give the household its identifier: Missing or insufficient
+    permissions" on every open (the test copy's rules predate v37.49).
+    `hhRulesBehind(e, note)`: a permission refusal is logged ONCE as `system`,
+    and the app's owner gets "The database rules need publishing" once per
+    version (`mkn_rules_offer_<version>`, `hhOfferRulesPublish`) → Family
+    Access opens with the rules shown. Test `rules_behind_is_not_an_error`.
   - **v37.54 — "Downloads contains system files".** Tony picked Downloads for
     the extension folder and Chrome refused with that message (Chrome's own
     wording: it never gives a page Downloads, Desktop or the home folder as a
