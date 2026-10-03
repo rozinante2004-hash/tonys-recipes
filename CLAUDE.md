@@ -813,6 +813,11 @@ found only because a test was written first and disagreed with the code.
     Tony's accounts; then the links go in extensionStores. Tests:
     `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
+  - **Release v37.47 (3 Oct 2026, Tony's yes):** main had moved — Tony's
+    "Update all supported languages" committed i18n straight to main
+    (53402ba) and the workflow merged it into test (e036bf8, no CI run: a
+    GITHUB_TOKEN push starts none). This note's commit runs CI on test =
+    v37.47 + the published languages; main is fast-forwarded to it when green.
   - **v37.47 — Shortcuts and extensions; Tony's contact.** Tony (3 Oct):
     contact = tony.schvekher@gmail.com "whenever necessary … also Send
     feedback" (until a domain): `APP_CONFIG.supportEmail`, the extension's
