@@ -40,7 +40,7 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'icons'), { recursive: true });
 const src = path.join(repo, 'extension');
 for (const f of fs.readdirSync(src)) {
-  if (f === 'icons' || f.endsWith('.md')) continue;
+  if (f === 'icons' || f === 'store' || f.endsWith('.md')) continue;   // store/ = the listing's screenshots (1.6)
   fs.copyFileSync(path.join(src, f), path.join(out, f));
 }
 for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.join(src, 'icons', f), path.join(out, 'icons', f));

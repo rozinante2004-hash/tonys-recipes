@@ -1235,9 +1235,17 @@ window.SELF_TESTS = [
         document.documentElement.setAttribute('data-mkn-extension-'+tag, '9.9.0'); openExtensionOffer();
         if(!/already installed/.test(dlg('extOfferOverlay').textContent)) throw new Error('an up-to-date extension is asked to update');
         if(maybeOfferExtensionUpdate(9)!==false) throw new Error('an up-to-date extension is offered an update');
+        // v37.52 — a store install updates itself: never asked; a folder install, once the store has it, is offered the move.
+        document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.5.0'); document.documentElement.setAttribute('data-mkn-extension-'+tag+'-from', 'store');
+        localStorage.removeItem(EXT_UPDATE_SEEN+'9.9.0');
+        if(maybeOfferExtensionUpdate(9)!==false) throw new Error('a store install is asked to update by hand');
+        document.documentElement.setAttribute('data-mkn-extension-'+tag+'-from', 'folder');
+        window._extStoresOverride={ chrome:'https://chromewebstore.google.com/detail/x' }; openExtensionOffer();
+        t=dlg('extOfferOverlay').textContent;
+        if(!dlg('extStoreLink') || !/now in the Chrome store/.test(t) || !/Remove/.test(t)) throw new Error('a folder install is not offered the store copy: '+t.slice(0,200));
       } finally {
         _extLatest=real.latest; window._extFolder=real.folder; delete window._deviceOfferForce; delete window._extStoresOverride;
-        document.documentElement.removeAttribute('data-mkn-extension-'+tag); localStorage.removeItem(EXT_UPDATE_SEEN+'9.9.0');
+        document.documentElement.removeAttribute('data-mkn-extension-'+tag); document.documentElement.removeAttribute('data-mkn-extension-'+tag+'-from'); localStorage.removeItem(EXT_UPDATE_SEEN+'9.9.0');
         try{ delete navigator.userAgent; }catch(e){}
         ['deviceOfferOverlay','extOfferOverlay'].forEach(function(id){ var o=dlg(id); if(o) o.remove(); });
       }

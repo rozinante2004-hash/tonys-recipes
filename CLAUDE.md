@@ -814,6 +814,18 @@ found only because a test was written first and disagreed with the code.
     `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
+  - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.52 + extension 1.6 — ready for the Chrome Web Store.** Tony is
+    opening the developer account (US$5) to publish UNLISTED. appmark.js
+    also says where it came from: `data-mkn-extension-<tag>-from` =
+    'store' (its manifest has the store's update_url) or 'folder'. The app
+    never asks a store copy to update (`extInstalledFrom`); a folder copy,
+    once `extensionStores` has this browser's link, is offered the move
+    ("now in the Chrome store … add it, then Remove the folder copy").
+    Listing screenshots (1280×800) in extension/store/ (skipped by the
+    build); listing text, permissions and privacy in extension/STORE.md.
+    The listing publishes the LIVE build (sends to the family app); a beta
+    listing comes with the beta copy.
   - **v37.51 — "a new version of the Save-recipe button".** Tony: whenever
     the extension changes, people must know to update it and to remove the
     old one (no page can). tools/build-extension.mjs writes

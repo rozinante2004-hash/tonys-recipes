@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.51 -->
+<!-- Tony's Recipes Collection v37.52 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5190,7 +5190,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.51';
+var APP_VERSION = 'v37.52';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7827,7 +7827,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.51</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.52</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8503,7 +8503,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.51</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.52</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -27338,6 +27338,8 @@ function extBrowser() {
 var EXT_BROWSER_NAME = { chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', opera: 'Opera', brave: 'Brave', vivaldi: 'Vivaldi', safari: 'Safari', other: 'this browser' };
 function extTag() { return String(APP_CONFIG.environment || 'live') === 'live' ? 'live' : 'test'; }
 function extInstalledVersion() { return document.documentElement.getAttribute('data-mkn-extension-' + extTag()) || ''; }
+// v37.52 (extension 1.6) — 'store' (updates itself) or 'folder' (by hand); '' before 1.6.
+function extInstalledFrom() { return document.documentElement.getAttribute('data-mkn-extension-' + extTag() + '-from') || ''; }
 function extStoreUrl(b) {
   var st = window._extStoresOverride || APP_CONFIG.extensionStores || {};
   var u = b === 'edge' ? st.edge : b === 'firefox' ? st.firefox : /^(chrome|brave|vivaldi|opera)$/.test(b) ? st.chrome : '';
@@ -27355,7 +27357,13 @@ function openExtensionOffer() {
   var what = '<div style="font-size:13.5px;line-height:1.6;margin:4px 0 12px;">Adds a <b>\u{1F4D8} Save recipe</b> button under Facebook, Instagram and TikTok posts, and a button in ' + escH(name)
     + '’s toolbar that sends the recipe from any website — straight into this app, with no copying or pasting.</div>';
   var body;
-  var latest = _extLatest, older = !!(have && latest && verCmp(latest, have) > 0);
+  var latest = _extLatest, older = !!(have && latest && verCmp(latest, have) > 0) && extInstalledFrom() !== 'store';
+  // From a folder, and now in this browser's store: move to the store copy, which updates itself.
+  if (have && store && extInstalledFrom() !== 'store') {
+    body = '<div style="font-size:13.5px;line-height:1.6;">It is now in the ' + escH(name) + ' store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on <b dir="ltr">' + escH(b) + '://extensions</b>, press <b>Remove</b> on the old My Kitchen Notes).</div>'
+      + '<div style="margin-top:10px;"><a id="extStoreLink" href="' + escA(store) + '" target="_blank" rel="noopener noreferrer" style="' + primary + '">\u2795 Add to ' + escH(name) + '</a></div>';
+    older = false; have = '';
+  }
   if (older && /^(chrome|edge|brave|opera|vivaldi)$/.test(b) && !store) {
     // v37.51 — Tony: whenever the extension changes, people must know to update
     // it — and to remove the old one, which no page can do for them.
@@ -27371,6 +27379,7 @@ function openExtensionOffer() {
             + '<li><button type="button" onclick="fbProbeCopy(\'' + pg + '\', \'The address\')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u{1F4CB} Copy <span dir="ltr">' + escH(pg) + '</span></button> and paste it into a new tab\u2019s address bar. <b>Remove</b> the old My Kitchen Notes there, then press <b>Load unpacked</b> and choose the new folder.</li>')
       + '</ol><div style="font-size:12px;color:var(--muted);margin-top:8px;">If you see two My Kitchen Notes on that page, remove the one with the older version number \u2014 the page cannot do that for you.</div>';
   }
+  else if (body) { /* the move to the store, above */ }
   else if (have) body = '<div style="font-size:14px;font-weight:600;color:var(--ok-text,#2e7d32);">✅ It is already installed in ' + escH(name) + ' (version ' + escH(have) + ').</div>'
       + '<div style="font-size:13px;line-height:1.6;margin-top:6px;">On a Facebook, Instagram or TikTok post, press <b>\u{1F4D8} Save recipe</b> under it. On any other recipe site, press the toolbar button, or Alt+Shift+S.</div>';
   else if (store) body = '<a id="extStoreLink" href="' + escA(store) + '" target="_blank" rel="noopener noreferrer" style="' + primary + '">➕ Add to ' + escH(name) + '</a>'
@@ -27470,6 +27479,7 @@ function maybeOfferExtensionUpdate(tries) {
   if (!extIsComputer()) return false;
   var have = extInstalledVersion();
   if (!have || !_extLatest || verCmp(_extLatest, have) <= 0) return false;
+  if (extInstalledFrom() === 'store') return false;   // v37.52 — the store updates it by itself
   try { if (localStorage.getItem(EXT_UPDATE_SEEN + _extLatest)) return false; } catch(e) { return false; }
   if (!window._deviceOfferForce && document.querySelector('#askOverlay, .modal-overlay.open, #deviceOfferOverlay, #tourOverlay, #extOfferOverlay')) {
     if (tries < 6) setTimeout(function(){ maybeOfferExtensionUpdate(tries + 1); }, 10000);
@@ -27484,7 +27494,7 @@ function maybeOfferExtensionUpdate(tries) {
   return 'update';
 }
 setTimeout(function(){ extLoadLatest().then(function(){ try { maybeOfferExtensionUpdate(0); } catch(e) {} }); }, 8000);
-window.verCmp = verCmp; window.extLoadLatest = extLoadLatest; window.maybeOfferExtensionUpdate = maybeOfferExtensionUpdate;
+window.verCmp = verCmp; window.extInstalledFrom = extInstalledFrom; window.extLoadLatest = extLoadLatest; window.maybeOfferExtensionUpdate = maybeOfferExtensionUpdate;
 window.openExtensionOffer = openExtensionOffer; window.extBrowser = extBrowser; window.extIsComputer = extIsComputer;
 window.extInstalledVersion = extInstalledVersion; window.extStoreUrl = extStoreUrl;
 

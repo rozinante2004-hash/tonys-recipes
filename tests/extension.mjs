@@ -203,6 +203,7 @@ try {
   await page.goto(APP, { waitUntil: 'load' });
   await page.waitForTimeout(300);
   const markTest = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-test'), document.documentElement.getAttribute('data-mkn-extension-live')]);
+  ok('1.6: …and that it was loaded from a folder (a store copy says "store")', await page.evaluate(() => document.documentElement.getAttribute('data-mkn-extension-test-from')) === 'folder');
   await page.goto(APP_LIVE, { waitUntil: 'load' });
   await page.waitForTimeout(300);
   const markLive = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
