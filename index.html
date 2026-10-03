@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.56 -->
+<!-- Tony's Recipes Collection v37.57 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -421,6 +421,13 @@
           console.warn('Persistence error:', e.code);
       });
 
+      // v37.57 — the sign-in token the Worker checks for AI per household,
+      // kept fresh (Firebase renews it hourly and says so here).
+      if (_fbAuth.onIdTokenChanged) _fbAuth.onIdTokenChanged(function(u) {
+        window._aiIdToken = '';
+        if (u) u.getIdToken().then(function(t){ window._aiIdToken = t; }).catch(function(){});
+        if (u && typeof checkWorkerHealth === 'function') setTimeout(function(){ try { checkWorkerHealth(); } catch(e) {} }, 1500);
+      });
       _fbAuth.onAuthStateChanged(function(user) {
         try { syncLog('auth', user ? 'Signed in' : 'Signed out'); } catch(e) {}
         if (user && typeof window.emailVerifyNudge === 'function') try { window.emailVerifyNudge(user); } catch(e) {}
@@ -1960,8 +1967,20 @@ function workerBody(payload) {
   var o = {};
   Object.keys(payload || {}).forEach(function(k){ o[k] = payload[k]; });
   o.appKey = WORKER_APP_KEY;
+  // v37.57 — AI per household: an AI call (and meter-*) carries the sign-in
+  // and the household, ONLY to a Worker that says it strips them (health
+  // `metering`, v60+). An older Worker would pass them on to Anthropic, which
+  // refuses unknown fields — every AI feature would break (the v37 lesson).
+  if ((o.messages || /^meter-/.test(String(o.action || ''))) && aiMeterOn()) {
+    if (!o.idToken && window._aiIdToken) o.idToken = window._aiIdToken;
+    if (!o.hid && typeof _cloudHid === 'string' && _cloudHid && typeof cloudLayout === 'function' && cloudLayout() === 'households') o.hid = _cloudHid;
+  }
   return JSON.stringify(o);
 }
+function aiMeterOn() {
+  return !!(typeof _workerHealth !== 'undefined' && _workerHealth && _workerHealth.metering && _workerHealth.metering.version >= 1);
+}
+window.aiMeterOn = aiMeterOn;
 window.workerBody = workerBody;
 // Turn the Worker's own refusals into something actionable rather than a raw code.
 function workerErrorText(status, data) {
@@ -3570,6 +3589,9 @@ function renderSyncHealth() {
                      ? ' (' + _sp.calls + ' calls) — the whole family: ' + _workerHealth.spend.monthlyUsed + ' of '
                        + _workerHealth.spend.monthlyMax + ' calls allowed'
                      : ', ' + _sp.calls + ' calls'));
+  if (_aiMeter) out += healthRow('AI this month, the household', aiMeterLine(),   // v37.57
+                   (_aiMeter.cap && _aiMeter.usd >= _aiMeter.cap) ? 'bad' : (_aiMeter.cap && _aiMeter.usd >= 0.8 * _aiMeter.cap) ? 'warn' : 'good',
+                   _aiMeter.cap ? 'every member and device together; renews on the 1st' : 'every member and device together');
   out += healthRow('Last backup', h.backupDays === null ? 'never' : (h.backupDays + ' day' + (h.backupDays !== 1 ? 's' : '') + ' ago'),
                    (h.backupDays === null || h.backupDays > 30) ? 'warn' : 'good',
                    h.backupDays === null ? 'on any device' : backupWhereText());
@@ -3697,6 +3719,7 @@ window.checkWorkerHealth = checkWorkerHealth;
 
 function openSyncHealth() {
   renderSyncHealth();
+  if (typeof aiMeterRefresh === 'function') aiMeterRefresh();     // v37.57
   refreshAutoFetchUndoItem().catch(function(){});
   checkPhotoCloudDiff();          // answer it, do not just ask it
   checkWorkerHealth().catch(function(){});   // v36.29 — and which Worker is live
@@ -5660,7 +5683,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.56';
+var APP_VERSION = 'v37.57';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8297,7 +8320,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.56</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.57</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8980,7 +9003,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.56</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.57</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17323,6 +17346,35 @@ function aiSpendLine(o) {
   return o.calls + ' AI call' + (o.calls === 1 ? '' : 's') + ', about ' + usd
     + (o.unpriced ? ' (+' + o.unpriced + ' on a model with no price listed)' : '');
 }
+// v37.57 — the HOUSEHOLD's AI this month, as the Worker counts it (every
+// device and member together), and its allowance where the copy has one.
+var _aiMeter = null;   // { usd, cap, at }
+function aiMeterNote(m) {
+  if (!m || typeof m.usd !== 'number') return;
+  _aiMeter = { usd: m.usd, cap: (typeof m.cap === 'number') ? m.cap : null, at: Date.now() };
+  // A word when four-fifths are gone, once per month and household.
+  if (_aiMeter.cap && _aiMeter.usd >= 0.8 * _aiMeter.cap && _aiMeter.usd < _aiMeter.cap && !_selfTestRunning) {
+    var k = 'mkn_ai_warned_' + aiSpendMonth() + '_' + (_cloudHid || '');
+    try { if (!localStorage.getItem(k)) { localStorage.setItem(k, '1');
+      toast('\u{1F916} Your household has used $' + _aiMeter.usd.toFixed(2) + ' of this month\u2019s $' + _aiMeter.cap.toFixed(2) + ' AI allowance.', 8000); } } catch(e) {}
+  }
+}
+function aiMeterLine(m) {
+  m = m || _aiMeter;
+  if (!m) return '';
+  return '$' + m.usd.toFixed(2) + (m.cap !== null && m.cap !== undefined ? ' of $' + Number(m.cap).toFixed(2) + ' allowed' : '');
+}
+async function aiMeterRefresh() {
+  if (!aiMeterOn() || !window._fbUser || !_cloudHid) return null;
+  try {
+    var t = await _fbUser.getIdToken(); window._aiIdToken = t;
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'meter-me' }), signal: AbortSignal.timeout(10000) });
+    var d = await r.json();
+    if (r.ok && d && typeof d.usd === 'number') { aiMeterNote(d); renderSyncHealth(); }
+    return d;
+  } catch(e) { return null; }
+}
+window.aiMeterNote = aiMeterNote; window.aiMeterLine = aiMeterLine; window.aiMeterRefresh = aiMeterRefresh;
 window.aiCallCost = aiCallCost; window.aiSpendNote = aiSpendNote; window.aiSpendRead = aiSpendRead;
 window.aiSpendLine = aiSpendLine; window.AI_PRICES = AI_PRICES;
 
@@ -17524,6 +17576,7 @@ function aiRetryable(e) {
   // arriving at the same answer. Anthropic's own 429 is handled separately and
   // IS retried, because that one genuinely clears.
   if (m.indexOf('SPEND_CAP:') === 0 || m.indexOf('RATE_LIMIT:') === 0) return false;
+  if (m.indexOf('AI_ALLOWANCE:') === 0) return false;   // v37.57 — the household's monthly allowance
   if (m.indexOf('Rate limit') !== -1) return false;
   var code = m.match(/^API error (\d{3})/);
   if (code) {
@@ -17546,6 +17599,10 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
   syncLog('ai', 'AI call: ' + Math.round(prompt.length / 1000) + 'k chars in, '
     + maxTokens + ' tokens out, ' + Math.round(budget / 1000) + 's budget');
 
+  // v37.57 — know whether the Worker meters (once a session), and send a
+  // sign-in that is fresh (Firebase renews it if it is about to expire).
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+  if (aiMeterOn() && window._fbUser && _fbUser.getIdToken) { try { window._aiIdToken = await _fbUser.getIdToken(); } catch(e) {} }
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const body = {
@@ -17590,6 +17647,9 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
         const errText = await r.text().catch(function(){ return ''; });
         let errData = {};
         try { errData = JSON.parse(errText); } catch(e) {}
+        // v37.57 — our Worker's word about the household's allowance (or the
+        // sign-in behind it), said as it is — never "the API key is invalid".
+        if (errData && errData.allowance && errData.error) throw new Error(errData.error);
         const errType = (errData.error && errData.error.type) || '';
         if (r.status === 402 || errType === 'billing_error') {
           throw new Error('BILLING: Your Anthropic API credits have run out.\n\nTo top up: https://console.anthropic.com/settings/billing\n\nAll AI features (translate, suggest, import, explore) will not work until credits are added.');
@@ -17602,6 +17662,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
       const d = await r.json();
       // Counted before anything below can throw: a truncated answer is still billed.
       if (d && d.usage) aiSpendNote(model || AI_MODEL, d.usage);
+      if (d && d._meter) aiMeterNote(d._meter);                 // v37.57 — the household's month so far
       // Check for errors in the response body too
       if (d.error) {
         const errType = d.error.type || '';

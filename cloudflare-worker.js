@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v59
+// Tony's Recipes — Cloudflare Worker v60
+// v60: AI PER HOUSEHOLD (design step 3). Each AI answer's cost is counted
+//      against the household that asked — proved by the person's Firebase
+//      sign-in (checked against Google's keys) and their membership (read from
+//      Firestore with that same sign-in) — in a D1 database (METER_DB). On the
+//      test copy and the beta a household past its monthly allowance ($2; $4
+//      in its first month) is refused with a friendly word. `meter-me` (a
+//      household's month so far) and `meter-admin` (the management app, owner
+//      only). See AI PER HOUSEHOLD below. Without METER_DB nothing changes.
 // v59: CLEAN-UP after v58 found the text in the page's own data. Gone: the
 //      web search for the rest of a cut-off caption (v51–v56: Gemini and
 //      Claude, never found it, cost a minute's wait), and the reading test's
@@ -203,7 +211,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v59';
+const WORKER_VERSION = 'v60';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -618,6 +626,10 @@ async function handleRequest(request, env) {
         appKeyRequired: !!env.APP_SHARED_KEY,
         appKeyAccepted: keyed,
         rateLimiting: !!env.BRING_KV,
+        // v60 — the app sends its sign-in and household only to a Worker that
+        // strips them before Anthropic (an older one would forward them, and
+        // Anthropic refuses unknown fields — the v37 lesson).
+        metering: { version: 1, db: !!env.METER_DB },
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1185,6 +1197,9 @@ async function handleRequest(request, env) {
     // action now falls through to the Anthropic proxy's own validation, which
     // refuses a body with no messages.
 
+    // ── meter-me / meter-admin (v60) ─────────────────────────────────────────
+    if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
+
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
       const apiKey = env.ANTHROPIC_API_KEY;
@@ -1200,15 +1215,20 @@ async function handleRequest(request, env) {
       // Anything added to workerBody() in index.html must be added here too.
       const forwarded = {};
       Object.keys(body).forEach(function(k) {
-        if (k === 'appKey' || k === 'action') return;   // Worker-only, never Anthropic's
+        // Worker-only, never Anthropic's (v60: the sign-in and the household too)
+        if (k === 'appKey' || k === 'action' || k === 'idToken' || k === 'hid') return;
         forwarded[k] = body[k];
       });
+      const metered = await meterStart(request, env, body);
+      if (metered.resp) return metered.resp;
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify(forwarded),
       });
       const data = await r.json();
+      // v60 — what it cost, counted against the household; the app shows it.
+      if (metered.ctx && data && data.usage) data._meter = await meterAdd(env, metered.ctx, forwarded.model, data.usage);
       // CORS is applied centrally by the fetch wrapper (v36); it overwrites
       // whatever is set here, so this carries only Content-Type.
       return new Response(JSON.stringify(data), {
@@ -1216,6 +1236,262 @@ async function handleRequest(request, env) {
         headers: { 'Content-Type': 'application/json' }
       });
     } catch(err) { return jsonResp({ error: err.message }, 500); }
+}
+
+// ─── AI PER HOUSEHOLD (v60, design step 3) ───────────────────────────────────
+// Every AI answer is counted against the HOUSEHOLD that asked, in US dollars
+// from the answer's own usage report, and on the copies that have a monthly
+// allowance (the test copy, the beta) a household past its allowance is
+// refused with a friendly word — everything that is not AI keeps working.
+//
+// Who is asking is PROVED, never taken from the app's say-so:
+//   1. the app sends the person's Firebase sign-in token (`idToken`) and the
+//      household (`hid`); the token is checked against Google's public keys
+//      (RS256), its project (`aud`) against METER_PROJECTS, issuer, expiry;
+//   2. membership is read from Firestore WITH THAT SAME TOKEN — the database
+//      rules let a member read their own membership and nobody else's, so no
+//      service account or secret is needed here at all.
+// The counts live in a D1 database bound as METER_DB (Cloudflare → Storage &
+// Databases → D1 → Create; Worker → Settings → Bindings → D1 → METER_DB). The
+// tables are created on first use. Without it nothing is metered, the app
+// works as before, and `health` says so.
+//
+//   METER_PROJECTS   Firebase projects whose sign-ins count (default: the
+//                    family's and the test copy's; add the beta's)
+//   CAPPED_PROJECTS  …of those, the ones with an allowance (default: the test
+//                    copy; add the beta's). The family's is counted, not capped.
+//   CAPPED_ORIGINS   pages of capped copies: an AI call from one WITHOUT a
+//                    sign-in is refused (default: the test copy's address)
+//   AI_CAP_USD       the monthly allowance (2); AI_CAP_FIRST_USD the first
+//                    month's, for a household's big first import (4)
+//   OWNER_EMAILS     who may read every household's spending and set caps
+//                    (`meter-admin`, the management app)
+const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test';
+const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test';
+const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev';
+const OWNER_EMAILS_DEFAULT = 'rozinante2004@gmail.com';
+const AI_CAP_USD_DEFAULT = 2, AI_CAP_FIRST_USD_DEFAULT = 4;
+// USD per million tokens — the same table as the app's AI_PRICES (index.html).
+// A model missing here is priced at the dearest rate, so a cap is never
+// under-counted.
+const AI_PRICES = {
+  'claude-sonnet-5':  { input: 2, cacheWrite: 2.5,  cacheRead: 0.2, output: 10 },
+  'claude-haiku-4-5': { input: 1, cacheWrite: 1.25, cacheRead: 0.1, output: 5 }
+};
+const AI_PRICE_UNKNOWN = { input: 5, cacheWrite: 6.25, cacheRead: 0.5, output: 25 };
+const AI_WEB_SEARCH_USD = 0.01;
+function csvList(v, dflt) { return String(v || dflt).split(',').map(s => s.trim()).filter(Boolean); }
+function aiCostUsd(model, usage) {
+  const p = AI_PRICES[model] || AI_PRICE_UNKNOWN, M = 1e6, u = usage || {};
+  return (u.input_tokens || 0) * p.input / M + (u.cache_creation_input_tokens || 0) * p.cacheWrite / M
+       + (u.cache_read_input_tokens || 0) * p.cacheRead / M + (u.output_tokens || 0) * p.output / M
+       + ((u.server_tool_use || {}).web_search_requests || 0) * AI_WEB_SEARCH_USD;
+}
+function b64uBytes(s) {
+  s = String(s).replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s), a = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+function jwtPart(s) { return JSON.parse(new TextDecoder().decode(b64uBytes(s))); }
+let _gKeys = null, _gKeysAt = 0;
+async function googleSigningKeys(env, fresh) {
+  if (env.__testKeys) return env.__testKeys;                 // tests sign their own tokens
+  if (_gKeys && !fresh && Date.now() - _gKeysAt < 3600e3) return _gKeys;
+  const r = await fetch('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
+    { signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error('Google\'s keys could not be read (' + r.status + ')');
+  const d = await r.json(), keys = {};
+  (d.keys || []).forEach(k => { keys[k.kid] = k; });
+  _gKeys = keys; _gKeysAt = Date.now();
+  return keys;
+}
+async function verifyIdToken(token, env) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) throw new Error('not a sign-in token');
+  let head, claims;
+  try { head = jwtPart(parts[0]); claims = jwtPart(parts[1]); } catch (e) { throw new Error('not a sign-in token'); }
+  if (head.alg !== 'RS256' || !head.kid) throw new Error('not a sign-in token');
+  let keys = await googleSigningKeys(env), jwk = keys[head.kid];
+  if (!jwk) { keys = await googleSigningKeys(env, true); jwk = keys[head.kid]; }   // Google rotates them
+  if (!jwk) throw new Error('signed with an unknown key');
+  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64uBytes(parts[2]),
+    new TextEncoder().encode(parts[0] + '.' + parts[1]));
+  if (!ok) throw new Error('the signature does not match');
+  const now = Math.floor(Date.now() / 1000);
+  if (!csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT).includes(claims.aud)) throw new Error('from an app this server does not serve');
+  if (claims.iss !== 'https://securetoken.google.com/' + claims.aud) throw new Error('not issued by Firebase');
+  if (!(claims.exp > now - 30)) throw new Error('expired');
+  if (!(claims.iat < now + 300) || !claims.sub) throw new Error('not valid yet');
+  return claims;
+}
+// Is this person in this household? Asked of Firestore with their own token;
+// remembered for ten minutes in this Worker instance.
+const _meterMembers = new Map();
+function fsValue(f) {
+  if (!f) return null;
+  if ('integerValue' in f) return Number(f.integerValue);
+  if ('doubleValue' in f) return Number(f.doubleValue);
+  if ('stringValue' in f) return f.stringValue;
+  if ('booleanValue' in f) return f.booleanValue;
+  return null;
+}
+async function meterMembership(claims, hid, token, env) {
+  const k = claims.aud + '/' + hid + '/' + claims.sub, c = _meterMembers.get(k);
+  if (c && Date.now() - c.at < 600e3) return c;
+  const base = (env.__firestoreBase || 'https://firestore.googleapis.com') + '/v1/projects/' + encodeURIComponent(claims.aud)
+    + '/databases/(default)/documents/households/' + encodeURIComponent(hid);
+  const h = { Authorization: 'Bearer ' + token };
+  const [m, hh] = await Promise.all([
+    fetch(base + '/members/' + encodeURIComponent(claims.sub), { headers: h, signal: AbortSignal.timeout(8000) }),
+    fetch(base, { headers: h, signal: AbortSignal.timeout(8000) })]);
+  if (m.status === 403 || m.status === 404) return { member: false };   // not remembered: they may join any minute
+  if (!m.ok) throw new Error('the household could not be checked (' + m.status + ')');
+  let f = {};
+  try { if (hh.ok) f = ((await hh.json()) || {}).fields || {}; } catch (e) {}
+  const v = { member: true, name: String(fsValue(f.name) || '').slice(0, 80), code: String(fsValue(f.code) || ''),
+              created: Number(fsValue(f.createdAt)) || null, at: Date.now() };
+  _meterMembers.set(k, v);
+  return v;
+}
+let _meterReady = false;
+async function meterDb(env) {
+  const db = env.METER_DB;
+  if (!db) return null;
+  if (!_meterReady) {
+    await db.batch([
+      db.prepare('CREATE TABLE IF NOT EXISTS ai_spend (project TEXT NOT NULL, hid TEXT NOT NULL, month TEXT NOT NULL, '
+        + 'usd REAL NOT NULL DEFAULT 0, calls INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (project, hid, month))'),
+      db.prepare('CREATE TABLE IF NOT EXISTS ai_households (project TEXT NOT NULL, hid TEXT NOT NULL, name TEXT, code TEXT, '
+        + 'created_at INTEGER, first_seen INTEGER, last_seen INTEGER, cap REAL, note TEXT, PRIMARY KEY (project, hid))')
+    ]);
+    _meterReady = true;
+  }
+  return db;
+}
+function allowanceResp(msg, status) {
+  return jsonResp({ error: 'AI_ALLOWANCE: ' + msg, rateLimited: true, allowance: true }, status || 429);
+}
+function capFor(row, month, env) {
+  if (row && typeof row.cap === 'number') return row.cap;                    // set in the management app
+  const started = row && (row.created_at || row.first_seen);
+  const first = !started || utcMonthKey(started) === month;
+  return first ? (parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT)
+               : (parseFloat(env.AI_CAP_USD) || AI_CAP_USD_DEFAULT);
+}
+// Before an AI call: who, which household, and is there allowance left.
+// → { resp } to refuse, { ctx } to count, {} to go ahead uncounted.
+async function meterStart(request, env, body) {
+  const token = body.idToken, hid = body.hid;
+  const origin = request.headers.get('Origin') || '';
+  const cappedOrigin = csvList(env.CAPPED_ORIGINS, CAPPED_ORIGINS_DEFAULT).includes(origin);
+  if (!env.METER_DB) return {};
+  if (!token || !hid) {
+    return cappedOrigin ? { resp: allowanceResp('sign in to use the AI here — it is counted per household.', 401) } : {};
+  }
+  let aud = '';
+  try { aud = jwtPart(String(token).split('.')[1]).aud || ''; } catch (e) {}
+  const capped = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT).includes(aud) || cappedOrigin;
+  try {
+    if (!/^[A-Za-z0-9]{1,64}$/.test(String(hid))) throw new Error('not a household');
+    const claims = await verifyIdToken(token, env);
+    const hh = await meterMembership(claims, hid, token, env);
+    if (!hh.member) throw new Error('you are not in that household');
+    const db = await meterDb(env), month = utcMonthKey(Date.now());
+    const row = await db.prepare('SELECT h.cap, h.created_at, h.first_seen, s.usd FROM (SELECT 1) LEFT JOIN ai_households h '
+      + 'ON h.project = ?1 AND h.hid = ?2 LEFT JOIN ai_spend s ON s.project = ?1 AND s.hid = ?2 AND s.month = ?3')
+      .bind(claims.aud, hid, month).first() || {};
+    if (!row.created_at && hh.created) row.created_at = hh.created;
+    const spent = row.usd || 0, cap = capFor(row, month, env);
+    const ctx = { db, project: claims.aud, hid, month, capped, cap, spent, name: hh.name, code: hh.code, created: hh.created };
+    if (capped && spent >= cap) {
+      return { resp: allowanceResp('this month\'s AI allowance for your household is used up ($' + spent.toFixed(2)
+        + ' of $' + cap.toFixed(2) + '). It renews on the 1st; everything that does not use the AI keeps working.') };
+    }
+    return { ctx };
+  } catch (e) {
+    // Spend that cannot be counted is what an allowance exists to stop — on a
+    // capped copy. The family's copy is only counted, so it carries on.
+    if (capped) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
+      + (e && e.message) + '). Reload the app and try again.', 403) };
+    return {};
+  }
+}
+// After the answer: add what it cost, and note the household.
+async function meterAdd(env, ctx, model, usage) {
+  const usd = aiCostUsd(model, usage), now = Date.now();
+  try {
+    await ctx.db.batch([
+      ctx.db.prepare('INSERT INTO ai_spend (project, hid, month, usd, calls) VALUES (?1, ?2, ?3, ?4, 1) '
+        + 'ON CONFLICT (project, hid, month) DO UPDATE SET usd = usd + excluded.usd, calls = calls + 1')
+        .bind(ctx.project, ctx.hid, ctx.month, usd),
+      ctx.db.prepare('INSERT INTO ai_households (project, hid, name, code, created_at, first_seen, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6) '
+        + 'ON CONFLICT (project, hid) DO UPDATE SET name = excluded.name, code = excluded.code, '
+        + 'created_at = COALESCE(excluded.created_at, created_at), last_seen = excluded.last_seen')
+        .bind(ctx.project, ctx.hid, ctx.name || null, ctx.code || null, ctx.created || null, now)
+    ]);
+  } catch (e) {}
+  return { usd: ctx.spent + usd, cap: ctx.capped ? ctx.cap : null };
+}
+// `meter-me` — this household's month so far (Sync Health); `meter-admin` —
+// every household's, and setting a cap (the management app; owner only).
+async function meterAction(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'METER: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'METER: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  const db = await meterDb(env), month = utcMonthKey(Date.now());
+  const capped = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT).includes(claims.aud);
+  if (body.action === 'meter-me') {
+    const hid = String(body.hid || '');
+    let hh;
+    try { hh = await meterMembership(claims, hid, body.idToken, env); } catch (e) { return jsonResp({ error: 'METER: ' + e.message }, 502); }
+    if (!hh.member) return jsonResp({ error: 'METER: you are not in that household.' }, 403);
+    const row = await db.prepare('SELECT h.cap, h.created_at, h.first_seen, s.usd, s.calls FROM (SELECT 1) LEFT JOIN ai_households h '
+      + 'ON h.project = ?1 AND h.hid = ?2 LEFT JOIN ai_spend s ON s.project = ?1 AND s.hid = ?2 AND s.month = ?3')
+      .bind(claims.aud, hid, month).first() || {};
+    if (!row.created_at && hh.created) row.created_at = hh.created;
+    return jsonResp({ month, usd: row.usd || 0, calls: row.calls || 0, cap: capped ? capFor(row, month, env) : null });
+  }
+  // meter-admin
+  const owners = csvList(env.OWNER_EMAILS, OWNER_EMAILS_DEFAULT).map(s => s.toLowerCase());
+  if (!claims.email_verified || !owners.includes(String(claims.email || '').toLowerCase()))
+    return jsonResp({ error: 'METER: only the app\'s owner may see this.' }, 403);
+  if (body.op === 'set-cap') {
+    const hid = String(body.hid || ''), cap = body.cap === null || body.cap === '' ? null : Number(body.cap);
+    if (!/^[A-Za-z0-9]{1,64}$/.test(hid) || (cap !== null && !(cap >= 0 && cap <= 1000))) return jsonResp({ error: 'METER: a household and an amount from 0 to 1000.' }, 400);
+    await db.batch([
+      db.prepare('INSERT INTO ai_households (project, hid, cap, note) VALUES (?1, ?2, ?3, ?4) '
+        + 'ON CONFLICT (project, hid) DO UPDATE SET cap = excluded.cap, note = COALESCE(excluded.note, note)')
+        .bind(claims.aud, hid, cap, typeof body.note === 'string' ? body.note.slice(0, 500) : null)
+    ]);
+    return jsonResp({ ok: true, hid, cap });
+  }
+  if (body.op === 'set-note') {
+    const hid = String(body.hid || '');
+    if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
+    await db.prepare('INSERT INTO ai_households (project, hid, note) VALUES (?1, ?2, ?3) ON CONFLICT (project, hid) DO UPDATE SET note = excluded.note')
+      .bind(claims.aud, hid, String(body.note || '').slice(0, 500)).run();
+    return jsonResp({ ok: true });
+  }
+  // list: every household this copy has counted, and its last three months.
+  const months = [0, 1, 2].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return utcMonthKey(d.getTime()); });
+  const hs = (await db.prepare('SELECT hid, name, code, created_at, first_seen, last_seen, cap, note FROM ai_households WHERE project = ?1')
+    .bind(claims.aud).all()).results || [];
+  const sp = (await db.prepare('SELECT hid, month, usd, calls FROM ai_spend WHERE project = ?1 AND month >= ?2')
+    .bind(claims.aud, months[2]).all()).results || [];
+  const out = hs.map(h => {
+    const mine = sp.filter(s => s.hid === h.hid);
+    return Object.assign({}, h, {
+      capNow: capped ? capFor(h, month, env) : null,
+      months: months.map(m => { const s = mine.filter(x => x.month === m)[0]; return { month: m, usd: s ? s.usd : 0, calls: s ? s.calls : 0 }; })
+    });
+  });
+  return jsonResp({ project: claims.aud, capped, month, months, households: out,
+    defaults: { cap: parseFloat(env.AI_CAP_USD) || AI_CAP_USD_DEFAULT, firstMonth: parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT } });
 }
 
 // ─── VIDEO RECIPES (v43, v44) ────────────────────────────────────────────────
@@ -1712,4 +1988,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v59 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v60 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

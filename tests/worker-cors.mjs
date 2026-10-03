@@ -846,6 +846,132 @@ const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't',
 expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,
   `got ${noSecret.status} — an unset secret must CLOSE the endpoint, never fall back to a default`);
 
+// v60 — AI per household. Real RS256 tokens signed with a key made here, a real
+// SQLite standing in for D1 (node:sqlite), Firestore and Anthropic faked.
+console.log('\nAI per household (v60):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  function fakeD1() {
+    const raw = new DatabaseSync(':memory:');
+    const stmt = (sql, args) => ({
+      bind: (...a) => stmt(sql, a),
+      first: async () => raw.prepare(sql).get(...(args || [])) || null,
+      all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+      run: async () => { raw.prepare(sql).run(...(args || [])); return { success: true }; },
+      _run() { raw.prepare(sql).run(...(args || [])); }
+    });
+    return { raw, prepare: (sql) => stmt(sql, []), batch: async (list) => { raw.exec('BEGIN'); try { list.forEach(s => s._run()); raw.exec('COMMIT'); } catch (e) { raw.exec('ROLLBACK'); throw e; } return []; } };
+  }
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pub = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const other = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
+  async function token(claims, key = kp.privateKey, kid = 'k1') {
+    const now = Math.floor(Date.now() / 1000);
+    const c = Object.assign({ iss: 'https://securetoken.google.com/' + (claims.aud || 'tonys-recipes-test'), aud: 'tonys-recipes-test',
+      sub: 'uA', email: 'a@example.com', email_verified: true, iat: now - 10, exp: now + 3600 }, claims);
+    if (claims.aud && !claims.iss) c.iss = 'https://securetoken.google.com/' + claims.aud;
+    const head = b64u({ alg: 'RS256', kid }), body = b64u(c);
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(head + '.' + body));
+    return head + '.' + body + '.' + Buffer.from(sig).toString('base64url');
+  }
+  const TEST_ORIGIN = 'https://tonys-recipes-test.pages.dev';
+  const db = fakeD1();
+  const envM = { ANTHROPIC_API_KEY: 'sk-test', METER_DB: db, __testKeys: { k1: Object.assign({ kid: 'k1' }, pub) },
+                 ALLOWED_ORIGINS: TEST_ORIGIN, __firestoreBase: 'https://fs.test' };
+  // Firestore: uA is in hA (created long ago); uB is in nothing.
+  const members = { 'hA/uA': true, 'hF/uF': true };
+  let anthropicCalls = 0, sent = null, firestoreAsks = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    url = String(url);
+    if (url.startsWith('https://fs.test/')) {
+      firestoreAsks.push({ url, auth: init && init.headers && init.headers.Authorization });
+      const m = /households\/([^/]+)(?:\/members\/([^/?]+))?$/.exec(url);
+      if (m[2]) return new Response(members[m[1] + '/' + m[2]] ? '{"fields":{"role":{"stringValue":"owner"}}}' : '{}', { status: members[m[1] + '/' + m[2]] ? 200 : 403 });
+      return new Response(JSON.stringify({ fields: { name: { stringValue: 'Kitchen A' }, code: { stringValue: 'MKN-AAAA-2222' }, createdAt: { integerValue: String(Date.parse('2026-01-05')) } } }), { status: 200 });
+    }
+    if (url === 'https://api.anthropic.com/v1/messages') {
+      anthropicCalls++; sent = JSON.parse(init.body);
+      // 100k input + 20k output on Sonnet 5 = $0.20 + $0.20 = $0.40
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 100000, output_tokens: 20000 } }), { status: 200 });
+    }
+    return realFetch(url, init);
+  };
+  const ai = async (extra, origin = TEST_ORIGIN, env = envM) => {
+    const r = await worker.fetch(post(Object.assign({ model: 'claude-sonnet-5', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] }, extra), origin), env);
+    let d = null; try { d = await r.json(); } catch (e) {}
+    return { status: r.status, d };
+  };
+  try {
+    const health = await (await worker.fetch(post({ action: 'health' }), envM)).json();
+    expect('health says metering is on (so the app sends its sign-in)', health.metering && health.metering.version === 1 && health.metering.db === true, JSON.stringify(health.metering));
+    const tA = await token({ sub: 'uA' });
+    let r = await ai({ idToken: tA, hid: 'hA' });
+    expect('a member\'s call goes through', r.status === 200 && anthropicCalls === 1, JSON.stringify(r));
+    expect('…the sign-in and the household are NOT forwarded to Anthropic', sent && sent.idToken === undefined && sent.hid === undefined && sent.appKey === undefined, JSON.stringify(Object.keys(sent || {})));
+    expect('…membership was read with the person\'s own sign-in', firestoreAsks.some(a => /households\/hA\/members\/uA$/.test(a.url) && a.auth === 'Bearer ' + tA), JSON.stringify(firestoreAsks));
+    expect('…and the answer says what the household has used', r.d && r.d._meter && Math.abs(r.d._meter.usd - 0.40) < 1e-9 && r.d._meter.cap === 2, JSON.stringify(r.d && r.d._meter));
+    const row = db.raw.prepare('SELECT * FROM ai_spend').get();
+    expect('…counted in the database, in dollars, from the answer\'s own usage', row && row.hid === 'hA' && row.project === 'tonys-recipes-test' && Math.abs(row.usd - 0.40) < 1e-9 && row.calls === 1, JSON.stringify(row));
+    const hrow = db.raw.prepare('SELECT * FROM ai_households').get();
+    expect('…with the household\'s name, identifier and last use', hrow && hrow.name === 'Kitchen A' && hrow.code === 'MKN-AAAA-2222' && hrow.last_seen > 0, JSON.stringify(hrow));
+    for (let i = 0; i < 4; i++) await ai({ idToken: tA, hid: 'hA' });            // $2.00 now
+    const before = anthropicCalls;
+    r = await ai({ idToken: tA, hid: 'hA' });
+    expect('past the $2 allowance: refused, kindly, before any cost', r.status === 429 && r.d.rateLimited === true && /^AI_ALLOWANCE: this month's AI allowance/.test(r.d.error) && /renews on the 1st/.test(r.d.error) && anthropicCalls === before, JSON.stringify(r));
+    const tB = await token({ sub: 'uB' });
+    r = await ai({ idToken: tB, hid: 'hA' });
+    expect('someone not in the household is refused', r.status === 403 && /not in that household/.test(r.d.error), JSON.stringify(r));
+    r = await ai({ idToken: tA.slice(0, -4) + 'AAAA', hid: 'hA' });
+    expect('a forged sign-in is refused', r.status === 403 && /signature/.test(r.d.error), JSON.stringify(r));
+    r = await ai({ idToken: await token({ sub: 'uA' }, other.privateKey), hid: 'hA' });
+    expect('a sign-in signed by anyone but Google is refused', r.status === 403, JSON.stringify(r));
+    r = await ai({ idToken: await token({ sub: 'uA', exp: Math.floor(Date.now() / 1000) - 3600 }), hid: 'hA' });
+    expect('an expired sign-in is refused', r.status === 403 && /expired/.test(r.d.error), JSON.stringify(r));
+    r = await ai({ idToken: await token({ sub: 'uA', aud: 'someone-elses-app' }), hid: 'hA' });
+    expect('a sign-in from another Firebase project is refused', r.status === 403 && /does not serve/.test(r.d.error), JSON.stringify(r));
+    r = await ai({});
+    expect('the test copy without a sign-in: refused (it is counted per household)', r.status === 401 && /sign in/.test(r.d.error), JSON.stringify(r));
+    // A new household this month gets $4.
+    members['hN/uN'] = true;
+    const realFetch2 = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      if (String(url) === 'https://fs.test/v1/projects/tonys-recipes-test/databases/(default)/documents/households/hN')
+        return new Response(JSON.stringify({ fields: { name: { stringValue: 'New' }, createdAt: { integerValue: String(Date.now()) } } }), { status: 200 });
+      return realFetch2(url, init);
+    };
+    const tN = await token({ sub: 'uN' });
+    for (let i = 0; i < 5; i++) r = await ai({ idToken: tN, hid: 'hN' });
+    expect('a household new this month has $4: still going at $2.00', r.status === 200 && Math.abs(r.d._meter.usd - 2.0) < 1e-9 && r.d._meter.cap === 4, JSON.stringify(r.d && r.d._meter));
+    globalThis.fetch = realFetch2;
+    // The family's copy: counted, never capped, and nothing breaks without a sign-in.
+    const tF = await token({ sub: 'uF', aud: 'recipes-f379d' });
+    for (let i = 0; i < 7; i++) r = await ai({ idToken: tF, hid: 'hF' }, ORIGIN);
+    expect('the family\'s copy is counted but never capped ($2.80, still answering)', r.status === 200 && Math.abs(r.d._meter.usd - 2.8) < 1e-9 && r.d._meter.cap === null, JSON.stringify(r));
+    r = await ai({}, ORIGIN);
+    expect('…and works without a sign-in, as before', r.status === 200, JSON.stringify(r));
+    r = await ai({}, TEST_ORIGIN, { ANTHROPIC_API_KEY: 'sk-test', ALLOWED_ORIGINS: TEST_ORIGIN });
+    expect('without METER_DB nothing changes (the test copy works unsigned)', r.status === 200, JSON.stringify(r));
+    // meter-me and meter-admin
+    let m = await (await worker.fetch(post({ action: 'meter-me', idToken: tA, hid: 'hA' }, TEST_ORIGIN), envM)).json();
+    expect('meter-me: the household\'s month so far', Math.abs(m.usd - 2.0) < 1e-9 && m.cap === 2 && m.calls === 5, JSON.stringify(m));
+    let adm = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tA }, TEST_ORIGIN), envM);
+    expect('meter-admin is refused to anyone but the owner', adm.status === 403, 'status ' + adm.status);
+    const tOwner = await token({ sub: 'uT', email: 'rozinante2004@gmail.com' });
+    adm = await (await worker.fetch(post({ action: 'meter-admin', op: 'set-cap', hid: 'hA', cap: 5, idToken: tOwner }, TEST_ORIGIN), envM)).json();
+    expect('the owner raises a household\'s cap', adm.ok === true && adm.cap === 5, JSON.stringify(adm));
+    r = await ai({ idToken: tA, hid: 'hA' });
+    expect('…and the household answers again', r.status === 200 && r.d._meter.cap === 5, JSON.stringify(r));
+    const list = await (await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tOwner }, TEST_ORIGIN), envM)).json();
+    const hA = (list.households || []).filter(h => h.hid === 'hA')[0];
+    expect('the owner lists every household with this month and the two before', hA && hA.capNow === 5 && hA.months.length === 3 && Math.abs(hA.months[0].usd - 2.4) < 1e-9 && list.capped === true, JSON.stringify(list).slice(0, 300));
+    const unverified = await token({ sub: 'uT', email: 'rozinante2004@gmail.com', email_verified: false });
+    adm = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: unverified }, TEST_ORIGIN), envM);
+    expect('…but not with an unconfirmed address', adm.status === 403, 'status ' + adm.status);
+  } finally { globalThis.fetch = realFetch; }
+}
+
 // v41 — the file said "Worker v40" on line 1 and 'v41' in WORKER_VERSION; Tony
 // spotted it while pasting. The number he sees at the top of the file he
 // pastes must be the number Sync Health then reports.

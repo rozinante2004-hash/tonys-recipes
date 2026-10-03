@@ -815,6 +815,27 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.57 + Worker v60 — AI per household (design step 3).** Tony's
+    answers (3 Oct): $4 in a household's first month, then $2; capped on the
+    beta and the test copy, the family's counted but never capped; the
+    management app covers beta, test AND family. Worker: `meterStart` before
+    the Anthropic call verifies the Firebase ID token (RS256 against Google's
+    JWKs; `aud` in METER_PROJECTS, iss, exp) and reads
+    `households/<hid>/members/<uid>` + the household from Firestore REST WITH
+    THAT TOKEN (no service account); D1 `METER_DB` (tables made on first use:
+    `ai_spend` per project/hid/month in USD, `ai_households` name/code/
+    created/first+last seen/cap/note); refusal `AI_ALLOWANCE: …` (429,
+    `rateLimited`, `allowance`); `meterAdd` after, and the answer carries
+    `_meter` {usd, cap}. `meter-me` (Sync Health) and `meter-admin` (owner:
+    OWNER_EMAILS; list / set-cap / set-note). `idToken`/`hid` are stripped
+    before Anthropic. Without METER_DB nothing changes. App: `workerBody`
+    adds them ONLY when health says `metering` (v60+, an older Worker would
+    forward them and Anthropic refuses unknown fields); `_aiIdToken` from
+    `onIdTokenChanged`, refreshed before each AI call; `aiMeterNote` (toast at
+    80%, once a month), Sync Health row "AI this month, the household";
+    `AI_ALLOWANCE:` never retried and never read as a bad API key. Tests: 24
+    Worker checks (real RS256 tokens, node:sqlite as D1), self-test
+    `ai_per_household`.
   - **v37.56 — THE FAMILY'S COPY RUNS IN HOUSEHOLDS** (`dataLayout:
     'households'` in index.html's #appConfig; Tony, 3 Oct 2026: "we can safely
     move the family app to a household"). Released to main only AFTER Tony
