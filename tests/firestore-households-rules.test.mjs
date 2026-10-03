@@ -182,6 +182,35 @@ await check('notices cannot be listed',                       getDocs(collection
 await check('…but the kept place itself stays closed to it',  getDocs(query(collection(newbieUnconfirmed, 'pending'), where('email', '==', 'newbie@example.com'))), false);
 await check('the address removes its own notice',             deleteDoc(doc(newbieUnconfirmed, 'pendingNotice/newbie@example.com')), true);
 
+console.log('Household identifiers (v37.49)');
+function foundWithCode(db, hid, uid, code, codeHid) {
+  const b = writeBatch(db);
+  b.set(doc(db, 'households/' + hid), { name: 'Coded', ownerUid: uid, createdAt: 1, code });
+  b.set(doc(db, 'households/' + hid + '/members/' + uid), { uid, role: 'owner', email: uid + '@example.com', joinedAt: 1 });
+  b.set(doc(db, 'codes/' + code), { hid: codeHid || hid, at: 1 });
+  return b.commit();
+}
+await check('a household is founded with its identifier, reserved in the same batch', foundWithCode(frank, 'hc1', 'frank', 'MKN-ABCD-2345'), true);
+await check('…no other household can take the same identifier',   foundWithCode(carol, 'hc2', 'carol', 'MKN-ABCD-2345'), false);
+await check('…nor one reserved for another household',            foundWithCode(carol, 'hc2', 'carol', 'MKN-WXYZ-6789', 'hc1'), false);
+await check('…nor one in the wrong form (O, 0, I, 1, L)',          foundWithCode(carol, 'hc2', 'carol', 'MKN-OOOO-1111'), false);
+await check('…nor an identifier that is not reserved', (() => { const b = writeBatch(carol);
+  b.set(doc(carol, 'households/hc2'), { name: 'X', ownerUid: 'carol', createdAt: 1, code: 'MKN-QRST-3456' });
+  b.set(doc(carol, 'households/hc2/members/carol'), { uid: 'carol', role: 'owner', email: 'carol@example.com', joinedAt: 1 }); return b.commit(); })(), false);
+await check('anyone signed in looks an identifier up', getDoc(doc(carol, 'codes/MKN-ABCD-2345')), true);
+await check('…but not signed out',                      getDoc(doc(nobody, 'codes/MKN-ABCD-2345')), false);
+await check('an identifier never changes', (() => { const b = writeBatch(frank);
+  b.update(doc(frank, 'households/hc1'), { code: 'MKN-HJKM-7892' }); b.set(doc(frank, 'codes/MKN-HJKM-7892'), { hid: 'hc1', at: 2 }); return b.commit(); })(), false);
+await check('…and its register entry is not removed while the household exists', deleteDoc(doc(carol, 'codes/MKN-ABCD-2345')), false);
+await check('a household made before identifiers', found(michal, 'hc4', 'michal'), true);
+await check('…gets one from its owner, reserved in the same batch', (() => { const b = writeBatch(michal);
+  b.update(doc(michal, 'households/hc4'), { code: 'MKN-PQRS-4567' }); b.set(doc(michal, 'codes/MKN-PQRS-4567'), { hid: 'hc4', at: 2 }); return b.commit(); })(), true);
+await check('a stranger cannot give a household an identifier', (() => { const b = writeBatch(carol);
+  b.update(doc(carol, 'households/hc1'), { name: 'Mine' }); return b.commit(); })(), false);
+await check('the owner stops link requests through the app', updateDoc(doc(frank, 'households/hc1'), { appRequests: false }), true);
+await check('…with a yes or no only',                       updateDoc(doc(frank, 'households/hc1'), { appRequests: 'maybe' }), false);
+await check('…and the identifier survives a rename',        updateDoc(doc(frank, 'households/hc1'), { name: 'Frank\'s Kitchen' }), true);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);

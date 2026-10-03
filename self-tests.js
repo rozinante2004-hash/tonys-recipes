@@ -1148,6 +1148,34 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'household_identifier', group:'Sharing', name:'Each household has a unique identifier, shown in ⚙️; link requests through the app can be blocked (v37.49)',
+    test: async()=>{
+      var seen={}, re=/^MKN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}$/;
+      for(var i=0;i<500;i++){ var c=hhNewCode(); if(!re.test(c)) throw new Error('an identifier in the wrong form: '+c); if(seen[c]) throw new Error('the same identifier twice in 500'); seen[c]=1; }
+      if(!document.querySelector('#settingsDrop [onclick*="openMyIdentifier"]') || !document.getElementById('appRequestsItem')) throw new Error('the two ⚙️ items are missing');
+      var realHh=window._household, realSet=window.hhSetAppRequests, realAsk=window.askConfirm, wrote=null;
+      try{
+        _household={ hid:'h1', role:'owner', name:'Test', code:'MKN-ABCD-2345', appRequests:true };
+        var shown=openMyIdentifier();
+        var big=document.getElementById('myIdentifier');
+        if(!big || big.textContent!=='MKN-ABCD-2345') throw new Error('the identifier is not shown');
+        if(/@/.test(document.querySelector('#askOverlay').textContent)) throw new Error('the identifier screen shows an e-mail address');
+        document.getElementById('askCancel').click(); await shown;
+        window.askConfirm=async function(){ return true; };
+        window.hhSetAppRequests=async function(v){ wrote=v; };
+        await toggleAppRequests();
+        if(wrote!==false || _household.appRequests!==false || !/blocked/.test(document.getElementById('appRequestsItem').textContent)) throw new Error('blocking did not take: '+wrote);
+        await toggleAppRequests();
+        if(wrote!==true || !/allowed/.test(document.getElementById('appRequestsItem').textContent)) throw new Error('allowing again did not take');
+        _household.role='viewer'; wrote=null;
+        await toggleAppRequests();
+        if(wrote!==null) throw new Error('a viewer changed the setting');
+      } finally {
+        window._household=realHh; window.hhSetAppRequests=realSet; window.askConfirm=realAsk;
+        var o=document.getElementById('askOverlay'); if(o) o.remove(); hhRenderAppRequests();
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');

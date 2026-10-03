@@ -121,18 +121,36 @@ service cloud.firestore {
         && get(path).data.expiresAt > request.time;
     }
 
+    // v37.49 — a household's identifier (MKN-XXXX-XXXX; no O/0, I/1, L) is
+    // reserved in /codes in the SAME batch that gives it to the household, so
+    // two households can never share one, and it never changes once given.
+    function codeFor(hid, c) {
+      return c is string && c.matches('MKN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}')
+        && getAfter(/databases/$(database)/documents/codes/$(c)).data.hid == hid;
+    }
+    function codeKept(hid) {
+      return request.resource.data.get('code', null) == resource.data.get('code', null)
+        || (resource.data.get('code', null) == null && codeFor(hid, request.resource.data.get('code', null)));
+    }
+    function hhKeys() { return ['name', 'ownerUid', 'createdAt', 'code', 'appRequests']; }
+    function okAppRequests() { return request.resource.data.get('appRequests', true) is bool; }
+
     match /households/{hid} {
       allow read: if isMember(hid);
       // Founding a household: you are its owner, and your own owner membership
       // is written in the same batch (so a household never exists ownerless).
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'createdAt'])
+        && request.resource.data.keys().hasOnly(hhKeys())
+        && (request.resource.data.get('code', null) == null || codeFor(hid, request.resource.data.code))
+        && okAppRequests()
         && getAfter(memberPath(hid, request.auth.uid)).data.role == 'owner';
-      // Renaming: owner or admin. Handing it over: the owner only, to a member
-      // who is an owner after the same batch.
-      allow update: if request.resource.data.keys().hasOnly(['name', 'ownerUid', 'createdAt'])
+      // Renaming, its identifier (once) and whether it takes link requests
+      // through the app: owner or admin. Handing it over: the owner only, to a
+      // member who is an owner after the same batch.
+      allow update: if request.resource.data.keys().hasOnly(hhKeys())
         && request.resource.data.createdAt == resource.data.createdAt
+        && codeKept(hid) && okAppRequests()
         && ( (atLeast(hid, 'admin') && request.resource.data.ownerUid == resource.data.ownerUid)
           || (resource.data.ownerUid == request.auth.uid
               && getAfter(memberPath(hid, request.resource.data.ownerUid)).data.role == 'owner') );
@@ -225,6 +243,22 @@ service cloud.firestore {
     // "which households am I in?" with a collection-group query on `members`.
     match /{path=**}/members/{uid} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // v37.49 — the register of household identifiers: `codes/<code>` = { hid, at }.
+    // Anyone signed in may look one up (it names a household, nobody's address)
+    // — that is how a link request by identifier finds its household. Written
+    // only together with the household that takes it, by its owner or an admin;
+    // never changed; removed only once its household is gone.
+    match /codes/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['hid', 'at'])
+        && getAfter(hh(request.resource.data.hid)).data.get('code', '') == code
+        && (atLeast(request.resource.data.hid, 'admin')
+            || getAfter(memberPath(request.resource.data.hid, request.auth.uid)).data.role == 'owner');
+      allow update: if false;
+      allow delete: if signedIn() && !existsAfter(hh(resource.data.hid));
     }
 
     // Places kept by e-mail — `pending/<hid>:<email>` = { hid, email, role }.

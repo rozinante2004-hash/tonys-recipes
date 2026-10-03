@@ -814,6 +814,19 @@ found only because a test was written first and disagreed with the code.
     `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
+  - **v37.49 — household identifiers (design step 1).** `MKN-XXXX-XXXX`
+    (`hhNewCode`, 31 chars, no O/0/I/1/L), reserved in top-level
+    `codes/<code>` = {hid, at} in the SAME batch that gives it
+    (firestore.rules `codeFor`/`codeKept`: never changes once given; anyone
+    signed in may look a code up — it names a household, no address).
+    `householdFound` founds WITH a code (retries on a clash; falls back to no
+    code while the old rules are live); `hhEnsureCode` gives one to an older
+    household when its owner/admin opens the app. ⚙️ → 🪪 Display my personal
+    identifier (copy / share; shows no address) and 🤝 Link requests through
+    the app: allowed/blocked (`households.appRequests`, default allowed;
+    owner/admin only). Households layout only. Rules tests: 14 new checks
+    (emulator runs locally now: scratchpad/hh). Self-test
+    `household_identifier`. Tony must publish the test copy's rules.
   - **v37.48 — 📲 Share this app beside 🌐** (Tony: "always available and
     visible"): `#shareAppBtn` in the header, opens `openShareAppModal()`.
     Fits a 375 px phone. Design doc for the beta, household identifiers,
