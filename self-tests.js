@@ -1178,6 +1178,114 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'linked_households', group:'Sharing', name:'🤝 Households link: asked by identifier or any member\'s e-mail, accepted, rejected or put off; each sees the other\'s recipes read-only (v37.53)',
+    test: async()=>{
+      if(JSON.stringify(hhLinkTarget(' mkn 7q4k 2f9p '))!=='{"code":"MKN-7Q4K-2F9P"}') throw new Error('an identifier typed loosely is not understood');
+      if(JSON.stringify(hhLinkTarget('Dana@Example.com'))!=='{"email":"dana@example.com"}' || hhLinkTarget('hello')!==null) throw new Error('e-mail / nonsense');
+      if(!document.querySelector('#moreDrop [onclick*="openConnectHousehold"]')) throw new Error('⋯ More has no 🤝 Connect with another household');
+      // A small Firestore of our own: path → data.
+      var store={};
+      function ref(path){ var parts=path.split('/'); return { id:parts[parts.length-1], path:path,
+        collection:function(c){ return coll(path+'/'+c); },
+        get:async function(){ var d=store[path]; return { id:parts[parts.length-1], ref:ref(path), exists:!!d, data:function(){ return d?JSON.parse(JSON.stringify(d)):undefined; } }; },
+        set:async function(d){ store[path]=JSON.parse(JSON.stringify(d)); },
+        update:async function(d){ if(!store[path]) throw new Error('no such document'); Object.assign(store[path], d); },
+        delete:async function(){ delete store[path]; } }; }
+      function coll(path){ var filters=[]; var q={
+        doc:function(id){ return ref(path+'/'+id); },
+        where:function(f,op,v){ filters.push([f,v]); return q; },
+        get:async function(){ var out=[]; Object.keys(store).forEach(function(k){
+            if(k.slice(0,k.lastIndexOf('/'))!==path) return;
+            if(filters.every(function(f){ return store[k][f[0]]===f[1]; })) out.push(k); });
+          return { size:out.length, forEach:function(fn){ out.forEach(function(k){ fn({ id:k.split('/').pop(), ref:ref(k), data:function(){ return JSON.parse(JSON.stringify(store[k])); } }); }); } }; } };
+        return q; }
+      var fake={ collection:coll, batch:function(){ var ops=[]; return { set:function(r,d){ ops.push(function(){ return r.set(d); }); }, update:function(r,d){ ops.push(function(){ return r.update(d); }); },
+        delete:function(r){ ops.push(function(){ return r.delete(); }); }, commit:async function(){ for(var i=0;i<ops.length;i++) await ops[i](); } }; } };
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, ask:window.askConfirm, save:window.saveData, toast:window.toast, err:window.showServiceError, share:window.shareMessage };
+      var answers=[], asked=[];
+      try{
+        window._fbDb=fake; window.toast=function(){}; window.saveData=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
+        window.askConfirm=async function(o){ asked.push(o); return answers.length?answers.shift():false; };
+        store['codes/MKN-BBBB-3333']={ hid:'hB' }; store['codes/MKN-CCCC-4444']={ hid:'hC' };
+        // Kitchen A's owner asks Kitchen B by its identifier.
+        window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true };
+        _household={ hid:'hA', role:'owner', name:'Kitchen A', code:'MKN-AAAA-2222', appRequests:true };
+        var r=await hhSendLinkRequest('MKN-AAAA-2222');
+        if(r.ok) throw new Error('a household asked itself');
+        r=await hhSendLinkRequest('MKN-ZZZZ-9999');
+        if(r.ok || !/No household/.test(r.msg)) throw new Error('an unknown identifier: '+JSON.stringify(r));
+        r=await hhSendLinkRequest('mkn-bbbb-3333');
+        var q=store['linkRequests/hA_hB'];
+        if(!r.ok || !q || q.to!=='hB' || q.fromName!=='Kitchen A' || q.fromCode!=='MKN-AAAA-2222' || q.via!=='code') throw new Error('the request was not written: '+JSON.stringify(q));
+        // By e-mail, to Jo, who only reads in Kitchen B: the app offers to tell her.
+        var told=null; window.shareMessage=async function(o){ told=o; };
+        window.askConfirm=async function(){ return 'jo@example.com'; };
+        _household={ hid:'hC', role:'owner', name:'Kitchen C', code:'MKN-CCCC-4444' };
+        r=await openConnectHousehold();
+        if(!r || !r.ok || !store['linkRequests/hC:jo@example.com'] || !told || told.to!=='jo@example.com') throw new Error('asking by e-mail: '+JSON.stringify(r));
+        window.askConfirm=async function(o){ asked.push(o); return answers.length?answers.shift():false; };
+        // Jo opens the app: the request is passed on to Kitchen B, without a word to her.
+        window._fbUser={ uid:'uJ', email:'jo@example.com', emailVerified:true };
+        _household={ hid:'hB', role:'viewer', name:'Kitchen B', code:'MKN-BBBB-3333' };
+        asked=[]; await hhLoadLinks(); await hhCheckLinkRequests(true);
+        if(asked.length) throw new Error('someone who only reads was asked');
+        if(store['linkRequests/hC:jo@example.com'] || !store['linkRequests/hC_hB'] || store['linkRequests/hC_hB'].to!=='hB') throw new Error('the e-mail request was not passed on');
+        // Kitchen B's owner: two requests. Accept A's, put C's off.
+        window._fbUser={ uid:'uB', email:'b@example.com', emailVerified:true };
+        _household={ hid:'hB', role:'owner', name:'Kitchen B', code:'MKN-BBBB-3333' };
+        localStorage.removeItem(LINK_LATER_KEY+'hA_hB'); localStorage.removeItem(LINK_LATER_KEY+'hC_hB');
+        asked=[]; answers=[true, false];
+        await hhLoadLinks(); await hhCheckLinkRequests(true);
+        if(asked.length!==2 || !/Kitchen A \(MKN-AAAA-2222\) would like to link/.test(asked[0].message) || asked[0].altLabel!=='Reject' || asked[0].cancelLabel!=='Remind me later')
+          throw new Error('the pop-up: '+JSON.stringify(asked.map(function(a){ return a.message; })));
+        if(!store['households/hB/links/hA'] || !store['households/hA/links/hB'] || store['linkRequests/hA_hB']) throw new Error('accepting did not link both sides');
+        if(store['households/hA/links/hB'].name!=='Kitchen B' || store['households/hB/links/hA'].name!=='Kitchen A') throw new Error('the links do not carry the names');
+        if(hhLinks().length!==1 || hhLinks()[0].hid!=='hA') throw new Error('the link is not loaded');
+        if(!store['homes/uB'] || store['homes/uB'].hid!=='hB') throw new Error('where this person looks from was not noted (the rules need it)');
+        asked=[]; await hhCheckLinkRequests(true);
+        if(asked.length) throw new Error('"Remind me later" asked again at once');
+        localStorage.removeItem(LINK_LATER_KEY+'hC_hB'); answers=['alt'];
+        await hhCheckLinkRequests(true);
+        if(!store['linkRequests/hC_hB'] || store['linkRequests/hC_hB'].declined!==true || store['households/hB/links/hC']) throw new Error('rejecting');
+        asked=[]; await hhCheckLinkRequests(true);
+        if(asked.length) throw new Error('a rejected request asked again');
+        // Kitchen A's recipes: a chip, the grid, the read-only view, a copy.
+        store['households/hA/recipes/1']={ id:1, name:'Soup from A', category:'Soup', ingredients:[{ a:'2', n:'onions' }], steps:['Cook slowly'] };
+        renderFilters();
+        var chip=document.querySelector('#filterBar .linked-btn');
+        if(!chip || chip.textContent.indexOf('Kitchen A')===-1) throw new Error('no 🤝 Kitchen A filter');
+        toggleLinkedFilter('hA'); await hhFetchLinked('hA'); renderGrid();
+        var grid=document.getElementById('recipeGrid').textContent;
+        if(grid.indexOf('Soup from A')===-1 || !/read-only/.test(document.getElementById('sectionLabel').textContent)) throw new Error('the grid does not show their recipes: '+grid.slice(0,200));
+        if(recipes.some(function(x){ return grid.indexOf(x.name)>-1 && x.name.length>8; })) throw new Error('the grid mixes in this household\'s own recipes');
+        if(!openLinkedRecipe(0)) throw new Error('could not open it');
+        var view=document.getElementById('linkedViewOverlay').textContent;
+        if(view.indexOf('onions')===-1 || view.indexOf('Cook slowly')===-1 || !/From/.test(view)) throw new Error('the read-only view: '+view.slice(0,200));
+        if(document.querySelector('#linkedViewOverlay [onclick*="edit"], #linkedViewOverlay [onclick*="delete"], #linkedViewOverlay [onclick*="toggleFav"]')) throw new Error('the read-only view offers changes');
+        var before=recipes.length, savedId=nextId; nextId=Math.max(nextId, TEST_ID_MIN+9100);
+        var copyId=saveLinkedCopy();
+        var copy=recipes.filter(function(x){ return x.id===copyId; })[0];
+        if(!copy || recipes.length!==before+1 || copy.name!=='Soup from A' || copy.uid==='legacy-1') throw new Error('the copy');
+        recipes.splice(recipes.indexOf(copy),1); nextId=savedId;
+        _household.role='viewer'; openLinkedRecipe(0);
+        if(saveLinkedCopy()!==false) throw new Error('someone who only reads saved a copy');
+        closeM('linkedViewOverlay');
+        if(hhLinksHtml().indexOf('Kitchen A')===-1) throw new Error('Family Access does not list the link');
+        // Removing the link takes both halves.
+        _household.role='owner'; answers=[true];
+        await hhRemoveLink(0);
+        if(store['households/hB/links/hA'] || store['households/hA/links/hB'] || hhLinks().length || _linkedShow) throw new Error('removing the link');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.saveData=real.save;
+        window.toast=real.toast; window.showServiceError=real.err; window.shareMessage=real.share;
+        _linkedShow=null; _linkCache={}; _homeSet='';
+        var o=document.getElementById('askOverlay'); if(o) o.remove();
+        var v=document.getElementById('linkedViewOverlay'); if(v) v.classList.remove('open');
+        ['hA_hB','hC_hB'].forEach(function(k){ localStorage.removeItem(LINK_LATER_KEY+k); });
+        renderFilters(); renderGrid();
+      }
+    } },
+
   { id:'extension_into_a_folder', group:'UI', name:'🧩 The extension is unzipped into a folder the person picks, and the folder remembered (v37.50)',
     test: async()=>{
       var real={ pick:window.showDirectoryPicker, zip:window.JSZip, fetch:window.fetch, folder:window._extFolder, toast:window.toast };
@@ -9177,8 +9285,12 @@ window.SELF_TESTS = [
       // of real features (households for everyone: first run, sign-in by
       // password and link, deleting an account, asking to write; reading
       // recipes from Facebook text and from videos) and it reached 1501 KB.
+      // Raised to 1700 in v37.53, the same way: v37.19–v37.53 added ~100 KB of
+      // real features (shortcuts and the browser extension, help in the
+      // person's language, household identifiers, linked households) and the
+      // page reached 1601 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 1600) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 1700) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

@@ -90,6 +90,9 @@ service cloud.firestore {
     //                                         the family's members arrive)
     //   invites/{code}                      { hid, role, createdBy, expiresAt } — the
     //                                         code is the secret (random, long)
+    //   households/{hid}/links/{other}      { hid, name, code, at } — a linked household (v37.53)
+    //   homes/{uid}                         { hid, at } — the household a person looks from
+    //   linkRequests/{id}                   asking to link (v37.53, below)
     //   i18n/{lang}                         interface translations, for EVERY household
     //   users/{uid}/…                       each person's own, and nobody else's
     //
@@ -134,6 +137,23 @@ service cloud.firestore {
     }
     function hhKeys() { return ['name', 'ownerUid', 'createdAt', 'code', 'appRequests']; }
     function okAppRequests() { return request.resource.data.get('appRequests', true) is bool; }
+
+    // v37.53 — LINKED HOUSEHOLDS. Two households that agreed to link each keep
+    // `households/<hid>/links/<other>` = { hid, name, code, at }, and each one's
+    // members read the other's recipes and photos — nothing else, and never
+    // write. A rule cannot list a person's households, so the household a
+    // person is looking FROM is named in `homes/<uid>` = { hid, at } (written
+    // by the app; it counts only while they are a member of it).
+    function homePath() { return /databases/$(database)/documents/homes/$(request.auth.uid); }
+    function linkPath(hid, other) { return /databases/$(database)/documents/households/$(hid)/links/$(other); }
+    function reqPath(id) { return /databases/$(database)/documents/linkRequests/$(id); }
+    // Owner or admin of h, and a plain "no" (not an error) when h is missing.
+    function adminOf(h) { return h is string && h != '' && atLeast(h, 'admin'); }
+    function linkedReader(hid) {
+      return signedIn() && exists(homePath())
+        && exists(linkPath(hid, get(homePath()).data.hid))
+        && isMember(get(homePath()).data.hid);
+    }
 
     match /households/{hid} {
       allow read: if isMember(hid);
@@ -206,12 +226,12 @@ service cloud.firestore {
       // The household's content. Editors add and change; only admins delete —
       // the same line today's rules draw between write and delete.
       match /recipes/{id} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) || linkedReader(hid);   // v37.53 — a linked household reads
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin');
       }
       match /photos/{id} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) || linkedReader(hid);   // v37.53 — a linked household reads
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin');
       }
@@ -237,6 +257,96 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin');
       }
+      // v37.53 — the households this one is linked with. Both sides are written
+      // in the batch that ACCEPTS a request (linkRequests/<from>_<to>, removed in
+      // the same batch), by the owner or an admin of the household asked; either
+      // side's owner or admin removes the link, both halves at once.
+      match /links/{other} {
+        allow read: if isMember(hid);
+        allow create: if signedIn() && other != hid
+          && request.resource.data.keys().hasOnly(['hid', 'name', 'code', 'at'])
+          && request.resource.data.hid == other
+          && request.resource.data.name is string && request.resource.data.name.size() <= 80
+          && ( (atLeast(hid, 'admin') && exists(reqPath(other + '_' + hid))
+                && get(reqPath(other + '_' + hid)).data.to == hid && !existsAfter(reqPath(other + '_' + hid)))
+            || (atLeast(other, 'admin') && exists(reqPath(hid + '_' + other))
+                && get(reqPath(hid + '_' + other)).data.to == other && !existsAfter(reqPath(hid + '_' + other))) );
+        allow update: if false;
+        allow delete: if atLeast(hid, 'admin') || atLeast(other, 'admin');
+      }
+    }
+
+    // v37.53 — where a person is looking from, for linkedReader: their own, and
+    // only a household they are in.
+    match /homes/{uid} {
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow create, update: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['hid', 'at'])
+        && isMember(request.resource.data.hid);
+      allow delete: if signedIn() && uid == request.auth.uid;
+    }
+
+    // v37.53 — asking to link. `linkRequests/<id>` =
+    //   { from, fromName, fromCode, to?, email?, via, by, at, declined?, toLabel? }
+    //   (toLabel: what the sender typed, so they can see whom they asked)
+    //   by identifier:  <from>_<to>    via 'code' — only if the household asked
+    //                                  takes requests through the app
+    //   by e-mail:      <from>:<email> via 'email' — always; whoever signs in
+    //                                  with that (confirmed) address passes it
+    //                                  on to their household as <from>_<to>
+    // Sent by the owner or an admin, under their household's real name and
+    // identifier. The household asked sees it (its owner and admins); a
+    // refusal is only marked, so the sender never sees "rejected".
+    match /linkRequests/{id} {
+      allow read: if signedIn() && (
+        (verified() && resource.data.get('email', '') == myEmail())
+        || adminOf(resource.data.get('from', ''))
+        || adminOf(resource.data.get('to', '')));
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'email', 'via', 'by', 'at', 'declined', 'toLabel'])
+        && request.resource.data.get('declined', false) == false
+        && request.resource.data.get('toLabel', '') is string && request.resource.data.get('toLabel', '').size() <= 120
+        && request.resource.data.fromName == get(hh(request.resource.data.from)).data.name
+        && request.resource.data.get('fromCode', '') == get(hh(request.resource.data.from)).data.get('code', '')
+        && (
+          // 1. by identifier, from the asking household's owner or an admin
+          (request.resource.data.via == 'code' && request.resource.data.by == request.auth.uid
+            && id == request.resource.data.from + '_' + request.resource.data.to
+            && request.resource.data.from != request.resource.data.to
+            && !('email' in request.resource.data)
+            && atLeast(request.resource.data.from, 'admin')
+            && exists(hh(request.resource.data.to))
+            && get(hh(request.resource.data.to)).data.get('appRequests', true) == true
+            && !exists(linkPath(request.resource.data.to, request.resource.data.from)))
+          // 2. by e-mail, the same people
+          || (request.resource.data.via == 'email' && request.resource.data.by == request.auth.uid
+            && !('to' in request.resource.data)
+            && request.resource.data.email is string
+            && request.resource.data.email == request.resource.data.email.lower()
+            && id == request.resource.data.from + ':' + request.resource.data.email
+            && atLeast(request.resource.data.from, 'admin'))
+          // 3. passed on by the person it was sent to, to a household they are
+          //    in, in the batch that removes the e-mail one
+          || (request.resource.data.via == 'email' && verified()
+            && id == request.resource.data.from + '_' + request.resource.data.to
+            && request.resource.data.from != request.resource.data.to
+            && isMember(request.resource.data.to)
+            && !('email' in request.resource.data)
+            && exists(reqPath(request.resource.data.from + ':' + myEmail()))
+            && get(reqPath(request.resource.data.from + ':' + myEmail())).data.by == request.resource.data.by
+            && !existsAfter(reqPath(request.resource.data.from + ':' + myEmail()))
+            && !exists(linkPath(request.resource.data.to, request.resource.data.from)))
+        );
+      // Refusing: the household asked marks it, and nothing else changes.
+      allow update: if adminOf(resource.data.get('to', ''))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declined'])
+        && request.resource.data.declined == true;
+      // Withdrawn by the sender, answered by the household asked, or passed on
+      // (or let go) by the person an e-mail one was sent to.
+      allow delete: if signedIn() && (
+        (verified() && resource.data.get('email', '') == myEmail())
+        || adminOf(resource.data.get('from', ''))
+        || adminOf(resource.data.get('to', '')));
     }
 
     // A member finding their own memberships across households — the app asks

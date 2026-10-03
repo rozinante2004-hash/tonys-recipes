@@ -815,6 +815,33 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.53 — linked households (design step 2).** ⋯ More → 🤝 Connect
+    with another household (`openConnectHousehold`, owner/admin only; others
+    are told to ask): type an identifier or the e-mail of ANYONE in that
+    household (`hhLinkTarget`, `hhSendLinkRequest`). Top-level
+    `linkRequests/<id>` = {from, fromName, fromCode, to?, email?, via, by,
+    at, declined?, toLabel?}: by identifier `<from>_<to>` (refused by the
+    rules when the household blocks app requests); by e-mail
+    `<from>:<email>`, and whoever signs in with that confirmed address passes
+    it on unseen to their current household as `<from>_<to>`
+    (`hhPassOnLinkRequests`). The owner/admins of the household asked get the
+    pop-up (`hhCheckLinkRequests` from `householdUse`; `hhAnswerLinkRequest`):
+    Accept (`hhAcceptLink`: `households/<both>/links/<other>` = {hid, name,
+    code, at} + the request removed, one batch), Reject (marks `declined`;
+    the sender keeps seeing "waiting"), Remind me later (a day,
+    `mkn_link_later_<id>`). Reading: rules `linkedReader(hid)` — recipes and
+    photos only, never writing — via `homes/<uid>` = {hid} (`hhSetHome`; a rule
+    cannot list someone's households). In the app: a 🤝 <name> chip per link
+    in both filter bars (`toggleLinkedFilter`, `_linkedShow`; All resets it);
+    `renderGrid` hands over to `renderLinkedGrid` (their recipes, meal/diet
+    filters and search apply; photos fetched one by one); a card opens
+    `#linkedViewOverlay` (`openLinkedRecipe`, read-only) with 📥 Save a copy to
+    my recipes (`saveLinkedCopy`, a new id/uid; not for viewers). Family
+    Access lists links (Remove the link: both halves) and requests sent
+    (Withdraw) — `hhLinksHtml`. Deleting a household removes its links and
+    requests. No note field (one box only). Rules tests: 56 new checks on the
+    emulator; self-test `linked_households`. The size budget is now 1700 KB.
+    **Tony must publish the test copy's rules again** (covers steps 1+2).
   - **v37.52 + extension 1.6 — ready for the Chrome Web Store.** Tony is
     opening the developer account (US$5) to publish UNLISTED. appmark.js
     also says where it came from: `data-mkn-extension-<tag>-from` =

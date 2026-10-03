@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.52 -->
+<!-- Tony's Recipes Collection v37.53 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4041,6 +4041,423 @@ async function toggleAppRequests() {
 function hhSetAppRequests(v) { return hhRef().update({ appRequests: !!v }); }
 window.hhNewCode = hhNewCode; window.hhEnsureCode = hhEnsureCode; window.openMyIdentifier = openMyIdentifier;
 window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetAppRequests; window.hhRenderAppRequests = hhRenderAppRequests;
+// ─── LINKED HOUSEHOLDS (v37.53) ──────────────────────────────────────────────
+// Tony: households that know each other LINK, and each then sees the other's
+// recipes, read-only — each keeps its own collection; nothing is copied or
+// changed. ⋯ More → 🤝 Connect with another household asks, by identifier
+// (straight into their app, if they take requests through it) or by the e-mail
+// address of ANYONE in that household (whoever signs in with it passes it on
+// to their household, unseen). Only the owner or an admin asks and answers:
+// Accept, Reject (the sender is never told "rejected") or Remind me later (a
+// day). firestore.rules: linkRequests, households/<hid>/links, homes.
+var LINK_LATER_KEY = 'mkn_link_later_';
+var _linkCache = {};          // hid → { at, list, photos: {id: src}, error }
+var _linkedShow = null;       // the linked household whose recipes the grid shows
+var _linkedListShown = [];    // the cards on screen, in order (openLinkedRecipe)
+var _linkedViewing = null;    // the linked recipe open in the read-only view
+var _homeSet = '';
+function hhLinks() { return (_household && _household.links) || []; }
+function hhLinkName(l) { return (l && (l.name || l.code)) || 'Linked household'; }
+async function hhLoadLinks() {
+  if (!_household || !hhDb()) return [];
+  var out = [], asking = [];
+  try { (await hhRef(_household.hid).collection('links').get()).forEach(function(d){
+          var x = d.data() || {}; out.push({ hid: d.id, name: x.name || '', code: x.code || '' }); }); }
+  catch(e) { /* rules not published yet: no links */ }
+  if (householdCanManage()) {
+    try { (await hhDb().collection('linkRequests').where('from', '==', _household.hid).get()).forEach(function(d){
+            var x = d.data() || {}; asking.push({ id: d.id, label: x.toLabel || x.email || '' }); }); }
+    catch(e) {}
+  }
+  _household.links = out; _household.asking = asking;
+  if (_linkedShow && !out.some(function(l){ return l.hid === _linkedShow; })) _linkedShow = null;
+  return out;
+}
+// The rules let a linked household's members read only while `homes/<uid>`
+// names the household they look from (a rule cannot list someone's households).
+async function hhSetHome() {
+  if (!_household || !window._fbUser || !hhDb() || _homeSet === _household.hid) return;
+  try { await hhDb().collection('homes').doc(_fbUser.uid).set({ hid: _household.hid, at: Date.now() }); _homeSet = _household.hid; }
+  catch(e) { syncLog('error', 'Could not note which household this device looks from', String(e && e.message).slice(0, 160)); }
+}
+function hhLinkTarget(text) {
+  var t = String(text || '').trim();
+  var c = /MKN[-\s‐-―]*([A-Z0-9]{4})[-\s‐-―]*([A-Z0-9]{4})/.exec(t.toUpperCase());
+  if (c) return { code: 'MKN-' + c[1] + '-' + c[2] };
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return { email: t.toLowerCase() };
+  return null;
+}
+async function hhSendLinkRequest(text) {
+  var tg = hhLinkTarget(text), me = _household, db = hhDb();
+  if (!tg) return { ok: false, msg: 'That is neither an identifier (MKN-…) nor an e-mail address.' };
+  var base = { from: me.hid, fromName: me.name || '', fromCode: me.code || '', by: _fbUser.uid, at: Date.now() };
+  if (tg.code) {
+    if (tg.code === me.code) return { ok: false, msg: 'That is your own household’s identifier.' };
+    var c;
+    try { c = await db.collection('codes').doc(tg.code).get(); }
+    catch(e) { return { ok: false, msg: 'Could not look it up: ' + (e && e.message) }; }
+    if (!c.exists) return { ok: false, msg: 'No household has the identifier ' + tg.code + ' — check it and try again.' };
+    var to = (c.data() || {}).hid;
+    if (to === me.hid) return { ok: false, msg: 'That is your own household’s identifier.' };
+    var had = hhLinks().filter(function(l){ return l.hid === to; })[0];
+    if (had) return { ok: false, msg: 'You are already linked with ' + hhLinkName(had) + '.' };
+    var ref = db.collection('linkRequests').doc(me.hid + '_' + to);
+    try { if ((await ref.get()).exists) return { ok: true, via: 'code', again: true, label: tg.code }; } catch(e) {}
+    try { await ref.set(Object.assign({ to: to, via: 'code', toLabel: tg.code }, base)); }
+    catch(e) { return { ok: false, blocked: true,
+      msg: 'This household does not take requests through the app. Ask them by e-mail instead: type the address of anyone in it.' }; }
+    syncLog('save', 'Asked to link with a household', tg.code);
+    return { ok: true, via: 'code', label: tg.code };
+  }
+  var mine = String(_fbUser.email || '').toLowerCase();
+  if (tg.email === mine || getAccessMembers().some(function(m){ return String(m.email || '').toLowerCase() === tg.email; }))
+    return { ok: false, msg: 'That address is in your own household.' };
+  var ref2 = db.collection('linkRequests').doc(me.hid + ':' + tg.email);
+  try { if ((await ref2.get()).exists) return { ok: true, via: 'email', again: true, email: tg.email, label: tg.email }; } catch(e) {}
+  try { await ref2.set(Object.assign({ email: tg.email, via: 'email', toLabel: tg.email }, base)); }
+  catch(e) { return { ok: false, msg: 'Could not send it: ' + (e && e.message) }; }
+  syncLog('save', 'Asked to link with a household, by e-mail', tg.email);
+  return { ok: true, via: 'email', email: tg.email, label: tg.email };
+}
+async function openConnectHousehold() {
+  if (!_household || !window._fbUser) { toast('Sign in first — then you can link your kitchen with another.', 6000); return null; }
+  if (!householdCanManage()) {
+    toast('Only your household’s owner or an admin can link it with another — ask ' + (_household.ownerName || 'its owner') + '.', 7000);
+    return null;
+  }
+  var t = await askConfirm({ icon: '\u{1F91D}', title: 'Connect with another household',
+    message: 'Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed.\n\n'
+      + 'Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.',
+    input: '', placeholder: 'MKN-XXXX-XXXX  /  name@example.com', okLabel: 'Send' });
+  if (typeof t !== 'string' || !t.trim()) return null;
+  var r = await hhSendLinkRequest(t);
+  if (!r.ok) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: r.msg, okLabel: 'OK' }); return r; }
+  await hhLoadLinks(); householdRenderBar();
+  if (r.via === 'code') {
+    toast(r.again ? '⏳ Already asked — waiting for them.' : '\u{1F91D} Sent. It pops up in their app the next time they open it.', 7000);
+    return r;
+  }
+  // By e-mail the app sends nothing itself: offer to tell them.
+  var url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath;
+  await shareMessage({ to: r.email, title: 'Tell them', intro: 'Asked. It pops up in their app the next time they open it — let them know.',
+    subject: 'Let’s link our kitchens',
+    text: 'Hi! I’d like to link our kitchens on My Kitchen Notes, so we can see each other’s recipes.\n\n'
+      + 'Open the app (signed in as ' + r.email + ') and accept:\n' + url });
+  return r;
+}
+// Someone asked by e-mail: whoever signs in with that (confirmed) address
+// passes it on to the household they are in, without a word — only its owner
+// and admins are asked.
+async function hhPassOnLinkRequests() {
+  var u = window._fbUser;
+  if (!u || u.emailVerified === false || !_household) return 0;
+  var email = String(u.email || '').toLowerCase(), docs = [], n = 0;
+  if (!email) return 0;
+  try { (await hhDb().collection('linkRequests').where('email', '==', email).get()).forEach(function(d){ docs.push(d); }); }
+  catch(e) { return 0; }
+  for (var i = 0; i < docs.length; i++) {
+    var x = docs[i].data() || {};
+    if (x.from === _household.hid || hhLinks().some(function(l){ return l.hid === x.from; })) {
+      try { await docs[i].ref.delete(); } catch(e) {}
+      continue;
+    }
+    var copy = { from: x.from, fromName: x.fromName || '', fromCode: x.fromCode || '', to: _household.hid,
+                 via: 'email', by: x.by, at: x.at || Date.now() };
+    if (x.toLabel) copy.toLabel = x.toLabel;
+    var b = hhDb().batch();
+    b.set(hhDb().collection('linkRequests').doc(x.from + '_' + _household.hid), copy);
+    b.delete(docs[i].ref);
+    try { await b.commit(); n++; } catch(e) { syncLog('error', 'Could not pass on a link request', String(e && e.message).slice(0, 160)); }
+  }
+  return n;
+}
+var _linkAsking = false;
+async function hhCheckLinkRequests(force) {
+  if (!_household || !hhDb() || !window._fbUser || _linkAsking) return 0;
+  if (_selfTestRunning && !force) return 0;
+  _linkAsking = true;
+  try {
+    await hhPassOnLinkRequests();
+    if (!householdCanManage()) return 0;
+    var list = [], shown = 0;
+    try { (await hhDb().collection('linkRequests').where('to', '==', _household.hid).get()).forEach(function(d){
+            list.push({ id: d.id, ref: d.ref, d: d.data() || {} }); }); }
+    catch(e) { return 0; }
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      if (r.d.declined) continue;
+      if (hhLinks().some(function(l){ return l.hid === r.d.from; })) { try { await r.ref.delete(); } catch(e) {} continue; }
+      var later = 0;
+      try { later = +localStorage.getItem(LINK_LATER_KEY + r.id) || 0; } catch(e) {}
+      if (later && Date.now() - later < 864e5) continue;
+      for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);
+      shown++;
+      await hhAnswerLinkRequest(r);
+    }
+    return shown;
+  } finally { _linkAsking = false; }
+}
+async function hhAnswerLinkRequest(r) {
+  var who = (r.d.fromName || 'A household') + (r.d.fromCode ? ' (' + r.d.fromCode + ')' : '');
+  var a = await askConfirm({ icon: '\u{1F91D}', title: 'A request to link kitchens',
+    message: who + ' would like to link with your kitchen.\n\nOnce linked, each of you sees the other’s recipes — read-only; '
+      + 'nothing is copied or changed. Either of you can remove the link at any time in ⚙️ → \u{1F465} Family Access.',
+    okLabel: 'Accept', altLabel: 'Reject', cancelLabel: 'Remind me later' });
+  if (a === true) return hhAcceptLink(r);
+  if (a === 'alt') {
+    try { await r.ref.update({ declined: true }); } catch(e) {}
+    try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
+    toast('Rejected. They are not told.', 5000);
+    return 'rejected';
+  }
+  try { localStorage.setItem(LINK_LATER_KEY + r.id, String(Date.now())); } catch(e) {}
+  toast('⏰ It will ask again tomorrow.', 4000);
+  return 'later';
+}
+async function hhAcceptLink(r) {
+  var from = r.d.from, me = _household, name = String(r.d.fromName || r.d.fromCode || '').slice(0, 80), b = hhDb().batch();
+  b.set(hhRef(_household.hid).collection('links').doc(from), { hid: from, name: name, code: r.d.fromCode || '', at: Date.now() });
+  b.set(hhRef(from).collection('links').doc(me.hid), { hid: me.hid, name: String(me.name || '').slice(0, 80), code: me.code || '', at: Date.now() });
+  b.delete(r.ref);
+  try { await b.commit(); }
+  catch(e) { showServiceError('Could not link the two households: ' + (e && e.message)); return 'error'; }
+  try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
+  syncLog('save', 'Linked with a household', { name: name, code: r.d.fromCode || '' });
+  await hhLoadLinks(); await hhSetHome();
+  if (typeof renderFilters === 'function') renderFilters();
+  householdRenderBar();
+  toast('\u{1F91D} Linked with ' + name + ' — their recipes are under \u{1F91D} ' + name + ' among the filters.', 9000);
+  return 'accepted';
+}
+async function hhRemoveLink(i) {
+  var l = hhLinks()[i];
+  if (!l || !householdCanManage()) return false;
+  if (await askConfirm({ icon: '\u{1F91D}', title: 'Remove the link with ' + hhLinkName(l) + '?',
+      message: 'Neither household will see the other’s recipes any more. Nothing is deleted. To link again, one of you asks again.',
+      okLabel: 'Remove the link', danger: true }) !== true) return false;
+  var b = hhDb().batch();
+  b.delete(hhRef(_household.hid).collection('links').doc(l.hid));
+  b.delete(hhRef(l.hid).collection('links').doc(_household.hid));
+  try { await b.commit(); } catch(e) { showServiceError('Could not remove the link: ' + (e && e.message)); return false; }
+  delete _linkCache[l.hid];
+  if (_linkedShow === l.hid) _linkedShow = null;
+  await hhLoadLinks();
+  if (typeof renderFilters === 'function') { renderFilters(); renderGrid(); }
+  householdRenderBar();
+  toast('Link removed');
+  return true;
+}
+async function hhWithdrawLinkRequest(i) {
+  var a = ((_household && _household.asking) || [])[i];
+  if (!a) return false;
+  try { await hhDb().collection('linkRequests').doc(a.id).delete(); } catch(e) { showServiceError('Could not withdraw it: ' + (e && e.message)); return false; }
+  await hhLoadLinks(); householdRenderBar();
+  toast('Withdrawn');
+  return true;
+}
+// Family Access: who this household is linked with, and whom it has asked.
+function hhLinksHtml() {
+  var links = hhLinks(), asking = (_household && _household.asking) || [], manage = householdCanManage();
+  if (!links.length && !asking.length) return '';
+  return '<div id="householdLinks" style="margin-top:12px;">'
+    + '<div class="access-email" style="font-weight:600;margin-bottom:2px;">\u{1F91D} Linked households</div>'
+    + '<div class="access-email" style="margin-bottom:6px;">You see each other’s recipes, read-only.</div>'
+    + links.map(function(l, i) {
+        return '<div class="access-row" style="margin-top:6px;"><div class="access-avatar">\u{1F91D}</div>'
+          + '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(hhLinkName(l)) + '</div>'
+          + '<div class="access-email" data-no-i18n dir="ltr">' + escH(l.code || '') + '</div></div>'
+          + (manage ? '<button class="access-remove-btn" onclick="hhRemoveLink(' + i + ')">Remove the link</button>' : '') + '</div>';
+      }).join('')
+    + asking.map(function(a, i) {
+        return '<div class="access-row" style="margin-top:6px;border-style:dashed;"><div class="access-avatar">⏳</div>'
+          + '<div class="access-info"><div class="access-email">Asked — waiting for them</div>'
+          + '<div class="access-name" data-no-i18n dir="ltr">' + escH(a.label) + '</div></div>'
+          + '<button class="access-remove-btn" onclick="hhWithdrawLinkRequest(' + i + ')">Withdraw</button></div>';
+      }).join('')
+    + '</div>';
+}
+// ─── A linked household's recipes, in the grid (read-only) ───────────────────
+function toggleLinkedFilter(hid) {
+  _linkedShow = (_linkedShow === hid) ? null : hid;
+  if (_linkedShow && selectMode && typeof toggleSelectMode === 'function') toggleSelectMode();
+  renderFilters(); renderGrid();
+}
+async function hhFetchLinked(hid) {
+  var c = _linkCache[hid] = _linkCache[hid] || { at: 0, list: [], photos: {} };
+  if (c.loading) return c.loading;
+  return (c.loading = hhFetchLinkedNow(hid, c));
+}
+async function hhFetchLinkedNow(hid, c) {
+  try {
+    await hhSetHome();
+    var q = await hhRef(hid).collection('recipes').get(), list = [];
+    q.forEach(function(d) {
+      var r = d.data() || {};
+      if (r.id == null) r.id = /^\d+$/.test(d.id) ? +d.id : d.id;
+      list.push(normalizeRecipe(r));
+    });
+    list.sort(function(a, b){ return String(a.name).localeCompare(String(b.name)); });
+    c.list = list; c.error = '';
+  } catch(e) {
+    c.error = 'Their recipes could not be opened — ' + ((e && e.code === 'permission-denied')
+      ? 'the link may have been removed, or the new database rules are not published yet.' : (e && e.message) || 'no connection.');
+  }
+  c.at = Date.now(); c.loading = null;
+  if (_linkedShow === hid) renderGrid();
+  hhFetchLinkedPhotos(hid);
+  return c;
+}
+async function hhFetchLinkedPhotos(hid) {
+  var c = _linkCache[hid];
+  if (!c || c.photosLoading) return;
+  c.photosLoading = true;
+  var want = c.list.filter(function(r){ return r._ph && !c.photos[r.id]; });
+  for (var i = 0; i < want.length && _linkedShow === hid; i++) {
+    try {
+      var s = await hhRef(hid).collection('photos').doc(String(want[i].id)).get();
+      var pd = s.exists ? (s.data() || {}) : {};
+      if (pd.photo || pd.photoUrl) c.photos[want[i].id] = pd.photo || pd.photoUrl;
+    } catch(e) {}
+    if ((i % 6 === 5 || i === want.length - 1) && _linkedShow === hid) renderGrid();
+  }
+  c.photosLoading = false;
+}
+function renderLinkedGrid(q) {
+  var l = hhLinks().filter(function(x){ return x.hid === _linkedShow; })[0];
+  var g = document.getElementById('recipeGrid'), lab = document.getElementById('sectionLabel');
+  if (!l) { _linkedShow = null; renderFilters(); renderGrid(); return; }
+  lab.innerHTML = '\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span> · <span>read-only</span>';
+  var np = document.getElementById('noPhotoPrompt');
+  if (np) np.style.display = 'none';
+  var c = _linkCache[l.hid];
+  if (!c || (!c.loading && Date.now() - c.at > 5 * 60e3)) hhFetchLinked(l.hid);
+  c = _linkCache[l.hid];
+  function empty(icon, title, sub) {
+    g.className = '';
+    g.innerHTML = '<div class="empty-state"><div style="font-size:32px;margin-bottom:10px;">' + icon + '</div>'
+      + '<div style="font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:18px;font-weight:700;color:var(--heading);margin-bottom:8px;">' + escH(title) + '</div>'
+      + (sub ? '<p style="font-size:13px;color:var(--muted);line-height:1.6;max-width:320px;margin:0 auto;">' + escH(sub) + '</p>' : '') + '</div>';
+  }
+  if (!c || (c.loading && !c.list.length)) return empty('⏳', 'Opening their recipes…', '');
+  if (c.error && !c.list.length) return empty('⚠️', 'Could not open them', c.error);
+  var list = c.list.filter(function(r) {
+    if (activeCategories.size > 0 && !recipeCategories(r).some(function(x){ return activeCategories.has(x); })) return false;
+    if (activeDiets.size > 0 && !activeDiets.has('Omnivore') && !recipeDiets(r).some(function(d){ return activeDiets.has(d); })) return false;
+    return !q || recipeMatchesQuery(r, q);
+  });
+  _linkedListShown = list;
+  if (!list.length) return empty(q ? '\u{1F50D}' : '\u{1F37D}️', q ? 'No recipes found' : 'No recipes here yet', '');
+  var T = i18nPhrase;
+  function pic(r, size) {
+    var src = c.photos[r.id] || (/^https?:/i.test(r.photo || '') ? r.photo : '');
+    return src ? '<img src="' + escA(src) + '" alt="" loading="lazy" decoding="async">'
+               : '<span style="font-size:' + size + 'px;line-height:1;">' + escH(r.emoji) + '</span>';
+  }
+  if (viewMode === 'list') {
+    g.className = 'recipe-list';
+    g.innerHTML = list.map(function(r, i) {
+      return '<div class="recipe-list-item linked-card" data-no-i18n onclick="openLinkedRecipe(' + i + ')">'
+        + '<div class="recipe-list-thumb" style="background:' + escA(r.bg) + ';position:relative;overflow:hidden;">' + pic(r, 26) + '</div>'
+        + '<div class="recipe-list-info"><div class="recipe-list-name" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
+        + '<div class="recipe-list-meta"><span>' + escH(T(r.category)) + '</span><bdi>⏱ ' + escH(r.prep) + '</bdi>'
+        + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '" style="padding:1px 6px;">' + escH(T(r.difficulty)) + '</span></div></div>'
+        + '<div class="recipe-list-right" title="' + escA(T('Read-only')) + '">\u{1F441}</div></div>';
+    }).join('');
+  } else {
+    g.className = 'recipe-grid';
+    g.innerHTML = list.map(function(r, i) {
+      return '<div class="recipe-card linked-card" data-no-i18n onclick="openLinkedRecipe(' + i + ')">'
+        + '<div class="card-image" style="background:' + escA(r.bg) + '">' + pic(r, 52)
+        + '<div class="card-category-badge">' + escH(T(r.category)) + '</div></div>'
+        + '<div class="card-body"><div class="card-title" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
+        + '<div class="card-meta"><bdi>⏱ ' + escH(r.prep) + '</bdi></div></div>'
+        + '<div class="card-footer"><span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(T(r.difficulty)) + '</span>'
+        + '<span title="' + escA(T('Read-only')) + '">\u{1F441}</span></div></div>';
+    }).join('');
+  }
+  if (typeof applyContentLang === 'function') applyContentLang(g);
+}
+function linkedLinesHtml(r) {
+  var parts = isCollection(r) ? recipeParts(r) : [r];
+  return parts.map(function(p) {
+    var num = 0;
+    var ings = (p.ingredients || []).map(function(i) {
+      if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escH(i.sub) + '</li>';
+      return '<li dir="auto"><span class="line-text">' + escH(i.n) + '</span><span class="ing-amount">' + escH(i.a || '') + '</span></li>';
+    }).join('');
+    var steps = (p.steps || []).map(function(s) {
+      if (isSubLine(s)) return '<li class="line-sub" dir="auto">' + escH(s.sub) + '</li>';
+      num++;
+      return '<li dir="auto"><span class="step-num">' + num + '</span><span class="step-text">' + escH(stepText(s)) + '</span></li>';
+    }).join('');
+    return (parts.length > 1 ? '<div dir="auto" data-no-i18n style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);margin:14px 0 6px;">' + escH(p.name) + '</div>' : '')
+      + ((ings || steps) ? '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
+      + '<div class="recipe-col-ings"><div class="modal-section-title">Ingredients</div><ul class="ingredients-list" data-no-i18n>' + ings + '</ul></div>'
+      + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div><ol class="steps-list" dir="auto" data-no-i18n>' + steps + '</ol></div></div>' : '');
+  }).join('');
+}
+function openLinkedRecipe(i) {
+  var r = _linkedListShown[i];
+  if (!r) return false;
+  var l = hhLinks().filter(function(x){ return x.hid === _linkedShow; })[0] || {};
+  var c = _linkCache[_linkedShow] || { photos: {} };
+  var src = c.photos[r.id] || (/^https?:/i.test(r.photo || '') ? r.photo : '');
+  var href = typeof safeUrl === 'function' ? safeUrl(r.source) : '';
+  _linkedViewing = { r: r, hid: _linkedShow, photo: src };
+  document.getElementById('linkedViewModal').innerHTML =
+      '<div style="position:sticky;top:max(60px, env(safe-area-inset-top) + 52px);display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">'
+    +   '<button onclick="closeM(\'linkedViewOverlay\')" aria-label="Close" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);box-shadow:0 2px 12px rgba(0,0,0,0.3);">✕</button></div>'
+    + '<div class="modal-hero" style="background:' + escA(r.bg) + ';">'
+    +   (src ? '<img src="' + escA(src) + '" alt="">' : '<span class="emoji-over">' + escH(r.emoji) + '</span>') + '</div>'
+    + '<div class="modal-content' + (recipeIsRTL(r) ? ' rtl-recipe' : '') + '">'
+    +   '<div id="linkedFrom" style="background:#EEF6FF;border:1px solid #C0D8F0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--ink);">'
+    +     '\u{1F91D} <span>From</span> <b data-no-i18n>' + escH(hhLinkName(l)) + '</b> · <span>read-only: you can look and cook, not change it.</span></div>'
+    +   '<div class="modal-category">' + escH(r.category) + '</div>'
+    +   '<div class="modal-title" dir="auto" data-no-i18n>' + escH(r.name) + '</div>'
+    +   '<div class="modal-meta">' + (isCollection(r) ? '<span>\u{1F4DA} <span data-no-i18n>' + recipeParts(r).length + '</span> recipes</span>'
+          : '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi><bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>'
+          + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
+    +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> '
+          + (href ? '<a href="' + escA(href) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);" data-no-i18n>' + escH(r.source) + '</a>'
+                  : '<span data-no-i18n>' + escH(r.source) + '</span>') + '</div>' : '')
+    +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + escH(r.notes) + '</div>' : '')
+    +   linkedLinesHtml(r)
+    +   '<div class="recipe-actions" style="margin-top:16px;">'
+    +     '<button class="action-btn" id="linkedCopyBtn" onclick="saveLinkedCopy()">\u{1F4E5} Save a copy to my recipes</button>'
+    +   '</div>'
+    + '</div>';
+  var ov = document.getElementById('linkedViewOverlay');
+  ov.classList.add('open');
+  ov.scrollTop = 0;
+  if (typeof trapFocus === 'function') trapFocus('linkedViewOverlay');
+  return true;
+}
+// A copy is the reader's own recipe from then on: a new number and identity,
+// nothing of the other household's favourites, cooking log or history.
+function saveLinkedCopy() {
+  var v = _linkedViewing;
+  if (!v) return false;
+  if (_household && _household.role === 'viewer') {
+    toast('You only read in your household — ask its owner to let you add recipes.', 7000);
+    return false;
+  }
+  var c = JSON.parse(JSON.stringify(v.r));
+  ['_ph', '_po', 'hp', 'originalPhoto', 'history', 'cookLog', 'lastCooked', 'cookCount'].forEach(function(k){ delete c[k]; });
+  c.id = nextId++; c.uid = newUid(); c.fav = false; c.photo = v.photo || ''; c.updatedAt = Date.now();
+  if (Array.isArray(c.parts)) c.parts.forEach(function(p){ p.uid = newUid(); p.fav = false; delete p.cookCount; delete p.lastCooked; });
+  var made = normalizeRecipe(c);
+  recipes.unshift(made);
+  saveData(); renderGrid();
+  closeM('linkedViewOverlay');
+  syncLog('save', 'Saved a copy of a linked household’s recipe', { name: made.name, id: made.id });
+  toast('\u{1F4E5} Saved to your recipes: “' + made.name + '”', 6000);
+  return made.id;
+}
+window.hhLoadLinks = hhLoadLinks; window.hhSendLinkRequest = hhSendLinkRequest; window.openConnectHousehold = openConnectHousehold;
+window.hhCheckLinkRequests = hhCheckLinkRequests; window.hhAnswerLinkRequest = hhAnswerLinkRequest; window.hhAcceptLink = hhAcceptLink;
+window.hhRemoveLink = hhRemoveLink; window.hhWithdrawLinkRequest = hhWithdrawLinkRequest; window.hhLinkTarget = hhLinkTarget;
+window.toggleLinkedFilter = toggleLinkedFilter; window.openLinkedRecipe = openLinkedRecipe; window.saveLinkedCopy = saveLinkedCopy;
+window.hhLinksHtml = hhLinksHtml; window.renderLinkedGrid = renderLinkedGrid;
 async function householdJoinByInvite(user, code) {
   var inv = await hhDb().collection('invites').doc(code).get();
   if (!inv.exists) throw new Error('This invitation does not exist, or was withdrawn.');
@@ -4120,7 +4537,11 @@ async function householdUse(hid, role) {
   await householdLoadMembers();
   try { await hhEnsureCode(); } catch(e) { syncLog('error', 'Could not give the household its identifier', String(e && e.message).slice(0, 160)); }
   hhRenderAppRequests();
+  await hhLoadLinks();                                           // v37.53
+  if (hhLinks().length) hhSetHome();
   householdRenderBar();
+  if (typeof renderFilters === 'function' && document.getElementById('filterBar')) try { renderFilters(); } catch(e) {}
+  hhCheckLinkRequests().catch(function(){});
   if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
   if (typeof renderAccessMembers === 'function') try { renderAccessMembers(); } catch(e) {}
   householdBrand();
@@ -4241,7 +4662,8 @@ function householdRenderBar() {
     +   (h.role !== 'owner' ? '<button class="access-remove-btn" onclick="householdLeave()">Leave this household</button>' : '')
     +   (h.role === 'owner' ? '<button class="access-role-btn" onclick="householdTransfer()">\u{1F451} Hand over…</button>'
                             + '<button class="access-remove-btn" onclick="householdDelete()">\u{1F5D1} Delete this household…</button>' : '')
-    + '</div>';
+    + '</div>'
+    + hhLinksHtml();                                              // v37.53
   var on = document.getElementById('ownerName'), oe = document.getElementById('ownerEmail');
   if (on) on.textContent = h.ownerName || (h.ownerEmail || '').split('@')[0] || '—';
   if (oe) oe.textContent = h.ownerEmail || '—';
@@ -4438,6 +4860,16 @@ async function householdWipe(hid, onStep) {
   var rq = await hhRef(hid).collection('requests').get(), rrefs = [];
   rq.forEach(function(d){ rrefs.push(d.ref); });
   await inBatches(rrefs);
+  // v37.53 — its links (both halves) and its link requests, sent and received.
+  try {
+    var ls = await hhRef(hid).collection('links').get(), lrefs = [];
+    ls.forEach(function(d){ lrefs.push(d.ref); lrefs.push(hhRef(d.id).collection('links').doc(hid)); });
+    await inBatches(lrefs);
+    var lr = [];
+    (await db.collection('linkRequests').where('from', '==', hid).get()).forEach(function(d){ lr.push(d.ref); });
+    (await db.collection('linkRequests').where('to', '==', hid).get()).forEach(function(d){ lr.push(d.ref); });
+    await inBatches(lr);
+  } catch(e) {}
   var ps = await db.collection('pending').where('hid', '==', hid).get(), prefs = [];
   ps.forEach(function(d){ prefs.push(d.ref); });
   await inBatches(prefs);
@@ -5190,7 +5622,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.52';
+var APP_VERSION = 'v37.53';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7827,7 +8259,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.52</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.53</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7932,6 +8364,7 @@ body.banner-shown .header {
           <button class="drop-item" id="waAskItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
           <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make?</button>
+          <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
@@ -7998,6 +8431,8 @@ body.banner-shown .header {
   </button>
   <button class="mobile-dropdown-btn" id="mobileMealBtn" onclick="toggleMobilePanel('mobileMealPanel', 'mobileMealBtn')">🍽 Meal ▾</button>
   <button class="mobile-dropdown-btn" id="mobileDietBtn" onclick="toggleMobilePanel('mobileDietPanel', 'mobileDietBtn')">🥗 Diet ▾</button>
+  <!-- v37.53 — linked households' recipes (filled by renderFilters) -->
+  <span id="mobileLinkedBtns" style="display:contents;"></span>
   <!-- The phone's copy of the Select frame. #filterBar is hidden below 700px,
        so the two never both exist on screen — but both elements are always in
        the DOM, which is why every state change has to touch BOTH. -->
@@ -8092,6 +8527,10 @@ body.banner-shown .header {
 <!-- VIEW MODAL -->
 <div class="modal-overlay" id="viewOverlay" onclick="bgClose(event,'viewOverlay')">
   <div class="modal" id="viewModal"></div>
+</div>
+<!-- v37.53 — a linked household's recipe, read-only -->
+<div class="modal-overlay" id="linkedViewOverlay" onclick="bgClose(event,'linkedViewOverlay')">
+  <div class="modal" id="linkedViewModal" aria-label="A recipe from a linked household"></div>
 </div>
 
 <!-- ADD / EDIT MODAL -->
@@ -8503,7 +8942,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.52</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.53</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9191,7 +9630,7 @@ var _bringTokenCheckInterval = null;
 // GRID
 // ═══════════════════════════════════
 function renderFilters() {
-  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly;
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || !!_linkedShow;
   var allInactive  = hasSelection ? ' inactive' : '';
 
   // Frame 1: All + Favourites + Clips
@@ -9203,6 +9642,10 @@ function renderFilters() {
     + (recentIds.length ? '<button class="filter-btn' + (showRecentOnly ? ' active' : '') + '" style="background:' + (showRecentOnly ? '#4F7AFF' : '#EEF2FF') + ';border-color:' + (showRecentOnly ? '#4F7AFF' : '#C0CAFF') + ';color:' + (showRecentOnly ? 'white' : '#3451CC') + ';" onclick="toggleRecentFilter()">🕐 Recent</button>' : '')
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + '<button class="filter-btn collection-btn' + (showCollectionsOnly ? ' active' : '') + '" onclick="toggleCollectionsFilter()">📚 Collections</button>'
+    // v37.53 — a linked household's recipes, one chip per link (its name is data)
+    + hhLinks().map(function(l) {
+        return '<button class="filter-btn linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(\'' + escA(l.hid) + '\')"'
+          + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('')
     + (function(){ var n = recipes.filter(function(r){ return !r.photo; }).length;
         return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (<span data-no-i18n>' + n + '</span>)</button>' : ''; })()
     // 5f.5 — only offered when it can answer: no pantry, or nothing one item
@@ -9239,11 +9682,17 @@ function renderFilters() {
     + '</div>';
 
   document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3 + frame4;
+  var mob = document.getElementById('mobileLinkedBtns');
+  if (mob) mob.innerHTML = hhLinks().map(function(l) {
+    return '<button class="mobile-filter-toggle linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(\'' + escA(l.hid) + '\')"'
+      + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('');
+  if (typeof updateMobileButtons === 'function') updateMobileButtons();
   // Update sticky top position after render
   if (typeof updateFilterBarTop === 'function') updateFilterBarTop();
 }
 
 function resetFilters() {
+  _linkedShow = null;                                             // v37.53
   activeCategories.clear();
   activeDiets.clear();
   showFavOnly    = false;
@@ -13833,6 +14282,7 @@ window.matchReason = matchReason; window.hlMatch = hlMatch;
 
 function renderGrid() {
   const q = document.getElementById('searchInput').value.toLowerCase();
+  if (_linkedShow) return renderLinkedGrid(q);                    // v37.53 — a linked household's, read-only
   // Apply sort
   var sortedRecipes = recipes.slice();
   if (sortMode === 'alpha') {
@@ -23087,6 +23537,8 @@ var HELP_SYSTEM_PROMPT = [
   "- INVITATION LINK: Family Access → 🔗 Invitation link… — anyone with it can join for 14 days, with the role chosen.",
   "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
+  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked the next time they open the app: Accept, Reject or Remind me later. A refusal is never shown to the sender.",
+  "- Once linked, each household sees the other's recipes, read-only, under a 🤝 filter with that household's name; 📥 Save a copy to my recipes makes one your own. Links are listed, and removed, in ⚙️ → 👥 Family Access. ⚙️ → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "",
   "=== SIGNING IN AND YOUR ACCOUNT ===",
   "- Sign in with Google, or with any e-mail address (a password, or a sign-in link sent to it) where that is offered.",
@@ -27773,6 +28225,7 @@ function mobileClipToggle() {
 }
 
 function mobileResetFilters() {
+  _linkedShow = null;                                             // v37.53
   activeCategories.clear();
   activeDiets.clear();
   showFavOnly = false;
@@ -27790,7 +28243,7 @@ function updateMobileButtons() {
   var clipBtn = document.getElementById('mobileClipBtn');
   var mealBtn = document.getElementById('mobileMealBtn');
   var dietBtn = document.getElementById('mobileDietBtn');
-  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly;
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly || !!_linkedShow;
   if (allBtn)  allBtn.classList.toggle('active', !hasSelection);
   if (favBtn)  { favBtn.classList.remove('active','fav-active'); if(showFavOnly) favBtn.classList.add('fav-active'); }
   if (clipBtn) { clipBtn.classList.remove('active','clip-active'); if(showClipsOnly) clipBtn.classList.add('clip-active'); }

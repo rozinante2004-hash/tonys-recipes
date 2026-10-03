@@ -211,6 +211,98 @@ await check('the owner stops link requests through the app', updateDoc(doc(frank
 await check('…with a yes or no only',                       updateDoc(doc(frank, 'households/hc1'), { appRequests: 'maybe' }), false);
 await check('…and the identifier survives a rename',        updateDoc(doc(frank, 'households/hc1'), { name: 'Frank\'s Kitchen' }), true);
 
+console.log('Linked households (v37.53)');
+// gina owns L1 (hank reads in it), ivy owns L2 (jo reads in it), kim owns L3,
+// which takes no link requests through the app.
+const gina = person('gina'), hank = person('hank'), ivy = person('ivy'), jo = person('jo'), kim = person('kim'),
+      joUnconfirmed = person('jo2', { email: 'jo@example.com', email_verified: false });
+await check('three households, with identifiers', Promise.all([
+  foundWithCode(gina, 'L1', 'gina', 'MKN-GGGG-2222'), foundWithCode(ivy, 'L2', 'ivy', 'MKN-HHHH-3333'),
+  foundWithCode(kim, 'L3', 'kim', 'MKN-KKKK-4444')]), true);
+await check('…people reading in two of them', (async () => {
+  await setDoc(doc(gina, 'invites/INV-L1'), { hid: 'L1', role: 'viewer', createdBy: 'gina', expiresAt: later });
+  await setDoc(doc(ivy, 'invites/INV-L2'), { hid: 'L2', role: 'viewer', createdBy: 'ivy', expiresAt: later });
+  await join(hank, 'L1', 'hank', 'viewer', 'INV-L1'); await join(jo, 'L2', 'jo', 'viewer', 'INV-L2');
+  await updateDoc(doc(kim, 'households/L3'), { appRequests: false });
+  await setDoc(doc(ivy, 'households/L2/recipes/1'), { name: 'Ivy\'s soup' });
+  await setDoc(doc(ivy, 'households/L2/photos/1'), { photo: 'data:' });
+  await setDoc(doc(gina, 'households/L1/recipes/7'), { name: 'Gina\'s cake' });
+})(), true);
+const byCode = (from, to, by, extra) => Object.assign({ from, fromName: 'Coded', fromCode: { L1: 'MKN-GGGG-2222', L2: 'MKN-HHHH-3333', L3: 'MKN-KKKK-4444' }[from],
+  to, via: 'code', by, at: 1 }, extra || {});
+await check('a reader cannot ask for the household',        setDoc(doc(hank, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'hank')), false);
+await check('the owner cannot ask under another name',      setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina', { fromName: 'Tony\'s Kitchen' })), false);
+await check('…nor with another household\'s identifier',    setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina', { fromCode: 'MKN-HHHH-3333' })), false);
+await check('…nor on someone else\'s behalf',                setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'ivy')), false);
+await check('…nor her own household',                        setDoc(doc(gina, 'linkRequests/L1_L1'), byCode('L1', 'L1', 'gina')), false);
+await check('…nor one that takes no requests through the app', setDoc(doc(gina, 'linkRequests/L1_L3'), byCode('L1', 'L3', 'gina')), false);
+await check('…nor carry anything else',                      setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina', { role: 'admin' })), false);
+await check('the owner asks by identifier',                  setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina')), true);
+await check('…and sees it waiting',                          getDocs(query(collection(gina, 'linkRequests'), where('from', '==', 'L1'))), true);
+await check('the household asked: its owner sees it',        getDocs(query(collection(ivy, 'linkRequests'), where('to', '==', 'L2'))), true);
+await check('…its readers do not',                           getDocs(query(collection(jo, 'linkRequests'), where('to', '==', 'L2'))), false);
+await check('…nor does a stranger',                          getDoc(doc(carol, 'linkRequests/L1_L2')), false);
+await check('the sender cannot change it',                   updateDoc(doc(gina, 'linkRequests/L1_L2'), { to: 'L3' }), false);
+await check('the owner asked marks it refused',              updateDoc(doc(ivy, 'linkRequests/L1_L2'), { declined: true }), true);
+await check('…and nothing else',                             updateDoc(doc(ivy, 'linkRequests/L1_L2'), { fromName: 'X' }), false);
+const accept = (db, extra) => { const b = writeBatch(db);
+  b.set(doc(db, 'households/L2/links/L1'), { hid: 'L1', name: 'Coded', code: 'MKN-GGGG-2222', at: 1 });
+  b.set(doc(db, 'households/L1/links/L2'), { hid: 'L2', name: 'Coded', code: 'MKN-HHHH-3333', at: 1 });
+  if (!extra || !extra.keep) b.delete(doc(db, 'linkRequests/L1_L2'));
+  return b.commit(); };
+await check('a reader of the household asked cannot accept', accept(jo), false);
+await check('accepting removes the request in the same batch', accept(ivy, { keep: true }), false);
+await check('no link without a request',                     setDoc(doc(ivy, 'households/L2/links/L3'), { hid: 'L3', name: 'X', code: '', at: 1 }), false);
+await check('hank, before the link, cannot read L2',         getDoc(doc(hank, 'households/L2/recipes/1')), false);
+await check('the owner asked accepts: both halves, one batch', accept(ivy), true);
+await check('both households see the link',                  Promise.all([getDocs(collection(hank, 'households/L1/links')), getDocs(collection(jo, 'households/L2/links'))]), true);
+await check('a stranger does not',                           getDocs(collection(carol, 'households/L1/links')), false);
+await check('nobody changes a link',                         updateDoc(doc(gina, 'households/L1/links/L2'), { name: 'X' }), false);
+await check('hank says where he looks from: his household',  setDoc(doc(hank, 'homes/hank'), { hid: 'L1', at: 1 }), true);
+await check('…never one he is not in',                       setDoc(doc(hank, 'homes/hank'), { hid: 'L2', at: 1 }), false);
+await check('…nor for someone else',                         setDoc(doc(hank, 'homes/jo'), { hid: 'L1', at: 1 }), false);
+await check('hank reads L2\'s recipes',                      Promise.all([getDoc(doc(hank, 'households/L2/recipes/1')), getDocs(collection(hank, 'households/L2/recipes'))]), true);
+await check('…and its photos',                               getDocs(collection(hank, 'households/L2/photos')), true);
+await check('…but writes nothing there',                     setDoc(doc(hank, 'households/L2/recipes/1'), { name: 'Mine now' }), false);
+await check('…nor can gina, who owns L1',       setDoc(doc(gina, 'households/L2/recipes/2'), { name: 'X' }), false);
+await check('…nor reads its members, settings or chats',     getDocs(collection(hank, 'households/L2/members')), false);
+await check('…nor the household itself',                     getDoc(doc(hank, 'households/L2')), false);
+await check('…nor its state',                                getDoc(doc(hank, 'households/L2/state/meta')), false);
+await check('jo, in L2, reads L1\'s recipes too', (async () => { await setDoc(doc(jo, 'homes/jo'), { hid: 'L2', at: 1 });
+  await getDoc(doc(jo, 'households/L1/recipes/7')); })(), true);
+await check('a household not linked reads nothing', (async () => { await setDoc(doc(kim, 'homes/kim'), { hid: 'L3', at: 1 });
+  await getDoc(doc(kim, 'households/L2/recipes/1')); })(), false);
+await check('a stranger naming L1 as home is refused',       setDoc(doc(carol, 'homes/carol'), { hid: 'L1', at: 1 }), false);
+
+const byMail = (from, email, by, extra) => Object.assign({ from, fromName: 'Coded', fromCode: { L1: 'MKN-GGGG-2222', L2: 'MKN-HHHH-3333', L3: 'MKN-KKKK-4444' }[from],
+  email, via: 'email', by, at: 1 }, extra || {});
+await check('an owner asks by e-mail, even a household that takes none through the app',
+            setDoc(doc(ivy, 'linkRequests/L2:kim@example.com'), byMail('L2', 'kim@example.com', 'ivy')), true);
+await check('…the address written small only',              setDoc(doc(kim, 'linkRequests/L3:Jo@example.com'), byMail('L3', 'Jo@example.com', 'kim')), false);
+await check('…under its own name only',                      setDoc(doc(kim, 'linkRequests/L3:x@example.com'), byMail('L3', 'jo@example.com', 'kim')), false);
+await check('kim asks jo (who only reads, in L2) by e-mail', setDoc(doc(kim, 'linkRequests/L3:jo@example.com'), byMail('L3', 'jo@example.com', 'kim')), true);
+await check('jo finds it',                                   getDocs(query(collection(jo, 'linkRequests'), where('email', '==', 'jo@example.com'))), true);
+await check('…not with the address unconfirmed',            getDocs(query(collection(joUnconfirmed, 'linkRequests'), where('email', '==', 'jo@example.com'))), false);
+await check('…nor does anyone else',                         getDocs(query(collection(carol, 'linkRequests'), where('email', '==', 'jo@example.com'))), false);
+const passOn = (db, to, opts) => { const b = writeBatch(db);
+  b.set(doc(db, 'linkRequests/L3_' + to), { from: 'L3', fromName: 'Coded', fromCode: 'MKN-KKKK-4444', to, via: 'email', by: (opts && opts.by) || 'kim', at: 1 });
+  if (!(opts && opts.keep)) b.delete(doc(db, 'linkRequests/L3:jo@example.com'));
+  return b.commit(); };
+await check('jo cannot pass it to a household she is not in', passOn(jo, 'L1'), false);
+await check('…nor keep the e-mail one as well',              passOn(jo, 'L2', { keep: true }), false);
+await check('…nor say someone else sent it',                 passOn(jo, 'L2', { by: 'ivy' }), false);
+await check('jo passes it on to her household',              passOn(jo, 'L2'), true);
+await check('…where its owner sees it',                      getDoc(doc(ivy, 'linkRequests/L3_L2')), true);
+await check('a stranger cannot withdraw it',                 deleteDoc(doc(carol, 'linkRequests/L3_L2')), false);
+await check('the sender withdraws it',                       deleteDoc(doc(kim, 'linkRequests/L3_L2')), true);
+await check('the person asked by e-mail may let it go',      deleteDoc(doc(kim, 'linkRequests/L2:kim@example.com')), true);
+
+const unlink = (db) => { const b = writeBatch(db);
+  b.delete(doc(db, 'households/L1/links/L2')); b.delete(doc(db, 'households/L2/links/L1')); return b.commit(); };
+await check('a reader cannot remove the link',               unlink(hank), false);
+await check('either owner removes it, both halves at once',  unlink(gina), true);
+await check('…and hank reads L2 no more',                    getDoc(doc(hank, 'households/L2/recipes/1')), false);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);
