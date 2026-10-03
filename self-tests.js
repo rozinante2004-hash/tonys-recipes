@@ -1210,6 +1210,66 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'management_app', group:'Sharing', name:'📊 The management app: every household, its members, AI spending and allowance, links, shares and last use; caps changed through the server (v37.58)',
+    test: async()=>{
+      if(!document.querySelector('#settingsDrop [onclick*="openManagement"][data-owner-only]')) throw new Error('⚙️ has no owner-only 📊 Households');
+      var now=Date.now(), month=new Date().toISOString().slice(0,7);
+      var docs={ households:{ hA:{ name:'Kitchen A', code:'MKN-AAAA-2222', ownerUid:'uA', createdAt:now-90*864e5 }, hB:{ name:'Kitchen B', code:'MKN-BBBB-3333', ownerUid:'uB', createdAt:now-5*864e5, referredBy:'MKN-AAAA-2222' } },
+        members:[ ['hA',{ uid:'uA', email:'a@example.com', role:'owner', lastSeen:now-2*864e5 }], ['hA',{ uid:'uC', email:'c@example.com', role:'viewer', lastSeen:now-3600e3 }], ['hB',{ uid:'uB', email:'b@example.com', role:'owner' }] ],
+        links:[ ['hA','hB',{ hid:'hB', name:'Kitchen B', code:'MKN-BBBB-3333' }], ['hB','hA',{ hid:'hA', name:'Kitchen A', code:'MKN-AAAA-2222' }] ] };
+      function snap(list){ return { size:list.length, forEach:function(fn){ list.forEach(fn); } }; }
+      function d(id, data, parentHid){ return { id:id, data:function(){ return data; }, ref:{ parent:{ parent:{ id:parentHid } } } }; }
+      var fakeDb={ collection:function(c){ return { get:async function(){
+            if(c==='households') return snap(Object.keys(docs.households).map(function(k){ return d(k, docs.households[k]); }));
+            if(c==='linkRequests') return snap([d('hX_hA', { from:'hX', fromName:'Kitchen X', fromCode:'MKN-XXXX-4444', to:'hA', via:'code' })]);
+            return snap([]); } }; },
+        collectionGroup:function(c){ return { get:async function(){
+            if(c==='members') return snap(docs.members.map(function(m){ return d(m[1].uid, m[1], m[0]); }));
+            if(c==='links') return snap(docs.links.map(function(l){ return d(l[1], l[2], l[0]); }));
+            return snap([]); } }; } };
+      var sent=[], real={ db:window._fbDb, user:window._fbUser, owner:window.isAppOwner, fetch:window.fetch, toast:window.toast, err:window.showServiceError, h:_workerHealth };
+      try{
+        window._fbDb=fakeDb; window._fbUser={ uid:'uT', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window.isAppOwner=function(){ return true; }; window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
+        _workerHealth={ ok:true, metering:{ version:1, db:true } };
+        var capNow=2;
+        window.fetch=async function(u, init){
+          var b=JSON.parse(init.body); sent.push(b);
+          if(b.action==='meter-admin' && b.op==='list') return new Response(JSON.stringify({ project:'p', capped:true, month:month, months:[month,'2026-09','2026-08'],
+            defaults:{ cap:2, firstMonth:4 }, households:[ { hid:'hA', name:'Kitchen A', cap:null, capNow:capNow, note:'friendly', last_seen:now-60e3, months:[{ month:month, usd:1.7, calls:12 },{ month:'2026-09', usd:0.4, calls:3 },{ month:'2026-08', usd:0, calls:0 }] } ] }), { status:200 });
+          if(b.action==='meter-admin' && b.op==='set-cap'){ capNow=b.cap; return new Response(JSON.stringify({ ok:true, hid:b.hid, cap:b.cap }), { status:200 }); }
+          return real.fetch.apply(window, arguments);
+        };
+        var n=await openManagement();
+        if(n!==2) throw new Error('households read: '+n);
+        var ov=document.getElementById('manageOverlay'), t=ov.textContent;
+        ['Kitchen A','MKN-AAAA-2222','a@example.com','$1.70','of $2.00','Kitchen B'].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the table does not show '+w); });
+        var rA=mknManage._state.rows.filter(function(r){ return r.hid==='hA'; })[0];
+        if(rA.referred!==1 || rA.members.length!==2 || rA.links.length!==1 || rA.asked.length!==1 || rA.lastSeen<now-120e3) throw new Error('row A: '+JSON.stringify({ ref:rA.referred, m:rA.members.length, l:rA.links.length, asked:rA.asked.length, seen:rA.lastSeen }));
+        mknManage.search('b@example'); if(document.querySelectorAll('#manageOverlay .mg-row').length!==1) throw new Error('search by a member\u2019s address');
+        mknManage.search('');
+        mknManage.show('hA');
+        var firstMember=document.querySelector('#manageOverlay .mg-panel .mg-li .mg-email');
+        if(!firstMember || firstMember.textContent!=='a@example.com') throw new Error('the owner is not listed first');
+        if(!/Requests waiting/.test(ov.textContent) || !/Kitchen X/.test(ov.textContent) || !/1 new household came through/.test(ov.textContent)) throw new Error('the details panel');
+        document.getElementById('mgCap').value='5';
+        await mknManage.saveCap();
+        var setc=sent.filter(function(b){ return b.op==='set-cap'; })[0];
+        if(!setc || setc.cap!==5 || setc.hid!=='hA' || setc.idToken!=='tok') throw new Error('the cap was not sent to the server: '+JSON.stringify(setc));
+        if(mknManage._state.rows.filter(function(r){ return r.hid==='hA'; })[0].cap!==5) throw new Error('the new cap is not shown');
+        var realUrl=URL.createObjectURL, made=null; URL.createObjectURL=function(b){ made=b; return 'blob:x'; };
+        var lines=mknManage.csv(); URL.createObjectURL=realUrl;
+        if(lines!==2 || !made) throw new Error('the CSV');
+        var csvText=await made.text();
+        if(csvText.indexOf('Kitchen A,MKN-AAAA-2222,a@example.com,2')===-1) throw new Error('the CSV rows: '+csvText.slice(0,200));
+        window.isAppOwner=function(){ return false; }; mknManage.close();
+        if(await openManagement()!==false || document.getElementById('manageOverlay')) throw new Error('someone who is not the owner opened it');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h;
+        if(window.mknManage) mknManage.close();
+      }
+    } },
+
   { id:'rules_behind_is_not_an_error', group:'Sharing', name:'Rules not yet published: noted once and the owner is led to them, not logged as an error on every open (v37.55)',
     test: async()=>{
       if(hhRulesBehind({ code:'permission-denied', message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('a refusal by the rules is not recognised');

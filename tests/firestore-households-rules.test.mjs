@@ -303,6 +303,29 @@ await check('a reader cannot remove the link',               unlink(hank), false
 await check('either owner removes it, both halves at once',  unlink(gina), true);
 await check('…and hank reads L2 no more',                    getDoc(doc(hank, 'households/L2/recipes/1')), false);
 
+console.log('The management app, last seen and referrals (v37.58)');
+// alice is the app's owner here ({{APP_ADMINS}}).
+await check('the app\'s owner lists every household',          getDocs(collection(alice, 'households')), true);
+await check('…nobody else may',                                 getDocs(collection(carol, 'households')), false);
+await check('…every member of every household',                 getDocs(collectionGroup(alice, 'members')), true);
+await check('…every link',                                      getDocs(collectionGroup(alice, 'links')), true);
+await check('…but nobody else every link',                      getDocs(collectionGroup(carol, 'links')), false);
+await check('…every link request',                              getDocs(collection(alice, 'linkRequests')), true);
+await check('…but nobody else every request',                   getDocs(collection(carol, 'linkRequests')), false);
+await check('…and NOT their recipes',                           getDocs(collection(alice, 'households/L2/recipes')), false);
+await check('…nor their photos',                                getDocs(collection(alice, 'households/L2/photos')), false);
+await check('an unconfirmed owner\'s address is not enough',
+            getDocs(collection(person('alice2', { email: 'alice@example.com', email_verified: false }), 'households')), false);
+await check('a member notes when they last opened the app',     updateDoc(doc(hank, 'households/L1/members/hank'), { lastSeen: Date.now() }), true);
+await check('…a number only',                                   updateDoc(doc(hank, 'households/L1/members/hank'), { lastSeen: 'today' }), false);
+await check('…and nothing else with it',                        updateDoc(doc(hank, 'households/L1/members/hank'), { lastSeen: 5, role: 'admin' }), false);
+await check('…only on their own membership',                    updateDoc(doc(hank, 'households/L1/members/gina'), { lastSeen: 5 }), false);
+await check('a household founded through a share link says whose', (() => { const b = writeBatch(frank);
+  b.set(doc(frank, 'households/R1'), { name: 'Referred', ownerUid: 'frank', createdAt: 1, referredBy: 'MKN-GGGG-2222' });
+  b.set(doc(frank, 'households/R1/members/frank'), { uid: 'frank', role: 'owner', email: 'frank@example.com', joinedAt: 1 }); return b.commit(); })(), true);
+await check('…and that never changes',                          updateDoc(doc(frank, 'households/R1'), { referredBy: 'MKN-KKKK-4444' }), false);
+await check('…while renaming still works',                      updateDoc(doc(frank, 'households/R1'), { name: 'Frank\'s' }), true);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);

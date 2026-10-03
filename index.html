@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.57 -->
+<!-- Tony's Recipes Collection v37.58 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2094,6 +2094,27 @@ window.selfTestsEnabled = selfTestsEnabled;
 window.setSelfTestsEnabled = setSelfTestsEnabled;
 window.applySelfTestVisibility = applySelfTestVisibility;
 window.loadSelfTests = loadSelfTests;
+// v37.58 — the management app (manage.js), fetched only when the owner opens it.
+var _manageLoading = null;
+function loadManagement() {
+  if (window._manageLoaded) return Promise.resolve(true);
+  if (_manageLoading) return _manageLoading;
+  _manageLoading = new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'manage.js?v=' + encodeURIComponent(APP_VERSION);
+    s.onload = function() { window._manageLoaded ? resolve(true) : reject(new Error('manage.js loaded but did nothing')); };
+    s.onerror = function() { reject(new Error('manage.js could not be downloaded')); };
+    document.head.appendChild(s);
+  });
+  _manageLoading.catch(function(){ _manageLoading = null; });
+  return _manageLoading;
+}
+async function openManagement() {
+  if (!isAppOwner()) { toast('Only the app\u2019s owner can open this.'); return false; }
+  try { await loadManagement(); } catch(e) { showServiceError(e.message); return false; }
+  return window.mknManage.open();
+}
+window.loadManagement = loadManagement; window.openManagement = openManagement;
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 // SELF_TESTS is a `var` (see the loader above), so it IS window.SELF_TESTS and
@@ -3910,6 +3931,18 @@ function hhRef(hid) { return hhDb().collection('households').doc(hid || _cloudHi
   } catch(e) {}
 })();
 
+// v37.58 — arrived through someone's 📲 share link (…?ref=MKN-…): kept until
+// this person founds a household, and taken out of the address.
+var REF_KEY = 'mkn_ref';
+(function captureRef() {
+  try {
+    var m = /[?&]ref=(MKN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4})(?:&|$)/.exec(location.search);
+    if (!m) return;
+    if (!localStorage.getItem(REF_KEY)) localStorage.setItem(REF_KEY, m[1]);
+    var clean = location.pathname + location.search.replace(/([?&])ref=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash;
+    history.replaceState(null, '', clean);
+  } catch(e) {}
+})();
 function householdDefaultName(user) {
   // v37.05 — a first name, also from an address: tony.schvekher@… → "Tony"
   // (it gave "Tony.schvekher's" for an account made with a password).
@@ -3978,13 +4011,18 @@ async function householdFound(user, name) {
   for (var attempt = 0; attempt < 4; attempt++) {
     var ref = hhDb().collection('households').doc();
     var code = hhNewCode();
-    var b = hhDb().batch();
-    b.set(ref, { name: name, ownerUid: user.uid, createdAt: Date.now(), code: code });
+    var b = hhDb().batch(), hdoc = { name: name, ownerUid: user.uid, createdAt: Date.now(), code: code };
+    // v37.58 — whose share link brought them (not on the last tries: rules
+    // published before v37.58 refuse the field, and a household matters more).
+    var ref0 = ''; try { ref0 = localStorage.getItem(REF_KEY) || ''; } catch(e) {}
+    if (ref0 && attempt < 2) hdoc.referredBy = ref0;
+    b.set(ref, hdoc);
     b.set(ref.collection('members').doc(user.uid), hhMemberDoc(user, 'owner'));
     b.set(hhDb().collection('codes').doc(code), { hid: ref.id, at: Date.now() });
     try { await b.commit(); }
     catch(e) { if (attempt < 3 && /permission|exists/i.test(String(e && (e.code || e.message)))) continue; break; }
-    syncLog('save', 'Founded a household', { name: name, code: code });
+    syncLog('save', 'Founded a household', { name: name, code: code, referredBy: hdoc.referredBy || '' });
+    try { localStorage.removeItem(REF_KEY); } catch(e) {}
     return ref.id;
   }
   // Rules not yet published with identifiers (the owner publishes them from
@@ -4096,6 +4134,15 @@ async function hhOfferRulesPublish() {
   return true;
 }
 window.hhRulesBehind = hhRulesBehind; window.hhOfferRulesPublish = hhOfferRulesPublish;
+// v37.58 — when this person last opened the app (the management app's "Last
+// active"): once a day from each device, on their own membership only.
+function hhNoteSeen() {
+  if (!_household || !window._fbUser || !hhDb() || _selfTestRunning) return;
+  var k = 'mkn_seen_' + _household.hid;
+  try { if (Date.now() - (+localStorage.getItem(k) || 0) < 20 * 3600e3) return; localStorage.setItem(k, String(Date.now())); } catch(e) { return; }
+  hhRef(_household.hid).collection('members').doc(_fbUser.uid).update({ lastSeen: Date.now() }).catch(function(){});
+}
+window.hhNoteSeen = hhNoteSeen;
 function hhSetAppRequests(v) { return hhRef().update({ appRequests: !!v }); }
 window.hhNewCode = hhNewCode; window.hhEnsureCode = hhEnsureCode; window.openMyIdentifier = openMyIdentifier;
 window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetAppRequests; window.hhRenderAppRequests = hhRenderAppRequests;
@@ -4599,6 +4646,7 @@ async function householdUse(hid, role) {
   }
   hhRenderAppRequests();
   await hhLoadLinks();                                           // v37.53
+  hhNoteSeen();                                                  // v37.58
   if (hhLinks().length) hhSetHome();
   householdRenderBar();
   if (typeof renderFilters === 'function' && document.getElementById('filterBar')) try { renderFilters(); } catch(e) {}
@@ -5683,7 +5731,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.57';
+var APP_VERSION = 'v37.58';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8320,7 +8368,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.57</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.58</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8362,6 +8410,7 @@ body.banner-shown .header {
           <button class="drop-item" title="Save or restore a backup file of your recipes and photos, and set up automatic daily backups to a folder." onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
           <button class="drop-item" title="Exactly what the app sends where (the cloud, the AI, photo searches). Read-only — changes nothing." onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
           <button class="drop-item" title="Whether this device and the cloud agree, with a report to copy and send. Read-only — changes nothing." onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
+          <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
           <button class="drop-item" title="Checks that the app works on this device. Your recipes are not changed." id="selfTestMenuItem" style="display:none;" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
           <button class="drop-item" title="Removes photos kept on THIS device that no recipe uses any more. Does not touch the cloud or any recipe's photo." onclick="closeDrop('settingsDrop');sweepOrphanPhotos()">🧹 Clean up orphaned photos</button>
           <!-- Photo repair lives HERE, next to the orphan sweep, because that is
@@ -9003,7 +9052,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.57</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.58</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -22678,17 +22727,26 @@ async function swUpdateNow() {
 }
 window.swUpdateNow = swUpdateNow;
 
+// v37.58 — the 📲 share link carries this household's identifier, so a new
+// household that arrives through it says who brought it (the management app's
+// "Shared the app"; rewards for sharing come later).
+function appShareUrl() {
+  var url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  var code = (typeof _household !== 'undefined' && _household && _household.code) || '';
+  return code ? url + '/?ref=' + code : url;
+}
+window.appShareUrl = appShareUrl;
 function openShareAppModal() {
-  const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  const url = appShareUrl();
   document.getElementById('shareAppUrl').textContent = url;
   document.getElementById('shareAppOverlay').classList.add('open');
 }
 function shareAppWhatsApp() {
-  const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  const url = appShareUrl();
   window.open('https://wa.me/?text=' + encodeURIComponent("Tony's Recipes Collection\n\n" + url));
 }
 function copyAppLink() {
-  const url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  const url = appShareUrl();
   navigator.clipboard.writeText(url).then(function() { toast('Link copied!'); });
 }
 

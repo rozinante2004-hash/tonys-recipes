@@ -135,7 +135,16 @@ service cloud.firestore {
       return request.resource.data.get('code', null) == resource.data.get('code', null)
         || (resource.data.get('code', null) == null && codeFor(hid, request.resource.data.get('code', null)));
     }
-    function hhKeys() { return ['name', 'ownerUid', 'createdAt', 'code', 'appRequests']; }
+    function hhKeys() { return ['name', 'ownerUid', 'createdAt', 'code', 'appRequests', 'referredBy']; }
+    // v37.58 — the app's owner (the management app) reads the list of
+    // households, their members, links and requests — never their recipes,
+    // photos or chats. The APP_ADMINS placeholder, as for translations.
+    function appAdmin() { return signedIn() && verified() && myEmail() in [{{APP_ADMINS}}]; }
+    // v37.58 — which household's 📲 share link brought this one (its
+    // identifier), set when it is founded and never changed.
+    function okReferredBy() {
+      return request.resource.data.get('referredBy', '') is string && request.resource.data.get('referredBy', '').size() <= 20;
+    }
     function okAppRequests() { return request.resource.data.get('appRequests', true) is bool; }
 
     // v37.53 — LINKED HOUSEHOLDS. Two households that agreed to link each keep
@@ -156,14 +165,14 @@ service cloud.firestore {
     }
 
     match /households/{hid} {
-      allow read: if isMember(hid);
+      allow read: if isMember(hid) || appAdmin();
       // Founding a household: you are its owner, and your own owner membership
       // is written in the same batch (so a household never exists ownerless).
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly(hhKeys())
         && (request.resource.data.get('code', null) == null || codeFor(hid, request.resource.data.code))
-        && okAppRequests()
+        && okAppRequests() && okReferredBy()
         && getAfter(memberPath(hid, request.auth.uid)).data.role == 'owner';
       // Renaming, its identifier (once) and whether it takes link requests
       // through the app: owner or admin. Handing it over: the owner only, to a
@@ -171,13 +180,14 @@ service cloud.firestore {
       allow update: if request.resource.data.keys().hasOnly(hhKeys())
         && request.resource.data.createdAt == resource.data.createdAt
         && codeKept(hid) && okAppRequests()
+        && request.resource.data.get('referredBy', null) == resource.data.get('referredBy', null)
         && ( (atLeast(hid, 'admin') && request.resource.data.ownerUid == resource.data.ownerUid)
           || (resource.data.ownerUid == request.auth.uid
               && getAfter(memberPath(hid, request.resource.data.ownerUid)).data.role == 'owner') );
       allow delete: if resource.data.ownerUid == request.auth.uid;
 
       match /members/{uid} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) || appAdmin();
         // Joining. Three ways, and each can only make YOU a member:
         allow create: if signedIn() && uid == request.auth.uid
           && request.resource.data.uid == uid
@@ -204,6 +214,11 @@ service cloud.firestore {
         // Changing a role. The owner may change anyone's (that is how ownership
         // is handed over); an admin only editors' and viewers', and only to
         // editor or viewer. Nobody changes the uid or the e-mail on file.
+        // v37.58 — anyone may note when they last opened the app (`lastSeen`,
+        // a number), on their own membership and nothing else of it.
+        allow update: if signedIn() && uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen'])
+          && request.resource.data.lastSeen is number;
         allow update: if request.resource.data.uid == resource.data.uid
           && request.resource.data.email == resource.data.email
           && validRole(request.resource.data.role)
@@ -262,7 +277,7 @@ service cloud.firestore {
       // the same batch), by the owner or an admin of the household asked; either
       // side's owner or admin removes the link, both halves at once.
       match /links/{other} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) || appAdmin();
         allow create: if signedIn() && other != hid
           && request.resource.data.keys().hasOnly(['hid', 'name', 'code', 'at'])
           && request.resource.data.hid == other
@@ -299,7 +314,8 @@ service cloud.firestore {
     // refusal is only marked, so the sender never sees "rejected".
     match /linkRequests/{id} {
       allow read: if signedIn() && (
-        (verified() && resource.data.get('email', '') == myEmail())
+        appAdmin()
+        || (verified() && resource.data.get('email', '') == myEmail())
         || adminOf(resource.data.get('from', ''))
         || adminOf(resource.data.get('to', '')));
       allow create: if signedIn()
@@ -352,7 +368,11 @@ service cloud.firestore {
     // A member finding their own memberships across households — the app asks
     // "which households am I in?" with a collection-group query on `members`.
     match /{path=**}/members/{uid} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || appAdmin());
+    }
+    // v37.58 — every household's links, for the management app.
+    match /{path=**}/links/{other} {
+      allow read: if appAdmin();
     }
 
     // v37.49 — the register of household identifiers: `codes/<code>` = { hid, at }.

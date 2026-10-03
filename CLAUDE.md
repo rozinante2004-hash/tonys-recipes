@@ -815,6 +815,26 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.58 — the management app (design step 4).** ⚙️ → 📊 Households
+    (management) — `data-owner-only`, households layout; `openManagement`
+    loads manage.js ON DEMAND (like self-tests.js) → `mknManage.open()`: a
+    full-screen view of EVERY household in this copy (each copy its own
+    database: family, test, beta): name + identifier, owner, members, this
+    month's AI against its cap (bar), the two months before, linked with,
+    shared the app, last active; search (name / identifier / any member's
+    address), sort by any column, a details panel (members with role and last
+    opened, links, requests waiting, the allowance — Save / Pause AI (= $0) /
+    Back to the default — and private notes), ⬇ CSV. Spending, caps and notes
+    come from the Worker (`meter-admin`), the rest from Firestore: rules
+    `appAdmin()` (verified address in {{APP_ADMINS}}) may read households,
+    members (also by collection group), links (collection group) and
+    linkRequests — NEVER recipes, photos or chats. Also: members note their
+    own `lastSeen` once a day (rules: only that field, on their own
+    membership; `hhNoteSeen`); the 📲 share link carries `?ref=<identifier>`
+    (`appShareUrl`), kept in `mkn_ref` until this person founds a household,
+    which records `referredBy` (rules: on create only, never changed; not on
+    the last founding tries, so older rules still let a household be made).
+    Rules tests: 17 new; self-test `management_app`.
   - **v37.57 + Worker v60 — AI per household (design step 3).** Tony's
     answers (3 Oct): $4 in a household's first month, then $2; capped on the
     beta and the test copy, the family's counted but never capped; the
