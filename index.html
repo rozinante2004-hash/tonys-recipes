@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.53 -->
+<!-- Tony's Recipes Collection v37.54 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5622,7 +5622,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.53';
+var APP_VERSION = 'v37.54';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8259,7 +8259,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.53</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.54</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8942,7 +8942,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.53</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.54</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -27826,7 +27826,8 @@ function openExtensionOffer() {
           ? '<li><button type="button" id="extUpdateHere" onclick="extSaveToFolder(true)" style="' + primary + 'padding:7px 12px;min-height:0;">\u21BB Put the new version in ' + escH(sv.where) + '</button></li>'
             + '<li><button type="button" onclick="fbProbeCopy(\'' + pg + '\', \'The address\')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u{1F4CB} Copy <span dir="ltr">' + escH(pg) + '</span></button> and paste it into a new tab\u2019s address bar; on <b>My Kitchen Notes</b> press <b>\u21BB</b> (Reload).</li>'
           : (hasPicker
-              ? '<li><button type="button" id="extFolderBtn" onclick="extSaveToFolder(false)" style="' + primary + 'padding:7px 12px;min-height:0;">\u{1F4C1} Put the new version in a folder</button> <a href="' + escA(extDownloadUrl()) + '" download style="font-size:12px;color:var(--muted);">or download the zip</a></li>'
+              ? '<li><button type="button" id="extFolderBtn" onclick="extSaveToFolder(false)" style="' + primary + 'padding:7px 12px;min-height:0;">\u{1F4C1} Put the new version in a folder</button> <a href="' + escA(extDownloadUrl()) + '" download style="font-size:12px;color:var(--muted);">or download the zip</a>'
+                + '<div style="font-size:12px;color:var(--muted);">' + EXT_PICK_HINT + '</div></li>'
               : '<li><a href="' + escA(extDownloadUrl()) + '" download style="' + primary + 'padding:7px 12px;min-height:0;">\u2B07 Download the new version</a> \u2014 then unzip it.</li>')
             + '<li><button type="button" onclick="fbProbeCopy(\'' + pg + '\', \'The address\')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u{1F4CB} Copy <span dir="ltr">' + escH(pg) + '</span></button> and paste it into a new tab\u2019s address bar. <b>Remove</b> the old My Kitchen Notes there, then press <b>Load unpacked</b> and choose the new folder.</li>')
       + '</ol><div style="font-size:12px;color:var(--muted);margin-top:8px;">If you see two My Kitchen Notes on that page, remove the one with the older version number \u2014 the page cannot do that for you.</div>';
@@ -27845,7 +27846,7 @@ function openExtensionOffer() {
     var step1 = (typeof window.showDirectoryPicker === 'function')
       ? (saved
           ? '<li>\u2705 It is in <b dir="auto">' + escH(saved.where) + '</b>. <button type="button" onclick="extSaveToFolder(true)" style="font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card-bg);color:var(--heading);cursor:pointer;">\u21BB Put the newest version there</button></li>'
-          : '<li><button type="button" id="extFolderBtn" onclick="extSaveToFolder(false)" style="' + primary + 'padding:7px 12px;min-height:0;">\u{1F4C1} Put it in a folder</button> \u2014 pick a folder (Documents, say); the app unzips it there.'
+          : '<li><button type="button" id="extFolderBtn" onclick="extSaveToFolder(false)" style="' + primary + 'padding:7px 12px;min-height:0;">\u{1F4C1} Put it in a folder</button> \u2014 the app unzips it there. ' + EXT_PICK_HINT + '.'
             + ' <a href="' + escA(extDownloadUrl()) + '" download style="font-size:12px;color:var(--muted);">or download the zip</a></li>')
       : '<li><a id="extDownloadLink" href="' + escA(extDownloadUrl()) + '" download style="' + primary + 'padding:7px 12px;min-height:0;">\u2B07 Download it</a> \u2014 then double-click the file to unzip it.</li>';
     body = '<ol style="font-size:13.5px;line-height:1.7;margin:0;padding-inline-start:20px;">' + step1
@@ -27862,6 +27863,10 @@ function openExtensionOffer() {
 }
 // The folder it was put in, remembered on this device (the browser keeps the
 // permission; the app keeps the handle in IndexedDB, and its name to show).
+// v37.54 — Tony picked Downloads and Chrome refused: "it contains system
+// files". Its words, not ours: Chrome never gives a page Downloads or Desktop
+// (or the home folder) as a whole — a folder inside them is fine.
+var EXT_PICK_HINT = 'Pick Documents, or a folder inside Downloads (\u201cNew folder\u201d in that window) \u2014 Chrome does not accept Downloads or Desktop themselves';
 var EXT_FOLDER_NAME = function(){ return 'My Kitchen Notes extension' + (extTag() === 'live' ? '' : ' (TEST)'); };
 function extIdb() {
   return new Promise(function(res, rej) {
@@ -27906,7 +27911,10 @@ async function extSaveToFolder(again) {
     if (document.getElementById('extOfferOverlay')) openExtensionOffer();
     return names.length;
   } catch (e) {
-    if (e && e.name === 'AbortError') return 0;   // the person closed the folder picker
+    if (e && e.name === 'AbortError') {            // the person closed the folder picker
+      toast('\u{1F4C1} ' + EXT_PICK_HINT + '.', 9000);  // v37.54 — perhaps because Chrome refused the folder
+      return 0;
+    }
     showServiceError('The extension could not be put in a folder: ' + (e && e.message) + '\n\nUse \u201cor download the zip\u201d instead.');
     return 0;
   }

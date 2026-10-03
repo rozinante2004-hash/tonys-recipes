@@ -1310,6 +1310,9 @@ window.SELF_TESTS = [
         window._extStoresOverride={}; openExtensionOffer();
         var t=document.getElementById('extOfferOverlay').textContent;
         if(t.indexOf('Documents › '+EXT_FOLDER_NAME())===-1 || !/Put the newest version there/.test(t)) throw new Error('the dialog does not name the folder: '+t.slice(0,300));
+        var keep=window._extFolder; window._extFolder=null; openExtensionOffer();
+        if(!/inside Downloads/.test(document.getElementById('extOfferOverlay').textContent)) throw new Error('the dialog does not say which folders Chrome accepts (v37.54)');
+        window._extFolder=keep;
         files={}; if(await extSaveToFolder(true)!==3 || !files['Documents/'+EXT_FOLDER_NAME()+'/content.js']) throw new Error('the newest version was not written in place');
       } finally {
         window.showDirectoryPicker=real.pick; if(real.zip) window.JSZip=real.zip; else delete window.JSZip; window.fetch=real.fetch; window._extFolder=real.folder; window.toast=real.toast;

@@ -815,6 +815,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.54 — "Downloads contains system files".** Tony picked Downloads for
+    the extension folder and Chrome refused with that message (Chrome's own
+    wording: it never gives a page Downloads, Desktop or the home folder as a
+    whole; a folder inside them, or Documents, is fine). The 🧩 dialog now says
+    so before the picker (`EXT_PICK_HINT`), and a closed picker repeats it as a
+    toast. Test: `extension_into_a_folder`.
   - **v37.53 — linked households (design step 2).** ⋯ More → 🤝 Connect
     with another household (`openConnectHousehold`, owner/admin only; others
     are told to ask): type an identifier or the e-mail of ANYONE in that
