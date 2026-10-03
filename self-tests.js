@@ -1096,6 +1096,58 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'shortcuts_and_extensions', group:'UI', name:'Shortcuts and extensions: a ⚙️ section with what fits this device, offered once on its first visit (v37.47)',
+    test: async()=>{
+      var setUA=function(u){ Object.defineProperty(navigator, 'userAgent', { value:u, configurable:true }); };
+      var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
+      var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)', ANDROID='Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile';
+      var tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test';
+      var vis=function(id){ var e=document.getElementById(id); return !!e && !e.hidden; };
+      var kept=null; try{ kept=localStorage.getItem(DEVICE_OFFER_KEY); }catch(e){}
+      var realEv=window._pwaInstallEvent, realAsk=window.askChoice, realOpen=window.open, opened=null;
+      var dlg=function(){ return document.getElementById('deviceOfferOverlay'); };
+      try{
+        // The section shows only what fits this device.
+        setUA(CHROME); refreshShortcutsSection();
+        if(!vis('shortcutsSection') || !vis('extensionItem') || vis('iosShortcutItem') || vis('androidShareItem')) throw new Error('a computer\'s section is wrong');
+        if(!/Shortcuts and extensions/.test(document.getElementById('shortcutsSection').textContent)) throw new Error('the section has no heading');
+        setUA(IPHONE); window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123'; refreshShortcutsSection();
+        if(!vis('iosShortcutItem') || vis('extensionItem') || vis('androidShareItem')) throw new Error('an iPhone\'s section is wrong');
+        setUA(ANDROID); refreshShortcutsSection();
+        if(!vis('androidShareItem') || vis('extensionItem') || vis('iosShortcutItem')) throw new Error('an Android phone\'s section is wrong');
+        // First visit on a computer: the extension, once, with why — and where to find it again.
+        window._deviceOfferForce=true; localStorage.removeItem(DEVICE_OFFER_KEY); setUA(CHROME);
+        document.documentElement.removeAttribute('data-mkn-extension-'+tag);
+        if(maybeOfferDeviceShortcut(9)!=='computer') throw new Error('a computer\'s first visit offers nothing');
+        if(!/Save recipes in one click/.test(dlg().textContent) || !/Save recipe button under Facebook/.test(dlg().textContent) || !/Shortcuts and extensions/.test(dlg().textContent)) throw new Error('the offer lacks its why or where: '+dlg().textContent.slice(0,200));
+        dlg().remove();
+        if(maybeOfferDeviceShortcut(9)!==false || dlg()) throw new Error('offered twice');
+        // Installed already: not offered.
+        localStorage.removeItem(DEVICE_OFFER_KEY); document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.4.0');
+        if(maybeOfferDeviceShortcut(9)!==false) throw new Error('the extension is offered although installed');
+        document.documentElement.removeAttribute('data-mkn-extension-'+tag);
+        // An iPhone: the shortcut, as one tap on its link.
+        localStorage.removeItem(DEVICE_OFFER_KEY); setUA(IPHONE);
+        if(maybeOfferDeviceShortcut(9)!=='ios' || (dlg().querySelector('#deviceOfferGo')||{}).getAttribute('href')!=='https://www.icloud.com/shortcuts/abc123') throw new Error('an iPhone is not offered the shortcut');
+        dlg().remove();
+        // Android that can install: one tap installs.
+        localStorage.removeItem(DEVICE_OFFER_KEY); setUA(ANDROID); _pwaInstallEvent={ prompt:function(){}, userChoice:Promise.resolve({ outcome:'dismissed' }) };
+        if(maybeOfferDeviceShortcut(9)!=='android' || !dlg().querySelector('button#deviceOfferGo')) throw new Error('Android is not offered the install');
+        dlg().remove();
+        // Send feedback: to Tony's address, through a choice that works without a mail app.
+        setUA(CHROME);
+        window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(!/tony\.schvekher@gmail\.com/.test(intro)) throw new Error('feedback does not say where it goes'); return 'gmail'; };
+        window.open=function(u){ opened=u; return null; };
+        await sendFeedback();
+        if(!opened || opened.indexOf('to='+encodeURIComponent('tony.schvekher@gmail.com'))===-1) throw new Error('feedback does not reach tony.schvekher@gmail.com: '+opened);
+      } finally {
+        delete window._deviceOfferForce; delete window._iosShortcutOverride; _pwaInstallEvent=realEv; window.askChoice=realAsk; window.open=realOpen;
+        try{ if(kept===null) localStorage.removeItem(DEVICE_OFFER_KEY); else localStorage.setItem(DEVICE_OFFER_KEY, kept); }catch(e){}
+        try{ delete navigator.userAgent; }catch(e){}
+        var o=dlg(); if(o) o.remove(); refreshShortcutsSection();
+      }
+    } },
+
   { id:'import_ios_share_menu_offer', group:'Import/Export', name:'On an iPhone, one tap adds "Save to My Kitchen Notes" to the Share menu — each copy its own (v37.28, v37.40)',
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');

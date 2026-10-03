@@ -15,4 +15,4 @@ My Kitchen Notes collection, in your own browser.**
 - **What it does not do:** it makes no network requests of its own, keeps no copy of what it read, collects no
   browsing history, contains no analytics or advertising, and does not read any site while you are not clicking.
 - **Your accounts:** the extension never sees, stores or sends your Facebook, Instagram or TikTok password or session.
-- **Contact:** rozinante2004@gmail.com
+- **Contact:** tony.schvekher@gmail.com

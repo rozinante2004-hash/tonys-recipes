@@ -812,6 +812,22 @@ found only because a test was written first and disagreed with the code.
     stores: Chrome Web Store (US$5 once), Edge Add-ons (free), AMO (free) —
     Tony's accounts; then the links go in extensionStores. Tests:
     `extension_offer`, 2 extension checks.
+  - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.47 — Shortcuts and extensions; Tony's contact.** Tony (3 Oct):
+    contact = tony.schvekher@gmail.com "whenever necessary … also Send
+    feedback" (until a domain): `APP_CONFIG.supportEmail`, the extension's
+    privacy page and PRIVACY.md (ownerEmail unchanged — it is the owner's
+    sign-in identity). Send feedback now goes through `shareMessage` (Gmail /
+    Outlook / mail app / copy the address; `omit`, `copyLabel`, `copyText`)
+    — a bare mailto: did nothing on his iPhone. ⚙️ → "SHORTCUTS AND
+    EXTENSIONS" section (`refreshShortcutsSection`): only what fits THIS
+    device — iPhone shortcut / Android install / browser extension
+    (`deviceKind`). First visit on a device (`maybeOfferDeviceShortcut`, 6 s
+    after load, once — `mkn_device_offer_shown`; never over another dialog,
+    retried; skipped under webdriver): the one offer that fits, with why, and
+    "find it any time in ⚙️ → Shortcuts and extensions"; not offered if the
+    extension is installed / the app is installed. Test:
+    `shortcuts_and_extensions`.
   - **Released to the family app: v37.45 (3 Oct 2026, Tony's yes, CI green on
     ed47bb5).** With v37.44 (the Share-menu wording). Tony confirmed help now
     answers in Hebrew with the right button names. Two help suggestions stay
