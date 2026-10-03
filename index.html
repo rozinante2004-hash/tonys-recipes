@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.47 -->
+<!-- Tony's Recipes Collection v37.48 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5100,7 +5100,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.47';
+var APP_VERSION = 'v37.48';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7737,7 +7737,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.47</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.48</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -7748,6 +7748,8 @@ body.banner-shown .header {
       <!-- v36.31 — the interface language. Beside ? and the cog because that is
            where the app's own settings already live; a globe in the filter bar
            would read as filtering by language. -->
+      <!-- v37.48 — Tony: "Share this App should also be an icon next to the language picker, so it will always be available and visible". -->
+      <button class="help-icon-btn" id="shareAppBtn" onclick="openShareAppModal()" title="Share this app" aria-label="Share this app">📲</button>
       <div class="drop-group">
         <button class="help-icon-btn" id="langBtn" onclick="toggleLangMenu()" title="Interface language"
                 aria-label="Interface language: English" data-no-i18n style="position:relative;">🌐<span
@@ -8408,7 +8410,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.47</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.48</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

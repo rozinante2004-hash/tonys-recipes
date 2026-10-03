@@ -813,6 +813,18 @@ found only because a test was written first and disagreed with the code.
     Tony's accounts; then the links go in extensionStores. Tests:
     `extension_offer`, 2 extension checks.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
+  - **v37.48 — 📲 Share this app beside 🌐** (Tony: "always available and
+    visible"): `#shareAppBtn` in the header, opens `openShareAppModal()`.
+    Fits a 375 px phone. Design doc for the beta, household identifiers,
+    links, metering, caps and the management app:
+    https://claude.ai/code/artifact/b0a47748-a782-4784-b4e2-d7efff2777d6 —
+    Tony's answers (3 Oct): a join request LINKS households (each keeps its
+    own; the other's recipes read-only; read+write only if that owner
+    agrees); default cap $2/month per household; the management app is Tony's
+    only; only an owner or admin accepts a link request; requests by e-mail of
+    ANY member or by identifier; ⚙️ allow/block app requests (default allow;
+    e-mail requests always allowed).
   - **Release v37.47 (3 Oct 2026, Tony's yes):** main had moved — Tony's
     "Update all supported languages" committed i18n straight to main
     (53402ba) and the workflow merged it into test (e036bf8, no CI run: a
