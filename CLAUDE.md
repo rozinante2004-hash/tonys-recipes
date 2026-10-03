@@ -822,6 +822,9 @@ found only because a test was written first and disagreed with the code.
     app (v37.54/55, still first layout) with the new rules published there.
     `shared` stays untouched; 'shared' returns to it. tests/e2e-sync.mjs now
     SETS the layout either way (it assumed the family default was 'shared').
+    The family project needed the collection-group index on `members.uid`
+    (single-field exemption, ascending) — ONE per Firebase project, covering
+    every household; the beta project needs it too (put it in its setup steps).
   - **v37.55 — rules not yet published ≠ an error.** Tony's test log showed
     "Could not give the household its identifier: Missing or insufficient
     permissions" on every open (the test copy's rules predate v37.49).
