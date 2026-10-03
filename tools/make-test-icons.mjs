@@ -3,7 +3,9 @@
  * Draw the TEST copy's app icons (v36.73) from the real ones, so the two apps
  * cannot be confused on a home screen or in a browser tab.
  *
- *     node tools/make-test-icons.mjs        (needs Playwright; run by hand, once)
+ *     node tools/make-test-icons.mjs [test|beta]   (needs Playwright; run by hand, once)
+ *
+ * v37.59 — the beta copy's too (`beta`: its own colour and a BETA band).
  *
  * The brown background becomes teal, and an orange band — the colour of the
  * "TEST COPY" ribbon — says TEST across the bottom. Writes icons/test/*.png,
@@ -18,14 +20,15 @@ import { fileURLToPath } from 'url';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const envs = JSON.parse(fs.readFileSync(path.join(repo, 'tools', 'environments.json'), 'utf8'));
-const brand = envs.test.brand;
-fs.mkdirSync(path.join(repo, 'icons', 'test'), { recursive: true });
+const which = process.argv[2] || 'test';
+const brand = envs[which].brand, label = brand.label || 'TEST';
+fs.mkdirSync(path.join(repo, brand.icons), { recursive: true });
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 const page = await browser.newPage();
 for (const size of [192, 512]) {
   const src = fs.readFileSync(path.join(repo, 'icons', 'icon-' + size + '.png')).toString('base64');
-  const out = await page.evaluate(async ({ src, size, brand }) => {
+  const out = await page.evaluate(async ({ src, size, brand, label }) => {
     const img = new Image(); img.src = 'data:image/png;base64,' + src; await img.decode();
     const c = document.createElement('canvas'); c.width = c.height = size;
     const x = c.getContext('2d'); x.drawImage(img, 0, 0);
@@ -47,11 +50,11 @@ for (const size of [192, 512]) {
     x.fillStyle = '#FFFFFF';
     x.font = '800 ' + Math.round(h * 0.72) + 'px "DejaVu Sans", Arial, sans-serif';
     x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText('TEST', size / 2, top + h / 2 + h * 0.04);
+    x.fillText(label, size / 2, top + h / 2 + h * 0.04);
     x.restore();
     return c.toDataURL('image/png').split(',')[1];
-  }, { src, size, brand });
-  fs.writeFileSync(path.join(repo, 'icons', 'test', 'icon-' + size + '.png'), Buffer.from(out, 'base64'));
-  console.log('wrote icons/test/icon-' + size + '.png');
+  }, { src, size, brand, label });
+  fs.writeFileSync(path.join(repo, brand.icons, 'icon-' + size + '.png'), Buffer.from(out, 'base64'));
+  console.log('wrote ' + brand.icons + '/icon-' + size + '.png');
 }
 await browser.close();

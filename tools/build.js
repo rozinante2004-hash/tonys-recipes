@@ -35,6 +35,9 @@ if (!envName || !envs[envName] || envName.charAt(0) === '_') {
 }
 const overrides = envs[envName];
 function fail(msg) { console.error('BUILD REFUSED (' + envName + '): ' + msg); process.exit(1); }
+// v37.59 — a copy whose settings are still to be filled in (the beta, until
+// Tony sends its Firebase project's settings) is not built at all.
+if (JSON.stringify(overrides).indexOf('"FILL-IN"') !== -1) fail('its settings in tools/environments.json are not filled in yet (FILL-IN)');
 
 // ── The #appConfig block ─────────────────────────────────────────────────────
 const src = fs.readFileSync(path.join(repo, 'index.html'), 'utf8');

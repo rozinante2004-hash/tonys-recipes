@@ -44,5 +44,50 @@
     },
     "_why_brand": "Its own icons (tools/make-test-icons.mjs) and a teal tab icon, so the test copy cannot be mistaken for the family's app on a home screen or in a browser tab.",
     "_why_bringDirect_off": "Bring!'s own import (feature 'bring', v36.89) is safe here — it opens the tester's own Bring! app. Sending straight to a list ('bringDirect') goes through the Worker's token to the family's real list, so it stays off."
+  },
+  "beta": {
+    "environment": "beta",
+    "_why": "v37.59 — the BETA copy (design step 5): the testers' own app, with its own Firebase project and site, built from the `beta` branch, which moves forward only when Tony says (like the family's). Tony, 3 Oct 2026: a beta copy and a per-household AI cap.",
+    "firebase": {
+      "apiKey": "FILL-IN",
+      "authDomain": "my-kitchen-notes-beta.pages.dev",
+      "projectId": "FILL-IN",
+      "storageBucket": "FILL-IN",
+      "messagingSenderId": "FILL-IN",
+      "appId": "FILL-IN"
+    },
+    "_why_firebase": "Filled in from the beta Firebase project's web-app settings (Project settings → Your apps), which Tony sends. Until then tools/build.js refuses to build this copy. Sign-in runs on the copy's own address, as for the test copy.",
+    "siteOrigin": "https://my-kitchen-notes-beta.pages.dev",
+    "sitePath": "/",
+    "iosShortcutUrl": "",
+    "_why_iosShortcutUrl": "Tony's third shortcut (a copy of his, pointed at this address) — its iCloud link goes here; empty = the offer is not shown.",
+    "dataLayout": "households",
+    "features": {
+      "whatsapp": false,
+      "bringDirect": false,
+      "gmail": false
+    },
+    "_why_features": "Testers get the app the public will: no WhatsApp-export tools, no sending to the family's Bring! list, no Gmail permission (Google reviews that scope before it may be offered to the public). Bring!'s own import stays.",
+    "diagnostics": {
+      "logging": true,
+      "debug": false
+    },
+    "_why_diagnostics": "Logging on, so ✉️ Send feedback from a tester carries the log.",
+    "signIn": {
+      "password": true,
+      "emailLink": true
+    },
+    "manifest": {
+      "name": "My Kitchen Notes (beta)",
+      "short_name": "Kitchen Notes β"
+    },
+    "brand": {
+      "iconFrom": "#5C3D2E",
+      "color": "#4B3F72",
+      "band": "#7A5AC8",
+      "icons": "icons/beta",
+      "label": "BETA"
+    },
+    "_why_brand": "Its own violet icons with a BETA band (tools/make-test-icons.mjs beta) and a small 'Beta' mark instead of the test copy's warning stripes: testers are real users of their own recipes."
   }
 }

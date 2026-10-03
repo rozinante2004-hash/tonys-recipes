@@ -815,6 +815,21 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.59 — the BETA copy, prepared (design step 5).** tools/
+    environments.json `beta`: environment 'beta', households, logging on,
+    password + e-mail-link sign-in, features whatsapp/bringDirect/gmail OFF,
+    site https://my-kitchen-notes-beta.pages.dev/ (Cloudflare Pages project
+    `my-kitchen-notes-beta`, production branch `beta`, build `node
+    tools/build.js beta`), manifest "My Kitchen Notes (beta)", violet icons
+    with a BETA band (icons/beta, `node tools/make-test-icons.mjs beta`), and
+    a small "β BETA" mark instead of the test copy's stripes and frame. Its
+    Firebase settings are "FILL-IN" until Tony sends them — tools/build.js
+    REFUSES to build a copy with FILL-IN. Extension: `build-extension.mjs
+    beta` (-BETA zip, "(BETA)" name, gecko id -beta; CI builds all three);
+    app `extTag()` 'beta'. Worker v60 (not yet deployed) already allows the
+    beta origin and meters/caps project `my-kitchen-notes-beta` — change if
+    Firebase gives the project another id. The `beta` branch moves only when
+    Tony says, like main.
   - **v37.58 — the management app (design step 4).** ⚙️ → 📊 Households
     (management) — `data-owner-only`, households layout; `openManagement`
     loads manage.js ON DEMAND (like self-tests.js) → `mknManage.open()`: a

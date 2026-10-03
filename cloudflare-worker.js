@@ -269,6 +269,8 @@ const DEFAULT_ORIGINS = [
   'https://web.getbring.com',
   'http://localhost:8137',
   'http://127.0.0.1:8137',
+  // v60 — the beta copy (design step 5); the test copy comes in ALLOWED_ORIGINS.
+  'https://my-kitchen-notes-beta.pages.dev',
 ];
 function allowedOrigins(env) {
   const extra = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
@@ -1266,9 +1268,9 @@ async function handleRequest(request, env) {
 //                    month's, for a household's big first import (4)
 //   OWNER_EMAILS     who may read every household's spending and set caps
 //                    (`meter-admin`, the management app)
-const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test';
-const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test';
-const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev';
+const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test,my-kitchen-notes-beta';
+const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test,my-kitchen-notes-beta';
+const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev,https://my-kitchen-notes-beta.pages.dev';
 const OWNER_EMAILS_DEFAULT = 'rozinante2004@gmail.com';
 const AI_CAP_USD_DEFAULT = 2, AI_CAP_FIRST_USD_DEFAULT = 4;
 // USD per million tokens — the same table as the app's AI_PRICES (index.html).

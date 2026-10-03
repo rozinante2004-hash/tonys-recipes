@@ -4,6 +4,7 @@
 //   node tools/build-extension.mjs live   → dist-extension/live/ + my-kitchen-notes-extension.zip            (Chrome, Edge, Brave, Opera, Vivaldi)
 //                                            dist-extension/live-firefox/ + my-kitchen-notes-extension-firefox.zip (Firefox)
 //   node tools/build-extension.mjs test   → the same with -TEST
+//   node tools/build-extension.mjs beta   → the same with -BETA (v37.59: the testers' app)
 //
 // 1.4 (app v37.46) — Tony: "the same extension for other common browsers like
 // Edge", installed "as easy and simple as possible". Every Chromium browser runs
@@ -23,7 +24,8 @@ import { fileURLToPath } from 'node:url';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const which = process.argv[2];
-if (!['live', 'test'].includes(which)) { console.error('usage: node tools/build-extension.mjs <live|test>'); process.exit(2); }
+if (!['live', 'test', 'beta'].includes(which)) { console.error('usage: node tools/build-extension.mjs <live|test|beta>'); process.exit(2); }
+const LABEL = which === 'live' ? '' : ' (' + which.toUpperCase() + ')';
 
 const html = fs.readFileSync(path.join(repo, 'index.html'), 'utf8');
 const envs = JSON.parse(fs.readFileSync(path.join(repo, 'tools/environments.json'), 'utf8'));
@@ -59,12 +61,12 @@ for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.jo
 fs.writeFileSync(path.join(out, 'config.js'),
   '// Written by tools/build-extension.mjs (' + which + ').\n'
   + 'var MKN_APP = ' + JSON.stringify(app) + ';\n'
-  + 'var MKN_APP_NAME = ' + JSON.stringify('My Kitchen Notes' + (which === 'test' ? ' (TEST)' : '')) + ';\n'
+  + 'var MKN_APP_NAME = ' + JSON.stringify('My Kitchen Notes' + LABEL) + ';\n'
   + 'var MKN_TAG = ' + JSON.stringify(which) + ';\n');
-if (which === 'test') {
+if (which !== 'live') {
   const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
-  m.name = m.name + ' (TEST)';
-  m.short_name = 'MKN (TEST)';
+  m.name = m.name + LABEL;
+  m.short_name = 'MKN' + LABEL;
   fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(m, null, 2) + '\n');
 }
 // Reproducible zips: fixed times, files in a fixed order, no extra attributes.
@@ -76,7 +78,7 @@ function zipDir(dir, zipPath) {
   fs.rmSync(zipPath, { force: true });
   execFileSync('zip', ['-q', '-X', '-D', zipPath].concat(files), { cwd: dir, env: Object.assign({}, process.env, { TZ: 'UTC' }) });
 }
-const tag = which === 'test' ? '-TEST' : '';
+const tag = which === 'live' ? '' : '-' + which.toUpperCase();
 const zip = path.join(repo, 'dist-extension', 'my-kitchen-notes-extension' + tag + '.zip');
 zipDir(out, zip);
 
@@ -88,7 +90,7 @@ fs.cpSync(out, ffOut, { recursive: true });
   const mp = path.join(ffOut, 'manifest.json');
   const m = JSON.parse(fs.readFileSync(mp, 'utf8'));
   m.background = { scripts: ['config.js', 'shared.js', 'background.js'] };
-  m.browser_specific_settings = { gecko: { id: 'my-kitchen-notes' + (which === 'test' ? '-test' : '') + '@rozinante2004-hash.github.io', strict_min_version: '121.0' } };
+  m.browser_specific_settings = { gecko: { id: 'my-kitchen-notes' + (which === 'live' ? '' : '-' + which) + '@rozinante2004-hash.github.io', strict_min_version: '121.0' } };
   if (m.options_page) { m.options_ui = { page: m.options_page, open_in_tab: true }; delete m.options_page; }
   fs.writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
 }
