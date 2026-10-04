@@ -815,6 +815,19 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.61 — the owner deletes a household from 📊 Households.** Tony: "As
+    the Admin, I should be able to delete accounts from this Households
+    table. With a verification pop up". Details panel → 🗑 Delete this
+    household… (not the one he is in now): typed name (`sameTypedName`), then
+    `deleteHousehold`: mark `deleting: true` → recipes, photos, chats, state,
+    requests → links (both halves) → link requests → kept places → members →
+    the household + its `codes/` entry. Rules: `beingDeleted(hid)` = appAdmin
+    AND the household is marked — only then may he read/remove its content;
+    the mark only by him and only that field (13 new rules checks). Sign-ins
+    are Firebase Auth's own list (a server key no page may hold): afterwards
+    he is offered that list with their addresses. With the database readable,
+    the page lists only its households (server-only rows only when refused).
+    Self-test `management_delete_household`.
   - **v37.60 — the management page says why it is empty.** Tony saw "0
     households" after closing an error box (the test copy's rules were not
     yet published). manage.js now reads the database and the server

@@ -1278,6 +1278,65 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'management_delete_household', group:'Sharing', name:'📊 The owner deletes a household from the management app: typed name, everything in it, both halves of its links — and never his own (v37.61)',
+    test: async()=>{
+      var store={};
+      function ref(path){ var parts=path.split('/'); return { id:parts[parts.length-1], path:path,
+        collection:function(c){ return coll(path+'/'+c); },
+        get:async function(){ var d=store[path]; return { id:parts[parts.length-1], ref:ref(path), exists:!!d, data:function(){ return d; } }; },
+        update:async function(d){ if(!store[path]) throw new Error('no such document'); Object.assign(store[path], d); },
+        delete:async function(){ delete store[path]; } }; }
+      function docsUnder(path, group){ return Object.keys(store).filter(function(k){ var parent=k.slice(0,k.lastIndexOf('/'));
+        return group ? parent.split('/').pop()===group : parent===path; }); }
+      function coll(path, group){ var filters=[]; var q={ doc:function(id){ return ref(path+'/'+id); },
+        where:function(f,op,v){ filters.push([f,v]); return q; },
+        get:async function(){ var keys=docsUnder(path, group).filter(function(k){ return filters.every(function(f){ return store[k][f[0]]===f[1]; }); });
+          return { size:keys.length, forEach:function(fn){ keys.forEach(function(k){ var r=ref(k); r.parent={ parent:{ id:k.split('/')[1] } };
+            fn({ id:k.split('/').pop(), ref:r, data:function(){ return store[k]; } }); }); } }; } }; return q; }
+      var fake={ collection:function(c){ return coll(c); }, collectionGroup:function(c){ return coll(null, c); },
+        batch:function(){ var ops=[]; return { delete:function(r){ ops.push(function(){ return r.delete(); }); }, commit:async function(){ for(var i=0;i<ops.length;i++) await ops[i](); } }; } };
+      store['households/hX']={ name:'Old test kitchen', code:'MKN-XXXX-2222', ownerUid:'uX', createdAt:1 };
+      store['households/hX/members/uX']={ uid:'uX', email:'x@example.com', role:'owner' };
+      store['households/hX/members/uY']={ uid:'uY', email:'y@example.com', role:'viewer' };
+      store['households/hX/recipes/1']={ name:'r1' }; store['households/hX/recipes/2']={ name:'r2' };
+      store['households/hX/photos/1']={ photo:'p' }; store['households/hX/state/meta']={ nextId:3 };
+      store['households/hX/links/hK']={ hid:'hK', name:'Keep' }; store['households/hK/links/hX']={ hid:'hX', name:'Old test kitchen' };
+      store['households/hK']={ name:'Keep', code:'MKN-KKKK-3333', ownerUid:'uK' }; store['households/hK/members/uK']={ uid:'uK', email:'k@example.com', role:'owner' };
+      store['households/hK/recipes/9']={ name:'keep me' };
+      store['linkRequests/hX_hK']={ from:'hX', to:'hK' }; store['pending/hX:z@example.com']={ hid:'hX', email:'z@example.com' };
+      store['codes/MKN-XXXX-2222']={ hid:'hX' }; store['codes/MKN-KKKK-3333']={ hid:'hK' };
+      var real={ db:window._fbDb, user:window._fbUser, owner:window.isAppOwner, fetch:window.fetch, toast:window.toast, err:window.showServiceError, ask:window.askConfirm, hh:window._household, open:window.open, h:_workerHealth };
+      var asked=[];
+      try{
+        window._fbDb=fake; window._fbUser={ uid:'uT', email:'owner@example.com', getIdToken:async function(){ return 't'; } };
+        window.isAppOwner=function(){ return true; }; window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
+        window.open=function(){}; _workerHealth=null; _household={ hid:'hK', role:'owner' };
+        window.fetch=async function(){ return new Response('{"error":"METER: not set up on this Worker (METER_DB)."}', { status:503 }); };
+        await openManagement();
+        mknManage.show('hK');
+        if(document.getElementById('mgDelete')) throw new Error('the household he is in can be deleted from here');
+        mknManage.show('hX');
+        if(!document.getElementById('mgDelete')) throw new Error('no 🗑 Delete in the details');
+        window.askConfirm=async function(o){ asked.push(o); return o.input!==undefined ? 'old TEST kitchen ' : false; };
+        var n=await mknManage.del();
+        if(!/2 members \(x@example.com, y@example.com\)/.test(asked[0].message) || !asked[0].danger) throw new Error('the warning does not say who is in it: '+asked[0].message);
+        var left=Object.keys(store).filter(function(k){ return k.indexOf('hX')!==-1 || k==='codes/MKN-XXXX-2222'; });
+        if(left.length) throw new Error('left behind: '+left.join(', '));
+        ['households/hK','households/hK/members/uK','households/hK/recipes/9','codes/MKN-KKKK-3333'].forEach(function(k){ if(!store[k]) throw new Error('removed what was not its: '+k); });
+        if(!(n>=12)) throw new Error('items counted: '+n);
+        if(!/sign-ins are kept/.test(asked[1].message) || !/x@example.com, y@example.com/.test(asked[1].message)) throw new Error('the sign-ins are not mentioned afterwards');
+        if(mknManage._state.rows.some(function(r){ return r.hid==='hX'; })) throw new Error('still listed');
+        store['households/hZ']={ name:'Zed', ownerUid:'uZ' };
+        await mknManage.reload(); mknManage.show('hZ');
+        window.askConfirm=async function(o){ return o.input!==undefined ? 'something else' : false; };
+        if(await mknManage.del()!==false || !store['households/hZ']) throw new Error('deleted without the name typed');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err;
+        window.askConfirm=real.ask; window._household=real.hh; window.open=real.open; _workerHealth=real.h;
+        if(window.mknManage) mknManage.close();
+      }
+    } },
+
   { id:'rules_behind_is_not_an_error', group:'Sharing', name:'Rules not yet published: noted once and the owner is led to them, not logged as an error on every open (v37.55)',
     test: async()=>{
       if(hhRulesBehind({ code:'permission-denied', message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('a refusal by the rules is not recognised');

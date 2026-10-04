@@ -140,6 +140,11 @@ service cloud.firestore {
     // households, their members, links and requests — never their recipes,
     // photos or chats. The APP_ADMINS placeholder, as for translations.
     function appAdmin() { return signedIn() && verified() && myEmail() in [{{APP_ADMINS}}]; }
+    // v37.61 — the app's owner deleting a household from the management app:
+    // first marked `deleting: true` (only by him, and only that), and ONLY
+    // then may he read and remove what is inside it. He never reads the
+    // content of a household he is not deleting.
+    function beingDeleted(hid) { return appAdmin() && get(hh(hid)).data.get('deleting', false) == true; }
     // v37.58 — which household's 📲 share link brought this one (its
     // identifier), set when it is founded and never changed.
     function okReferredBy() {
@@ -184,7 +189,11 @@ service cloud.firestore {
         && ( (atLeast(hid, 'admin') && request.resource.data.ownerUid == resource.data.ownerUid)
           || (resource.data.ownerUid == request.auth.uid
               && getAfter(memberPath(hid, request.resource.data.ownerUid)).data.role == 'owner') );
-      allow delete: if resource.data.ownerUid == request.auth.uid;
+      allow delete: if resource.data.ownerUid == request.auth.uid
+        || (appAdmin() && resource.data.get('deleting', false) == true);
+      allow update: if appAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleting'])
+        && request.resource.data.deleting == true;
 
       match /members/{uid} {
         allow read: if isMember(hid) || appAdmin();
@@ -235,42 +244,43 @@ service cloud.firestore {
               && (atLeast(hid, 'owner') || (atLeast(hid, 'admin') && rank(resource.data.role) <= 2)))
           // v36.99 — the owner's own membership goes in the same batch that
           // deletes the household (never while the household is still there).
-          || (uid == request.auth.uid && resource.data.role == 'owner' && !existsAfter(hh(hid)));
+          || (uid == request.auth.uid && resource.data.role == 'owner' && !existsAfter(hh(hid)))
+          || beingDeleted(hid);
       }
 
       // The household's content. Editors add and change; only admins delete —
       // the same line today's rules draw between write and delete.
       match /recipes/{id} {
-        allow read: if isMember(hid) || linkedReader(hid);   // v37.53 — a linked household reads
+        allow read: if isMember(hid) || linkedReader(hid) || beingDeleted(hid);   // v37.53 — a linked household reads
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin');
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
       match /photos/{id} {
-        allow read: if isMember(hid) || linkedReader(hid);   // v37.53 — a linked household reads
+        allow read: if isMember(hid) || linkedReader(hid) || beingDeleted(hid);   // v37.53 — a linked household reads
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin');
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
       match /chats/{id} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin');
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
       match /state/{doc} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin');
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
       // v37.13 — a reader asking to add and change recipes: `requests/<uid>` =
       // { uid, at }. Only for themselves, only while a viewer; the household's
       // admins see them and answer (by changing the role, and removing it).
       match /requests/{uid} {
-        allow read: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin');
+        allow read: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin') || beingDeleted(hid);
         allow create: if signedIn() && uid == request.auth.uid && isMember(hid)
           && myRole(hid) == 'viewer'
           && request.resource.data.keys().hasOnly(['uid', 'at'])
           && request.resource.data.uid == uid;
         allow update: if false;
-        allow delete: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin');
+        allow delete: if (signedIn() && uid == request.auth.uid) || atLeast(hid, 'admin') || beingDeleted(hid);
       }
       // v37.53 — the households this one is linked with. Both sides are written
       // in the batch that ACCEPTS a request (linkRequests/<from>_<to>, removed in
@@ -287,7 +297,7 @@ service cloud.firestore {
             || (atLeast(other, 'admin') && exists(reqPath(hid + '_' + other))
                 && get(reqPath(hid + '_' + other)).data.to == other && !existsAfter(reqPath(hid + '_' + other))) );
         allow update: if false;
-        allow delete: if atLeast(hid, 'admin') || atLeast(other, 'admin');
+        allow delete: if atLeast(hid, 'admin') || atLeast(other, 'admin') || beingDeleted(hid) || beingDeleted(other);
       }
     }
 
@@ -360,7 +370,8 @@ service cloud.firestore {
       // Withdrawn by the sender, answered by the household asked, or passed on
       // (or let go) by the person an e-mail one was sent to.
       allow delete: if signedIn() && (
-        (verified() && resource.data.get('email', '') == myEmail())
+        appAdmin()
+        || (verified() && resource.data.get('email', '') == myEmail())
         || adminOf(resource.data.get('from', ''))
         || adminOf(resource.data.get('to', '')));
     }
@@ -398,7 +409,7 @@ service cloud.firestore {
     // claimed.
     match /pending/{key} {
       allow read: if signedIn() && (
-        (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
+        appAdmin() || (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
       allow create, update: if signedIn()
         && request.resource.data.keys().hasOnly(['hid', 'email', 'role'])
         && key == request.resource.data.hid + ':' + request.resource.data.email
@@ -407,7 +418,7 @@ service cloud.firestore {
         && (atLeast(request.resource.data.hid, 'owner')
             || (atLeast(request.resource.data.hid, 'admin') && request.resource.data.role != 'admin'));
       allow delete: if signedIn() && (
-        (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
+        appAdmin() || (verified() && resource.data.email == myEmail()) || atLeast(resource.data.hid, 'admin'));
     }
 
     // v37.11 — a word for an address that is NOT confirmed yet: that a place

@@ -52,8 +52,10 @@
     var spend = {};
     if (S.meter) (S.meter.households || []).forEach(function (h) {
       spend[h.hid] = h;
-      // known to the server but not readable here: still listed, from what the server noted
-      if (!rows[h.hid]) rows[h.hid] = { hid: h.hid, name: h.name || '', code: h.code || '', ownerUid: '', createdAt: h.created_at || 0,
+      // known to the server but not readable here (the database refused): still
+      // listed, from what the server noted. Otherwise the database is the list —
+      // a deleted household keeps its spending history on the server, unlisted.
+      if (S.loadError && !rows[h.hid]) rows[h.hid] = { hid: h.hid, name: h.name || '', code: h.code || '', ownerUid: '', createdAt: h.created_at || 0,
         referredBy: '', members: [], links: [], asking: [], asked: [], referred: 0, lastSeen: 0 };
     });
     finish(rows, spend);
@@ -191,6 +193,9 @@
       + '<div class="mg-h">Shared the app</div><div>' + (r.referred ? r.referred + ' new household' + (r.referred === 1 ? '' : 's') + ' came through its 📲 link' : '<span class="mg-muted">No new households through its link yet.</span>') + '</div>'
       + '<div class="mg-h">Your notes</div><textarea id="mgNote" rows="3" dir="auto" placeholder="Only you see these.">' + esc(r.note) + '</textarea>'
       + '<div><button type="button" class="mg-btn" onclick="mknManage.saveNote()">Save the note</button></div>'
+      + '<div class="mg-h">Delete</div>'
+      + (mine(r) ? '<div class="mg-muted">This is the household you are in now. To delete it, use ⚙️ → 👥 Family Access → 🗑 Delete this household.</div>'
+                 : '<button type="button" class="mg-btn mg-danger" id="mgDelete" onclick="mknManage.del()">🗑 Delete this household…</button>')
       + '</div>';
   }
 
@@ -203,6 +208,7 @@
     + '.mg-tools{display:flex;gap:6px;flex-wrap:wrap;}.mg-tools input{min-width:220px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);font-size:14px;}'
     + '.mg-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--heading);cursor:pointer;font-size:13px;min-height:36px;}'
     + '.mg-primary{background:var(--terracotta-fill);color:#fff;border-color:transparent;}'
+    + '.mg-danger{color:var(--danger);border-color:var(--danger);}'
     + '.mg-note{background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:8px 12px;margin-bottom:10px;font-size:13px;border-radius:6px;}'
     + '.mg-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);}'
     + '.mg-table{width:100%;min-width:900px;border-collapse:collapse;font-size:13px;}.mg-table th{text-align:start;background:var(--card-bg);position:sticky;top:0;border-bottom:1px solid var(--border);padding:0;white-space:nowrap;}'
@@ -218,6 +224,47 @@
     + '.mg-li{padding:3px 0;}.mg-caprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
     + '.mg-caprow input{width:90px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';
+
+  function mine(r) { return !!(typeof _household !== 'undefined' && _household && _household.hid === r.hid); }
+  // v37.61 — Tony: "As the Admin, I should be able to delete accounts from this
+  // Households table. With a verification pop up of course." A household and
+  // everything in it: marked first (the rules then let him read and remove its
+  // content — and only its), then its recipes, photos, chats, settings, the
+  // requests in it, its links (both halves), link requests, places kept by
+  // e-mail, its members, and last the household with its identifier. The
+  // people's SIGN-INS are Firebase's own list: removing those takes a server
+  // key no page may hold, so he is taken to that list with their addresses.
+  async function deleteHousehold(r, onStep) {
+    var db = window._fbDb, n = 0, ref = db.collection('households').doc(r.hid);
+    async function inBatches(refs) {
+      for (var i = 0; i < refs.length; i += 400) {
+        var b = db.batch(); refs.slice(i, i + 400).forEach(function (x) { b.delete(x); });
+        await b.commit(); n += Math.min(400, refs.length - i);
+      }
+    }
+    async function refsOf(q) { var out = []; (await q.get()).forEach(function (d) { out.push(d.ref); }); return out; }
+    onStep('Marking it for deletion…');
+    await ref.update({ deleting: true });
+    var kinds = ['recipes', 'photos', 'chats', 'state', 'requests'];
+    for (var k = 0; k < kinds.length; k++) {
+      onStep('Deleting its ' + kinds[k] + '…');
+      await inBatches(await refsOf(ref.collection(kinds[k])));
+    }
+    onStep('Removing its links and requests…');
+    var links = await refsOf(ref.collection('links')), other = [];
+    links.forEach(function (l) { other.push(db.collection('households').doc(l.id).collection('links').doc(r.hid)); });
+    await inBatches(links.concat(other));
+    await inBatches((await refsOf(db.collection('linkRequests').where('from', '==', r.hid)))
+      .concat(await refsOf(db.collection('linkRequests').where('to', '==', r.hid))));
+    await inBatches(await refsOf(db.collection('pending').where('hid', '==', r.hid)));
+    onStep('Removing its members…');
+    await inBatches(await refsOf(ref.collection('members')));
+    var last = db.batch();
+    last.delete(ref);
+    if (r.code) last.delete(db.collection('codes').doc(r.code));
+    await last.commit(); n += r.code ? 2 : 1;
+    return n;
+  }
 
   var api = window.mknManage = {
     open: async function () {
@@ -256,6 +303,32 @@
       toast(cap === null ? 'Back to the default allowance' : Number(cap) === 0 ? '⏸ Its AI is paused' : '✅ Allowance set to $' + Number(cap).toFixed(2));
       await api.reload(); S.open = r.hid; render();
       return true;
+    },
+    del: async function () {
+      var r = S.rows.filter(function (x) { return x.hid === S.open; })[0];
+      if (!r || mine(r)) return false;
+      var who = r.members.map(function (m) { return m.email; }).filter(Boolean);
+      var typed = await askConfirm({ icon: '🗑', title: 'Delete \u201c' + (r.name || r.code || 'this household') + '\u201d?',
+        message: 'Everything in it goes, for everyone in it: its recipes, photos, chats and settings, its links with other households, and its '
+          + who.length + ' member' + (who.length === 1 ? '' : 's') + (who.length ? ' (' + who.join(', ') + ')' : '') + '. This cannot be undone.\n\n'
+          + 'Their sign-ins stay: next time they open the app they are asked to start a collection or join one.\n\nType the household\u2019s name to confirm.',
+        input: '', placeholder: r.name || '', okLabel: 'Delete it', danger: true });
+      if (typeof typed !== 'string') return false;
+      if (!sameTypedName(typed, r.name || r.code)) { toast('The name did not match \u2014 nothing was deleted.', 6000); return false; }
+      var n;
+      try { n = await deleteHousehold(r, function (msg) { toast('\u23f3 ' + msg, 4000); }); }
+      catch (e) { showServiceError('The household could not be fully deleted: ' + (e && e.message)
+        + (/permission/i.test(String(e && e.message)) ? '\n\nThis copy\u2019s database rules need publishing first (⚙️ → 👥 Family Access → Show rules).' : '')
+        + '\n\nWhat was already removed stays removed; run it again to finish.'); return false; }
+      syncLog('save', 'Deleted a household from the management app', { name: r.name, code: r.code, items: n });
+      S.open = null;
+      await api.reload();
+      var pid = (window.APP_CONFIG && APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || '';
+      var open = await askConfirm({ icon: '✅', title: 'Deleted', message: '\u201c' + (r.name || r.code) + '\u201d and everything in it are gone (' + n + ' items).'
+          + (who.length ? '\n\nTheir sign-ins are kept in Firebase\u2019s own list. To remove those too, open it and delete: ' + who.join(', ') + '.' : ''),
+        okLabel: who.length ? 'Open Firebase\u2019s list of sign-ins' : 'OK', cancelLabel: 'Close' });
+      if (open === true && who.length && pid) window.open('https://console.firebase.google.com/project/' + encodeURIComponent(pid) + '/authentication/users', '_blank', 'noopener');
+      return n;
     },
     saveNote: async function () {
       var r = S.rows.filter(function (x) { return x.hid === S.open; })[0];

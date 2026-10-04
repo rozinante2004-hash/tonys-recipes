@@ -326,6 +326,23 @@ await check('a household founded through a share link says whose', (() => { cons
 await check('…and that never changes',                          updateDoc(doc(frank, 'households/R1'), { referredBy: 'MKN-KKKK-4444' }), false);
 await check('…while renaming still works',                      updateDoc(doc(frank, 'households/R1'), { name: 'Frank\'s' }), true);
 
+console.log('The owner deletes a household from the management app (v37.61)');
+await check('the app\'s owner cannot read a household\'s recipes before marking it', getDocs(collection(alice, 'households/L2/recipes')), false);
+await check('nobody else may mark a household for deletion', updateDoc(doc(carol, 'households/L2'), { deleting: true }), false);
+await check('…nor its own reader',                            updateDoc(doc(jo, 'households/L2'), { deleting: true }), false);
+await check('the mark carries nothing else',                  updateDoc(doc(alice, 'households/L2'), { deleting: true, name: 'X' }), false);
+await check('the app\'s owner marks it',                      updateDoc(doc(alice, 'households/L2'), { deleting: true }), true);
+await check('…and now reads what is in it, to remove it',    Promise.all([getDocs(collection(alice, 'households/L2/recipes')), getDocs(collection(alice, 'households/L2/photos')),
+  getDocs(collection(alice, 'households/L2/chats')), getDocs(collection(alice, 'households/L2/state')), getDocs(collection(alice, 'households/L2/requests'))]), true);
+await check('…but still not another household\'s',           getDocs(collection(alice, 'households/L1/recipes')), false);
+await check('a stranger may not delete a marked household',  deleteDoc(doc(carol, 'households/L2')), false);
+await check('…nor its content',                               deleteDoc(doc(carol, 'households/L2/recipes/1')), false);
+await check('the owner of the app removes its content',      Promise.all([deleteDoc(doc(alice, 'households/L2/recipes/1')), deleteDoc(doc(alice, 'households/L2/photos/1'))]), true);
+await check('…its members',                                   deleteDoc(doc(alice, 'households/L2/members/jo')), true);
+await check('…and the household, its owner\'s place and its identifier, together', (() => { const b = writeBatch(alice);
+  b.delete(doc(alice, 'households/L2/members/ivy')); b.delete(doc(alice, 'households/L2')); b.delete(doc(alice, 'codes/MKN-HHHH-3333')); return b.commit(); })(), true);
+await check('a household nobody marked cannot be deleted by him', deleteDoc(doc(alice, 'households/L3')), false);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);
