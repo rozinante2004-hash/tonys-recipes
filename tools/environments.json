@@ -49,14 +49,14 @@
     "environment": "beta",
     "_why": "v37.59 — the BETA copy (design step 5): the testers' own app, with its own Firebase project and site, built from the `beta` branch, which moves forward only when Tony says (like the family's). Tony, 3 Oct 2026: a beta copy and a per-household AI cap.",
     "firebase": {
-      "apiKey": "FILL-IN",
+      "apiKey": "AIzaSyD0UKy9SkhiHV3UwJ_KgkXFJSGN_6uMTPQ",
       "authDomain": "my-kitchen-notes-beta.pages.dev",
-      "projectId": "FILL-IN",
-      "storageBucket": "FILL-IN",
-      "messagingSenderId": "FILL-IN",
-      "appId": "FILL-IN"
+      "projectId": "my-kitchen-notes-beta",
+      "storageBucket": "my-kitchen-notes-beta.firebasestorage.app",
+      "messagingSenderId": "557995593102",
+      "appId": "1:557995593102:web:048cf4d1b54156b6ff68df"
     },
-    "_why_firebase": "Filled in from the beta Firebase project's web-app settings (Project settings → Your apps), which Tony sends. Until then tools/build.js refuses to build this copy. Sign-in runs on the copy's own address, as for the test copy.",
+    "_why_firebase": "Tony's beta Firebase project (4 Oct 2026). authDomain is the copy's OWN address, not my-kitchen-notes-beta.firebaseapp.com: sign-in is served from it (tools/build.js fetches Firebase's sign-in files into dist/__/), as for the test copy — on an iPhone the firebaseapp.com address fails with 'missing initial state'.",
     "siteOrigin": "https://my-kitchen-notes-beta.pages.dev",
     "sitePath": "/",
     "iosShortcutUrl": "",

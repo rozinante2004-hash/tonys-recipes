@@ -945,9 +945,9 @@ window.SELF_TESTS = [
   { id:'fb_reading_test', group:'Import/Export', name:'🔬 Facebook reading test: test copy only; every server route graded into one report (v37.38, v37.39)',
     test: async()=>{
       var item=document.getElementById('fbProbeItem');
-      var live=String(APP_CONFIG.environment||'live')==='live';
+      var live=String(APP_CONFIG.environment||'live')!=='test';   // v37.62 — the beta hides it like the family app
       if(!item) throw new Error('no 🔬 item in Settings');
-      if(live!==item.hidden) throw new Error(live ? 'the family app shows the Facebook reading test' : 'the test copy hides the Facebook reading test');
+      if(live!==item.hidden) throw new Error(live ? 'a copy other than the test copy shows the Facebook reading test' : 'the test copy hides the Facebook reading test');
       var real={ fetch:window.fetch, toast:window.toast }, saved=null, asked=null;
       try{ saved=localStorage.getItem(FB_PROBE_KEY); }catch(e){}
       try{
@@ -1060,7 +1060,7 @@ window.SELF_TESTS = [
 
   { id:'extension_offer', group:'UI', name:'🧩 The browser extension: offered on computers, one action for this browser (v37.46)',
     test: async()=>{
-      var item=document.getElementById('extensionItem'), tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test';
+      var item=document.getElementById('extensionItem'), tag=extTag();
       var setUA=function(u){ Object.defineProperty(navigator, 'userAgent', { value:u, configurable:true }); };
       var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
       var EDGE=CHROME+' Edg/140.0', FF='Mozilla/5.0 (Windows NT 10.0; rv:140.0) Gecko/20100101 Firefox/140.0';
@@ -1074,7 +1074,7 @@ window.SELF_TESTS = [
         setUA(CHROME); window._extStoresOverride={};
         openExtensionOffer();
         var d=dlg(), dl=d && d.querySelector('a[download]');
-        if(!dl || dl.getAttribute('href')!=='downloads/my-kitchen-notes-extension'+(tag==='live'?'':'-TEST')+'.zip') throw new Error('Chrome is not offered this copy\'s download: '+(dl&&dl.getAttribute('href')));
+        if(!dl || dl.getAttribute('href')!=='downloads/my-kitchen-notes-extension'+(tag==='live'?'':'-'+tag.toUpperCase())+'.zip') throw new Error('Chrome is not offered this copy\'s download: '+(dl&&dl.getAttribute('href')));
         if(typeof window.showDirectoryPicker==='function' && !d.querySelector('#extFolderBtn')) throw new Error('Chrome is not offered to put it in a folder');
         if(!/new tab/.test(d.textContent)) throw new Error('the copy step does not say where to paste');
         if(!/chrome:\/\/extensions/.test(d.textContent) || !/Load unpacked/.test(d.textContent) || !/Save recipe/.test(d.textContent)) throw new Error('the steps or what it is for are missing');
@@ -1103,7 +1103,7 @@ window.SELF_TESTS = [
       var setUA=function(u){ Object.defineProperty(navigator, 'userAgent', { value:u, configurable:true }); };
       var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
       var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)', ANDROID='Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile';
-      var tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test';
+      var tag=extTag();
       var vis=function(id){ var e=document.getElementById(id); return !!e && !e.hidden; };
       var kept=null; try{ kept=localStorage.getItem(DEVICE_OFFER_KEY); }catch(e){}
       var realEv=window._pwaInstallEvent, realAsk=window.askChoice, realOpen=window.open, opened=null;
@@ -1473,7 +1473,7 @@ window.SELF_TESTS = [
         if(!window._extFolder || window._extFolder.where!=='Documents › '+EXT_FOLDER_NAME()) throw new Error('the folder is not remembered: '+JSON.stringify(window._extFolder&&window._extFolder.where));
         var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
         Object.defineProperty(navigator, 'userAgent', { value:CHROME, configurable:true });
-        var tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test'; document.documentElement.removeAttribute('data-mkn-extension-'+tag);
+        var tag=extTag(); document.documentElement.removeAttribute('data-mkn-extension-'+tag);
         window._extStoresOverride={}; openExtensionOffer();
         var t=document.getElementById('extOfferOverlay').textContent;
         if(t.indexOf('Documents › '+EXT_FOLDER_NAME())===-1 || !/Put the newest version there/.test(t)) throw new Error('the dialog does not name the folder: '+t.slice(0,300));
@@ -1485,14 +1485,14 @@ window.SELF_TESTS = [
         window.showDirectoryPicker=real.pick; if(real.zip) window.JSZip=real.zip; else delete window.JSZip; window.fetch=real.fetch; window._extFolder=real.folder; window.toast=real.toast;
         delete window._extStoresOverride; try{ delete navigator.userAgent; }catch(e){}
         var o=document.getElementById('extOfferOverlay'); if(o) o.remove();
-        try{ await extIdbSet('folder-'+(String(APP_CONFIG.environment||'live')==='live'?'live':'test'), real.folder); }catch(e){}
+        try{ await extIdbSet('folder-'+(extTag()), real.folder); }catch(e){}
       }
     } },
 
   { id:'extension_update_prompt', group:'UI', name:'🧩 A newer extension: asked to update once per version, told to remove the old one (v37.51)',
     test: async()=>{
       if(verCmp('1.10.0','1.9.9')!==1 || verCmp('1.5','1.5.0')!==0 || verCmp('1.4.0','1.5.0')!==-1) throw new Error('version comparison');
-      var tag=String(APP_CONFIG.environment||'live')==='live'?'live':'test';
+      var tag=extTag();
       var real={ latest:_extLatest, folder:window._extFolder };
       var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
       var dlg=function(id){ return document.getElementById(id); };
@@ -1537,9 +1537,10 @@ window.SELF_TESTS = [
         if(!a) throw new Error('no offer in the import window');
         // v37.40 — each copy offers its OWN shortcut (Tony's links, 2 Oct 2026).
         delete window._iosShortcutOverride;
-        var own = String(APP_CONFIG.environment||'live')==='live'
-          ? 'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6'
-          : 'https://www.icloud.com/shortcuts/411eaddfe44243a180cbafdcc0638bdf';
+        // v37.62 — the beta's shortcut comes later (its link in tools/environments.json).
+        var own = { live:'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6',
+                    test:'https://www.icloud.com/shortcuts/411eaddfe44243a180cbafdcc0638bdf',
+                    beta:String(APP_CONFIG.iosShortcutUrl||'') }[String(APP_CONFIG.environment||'live')];
         if(iosShortcutUrl()!==own) throw new Error('this copy offers the wrong shortcut: '+iosShortcutUrl());
         window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
         Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)', configurable:true });
@@ -2704,7 +2705,9 @@ window.SELF_TESTS = [
       if(!rib) throw new Error('a '+env+' copy does not say so');
       if(!rib.closest('.header')) throw new Error('the strip is not part of the header — it would sit on top of something');
       if(getComputedStyle(rib).position!=='static') throw new Error('the strip is positioned ('+getComputedStyle(rib).position+'), not in the flow');
-      if(!frame || getComputedStyle(frame).pointerEvents!=='none') throw new Error('the frame round the screen is missing or catches taps');
+      // v37.59 — the beta (the testers' own app) has a small mark and no frame.
+      if(env==='beta'){ if(frame) throw new Error('the beta has the test copy\u2019s frame'); }
+      else if(!frame || getComputedStyle(frame).pointerEvents!=='none') throw new Error('the frame round the screen is missing or catches taps');
       // Covered means the strip is what a tap there would reach — not merely
       // that the two share screen space. On an iPhone the Self Test window
       // (running this very test) fills the screen and sits ABOVE the strip;

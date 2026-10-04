@@ -815,6 +815,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.62 — the beta's Firebase settings filled in** (project
+    my-kitchen-notes-beta, sender 557995593102; authDomain = the beta's own
+    address). The suite passes on a local beta build (328): tests now ask
+    `extTag()` instead of assuming live/test, the beta's shortcut is its own
+    setting, the beta has no frame; the 🔬 Facebook reading test shows in the
+    TEST copy only (it showed in any copy but the family's). `beta` branch
+    created for Cloudflare Pages (my-kitchen-notes-beta).
   - **v37.61 — the owner deletes a household from 📊 Households.** Tony: "As
     the Admin, I should be able to delete accounts from this Households
     table. With a verification pop up". Details panel → 🗑 Delete this
