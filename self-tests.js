@@ -1262,6 +1262,14 @@ window.SELF_TESTS = [
         if(lines!==2 || !made) throw new Error('the CSV');
         var csvText=await made.text();
         if(csvText.indexOf('Kitchen A,MKN-AAAA-2222,a@example.com,2')===-1) throw new Error('the CSV rows: '+csvText.slice(0,200));
+        // v37.60 — rules not yet published: the page SAYS so, and still lists what the server counted.
+        var realColl=fakeDb.collection;
+        fakeDb.collection=function(c){ return c==='households' ? { get:async function(){ throw new Error('Missing or insufficient permissions.'); } } : realColl(c); };
+        await mknManage.reload();
+        var le=document.getElementById('mgLoadError');
+        if(!le || !/rules need publishing/.test(le.textContent)) throw new Error('a refused read is not explained on the page');
+        if(document.getElementById('manageOverlay').textContent.indexOf('$1.70')===-1) throw new Error('what the server counted is hidden when the database refuses');
+        fakeDb.collection=realColl;
         window.isAppOwner=function(){ return false; }; mknManage.close();
         if(await openManagement()!==false || document.getElementById('manageOverlay')) throw new Error('someone who is not the owner opened it');
       } finally {

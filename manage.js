@@ -8,7 +8,7 @@
 // both check that it is him. It never reads anyone's recipes.
 (function () {
   'use strict';
-  var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', open: null, loading: false };
+  var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false };
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   function ago(t) {
@@ -38,8 +38,28 @@
   }
 
   // Everything about every household, gathered in five reads.
+  // v37.60 — the database and the server are read independently: either can
+  // fail (rules not yet published, the server's database not set up) without
+  // hiding what the other knows, and the page SAYS which one failed — Tony saw
+  // an empty table after an error box he had closed.
   async function load() {
-    var db = window._fbDb, rows = {}, byCode = {};
+    var rows = {}, byCode = {};
+    S.loadError = '';
+    try { await loadHouseholds(rows, byCode); }
+    catch (e) { S.loadError = String((e && e.message) || e); }
+    S.meter = null; S.meterError = '';
+    try { S.meter = await meterList(); } catch (e) { S.meterError = e.message; }
+    var spend = {};
+    if (S.meter) (S.meter.households || []).forEach(function (h) {
+      spend[h.hid] = h;
+      // known to the server but not readable here: still listed, from what the server noted
+      if (!rows[h.hid]) rows[h.hid] = { hid: h.hid, name: h.name || '', code: h.code || '', ownerUid: '', createdAt: h.created_at || 0,
+        referredBy: '', members: [], links: [], asking: [], asked: [], referred: 0, lastSeen: 0 };
+    });
+    finish(rows, spend);
+  }
+  async function loadHouseholds(rows, byCode) {
+    var db = window._fbDb;
     var hs = await db.collection('households').get();
     hs.forEach(function (d) {
       var h = d.data() || {};
@@ -70,10 +90,8 @@
       var by = rows[hid].referredBy && byCode[rows[hid].referredBy];
       if (by && rows[by]) rows[by].referred++;
     });
-    S.meter = null; S.meterError = '';
-    try { S.meter = await meterList(); } catch (e) { S.meterError = e.message; }
-    var spend = {};
-    if (S.meter) (S.meter.households || []).forEach(function (h) { spend[h.hid] = h; });
+  }
+  function finish(rows, spend) {
     S.rows = Object.keys(rows).map(function (hid) {
       var r = rows[hid], m = spend[hid] || null;
       var owner = r.members.filter(function (x) { return x.role === 'owner'; })[0];
@@ -123,6 +141,8 @@
       + '<div class="mg-tools"><input id="mgSearch" type="search" placeholder="Search name, identifier or e-mail" value="' + escA(S.q) + '" oninput="mknManage.search(this.value)">'
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
+    if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
+      + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
       + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
     if (S.loading) { body.innerHTML = head + '<div class="mg-empty">⏳ Reading every household…</div>'; return; }
@@ -217,8 +237,7 @@
     reload: async function () {
       S.loading = true; render();
       try { await load(); }
-      catch (e) { S.loading = false; render(); showServiceError('The households could not be read: ' + (e && e.message)
-        + (/permission/i.test(String(e && e.message)) ? '\n\nThe database rules need publishing (⚙️ → 👥 Family Access → Show rules).' : '')); return false; }
+      catch (e) { S.loadError = String((e && e.message) || e); }
       S.loading = false; render();
       var s = document.getElementById('mgSearch'); if (s && !S.open) s.focus();
       return S.rows.length;

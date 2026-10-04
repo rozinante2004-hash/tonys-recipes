@@ -815,6 +815,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.60 — the management page says why it is empty.** Tony saw "0
+    households" after closing an error box (the test copy's rules were not
+    yet published). manage.js now reads the database and the server
+    independently: a refused read shows on the page (`#mgLoadError`, with the
+    publish-the-rules steps), and households the server has counted are still
+    listed from its own notes.
   - **v37.59 — the BETA copy, prepared (design step 5).** tools/
     environments.json `beta`: environment 'beta', households, logging on,
     password + e-mail-link sign-in, features whatsapp/bringDirect/gmail OFF,
