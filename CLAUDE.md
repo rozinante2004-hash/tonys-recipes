@@ -815,6 +815,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.63 — the WhatsApp list rebuilds itself.** Tony: "all my WhatsApp
+    groups have disappeared" (before the move). The chats were in the cloud
+    (the move copied them); the device's list (`tonys_wa_index`) was empty —
+    a browser can clear a site's storage (Safari after ~7 days unopened) and
+    the list was rebuilt only when the WhatsApp window opened. `householdUse`
+    now runs `waRefreshCloud(true)` 4 s after opening (head documents only).
   - **v37.62 — the beta's Firebase settings filled in** (project
     my-kitchen-notes-beta, sender 557995593102; authDomain = the beta's own
     address). The suite passes on a local beta build (328): tests now ask
