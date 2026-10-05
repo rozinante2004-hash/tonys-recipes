@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.65 -->
+<!-- Tony's Recipes Collection v37.66 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -276,7 +276,9 @@
   @media print { #feedbackFab { display: none; } }
   /* …and out of the way while any window is open (its own form included). */
   body:has(.modal-overlay.open) #feedbackFab, body:has(#askOverlay) #feedbackFab,
-  body:has(#manageOverlay) #feedbackFab, body:has(#selectBar[style*="flex"]) #feedbackFab { display: none; }
+  body:has(#manageOverlay) #feedbackFab { display: none; }
+  /* (v37.66 — not "the selection bar's style mentions flex": it always does,
+     shown or not, and that hid the button for everyone. The bar sits above it.) */
   html[data-env-copy] #waFolderSection { display: none; }   /* v37.64 */
   /* v37.59 — the BETA copy is the testers' real app: a small mark, no stripes, no frame. */
   #envRibbon.env-beta { background: #4B3F72; padding: 2px 10px; padding-top: calc(2px + env(safe-area-inset-top)); }
@@ -5889,7 +5891,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.65';
+var APP_VERSION = 'v37.66';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8526,7 +8528,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.65</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.66</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9211,7 +9213,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.65</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.66</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

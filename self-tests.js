@@ -1355,6 +1355,17 @@ window.SELF_TESTS = [
         if(!b || !document.getElementById('feedbackFab') || !b.classList.contains('fb-shine') || !b.getAttribute('aria-label')) throw new Error('the button, its shimmer or its name');
         // (measured as styled: while the Self Test window is open the button stands aside)
         var cs=getComputedStyle(b); if(parseFloat(cs.width)<44 || parseFloat(cs.height)<44) throw new Error('too small to tap: '+cs.width);
+        // v37.66 — and with no window open it is actually SHOWN (a rule meant for
+        // open windows hid it for everyone in v37.64). The Self Test window is set
+        // aside for the measurement and put straight back.
+        var stOv=document.getElementById('selfTestOverlay'), wasOpen=stOv && stOv.classList.contains('open');
+        var others=Array.prototype.slice.call(document.querySelectorAll('.modal-overlay.open')).filter(function(o){ return o!==stOv; });
+        try{
+          if(stOv) stOv.classList.remove('open');
+          others.forEach(function(o){ o.classList.remove('open'); });
+          var shown=getComputedStyle(b).display;
+          if(shown==='none' && !document.getElementById('askOverlay') && !document.getElementById('manageOverlay')) throw new Error('the button is hidden with no window open');
+        } finally { if(stOv && wasOpen) stOv.classList.add('open'); others.forEach(function(o){ o.classList.add('open'); }); }
         localStorage.setItem(FB_FIRST_KEY, String(Date.now()-4*864e5)); renderFeedbackButton();
         if(document.getElementById('feedbackFab').classList.contains('fb-shine')) throw new Error('still shimmering after three days');
         toggleFeedbackButton(); if(document.getElementById('feedbackFab')) throw new Error('hiding it did not');
