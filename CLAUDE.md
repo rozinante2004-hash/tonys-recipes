@@ -815,6 +815,16 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.69 — the iPhone shortcut is not offered twice.** Tony was offered
+    "Save to My Kitchen Notes (TEST)" again although he has it (a page cannot
+    see a phone's shortcuts; the "offered" mark was only in localStorage,
+    which Safari erases after ~a week unopened). The account keeps it too:
+    `users/<uid>/prefs/offers` {offered_ios|offered_computer|offered_android, iosUsed} (`deviceOffersCloud`,
+    read once a session before offering and on opening; what the device knew
+    is synced up). A link shared in on an iPhone (not from the extension) =
+    the shortcut is installed (`iosShortcutNoteUsed`): never offered again,
+    not even in the import window. iOS's "Replace" adding a duplicate is the
+    Shortcuts app's own behaviour. Test `shortcut_not_offered_twice`.
   - **v37.68 + Worker v61 — one inbox for notes; the owner's dot; ✉️.**
     Tony did not see his beta notes in the family app (each copy kept its
     own). Worker v61 `feedback-send` keeps every copy's notes in D1

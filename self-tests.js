@@ -1447,6 +1447,51 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'shortcut_not_offered_twice', group:'UI', name:'📱 The iPhone shortcut is not offered again: the account remembers, and a recipe arriving through it proves it is there (v37.69)',
+    test: async()=>{
+      var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)';
+      var real={ cloud:_offersCloud, db:window._fbDb, user:window._fbUser, force:window._deviceOfferForce, ov:window._iosShortcutOverride };
+      var kept={}; [DEVICE_OFFER_KEY, IOS_SHORTCUT_USED_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      var written=[];
+      try{
+        Object.defineProperty(navigator, 'userAgent', { value:IPHONE, configurable:true });
+        window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
+        localStorage.removeItem(DEVICE_OFFER_KEY); localStorage.removeItem(IOS_SHORTCUT_USED_KEY);
+        window._fbUser={ uid:'uS' };
+        window._fbDb={ collection:function(){ return { doc:function(){ return { collection:function(){ return { doc:function(){ return {
+          get:async function(){ return { exists:true, data:function(){ return { offered_ios: 123, offered_computer: 99 }; } }; },
+          set:async function(d){ written.push(d); } }; } }; } }; } }; } };
+        // The account says it was offered (on another phone, or before Safari cleared this one): not again.
+        _offersCloud=null; await deviceOffersCloud();
+        window._deviceOfferForce=true;
+        if(maybeOfferDeviceShortcut(9)!==false || document.getElementById('deviceOfferOverlay')) throw new Error('offered again although the account remembers it');
+        if(!localStorage.getItem(DEVICE_OFFER_KEY)) throw new Error('this device did not learn it from the account');
+        // Never asked anywhere: offered once, and the account is told.
+        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={}; written=[];
+        if(maybeOfferDeviceShortcut(9)!=='ios') throw new Error('a new iPhone is not offered it');
+        var dlg=document.getElementById('deviceOfferOverlay'); if(dlg) dlg.remove();
+        if(!written.some(function(w){ return w.offered_ios; })) throw new Error('the account was not told it was offered');
+        // Offered the EXTENSION on this account (a computer) says nothing about the iPhone.
+        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={ offered_computer: 5 };
+        if(maybeOfferDeviceShortcut(9)!=='ios') throw new Error('an offer on the computer stopped the iPhone one');
+        dlg=document.getElementById('deviceOfferOverlay'); if(dlg) dlg.remove();
+        // A recipe arriving through the shortcut: installed — never offered, not even in the import window.
+        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={}; written=[];
+        iosShortcutNoteUsed();
+        if(!iosShortcutUsed() || !written.some(function(w){ return w.iosUsed; })) throw new Error('its use was not noted, here and on the account');
+        if(maybeOfferDeviceShortcut(9)!==false) throw new Error('offered although it is in use');
+        openUrlImportModal('');
+        if(document.getElementById('iosShortcutOffer').style.display!=='none') throw new Error('the import window still offers it');
+        closeM('urlImportOverlay');
+      } finally {
+        _offersCloud=real.cloud; window._fbDb=real.db; window._fbUser=real.user; window._deviceOfferForce=real.force;
+        if(real.ov===undefined) delete window._iosShortcutOverride; else window._iosShortcutOverride=real.ov;
+        try{ delete navigator.userAgent; }catch(e){}
+        Object.keys(kept).forEach(function(k){ try{ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); }catch(e){} });
+        var o=document.getElementById('deviceOfferOverlay'); if(o) o.remove();
+      }
+    } },
+
   { id:'rules_behind_is_not_an_error', group:'Sharing', name:'Rules not yet published: noted once and the owner is led to them, not logged as an error on every open (v37.55)',
     test: async()=>{
       if(hhRulesBehind({ code:'permission-denied', message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('a refusal by the rules is not recognised');
