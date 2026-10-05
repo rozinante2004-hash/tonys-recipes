@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.70–v37.74 (5 Oct 2026) and v37.75–v37.76 (5 Oct 2026, Tony's yes, CI green on 6f31cc4).**
   - **v37.76 — the share icon sends.** Tony: the envelope, "adding an arrow
     coming out of the envelope or something more artistic". An inline SVG
     (`.share-ico`): a cream envelope with a terracotta flap and a thin brown
