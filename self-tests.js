@@ -1414,6 +1414,10 @@ window.SELF_TESTS = [
       if(hhRulesBehind({ message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('the wording alone is not recognised');
       if(hhRulesBehind({ code:'unavailable', message:'offline' }, 'test note')!==false) throw new Error('any error is taken for the rules');
       if(document.getElementById('askOverlay')) throw new Error('the self test was interrupted by the offer');
+      // v37.65 — a Copy button before the rules as well as after them.
+      var panel=document.getElementById('accessRulesPanel'), pre=document.getElementById('accessRulesText');
+      var copies=panel ? panel.querySelectorAll('[onclick*="copyAccessRules"]') : [];
+      if(copies.length<2 || !(copies[0].compareDocumentPosition(pre) & Node.DOCUMENT_POSITION_FOLLOWING)) throw new Error('no Copy button before the rules');
     } },
 
   { id:'linked_households', group:'Sharing', name:'🤝 Households link: asked by identifier or any member\'s e-mail, accepted, rejected or put off; each sees the other\'s recipes read-only (v37.53)',

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.64 -->
+<!-- Tony's Recipes Collection v37.65 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5889,7 +5889,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.64';
+var APP_VERSION = 'v37.65';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8526,7 +8526,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.64</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.65</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9211,7 +9211,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.64</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.65</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -29364,6 +29364,8 @@ window.onHeaderScroll = onHeaderScroll;
         <button onclick="toggleAccessRules()" style="font-size:15px;font-weight:600;color:var(--heading);background:var(--card-bg);border:1px solid var(--border);border-radius:9px;cursor:pointer;padding:12px 16px;min-height:44px;width:100%;text-align:start;font-family:'DM Sans','Heebo',sans-serif;">🔧 Show Firestore security rules →</button>
         <div id="accessRulesPanel" style="display:none;margin-top:10px;">
           <div style="font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:8px;">Copy these rules to <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/firestore/databases/-default-/security/rules" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;">Firebase Console → Firestore Database → Rules</a>, paste over everything there, then press <strong>Publish</strong>.</div>
+          <!-- v37.65 — Tony: the Copy button only after the rules meant a lot of scrolling. -->
+          <button onclick="copyAccessRules()" style="margin-bottom:10px;padding:11px 18px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy Rules</button>
           <pre id="accessRulesText" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin:0;"></pre>
           <button onclick="copyAccessRules()" style="margin-top:10px;padding:11px 18px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">📋 Copy Rules</button>
         </div>

@@ -815,6 +815,8 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.65 — 📋 Copy Rules above the rules too** (Tony: a lot of scrolling
+    to reach the one below them). Self-test in `rules_behind_is_not_an_error`.
   - **v37.64 — notes from testers; WhatsApp on in the beta.** Tony (4 Oct):
     testers should get most of the app; "a shiny, lightly animated floating
     icon for feedback". Feature `feedbackButton` (live: false; test + beta:
