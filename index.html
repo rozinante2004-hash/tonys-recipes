@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.76 -->
+<!-- Tony's Recipes Collection v37.77 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6053,7 +6053,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.76';
+var APP_VERSION = 'v37.77';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8368,6 +8368,9 @@ body.banner-shown .header {
   flex-shrink: 0;
 }
 .help-icon-btn:hover { background: rgba(255,255,255,0.3); }
+/* v37.77 — the share badge fills its button: the button's own padding squeezed it to 14 px wide. */
+#shareAppBtn { padding: 0; }
+.share-ico { flex-shrink: 0; }
 /* v36.64 — which interface language is on, on the globe itself (Tony's ask). */
 .lang-badge {
   position: absolute; right: -6px; bottom: -5px;
@@ -8701,7 +8704,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.76</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.77</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8713,8 +8716,8 @@ body.banner-shown .header {
            where the app's own settings already live; a globe in the filter bar
            would read as filtering by language. -->
       <!-- v37.48 — Tony: "Share this App should also be an icon next to the language picker, so it will always be available and visible". -->
-      <!-- v37.76 — Tony: the envelope, with something going out of it (sending, spreading). -->
-      <button class="help-icon-btn" id="shareAppBtn" onclick="openShareAppModal()" title="Share this app" aria-label="Share this app"><svg class="share-ico" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" focusable="false"><rect x="1.4" y="8.6" width="15" height="11.2" rx="2.2" fill="#FFF6E8" stroke="#9A6B4F" stroke-width="0.9"/><path d="M2.3 9.9 8.9 14.9 15.5 9.9" fill="none" stroke="#C1440E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.6 9C12.7 5 16 3 20.6 3.1" fill="none" stroke="#F2B544" stroke-width="2.1" stroke-linecap="round"/><path d="M17.9 0.9 21.2 3.1 18.7 6" fill="none" stroke="#F2B544" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <!-- v37.77 — Tony: the modern share symbol, in our colours (terracotta, cream, gold). -->
+      <button class="help-icon-btn" id="shareAppBtn" onclick="openShareAppModal()" title="Share this app" aria-label="Share this app"><svg class="share-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M8.2 12 15.8 7.6M8.2 12 15.8 16.4" stroke="#FFF6E8" stroke-width="1.9" stroke-linecap="round"/><circle cx="16" cy="7.4" r="2.6" fill="#F2B544"/><circle cx="8" cy="12" r="2.6" fill="#FFF6E8"/><circle cx="16" cy="16.6" r="2.6" fill="#F2B544"/></svg></button>
       <div class="drop-group">
         <button class="help-icon-btn" id="langBtn" onclick="toggleLangMenu()" title="Interface language"
                 aria-label="Interface language: English" data-no-i18n style="position:relative;">🌐<span
@@ -8830,7 +8833,7 @@ body.banner-shown .header {
           <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make?</button>
           <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="1.4" y="8.6" width="15" height="11.2" rx="2.2" fill="#FFF6E8" stroke="#9A6B4F" stroke-width="0.9"/><path d="M2.3 9.9 8.9 14.9 15.5 9.9" fill="none" stroke="#C1440E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.6 9C12.7 5 16 3 20.6 3.1" fill="none" stroke="#F2B544" stroke-width="2.1" stroke-linecap="round"/><path d="M17.9 0.9 21.2 3.1 18.7 6" fill="none" stroke="#F2B544" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Share this app</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M8.2 12 15.8 7.6M8.2 12 15.8 16.4" stroke="#FFF6E8" stroke-width="1.9" stroke-linecap="round"/><circle cx="16" cy="7.4" r="2.6" fill="#F2B544"/><circle cx="8" cy="12" r="2.6" fill="#FFF6E8"/><circle cx="16" cy="16.6" r="2.6" fill="#F2B544"/></svg></span> Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
@@ -9407,7 +9410,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.76</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.77</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9471,7 +9474,7 @@ body.banner-shown .header {
   <div class="modal share-app-modal">
     <button class="modal-close" onclick="closeM('shareAppOverlay')">✕</button>
     <div class="modal-header">
-      <div class="modal-header-title"><span aria-hidden="true" data-no-i18n style="display:inline-flex;vertical-align:-3px;"><svg class="share-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="1.4" y="8.6" width="15" height="11.2" rx="2.2" fill="#FFF6E8" stroke="#9A6B4F" stroke-width="0.9"/><path d="M2.3 9.9 8.9 14.9 15.5 9.9" fill="none" stroke="#C1440E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.6 9C12.7 5 16 3 20.6 3.1" fill="none" stroke="#F2B544" stroke-width="2.1" stroke-linecap="round"/><path d="M17.9 0.9 21.2 3.1 18.7 6" fill="none" stroke="#F2B544" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Share This App</div>
+      <div class="modal-header-title"><span aria-hidden="true" data-no-i18n style="display:inline-flex;vertical-align:-3px;"><svg class="share-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M8.2 12 15.8 7.6M8.2 12 15.8 16.4" stroke="#FFF6E8" stroke-width="1.9" stroke-linecap="round"/><circle cx="16" cy="7.4" r="2.6" fill="#F2B544"/><circle cx="8" cy="12" r="2.6" fill="#FFF6E8"/><circle cx="16" cy="16.6" r="2.6" fill="#F2B544"/></svg></span> Share This App</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">Send this link to anyone — they can open it in their browser and install it on their phone or desktop.</div>
     </div>
     <div class="modal-body">
