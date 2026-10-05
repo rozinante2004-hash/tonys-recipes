@@ -815,6 +815,23 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.74 — ⚙️ in sections; the menu its own width.** Tony: "reorganize
+    the Setting page by functionality … Apparently I got lost there myself."
+    ⚙️ opens on 8 section names (`.set-group` > `.set-head` + `.set-body`):
+    🎨 How it looks · 🏠 My household · 📥 Saving recipes from other apps (with
+    `#shortcutsSection` inside) · 🔗 Connected services · 💾 Backups and photos
+    · 💬 Help and feedback · 🔧 Troubleshooting · 👑 App owner (data-owner-only);
+    then 🗑 Delete my account… on its own, last; ✉️ Confirm my e-mail stays on
+    top when shown. One open at a time (`settingsGroup`, re-placed below ⚙️);
+    all closed each time ⚙️ opens; a section with nothing visible is hidden
+    (`settingsGroupsRefresh`, `.set-empty`). Every "⚙️ → X" the app prints
+    names the section ("⚙️ → 💾 Backups and photos → “Send my photos…”");
+    `ui_menu_directions_true` checks the item is IN the named section. The
+    help knowledge describes the sections. Width: `#settingsDrop` and
+    `#langMenu` had an inline `right:0`, which stretched them from the left
+    edge (measured at -999px) to the screen's right — ~1576 px on Tony's PC;
+    removed (258 px now). New strings are English until Tony runs 🌐 → "…
+    still in English — finish it". Test `settings_in_sections`.
   - **v37.73 + Worker v64 — the ⚙️ menu below the bar; notes only in the
     family app; the extension item named.** Tony on a PC: the ⚙️ menu filled
     the screen and covered ⚙️ (v36.69 moved a menu that fit the screen but not

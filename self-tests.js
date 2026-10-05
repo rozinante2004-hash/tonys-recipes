@@ -1112,7 +1112,10 @@ window.SELF_TESTS = [
         // The section shows only what fits this device.
         setUA(CHROME); refreshShortcutsSection();
         if(!vis('shortcutsSection') || !vis('extensionItem') || vis('iosShortcutItem') || vis('androidShareItem')) throw new Error('a computer\'s section is wrong');
-        if(!/Shortcuts and extensions/.test(document.getElementById('shortcutsSection').textContent)) throw new Error('the section has no heading');
+        // v37.74 — in the ⚙️ section "📥 Saving recipes from other apps", which names the browser.
+        var sg=document.getElementById('shortcutsSection').closest('.set-group');
+        if(!sg || !/Saving recipes from other apps/.test(sg.querySelector('.set-head').textContent)) throw new Error('the shortcuts are not under their section');
+        if(!/Chrome extension/.test(document.getElementById('extensionItem').textContent)) throw new Error('the extension item does not say it is Chrome\u2019s: '+document.getElementById('extensionItem').textContent);
         setUA(IPHONE); window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123'; refreshShortcutsSection();
         if(!vis('iosShortcutItem') || vis('extensionItem') || vis('androidShareItem')) throw new Error('an iPhone\'s section is wrong');
         setUA(ANDROID); refreshShortcutsSection();
@@ -1121,7 +1124,7 @@ window.SELF_TESTS = [
         window._deviceOfferForce=true; localStorage.removeItem(DEVICE_OFFER_KEY); setUA(CHROME);
         document.documentElement.removeAttribute('data-mkn-extension-'+tag);
         if(maybeOfferDeviceShortcut(9)!=='computer') throw new Error('a computer\'s first visit offers nothing');
-        if(!/Save recipes in one click/.test(dlg().textContent) || !/Save recipe button under Facebook/.test(dlg().textContent) || !/Shortcuts and extensions/.test(dlg().textContent)) throw new Error('the offer lacks its why or where: '+dlg().textContent.slice(0,200));
+        if(!/Save recipes in one click/.test(dlg().textContent) || !/Save recipe button under Facebook/.test(dlg().textContent) || !/Saving recipes from other apps/.test(dlg().textContent)) throw new Error('the offer lacks its why or where: '+dlg().textContent.slice(0,200));
         dlg().remove();
         if(maybeOfferDeviceShortcut(9)!==false || dlg()) throw new Error('offered twice');
         // Installed already: not offered.
@@ -6048,6 +6051,44 @@ window.SELF_TESTS = [
       }
     }) },
 
+  { id:'settings_in_sections', group:'UI', name:'⚙️ Settings in sections: their names first, one open at a time, empty ones not shown, below the bar (v37.74)',
+    test: async()=>{
+      var m=document.getElementById('settingsDrop');
+      var heads=m.querySelectorAll('.set-group > .set-head');
+      if(heads.length<6) throw new Error('sections: '+heads.length);
+      // Every item of the menu is in a section — but the account's deletion, last and on its own, and the confirmation reminder.
+      var loose=Array.prototype.filter.call(m.querySelectorAll('.drop-item'), function(b){ return !b.closest('.set-group') && b.id!=='deleteAccountItem' && b.id!=='confirmEmailItem'; });
+      if(loose.length) throw new Error('items outside any section: '+loose.map(function(b){ return b.textContent.trim(); }).join(', '));
+      var last=Array.prototype.slice.call(m.querySelectorAll('.drop-item')).pop();
+      if(!last || last.id!=='deleteAccountItem') throw new Error('Delete my account is not the last item');
+      toggleDrop('settingsDrop');
+      await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); }); await wait(30);
+      try{
+        var visible=function(el){ return el.getClientRects().length>0 && getComputedStyle(el).display!=='none'; };
+        var shownItems=Array.prototype.filter.call(m.querySelectorAll('.set-body .drop-item'), visible);
+        if(shownItems.length) throw new Error('⚙️ opens with a section already open ('+shownItems.length+' items showing)');
+        var g=m.querySelector('.set-group[data-group="trouble"]');
+        settingsGroup('trouble');
+        if(!g.classList.contains('open') || g.querySelector('.set-head').getAttribute('aria-expanded')!=='true') throw new Error('a section did not open');
+        if(!visible(g.querySelector('[onclick*="openSyncHealth"]'))) throw new Error('its items are not shown');
+        if(!m.classList.contains('open')) throw new Error('opening a section closed the menu');
+        settingsGroup('look');
+        if(g.classList.contains('open') || !m.querySelector('.set-group[data-group="look"]').classList.contains('open')) throw new Error('two sections open at once');
+        var rc=m.getBoundingClientRect(), sb=document.getElementById('settingsBtn').getBoundingClientRect();
+        // v37.74 — "takes up the entire PC's screen": an inline right:0 stretched it from the button to the screen's edge.
+        if(window.innerWidth>800 && rc.width>520) throw new Error('the Settings menu is '+Math.round(rc.width)+' px wide on a '+window.innerWidth+' px screen');
+        if(rc.top<sb.bottom-1 || rc.bottom>window.innerHeight+1) throw new Error('an open section moved the menu over ⚙️ or off the screen');
+        settingsGroup('look');
+        if(m.querySelector('.set-group.open')) throw new Error('a second tap did not close the section');
+        // A section with nothing for this person is not shown: the owner's, for someone else.
+        var realOwner=window.isAppOwner;
+        closeDrop('settingsDrop'); window.isAppOwner=function(){ return false; };
+        toggleDrop('settingsDrop'); await wait(30);
+        if(visible(m.querySelector('.set-group[data-group="owner"] > .set-head'))) throw new Error('the App owner section shows for someone who is not the owner');
+        window.isAppOwner=realOwner;
+      } finally { closeDrop('settingsDrop'); if(typeof applyOwnerOnlyItems==='function') applyOwnerOnlyItems(); }
+    } },
+
   { id:'ui_menu_directions_true', group:'UI', name:'Every “⚙️ → X” the app prints is really in Settings (5g.10)',
     test: async()=>{
       // Tony went to ⚙️ Settings for "Send my photos to the cloud" because three
@@ -6070,14 +6111,19 @@ window.SELF_TESTS = [
       // messages — quoted names only, so the check is about a specific item.
       var sources=[autoFetchMissingPhotos, runPhotoRescue, undoAutoFetch, healCloudPhotos]
         .map(function(f){ return String(f); }).join('\n');
-      var claims=[], re=/⚙️\s*(?:Settings\s*)?→\s*[“"]([^”"]{3,60})[”"]/g, m;
-      while((m=re.exec(sources))) claims.push(m[1]);
+      // v37.74 — ⚙️ is in sections: "⚙️ → <section> → “item”", and the item must be IN that section.
+      var claims=[], re=/⚙️\s*(?:Settings\s*)?→\s*(?:([^→“"\n]{3,50}?)\s*→\s*)?[“"]([^”"]{3,60})[”"]/g, m, sections=[];
+      while((m=re.exec(sources))) { claims.push(m[2]); sections.push(m[1]||''); }
       if(!claims.length)
         throw new Error('no “⚙️ → …” directions found at all — this check would pass vacuously');
-      claims.forEach(function(c){
+      claims.forEach(function(c, i){
         var name=c.replace(/^[^A-Za-z\u0590-\u05FF]+/, '').trim();
         if(!inSettings(name))
           throw new Error('the app tells the user “⚙️ → ' + c + '” but no such item is in the Settings menu — they will look and not find it, which is exactly what happened');
+        var head=Array.prototype.filter.call(settings.querySelectorAll('.set-head'), function(h){ return sections[i] && h.textContent.trim()===sections[i].trim(); })[0];
+        if(!sections[i] || !head) throw new Error('“⚙️ → ' + c + '” does not name the section it is in ('+JSON.stringify(sections[i])+')');
+        var inIt=Array.prototype.some.call(head.parentElement.querySelectorAll('.drop-item'), function(b){ return (b.textContent||'').toLowerCase().indexOf(name.toLowerCase())>-1; });
+        if(!inIt) throw new Error('“⚙️ → ' + sections[i] + ' → ' + c + '”: the item is not in that section');
       });
 
       // And the three photo-repair tools must be reachable at all.

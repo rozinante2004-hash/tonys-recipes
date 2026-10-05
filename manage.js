@@ -169,7 +169,7 @@
   function syncDot() { if (S.notes && typeof feedbackDot === 'function') feedbackDot(newCount()); }
   function notesHtml() {
     if (S.notesError) return '<div class="mg-note">The notes could not be read: ' + esc(S.notesError)
-      + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 👥 Family Access → Show rules).' : '') + '</div>';
+      + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 🏠 My household → 👥 Family Access → Show rules).' : '') + '</div>';
     if (!S.notes) return '<div class="mg-empty">⏳ Reading the notes…</div>';
     var list = S.notes.filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; });
     var filt = '<div class="mg-tools" style="margin-bottom:10px;">'
@@ -247,7 +247,7 @@
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
     if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
-      + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
+      + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 🏠 My household → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
       + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
     var nc = newCount();
@@ -332,7 +332,7 @@
       + (r.deleted ? '' : '<div class="mg-h">Delete</div>')
       + (r.deleted ? '' : r.remote ? '<div class="mg-muted">It lives in the ' + esc(r.copy) + ' copy’s own database, so it is deleted there'
           + (url ? ': <a class="mg-link" href="' + escA(url) + '" target="_blank" rel="noopener">open the ' + esc(r.copy) + ' copy’s Households \u2197</a>' : '.') + '</div>'
-       : mine(r) ? '<div class="mg-muted">This is the household you are in now. To delete it, use ⚙️ → 👥 Family Access → 🗑 Delete this household.</div>'
+       : mine(r) ? '<div class="mg-muted">This is the household you are in now. To delete it, use ⚙️ → 🏠 My household → 👥 Family Access → 🗑 Delete this household.</div>'
                  : '<button type="button" class="mg-btn mg-danger" id="mgDelete" onclick="mknManage.del()">🗑 Delete this household…</button>')
       + '</div>';
   }
@@ -495,7 +495,7 @@
       var n;
       try { n = await deleteHousehold(r, function (msg) { toast('\u23f3 ' + msg, 4000); }); }
       catch (e) { showServiceError('The household could not be fully deleted: ' + (e && e.message)
-        + (/permission/i.test(String(e && e.message)) ? '\n\nThis copy\u2019s database rules need publishing first (⚙️ → 👥 Family Access → Show rules).' : '')
+        + (/permission/i.test(String(e && e.message)) ? '\n\nThis copy\u2019s database rules need publishing first (⚙️ → 🏠 My household → 👥 Family Access → Show rules).' : '')
         + '\n\nWhat was already removed stays removed; run it again to finish.'); return false; }
       syncLog('save', 'Deleted a household from the management app', { name: r.name, code: r.code, items: n });
       // v37.72 — kept on the list, marked as deleted by you, with who was in it.
