@@ -17,6 +17,8 @@
     "sitePath": "/",
     "dataLayout": "households",
     "_why_dataLayout": "WP-D rehearsal (28 Sep 2026): the test copy runs in the household layout after Tony copied its collection into a household (Family Access → Copy this collection into a household). Its `shared` collection is untouched; setting this back to 'shared' returns to it.",
+    "extensionStores": { "chrome": "", "edge": "", "firefox": "" },
+    "_why_extensionStores": "v37.73 — the stores list the FAMILY's extension; this copy offers its own download (my-kitchen-notes-extension-TEST.zip), never the family's listing.",
     "features": {
       "bringDirect": false,
       "feedbackButton": true
@@ -64,6 +66,8 @@
     "iosShortcutUrl": "https://www.icloud.com/shortcuts/d207d5c07d9049bfb311aa13cccef43e",
     "_why_iosShortcutUrl": "v37.72 — Tony's beta shortcut (5 Oct 2026): a copy of his, pointed at this address.",
     "dataLayout": "households",
+    "extensionStores": { "chrome": "", "edge": "", "firefox": "" },
+    "_why_extensionStores": "v37.73 — the stores list the FAMILY's extension; this copy offers its own download (my-kitchen-notes-extension-BETA.zip), never the family's listing.",
     "features": {
       "whatsapp": true,
       "bringDirect": false,

@@ -1442,7 +1442,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'feedback_notes', group:'Sharing', name:'💬 Notes from testers: a floating button (beta and test copy), a form with screenshot and log, kept for the owner, read and marked in 📊 Households (v37.64)',
+  { id:'feedback_notes', group:'Sharing', name:'💬 Notes from testers: a floating button (beta and test copy), a form with screenshot and log, ALWAYS to the one inbox, read and marked in the family app\u2019s 📊 Households only (v37.64, v37.73)',
     test: async()=>{
       var real={ ov:Object.assign({}, window._featureOverride), db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError,
                  email:window.sendFeedbackByEmail, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, hh:window._household };
@@ -1488,33 +1488,45 @@ window.SELF_TESTS = [
         if(!fbSignedInUser() || fbSignedInUser().uid!=='uEarly') throw new Error('the sign-in Firebase already has is not used');
         window._fbAuth=realAuth;
         document.getElementById('feedbackOverlay').remove();
-        // Signed in: the form; an empty note is refused; a note is kept with exactly the fields the rules accept.
-        window._fbUser={ uid:'uT', email:'tester@example.com', displayName:'Tess' }; window._household={ hid:'hT', name:'Tess\u2019s Kitchen' };
+        // Signed in: the form; an empty note is refused; the note goes to the ONE inbox (the Worker), the sign-in proving who.
+        window._fbUser={ uid:'uT', email:'tester@example.com', displayName:'Tess', getIdToken:async function(){ return 'tok'; } }; window._household={ hid:'hT', name:'Tess\u2019s Kitchen' };
         window._fbDb={ collection:function(c){ return { add:async function(d){ added.push({ c:c, d:d }); return { id:'n1' }; } }; } };
-        _workerHealth=false;   // an older Worker: this copy's own database
+        var sentToWorker=null; window.fetch=async function(u, init){ sentToWorker=JSON.parse(init.body); return new Response('{"ok":true,"id":7}', { status:200 }); };
+        // v37.73 — whatever the app believes of the Worker (here: an old one), never this copy's own database.
+        _workerHealth=false;
         openFeedbackForm();
         if(!document.getElementById('feedbackOverlay') || !document.getElementById('fbLog').checked) throw new Error('the form, with the log ticked');
         if(getComputedStyle(document.getElementById('feedbackFab')).display!=='none') throw new Error('the button sits on top of the open form');
-        if(await sendFeedbackNote()!==false || added.length) throw new Error('an empty note was sent');
+        if(await sendFeedbackNote()!==false || sentToWorker) throw new Error('an empty note was sent');
         document.getElementById('fbText').value='The photo search is lovely';
         _fbShot='data:image/jpeg;base64,AAAA';
         if(await sendFeedbackNote()!==true) throw new Error('the note was not sent');
-        var d=added[0] && added[0].d, allowed=['uid','email','name','hid','household','text','shot','log','version','env','device','lang','where','at','status'];
-        if(!d || added[0].c!=='feedback' || d.uid!=='uT' || d.status!=='new' || d.text!=='The photo search is lovely' || d.hid!=='hT' || d.shot.indexOf('data:image')!==0 || d.version!==APP_VERSION)
-          throw new Error('the note: '+JSON.stringify(d && Object.assign({}, d, { log:'…' })));
-        var extra=Object.keys(d).filter(function(k){ return allowed.indexOf(k)===-1; });
-        if(extra.length) throw new Error('fields the rules refuse: '+extra.join(', '));
+        var d=sentToWorker && sentToWorker.note;
+        if(!sentToWorker || sentToWorker.action!=='feedback-send' || sentToWorker.idToken!=='tok' || !d || d.text!=='The photo search is lovely' || d.hid!=='hT' || d.shot.indexOf('data:image')!==0 || d.version!==APP_VERSION)
+          throw new Error('the note did not go to the one inbox: '+JSON.stringify(sentToWorker && Object.assign({}, sentToWorker, { note:'…' })));
+        if(added.length) throw new Error('the note was kept in this copy\u2019s own database (Tony never looks there)');
+        if(d.uid!==undefined || d.email!==undefined) throw new Error('the note names its own sender (the server takes it from the sign-in)');
         if(!d.log || d.log.length>200000) throw new Error('the log: '+(d.log||'').length);
         if(document.getElementById('feedbackOverlay')) throw new Error('the form stayed open');
-        // v37.68 — a Worker that keeps notes (v61): ONE inbox for every copy, the sign-in proving who.
-        var sentToWorker=null; window.fetch=async function(u, init){ sentToWorker=JSON.parse(init.body); return new Response('{"ok":true,"id":7}', { status:200 }); };
-        _workerHealth={ ok:true, feedback:true }; window._fbUser.getIdToken=async function(){ return 'tok'; };
-        openFeedbackForm(); document.getElementById('fbText').value='To the one inbox';
-        if(await sendFeedbackNote()!==true || !sentToWorker || sentToWorker.action!=='feedback-send' || sentToWorker.idToken!=='tok' || sentToWorker.note.text!=='To the one inbox' || added.length!==1)
-          throw new Error('the note did not go to the one inbox: '+JSON.stringify(sentToWorker && Object.assign({}, sentToWorker, { note:'…' })));
-        if(sentToWorker.note.uid!==undefined || sentToWorker.note.email!==undefined) throw new Error('the note names its own sender (the server takes it from the sign-in)');
+        // The inbox unreachable: not sent, kept in the box, and still never in this copy's database.
+        var shown=''; window.showServiceError=function(m){ shown=m; };
+        window.fetch=async function(){ return new Response('{"error":"down"}', { status:502 }); };
+        openFeedbackForm(); document.getElementById('fbText').value='Kept for later';
+        if(await sendFeedbackNote()!==false || !/could not be sent/.test(shown) || document.getElementById('fbText').value!=='Kept for later' || added.length) throw new Error('a note that could not reach the inbox: '+shown);
+        document.getElementById('feedbackOverlay').remove();
+        window.showServiceError=function(m){ throw new Error('error shown: '+m); };
         window.fetch=real.fetch;
-        // The owner's Feedback tab.
+        // v37.73 — notes left in this copy's database move to the inbox (the owner's app), each removed once the inbox has it.
+        var stranded=[ { id:'s1', d:{ uid:'uB', email:'b@example.com', text:'Left in the beta', at:1, status:'new' } }, { id:'s2', d:{ uid:'uC', email:'c@example.com', text:'Second', at:2, status:'new' } } ];
+        var removed=[], imported=[];
+        window._fbDb={ collection:function(c){ return { limit:function(){ return { get:async function(){ return { forEach:function(fn){ stranded.forEach(function(x){ fn({ id:x.id, data:function(){ return x.d; }, ref:{ delete:async function(){ removed.push(x.id); } } }); }); } }; } }; } }; } };
+        window.isAppOwner=function(){ return true; }; _workerHealth={ ok:true, feedback:true, notesImport:true };
+        window.fetch=async function(u, init){ var b=JSON.parse(init.body); imported.push(b); return new Response(imported.length===1 ? '{"ok":true,"id":9}' : '{"error":"down"}', { status:imported.length===1 ? 200 : 502 }); };
+        var moved=await feedbackMoveToInbox();
+        if(moved!==1 || imported[0].op!=='notes-import' || imported[0].note.email!=='b@example.com' || imported[0].project!==String(APP_CONFIG.firebase.projectId) || removed.join()!=='s1')
+          throw new Error('moving the stranded notes: '+JSON.stringify({ moved:moved, removed:removed, first:imported[0] && imported[0].op }));
+        window.fetch=real.fetch;
+        // The owner's Feedback tab — in the FAMILY app only.
         var notes=[ { id:'n1', uid:'uT', email:'tester@example.com', household:'Tess\u2019s Kitchen', text:'The photo search is lovely', shot:'', log:'L', version:'v37.64', env:'beta', at:Date.now(), status:'new' },
                     { id:'n2', uid:'uU', email:'u@example.com', text:'Done one', at:Date.now()-1000, status:'done' } ];
         window._fbDb={ collection:function(c){
@@ -1524,10 +1536,17 @@ window.SELF_TESTS = [
           collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
         window.isAppOwner=function(){ return true; }; _workerHealth=null;
         window.fetch=async function(){ return new Response('{"error":"METER: not set up"}', { status:503 }); };
+        var dot=document.getElementById('feedbackDot');
+        if(!feedbackInboxHere()){
+          await openManagement();
+          if(/Feedback/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the notes are shown in the '+APP_CONFIG.environment+' copy (only the family app reads them)');
+          feedbackDot(2);
+          if(!dot.hidden) throw new Error('the '+APP_CONFIG.environment+' copy shows the notes dot');
+          return;
+        }
         await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
         var t=document.getElementById('manageOverlay').textContent;
         if(t.indexOf('The photo search is lovely')===-1 || t.indexOf('Done one')!==-1 || !/Feedback\s*1/.test(t)) throw new Error('the Feedback tab: '+t.slice(0,300));
-        var dot=document.getElementById('feedbackDot');
         feedbackDot(1);
         if(!dot || dot.hidden || dot.className!=='fb-dot-new') throw new Error('no red dot on ⚙️ with a new note');
         await mknManage.mark('dn1','done');
@@ -2893,12 +2912,15 @@ window.SELF_TESTS = [
       var p=dropPlacement(btn, 230, 1100, W, H);
       if(p.top<8) throw new Error('a tall menu starts off the top of the screen (top '+p.top+')');
       if(!p.maxHeight || p.top+p.maxHeight>H-8) throw new Error('a menu taller than the screen is not capped to it (top '+p.top+', max '+p.maxHeight+')');
-      // v36.69 — Tony's NEXT case: a menu that does not fit below the button
-      // but DOES fit on the screen. v36.67 capped it and made it scroll, and
-      // Deployments vanished below the fold. All of it must show, uncapped.
+      // v37.73 — Tony on a PC: the ⚙️ menu, moved up to fit (v36.69), covered
+      // the header and ⚙️ itself; only Esc closed it. A menu that does not fit
+      // below its button opens below it anyway, capped to the room there and
+      // scrolling — the header stays clickable.
       var mid=dropPlacement(btn, 230, 760, W, H);
-      if(mid.maxHeight) throw new Error('a menu that fits on the screen was cut to the room below the button — its last items hide');
-      if(mid.top<8 || mid.top+760>H-8) throw new Error('a menu that fits on the screen is not wholly on it (top '+mid.top+')');
+      if(mid.top!==btn.bottom+4) throw new Error('a menu too tall for the room below covers its button (top '+mid.top+')');
+      if(!mid.maxHeight || mid.top+mid.maxHeight>H-8) throw new Error('…and is not capped to the room below (max '+mid.maxHeight+')');
+      var pc=dropPlacement({ top:14, bottom:52, right:1880 }, 260, 1000, 1920, 960);
+      if(pc.top!==56 || pc.maxHeight!==960-8-56) throw new Error('on a PC the menu does not open below the bar (top '+pc.top+', max '+pc.maxHeight+')');
       // A menu that fits below opens below, uncapped.
       var q=dropPlacement(btn, 230, 400, W, H);
       if(q.top!==btn.bottom+4 || q.maxHeight) throw new Error('a menu that fits below did not simply open below');
@@ -2924,6 +2946,8 @@ window.SELF_TESTS = [
         if(headerSlidePx() && _hdrHidden) throw new Error('opening ⚙️ with the header slid away did not bring the header back');
         if(rc.top<0 || rc.bottom>window.innerHeight+1) throw new Error('the Settings menu is outside the window ('+Math.round(rc.top)+'…'+Math.round(rc.bottom)+' of '+window.innerHeight+')');
         if(m.scrollHeight>m.clientHeight+1 && getComputedStyle(m).overflowY!=='auto') throw new Error('a capped menu cannot be scrolled');
+        var sb=document.getElementById('settingsBtn').getBoundingClientRect();
+        if(rc.top<sb.bottom-1) throw new Error('the Settings menu covers ⚙️ (menu top '+Math.round(rc.top)+', ⚙️ bottom '+Math.round(sb.bottom)+')');
       } finally { closeDrop('settingsDrop'); _hdrHidden=hidWas; applyHeaderGeometry(); }
     } },
 

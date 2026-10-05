@@ -996,8 +996,19 @@ console.log('\nAI per household (v60):');
     expect('…marks one done', f.status === 200 && db.raw.prepare('SELECT status FROM feedback WHERE id = ?').get(id).status === 'done', JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'note-delete', id, idToken: tOwner });
     expect('…and removes it', f.status === 200 && !db.raw.prepare('SELECT id FROM feedback WHERE id = ?').get(id), JSON.stringify(f));
+    // v64 — notes left in a copy's own database move to the inbox, as they were.
+    const old = { uid: 'uOld', email: 'old@example.com', text: 'Left in the beta', at: 1759500000000, status: 'new', env: 'beta', shot: 'data:image/png;base64,AAAA' };
+    f = await fb({ action: 'meter-admin', op: 'notes-import', project: 'my-kitchen-notes-beta', note: old, idToken: tA });
+    expect('only the owner moves notes in', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes-import', project: 'my-kitchen-notes-beta', note: old, idToken: tOwner });
+    const im = db.raw.prepare("SELECT * FROM feedback WHERE text = 'Left in the beta'").all();
+    expect('a note left in the beta\'s database joins the inbox — its writer, time and copy kept', f.status === 200 && im.length === 1 && im[0].email === 'old@example.com' && im[0].project === 'my-kitchen-notes-beta' && im[0].at === 1759500000000 && im[0].status === 'new', JSON.stringify(im));
+    f = await fb({ action: 'meter-admin', op: 'notes-import', project: 'my-kitchen-notes-beta', note: old, idToken: tOwner });
+    expect('…and moved twice, it is kept once', f.status === 200 && f.d.already === true && db.raw.prepare("SELECT COUNT(*) AS n FROM feedback WHERE text = 'Left in the beta'").get().n === 1, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes-import', project: 'someone-elses-app', note: old, idToken: tOwner });
+    expect('…only from a copy this server serves', f.status === 400, JSON.stringify(f));
     const hh2 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
-    expect('health says notes go here (so the app sends them)', hh2.feedback === true, JSON.stringify(hh2.feedback));
+    expect('health says notes go here (so the app sends them)', hh2.feedback === true && hh2.notesImport === true, JSON.stringify(hh2));
     // v62 — one Households page for every copy.
     expect('health says households may report themselves', hh2.reports === true, JSON.stringify(hh2.reports));
     const report = { name: 'ignored', members: [{ uid: 'uF', email: 'f@example.com', name: 'F', role: 'owner', lastSeen: 1759600000000, extra: 'x' }],

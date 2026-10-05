@@ -251,7 +251,10 @@
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
       + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
     var nc = newCount();
-    var tabs = '<div class="mg-tabs" role="tablist">'
+    // v37.73 — the notes are read in the family app only (Tony: never in the beta's).
+    var inbox = typeof feedbackInboxHere !== 'function' || feedbackInboxHere();
+    if (!inbox) S.tab = 'households';
+    var tabs = !inbox ? '' : '<div class="mg-tabs" role="tablist">'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'households') + '" class="mg-tab' + (S.tab === 'households' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'households\')">🏠 Households</button>'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'feedback') + '" class="mg-tab' + (S.tab === 'feedback' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'feedback\')">💬 Feedback' + (nc ? ' <span class="mg-badge">' + nc + '</span>' : '') + '</button></div>';
     if (S.tab === 'feedback') { body.innerHTML = tabs + notesHtml(); return; }
@@ -430,7 +433,7 @@
         document.body.appendChild(ov);
         ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') api.close(); });
       }
-      loadNotes().then(function () { render(); syncDot(); });
+      if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadNotes().then(function () { render(); syncDot(); });
       return api.reload();
     },
     tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(render); },

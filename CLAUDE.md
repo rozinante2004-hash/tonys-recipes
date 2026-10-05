@@ -815,6 +815,21 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.73 + Worker v64 — the ⚙️ menu below the bar; notes only in the
+    family app; the extension item named.** Tony on a PC: the ⚙️ menu filled
+    the screen and covered ⚙️ (v36.69 moved a menu that fit the screen but not
+    the room below up over the header); only Esc closed it. `dropPlacement`:
+    a visible button with ≥240 px below (and more room below than above) →
+    the menu opens below it, capped and scrolling (the fade). Notes: the beta's
+    were in the beta's own database — `sendFeedbackNote` now ALWAYS sends to
+    the Worker (no Firestore fallback; failure keeps the note in the box);
+    the 💬 Feedback tab, the ⚙️ dot and the "new notes" toast are family-app
+    only (`feedbackInboxHere`); the owner's app in any copy moves notes left
+    in its database into the inbox (`feedbackMoveToInbox`, Worker v64
+    `notes-import`, owner only, dedup on project+uid+at+text; health
+    `notesImport`). ⚙️ "🧩 Chrome extension (Save-recipe button)" — named by
+    browser (Tony did not find the beta's). test/beta set `extensionStores`
+    empty, so the family's store listing never reaches them.
   - **v37.72 + Worker v63 — deleted households stay listed, marked; the
     beta's shortcut.** Tony: "I would like to know who deleted their account
     as well. Please do not remove these entries … Just mark them". Worker v63:

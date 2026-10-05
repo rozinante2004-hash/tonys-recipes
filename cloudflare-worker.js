@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v63
+// Tony's Recipes — Cloudflare Worker v64
+// v64: NOTES LEFT BEHIND come to the one inbox. Tony found the beta's notes
+//      in the beta's own database (an app that thought the inbox was missing
+//      kept them there). `meter-admin` `notes-import` (owner only) moves such
+//      a note in, keeping who wrote it, when, and its copy; sent twice, it is
+//      kept once. Health: `notesImport`.
 // v63: A DELETED HOUSEHOLD STAYS LISTED, marked. Tony: "I would like to know
 //      who deleted their account as well … do not remove these entries".
 //      `household-report` `gone` (its owner only: deleting the household, or
@@ -230,7 +235,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v63';
+const WORKER_VERSION = 'v64';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -653,6 +658,7 @@ async function handleRequest(request, env) {
         metering: { version: 1, db: !!env.METER_DB },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
+        notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1689,6 +1695,27 @@ async function feedbackAdmin(env, db, body) {
       + 'FROM feedback ORDER BY at DESC LIMIT 300').all()).results || [];
     return jsonResp({ notes: rows });
   }
+  // v64 — a note kept in a copy's own database (before the inbox, or by an
+  // app that thought it missing), moved here by the owner's app. Its writer,
+  // time and copy are kept as they were; the same note twice is kept once.
+  if (body.op === 'notes-import') {
+    const n = body.note || {}, str = (v, max) => String(v == null ? '' : v).slice(0, max);
+    const project = String(body.project || '');
+    if (!csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT).includes(project)) return jsonResp({ error: 'FEEDBACK: not a copy this server serves.' }, 400);
+    const text = str(n.text, 5000).trim(), at = Number(n.at) || Date.now();
+    if (!text) return jsonResp({ error: 'FEEDBACK: the note is empty.' }, 400);
+    const shot = str(n.shot, 750000);
+    if (shot && !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(shot)) return jsonResp({ error: 'FEEDBACK: the screenshot is not a picture.' }, 400);
+    const dup = await db.prepare('SELECT id FROM feedback WHERE project = ?1 AND uid = ?2 AND at = ?3 AND text = ?4')
+      .bind(project, str(n.uid, 128), at, text).first();
+    if (dup) return jsonResp({ ok: true, id: dup.id, already: true });
+    const st = ['new', 'seen', 'done'].indexOf(n.status) === -1 ? 'new' : n.status;
+    const r = await db.prepare('INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) '
+      + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)')
+      .bind(project, str(n.uid, 128), str(n.email, 200), str(n.name, 120), str(n.hid, 64), str(n.household, 120), text, shot,
+            str(n.log, 200000), str(n.version, 20), str(n.env, 20), str(n.device, 300), str(n.lang, 10), at, st).run();
+    return jsonResp({ ok: true, id: (r && r.meta && r.meta.last_row_id) || null });
+  }
   if (body.op === 'notes-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
     return jsonResp({ new: (r && r.n) || 0 });
@@ -2201,4 +2228,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v63 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v64 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

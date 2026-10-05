@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.72 -->
+<!-- Tony's Recipes Collection v37.73 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5695,16 +5695,17 @@ async function sendFeedbackNote() {
     at: Date.now(), status: 'new' };
   try {
     // v37.68 — one inbox for every copy: through the Worker (v61+), which
-    // keeps it with the copy it came from; an older Worker → this copy's own
-    // database, as in v37.64.
-    if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
-    if (_workerHealth && _workerHealth.feedback && u.getIdToken) {
-      var send = {}; Object.keys(note).forEach(function(k){ if (['uid', 'email', 'at', 'status'].indexOf(k) === -1) send[k] = note[k]; });
-      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-        body: workerBody({ action: 'feedback-send', idToken: await u.getIdToken(), note: send }), signal: AbortSignal.timeout(30000) });
-      var d = {}; try { d = await r.json(); } catch(e2) {}
-      if (!r.ok || !d.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
-    } else await hhDb().collection('feedback').add(note);
+    // keeps it with the copy it came from. v37.73 — ALWAYS there: Tony found
+    // the beta's notes in the beta's own database (an app that thought the
+    // inbox missing — an old health answer, or none yet — kept them there),
+    // where he never looks. A note that cannot reach the inbox is not sent;
+    // it stays in the box.
+    if (!u.getIdToken) throw new Error('sign in again first');
+    var send = {}; Object.keys(note).forEach(function(k){ if (['uid', 'email', 'at', 'status'].indexOf(k) === -1) send[k] = note[k]; });
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'feedback-send', idToken: await u.getIdToken(), note: send }), signal: AbortSignal.timeout(30000) });
+    var d = {}; try { d = await r.json(); } catch(e2) {}
+    if (!r.ok || !d.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
   }
   catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
@@ -5719,15 +5720,42 @@ async function sendFeedbackNote() {
 }
 // The app's owner hears about new notes when he opens the app.
 var _fbNewTold = false;
-// v37.68 — in EVERY copy (the family app is where Tony looks): the new notes
-// in the one inbox, plus any kept in this copy's own database before it.
+// v37.73 — Tony: the notes "arrived at the Beta's feedback area, where they
+// should never go". The inbox is read in the FAMILY app only: its 💬 Feedback
+// tab, its dot and its "new notes" word. Every copy (the owner's app) moves
+// notes left in its own database into the inbox (`feedbackMoveToInbox`).
+function feedbackInboxHere() { return String((window.APP_CONFIG && APP_CONFIG.environment) || 'live') === 'live'; }
 async function feedbackTellOwner() {
   if (_fbNewTold || _selfTestRunning || typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return 0;
   _fbNewTold = true;
+  try { await feedbackMoveToInbox(); } catch(e) {}
+  if (!feedbackInboxHere()) { feedbackDot(null); return 0; }
   var n = await feedbackCountNew();
   if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000);
   feedbackDot(n);
   return n;
+}
+// Notes kept in this copy's own database (v37.64–67, or by an app that
+// thought the inbox missing) go to the inbox — each removed here only once
+// the inbox has it (Worker v64 `notes-import`, owner only).
+async function feedbackMoveToInbox() {
+  if (typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb() || !window._fbUser) return 0;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+  if (!(_workerHealth && _workerHealth.notesImport)) return 0;
+  var docs = [];
+  (await hhDb().collection('feedback').limit(100).get()).forEach(function(d){ docs.push(d); });
+  var project = String((APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || ''), moved = 0;
+  for (var i = 0; i < docs.length; i++) {
+    var n = docs[i].data() || {};
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'meter-admin', op: 'notes-import', project: project, note: n, idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(30000) });
+    var d = {}; try { d = await r.json(); } catch(e) {}
+    if (!r.ok || !d.ok) break;
+    await docs[i].ref.delete();
+    moved++;
+  }
+  if (moved) syncLog('save', 'Moved notes from this copy\u2019s database to the one inbox', { notes: moved });
+  return moved;
 }
 async function feedbackCountNew() {
   var n = 0;
@@ -5749,17 +5777,18 @@ async function feedbackCountNew() {
 function feedbackDot(n) {
   var d = document.getElementById('feedbackDot');
   if (!d) return;
-  if (typeof isAppOwner !== 'function' || !isAppOwner() || typeof n !== 'number') { d.hidden = true; return; }
+  if (typeof isAppOwner !== 'function' || !isAppOwner() || typeof n !== 'number' || !feedbackInboxHere()) { d.hidden = true; return; }
   d.hidden = false;
   d.className = n > 0 ? 'fb-dot-new' : 'fb-dot-read';
   var b = document.getElementById('settingsBtn');
   if (b) b.setAttribute('aria-label', 'Settings' + (n > 0 ? ' — ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers' : ''));
 }
-setInterval(function(){ if (typeof isAppOwner === 'function' && isAppOwner() && !_selfTestRunning && hhDb()) feedbackCountNew().then(feedbackDot).catch(function(){}); }, 15 * 60e3);
+setInterval(function(){ if (typeof isAppOwner === 'function' && isAppOwner() && !_selfTestRunning && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackDot).catch(function(){}); }, 15 * 60e3);
 window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew;
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
 window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedbackNote; window.fbShotPicked = fbShotPicked;
 window.feedbackTellOwner = feedbackTellOwner; window.fbSignedInUser = fbSignedInUser;
+window.feedbackInboxHere = feedbackInboxHere; window.feedbackMoveToInbox = feedbackMoveToInbox;
 document.addEventListener('DOMContentLoaded', function(){ try { renderFeedbackButton(); } catch(e) {} });
 
 
@@ -6012,7 +6041,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.72';
+var APP_VERSION = 'v37.73';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8649,7 +8678,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.72</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.73</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8718,7 +8747,7 @@ body.banner-shown .header {
             <div style="padding:6px 14px 2px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--muted);">Shortcuts and extensions</div>
             <button class="drop-item" id="iosShortcutItem" hidden title="Save recipes from Facebook, Instagram or any app through the iPhone's Share menu" onclick="closeDrop('settingsDrop');openDeviceOffer('ios')">📱 Save from the iPhone’s Share menu</button>
             <button class="drop-item" id="androidShareItem" hidden title="Save recipes from Facebook, Instagram or any app through the phone's Share menu" onclick="closeDrop('settingsDrop');openDeviceOffer('android')">📱 Save from the phone’s Share menu</button>
-            <button class="drop-item" id="extensionItem" hidden title="A Save-recipe button in your browser: under Facebook, Instagram and TikTok posts, and on any recipe site" onclick="closeDrop('settingsDrop');openExtensionOffer()">🧩 Save-recipe button for your browser</button>
+            <button class="drop-item" id="extensionItem" hidden title="A Save-recipe button in your browser: under Facebook, Instagram and TikTok posts, and on any recipe site" onclick="closeDrop('settingsDrop');openExtensionOffer()">🧩 Browser extension (Save-recipe button)</button>
           </div>
           <!-- v37.38 — test copy only (shown by applyTestOnlyItems) -->
           <button class="drop-item" id="fbProbeItem" hidden title="Every way to a Facebook post's text, tried and graded" onclick="closeDrop('settingsDrop');openFbProbe()">🔬 Facebook reading test</button>
@@ -9334,7 +9363,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.72</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.73</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18157,7 +18186,7 @@ function _armDropOutside(menu){
 // it flipped up and ran off the top, leaving only its last item showing. Now:
 // below if it fits, above if it fits, otherwise on whichever side has more
 // room, capped to that room and scrollable. It can never start off-screen.
-var DROP_MARGIN = 8;
+var DROP_MARGIN = 8, DROP_MIN_BELOW = 240;
 function dropPlacement(r, mw, mh, vw, vh) {
   var left = r.right - mw;
   if (left + mw > vw - DROP_MARGIN) left = vw - mw - DROP_MARGIN;
@@ -18166,6 +18195,15 @@ function dropPlacement(r, mw, mh, vw, vh) {
   var above = (r.top - 4) - DROP_MARGIN;
   // …and never above the top of the screen, whatever the button's rectangle says.
   if (mh <= below) return { top: Math.max(DROP_MARGIN, r.bottom + 4), left: left, maxHeight: 0 };
+  // v37.73 — Tony: "The Settings screen has inflated so much that it takes up
+  // the entire PC's screen … I cannot click the Settings icon. The only way to
+  // close it is hitting Esc. Please open the menu below the App's controls
+  // bar." A button on the screen with real room below it: the menu opens
+  // THERE, capped to that room and scrolling (the fade says there is more) —
+  // never over the header, so ⚙️ and everything beside it stay clickable.
+  var onScreen = r.top >= 0 && r.bottom <= vh;
+  if (onScreen && below >= DROP_MIN_BELOW && below >= above)
+    return { top: r.bottom + 4, left: left, maxHeight: below };
   if (mh <= above) return { top: r.top - 4 - mh, left: left, maxHeight: 0 };
   // v36.69 — fits on the screen at all? Then ALL of it shows, moved up as far
   // as it has to go (over the header, which is fine: it closes on the next
@@ -28448,6 +28486,10 @@ function refreshShortcutsSection() {
   show('iosShortcutItem', k === 'ios' && !!iosShortcutUrl());
   show('androidShareItem', k === 'android');
   show('extensionItem', k === 'computer');
+  // v37.73 — Tony looked for the beta's "Chrome extension" and did not see it
+  // under its old name: the item now says which browser's extension it is.
+  var ei = document.getElementById('extensionItem');
+  if (ei && k === 'computer') { var bn = EXT_BROWSER_NAME[extBrowser()]; ei.textContent = '\u{1F9E9} ' + (bn && bn !== 'this browser' ? bn + ' extension' : 'Browser extension') + ' (Save-recipe button)'; }
   var sec = document.getElementById('shortcutsSection'); if (sec) sec.hidden = !any;
   return any;
 }
