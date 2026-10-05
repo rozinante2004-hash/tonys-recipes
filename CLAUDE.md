@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.79 — the share symbol centred.** Tony: it leaned right (two of its three dots are on the right, so centring by its edges is not enough): set 1 unit left in its 24-unit box.
   - **v37.78 — white dots; each copy's own households.** Tony: no golden
     dots — the share symbol is all white on terracotta. And the beta's 📊
     Households "should only include its own details": every copy's households
