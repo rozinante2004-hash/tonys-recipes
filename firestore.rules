@@ -402,6 +402,24 @@ service cloud.firestore {
       allow delete: if signedIn() && !existsAfter(hh(resource.data.hid));
     }
 
+    // v37.64 — notes to the app's owner from the floating 💬 button (the beta
+    // and the test copy). Anyone signed in may leave one, as themselves; only
+    // the owner reads them, marks them seen/done, or removes them.
+    match /feedback/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'name', 'hid', 'household', 'text', 'shot', 'log',
+                                                 'version', 'env', 'device', 'lang', 'where', 'at', 'status'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 5000
+        && request.resource.data.get('shot', '') is string && request.resource.data.get('shot', '').size() <= 750000
+        && request.resource.data.get('log', '') is string && request.resource.data.get('log', '').size() <= 200000
+        && request.resource.data.status == 'new';
+      allow read, delete: if appAdmin();
+      allow update: if appAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['new', 'seen', 'done'];
+    }
+
     // Places kept by e-mail — `pending/<hid>:<email>` = { hid, email, role }.
     // Top-level so the person can FIND theirs (a query on their own address)
     // before they know which household it is. Admins keep places for editors

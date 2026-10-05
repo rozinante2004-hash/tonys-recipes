@@ -1337,6 +1337,77 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'feedback_notes', group:'Sharing', name:'💬 Notes from testers: a floating button (beta and test copy), a form with screenshot and log, kept for the owner, read and marked in 📊 Households (v37.64)',
+    test: async()=>{
+      var real={ ov:Object.assign({}, window._featureOverride), db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError,
+                 email:window.sendFeedbackByEmail, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, hh:window._household };
+      var keptHidden=null, keptFirst=null; try{ keptHidden=localStorage.getItem(FB_HIDDEN_KEY); keptFirst=localStorage.getItem(FB_FIRST_KEY); }catch(e){}
+      var added=[], updated=[], deleted=[];
+      try{
+        window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
+        // Off: no button (the family's copy).
+        window._featureOverride.feedbackButton=false; applyFeatureFlags(); renderFeedbackButton();
+        if(document.getElementById('feedbackFab')) throw new Error('the button shows where the feature is off');
+        // On: the button, shimmering in its first days; hidden and shown again from ⚙️.
+        window._featureOverride.feedbackButton=true; applyFeatureFlags();
+        localStorage.removeItem(FB_HIDDEN_KEY); localStorage.removeItem(FB_FIRST_KEY);
+        var b=renderFeedbackButton();
+        if(!b || !document.getElementById('feedbackFab') || !b.classList.contains('fb-shine') || !b.getAttribute('aria-label')) throw new Error('the button, its shimmer or its name');
+        // (measured as styled: while the Self Test window is open the button stands aside)
+        var cs=getComputedStyle(b); if(parseFloat(cs.width)<44 || parseFloat(cs.height)<44) throw new Error('too small to tap: '+cs.width);
+        localStorage.setItem(FB_FIRST_KEY, String(Date.now()-4*864e5)); renderFeedbackButton();
+        if(document.getElementById('feedbackFab').classList.contains('fb-shine')) throw new Error('still shimmering after three days');
+        toggleFeedbackButton(); if(document.getElementById('feedbackFab')) throw new Error('hiding it did not');
+        toggleFeedbackButton(); if(!document.getElementById('feedbackFab')) throw new Error('showing it again did not');
+        // Signed out: the e-mail way.
+        var mailed=0; window.sendFeedbackByEmail=function(){ mailed++; };
+        window._fbUser=null; openFeedbackForm();
+        if(mailed!==1 || document.getElementById('feedbackOverlay')) throw new Error('signed out, it did not fall back to e-mail');
+        // Signed in: the form; an empty note is refused; a note is kept with exactly the fields the rules accept.
+        window._fbUser={ uid:'uT', email:'tester@example.com', displayName:'Tess' }; window._household={ hid:'hT', name:'Tess\u2019s Kitchen' };
+        window._fbDb={ collection:function(c){ return { add:async function(d){ added.push({ c:c, d:d }); return { id:'n1' }; } }; } };
+        openFeedbackForm();
+        if(!document.getElementById('feedbackOverlay') || !document.getElementById('fbLog').checked) throw new Error('the form, with the log ticked');
+        if(getComputedStyle(document.getElementById('feedbackFab')).display!=='none') throw new Error('the button sits on top of the open form');
+        if(await sendFeedbackNote()!==false || added.length) throw new Error('an empty note was sent');
+        document.getElementById('fbText').value='The photo search is lovely';
+        _fbShot='data:image/jpeg;base64,AAAA';
+        if(await sendFeedbackNote()!==true) throw new Error('the note was not sent');
+        var d=added[0] && added[0].d, allowed=['uid','email','name','hid','household','text','shot','log','version','env','device','lang','where','at','status'];
+        if(!d || added[0].c!=='feedback' || d.uid!=='uT' || d.status!=='new' || d.text!=='The photo search is lovely' || d.hid!=='hT' || d.shot.indexOf('data:image')!==0 || d.version!==APP_VERSION)
+          throw new Error('the note: '+JSON.stringify(d && Object.assign({}, d, { log:'…' })));
+        var extra=Object.keys(d).filter(function(k){ return allowed.indexOf(k)===-1; });
+        if(extra.length) throw new Error('fields the rules refuse: '+extra.join(', '));
+        if(!d.log || d.log.length>200000) throw new Error('the log: '+(d.log||'').length);
+        if(document.getElementById('feedbackOverlay')) throw new Error('the form stayed open');
+        // The owner's Feedback tab.
+        var notes=[ { id:'n1', uid:'uT', email:'tester@example.com', household:'Tess\u2019s Kitchen', text:'The photo search is lovely', shot:'', log:'L', version:'v37.64', env:'beta', at:Date.now(), status:'new' },
+                    { id:'n2', uid:'uU', email:'u@example.com', text:'Done one', at:Date.now()-1000, status:'done' } ];
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(fn){ notes.forEach(function(n){ fn({ id:n.id, data:function(){ return n; } }); }); } }; } }; } }; },
+              doc:function(id){ return { update:async function(x){ updated.push([id,x]); }, delete:async function(){ deleted.push(id); } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window.fetch=async function(){ return new Response('{"error":"METER: not set up"}', { status:503 }); };
+        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
+        var t=document.getElementById('manageOverlay').textContent;
+        if(t.indexOf('The photo search is lovely')===-1 || t.indexOf('Done one')!==-1 || !/Feedback\s*1/.test(t)) throw new Error('the Feedback tab: '+t.slice(0,300));
+        await mknManage.mark('n1','done');
+        if(!updated.length || updated[0][0]!=='n1' || updated[0][1].status!=='done') throw new Error('marking it done');
+        mknManage.noteFilter('all');
+        if(document.getElementById('manageOverlay').textContent.indexOf('Done one')===-1) throw new Error('"All" does not show the done ones');
+      } finally {
+        window._featureOverride=real.ov; applyFeatureFlags(); window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err;
+        window.sendFeedbackByEmail=real.email; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h; window._household=real.hh;
+        try{ if(keptHidden===null) localStorage.removeItem(FB_HIDDEN_KEY); else localStorage.setItem(FB_HIDDEN_KEY, keptHidden);
+             if(keptFirst===null) localStorage.removeItem(FB_FIRST_KEY); else localStorage.setItem(FB_FIRST_KEY, keptFirst); }catch(e){}
+        var o=document.getElementById('feedbackOverlay'); if(o) o.remove();
+        if(window.mknManage) mknManage.close();
+        renderFeedbackButton();
+      }
+    } },
+
   { id:'rules_behind_is_not_an_error', group:'Sharing', name:'Rules not yet published: noted once and the owner is led to them, not logged as an error on every open (v37.55)',
     test: async()=>{
       if(hhRulesBehind({ code:'permission-denied', message:'Missing or insufficient permissions.' }, 'test note')!==true) throw new Error('a refusal by the rules is not recognised');

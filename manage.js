@@ -8,7 +8,8 @@
 // both check that it is him. It never reads anyone's recipes.
 (function () {
   'use strict';
-  var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false };
+  var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false,
+            tab: 'households', notes: null, notesError: '', noteFilter: 'open' };
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   function ago(t) {
@@ -108,6 +109,46 @@
     });
   }
 
+  // v37.64 — notes from the floating 💬 button (feedback/<id>), newest first.
+  async function loadNotes() {
+    S.notesError = '';
+    try {
+      var out = [];
+      (await window._fbDb.collection('feedback').orderBy('at', 'desc').limit(300).get()).forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data() || {})); });
+      S.notes = out;
+    } catch (e) { S.notes = []; S.notesError = e.message; }
+  }
+  function newCount() { return (S.notes || []).filter(function (n) { return n.status === 'new'; }).length; }
+  function notesHtml() {
+    if (S.notesError) return '<div class="mg-note">The notes could not be read: ' + esc(S.notesError)
+      + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 👥 Family Access → Show rules).' : '') + '</div>';
+    if (!S.notes) return '<div class="mg-empty">⏳ Reading the notes…</div>';
+    var list = S.notes.filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; });
+    var filt = '<div class="mg-tools" style="margin-bottom:10px;">'
+      + '<button type="button" class="mg-btn' + (S.noteFilter === 'open' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'open\')">Not done yet</button>'
+      + '<button type="button" class="mg-btn' + (S.noteFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'all\')">All (' + S.notes.length + ')</button></div>';
+    if (!list.length) return filt + '<div class="mg-empty">' + (S.notes.length ? 'Every note is done. 🎉' : 'No notes yet.') + '</div>';
+    var tag = { new: '🆕 new', seen: '👀 seen', done: '✅ done' };
+    return filt + list.map(function (n) {
+      var subj = encodeURIComponent('Your note about My Kitchen Notes');
+      var body = encodeURIComponent('\n\n\u2014 you wrote (' + new Date(n.at || 0).toLocaleString() + '):\n' + (n.text || ''));
+      return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + '" id="mgNote-' + esc(n.id) + '">'
+        + '<div class="mg-ptop"><div><b class="mg-email">' + esc(n.email || n.uid) + '</b> <span class="mg-muted">' + esc(n.household || '') + '</span>'
+        + '<div class="mg-muted">' + new Date(n.at || 0).toLocaleString() + ' · ' + esc(n.version || '') + ' · ' + esc(n.env || '') + ' · ' + esc(n.lang || '') + '</div></div>'
+        + '<span class="mg-muted">' + (tag[n.status] || esc(n.status)) + '</span></div>'
+        + '<div class="mg-text" dir="auto">' + esc(n.text || '') + '</div>'
+        + (n.shot ? '<img class="mg-shot" src="' + escA(n.shot) + '" alt="The tester\u2019s screenshot" onclick="this.classList.toggle(\'mg-big\')">' : '')
+        + (n.log ? '<details><summary class="mg-muted">What the app was doing (' + Math.round(n.log.length / 1024) + ' KB)</summary>'
+            + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(\'' + esc(n.id) + '\')">📋 Copy the log</button></details>' : '')
+        + '<div class="mg-device mg-muted">' + esc(n.device || '') + '</div>'
+        + '<div class="mg-tools" style="margin-top:8px;">'
+        + (n.email ? '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '">✉️ Reply by e-mail</a>' : '')
+        + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + esc(n.id) + '\',\'seen\')">👀 Seen</button>' : '')
+        + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + esc(n.id) + '\',\'done\')">✅ Done</button>' : '')
+        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(\'' + esc(n.id) + '\')">🗑</button></div></div>';
+    }).join('');
+  }
+
   function sorted() {
     var q = S.q.trim().toLowerCase();
     var list = S.rows.filter(function (r) {
@@ -147,6 +188,12 @@
       + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
       + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
+    var nc = newCount();
+    var tabs = '<div class="mg-tabs" role="tablist">'
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'households') + '" class="mg-tab' + (S.tab === 'households' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'households\')">🏠 Households</button>'
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'feedback') + '" class="mg-tab' + (S.tab === 'feedback' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'feedback\')">💬 Feedback' + (nc ? ' <span class="mg-badge">' + nc + '</span>' : '') + '</button></div>';
+    if (S.tab === 'feedback') { body.innerHTML = tabs + notesHtml(); return; }
+    head = tabs + head;
     if (S.loading) { body.innerHTML = head + '<div class="mg-empty">⏳ Reading every household…</div>'; return; }
     var list = sorted();
     var months = (S.meter && S.meter.months) || [];
@@ -223,6 +270,18 @@
     + '.mg-h{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px;}'
     + '.mg-li{padding:3px 0;}.mg-caprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
     + '.mg-caprow input{width:90px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);}'
+    + '.mg-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);}'
+    + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;}'
+    + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
+    + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
+    + '.mg-card{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:12px 14px;margin-bottom:10px;}'
+    + '.mg-card.mg-new{border-inline-start:4px solid var(--terracotta-fill);}'
+    + '.mg-text{white-space:pre-wrap;margin:8px 0;font-size:14px;line-height:1.5;}'
+    + '.mg-shot{max-height:160px;max-width:100%;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;display:block;margin:6px 0;}'
+    + '.mg-shot.mg-big{max-height:none;cursor:zoom-out;}'
+    + '.mg-log{max-height:260px;overflow:auto;font-size:11px;background:var(--note-bg);padding:8px;border-radius:6px;white-space:pre-wrap;}'
+    + '.mg-device{font-size:11px;word-break:break-all;margin-top:4px;}'
+    + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';
 
   function mine(r) { return !!(typeof _household !== 'undefined' && _household && _household.hid === r.hid); }
@@ -278,8 +337,24 @@
         document.body.appendChild(ov);
         ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') api.close(); });
       }
+      loadNotes().then(render);
       return api.reload();
     },
+    tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(render); },
+    noteFilter: function (f) { S.noteFilter = f; render(); },
+    mark: async function (id, status) {
+      try { await window._fbDb.collection('feedback').doc(id).update({ status: status }); }
+      catch (e) { showServiceError('Could not mark the note: ' + e.message); return false; }
+      (S.notes || []).forEach(function (n) { if (n.id === id) n.status = status; }); render(); return true;
+    },
+    delNote: async function (id) {
+      if (await askConfirm({ icon: '🗑', title: 'Remove this note?', message: 'It is gone for good.', okLabel: 'Remove', danger: true }) !== true) return false;
+      try { await window._fbDb.collection('feedback').doc(id).delete(); }
+      catch (e) { showServiceError('Could not remove the note: ' + e.message); return false; }
+      S.notes = (S.notes || []).filter(function (n) { return n.id !== id; }); render(); return true;
+    },
+    copyLog: function (id) { var n = (S.notes || []).filter(function (x) { return x.id === id; })[0]; if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
+    _notes: loadNotes,
     close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; },
     reload: async function () {
       S.loading = true; render();

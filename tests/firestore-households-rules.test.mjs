@@ -343,6 +343,22 @@ await check('…and the household, its owner\'s place and its identifier, togeth
   b.delete(doc(alice, 'households/L2/members/ivy')); b.delete(doc(alice, 'households/L2')); b.delete(doc(alice, 'codes/MKN-HHHH-3333')); return b.commit(); })(), true);
 await check('a household nobody marked cannot be deleted by him', deleteDoc(doc(alice, 'households/L3')), false);
 
+console.log('Notes from testers (v37.64)');
+const note = (uid, extra) => Object.assign({ uid, email: uid + '@example.com', text: 'The import was slow', shot: '', log: 'log',
+  version: 'v37.64', env: 'beta', device: 'x', lang: 'en', where: '/', at: 1, status: 'new' }, extra || {});
+await check('anyone signed in leaves a note, as themselves',   setDoc(doc(carol, 'feedback/n1'), note('carol')), true);
+await check('…not in someone else\'s name',                    setDoc(doc(carol, 'feedback/n2'), note('bob')), false);
+await check('…not signed out',                                 setDoc(doc(nobody, 'feedback/n3'), note('carol')), false);
+await check('…not empty',                                      setDoc(doc(carol, 'feedback/n4'), note('carol', { text: '' })), false);
+await check('…not already marked done',                        setDoc(doc(carol, 'feedback/n5'), note('carol', { status: 'done' })), false);
+await check('…and nothing else with it',                       setDoc(doc(carol, 'feedback/n6'), note('carol', { role: 'admin' })), false);
+await check('the sender cannot read notes back',               getDoc(doc(carol, 'feedback/n1')), false);
+await check('…nor can anyone else',                            getDocs(collection(bob, 'feedback')), false);
+await check('the app\'s owner reads them',                     getDocs(collection(alice, 'feedback')), true);
+await check('…marks one seen',                                 updateDoc(doc(alice, 'feedback/n1'), { status: 'seen' }), true);
+await check('…but does not rewrite it',                        updateDoc(doc(alice, 'feedback/n1'), { text: 'changed' }), false);
+await check('…and removes it',                                 deleteDoc(doc(alice, 'feedback/n1')), true);
+
 console.log('Translations and personal settings');
 await check('anyone signed in reads a translation', getDoc(doc(carol, 'i18n/he')), true);
 await check('signed out can too (public, v36.88)',   getDoc(doc(nobody, 'i18n/he')), true);

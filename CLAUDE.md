@@ -815,6 +815,25 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.64 — notes from testers; WhatsApp on in the beta.** Tony (4 Oct):
+    testers should get most of the app; "a shiny, lightly animated floating
+    icon for feedback". Feature `feedbackButton` (live: false; test + beta:
+    true): `#feedbackFab` bottom-left (50 px, a shimmer + bob for its first
+    3 days `mkn_fb_first`, none under reduced motion, hidden while any window
+    is open via `body:has(…)`), ⚙️ "💬 Feedback button: shown/hidden"
+    (`mkn_fb_hidden`). `openFeedbackForm`: note, optional screenshot
+    (`fbShotPicked`, ≤700 KB), "include what the app was doing" (the sync
+    log, ≤190 KB, ticked) → `feedback/<id>` {uid, email, name, hid,
+    household, text, shot, log, version, env, device, lang, where, at,
+    status:'new'}; signed out → the e-mail way (`sendFeedbackByEmail`); ⚙️ ✉️
+    Send feedback opens the form where the feature is on. Rules: create as
+    yourself only, sizes bounded, status 'new'; read/delete/mark (status
+    only) by appAdmin (12 checks). Owner: a toast with the count of new notes
+    on opening (`feedbackTellOwner`); 📊 Households → 💬 Feedback tab (badge,
+    "Not done yet"/All, screenshot zoom, the log + copy, ✉️ Reply by e-mail,
+    👀 Seen, ✅ Done, 🗑). Beta features: whatsapp ON (gmail, bringDirect off);
+    the family's repository-folder WhatsApp field (`#waFolderSection`) is
+    hidden in every copy but the family's. Self-test `feedback_notes`.
   - **v37.63 — the WhatsApp list rebuilds itself.** Tony: "all my WhatsApp
     groups have disappeared" (before the move). The chats were in the cloud
     (the move copied them); the device's list (`tonys_wa_index`) was empty —

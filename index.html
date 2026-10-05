@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.63 -->
+<!-- Tony's Recipes Collection v37.64 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -172,7 +172,8 @@
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
       bring:    true,     // Bring!: open the chosen ingredients in the person's own Bring! app (official import, v36.89)
       bringDirect: true,  // …and send them straight to THIS household's Bring! list (token kept on the Worker)
-      gmail:    true      // Send a recipe by e-mail through your Gmail
+      gmail:    true,     // Send a recipe by e-mail through your Gmail
+      feedbackButton: false   // v37.64 — the floating 💬 note to Tony (the beta and the test copy)
     }),
     // v37.03 — the ways to sign in on THIS copy. Each needs switching on in the
     // Firebase console (Authentication → Sign-in method) as well, and Apple and
@@ -261,6 +262,22 @@
   #envRibbon span { display: inline-block; background: #B54708; color: #fff; border: 2px solid #fff; border-radius: 6px;
                padding: 3px 12px; font: 800 14px/1.3 'DM Sans', 'Heebo', sans-serif; letter-spacing: 1px; }
   #envFrame  { position: fixed; inset: 0; border: 6px solid #B54708; pointer-events: none; z-index: 100000; }
+  /* v37.64 — the floating note to Tony (beta and test copy). */
+  #feedbackFab { position: fixed; left: calc(14px + env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 450;
+    width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; font-size: 22px; line-height: 1;
+    background: linear-gradient(135deg, #C1440E, #D4A843); color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.28); overflow: hidden; }
+  #feedbackFab:focus-visible { outline: 3px solid var(--terracotta, #C1440E); outline-offset: 3px; }
+  #feedbackFab.fb-shine { animation: fbBob 3.2s ease-in-out infinite; }
+  #feedbackFab.fb-shine::after { content: ''; position: absolute; inset: -40%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.75) 50%, transparent 60%);
+    transform: translateX(-120%); animation: fbShine 3.2s ease-in-out infinite; }
+  @keyframes fbShine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+  @keyframes fbBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { #feedbackFab.fb-shine, #feedbackFab.fb-shine::after { animation: none; } #feedbackFab.fb-shine::after { display: none; } }
+  @media print { #feedbackFab { display: none; } }
+  /* …and out of the way while any window is open (its own form included). */
+  body:has(.modal-overlay.open) #feedbackFab, body:has(#askOverlay) #feedbackFab,
+  body:has(#manageOverlay) #feedbackFab, body:has(#selectBar[style*="flex"]) #feedbackFab { display: none; }
+  html[data-env-copy] #waFolderSection { display: none; }   /* v37.64 */
   /* v37.59 — the BETA copy is the testers' real app: a small mark, no stripes, no frame. */
   #envRibbon.env-beta { background: #4B3F72; padding: 2px 10px; padding-top: calc(2px + env(safe-area-inset-top)); }
   #envRibbon.env-beta span { background: none; border: 0; padding: 0; font: 700 11px/1.4 'DM Sans', 'Heebo', sans-serif; letter-spacing: 2px; }
@@ -298,6 +315,7 @@
   html[data-feature-off-whatsapp] [data-feature="whatsapp"],
   html[data-feature-off-bring]    [data-feature="bring"],
   html[data-feature-off-bringDirect] [data-feature="bringDirect"],
+  html[data-feature-off-feedbackButton] [data-feature="feedbackButton"],
   html[data-feature-off-gmail]    [data-feature="gmail"] { display: none !important; }
 </style>
 <script src="https://accounts.google.com/gsi/client" async></script>
@@ -4653,6 +4671,7 @@ async function householdUse(hid, role) {
   hhRenderAppRequests();
   await hhLoadLinks();                                           // v37.53
   hhNoteSeen();                                                  // v37.58
+  if (typeof feedbackTellOwner === 'function') setTimeout(function(){ feedbackTellOwner().catch(function(){}); }, 5000);   // v37.64
   // v37.63 — Tony: "all my WhatsApp groups have disappeared". The chats are in
   // the cloud; only this device's LIST of them was gone (a browser may clear a
   // site's storage — Safari after about a week unopened — and the list was
@@ -5482,7 +5501,12 @@ function feedbackMailto() {
 // v37.47 — Tony: "Send feedback" did nothing on his iPhone (a mailto: link with
 // no mail app set up does nothing). The same choice as letting a person know:
 // Gmail, Outlook, the mail app, or copy — and it says where it goes.
+// v37.64 — where notes are kept (the beta, the test copy), the form; else e-mail.
 function sendFeedback() {
+  if (typeof featureOn === 'function' && featureOn('feedbackButton') && window._fbUser) return openFeedbackForm();
+  return sendFeedbackByEmail();
+}
+function sendFeedbackByEmail() {
   var to = APP_CONFIG.supportEmail || APP_CONFIG.ownerEmail;
   var body = '\n\n\u2014\n' + (typeof appCopyLabel === 'function' ? appCopyLabel() + '\n' : '') + APP_VERSION + ' \u00b7 ' + navigator.userAgent;
   return shareMessage({ to: to, omit: ['wa'], copyLabel: '\u{1F4CB} Copy the address', copyText: to,
@@ -5494,6 +5518,127 @@ window.householdCodeFrom = householdCodeFrom; window.householdWelcome = househol
 window.addSampleRecipes = addSampleRecipes; window.startTour = startTour; window.tourTargets = tourTargets;
 window.i18nDeviceLangOffer = i18nDeviceLangOffer; window.firstRunLanguageOffer = firstRunLanguageOffer;
 window.feedbackMailto = feedbackMailto; window.sendFeedback = sendFeedback; window.TOUR_STEPS = TOUR_STEPS;
+window.sendFeedbackByEmail = sendFeedbackByEmail;
+// ─── NOTES FROM TESTERS (v37.64) ─────────────────────────────────────────────
+// Tony: "a shiny, lightly animated floating icon for feedback on top of the
+// app, to make it easier for them to send a note". On the copies where the
+// `feedbackButton` feature is on (the beta and the test copy) a small 💬
+// button floats in a corner — it shimmers for its first three days, then sits
+// still (never for anyone who asked their device for less motion) — and opens
+// a short form: the note, a screenshot if they like, and what the app was
+// doing (the log, ticked by default). Each note is kept in this copy's
+// database (`feedback/<id>`), readable only by the app's owner, who reads,
+// marks and answers them in ⚙️ → 📊 Households → 💬 Feedback.
+var FB_HIDDEN_KEY = 'mkn_fb_hidden', FB_FIRST_KEY = 'mkn_fb_first';
+function feedbackButtonOn() {
+  if (typeof featureOn !== 'function' || !featureOn('feedbackButton')) return false;
+  try { return localStorage.getItem(FB_HIDDEN_KEY) !== '1'; } catch(e) { return true; }
+}
+function renderFeedbackButton() {
+  var b = document.getElementById('feedbackFab');
+  var item = document.getElementById('feedbackFabItem');
+  if (item) item.textContent = '\u{1F4AC} Feedback button: ' + (feedbackButtonOn() ? 'shown' : 'hidden');
+  if (!feedbackButtonOn()) { if (b) b.remove(); return null; }
+  if (!b) {
+    b = document.createElement('button');
+    b.id = 'feedbackFab'; b.type = 'button';
+    b.setAttribute('aria-label', 'Send a note about the app');
+    b.title = 'Send a note about the app';
+    b.textContent = '\u{1F4AC}';
+    b.onclick = function(){ openFeedbackForm(); };
+    document.body.appendChild(b);
+  }
+  var first = 0;
+  try { first = +localStorage.getItem(FB_FIRST_KEY) || 0; if (!first) { first = Date.now(); localStorage.setItem(FB_FIRST_KEY, String(first)); } } catch(e) {}
+  b.classList.toggle('fb-shine', !!first && Date.now() - first < 3 * 864e5);
+  return b;
+}
+function toggleFeedbackButton() {
+  var hide = feedbackButtonOn();
+  try { localStorage.setItem(FB_HIDDEN_KEY, hide ? '1' : '0'); } catch(e) {}
+  renderFeedbackButton();
+  toast(hide ? 'The \u{1F4AC} button is hidden — ⚙️ → ✉️ Send feedback still works' : 'The \u{1F4AC} button is back', 5000);
+}
+var _fbShot = '';
+async function fbShotPicked(input) {
+  var f = input && input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  try {
+    var data = await new Promise(function(res, rej){ var r = new FileReader(); r.onload = function(){ res(r.result); }; r.onerror = rej; r.readAsDataURL(f); });
+    var small = await resizeImageForVision(data, 1400, 0.7);
+    if (small.length > 700000) small = await resizeImageForVision(data, 900, 0.6);
+    if (small.length > 700000) throw new Error('the picture is too large even made smaller');
+    _fbShot = small;
+    var p = document.getElementById('fbShotPreview');
+    if (p) { p.src = small; p.style.display = 'block'; }
+    var btn = document.getElementById('fbShotBtn');
+    if (btn) btn.textContent = '\u{1F5BC} Change the screenshot';
+  } catch(e) { toast('⚠️ The screenshot could not be added: ' + (e && e.message), 6000); }
+}
+function openFeedbackForm() {
+  // Not signed in: there is nowhere to keep it — the e-mail way, as before.
+  if (!window._fbUser || !hhDb()) return sendFeedbackByEmail();
+  _fbShot = '';
+  var prev = document.getElementById('feedbackOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'feedbackOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="fbTitle" style="max-width:480px;text-align:start;">'
+    + '<div class="ask-title" id="fbTitle">\u{1F4AC} A note about the app</div>'
+    + '<div class="ask-body" style="text-align:start;">What works, what doesn’t, what you wish it did — anything helps. It goes straight to Tony.</div>'
+    + '<textarea id="fbText" dir="auto" rows="5" maxlength="5000" placeholder="Your note" style="width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border:1.5px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--ink);font:inherit;font-size:14px;"></textarea>'
+    + '<input type="file" id="fbShotIn" accept="image/*" style="display:none" onchange="fbShotPicked(this)">'
+    + '<button type="button" id="fbShotBtn" class="ask-btn ghost" style="margin-top:8px;" onclick="document.getElementById(\'fbShotIn\').click()">\u{1F5BC} Add a screenshot</button>'
+    + '<img id="fbShotPreview" alt="" style="display:none;max-width:100%;max-height:180px;margin-top:8px;border-radius:8px;border:1px solid var(--border);">'
+    + '<label class="ask-check" style="margin-top:10px;"><input type="checkbox" id="fbLog" checked><span>Include what the app was doing (helps find a fault; no recipes)</span></label>'
+    + '<div class="ask-actions"><button type="button" class="ask-btn" id="fbSend" onclick="sendFeedbackNote()">Send</button>'
+    + '<button type="button" class="ask-btn ghost" onclick="document.getElementById(\'feedbackOverlay\').remove()">Cancel</button></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  setTimeout(function(){ var t = document.getElementById('fbText'); if (t) t.focus(); }, 60);
+  return ov;
+}
+async function sendFeedbackNote() {
+  var t = document.getElementById('fbText'), text = t ? t.value.trim() : '';
+  if (!text) { toast('Write a few words first.'); if (t) t.focus(); return false; }
+  var btn = document.getElementById('fbSend'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  var withLog = (document.getElementById('fbLog') || {}).checked;
+  var log = '';
+  if (withLog) { try { log = syncLogReportText(); } catch(e) {} if (log.length > 190000) log = log.slice(0, 190000) + '\n…(cut)'; }
+  var u = window._fbUser || {};
+  var note = { uid: u.uid, email: String(u.email || ''), name: String(u.displayName || ''),
+    hid: (_household && _household.hid) || '', household: (_household && _household.name) || '',
+    text: text.slice(0, 5000), shot: _fbShot || '', log: log, version: APP_VERSION,
+    env: String(APP_CONFIG.environment || 'live'), device: String(navigator.userAgent || '').slice(0, 300),
+    lang: (typeof _i18nLang === 'string' ? _i18nLang : 'en'), where: String(location.pathname + location.hash).slice(0, 200),
+    at: Date.now(), status: 'new' };
+  try { await hhDb().collection('feedback').add(note); }
+  catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+    showServiceError('Your note could not be sent: ' + (e && e.message) + '\n\nYou can still write by e-mail: ⚙️ → ✉️ Send feedback.');
+    return false;
+  }
+  var ov = document.getElementById('feedbackOverlay'); if (ov) ov.remove();
+  syncLog('save', 'Sent a note to Tony', { chars: text.length, screenshot: !!_fbShot, log: !!log });
+  toast('\u{1F49C} Thank you — your note is with Tony.', 6000);
+  _fbShot = '';
+  return true;
+}
+// The app's owner hears about new notes when he opens the app.
+var _fbNewTold = false;
+async function feedbackTellOwner() {
+  if (_fbNewTold || _selfTestRunning || !featureOn('feedbackButton') || typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return 0;
+  _fbNewTold = true;
+  var n = 0;
+  try { n = (await hhDb().collection('feedback').where('status', '==', 'new').limit(100).get()).size; } catch(e) { return 0; }
+  if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000);
+  return n;
+}
+window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
+window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedbackNote; window.fbShotPicked = fbShotPicked;
+window.feedbackTellOwner = feedbackTellOwner;
+document.addEventListener('DOMContentLoaded', function(){ try { renderFeedbackButton(); } catch(e) {} });
+
 
 // ─── MOVING THE FAMILY'S COLLECTION INTO A HOUSEHOLD (WP-D, v36.86) ─────────
 // The owner's one-time step from the first layout to the household one. It
@@ -5744,7 +5889,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.63';
+var APP_VERSION = 'v37.64';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8381,7 +8526,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.63</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.64</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8443,6 +8588,7 @@ body.banner-shown .header {
           <!-- v37.00 (WP-O) -->
           <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
           <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
+          <button class="drop-item" data-feature="feedbackButton" id="feedbackFabItem" title="Show or hide the floating 💬 button" onclick="closeDrop('settingsDrop');toggleFeedbackButton()">💬 Feedback button: shown</button>
           <!-- v37.47 — Tony: a dedicated section, "Shortcuts and extensions". Only what fits THIS device is shown (refreshShortcutsSection). -->
           <div id="shortcutsSection" hidden>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -9065,7 +9211,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.63</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.64</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9371,6 +9517,7 @@ body.banner-shown .header {
     <input type="file" id="waFileIn" accept=".txt,.zip,text/plain,application/zip" multiple style="display:none" onchange="waImportFiles(this.files);this.value='';">
     <button onclick="document.getElementById('waFileIn').click()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:14px;">📂 Import exported .txt or .zip files</button>
 
+    <div id="waFolderSection"><!-- v37.64 — the family's own repository folder: the family's copy only -->
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px;">☁️ Shared folder — needs GitHub</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.6;">
       The older route: <code>.txt</code> files committed to the repo's <code>whatsapp/</code> folder. Still read, and still
@@ -9382,6 +9529,7 @@ body.banner-shown .header {
       <button class="help-btn" onclick="saveWaBase()">Save</button>
     </div>
     <button onclick="waRefreshFolder()" style="width:100%;padding:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--heading);cursor:pointer;margin-bottom:6px;">🔄 Load chats from this folder</button>
+    </div>
     <div id="waFolderStatus" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:14px;"></div>
 
     <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Loaded chats</div>
