@@ -888,7 +888,8 @@ console.log('\nAI per household (v60):');
     if (url.startsWith('https://fs.test/')) {
       firestoreAsks.push({ url, auth: init && init.headers && init.headers.Authorization });
       const m = /households\/([^/]+)(?:\/members\/([^/?]+))?$/.exec(url);
-      if (m[2]) return new Response(members[m[1] + '/' + m[2]] ? '{"fields":{"role":{"stringValue":"owner"}}}' : '{}', { status: members[m[1] + '/' + m[2]] ? 200 : 403 });
+      const mem = members[m[1] + '/' + m[2]];
+      if (m[2]) return new Response(mem ? JSON.stringify({ fields: { role: { stringValue: typeof mem === 'string' ? mem : 'owner' } } }) : '{}', { status: mem ? 200 : 403 });
       return new Response(JSON.stringify({ fields: { name: { stringValue: 'Kitchen A' }, code: { stringValue: 'MKN-AAAA-2222' }, createdAt: { integerValue: String(Date.parse('2026-01-05')) } } }), { status: 200 });
     }
     if (url === 'https://api.anthropic.com/v1/messages') {
@@ -1018,8 +1019,17 @@ console.log('\nAI per household (v60):');
     const tR = await token({ sub: 'uR', aud: 'my-kitchen-notes-beta' });
     await fb({ action: 'household-report', idToken: tR, hid: 'hG', report: { members: [] } });
     db.raw.prepare("INSERT INTO ai_spend (project, hid, month, usd, calls) VALUES ('my-kitchen-notes-beta', 'hG', '2099-01', 1.5, 3)").run();
-    f = await fb({ action: 'household-report', idToken: tR, hid: 'hG', gone: true });
-    expect('a household being deleted by its own owner leaves the list', f.status === 200 && !db.raw.prepare("SELECT 1 FROM hh_reports WHERE hid = 'hG'").get(), JSON.stringify(f));
+    members['hG/uV'] = 'viewer';
+    f = await fb({ action: 'household-report', idToken: await token({ sub: 'uV', aud: 'my-kitchen-notes-beta' }), hid: 'hG', gone: true });
+    expect('only its owner may say a household is deleted', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'household-report', idToken: await token({ sub: 'uV', aud: 'my-kitchen-notes-beta', email: 'v@example.com' }), hid: 'hG', left: true });
+    const gl = JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hG'").get().summary);
+    expect('a member who deletes their account is noted under the household', f.status === 200 && gl.left.length === 1 && gl.left[0].email === 'v@example.com' && gl.left[0].at > 0, JSON.stringify(gl));
+    await fb({ action: 'household-report', idToken: tR, hid: 'hG', report: { members: [] } });
+    expect('…and stays noted after the next daily report', JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hG'").get().summary).left.length === 1);
+    f = await fb({ action: 'household-report', idToken: tR, hid: 'hG', gone: true, how: 'account' });
+    const gs = JSON.parse((db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hG'").get() || {}).summary || '{}');
+    expect('a household deleted by its owner STAYS listed, marked: who, when, how', f.status === 200 && gs.deletedAt > 0 && gs.deletedBy === 'a@example.com' && gs.deletedHow === 'account' && gs.name === 'Kitchen A', JSON.stringify(gs));
     expect('…but its spending stays (no member can reset an allowance that way)', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hG'").get());
     f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: fam }, ORIGIN);
     expect('nobody but the owner lists every copy', f.status === 403, JSON.stringify(f));
@@ -1036,9 +1046,13 @@ console.log('\nAI per household (v60):');
     expect('the owner sets the beta\'s allowance from the family app', f.status === 200 && db.raw.prepare("SELECT cap FROM ai_households WHERE project = 'my-kitchen-notes-beta' AND hid = 'hR'").get().cap === 7, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'set-note', project: 'someone-elses-app', hid: 'hR', note: 'x', idToken: famOwner }, ORIGIN);
     expect('…but not a copy this server does not serve', f.status === 400, JSON.stringify(f));
-    f = await fb({ action: 'meter-admin', op: 'forget', project: 'recipes-f379d', hid: 'hF', idToken: famOwner }, ORIGIN);
-    const gone = !db.raw.prepare("SELECT 1 FROM hh_reports WHERE hid = 'hF'").get() && !db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hF'").get() && !db.raw.prepare("SELECT 1 FROM ai_households WHERE hid = 'hF'").get();
-    expect('a deleted household is forgotten here too', f.status === 200 && gone, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'mark-deleted', project: 'recipes-f379d', hid: 'hF', idToken: famOwner }, ORIGIN);
+    const fs2 = JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hF'").get().summary);
+    expect('a household the owner deletes stays listed, marked as his doing', f.status === 200 && fs2.deletedHow === 'admin' && fs2.deletedBy === 'rozinante2004@gmail.com' && fs2.members.length === 1, JSON.stringify(fs2));
+    expect('…and its spending stays', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hF'").get());
+    f = await fb({ action: 'meter-admin', op: 'mark-deleted', project: 'recipes-f379d', hid: 'hNever', name: 'Old one', code: 'MKN-OOOO-7777', idToken: famOwner }, ORIGIN);
+    const nv = JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hNever'").get().summary);
+    expect('…even one that never reported (named from the page)', nv.name === 'Old one' && nv.deletedAt > 0, JSON.stringify(nv));
   } finally { globalThis.fetch = realFetch; }
 }
 

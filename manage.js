@@ -57,6 +57,9 @@
       // long deleted, and its spending alone says nothing about it.
       if (h.project && h.project !== here) { if (h.report) remoteRow(rows, h); return; }
       spend[h.hid] = h;
+      // v37.72 — deleted, and kept on the list, marked (Tony: "do not remove
+      // these entries"): what the server noted when it went.
+      if (h.report && h.report.deletedAt && !S.loadError && !rows[h.hid]) { remoteRow(rows, h, true); return; }
       // known to the server but not readable here (the database refused): still
       // listed, from what the server noted. Otherwise the database is the list —
       // a deleted household keeps its spending history on the server, unlisted.
@@ -106,9 +109,10 @@
     var u = c === 'family' ? A.liveSiteUrl : c === 'test' ? (A.testCopy && A.testCopy.siteUrl) : c === 'beta' ? (A.betaCopy && A.betaCopy.siteUrl) : '';
     return u ? u + '?manage' : '';
   }
-  function remoteRow(rows, h) {
-    var p = h.report || {}, key = h.project + ':' + h.hid;
-    var r = { key: key, hid: h.hid, project: h.project, remote: true, name: h.name || p.name || '', code: h.code || p.code || '', ownerUid: '',
+  function remoteRow(rows, h, here) {
+    var p = h.report || {}, key = here ? h.hid : h.project + ':' + h.hid;
+    var r = { key: key, hid: h.hid, project: here ? thisProject() : h.project, remote: !here,
+              deleted: p.deletedAt ? { at: p.deletedAt, by: p.deletedBy || '', how: p.deletedHow || '' } : null, left: (p.left || []).slice(), name: h.name || p.name || '', code: h.code || p.code || '', ownerUid: '',
               createdAt: h.created_at || p.createdAt || 0, referredBy: p.referredBy || '', members: (p.members || []).slice(), links: (p.links || []).slice(),
               asking: [], asked: [], referred: 0, lastSeen: 0, reportAt: h.reportAt || 0, meter: h };
     r.members.forEach(function (m) { if (m.lastSeen > r.lastSeen) r.lastSeen = m.lastSeen; });
@@ -120,7 +124,8 @@
     Object.keys(rows).forEach(function (k) { var r = rows[k]; if (r.remote && r.code) byCode[r.project + '/' + r.code] = r; });
     Object.keys(rows).forEach(function (k) { var r = rows[k], by = r.remote && r.referredBy && byCode[r.project + '/' + r.referredBy]; if (by) by.referred++; });
     S.rows = Object.keys(rows).map(function (key) {
-      var r = rows[key], m = r.remote ? r.meter : (spend[r.hid] || null);
+      var r = rows[key], m = (r.remote || r.deleted) ? r.meter : (spend[r.hid] || null);
+      if (!r.left) r.left = (m && m.report && m.report.left) || [];
       r.copy = copyOf(r.project || thisProject()) || 'this copy';
       r.capped = r.remote ? !!(m && m.capped) : !!(S.meter && S.meter.capped);
       var owner = r.members.filter(function (x) { return x.role === 'owner'; })[0];
@@ -198,13 +203,15 @@
     var q = S.q.trim().toLowerCase();
     var list = S.rows.filter(function (r) {
       if (!q) return true;
-      return [r.name, r.code, r.owner, r.copy].concat(r.members.map(function (m) { return m.email; })).join(' ').toLowerCase().indexOf(q) !== -1;
+      return [r.name, r.code, r.owner, r.copy, r.deleted ? 'deleted ' + r.deleted.by : ''].concat(r.members.map(function (m) { return m.email; })).join(' ').toLowerCase().indexOf(q) !== -1;
     });
     var key = { name: function (r) { return r.name.toLowerCase(); }, copy: function (r) { return r.copy; }, owner: function (r) { return r.owner; },
                 members: function (r) { return r.members.length; }, month: function (r) { return r.month; },
                 cap: function (r) { return r.cap == null ? 1e9 : r.cap; }, links: function (r) { return r.links.length; },
                 referred: function (r) { return r.referred; }, seen: function (r) { return r.lastSeen; } }[S.sort] || function (r) { return r.month; };
-    return list.sort(function (a, b) { var x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * S.dir; });
+    return list.sort(function (a, b) {
+      if (!!a.deleted !== !!b.deleted) return a.deleted ? 1 : -1;     // v37.72 — the deleted ones last
+      var x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * S.dir; });
   }
 
   function barHtml(r) {
@@ -228,11 +235,12 @@
       .filter(function (c) { return c[2] && c[0] !== env; });
     // v37.70 — each copy has its own households: one tap opens another copy's list.
     var multi = S.rows.some(function (r) { return r.remote; });
+    var nDel = S.rows.filter(function (r) { return r.deleted; }).length;
     var others = copies.length ? '<div class="mg-muted" style="margin-top:4px;">' + (multi ? 'Their own pages: ' : 'Other copies: ') + copies.map(function (c) {
         return '<a class="mg-link" href="' + escA(c[2] + '?manage') + '" target="_blank" rel="noopener">' + esc(c[1]) + ' \u2197</a>'; }).join(' · ') + '</div>' : '';
     var head = '<div class="mg-top"><div><div class="mg-title">📊 Households</div><div class="mg-muted">'
-      + (multi ? 'every copy' : esc(env === 'live' ? 'the family’s copy' : env + ' copy')) + ' · ' + S.rows.length + ' household' + (S.rows.length === 1 ? '' : 's')
-      + (multi ? ' (' + copyCounts() + ')' : '')
+      + (multi ? 'every copy' : esc(env === 'live' ? 'the family’s copy' : env + ' copy')) + ' · ' + (S.rows.length - nDel) + ' household' + (S.rows.length - nDel === 1 ? '' : 's')
+      + (multi ? ' (' + copyCounts() + ')' : '') + (nDel ? ' \u00b7 ' + nDel + ' deleted' : '')
       + (!S.meter ? '' : multi ? ' · AI allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first) on the test copy and the beta; the family’s is counted, not capped'
           : ' · AI ' + (S.meter.capped ? 'allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)' : 'counted, not capped')) + '</div>' + others + '</div>'
       + '<div class="mg-tools"><input id="mgSearch" type="search" placeholder="Search name, identifier or e-mail" value="' + escA(S.q) + '" oninput="mknManage.search(this.value)">'
@@ -256,8 +264,10 @@
       + th('cap', 'Cap') + '<th>' + (months.length ? months.slice(1).map(mon).reverse().join(' · ') : 'Before') + '</th>'
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
       + (list.length ? list.map(function (r) {
-          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + '" onclick="mknManage.show(\'' + escA(r.key) + '\')">'
-            + '<td><div class="mg-name" dir="auto">' + esc(r.name || '(no name)') + '</div><div class="mg-muted mg-code">' + esc(r.code || '—') + '</div></td>'
+          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + '" onclick="mknManage.show(\'' + escA(r.key) + '\')">'
+            + '<td><div class="mg-name" dir="auto">' + esc(r.name || '(no name)') + '</div><div class="mg-muted mg-code">' + esc(r.code || '—') + '</div>'
+            + (r.deleted ? '<div class="mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '</div>' : '')
+            + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '') + '</td>'
             + (multi ? '<td><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
             + '<td class="mg-email">' + esc(r.owner || '—') + '</td>'
             + '<td class="mg-c">' + r.members.length + '</td>'
@@ -271,9 +281,20 @@
       + '</tbody></table></div>';
     body.innerHTML = head + table + panelHtml();
   }
+  // v37.72 — who deleted it, how, and when.
+  function deletedText(d) {
+    var who = d.by ? ' (' + d.by + ')' : '';
+    return (d.how === 'account' ? 'Deleted with its owner\u2019s account' + who : d.how === 'admin' ? 'Deleted by you' + who : 'Deleted by its owner' + who)
+      + ' \u00b7 ' + new Date(d.at).toLocaleDateString();
+  }
+  function leftHtml(r) {
+    return (r.left || []).length ? '<div class="mg-h">Left</div>' + r.left.map(function (x) {
+      return '<div class="mg-li"><span class="mg-email">' + esc(x.email || 'someone') + '</span> <span class="mg-muted">deleted their account \u00b7 '
+        + new Date(x.at || 0).toLocaleDateString() + '</span></div>'; }).join('') : '';
+  }
   function copyCounts() {
     var n = {};
-    S.rows.forEach(function (r) { n[r.copy] = (n[r.copy] || 0) + 1; });
+    S.rows.forEach(function (r) { if (!r.deleted) n[r.copy] = (n[r.copy] || 0) + 1; });
     return Object.keys(n).sort().map(function (c) { return n[c] + ' ' + c; }).join(', ');
   }
   function openRow() { return S.rows.filter(function (x) { return x.key === S.open; })[0]; }
@@ -284,18 +305,20 @@
     return '<div class="mg-panel" role="region" aria-label="Household details">'
       + '<div class="mg-ptop"><div><div class="mg-title" dir="auto">' + esc(r.name) + '</div><div class="mg-muted">' + esc(r.code || 'no identifier yet')
       + ' · founded ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—') + (r.referredBy ? ' · came through ' + esc(r.referredBy) : '')
-      + (r.remote ? ' · <span class="mg-copy">' + esc(r.copy) + '</span> as of ' + ago(r.reportAt) : '') + '</div></div>'
+      + (r.remote && !r.deleted ? ' · <span class="mg-copy">' + esc(r.copy) + '</span> as of ' + ago(r.reportAt) : r.remote ? ' · <span class="mg-copy">' + esc(r.copy) + '</span>' : '') + '</div></div>'
       + '<button type="button" class="mg-btn" onclick="mknManage.show(null)" aria-label="Close the details">✕</button></div>'
-      + '<div class="mg-h">AI allowance</div>'
-      + (r.cap == null && !r.capped ? '<div class="mg-muted">' + (r.remote ? 'The ' + esc(r.copy) + ' copy’s' : 'This copy’s') + ' AI is counted, not capped.</div>'
+      + (r.deleted ? '<div class="mg-note mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '. Its recipes and photos are gone; this is what was known about it then.</div>' : '')
+      + (r.deleted ? '' : '<div class="mg-h">AI allowance</div>')
+      + (r.deleted ? '' : r.cap == null && !r.capped ? '<div class="mg-muted">' + (r.remote ? 'The ' + esc(r.copy) + ' copy’s' : 'This copy’s') + ' AI is counted, not capped.</div>'
         : '<div class="mg-caprow">' + barHtml(r) + '<input id="mgCap" type="number" min="0" max="1000" step="0.5" value="' + (r.cap == null ? '' : r.cap) + '" aria-label="Monthly allowance in dollars">'
           + '<button type="button" class="mg-btn mg-primary" onclick="mknManage.saveCap()">Save</button>'
           + '<button type="button" class="mg-btn" onclick="mknManage.saveCap(0)" title="Stops its AI; nothing else is affected">Pause AI</button>'
           + (r.capSet ? '<button type="button" class="mg-btn" onclick="mknManage.saveCap(null)">Back to the default</button>' : '') + '</div>')
       + (r.months.length ? '<div class="mg-muted" style="margin-top:4px;">' + r.months.map(function (m) { return mon(m.month) + ': ' + money(m.usd) + ' (' + m.calls + ' calls)'; }).join(' · ') + '</div>' : '')
-      + '<div class="mg-h">Members</div>'
+      + '<div class="mg-h">' + (r.deleted ? 'Members when it was deleted' : 'Members') + '</div>'
       + r.members.sort(function (a, b) { return roleRank(a.role) - roleRank(b.role); })
           .map(function (m) { return '<div class="mg-li"><span class="mg-email">' + esc(m.email) + '</span> <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen) + '</span></div>'; }).join('')
+      + leftHtml(r)
       + '<div class="mg-h">Linked with</div>' + (r.links.length ? r.links.map(function (l) { return '<div class="mg-li">' + esc(l.name) + ' <span class="mg-muted">' + esc(l.code) + '</span></div>'; }).join('') : '<div class="mg-muted">Nobody yet.</div>')
       + ((r.asked.length || r.asking.length) ? '<div class="mg-h">Requests waiting</div>'
           + r.asked.map(function (a) { return '<div class="mg-li">from ' + esc(a.from) + ' <span class="mg-muted">' + esc(a.code) + '</span></div>'; }).join('')
@@ -303,8 +326,8 @@
       + '<div class="mg-h">Shared the app</div><div>' + (r.referred ? r.referred + ' new household' + (r.referred === 1 ? '' : 's') + ' came through its ✉️ share link' : '<span class="mg-muted">No new households through its link yet.</span>') + '</div>'
       + '<div class="mg-h">Your notes</div><textarea id="mgNote" rows="3" dir="auto" placeholder="Only you see these.">' + esc(r.note) + '</textarea>'
       + '<div><button type="button" class="mg-btn" onclick="mknManage.saveNote()">Save the note</button></div>'
-      + '<div class="mg-h">Delete</div>'
-      + (r.remote ? '<div class="mg-muted">It lives in the ' + esc(r.copy) + ' copy’s own database, so it is deleted there'
+      + (r.deleted ? '' : '<div class="mg-h">Delete</div>')
+      + (r.deleted ? '' : r.remote ? '<div class="mg-muted">It lives in the ' + esc(r.copy) + ' copy’s own database, so it is deleted there'
           + (url ? ': <a class="mg-link" href="' + escA(url) + '" target="_blank" rel="noopener">open the ' + esc(r.copy) + ' copy’s Households \u2197</a>' : '.') + '</div>'
        : mine(r) ? '<div class="mg-muted">This is the household you are in now. To delete it, use ⚙️ → 👥 Family Access → 🗑 Delete this household.</div>'
                  : '<button type="button" class="mg-btn mg-danger" id="mgDelete" onclick="mknManage.del()">🗑 Delete this household…</button>')
@@ -341,6 +364,7 @@
     + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;}'
     + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
     + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
+    + '.mg-deleted{opacity:.62;}.mg-deleted .mg-name{text-decoration:line-through;}.mg-gone{color:var(--danger);font-size:12px;margin-top:2px;}'
     + '.mg-link{color:var(--terracotta);font-weight:600;text-decoration:none;}'
     + '.mg-copy{display:inline-block;padding:1px 7px;border-radius:9px;border:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}'
     + '.mg-card{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:12px 14px;margin-bottom:10px;}'
@@ -456,7 +480,7 @@
     },
     del: async function () {
       var r = openRow();
-      if (!r || r.remote || mine(r)) return false;
+      if (!r || r.remote || r.deleted || mine(r)) return false;
       var who = r.members.map(function (m) { return m.email; }).filter(Boolean);
       var typed = await askConfirm({ icon: '🗑', title: 'Delete \u201c' + (r.name || r.code || 'this household') + '\u201d?',
         message: 'Everything in it goes, for everyone in it: its recipes, photos, chats and settings, its links with other households, and its '
@@ -471,7 +495,9 @@
         + (/permission/i.test(String(e && e.message)) ? '\n\nThis copy\u2019s database rules need publishing first (⚙️ → 👥 Family Access → Show rules).' : '')
         + '\n\nWhat was already removed stays removed; run it again to finish.'); return false; }
       syncLog('save', 'Deleted a household from the management app', { name: r.name, code: r.code, items: n });
-      try { await meterSet('forget', r.hid); } catch (e) {}      // v37.71 — and off every copy's page
+      // v37.72 — kept on the list, marked as deleted by you, with who was in it.
+      try { await meterSet('mark-deleted', r.hid, { name: r.name, code: r.code, report: { name: r.name, code: r.code, createdAt: r.createdAt,
+        referredBy: r.referredBy, members: r.members, links: r.links } }); } catch (e) {}
       S.open = null;
       await api.reload();
       var pid = (window.APP_CONFIG && APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || '';
@@ -492,13 +518,14 @@
     csv: function () {
       var months = (S.meter && S.meter.months) || [];
       var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
-        .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes']);
+        .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes', 'Deleted', 'Left']);
       var lines = [head].concat(sorted().map(function (r) {
         return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return m.email + ' (' + m.role + ')'; }).join('; ')]
           .concat(months.map(function (m) { var x = r.months.filter(function (y) { return y.month === m; })[0]; return x ? x.usd.toFixed(4) : '0'; }))
           .concat([r.cap == null ? '' : r.cap, r.links.map(function (l) { return l.name; }).join('; '), r.referred,
                    r.lastSeen ? new Date(r.lastSeen).toISOString().slice(0, 10) : '', r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : '',
-                   r.referredBy, r.note]);
+                   r.referredBy, r.note, r.deleted ? deletedText(r.deleted) : '',
+                   (r.left || []).map(function (x) { return x.email + ' ' + new Date(x.at || 0).toISOString().slice(0, 10); }).join('; ')]);
       })).map(function (row) { return row.map(function (c) { c = String(c == null ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(','); });
       var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob);

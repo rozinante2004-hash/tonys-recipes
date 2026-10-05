@@ -815,6 +815,23 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.72 + Worker v63 — deleted households stay listed, marked; the
+    beta's shortcut.** Tony: "I would like to know who deleted their account
+    as well. Please do not remove these entries … Just mark them". Worker v63:
+    `household-report` `gone` (owner only — membership now carries `role`;
+    `how` household|account) and `meter-admin` `mark-deleted` (was `forget`;
+    `how: 'admin'`, with the page's name/code/members) keep the report with
+    `deletedAt/deletedBy/deletedHow` (`markDeleted`); `left: true` notes a
+    member deleting their account in `summary.left` (kept across reports).
+    Spending is never removed. App: `hhReport({hid, gone, how})` before
+    `householdDelete`'s wipe and before each household `accountDelete` wipes;
+    `hhReport({hid, left})` before it leaves the others. manage.js: deleted
+    rows (this copy's from the server, the others' from their reports) are
+    last, faded and struck through, "🗑 Deleted by its owner (x) · date";
+    the panel shows members when deleted and no allowance/delete; "Left"
+    lists who deleted their account; CSV "Deleted", "Left". The beta's iPhone
+    shortcut: https://www.icloud.com/shortcuts/d207d5c07d9049bfb311aa13cccef43e
+    (tools/environments.json).
   - **v37.71 + Worker v62 — one Households page for every copy.** Tony:
     "Shouldn't I see all households in the family's Household page?" Each
     copy's households are in its own Firebase project, so a member's app

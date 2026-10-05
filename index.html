@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.71 -->
+<!-- Tony's Recipes Collection v37.72 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4201,17 +4201,22 @@ window.hhNoteSeen = hhNoteSeen;
 // family app cannot read. So once a day a member's app tells our server
 // (Worker v62+) what the 📊 Households page shows about this household — its
 // name, identifier, members and links; never a recipe — and the owner's page
-// in any copy lists every copy's. `gone` — the household is being deleted.
+// in any copy lists every copy's. v37.72 — Tony: "I would like to know who
+// deleted their account as well … do not remove these entries … mark them":
+// `gone` (its owner deletes it; `how: 'account'` — with their account) keeps
+// it listed, marked; `left` — a member deleting their account (Worker v63).
 var HH_REPORT_KEY = 'mkn_hh_report_';
 async function hhReport(opts) {
   opts = opts || {};
-  if (!_household || !window._fbUser || !hhDb() || !_fbUser.getIdToken) return false;
+  var hid = opts.hid || (_household && _household.hid);
+  if (!hid || !window._fbUser || !hhDb() || !_fbUser.getIdToken) return false;
   if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
   if (!(_workerHealth && _workerHealth.reports)) return false;
-  var hid = _household.hid, k = HH_REPORT_KEY + hid;
-  if (!opts.now && !opts.gone) { try { if (Date.now() - (+localStorage.getItem(k) || 0) < 20 * 3600e3) return false; } catch(e) { return false; } }
+  var k = HH_REPORT_KEY + hid, once = !opts.gone && !opts.left;
+  if (once && (!_household || _household.hid !== hid)) return false;
+  if (once && !opts.now) { try { if (Date.now() - (+localStorage.getItem(k) || 0) < 20 * 3600e3) return false; } catch(e) { return false; } }
   var report = null;
-  if (!opts.gone) {
+  if (once) {
     var members = [];
     (await hhRef(hid).collection('members').get()).forEach(function(d) {
       var m = d.data() || {};
@@ -4221,9 +4226,10 @@ async function hhReport(opts) {
       members: members, links: hhLinks().map(function(l){ return { hid: l.hid, name: l.name || '', code: l.code || '' }; }) };
   }
   var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-    body: workerBody({ action: 'household-report', hid: hid, gone: !!opts.gone, report: report, idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(15000) });
+    body: workerBody({ action: 'household-report', hid: hid, gone: !!opts.gone, how: opts.how || '', left: !!opts.left, report: report,
+      idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(15000) });
   if (!r.ok) return false;
-  try { if (opts.gone) localStorage.removeItem(k); else localStorage.setItem(k, String(Date.now())); } catch(e) {}
+  try { if (once) localStorage.setItem(k, String(Date.now())); else localStorage.removeItem(k); } catch(e) {}
   return true;
 }
 window.hhReport = hhReport;
@@ -5121,7 +5127,7 @@ async function householdDelete(opts) {
   var n;
   try {
     progressOpen({ icon: '\u{1F5D1}', title: 'Deleting ' + name, total: 5, step: 'Starting…' });
-    try { await hhReport({ gone: true }); } catch(e) {}           // v37.71 — off the owner's Households page too
+    try { await hhReport({ hid: hid, gone: true, how: 'household' }); } catch(e) {}   // v37.71/72 — marked on the owner's Households page
     n = await householdWipe(hid, progressStep);
     progressClose();
   } catch(e) {
@@ -5192,8 +5198,13 @@ async function accountDelete(opts) {
   }
   try {
     progressOpen({ icon: '\u{1F5D1}', title: 'Deleting your account', total: 3, step: 'Your households…' });
-    for (var a = 0; a < alone.length; a++) await householdWipe(alone[a].hid);
+    // v37.72 — the owner's Households page keeps who deleted their account.
+    for (var a = 0; a < alone.length; a++) {
+      try { await hhReport({ hid: alone[a].hid, gone: true, how: 'account' }); } catch(e) {}
+      await householdWipe(alone[a].hid);
+    }
     for (var l = 0; l < leave.length; l++) {
+      try { await hhReport({ hid: leave[l].hid, left: true }); } catch(e) {}
       try { await hhRef(leave[l].hid).collection('requests').doc(user.uid).delete(); } catch(e) {}
       await hhRef(leave[l].hid).collection('members').doc(user.uid).delete();
     }
@@ -6001,7 +6012,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.71';
+var APP_VERSION = 'v37.72';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8638,7 +8649,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.71</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.72</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9323,7 +9334,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.71</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.72</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

@@ -1316,7 +1316,12 @@ window.SELF_TESTS = [
             households:[ { project:here, capped:false, hid:'hA', name:'Kitchen A', capNow:null, months:[{ month:month, usd:0.5, calls:2 }] },
               { project:other, capped:true, hid:'hR', name:'Beta Kitchen', code:'MKN-RRRR-5555', capNow:4, cap:null, note:'', reportAt:now-3600e3, months:[{ month:month, usd:1.25, calls:5 },{ month:'2026-09', usd:0, calls:0 },{ month:'2026-08', usd:0, calls:0 }],
                 report:{ name:'Beta Kitchen', code:'MKN-RRRR-5555', members:[{ uid:'uR', email:'r@example.com', role:'owner', lastSeen:now-7200e3 }], links:[{ hid:'hS', name:'Sister', code:'MKN-SSSS-6666' }] } },
-              { project:other, capped:true, hid:'hGone', name:'Never reported', capNow:2, months:[] } ] }), { status:200 });
+              { project:other, capped:true, hid:'hGone', name:'Never reported', capNow:2, months:[] },
+              // v37.72 — deleted ones stay listed, marked; and who left.
+              { project:other, capped:true, hid:'hD', capNow:2, months:[], report:{ name:'Gone Kitchen', code:'MKN-DDDD-8888', deletedAt:now-864e5, deletedBy:'d@example.com', deletedHow:'account',
+                  members:[{ uid:'uD', email:'d@example.com', role:'owner' }], links:[] } },
+              { project:here, capped:false, hid:'hL', capNow:null, months:[], report:{ name:'Local Gone', code:'MKN-LLLL-9999', deletedAt:now-2*864e5, deletedBy:'l@example.com', deletedHow:'household', members:[], links:[] } },
+              ].map(function(h){ if(h.hid==='hA') h.report={ name:'Kitchen A', members:[], links:[], left:[{ email:'v@example.com', at:now-3600e3, how:'account' }] }; return h; }) }), { status:200 });
           if(b.action==='meter-admin') return new Response('{"ok":true}', { status:200 });
           return real.fetch.apply(window, arguments);
         };
@@ -1334,7 +1339,20 @@ window.SELF_TESTS = [
         // 2. The owner's page lists every copy's.
         window._household={ hid:'hZ', role:'owner' };
         var n=await openManagement();
-        if(n!==2) throw new Error('rows: '+n+' (a household that never reported must not be listed)');
+        if(n!==4) throw new Error('rows: '+n+' (a household that never reported must not be listed; the deleted ones must)');
+        var dRows=mknManage._state.rows.filter(function(r){ return r.deleted; });
+        if(dRows.length!==2) throw new Error('the deleted households are not marked: '+dRows.length);
+        var trs=document.querySelectorAll('#manageOverlay .mg-row');
+        if(!trs[trs.length-1].classList.contains('mg-deleted') || !trs[trs.length-2].classList.contains('mg-deleted')) throw new Error('the deleted ones are not last');
+        var tt=document.getElementById('manageOverlay').textContent;
+        if(!/Deleted with its owner\u2019s account \(d@example\.com\)/.test(tt) || !/Deleted by its owner \(l@example\.com\)/.test(tt) || !/2 deleted/.test(tt)) throw new Error('who deleted them is not said');
+        if(!/1 left \(deleted their account\)/.test(tt)) throw new Error('a member who deleted their account is not mentioned');
+        mknManage.show('hA');
+        if(!/v@example\.com/.test(document.querySelector('#manageOverlay .mg-panel').textContent)) throw new Error('who left is not in the details');
+        var gD=mknManage._state.rows.filter(function(r){ return r.hid==='hD'; })[0];
+        mknManage.show(gD.key);
+        if(document.getElementById('mgCap') || document.getElementById('mgDelete')) throw new Error('a deleted household offers an allowance or a delete');
+        mknManage.show(null);
         var list=sent.filter(function(b){ return b.op==='list'; })[0];
         if(!list || list.all!==true) throw new Error('the page did not ask for every copy');
         var ov=document.getElementById('manageOverlay'), t=ov.textContent;
@@ -1353,7 +1371,7 @@ window.SELF_TESTS = [
         await mknManage.saveNote();
         var setn=sent.filter(function(b){ return b.op==='set-note'; })[0];
         if(!setn || setn.project!==other) throw new Error('the note: '+JSON.stringify(setn));
-        mknManage.search(otherName); if(document.querySelectorAll('#manageOverlay .mg-row').length!==1) throw new Error('search by copy');
+        mknManage.search(otherName); if(document.querySelectorAll('#manageOverlay .mg-row').length!==2) throw new Error('search by copy (its household and its deleted one)');
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h; window._household=real.hh;
         try{ if(keptRep) localStorage.setItem(HH_REPORT_KEY+'hA', keptRep); else localStorage.removeItem(HH_REPORT_KEY+'hA'); }catch(e){}
@@ -1394,7 +1412,8 @@ window.SELF_TESTS = [
         window._fbDb=fake; window._fbUser={ uid:'uT', email:'owner@example.com', getIdToken:async function(){ return 't'; } };
         window.isAppOwner=function(){ return true; }; window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
         window.open=function(){}; _workerHealth=null; _household={ hid:'hK', role:'owner' };
-        window.fetch=async function(){ return new Response('{"error":"METER: not set up on this Worker (METER_DB)."}', { status:503 }); };
+        var bodies=[];
+        window.fetch=async function(u, init){ try{ bodies.push(JSON.parse(init.body)); }catch(e){} return new Response('{"error":"METER: not set up on this Worker (METER_DB)."}', { status:503 }); };
         await openManagement();
         mknManage.show('hK');
         if(document.getElementById('mgDelete')) throw new Error('the household he is in can be deleted from here');
@@ -1409,6 +1428,9 @@ window.SELF_TESTS = [
         if(!(n>=12)) throw new Error('items counted: '+n);
         if(!/sign-ins are kept/.test(asked[1].message) || !/x@example.com, y@example.com/.test(asked[1].message)) throw new Error('the sign-ins are not mentioned afterwards');
         if(mknManage._state.rows.some(function(r){ return r.hid==='hX'; })) throw new Error('still listed');
+        // v37.72 — the server is asked to keep it on the list, marked, with who was in it.
+        var md=bodies.filter(function(b){ return b.op==='mark-deleted'; })[0];
+        if(!md || md.hid!=='hX' || md.report.members.length!==2 || md.name!=='Old test kitchen') throw new Error('not kept as deleted: '+JSON.stringify(md));
         store['households/hZ']={ name:'Zed', ownerUid:'uZ' };
         await mknManage.reload(); mknManage.show('hZ');
         window.askConfirm=async function(o){ return o.input!==undefined ? 'something else' : false; };
@@ -1777,10 +1799,10 @@ window.SELF_TESTS = [
         if(!a) throw new Error('no offer in the import window');
         // v37.40 — each copy offers its OWN shortcut (Tony's links, 2 Oct 2026).
         delete window._iosShortcutOverride;
-        // v37.62 — the beta's shortcut comes later (its link in tools/environments.json).
+        // v37.72 — the beta's own (Tony's link, 5 Oct 2026).
         var own = { live:'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6',
                     test:'https://www.icloud.com/shortcuts/411eaddfe44243a180cbafdcc0638bdf',
-                    beta:String(APP_CONFIG.iosShortcutUrl||'') }[String(APP_CONFIG.environment||'live')];
+                    beta:'https://www.icloud.com/shortcuts/d207d5c07d9049bfb311aa13cccef43e' }[String(APP_CONFIG.environment||'live')];
         if(iosShortcutUrl()!==own) throw new Error('this copy offers the wrong shortcut: '+iosShortcutUrl());
         window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
         Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)', configurable:true });

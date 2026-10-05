@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v62
+// Tony's Recipes — Cloudflare Worker v63
+// v63: A DELETED HOUSEHOLD STAYS LISTED, marked. Tony: "I would like to know
+//      who deleted their account as well … do not remove these entries".
+//      `household-report` `gone` (its owner only: deleting the household, or
+//      their account with it) and the owner's `mark-deleted` (was `forget`)
+//      keep the row and note who, when and how; `left` notes a member who
+//      deleted their account. Spending is never removed.
 // v62: ONE HOUSEHOLDS PAGE FOR EVERY COPY. `household-report` (a member of a
 //      household, proved as for AI) keeps a short summary of it — name,
 //      identifier, members, links — in D1 (METER_DB, table `hh_reports`); the
@@ -224,7 +230,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v62';
+const WORKER_VERSION = 'v63';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1369,9 +1375,11 @@ async function meterMembership(claims, hid, token, env) {
     fetch(base, { headers: h, signal: AbortSignal.timeout(8000) })]);
   if (m.status === 403 || m.status === 404) return { member: false };   // not remembered: they may join any minute
   if (!m.ok) throw new Error('the household could not be checked (' + m.status + ')');
+  let role = '';
+  try { role = String(fsValue((((await m.json()) || {}).fields || {}).role) || ''); } catch (e) {}   // v63
   let f = {};
   try { if (hh.ok) f = ((await hh.json()) || {}).fields || {}; } catch (e) {}
-  const v = { member: true, name: String(fsValue(f.name) || '').slice(0, 80), code: String(fsValue(f.code) || ''),
+  const v = { member: true, role, name: String(fsValue(f.name) || '').slice(0, 80), code: String(fsValue(f.code) || ''),
               created: Number(fsValue(f.createdAt)) || null, at: Date.now() };
   _meterMembers.set(k, v);
   return v;
@@ -1483,15 +1491,13 @@ async function meterAction(request, env, body) {
   const projects = csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT);
   const proj = body.project == null || body.project === '' ? claims.aud : String(body.project);
   if (!projects.includes(proj)) return jsonResp({ error: 'METER: not a copy this server serves.' }, 400);
-  if (body.op === 'forget') {
+  // v63 — the owner deleted it from the management page: it stays listed,
+  // marked (Tony: "do not remove these entries"); its spending stays too.
+  if (body.op === 'mark-deleted' || body.op === 'forget') {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
     await reportsTable(db);
-    await db.batch([
-      db.prepare('DELETE FROM hh_reports WHERE project = ?1 AND hid = ?2').bind(proj, hid),
-      db.prepare('DELETE FROM ai_households WHERE project = ?1 AND hid = ?2').bind(proj, hid),
-      db.prepare('DELETE FROM ai_spend WHERE project = ?1 AND hid = ?2').bind(proj, hid)
-    ]);
+    await markDeleted(db, proj, hid, { by: String(claims.email || ''), how: 'admin', name: body.name, code: body.code, report: body.report });
     return jsonResp({ ok: true });
   }
   if (body.op === 'set-cap') {
@@ -1573,6 +1579,7 @@ function reportSummary(r) {
     members: (Array.isArray(r.members) ? r.members : []).slice(0, 200).map(m => ({
       uid: okId(m && m.uid) ? m.uid : null, email: str(m && m.email, 200), name: str(m && m.name, 120),
       role: str(m && m.role, 20), lastSeen: num(m && m.lastSeen), joinedAt: num(m && m.joinedAt) })),
+    left: [],
     links: (Array.isArray(r.links) ? r.links : []).slice(0, 100).filter(l => l && okId(l.hid)).map(l => ({
       hid: l.hid, name: str(l.name, 80), code: str(l.code, 20) })),
     referrals: num(r.referrals) || 0
@@ -1590,22 +1597,53 @@ async function householdReport(request, env, body) {
   if (!hh.member) return jsonResp({ error: 'REPORT: you are not in that household.' }, 403);
   const db = await meterDb(env);
   await reportsTable(db);
-  // Its owner is deleting it: off the owner's page. Only the summary goes —
-  // never the spending, or any member could reset an allowance this way.
+  // v63 — its owner is deleting it (the household, or their account with
+  // it): it stays on the owner's page, marked. Only its owner may say so.
   if (body.gone) {
-    await db.prepare('DELETE FROM hh_reports WHERE project = ?1 AND hid = ?2').bind(claims.aud, hid).run();
+    if (hh.role !== 'owner') return jsonResp({ error: 'REPORT: only its owner deletes a household.' }, 403);
+    await markDeleted(db, claims.aud, hid, { by: String(claims.email || ''), how: body.how === 'account' ? 'account' : 'household',
+      name: hh.name, code: hh.code, created: hh.created, report: body.report });
     return jsonResp({ ok: true, gone: true });
   }
+  const old = await reportRow(db, claims.aud, hid);
+  // v63 — a member deleting their account: noted under the household.
+  if (body.left) {
+    const sum0 = old || reportSummary(body.report);
+    const who = String(claims.email || '').slice(0, 200);
+    sum0.members = (sum0.members || []).filter(m => m.uid !== claims.sub && (!who || m.email !== who));
+    sum0.left = (sum0.left || []).concat([{ email: who, at: Date.now(), how: 'account' }]).slice(-50);
+    if (hh.name) sum0.name = hh.name;
+    if (hh.code) sum0.code = hh.code;
+    await putReport(db, claims.aud, hid, sum0);
+    return jsonResp({ ok: true, left: true });
+  }
   const sum = reportSummary(body.report);
+  if (old && old.left) sum.left = old.left;      // who left stays
   if (hh.name) sum.name = hh.name;               // what Firestore says wins
   if (hh.code) sum.code = hh.code;
   if (hh.created) sum.createdAt = hh.created;
-  const text = JSON.stringify(sum);
-  if (text.length > 65536) return jsonResp({ error: 'REPORT: too large.' }, 413);
+  if (JSON.stringify(sum).length > 65536) return jsonResp({ error: 'REPORT: too large.' }, 413);
+  await putReport(db, claims.aud, hid, sum);
+  return jsonResp({ ok: true });
+}
+async function reportRow(db, project, hid) {
+  const r = await db.prepare('SELECT summary FROM hh_reports WHERE project = ?1 AND hid = ?2').bind(project, hid).first();
+  try { return r && r.summary ? JSON.parse(r.summary) : null; } catch (e) { return null; }
+}
+async function putReport(db, project, hid, sum) {
   await db.prepare('INSERT INTO hh_reports (project, hid, summary, at) VALUES (?1, ?2, ?3, ?4) '
     + 'ON CONFLICT (project, hid) DO UPDATE SET summary = excluded.summary, at = excluded.at')
-    .bind(claims.aud, hid, text, Date.now()).run();
-  return jsonResp({ ok: true });
+    .bind(project, hid, JSON.stringify(sum), Date.now()).run();
+}
+// Kept, marked: who deleted it, when, and how (household | account | admin).
+async function markDeleted(db, project, hid, o) {
+  let sum = await reportRow(db, project, hid);
+  if (!sum) sum = reportSummary(o.report || {});
+  if (o.name) sum.name = String(o.name).slice(0, 80);
+  if (o.code) sum.code = String(o.code).slice(0, 20);
+  if (o.created && !sum.createdAt) sum.createdAt = o.created;
+  if (!sum.deletedAt) { sum.deletedAt = Date.now(); sum.deletedBy = String(o.by || '').slice(0, 200); sum.deletedHow = o.how; }
+  await putReport(db, project, hid, sum);
 }
 
 // ─── NOTES FROM TESTERS, ONE INBOX (v61) ─────────────────────────────────────
@@ -2163,4 +2201,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v62 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v63 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

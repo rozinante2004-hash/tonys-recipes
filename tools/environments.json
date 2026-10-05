@@ -61,8 +61,8 @@
     "_why_firebase": "Tony's beta Firebase project (4 Oct 2026). authDomain is the copy's OWN address, not my-kitchen-notes-beta.firebaseapp.com: sign-in is served from it (tools/build.js fetches Firebase's sign-in files into dist/__/), as for the test copy — on an iPhone the firebaseapp.com address fails with 'missing initial state'.",
     "siteOrigin": "https://my-kitchen-notes-beta.pages.dev",
     "sitePath": "/",
-    "iosShortcutUrl": "",
-    "_why_iosShortcutUrl": "Tony's third shortcut (a copy of his, pointed at this address) — its iCloud link goes here; empty = the offer is not shown.",
+    "iosShortcutUrl": "https://www.icloud.com/shortcuts/d207d5c07d9049bfb311aa13cccef43e",
+    "_why_iosShortcutUrl": "v37.72 — Tony's beta shortcut (5 Oct 2026): a copy of his, pointed at this address.",
     "dataLayout": "households",
     "features": {
       "whatsapp": true,
