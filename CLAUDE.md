@@ -815,6 +815,17 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.70 — AI right after opening; the copies' Households linked.** Tony
+    shared a reel into the beta from WhatsApp; the import asked the AI in the
+    app's first seconds, before the household was open, so the Worker had no
+    `hid` and refused ("AI_ALLOWANCE: sign in…"). `_aiCallUncached` now waits
+    (`aiWaitForHousehold`, ≤20 s; ends at once when Firebase has settled on
+    nobody, `_fbAuthSettled`) and takes the sign-in from `fbSignedInUser()`.
+    Allowance refusals are said without the prefix (`aiAllowanceError`, code
+    kept on the error for the retry rule). 📊 Households lists THIS copy's
+    households (each copy its own database) — it now links to the other
+    copies' pages (`APP_CONFIG.betaCopy`, `…?manage` opens the page once the
+    owner's household is open).
   - **v37.69 — the iPhone shortcut is not offered twice.** Tony was offered
     "Save to My Kitchen Notes (TEST)" again although he has it (a page cannot
     see a phone's shortcuts; the "offered" mark was only in localStorage,

@@ -197,9 +197,15 @@
     if (!ov) return;
     var body = ov.querySelector('.mg-body');
     var env = String((window.APP_CONFIG && APP_CONFIG.environment) || 'live');
+    var copies = [['live', 'family', APP_CONFIG.liveSiteUrl], ['test', 'test', APP_CONFIG.testCopy && APP_CONFIG.testCopy.siteUrl],
+                  ['beta', 'beta', APP_CONFIG.betaCopy && APP_CONFIG.betaCopy.siteUrl]]
+      .filter(function (c) { return c[2] && c[0] !== env; });
+    // v37.70 — each copy has its own households: one tap opens another copy's list.
+    var others = copies.length ? '<div class="mg-muted" style="margin-top:4px;">Other copies: ' + copies.map(function (c) {
+        return '<a class="mg-link" href="' + escA(c[2] + '?manage') + '" target="_blank" rel="noopener">' + esc(c[1]) + ' \u2197</a>'; }).join(' · ') + '</div>' : '';
     var head = '<div class="mg-top"><div><div class="mg-title">📊 Households</div><div class="mg-muted">'
       + esc(env === 'live' ? 'the family’s copy' : env + ' copy') + ' · ' + S.rows.length + ' household' + (S.rows.length === 1 ? '' : 's')
-      + (S.meter ? ' · AI ' + (S.meter.capped ? 'allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)' : 'counted, not capped') : '') + '</div></div>'
+      + (S.meter ? ' · AI ' + (S.meter.capped ? 'allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)' : 'counted, not capped') : '') + '</div>' + others + '</div>'
       + '<div class="mg-tools"><input id="mgSearch" type="search" placeholder="Search name, identifier or e-mail" value="' + escA(S.q) + '" oninput="mknManage.search(this.value)">'
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
@@ -295,6 +301,7 @@
     + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;}'
     + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
     + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
+    + '.mg-link{color:var(--terracotta);font-weight:600;text-decoration:none;}'
     + '.mg-copy{display:inline-block;padding:1px 7px;border-radius:9px;border:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}'
     + '.mg-card{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:12px 14px;margin-bottom:10px;}'
     + '.mg-card.mg-new{border-inline-start:4px solid var(--terracotta-fill);}'

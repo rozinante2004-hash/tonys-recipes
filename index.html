@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.69 -->
+<!-- Tony's Recipes Collection v37.70 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,6 +135,10 @@
     // v36.72 — the two copies, by name, for the 🚀 Deployments links. The two
     // lines above are THIS copy's address; these stay the same in every copy.
     liveSiteUrl:         'https://rozinante2004-hash.github.io/tonys-recipes/',
+    // v37.70 — the beta, by name, for the management page's links to it.
+    betaCopy: Object.freeze({
+      siteUrl:           'https://my-kitchen-notes-beta.pages.dev/'
+    }),
     testCopy: Object.freeze({
       siteUrl:           'https://tonys-recipes-test.pages.dev/',
       pagesProject:      'tonys-recipes-test',
@@ -461,6 +465,7 @@
         if (u && typeof checkWorkerHealth === 'function') setTimeout(function(){ try { checkWorkerHealth(); } catch(e) {} }, 1500);
       });
       _fbAuth.onAuthStateChanged(function(user) {
+        window._fbAuthSettled = true;   // v37.70 — Firebase has said who (or nobody) is signed in
         try { syncLog('auth', user ? 'Signed in' : 'Signed out'); } catch(e) {}
         if (user && typeof window.emailVerifyNudge === 'function') try { window.emailVerifyNudge(user); } catch(e) {}
         if (user) {
@@ -3971,6 +3976,17 @@ function hhRef(hid) { return hhDb().collection('households').doc(hid || _cloudHi
 // v37.58 — arrived through someone's ✉️ share link (…?ref=MKN-…): kept until
 // this person founds a household, and taken out of the address.
 var REF_KEY = 'mkn_ref';
+// v37.70 — …?manage (the management page's links between copies): open 📊
+// Households here as soon as the owner's household is open.
+var _openManageOnSignIn = false;
+(function captureManage() {
+  try {
+    if (!/[?&]manage(=|&|$)/.test(location.search)) return;
+    _openManageOnSignIn = true;
+    var clean = location.pathname + location.search.replace(/([?&])manage(=[^&]*)?&?/, '$1').replace(/[?&]$/, '') + location.hash;
+    history.replaceState(null, '', clean);
+  } catch(e) {}
+})();
 (function captureRef() {
   try {
     var m = /[?&]ref=(MKN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4})(?:&|$)/.exec(location.search);
@@ -4684,6 +4700,7 @@ async function householdUse(hid, role) {
   hhRenderAppRequests();
   await hhLoadLinks();                                           // v37.53
   hhNoteSeen();                                                  // v37.58
+  if (_openManageOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) { _openManageOnSignIn = false; setTimeout(function(){ openManagement(); }, 800); }
   if (typeof deviceOffersCloud === 'function' && !_selfTestRunning) deviceOffersCloud().catch(function(){});   // v37.69
   if (typeof feedbackTellOwner === 'function') setTimeout(function(){ feedbackTellOwner().catch(function(){}); }, 5000);   // v37.64
   // v37.63 — Tony: "all my WhatsApp groups have disappeared". The chats are in
@@ -5950,7 +5967,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.69';
+var APP_VERSION = 'v37.70';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8587,7 +8604,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.69</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.70</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9272,7 +9289,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.69</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.70</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17847,7 +17864,7 @@ function aiRetryable(e) {
   // arriving at the same answer. Anthropic's own 429 is handled separately and
   // IS retried, because that one genuinely clears.
   if (m.indexOf('SPEND_CAP:') === 0 || m.indexOf('RATE_LIMIT:') === 0) return false;
-  if (m.indexOf('AI_ALLOWANCE:') === 0) return false;   // v37.57 — the household's monthly allowance
+  if (m.indexOf('AI_ALLOWANCE:') === 0 || (e && e.code === 'AI_ALLOWANCE')) return false;   // v37.57 — the household's monthly allowance
   if (m.indexOf('Rate limit') !== -1) return false;
   var code = m.match(/^API error (\d{3})/);
   if (code) {
@@ -17857,7 +17874,29 @@ function aiRetryable(e) {
   return true;                                   // a bare network failure — worth one more go
 }
 window.aiTimeoutMs = aiTimeoutMs; window.aiRetryable = aiRetryable;
+// v37.70 — the Worker's word about the household's allowance, said to a person
+// without its machine prefix ("AI_ALLOWANCE: …"); the code stays on the error.
+function aiAllowanceError(msg) {
+  var t = String(msg || '').replace(/^AI_ALLOWANCE:\s*/, '');
+  if (/^sign in to use the AI/i.test(t)) t = 'Sign in first \u2014 the AI is counted per household, and this app does not know yours yet. If you are signed in, wait a few seconds and press Try again.';
+  else t = t.charAt(0).toUpperCase() + t.slice(1);
+  var e = new Error(t); e.code = 'AI_ALLOWANCE';
+  return e;
+}
+window.aiAllowanceError = aiAllowanceError;
 
+async function aiWaitForHousehold(ms) {
+  var until = Date.now() + (ms || 20000);
+  while (Date.now() < until) {
+    var u = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
+    if (_cloudHid && u) return true;
+    // Nobody signed in at all (and Firebase has finished deciding): no point waiting.
+    if (!u && window._fbAuthSettled) return false;
+    await new Promise(function(r){ setTimeout(r, 250); });
+  }
+  return false;
+}
+window.aiWaitForHousehold = aiWaitForHousehold;
 async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
   // Calls our Cloudflare Worker proxy which forwards to Anthropic API.
   // The Worker adds the API key server-side so it never travels through the browser.
@@ -17873,7 +17912,13 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
   // v37.57 — know whether the Worker meters (once a session), and send a
   // sign-in that is fresh (Firebase renews it if it is about to expire).
   if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
-  if (aiMeterOn() && window._fbUser && _fbUser.getIdToken) { try { window._aiIdToken = await _fbUser.getIdToken(); } catch(e) {} }
+  // v37.70 — Tony shared a reel into the beta from WhatsApp: the import asked
+  // the AI in the app's first seconds, before the household was open, so the
+  // Worker had no household to count it against and refused. A metering
+  // Worker now waits (up to 20 s) for the sign-in and the household.
+  if (aiMeterOn() && cloudLayout() === 'households') await aiWaitForHousehold(20000);
+  var _who = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
+  if (aiMeterOn() && _who && _who.getIdToken) { try { window._aiIdToken = await _who.getIdToken(); } catch(e) {} }
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const body = {
@@ -17907,6 +17952,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
         var ours = null;
         try { ours = await r.clone().json(); } catch(e) {}
         if (ours && ours.rateLimited && ours.error) {
+          if (ours.allowance) throw aiAllowanceError(ours.error);
           throw new Error(ours.error);
         }
         const retryAfter = r.headers.get('retry-after');
@@ -17920,7 +17966,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
         try { errData = JSON.parse(errText); } catch(e) {}
         // v37.57 — our Worker's word about the household's allowance (or the
         // sign-in behind it), said as it is — never "the API key is invalid".
-        if (errData && errData.allowance && errData.error) throw new Error(errData.error);
+        if (errData && errData.allowance && errData.error) throw aiAllowanceError(errData.error);
         const errType = (errData.error && errData.error.type) || '';
         if (r.status === 402 || errType === 'billing_error') {
           throw new Error('BILLING: Your Anthropic API credits have run out.\n\nTo top up: https://console.anthropic.com/settings/billing\n\nAll AI features (translate, suggest, import, explore) will not work until credits are added.');

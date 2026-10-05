@@ -1193,22 +1193,31 @@ window.SELF_TESTS = [
         if(b.idToken!=='tok.en.sig' || b.hid!=='hT') throw new Error('an AI call to a metering Worker carries no sign-in: '+JSON.stringify(b));
         b=JSON.parse(workerBody({ action:'photo-search', query:'x' }));
         if(b.idToken!==undefined) throw new Error('the sign-in is sent where it is not needed');
-        var calls=0;
+        var calls=0, settled0=window._fbAuthSettled; window._fbAuthSettled=true;
         window._fbUser=null;
         window.fetch=async function(u, init){ calls++; return new Response(JSON.stringify({ error:'AI_ALLOWANCE: this month\u2019s AI allowance for your household is used up ($2.01 of $2.00). It renews on the 1st.', rateLimited:true, allowance:true }), { status:429, headers:{ 'Content-Type':'application/json' } }); };
         var msg='';
         try{ await _aiCallUncached('hello', 50, null, null, null, null); }catch(e){ msg=e.message; }
-        if(!/^AI_ALLOWANCE: /.test(msg) || calls!==1) throw new Error('the allowance was not said as it is, or was retried ('+calls+' calls): '+msg);
+        if(!/^This month.s AI allowance for your household is used up/.test(msg) || /AI_ALLOWANCE/.test(msg) || calls!==1) throw new Error('the allowance was not said plainly, or was retried ('+calls+' calls): '+msg);
         window.fetch=async function(){ calls++; return new Response(JSON.stringify({ error:'AI_ALLOWANCE: the AI could not be checked against your household\u2019s allowance (expired).', rateLimited:true, allowance:true }), { status:403, headers:{ 'Content-Type':'application/json' } }); };
         calls=0; msg='';
         try{ await _aiCallUncached('hello', 50, null, null, null, null); }catch(e){ msg=e.message; }
-        if(/API key/i.test(msg) || !/^AI_ALLOWANCE: /.test(msg) || calls!==1) throw new Error('a 403 from the allowance read as a bad API key: '+msg);
+        if(/API key/i.test(msg) || !/^The AI could not be checked/.test(msg) || calls!==1) throw new Error('a 403 from the allowance read as a bad API key: '+msg);
+        // v37.70 — in the app's first seconds the call waits for the household, then goes with it.
+        var settledWas=window._fbAuthSettled; window._fbAuthSettled=true;
+        _cloudHid=null; window._fbUser={ uid:'uW', getIdToken:async function(){ return 'tok.W'; } };
+        var sentHid=null; window.fetch=async function(u, init){ var b=JSON.parse(init.body); sentHid=b.hid; return new Response(JSON.stringify({ content:[{ type:'text', text:'ok' }], usage:{ input_tokens:1, output_tokens:1 } }), { status:200 }); };
+        setTimeout(function(){ _cloudHid='hLate'; }, 600);
+        await _aiCallUncached('hello', 50, null, null, null, null);
+        if(sentHid!=='hLate') throw new Error('the AI was asked before the household was known: '+sentHid);
+        window._fbAuthSettled=settledWas;
         aiMeterNote({ usd:1.5, cap:2 });
         if(aiMeterLine()!=='$1.50 of $2.00 allowed') throw new Error('the household line: '+aiMeterLine());
         aiMeterNote({ usd:3.25, cap:null });
         if(aiMeterLine()!=='$3.25') throw new Error('an uncapped household: '+aiMeterLine());
       } finally {
         _workerHealth=real.h; window._aiIdToken=real.tok; _cloudHid=real.hid; _cloudLayout=real.layout; window.fetch=real.fetch; window._fbUser=real.user; _aiMeter=real.meter;
+        window._fbAuthSettled=settled0;
       }
     } },
 
@@ -1246,6 +1255,11 @@ window.SELF_TESTS = [
         if(n!==2) throw new Error('households read: '+n);
         var ov=document.getElementById('manageOverlay'), t=ov.textContent;
         ['Kitchen A','MKN-AAAA-2222','a@example.com','$1.70','of $2.00','Kitchen B'].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the table does not show '+w); });
+        // v37.70 — links to the other copies' Households pages (never to this one).
+        var links=Array.prototype.map.call(ov.querySelectorAll('a.mg-link'), function(a){ return a.getAttribute('href'); });
+        var here=String(APP_CONFIG.environment||'live');
+        if(links.length!==2 || links.some(function(h){ return !/\?manage$/.test(h); })) throw new Error('the links to the other copies: '+JSON.stringify(links));
+        if(here!=='live' && links.indexOf(APP_CONFIG.liveSiteUrl+'?manage')===-1) throw new Error('no link to the family\u2019s households');
         var rA=mknManage._state.rows.filter(function(r){ return r.hid==='hA'; })[0];
         if(rA.referred!==1 || rA.members.length!==2 || rA.links.length!==1 || rA.asked.length!==1 || rA.lastSeen<now-120e3) throw new Error('row A: '+JSON.stringify({ ref:rA.referred, m:rA.members.length, l:rA.links.length, asked:rA.asked.length, seen:rA.lastSeen }));
         mknManage.search('b@example'); if(document.querySelectorAll('#manageOverlay .mg-row').length!==1) throw new Error('search by a member\u2019s address');
