@@ -815,6 +815,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.67 — the 💬 note never turns into the list of ways to e-mail.**
+    Tony tapped it in the app's first seconds (the app's own `_fbUser` is set
+    ~3 s after Firebase signs in) and got the e-mail choices — "the note frame
+    should suffice … as simple and usable as possible". Now the form always
+    opens (also ⚙️ ✉️ Send feedback where the feature is on), the sign-in is
+    `fbSignedInUser()` (the app's, else Firebase's `currentUser`), and signed
+    out, Send says to sign in and keeps the note.
   - **v37.66 — the 💬 button actually shows.** Tony could not see it: the
     "hide while a window is open" rule also matched `#selectBar[style*=flex]`,
     which is ALWAYS true (its inline style mentions flex shown or not). Gone;

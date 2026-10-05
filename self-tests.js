@@ -1140,7 +1140,9 @@ window.SELF_TESTS = [
         setUA(CHROME);
         window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(!/tony\.schvekher@gmail\.com/.test(intro)) throw new Error('feedback does not say where it goes'); return 'gmail'; };
         window.open=function(u){ opened=u; return null; };
-        await sendFeedback();
+        // (v37.67 — where the 💬 note is on, Send feedback opens the note form; the e-mail way is the family's)
+        var fbWas=_featureOverride.feedbackButton; _featureOverride.feedbackButton=false;
+        try{ await sendFeedback(); } finally { if(fbWas===undefined) delete _featureOverride.feedbackButton; else _featureOverride.feedbackButton=fbWas; }
         if(!opened || opened.indexOf('to='+encodeURIComponent('tony.schvekher@gmail.com'))===-1) throw new Error('feedback does not reach tony.schvekher@gmail.com: '+opened);
       } finally {
         delete window._deviceOfferForce; delete window._iosShortcutOverride; _pwaInstallEvent=realEv; window.askChoice=realAsk; window.open=realOpen;
@@ -1370,10 +1372,19 @@ window.SELF_TESTS = [
         if(document.getElementById('feedbackFab').classList.contains('fb-shine')) throw new Error('still shimmering after three days');
         toggleFeedbackButton(); if(document.getElementById('feedbackFab')) throw new Error('hiding it did not');
         toggleFeedbackButton(); if(!document.getElementById('feedbackFab')) throw new Error('showing it again did not');
-        // Signed out: the e-mail way.
+        // v37.67 — never the list of ways to e-mail: the form, always; signed
+        // out, Send says to sign in and keeps the note.
         var mailed=0; window.sendFeedbackByEmail=function(){ mailed++; };
-        window._fbUser=null; openFeedbackForm();
-        if(mailed!==1 || document.getElementById('feedbackOverlay')) throw new Error('signed out, it did not fall back to e-mail');
+        var realAuth=window._fbAuth; window._fbAuth={ currentUser:null };
+        window._fbUser=null; sendFeedback();
+        if(mailed!==0 || !document.getElementById('feedbackOverlay')) throw new Error('signed out, it did not open the note form');
+        document.getElementById('fbText').value='kept';
+        if(await sendFeedbackNote()!==false || added.length || document.getElementById('fbText').value!=='kept') throw new Error('signed out, the note was sent or lost');
+        // Firebase has the sign-in before the app does (its first seconds): that is enough.
+        window._fbAuth={ currentUser:{ uid:'uEarly', email:'early@example.com' } };
+        if(!fbSignedInUser() || fbSignedInUser().uid!=='uEarly') throw new Error('the sign-in Firebase already has is not used');
+        window._fbAuth=realAuth;
+        document.getElementById('feedbackOverlay').remove();
         // Signed in: the form; an empty note is refused; a note is kept with exactly the fields the rules accept.
         window._fbUser={ uid:'uT', email:'tester@example.com', displayName:'Tess' }; window._household={ hid:'hT', name:'Tess\u2019s Kitchen' };
         window._fbDb={ collection:function(c){ return { add:async function(d){ added.push({ c:c, d:d }); return { id:'n1' }; } }; } };

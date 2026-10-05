@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.66 -->
+<!-- Tony's Recipes Collection v37.67 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5505,7 +5505,7 @@ function feedbackMailto() {
 // Gmail, Outlook, the mail app, or copy — and it says where it goes.
 // v37.64 — where notes are kept (the beta, the test copy), the form; else e-mail.
 function sendFeedback() {
-  if (typeof featureOn === 'function' && featureOn('feedbackButton') && window._fbUser) return openFeedbackForm();
+  if (typeof featureOn === 'function' && featureOn('feedbackButton')) return openFeedbackForm();   // v37.67 — always the form there
   return sendFeedbackByEmail();
 }
 function sendFeedbackByEmail() {
@@ -5578,9 +5578,13 @@ async function fbShotPicked(input) {
     if (btn) btn.textContent = '\u{1F5BC} Change the screenshot';
   } catch(e) { toast('⚠️ The screenshot could not be added: ' + (e && e.message), 6000); }
 }
+// v37.67 — Tony: a tap in the first seconds got the long list of ways to
+// e-mail (the sign-in finishes ~3 s after the app opens, and the form fell
+// back to e-mail until then). "The note frame should suffice" — "as simple
+// and usable as possible": the form always opens, and takes the sign-in from
+// Firebase itself if the app has not caught up with it yet.
+function fbSignedInUser() { return window._fbUser || (window._fbAuth && _fbAuth.currentUser) || null; }
 function openFeedbackForm() {
-  // Not signed in: there is nowhere to keep it — the e-mail way, as before.
-  if (!window._fbUser || !hhDb()) return sendFeedbackByEmail();
   _fbShot = '';
   var prev = document.getElementById('feedbackOverlay'); if (prev) prev.remove();
   var ov = document.createElement('div');
@@ -5603,11 +5607,12 @@ function openFeedbackForm() {
 async function sendFeedbackNote() {
   var t = document.getElementById('fbText'), text = t ? t.value.trim() : '';
   if (!text) { toast('Write a few words first.'); if (t) t.focus(); return false; }
+  if (!fbSignedInUser() || !hhDb()) { toast('Sign in first, so Tony knows who wrote \u2014 your note stays here.', 7000); return false; }
   var btn = document.getElementById('fbSend'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   var withLog = (document.getElementById('fbLog') || {}).checked;
   var log = '';
   if (withLog) { try { log = syncLogReportText(); } catch(e) {} if (log.length > 190000) log = log.slice(0, 190000) + '\n…(cut)'; }
-  var u = window._fbUser || {};
+  var u = fbSignedInUser() || {};
   var note = { uid: u.uid, email: String(u.email || ''), name: String(u.displayName || ''),
     hid: (_household && _household.hid) || '', household: (_household && _household.name) || '',
     text: text.slice(0, 5000), shot: _fbShot || '', log: log, version: APP_VERSION,
@@ -5617,7 +5622,7 @@ async function sendFeedbackNote() {
   try { await hhDb().collection('feedback').add(note); }
   catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
-    showServiceError('Your note could not be sent: ' + (e && e.message) + '\n\nYou can still write by e-mail: ⚙️ → ✉️ Send feedback.');
+    showServiceError('Your note could not be sent: ' + (e && e.message) + '\n\nIt is still in the box \u2014 try Send again in a moment.');
     return false;
   }
   var ov = document.getElementById('feedbackOverlay'); if (ov) ov.remove();
@@ -5638,7 +5643,7 @@ async function feedbackTellOwner() {
 }
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
 window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedbackNote; window.fbShotPicked = fbShotPicked;
-window.feedbackTellOwner = feedbackTellOwner;
+window.feedbackTellOwner = feedbackTellOwner; window.fbSignedInUser = fbSignedInUser;
 document.addEventListener('DOMContentLoaded', function(){ try { renderFeedbackButton(); } catch(e) {} });
 
 
@@ -5891,7 +5896,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.66';
+var APP_VERSION = 'v37.67';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8528,7 +8533,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.66</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.67</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9213,7 +9218,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.66</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.67</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
