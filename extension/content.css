@@ -20,5 +20,9 @@
 .mkn-save[disabled] { opacity: .6; cursor: default; }
 /* The test build's button: a teal ring, so the two can be told apart. */
 .mkn-save.mkn-test .mkn-ico { box-shadow: 0 0 0 2px #1F6F78; }
+/* 1.6.1 — the beta's: a gold ring. Without it the beta's button was the family's twin, and on a
+   reel its floating button sat exactly on the family's (Tony saw two of three). */
+.mkn-save.mkn-beta .mkn-ico { box-shadow: 0 0 0 2px #D4A843; }
 .mkn-float { position: fixed; left: 16px; bottom: 16px; z-index: 2147483000; margin: 0; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .mkn-float-test { bottom: 64px; }
+.mkn-float-beta { bottom: 112px; }

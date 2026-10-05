@@ -815,6 +815,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Extension 1.6.1 — the beta's button told apart.** Tony saw two buttons
+    (family, test), not three: the beta's was the family's twin (same icon, no
+    ring) and its floating reel button sat exactly ON the family's (both
+    bottom:16px). content.css: `.mkn-beta .mkn-ico` gold ring (#D4A843),
+    `.mkn-float-beta { bottom: 112px }`. (Also: an extension's buttons reach
+    only pages opened after it is installed — reload Facebook.) Checked with all
+    three loaded together: one button each, rings teal/gold/none, floats 48 px apart.
   - **v37.79 — the share symbol centred.** Tony: it leaned right (two of its three dots are on the right, so centring by its edges is not enough): set 1 unit left in its 24-unit box.
   - **v37.78 — white dots; each copy's own households.** Tony: no golden
     dots — the share symbol is all white on terracotta. And the beta's 📊
