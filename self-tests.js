@@ -942,40 +942,6 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'fb_reading_test', group:'Import/Export', name:'🔬 Facebook reading test: test copy only; every server route graded into one report (v37.38, v37.39)',
-    test: async()=>{
-      var item=document.getElementById('fbProbeItem');
-      var live=String(APP_CONFIG.environment||'live')!=='test';   // v37.62 — the beta hides it like the family app
-      if(!item) throw new Error('no 🔬 item in Settings');
-      if(live!==item.hidden) throw new Error(live ? 'a copy other than the test copy shows the Facebook reading test' : 'the test copy hides the Facebook reading test');
-      var real={ fetch:window.fetch, toast:window.toast }, saved=null, asked=null;
-      try{ saved=localStorage.getItem(FB_PROBE_KEY); }catch(e){}
-      try{
-        window.toast=function(){};
-        localStorage.removeItem(FB_PROBE_KEY);
-        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} asked=b;
-          if(b.action==='fb-probe') return { status:200, json:async function(){ return { preview:'x'.repeat(202), rows:[
-            { route:'server: the post page', grade:'whole', chars:2067, how:'page data (string)', tail:'אתם לא חוזרים אחורה!', note:'841 KB page' },
-            { route:'server: mobile site', grade:'nothing', chars:0, how:'', note:'19 KB page' } ] }; } };
-          return { status:404, json:async function(){ return {}; } }; };
-        openFbProbe();
-        if(document.querySelector('#fbProbeOverlay [onclick*="PhoneResult"], #fbProbeOverlay [onclick*="safari"]')) throw new Error('the phone steps are still there');
-        document.getElementById('fbProbeUrl').value='https://www.facebook.com/reel/1287081419887804/';
-        await fbProbeRunServer();
-        if(!asked || asked.action!=='fb-probe' || 'web' in asked) throw new Error('the test asked: '+JSON.stringify(asked));
-        var rep=fbProbeReport();
-        ['✅ WHOLE TEXT — server: the post page (2067 chars, page data (string))','❌ nothing — server: mobile site']
-          .forEach(function(w){ if(rep.indexOf(w)===-1) throw new Error('the report lacks "'+w+'":\n'+rep); });
-        if(/ON THE PHONE/.test(rep)) throw new Error('the report still has the phone section');
-        var body=function(t){ return String(t).split('\n').slice(1).join('\n'); };   // the first line carries the time
-        if(body(document.getElementById('fbProbeResults').textContent)!==body(rep)) throw new Error('the screen does not show the report');
-      } finally {
-        window.fetch=real.fetch; window.toast=real.toast;
-        var ov=document.getElementById('fbProbeOverlay'); if(ov) ov.remove();
-        try{ if(saved===null) localStorage.removeItem(FB_PROBE_KEY); else localStorage.setItem(FB_PROBE_KEY, saved); }catch(e){}
-      }
-    } },
-
   { id:'import_android_share_menu_offer', group:'Import/Export', name:'On Android, one tap installs the app into the Share menu (v37.42)',
     test: async()=>{
       var b=document.getElementById('androidShareOffer'), realEv=window._pwaInstallEvent, prompted=0;
@@ -1104,7 +1070,8 @@ window.SELF_TESTS = [
       var CHROME='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
       var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)', ANDROID='Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140.0 Mobile';
       var tag=extTag();
-      var vis=function(id){ var e=document.getElementById(id); return !!e && !e.hidden; };
+      // v37.75 — as SHOWN: a [hidden] item displayed anyway (the menu's display:flex outranked it) passed the old check.
+      var vis=function(id){ var e=document.getElementById(id); return !!e && !e.hidden && getComputedStyle(e).display!=='none'; };
       var kept=null; try{ kept=localStorage.getItem(DEVICE_OFFER_KEY); }catch(e){}
       var realEv=window._pwaInstallEvent, realAsk=window.askChoice, realOpen=window.open, opened=null;
       var dlg=function(){ return document.getElementById('deviceOfferOverlay'); };
@@ -3214,7 +3181,7 @@ window.SELF_TESTS = [
         window.householdMembersOf=async function(){ return [{ uid:'me', role:'owner' }, { uid:'you', role:'editor' }]; };
         var said=null; window.askConfirm=async function(o){ said=o; return true; };
         var r=await accountDelete();
-        if(r!==null||!said||!/Hand these over first/.test(said.title)||!/Test home/.test(said.message)) throw new Error('with others in it, deleting the account said: '+JSON.stringify(said));
+        if(r!==null||!said||!/Hand (these|it) over first/.test(said.title)||!/Test home/.test(said.message)) throw new Error('with others in it, deleting the account said: '+JSON.stringify(said));
         // v37.06 — proving it is you again asks a password account for its
         // password (hidden as typed), not for a Google sign-in.
         if(typeof accountReauthenticate!=='function') throw new Error('accountReauthenticate not defined');
@@ -3230,12 +3197,11 @@ window.SELF_TESTS = [
            || ad.indexOf('accountReauthenticate(user, true)') > ad.indexOf('householdWipe(alone'))
           throw new Error('deleting an account does not confirm it is you before deleting anything');
         // v37.05 — "Delete my account" is the ⚙️ menu's LAST item, bold and red;
-        // "Download all my data" has its own item (household layout only).
+        // v37.75 — "Download all my data" was the same file as 💾 Backups → Save: gone from ⚙️ (Tony).
         var drop=document.getElementById('settingsDrop'), items=drop.querySelectorAll('button.drop-item'), last=items[items.length-1];
         if(!last||last.id!=='deleteAccountItem'||last.getAttribute('data-layout-only')!=='households') throw new Error('"Delete my account" is not the last item of the ⚙️ menu');
         if(parseInt(getComputedStyle(last).fontWeight,10)<700) throw new Error('"Delete my account" is not bold');
-        var dl=drop.querySelector('[onclick*="accountDownload"]');
-        if(!dl||dl.getAttribute('data-layout-only')!=='households') throw new Error('"Download all my data" is not in the ⚙️ menu');
+        if(drop.querySelector('[onclick*="accountDownload"]')) throw new Error('"Download all my data" is back in ⚙️ — it is the same file as 💾 Backups');
       } finally {
         window._household=real.hh; _household=real.hh; _householdList=real.list; _cloudHid=real.hid; _cloudLayout=real.layout;
         window.askChoice=real.choice; window.askConfirm=real.confirm; window._fbAuth=real.auth; window._fbUser=real.user; window._fbDb=real.db;
@@ -3914,7 +3880,8 @@ window.SELF_TESTS = [
           // and the test copy has Bring! off on purpose (v36.72).
           _featureOverride[f]=true; applyFeatureFlags();
           var back=document.querySelector('#settingsDrop [data-feature="'+f+'"], #moreDrop [data-feature="'+f+'"]');
-          if(back && getComputedStyle(back).display==='none') throw new Error(f+' switched back on but its menu item stays hidden');
+          // (v37.75 — Gmail's and Bring!'s set-ups are the owner's: hidden from anyone else whatever the feature says.)
+          if(back && !(back.hasAttribute('data-owner-only') && !isAppOwner()) && getComputedStyle(back).display==='none') throw new Error(f+' switched back on but its menu item stays hidden');
           if(!privacyEntries().some(function(e){ return ENTRY[f].word.test(e.who+' '+e.sends); }))
             throw new Error(f+' is on but missing from "What leaves this device"');
         }
@@ -5870,8 +5837,8 @@ window.SELF_TESTS = [
         if(!el) throw new Error('the nudge reported "shown" but rendered nothing');
         if(!/refused/i.test(el.textContent)) throw new Error('the nudge does not say what the problem is');
         var btns=Array.prototype.slice.call(el.querySelectorAll('button')).map(function(b){ return b.textContent; });
-        if(!btns.some(function(t){ return /Copy report/.test(t); }))
-          throw new Error('the nudge has no Copy button, which is the only way this reaches anyone');
+        if(!btns.some(function(t){ return /Send to admin/.test(t); }))
+          throw new Error('the nudge has no Send to admin button, which is the only way this reaches anyone');
         if(!btns.some(function(t){ return /✕/.test(t); })) throw new Error('the nudge cannot be dismissed');
 
         // Guard 1: once per session.
@@ -5912,9 +5879,9 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'log_panel_controls', group:'UI', name:'Logging & debugging panel has all five controls (v35.4)',
+  { id:'log_panel_controls', group:'UI', name:'Logging & debugging: no switches (all on, 7 days), the log, and Transmit report to admin (v35.4, v37.75)',
     test: async()=>{
-      ['showLoggingPanel','renderLoggingPanel','copySyncLogReport','purgeSyncLogUI','applyLogRetention']
+      ['showLoggingPanel','renderLoggingPanel','sendLogReportToAdmin','purgeSyncLogUI','diagnosticsFixed']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       if(!document.getElementById('loggingOverlay')) throw new Error('#loggingOverlay missing');
       // The way in: three in-app messages point at ⚙️ Settings, so it has to be there.
@@ -5935,27 +5902,33 @@ window.SELF_TESTS = [
         if(body.querySelector('img[src="x"]'))
           throw new Error('a recipe name from the log was rendered as live HTML');
 
-        if(!body.querySelector('#logEnabledBox')) throw new Error('no enable/disable switch');
-        if(!body.querySelector('#logEnabledBox').checked) throw new Error('the switch does not reflect the stored setting');
-        var days=body.querySelector('#logDaysInput');
-        if(!days) throw new Error('no retention setting');
-        if(String(days.value)!==String(logRetentionDays())) throw new Error('the retention field shows the wrong value');
+        // v37.75 — Tony: "get rid of the entire block … keeping all options selected, and 7 days of logs".
+        ['#logEnabledBox','#logDaysInput','#logNudgeBox','#proxyAlwaysBox','#selfTestsEnabledBox'].forEach(function(q){
+          if(body.querySelector(q)) throw new Error('the panel still offers '+q+' — the person is not to change these'); });
         var html=body.innerHTML;
-        if(html.indexOf('copySyncLogReport()')===-1) throw new Error('no Copy report button');
+        if(html.indexOf('sendLogReportToAdmin()')===-1 || !/Transmit report to admin/.test(body.textContent)) throw new Error('no Transmit report to admin button');
+        if(html.indexOf('copySyncLogReport()')!==-1) throw new Error('Copy report is still there');
         if(html.indexOf('purgeSyncLogUI()')===-1) throw new Error('no Purge logs button');
         if(html.indexOf('setLogFilter(')===-1) throw new Error('no filter controls in the viewer');
         if(html.indexOf('What this looks like')===-1) throw new Error('the panel shows no analysis');
         if(html.indexOf('debugModeItem')===-1) throw new Error('debug mode did not move into this panel');
-        // The nudge switch, and it must be unusable while nothing is being
-        // recorded — an switch that promises notifications about a log that is
-        // not being written is a lie.
-        var nudgeBox=body.querySelector('#logNudgeBox');
-        if(!nudgeBox) throw new Error('no switch for the nudge');
-        if(nudgeBox.disabled) throw new Error('the nudge switch is disabled while recording is on');
-        setLogEnabled(false); renderLoggingPanel();
-        var off=document.getElementById('loggingBody').querySelector('#logNudgeBox');
-        if(!off || !off.disabled) throw new Error('the nudge switch stays usable while recording is off');
-        setLogEnabled(true); renderLoggingPanel();
+        // Every device ends up with all of it on, 7 days, once — over an earlier "off".
+        var keep={}; ['mkn_diag_fixed_v1','tonys_log_nudge','tonys_log_days','tonys_proxy_consent'].forEach(function(k){ keep[k]=localStorage.getItem(k); });
+        try{
+          localStorage.removeItem('mkn_diag_fixed_v1'); localStorage.setItem('tonys_log_enabled','0'); localStorage.removeItem('tonys_log_nudge');
+          localStorage.setItem('tonys_log_days','2'); localStorage.setItem('tonys_proxy_consent','ask');
+          if(diagnosticsFixed()!==true) throw new Error('the settings were not fixed');
+          if(!logEnabled() || !logNudgeEnabled() || logRetentionDays()!==7 || proxyConsentState()!=='always') throw new Error('not all on, 7 days: '+JSON.stringify([logEnabled(),logNudgeEnabled(),logRetentionDays(),proxyConsentState()]));
+          if(diagnosticsFixed()!==false) throw new Error('fixed again on every start');
+        } finally { Object.keys(keep).forEach(function(k){ if(keep[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); }); }
+        // Transmit: into the one inbox, the report as the note's log.
+        var sent=null, realF=window.fetch, realU=window._fbUser, realT=window.toast;
+        try{
+          window._fbUser={ uid:'uT', email:'t@example.com', getIdToken:async function(){ return 'tok'; } }; window.toast=function(){};
+          window.fetch=async function(u, init){ sent=JSON.parse(init.body); return new Response('{"ok":true,"id":3}', { status:200 }); };
+          if(await sendLogReportToAdmin()!==true || !sent || sent.action!=='feedback-send' || sent.idToken!=='tok' || !/Log report/.test(sent.note.text) || !/SYNC LOG REPORT/.test(sent.note.log))
+            throw new Error('the report was not transmitted to the admin: '+JSON.stringify(sent && Object.assign({}, sent, { note:'…' })));
+        } finally { window.fetch=realF; window._fbUser=realU; window.toast=realT; }
         // The findings must be visible, not just computed.
         if(html.indexOf('Try:')===-1) throw new Error('the findings are shown without their proposed fixes');
       } finally {
@@ -6050,6 +6023,23 @@ window.SELF_TESTS = [
         closeM('syncHealthOverlay');
       }
     }) },
+
+  { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
+    test: async()=>{
+      var real={ ask:window.askConfirm, fetch:window.fetch, user:window._fbUser, toast:window.toast }, asked=[], sent=[];
+      try{
+        window._fbUser={ uid:'uT', email:'t@example.com', getIdToken:async function(){ return 'tok'; } }; window.toast=function(){};
+        window.fetch=async function(u, init){ sent.push(JSON.parse(init.body)); return new Response('{"ok":true}', { status:200 }); };
+        window.askConfirm=async function(o){ asked.push(o); return false; };
+        if(await selfTestOfferSend(2)!==false || sent.length) throw new Error('sent without the person\u2019s yes');
+        if(!/Send to admin/.test(asked[0].okLabel) || !/e-mail/.test(asked[0].message)) throw new Error('the question does not say what is sent: '+JSON.stringify(asked[0]));
+        window.askConfirm=async function(o){ return true; };
+        if(await selfTestOfferSend(2)!==true || !sent.length || sent[0].action!=='feedback-send' || !/Self Test: 2 failing/.test(sent[0].note.text) || !/SELF TEST REPORT/.test(sent[0].note.log))
+          throw new Error('the report did not go to the admin: '+JSON.stringify(sent[0] && sent[0].note && sent[0].note.text));
+      } finally { window.askConfirm=real.ask; window.fetch=real.fetch; window._fbUser=real.user; window.toast=real.toast; }
+      var ad=String(accountDelete);
+      if(!/Why this is needed/.test(ad) || !/always has an owner/.test(ad)) throw new Error('deleting an account does not explain why a handover is needed');
+    } },
 
   { id:'settings_in_sections', group:'UI', name:'⚙️ Settings in sections: their names first, one open at a time, empty ones not shown, below the bar (v37.74)',
     test: async()=>{
@@ -9799,10 +9789,12 @@ window.SELF_TESTS = [
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
-      // Default OFF, and the menu entry follows the setting.
-      var prev = null;
+      // Default OFF, and the menu entry follows the setting. v37.75 — except on the
+      // copies with selfTestForAll (the beta, the test copy) and for the owner.
+      var prev = null, realFo=window._featureOverride.selfTestForAll, realOwner=window.isAppOwner;
       try{ prev = localStorage.getItem(SELFTESTS_KEY); }catch(e){}
       try{
+        window._featureOverride.selfTestForAll=false; window.isAppOwner=function(){ return false; };
         try{ localStorage.removeItem(SELFTESTS_KEY); }catch(e){}
         if(selfTestsEnabled()) throw new Error('the suite defaults to ON — every device would fetch it');
         applySelfTestVisibility();
@@ -9816,7 +9808,12 @@ window.SELF_TESTS = [
         setSelfTestsEnabled(false);
         if(getComputedStyle(item).display!=='none')
           throw new Error('turning the setting off did not hide the menu entry again');
+        window._featureOverride.selfTestForAll=true; applySelfTestVisibility();
+        if(getComputedStyle(item).display==='none') throw new Error('the beta/test copy does not offer the Self Test to everyone');
+        window._featureOverride.selfTestForAll=false; window.isAppOwner=function(){ return true; }; applySelfTestVisibility();
+        if(getComputedStyle(item).display==='none') throw new Error('the owner is not offered the Self Test');
       } finally {
+        window._featureOverride.selfTestForAll=realFo; window.isAppOwner=realOwner;
         try{ if(prev===null) localStorage.removeItem(SELFTESTS_KEY); else localStorage.setItem(SELFTESTS_KEY, prev); }catch(e){}
         applySelfTestVisibility();
       }
@@ -10141,7 +10138,8 @@ window.SELF_TESTS = [
       // Every third party the app can actually reach has to be in here. A
       // privacy note that omits one is worse than none, because it reads as
       // complete.
-      ['Firebase','Anthropic','Cloudflare','Pixabay','relay','Bring'].forEach(function(who){
+      // v37.75 — in plain words: "the app's own server" (Cloudflare is its host, not a recipient of anything else).
+      ['Firebase','Anthropic','own server','Pixabay','relay','Bring'].forEach(function(who){
         if(blob.indexOf(who)===-1) throw new Error(who+' is not in the list of what leaves this device');
       });
       list.forEach(function(e){
@@ -10149,18 +10147,11 @@ window.SELF_TESTS = [
         // "what it IS" is not the question; "what is SENT" is.
         if(e.sends.length < 40) throw new Error('"'+e.who+'" does not actually say what is sent');
       });
-      // The relay entry has to reflect the real setting, or the note is stale
-      // the moment someone ticks "never ask again".
+      // v37.75 — relays are always allowed now (Tony): the note says when they are used, and offers no setting.
       var relayEntry=list.filter(function(e){ return /relay/i.test(e.who); })[0];
-      var prev=proxyConsentState();
-      try{
-        setProxyConsent('always');
-        var whenAlways=privacyEntries().filter(function(e){ return /relay/i.test(e.who); })[0].when;
-        setProxyConsent('ask');
-        var whenAsk=privacyEntries().filter(function(e){ return /relay/i.test(e.who); })[0].when;
-        if(whenAlways===whenAsk)
-          throw new Error('the note says the same thing whether relays are always allowed or not');
-      } finally { setProxyConsent(prev==='always'?'always':'ask'); }
+      if(!relayEntry || /Logging|change that/i.test(relayEntry.sends+relayEntry.when)) throw new Error('the relay entry points at a setting that is gone');
+      // …and none of the internals: keys, the server's counts.
+      if(/API key|request count|cap the bill|YOUR Firebase project/i.test(blob)) throw new Error('the note still carries the internals: '+blob.slice(0,200));
 
       // It renders, and it is reachable from both places that promise it.
       showPrivacyPanel();
@@ -10176,8 +10167,10 @@ window.SELF_TESTS = [
           throw new Error('the privacy panel sits below the login screen that links to it');
       } finally { closeM('privacyOverlay'); }
 
-      if(!document.querySelector('#settingsDrop button[onclick*="showPrivacyPanel"]'))
-        throw new Error('it is not in the Settings menu');
+      // v37.75 — Tony: at the bottom of the ? window, not in ⚙️ Troubleshooting.
+      var hl=document.getElementById('helpPrivacyLink');
+      if(!hl || !document.getElementById('helpOverlay').contains(hl)) throw new Error('it is not at the bottom of the ? window');
+      if(document.querySelector('#settingsDrop button[onclick*="showPrivacyPanel"]')) throw new Error('it is still in ⚙️');
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       // The comment beside the change quotes the old sentence on purpose. The
       // question is what the app SAYS, so scan with the commentary taken out.

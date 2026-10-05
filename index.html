@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.74 -->
+<!-- Tony's Recipes Collection v37.75 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -177,7 +177,8 @@
       bring:    true,     // Bring!: open the chosen ingredients in the person's own Bring! app (official import, v36.89)
       bringDirect: true,  // …and send them straight to THIS household's Bring! list (token kept on the Worker)
       gmail:    true,     // Send a recipe by e-mail through your Gmail
-      feedbackButton: false   // v37.64 — the floating 💬 note to Tony (the beta and the test copy)
+      feedbackButton: false,  // v37.64 — the floating 💬 note to Tony (the beta and the test copy)
+      selfTestForAll: false   // v37.75 — 🧪 Self Test for everyone (the beta and the test copy); the owner always
     }),
     // v37.03 — the ways to sign in on THIS copy. Each needs switching on in the
     // Firebase console (Authentication → Sign-in method) as well, and Apple and
@@ -1001,8 +1002,8 @@ function showLogNudge(bad) {
   var copy = document.createElement('button');
   copy.style.cssText = 'flex:1;padding:9px;background:var(--terracotta-fill);color:#fff;border:none;'
     + 'border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
-  copy.textContent = '📋 Copy report';
-  copy.onclick = function(){ copySyncLogReport(); dismissLogNudge(); };
+  copy.textContent = '📤 Send to admin';   // v37.75 — to the one inbox, not the clipboard
+  copy.onclick = function(){ dismissLogNudge(); sendLogReportToAdmin(); };
 
   var open = document.createElement('button');
   open.style.cssText = 'padding:9px 12px;background:rgba(255,255,255,0.15);color:#fff;'
@@ -1053,71 +1054,10 @@ function renderLoggingPanel() {
 
   var h = '';
 
-  // 1 — the switch
-  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
-     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
-     + '<input type="checkbox" id="logEnabledBox"' + (on ? ' checked' : '')
-     + ' onchange="setLogEnabled(this.checked);renderLoggingPanel();" style="width:18px;height:18px;">'
-     + 'Record sync events on this device</label>'
-     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
-     + 'Off by default. Records what sync did — loads, saves, refused writes, refreshes, photo sync, sign-in — '
-     + 'with recipe names and ids, never recipe contents. It stays on this device: it is never uploaded and '
-     + 'never goes into a backup.</div></div>';
-
-  // 1a — the test suite, per device (v36.15)
-  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
-     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
-     + '<input type="checkbox" id="selfTestsEnabledBox"' + (selfTestsEnabled() ? ' checked' : '')
-     + ' onchange="setSelfTestsEnabled(this.checked);renderLoggingPanel();" style="width:18px;height:18px;">'
-     + 'Keep the test suite on this device</label>'
-     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
-     + 'Off by default. The self-test suite is a separate <strong>~590 KB</strong> download, so a phone that '
-     + 'will never run it does not carry it. Switching this on shows 🧪 Self Test in ⚙️ Settings and fetches '
-     + 'the file the first time you open it. <strong>This setting is per device.</strong></div></div>';
-
-  // 1a2 — the relay consent, per device (v36.18)
-  var _pc = proxyConsentState();
-  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
-     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
-     + '<input type="checkbox" id="proxyAlwaysBox"' + (_pc === 'always' ? ' checked' : '')
-     + ' onchange="setProxyConsent(this.checked ? \'always\' : \'ask\');renderLoggingPanel();" style="width:18px;height:18px;">'
-     + 'Always allow relay services for imports</label>'
-     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
-     + 'When a page cannot be fetched by your own server, the import can go through a public relay. '
-     + 'Those relays see the address you are importing and choose what text comes back. '
-     + (_pc === 'always'
-        ? 'They are used without asking (the app tries everything before bothering you) — untick this to be asked each time.'
-        : 'You are asked each time.')
-     + ' <strong>This setting is per device.</strong></div></div>';
-
-  // 1b — the nudge, per device
-  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;'
-     + (on ? '' : 'opacity:0.55;') + '">'
-     + '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;">'
-     + '<input type="checkbox" id="logNudgeBox"' + (logNudgeEnabled() ? ' checked' : '') + (on ? '' : ' disabled')
-     + ' onchange="setLogNudgeEnabled(this.checked);renderLoggingPanel();" style="width:18px;height:18px;">'
-     + 'Tell me when the log finds something</label>'
-     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
-     + 'Off by default. Shows a small note when the log has grown a problem worth reporting, with a '
-     + 'Copy button on it. <strong>This setting is per device</strong> — switch it on where you actually '
-     + 'read reports and leave it off on the phone. At most once per session, and never twice for the '
-     + 'same problems.'
-     + (on ? '' : ' <em>Needs recording switched on above.</em>')
-     + '</div></div>';
-
-  // 2 — retention
-  h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
-     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-     + '<span style="font-size:14px;font-weight:600;">Keep for</span>'
-     + '<input type="number" id="logDaysInput" min="' + LOG_MIN_DAYS + '" max="' + LOG_MAX_DAYS + '" value="' + logRetentionDays() + '"'
-     + ' onchange="applyLogRetention(this.value)" style="width:80px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;">'
-     + '<span style="font-size:14px;">days</span></div>'
-     + '<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">'
-     + 'Anything older is deleted automatically — when the app opens, when this panel opens, and as each new event '
-     + 'is recorded. There is no background timer, because one could not run while the app is closed. '
-     + 'A hard ceiling of ' + LOG_MAX_ENTRIES + ' entries applies as well, so a busy day cannot fill up storage.'
-     + '</div></div>';
-
+  // v37.75 — Tony: "get rid of the entire block … keeping all options
+  // selected, and 7 days of logs. This is not something we want the user
+  // playing with." Recording, the problem note and the relays are always on,
+  // seven days kept (diagnosticsFixed); the Self Test per copy (selfTestForAll).
   // 3 — findings
   h += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 6px;">What this looks like</div>';
   // `raw` marks the findings whose detail is BUILT OUT OF THE LOG rather than
@@ -1170,12 +1110,12 @@ function renderLoggingPanel() {
 
   // 5 — the buttons
   h += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
-     + '<button onclick="copySyncLogReport()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Copy report</button>'
+     + '<button id="logSendBtn" onclick="sendLogReportToAdmin()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📤 Transmit report to admin</button>'
      + '<button onclick="purgeSyncLogUI()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--card-bg);color:var(--danger);border:1px solid var(--bad-border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🗑 Purge logs</button>'
      + '</div>'
      + '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;">'
-     + 'The report is plain text: the findings above plus every event. Nobody but you can read this log — '
-     + 'it never leaves the device on its own — so paste it into the chat if you want it looked at.</div>';
+     + 'The report is the findings above plus every event — recipe names and ids, never their contents. '
+     + 'It never leaves this device on its own: Transmit sends it, with your e-mail address, to the app\u2019s admin.</div>';
 
   // 6 — debug mode, which lives here now
   h += '<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;">'
@@ -1206,6 +1146,52 @@ function copySyncLogReport() {
     });
 }
 
+// v37.75 — Tony: "instead of Copy report, it should say 'Transmit report to
+// admin' and it will indeed send it, the same as we send feedback, to the
+// Family app for analysis." Into the one inbox (Worker `feedback-send`): the
+// family app's 📊 Households → 💬 Feedback, with the report as the note's log.
+async function sendReportToAdmin(subject, report, opts) {
+  opts = opts || {};
+  var u = fbSignedInUser();
+  if (!u || !u.getIdToken) { toast('Sign in first, so the admin knows who sent it.', 7000); return false; }
+  var note = { text: String(subject || 'A report from the app').slice(0, 5000), log: String(report || '').slice(0, 199000),
+    hid: (_household && _household.hid) || '', household: (_household && _household.name) || '', name: String(u.displayName || ''),
+    version: APP_VERSION, env: String(APP_CONFIG.environment || 'live'), device: String(navigator.userAgent || '').slice(0, 300),
+    lang: (typeof _i18nLang === 'string' ? _i18nLang : 'en'), where: String(location.pathname + location.hash).slice(0, 200) };
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'feedback-send', idToken: await u.getIdToken(), note: note }), signal: AbortSignal.timeout(30000) });
+    var d = {}; try { d = await r.json(); } catch(e2) {}
+    if (!r.ok || !d.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
+  } catch(e) {
+    showServiceError('The report could not be sent: ' + (e && e.message) + '\n\nTry again in a moment.');
+    return false;
+  }
+  syncLog('save', 'Sent a report to the admin', { what: String(subject || '').slice(0, 60), chars: String(report || '').length });
+  if (!opts.quiet) toast('\u{1F4E4} Sent to the admin \u2014 thank you.', 6000);
+  return true;
+}
+function sendLogReportToAdmin() {
+  return sendReportToAdmin('\u{1FAB5} Log report', syncLogReportText());
+}
+window.sendReportToAdmin = sendReportToAdmin; window.sendLogReportToAdmin = sendLogReportToAdmin;
+// The diagnostics are no longer a person's choice (v37.75): on, 7 days, the
+// relays without asking, the problem note on — set once on each device, over
+// whatever was chosen before.
+var DIAG_FIXED_KEY = 'mkn_diag_fixed_v1';
+function diagnosticsFixed() {
+  try {
+    if (localStorage.getItem(DIAG_FIXED_KEY)) return false;
+    localStorage.setItem(LOG_ENABLED_KEY, '1');
+    localStorage.setItem(LOG_NUDGE_KEY, '1');
+    localStorage.removeItem(LOG_DAYS_KEY);
+    localStorage.removeItem('tonys_proxy_consent');   // PROXY_CONSENT_KEY, declared further down
+    localStorage.setItem(DIAG_FIXED_KEY, String(Date.now()));
+    return true;
+  } catch(e) { return false; }
+}
+window.diagnosticsFixed = diagnosticsFixed;
+setTimeout(function(){ if (!window._selfTestRunning) diagnosticsFixed(); }, 0);
 async function purgeSyncLogUI() {
   var n = readSyncLog().length;
   if (!n) { toast('Nothing to purge — the log is already empty'); return; }
@@ -2096,6 +2082,12 @@ var SELFTESTS_KEY = 'tonys_selftests_enabled';
 // Default OFF. Tony turns it on for his PC and his own phone; nobody else in
 // the family ever downloads it.
 function selfTestsEnabled() {
+  // v37.75 — Tony: "having the self test active on the Beta version could
+  // assist us in detecting issues. It will need to be removed when going
+  // officially live": everyone on the copies with `selfTestForAll` (the beta
+  // and the test copy), the app's owner everywhere.
+  if (typeof featureOn === 'function' && featureOn('selfTestForAll')) return true;
+  if (typeof isAppOwner === 'function' && isAppOwner()) return true;
   try { return localStorage.getItem(SELFTESTS_KEY) === '1'; } catch(e) { return false; }
 }
 function setSelfTestsEnabled(on) {
@@ -2478,7 +2470,19 @@ async function runSelfTests() {
   document.getElementById('selfTestProgress').textContent =
     `✅ ${passed} passed  ❌ ${failed} failed  (${toRun.length} total)`;
   renderSelfTestSummary(passed, failed, toRun.length);
+  // v37.75 — Tony: "At the end of the Self test, it should also send its
+  // findings to Admin, if something goes wrong." One tap, after asking: the
+  // report carries recipe names and who sent it. Never from the automated runs.
+  if (failed && !navigator.webdriver && fbSignedInUser()) selfTestOfferSend(failed);
 }
+async function selfTestOfferSend(failed) {
+  var go = await askConfirm({ icon: '\u{1F9EA}', title: failed + ' check' + (failed === 1 ? '' : 's') + ' did not pass',
+    message: 'Send the details to the app\u2019s admin, so it can be fixed? They include the app\u2019s version, this device, '
+      + 'what failed, and your e-mail address \u2014 no recipes.', okLabel: '\u{1F4E4} Send to admin', cancelLabel: 'Not now' });
+  if (go !== true) return false;
+  return sendReportToAdmin('\u{1F9EA} Self Test: ' + failed + ' failing', selfTestReportText());
+}
+window.selfTestOfferSend = selfTestOfferSend;
 
 var _selfTestNotRun = [];
 var _selfTestStartedAt = null;
@@ -5159,10 +5163,18 @@ async function accountDelete(opts) {
     (ms.length > 1 ? blocked : alone).push({ hid: h.hid, name: nm });
   }
   if (blocked.length) {
-    await askConfirm({ icon: '\u{1F451}', title: 'Hand these over first',
-      message: 'You own ' + blocked.map(function(x){ return x.name; }).join(', ') + ', and other people are in '
-        + (blocked.length === 1 ? 'it' : 'them') + '. Hand ' + (blocked.length === 1 ? 'it' : 'each') + ' over to one of them '
-        + '(Family Access → 👑 Hand over…), or delete ' + (blocked.length === 1 ? 'it' : 'them') + ', and then delete your account.',
+    // v37.75 — Tony: "add some more explanation on why a handover is necessary".
+    var many = blocked.length > 1, names = blocked.map(function(x){ return x.name; }).join(', ');
+    await askConfirm({ icon: '\u{1F451}', title: 'Hand ' + (many ? 'these' : 'it') + ' over first',
+      message: 'You own ' + names + ', and other people are in ' + (many ? 'them' : 'it') + '.\n\n'
+        + 'Why this is needed: a collection always has an owner \u2014 the one person who can add and remove people, '
+        + 'rename it, and decide what happens to it. If your account went while you are its owner, the others would '
+        + 'be left with recipes nobody can manage, and no way to invite anyone new.\n\n'
+        + 'So, either:\n'
+        + '\u2022 Hand ' + (many ? 'each' : 'it') + ' over to someone in it (\u2699\ufe0f \u2192 \u{1F3E0} My household \u2192 \u{1F465} Family Access \u2192 \u{1F451} Hand over\u2026). '
+        + 'Everything stays, for everyone; they become the owner.\n'
+        + '\u2022 Or delete ' + (many ? 'them' : 'it') + ' (same place, \u{1F5D1} Delete this household\u2026) \u2014 its recipes go, for everyone.\n\n'
+        + 'Then come back here to delete your account.',
       okLabel: 'OK' });
     return null;
   }
@@ -6041,7 +6053,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.74';
+var APP_VERSION = 'v37.75';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7030,6 +7042,9 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .drop-item { padding: 10px 14px; font-size: 13px; cursor: pointer; color: var(--ink); display: flex; align-items: center; gap: 8px; transition: background 0.1s; border: none; background: none; width: 100%; font-family: 'DM Sans', 'Heebo', sans-serif; text-align: left; }
 .drop-item:hover { background: #FFF0E8; color: var(--terracotta); }
 /* v37.74 — ⚙️ in sections: the names first, one section open at a time. */
+/* v37.75 — `.drop-item {display:flex}` outranks the browser's own [hidden] rule:
+   the iPhone and Android lines showed on Tony's PC although switched off. */
+.drop-menu [hidden] { display: none !important; }
 #settingsDrop .set-head { font-weight: 700; justify-content: space-between; }
 #settingsDrop .set-head::after { content: '›'; font-size: 16px; line-height: 1; color: var(--muted); transition: transform 0.15s; }
 [dir="rtl"] #settingsDrop .set-head::after { content: '‹'; }
@@ -8686,7 +8701,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.74</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.75</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8747,18 +8762,10 @@ body.banner-shown .header {
               </div>
             </div>
           </div>
-          <div class="set-group" data-group="services">
-            <button type="button" class="drop-item set-head" aria-expanded="false" title="Gmail, and the Bring! shopping list." onclick="settingsGroup('services')">🔗 Connected services</button>
-            <div class="set-body">
-              <button class="drop-item" title="Connect your Gmail so recipes can be e-mailed from the app." data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
-              <button class="drop-item" title="The connection that sends ingredients straight to the household's Bring! list." data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
-            </div>
-          </div>
           <div class="set-group" data-group="data">
-            <button type="button" class="drop-item set-head" aria-expanded="false" title="Backups, downloading all your data, and repairing photos." onclick="settingsGroup('data')">💾 Backups and photos</button>
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Backups of all your recipes and photos, and repairing photos." onclick="settingsGroup('data')">💾 Backups and photos</button>
             <div class="set-body">
               <button class="drop-item" title="Save or restore a backup file of your recipes and photos, and set up automatic daily backups to a folder." onclick="closeDrop('settingsDrop');showBackupPanel()">💾 Backups</button>
-              <button class="drop-item" title="A file with all your recipes, photos, languages and who is in your household. Nothing is deleted or changed." data-layout-only="households" onclick="closeDrop('settingsDrop');accountDownload()">⬇️ Download all my data</button>
               <button class="drop-item" title="Uploads photos that exist only on this device, so your other devices get them too. Deletes nothing." id="healCloudPhotosItem" onclick="closeDrop('settingsDrop');healCloudPhotos()">☁️ Send my photos to the cloud</button>
               <button class="drop-item" title="Puts photos back from a backup file, without replacing recipes changed since." id="photoRescueItem" onclick="closeDrop('settingsDrop');openPhotoRescue()">🖼️ Restore photos from a backup</button>
               <button class="drop-item" title="Takes away the photos the last automatic photo search added, putting back what was there before." id="autoFetchUndoItem" style="display:none;" onclick="closeDrop('settingsDrop');undoAutoFetch()">↩︎ Undo last auto-fetch</button>
@@ -8774,23 +8781,23 @@ body.banner-shown .header {
             </div>
           </div>
           <div class="set-group" data-group="trouble">
-            <button type="button" class="drop-item set-head" aria-expanded="false" title="Sync Health, what leaves this device, logging, and resetting this device. Nothing here changes your recipes unless it says so." onclick="settingsGroup('trouble')">🔧 Troubleshooting</button>
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Sync Health, the log, the Self Test, and resetting this device. Nothing here changes your recipes unless it says so." onclick="settingsGroup('trouble')">🔧 Troubleshooting</button>
             <div class="set-body">
               <button class="drop-item" title="Whether this device and the cloud agree, with a report to copy and send. Read-only — changes nothing." onclick="closeDrop('settingsDrop');openSyncHealth()">📡 Sync Health</button>
-              <button class="drop-item" title="Exactly what the app sends where (the cloud, the AI, photo searches). Read-only — changes nothing." onclick="closeDrop('settingsDrop');showPrivacyPanel()">🔒 What leaves this device</button>
               <button class="drop-item" title="Keep a record of what the app does, to send when something goes wrong. The record stays on this device." onclick="closeDrop('settingsDrop');showLoggingPanel()">🪵 Logging &amp; debugging</button>
               <button class="drop-item" title="Checks that the app works on this device. Your recipes are not changed." id="selfTestMenuItem" style="display:none;" onclick="closeDrop('settingsDrop');openSelfTest()">🧪 Self Test</button>
-              <button class="drop-item" id="fbProbeItem" hidden title="Every way to a Facebook post's text, tried and graded" onclick="closeDrop('settingsDrop');openFbProbe()">🔬 Facebook reading test</button>
               <button class="drop-item" title="Erases THIS device's copy of the recipes and photos, then reloads. Does NOT delete anything in the cloud — signed in, your recipes come straight back." id="resetDeviceItem" onclick="closeDrop('settingsDrop');clearAllData()">🧽 Reset this device…</button>
             </div>
           </div>
           <!-- v36.59 — owner only (applyOwnerOnlyItems): links straight into the Cloudflare account, the Firebase project and billing. -->
           <div class="set-group" data-group="owner" data-owner-only>
-            <button type="button" class="drop-item set-head" aria-expanded="false" title="Households, payments and deployments — the app&#39;s owner only." onclick="settingsGroup('owner')">👑 App owner</button>
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Households, payments, deployments, and the Gmail and Bring! connections — the app&#39;s owner only." onclick="settingsGroup('owner')">👑 App owner</button>
             <div class="set-body">
               <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
               <button class="drop-item" title="Where each copy of the app runs, with links (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
+              <button class="drop-item" data-owner-only title="The Google Cloud client ID that lets the app send recipes through Gmail (the app&#39;s owner only)." data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
+              <button class="drop-item" data-owner-only title="The connection that sends ingredients straight to the household's Bring! list." data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
             </div>
           </div>
           <!-- v37.05 — Tony: not hidden in a dialog; the last item, bold and red. -->
@@ -9399,7 +9406,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.74</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.75</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9865,6 +9872,10 @@ body.banner-shown .header {
     </div>
     <div id="helpAnswer" style="display:none;" class="help-answer"></div>
     <div id="helpLoading" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🤔 Thinking...</div>
+    <!-- v37.75 — Tony: not troubleshooting; at the bottom of ?. -->
+    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:10px;text-align:center;">
+      <button type="button" id="helpPrivacyLink" onclick="closeM('helpOverlay');showPrivacyPanel()" title="Who receives what, and when. Read-only — changes nothing." style="background:none;border:none;color:var(--terracotta);font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:8px;">🔒 What leaves this device</button>
+    </div>
   </div>
 </div>
 
@@ -18256,7 +18267,7 @@ function toggleDrop(id){
   if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') { applyOwnerOnlyItems(); renderUnitsMenuItem();
     var ci = document.getElementById('confirmEmailItem');
     if (ci) ci.style.display = (window._fbUser && window._fbUser.email && window._fbUser.emailVerified === false) ? '' : 'none';
-    if (!menu.classList.contains('open')) { try { refreshShortcutsSection(); } catch(e) {} settingsGroupsRefresh(true); } }
+    if (!menu.classList.contains('open')) { try { refreshShortcutsSection(); } catch(e) {} try { applySelfTestVisibility(); } catch(e) {} settingsGroupsRefresh(true); } }
   const wasOpen=menu.classList.contains('open');
   // Close all
   _disarmDropOutside();
@@ -19152,7 +19163,6 @@ async function runUrlImport() {
   // Facebook post's text, from its LINK alone (Worker v47: the official embed,
   // then the public embed page). A phone then needs only Share → Copy link.
   if (isFacebookUrl(url)) {
-    _lastFbImportUrl = url;   // v37.38 — the 🔬 test starts from it
     res.innerHTML = spinner('\u{1F4D8} Reading the Facebook post\u2026');
     try {
       var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
@@ -22728,7 +22738,7 @@ window.copyLogFromLogin = copyLogFromLogin;
 // v37.12 — Tony: the test copy only, never the family's (its diagnostics are off).
 function loginLogButtonShown() { return !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.logging); }
 (function(){ var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = !loginLogButtonShown(); })();
-(function(){ var b = document.getElementById('fbProbeItem'); if (b) b.hidden = String(APP_CONFIG.environment || 'live') !== 'test'; })();   // v37.38; v37.62 — the test copy only, not the beta
+// v37.75 — the 🔬 Facebook reading test is gone (it found its answer in v37.38–39; Tony: a leftover).   // v37.38; v37.62 — the test copy only, not the beta
 setTimeout(function(){ try { refreshShortcutsSection(); } catch(e) {} }, 0);   // v37.46, v37.47
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
 window.startProviderSignIn = startProviderSignIn; window.emailSignIn = emailSignIn; window.emailResetPassword = emailResetPassword;
@@ -24132,9 +24142,9 @@ var HELP_SYSTEM_PROMPT = [
   "=== SIGNING IN AND YOUR ACCOUNT ===",
   "- Sign in with Google, or with any e-mail address (a password, or a sign-in link sent to it) where that is offered.",
   "- An address used with a password must be CONFIRMED from the e-mail sent to it; until then, places kept for that address do not open (invitation links still work). ⚙️ → ✉️ Confirm my e-mail address sends it again.",
-  "- ⚙️ → 💾 Backups and photos → ⬇️ Download all my data saves a file with everything. ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone.",
+  "- ⚙️ → 💾 Backups and photos → 💾 Backups saves a file with everything (every recipe and photo). ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone.",
   "- ⚙️ → 🔧 Troubleshooting → 🧽 Reset this device… erases only this device's copy; nothing in the cloud is deleted.",
-  "- ⚙️ Settings is in sections — 🎨 How it looks, 🏠 My household, 📥 Saving recipes from other apps, 🔗 Connected services, 💾 Backups and photos, 💬 Help and feedback, 🔧 Troubleshooting (and 👑 App owner, for the app's owner). Tap a section to open it. 🗑 Delete my account… is the last item, on its own.",
+  "- ⚙️ Settings is in sections — 🎨 How it looks, 🏠 My household, 📥 Saving recipes from other apps, 💾 Backups and photos, 💬 Help and feedback, 🔧 Troubleshooting (and 👑 App owner, for the app's owner). Tap a section to open it. 🗑 Delete my account… is the last item, on its own. 🔒 What leaves this device (who receives what) is at the bottom of the ? window.",
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== TIPS ===",
@@ -26968,41 +26978,36 @@ async function autoBackupIfDue() {
 // The state is live, so a service that is not configured says so rather than
 // implying it is in use.
 function privacyEntries() {
+  // v37.75 — plain words for everyone using the app: who receives what, and
+  // when. The internals (keys, the server's counts, how a relay works) are
+  // gone; the names stay — a privacy notice names who receives data (Tony
+  // asked; hiding them would not make the app harder to attack: any browser
+  // shows the services a page talks to).
   var signedIn = !!(window._fbUser);
-  var relay = (typeof proxyConsentState === 'function') ? proxyConsentState() : 'ask';
   return [
-    { who: 'Google Firebase', when: signedIn ? 'always, while signed in' : 'not in use — you are signed out',
+    { who: 'Google Firebase (the app\u2019s cloud database)', when: signedIn ? 'always, while signed in' : 'not in use \u2014 you are signed out',
       on: signedIn,
-      sends: 'Every recipe, its photos, and the family member list'
-           // v36.70 — the synced chats were never mentioned, and they go there too.
-           + (featureOn('whatsapp') ? ', and any WhatsApp chat exports you chose to sync' : '')
-           + '. This is YOUR Firebase project: '
-           + 'the data sits in a Google account you own, and the access rules are yours to publish.' },
+      sends: 'Your household\u2019s recipes and photos, and who is in it'
+           + (featureOn('whatsapp') ? ', and the WhatsApp chats you chose to connect' : '')
+           + ', so every device of yours and of your family has them. Only the people in your household can read them.' },
     { who: 'Google Sign-in', when: signedIn ? 'always, while signed in' : 'only when you sign in', on: true,
-      sends: 'Your email address, so the access rules can tell family from strangers. Nothing else.' },
-    { who: 'Anthropic (Claude)', when: 'only when you use an AI feature', on: true,
-      sends: 'The text of whatever you asked about — a recipe to translate, a page to import, your '
-           + 'question to the help assistant, a pantry list. It goes through this app’s Cloudflare '
-           + 'Worker, which adds the API key and keeps no copy. Photos are never sent.' },
-    { who: 'This app’s Cloudflare Worker', when: 'when you import, search for a photo, or use AI', on: true,
-      sends: 'The address you are importing, the words you search photos for, and the AI request above. '
-           + 'It holds the API keys so your browser never has to, and stores nothing except a request '
-           + 'count used to cap the bill.' },
-    { who: 'Photo services (Pixabay, Pexels, Unsplash, Openverse)', when: 'only when you search for a photo', on: true,
+      sends: 'Your e-mail address, so the app knows who you are. Nothing else.' },
+    { who: 'Anthropic (Claude, the AI)', when: 'only when you use an AI feature', on: true,
+      sends: 'The text of what you asked about \u2014 a recipe to translate, a page to import, a question to the help assistant. '
+           + 'Not your photos.' },
+    { who: 'The app\u2019s own server', when: 'when you import, search for a photo, use the AI, or send a note', on: true,
+      sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.' },
+    { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Openverse)', when: 'only when you search for a photo', on: true,
       sends: 'The search words. Not your recipes, and not who you are.' },
-    { who: 'Public relay services', when: relay === 'always' ? 'whenever a page cannot be fetched — you chose not to be asked'
-                                                             : 'only after you agree, each time', on: true,
-      sends: 'The address of a page you are importing, when this app’s own server cannot fetch it. '
-           + 'These relays are not ours, and they choose what text comes back — which is why you are '
-           + 'asked first. You can change that in ⚙️ → 🔧 Troubleshooting → Logging & debugging.' },
+    { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,
+      sends: 'The address of the page you are importing \u2014 nothing about you.' },
   ].concat(
-    // v36.70 — only the ones switched on in this app (APP_CONFIG.features).
     (featureOn('bring') || featureOn('gmail')) ? [{
       who: [featureOn('bring') ? 'Bring!' : '', featureOn('gmail') ? 'Gmail' : ''].filter(Boolean).join(' and '),
-      when: 'only if you have connected ' + (featureOn('bring') && featureOn('gmail') ? 'them' : 'it') + ', and only when you send something', on: true,
-      sends: [featureOn('bring') ? 'To Bring!: an ingredient list you chose to send (kept on this app\u2019s server for 15 minutes, for Bring! to read).'
-                + (featureOn('bringDirect') ? ' Or straight onto the household\u2019s Bring! list.' : '') : '',
-              featureOn('gmail') ? 'To Gmail: a recipe you chose to email, to the address you typed.' : '']
+      when: 'only when you send something there', on: true,
+      sends: [featureOn('bring') ? 'To Bring!: the ingredients you chose to send'
+                + (featureOn('bringDirect') ? ', or straight onto your household\u2019s Bring! list.' : '.') : '',
+              featureOn('gmail') ? 'To Gmail: a recipe you chose to e-mail, to the address you typed.' : '']
              .filter(Boolean).join(' ') }] : []
   );
 }
@@ -28267,91 +28272,12 @@ window.importRecipeVideo = importRecipeVideo;
 // and opens this app with it after '#'. Nothing of Facebook's reaches our
 // server, and no login leaves the browser. Facebook changes its page often, so
 // selecting the text first is the sure way, and is said so.
-// ─── 🔬 THE FACEBOOK READING TEST (v37.38, test copy only) ──────────────────
-// Tony: "think of several ways to get to the text and design a test to check
-// all of them". Every route to a Facebook post's text, tried on ONE post and
-// graded alike — the whole text, the preview only (~200 characters, what
-// Facebook gives everyone), or nothing — then one report to send on. Its
-// first run found the answer (the post's own page holds the whole caption in
-// its data: Worker v58); v37.39 kept the server routes and dropped the phone
-// ones (test shortcut, bookmark, Safari) and the web searches.
-var FB_PROBE_KEY = 'mkn_fb_probe';
-var _lastFbImportUrl = '';
-function fbProbeState() { try { return JSON.parse(localStorage.getItem(FB_PROBE_KEY) || '{}') || {}; } catch(e) { return {}; } }
-function fbProbeSave(patch) {
-  var s = fbProbeState(); Object.keys(patch).forEach(function(k){ s[k] = patch[k]; });
-  try { localStorage.setItem(FB_PROBE_KEY, JSON.stringify(s)); } catch(e) {}
-  return s;
-}
-var FB_PROBE_MARK = { whole: '✅ WHOLE TEXT', preview: '⚠️ preview only', nothing: '❌ nothing', other: '❓ other text' };
-function fbProbeRowText(x) {
-  return FB_PROBE_MARK[x.grade] + ' — ' + x.route + (x.chars ? ' (' + x.chars + ' chars' + (x.how ? ', ' + x.how : '') + ')' : '')
-    + (x.note ? ' — ' + x.note : '') + (x.grade === 'whole' && x.tail ? '\n     …' + x.tail : '');
-}
-function fbProbeReport() {
-  var s = fbProbeState(), L = [];
-  L.push('FACEBOOK READING TEST — ' + APP_VERSION + ' — ' + new Date().toISOString());
-  L.push('Post: ' + (s.url || '(none)'));
-  if (s.server) {
-    L.push('Preview Facebook gives everyone: ' + (s.server.preview ? s.server.preview.length + ' chars' : 'none'));
-    L.push(''); L.push('FROM OUR SERVER (' + s.server.at + ')');
-    s.server.rows.forEach(function(x){ L.push('  ' + fbProbeRowText(x)); });
-  } else L.push('\nFROM OUR SERVER: not run');
-  return L.join('\n');
-}
-function fbProbeRender() {
-  var box = document.getElementById('fbProbeResults');
-  if (box) box.textContent = fbProbeReport();
-}
-async function fbProbeRunServer() {
-  var url = (document.getElementById('fbProbeUrl') || {}).value || '';
-  url = url.trim();
-  if (!isFacebookUrl(url)) { toast('Paste a Facebook post or reel link first'); return; }
-  fbProbeSave({ url: url });
-  var box = document.getElementById('fbProbeResults');
-  if (box) box.textContent = 'Trying every route from our server…';
-  try {
-    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'fb-probe', url: url }) });
-    var d = await r.json();
-    if (!d || !d.rows) throw new Error((d && d.error) || ('the server answered ' + r.status));
-    fbProbeSave({ server: { at: new Date().toISOString(), preview: d.preview || '', rows: d.rows } });
-  } catch(e) { toast('The server test did not run: ' + (e && e.message)); }
-  fbProbeRender();
-}
+// v37.75 — fbProbeCopy outlived the 🔬 Facebook reading test: the app's one copy-to-clipboard helper.
 function fbProbeCopy(text, what) {
   try { navigator.clipboard.writeText(text).then(function(){ toast('\u{1F4CB} ' + what + ' copied'); }, function(){ showServiceError(what + ':\n\n' + text); }); }
   catch(e) { showServiceError(what + ':\n\n' + text); }
 }
-function openFbProbe() {
-  var s = fbProbeState();
-  var url = s.url || _lastFbImportUrl || '';
-  var prev = document.getElementById('fbProbeOverlay'); if (prev) prev.remove();
-  var ov = document.createElement('div');
-  ov.id = 'fbProbeOverlay'; ov.className = 'modal-overlay';
-  ov.style.cssText = 'display:flex;z-index:1250;';
-  var btn = 'padding:9px 12px;min-height:40px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin:4px 6px 4px 0;font-family:\'DM Sans\',\'Heebo\',sans-serif;';
-  var primary = btn + 'background:var(--terracotta-fill);color:#fff;border:none;';
-  var h = function(t){ return '<div style="font-weight:700;margin:14px 0 4px;color:var(--heading);">' + t + '</div>'; };
-  var p = function(t){ return '<div style="font-size:13px;line-height:1.55;margin:2px 0;">' + t + '</div>'; };
-  ov.innerHTML = '<div class="ask-card" style="max-width:560px;max-height:88vh;overflow:auto;text-align:start;">'
-    + '<div class="ask-title">\u{1F52C} Facebook reading test</div>'
-    + p('Every way our server has to a Facebook post’s text, tried on one post. Each is graded: the whole text, the preview only, or nothing.')
-    + '<input id="fbProbeUrl" class="ask-input" dir="ltr" placeholder="https://www.facebook.com/reel/…" value="' + escA(url) + '">'
-    + '<button style="' + primary + '" onclick="fbProbeRunServer()">▶ Run the test</button>'
-    + h('Results')
-    + '<pre id="fbProbeResults" dir="auto" style="white-space:pre-wrap;font-size:11.5px;line-height:1.5;background:var(--warn-bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin:4px 0;"></pre>'
-    + '<div class="ask-actions">'
-    + '<button class="ask-btn" onclick="fbProbeCopy(fbProbeReport(), \'The report\')">\u{1F4CB} Copy the report</button>'
-    + '<button class="ask-btn ghost" onclick="fbProbeSave({server:null});fbProbeRender()">Start over</button>'
-    + '<button class="ask-btn ghost" onclick="document.getElementById(\'fbProbeOverlay\').remove()">Close</button>'
-    + '</div></div>';
-  document.body.appendChild(ov);
-  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
-  fbProbeRender();
-}
-window.openFbProbe = openFbProbe; window.fbProbeRunServer = fbProbeRunServer;
-window.fbProbeReport = fbProbeReport; window.fbProbeSave = fbProbeSave; window.fbProbeRender = fbProbeRender; window.fbProbeCopy = fbProbeCopy;
-window.fbProbeState = fbProbeState;
+window.fbProbeCopy = fbProbeCopy;
 
 
 // ─── 🧩 THE BROWSER EXTENSION, OFFERED (v37.46) ──────────────────────────────

@@ -815,6 +815,28 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.75 — Tony's Settings clean-up.** (1) The iPhone/Android lines showed
+    on a PC: `.drop-item {display:flex}` outranked `[hidden]` — `.drop-menu
+    [hidden] {display:none !important}`; the shortcuts test now checks the
+    COMPUTED display. (2) Gmail Setup (a Google Cloud OAuth client ID) and
+    Bring! Connection (the Worker's shared secret) → 👑 App owner; 🔗 Connected
+    services is gone. (3) "Download all my data" = Backups → Save
+    (`accountDownload` is `backupSave`): out of ⚙️ (the account menu keeps it).
+    (4) 🔒 What leaves this device: at the bottom of the ? window
+    (`#helpPrivacyLink`; the login screen's link stays); plain words, names
+    kept (Tony chose, after: hiding names does not stop anyone — the browser
+    shows them), no internals. (5) Logging & debugging: no switches — once per
+    device (`diagnosticsFixed`, key mkn_diag_fixed_v1) logging on, the problem
+    note on, 7 days, relays always; "📤 Transmit report to admin"
+    (`sendReportToAdmin` → Worker `feedback-send`, the report as the note's
+    log → the family app's 💬 Feedback); the problem note's button "📤 Send to
+    admin". (6) 🧪 Self Test: everyone on copies with feature `selfTestForAll`
+    (test, beta — Tony: off for the official launch), the owner everywhere; a
+    run with failures asks "Send to admin?" (`selfTestOfferSend`; never under
+    webdriver). (7) 🔬 Facebook reading test removed (`fbProbeCopy` stays: the
+    copy helper). (8) Deleting an account with others in a household says WHY
+    a handover is needed. Payments/Deployments were already owner-only.
+    Tests `reports_reach_the_admin`, updated log/privacy/self-test checks.
   - **v37.74 — ⚙️ in sections; the menu its own width.** Tony: "reorganize
     the Setting page by functionality … Apparently I got lost there myself."
     ⚙️ opens on 8 section names (`.set-group` > `.set-head` + `.set-body`):

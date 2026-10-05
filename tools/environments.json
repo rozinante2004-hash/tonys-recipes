@@ -21,7 +21,8 @@
     "_why_extensionStores": "v37.73 — the stores list the FAMILY's extension; this copy offers its own download (my-kitchen-notes-extension-TEST.zip), never the family's listing.",
     "features": {
       "bringDirect": false,
-      "feedbackButton": true
+      "feedbackButton": true,
+      "selfTestForAll": true
     },
     "diagnostics": {
       "logging": true,
@@ -72,7 +73,8 @@
       "whatsapp": true,
       "bringDirect": false,
       "gmail": false,
-      "feedbackButton": true
+      "feedbackButton": true,
+      "selfTestForAll": true
     },
     "_why_features": "Testers get nearly everything, so there is feedback on more of it (Tony, 4 Oct 2026). WhatsApp ON (each tester's own exported chats; the family's repository-folder field is hidden in every copy but the family's). Off: sending to a Bring! list (it is the family's list, through the Worker's token) and Gmail (Google reviews that permission before it may be offered to the public). The floating 💬 note to Tony is on (v37.64).",
     "diagnostics": {
