@@ -815,6 +815,24 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.71 + Worker v62 — one Households page for every copy.** Tony:
+    "Shouldn't I see all households in the family's Household page?" Each
+    copy's households are in its own Firebase project, so a member's app
+    reports its household to the Worker once a day (`hhReport`, from
+    `householdUse`, only when health says `reports`; key `mkn_hh_report_<hid>`):
+    name, identifier, founded, came-through, members, links — never recipes.
+    Worker v62: `household-report` (sign-in + membership as for AI; sanitised
+    by `reportSummary`; D1 `hh_reports`); `gone: true` (sent by
+    `householdDelete` before the wipe) removes the report only — never the
+    spending, or a member could reset an allowance. `meter-admin` list with
+    `all: true` returns every METER_PROJECTS copy's rows, each with `project`,
+    `capped` and `report`; set-cap/set-note take `project`; `forget` (owner)
+    drops a household's report and counts (manage.js `del()` calls it).
+    manage.js: other copies' rows come from their reports (`remoteRow`, key
+    `project:hid`; one that never reported is not listed), a Copy column when
+    there is more than one copy, allowance and notes editable, deleting via
+    the copy's own page (`copyUrl` → `…?manage`). Test `management_all_copies`;
+    11 Worker checks.
   - **v37.70 — AI right after opening; the copies' Households linked.** Tony
     shared a reel into the beta from WhatsApp; the import asked the AI in the
     app's first seconds, before the household was open, so the Worker had no

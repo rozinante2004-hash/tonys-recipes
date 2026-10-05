@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.70 -->
+<!-- Tony's Recipes Collection v37.71 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4196,6 +4196,37 @@ function hhNoteSeen() {
   hhRef(_household.hid).collection('members').doc(_fbUser.uid).update({ lastSeen: Date.now() }).catch(function(){});
 }
 window.hhNoteSeen = hhNoteSeen;
+// v37.71 — Tony: "Shouldn't I see all households in the family's Household
+// page?" Each copy's households are in that copy's own database, which the
+// family app cannot read. So once a day a member's app tells our server
+// (Worker v62+) what the 📊 Households page shows about this household — its
+// name, identifier, members and links; never a recipe — and the owner's page
+// in any copy lists every copy's. `gone` — the household is being deleted.
+var HH_REPORT_KEY = 'mkn_hh_report_';
+async function hhReport(opts) {
+  opts = opts || {};
+  if (!_household || !window._fbUser || !hhDb() || !_fbUser.getIdToken) return false;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+  if (!(_workerHealth && _workerHealth.reports)) return false;
+  var hid = _household.hid, k = HH_REPORT_KEY + hid;
+  if (!opts.now && !opts.gone) { try { if (Date.now() - (+localStorage.getItem(k) || 0) < 20 * 3600e3) return false; } catch(e) { return false; } }
+  var report = null;
+  if (!opts.gone) {
+    var members = [];
+    (await hhRef(hid).collection('members').get()).forEach(function(d) {
+      var m = d.data() || {};
+      members.push({ uid: m.uid || d.id, email: m.email || '', name: m.name || '', role: m.role || '', lastSeen: m.lastSeen || 0, joinedAt: m.joinedAt || 0 });
+    });
+    report = { name: _household.name || '', code: _household.code || '', createdAt: _household.createdAt || 0, referredBy: _household.referredBy || '',
+      members: members, links: hhLinks().map(function(l){ return { hid: l.hid, name: l.name || '', code: l.code || '' }; }) };
+  }
+  var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+    body: workerBody({ action: 'household-report', hid: hid, gone: !!opts.gone, report: report, idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(15000) });
+  if (!r.ok) return false;
+  try { if (opts.gone) localStorage.removeItem(k); else localStorage.setItem(k, String(Date.now())); } catch(e) {}
+  return true;
+}
+window.hhReport = hhReport;
 function hhSetAppRequests(v) { return hhRef().update({ appRequests: !!v }); }
 window.hhNewCode = hhNewCode; window.hhEnsureCode = hhEnsureCode; window.openMyIdentifier = openMyIdentifier;
 window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetAppRequests; window.hhRenderAppRequests = hhRenderAppRequests;
@@ -4691,7 +4722,8 @@ async function householdUse(hid, role) {
   var snap = await hhRef(hid).get();
   var h = snap.exists ? (snap.data() || {}) : {};
   _household = { hid: hid, role: role, name: h.name || '', ownerUid: h.ownerUid || '',
-                 code: h.code || '', appRequests: h.appRequests !== false };   // v37.49
+                 code: h.code || '', appRequests: h.appRequests !== false,   // v37.49
+                 createdAt: h.createdAt || 0, referredBy: h.referredBy || '' };   // v37.71
   await householdLoadMembers();
   try { await hhEnsureCode(); } catch(e) {
     if (!hhRulesBehind(e, 'The household gets its identifier once the new database rules are published'))
@@ -4700,6 +4732,7 @@ async function householdUse(hid, role) {
   hhRenderAppRequests();
   await hhLoadLinks();                                           // v37.53
   hhNoteSeen();                                                  // v37.58
+  if (!_selfTestRunning) setTimeout(function(){ hhReport().catch(function(){}); }, 6000);   // v37.71
   if (_openManageOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) { _openManageOnSignIn = false; setTimeout(function(){ openManagement(); }, 800); }
   if (typeof deviceOffersCloud === 'function' && !_selfTestRunning) deviceOffersCloud().catch(function(){});   // v37.69
   if (typeof feedbackTellOwner === 'function') setTimeout(function(){ feedbackTellOwner().catch(function(){}); }, 5000);   // v37.64
@@ -5088,6 +5121,7 @@ async function householdDelete(opts) {
   var n;
   try {
     progressOpen({ icon: '\u{1F5D1}', title: 'Deleting ' + name, total: 5, step: 'Starting…' });
+    try { await hhReport({ gone: true }); } catch(e) {}           // v37.71 — off the owner's Households page too
     n = await householdWipe(hid, progressStep);
     progressClose();
   } catch(e) {
@@ -5967,7 +6001,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.70';
+var APP_VERSION = 'v37.71';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8604,7 +8638,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.70</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.71</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9289,7 +9323,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.70</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.71</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

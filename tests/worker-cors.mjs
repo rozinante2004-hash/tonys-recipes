@@ -997,6 +997,48 @@ console.log('\nAI per household (v60):');
     expect('…and removes it', f.status === 200 && !db.raw.prepare('SELECT id FROM feedback WHERE id = ?').get(id), JSON.stringify(f));
     const hh2 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
     expect('health says notes go here (so the app sends them)', hh2.feedback === true, JSON.stringify(hh2.feedback));
+    // v62 — one Households page for every copy.
+    expect('health says households may report themselves', hh2.reports === true, JSON.stringify(hh2.reports));
+    const report = { name: 'ignored', members: [{ uid: 'uF', email: 'f@example.com', name: 'F', role: 'owner', lastSeen: 1759600000000, extra: 'x' }],
+                     links: [{ hid: 'hA', name: 'Kitchen A', code: 'MKN-AAAA-2222' }, { hid: 'bad id!', name: 'x' }], recipes: ['secret'] };
+    f = await fb({ action: 'household-report', idToken: fam, hid: 'hF', report }, ORIGIN);
+    expect('a member reports their household', f.status === 200 && f.d.ok === true, JSON.stringify(f));
+    const rrow = db.raw.prepare("SELECT * FROM hh_reports WHERE hid = 'hF'").get();
+    const rsum = rrow && JSON.parse(rrow.summary);
+    expect('…kept under its copy, with only what the page shows', rrow && rrow.project === 'recipes-f379d' && rsum.members.length === 1 && rsum.members[0].extra === undefined
+      && rsum.links.length === 1 && rsum.recipes === undefined && rsum.name === 'Kitchen A', JSON.stringify(rrow));
+    f = await fb({ action: 'household-report', idToken: tB, hid: 'hA', report });
+    expect('someone not in the household cannot report it', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'household-report', idToken: tA.slice(0, -4) + 'AAAA', hid: 'hA', report });
+    expect('…nor can a forged sign-in', f.status === 401, JSON.stringify(f));
+    members['hR/uR'] = true;
+    f = await fb({ action: 'household-report', idToken: await token({ sub: 'uR', aud: 'my-kitchen-notes-beta' }), hid: 'hR', report: { members: [] } });
+    expect('a household that never used the AI reports too (the beta)', f.status === 200, JSON.stringify(f));
+    members['hG/uR'] = true;
+    const tR = await token({ sub: 'uR', aud: 'my-kitchen-notes-beta' });
+    await fb({ action: 'household-report', idToken: tR, hid: 'hG', report: { members: [] } });
+    db.raw.prepare("INSERT INTO ai_spend (project, hid, month, usd, calls) VALUES ('my-kitchen-notes-beta', 'hG', '2099-01', 1.5, 3)").run();
+    f = await fb({ action: 'household-report', idToken: tR, hid: 'hG', gone: true });
+    expect('a household being deleted by its own owner leaves the list', f.status === 200 && !db.raw.prepare("SELECT 1 FROM hh_reports WHERE hid = 'hG'").get(), JSON.stringify(f));
+    expect('…but its spending stays (no member can reset an allowance that way)', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hG'").get());
+    f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: fam }, ORIGIN);
+    expect('nobody but the owner lists every copy', f.status === 403, JSON.stringify(f));
+    const famOwner = await token({ sub: 'uO', aud: 'recipes-f379d', email: 'rozinante2004@gmail.com' });
+    f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: famOwner }, ORIGIN);
+    const rows = (f.d && f.d.households) || [];
+    const rowOf = (p, h) => rows.filter(x => x.project === p && x.hid === h)[0];
+    expect('the owner, in the family app, lists every copy\'s households', f.status === 200 && rowOf('tonys-recipes-test', 'hA') && rowOf('recipes-f379d', 'hF') && rowOf('my-kitchen-notes-beta', 'hR'), JSON.stringify(rows.map(x => x.project + '/' + x.hid)));
+    expect('…each with its copy\'s allowance (the family never capped)', rowOf('tonys-recipes-test', 'hA').capNow === 5 && rowOf('recipes-f379d', 'hF').capNow === null && rowOf('my-kitchen-notes-beta', 'hR').capped === true, JSON.stringify(rows).slice(0, 400));
+    expect('…the counted ones with their months, the reported ones with their members', Math.abs(rowOf('recipes-f379d', 'hF').months[0].usd - 2.8) < 1e-9 && rowOf('recipes-f379d', 'hF').report.members[0].email === 'f@example.com' && rowOf('my-kitchen-notes-beta', 'hR').name === 'Kitchen A', JSON.stringify(rowOf('recipes-f379d', 'hF')));
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: famOwner }, ORIGIN);
+    expect('without `all`, only this copy (as before)', f.d.households.every(x => x.project === 'recipes-f379d'), JSON.stringify(f.d.households.map(x => x.project)));
+    f = await fb({ action: 'meter-admin', op: 'set-cap', project: 'my-kitchen-notes-beta', hid: 'hR', cap: 7, idToken: famOwner }, ORIGIN);
+    expect('the owner sets the beta\'s allowance from the family app', f.status === 200 && db.raw.prepare("SELECT cap FROM ai_households WHERE project = 'my-kitchen-notes-beta' AND hid = 'hR'").get().cap === 7, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'set-note', project: 'someone-elses-app', hid: 'hR', note: 'x', idToken: famOwner }, ORIGIN);
+    expect('…but not a copy this server does not serve', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'forget', project: 'recipes-f379d', hid: 'hF', idToken: famOwner }, ORIGIN);
+    const gone = !db.raw.prepare("SELECT 1 FROM hh_reports WHERE hid = 'hF'").get() && !db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hF'").get() && !db.raw.prepare("SELECT 1 FROM ai_households WHERE hid = 'hF'").get();
+    expect('a deleted household is forgotten here too', f.status === 200 && gone, JSON.stringify(f));
   } finally { globalThis.fetch = realFetch; }
 }
 

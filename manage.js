@@ -1,6 +1,6 @@
 // ─── THE MANAGEMENT APP (v37.58, design step 4) ──────────────────────────────
-// Tony's own view of every household in THIS copy (family, test or beta — each
-// has its own database): who is in it, what its AI has cost this month and the
+// Tony's own view of every household (family, test or beta — each copy has its
+// own database; v37.71: the other copies' through the Worker): who is in it, what its AI has cost this month and the
 // two before, its allowance (which he can change), who it is linked with, how
 // many new households its ✉️ share link brought, and when anyone last opened
 // the app. Loaded only when he opens it (⚙️ → 📊 Households); nobody else can
@@ -24,7 +24,7 @@
     if (!window._fbUser) throw new Error('Sign in first.');
     var t = await _fbUser.getIdToken();
     var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-      body: workerBody({ action: 'meter-admin', op: 'list', idToken: t }), signal: AbortSignal.timeout(15000) });
+      body: workerBody({ action: 'meter-admin', op: 'list', all: true, idToken: t }), signal: AbortSignal.timeout(15000) });
     var d = {}; try { d = await r.json(); } catch (e) {}
     if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
     return d;
@@ -32,7 +32,7 @@
   async function meterSet(op, hid, extra) {
     var t = await _fbUser.getIdToken();
     var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-      body: workerBody(Object.assign({ action: 'meter-admin', op: op, hid: hid, idToken: t }, extra)), signal: AbortSignal.timeout(15000) });
+      body: workerBody(Object.assign({ action: 'meter-admin', op: op, hid: hid, idToken: t }, extra || {})), signal: AbortSignal.timeout(15000) });
     var d = {}; try { d = await r.json(); } catch (e) {}
     if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
     return d;
@@ -50,13 +50,17 @@
     catch (e) { S.loadError = String((e && e.message) || e); }
     S.meter = null; S.meterError = '';
     try { S.meter = await meterList(); } catch (e) { S.meterError = e.message; }
-    var spend = {};
+    var spend = {}, here = thisProject();
     if (S.meter) (S.meter.households || []).forEach(function (h) {
+      // v37.71 — another copy's household: listed from what it reported to the
+      // server (Worker v62). One that never reported is not listed: it may be
+      // long deleted, and its spending alone says nothing about it.
+      if (h.project && h.project !== here) { if (h.report) remoteRow(rows, h); return; }
       spend[h.hid] = h;
       // known to the server but not readable here (the database refused): still
       // listed, from what the server noted. Otherwise the database is the list —
       // a deleted household keeps its spending history on the server, unlisted.
-      if (S.loadError && !rows[h.hid]) rows[h.hid] = { hid: h.hid, name: h.name || '', code: h.code || '', ownerUid: '', createdAt: h.created_at || 0,
+      if (S.loadError && !rows[h.hid]) rows[h.hid] = { key: h.hid, hid: h.hid, name: h.name || '', code: h.code || '', ownerUid: '', createdAt: h.created_at || 0,
         referredBy: '', members: [], links: [], asking: [], asked: [], referred: 0, lastSeen: 0 };
     });
     finish(rows, spend);
@@ -66,7 +70,7 @@
     var hs = await db.collection('households').get();
     hs.forEach(function (d) {
       var h = d.data() || {};
-      rows[d.id] = { hid: d.id, name: h.name || '', code: h.code || '', ownerUid: h.ownerUid || '', createdAt: h.createdAt || 0,
+      rows[d.id] = { key: d.id, hid: d.id, name: h.name || '', code: h.code || '', ownerUid: h.ownerUid || '', createdAt: h.createdAt || 0,
                      referredBy: h.referredBy || '', members: [], links: [], asking: [], asked: [], referred: 0, lastSeen: 0 };
       if (h.code) byCode[h.code] = d.id;
     });
@@ -94,14 +98,36 @@
       if (by && rows[by]) rows[by].referred++;
     });
   }
+  function thisProject() { return String((window.APP_CONFIG && APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || ''); }
+  function copyOf(project) { return COPY_NAME[project] || project || ''; }
+  // The copy's own page (deleting a household happens there, in its database).
+  function copyUrl(project) {
+    var c = copyOf(project), A = window.APP_CONFIG || {};
+    var u = c === 'family' ? A.liveSiteUrl : c === 'test' ? (A.testCopy && A.testCopy.siteUrl) : c === 'beta' ? (A.betaCopy && A.betaCopy.siteUrl) : '';
+    return u ? u + '?manage' : '';
+  }
+  function remoteRow(rows, h) {
+    var p = h.report || {}, key = h.project + ':' + h.hid;
+    var r = { key: key, hid: h.hid, project: h.project, remote: true, name: h.name || p.name || '', code: h.code || p.code || '', ownerUid: '',
+              createdAt: h.created_at || p.createdAt || 0, referredBy: p.referredBy || '', members: (p.members || []).slice(), links: (p.links || []).slice(),
+              asking: [], asked: [], referred: 0, lastSeen: 0, reportAt: h.reportAt || 0, meter: h };
+    r.members.forEach(function (m) { if (m.lastSeen > r.lastSeen) r.lastSeen = m.lastSeen; });
+    rows[key] = r;
+  }
   function finish(rows, spend) {
-    S.rows = Object.keys(rows).map(function (hid) {
-      var r = rows[hid], m = spend[hid] || null;
+    // Referrals within each other copy, from the identifiers its households came through.
+    var byCode = {};
+    Object.keys(rows).forEach(function (k) { var r = rows[k]; if (r.remote && r.code) byCode[r.project + '/' + r.code] = r; });
+    Object.keys(rows).forEach(function (k) { var r = rows[k], by = r.remote && r.referredBy && byCode[r.project + '/' + r.referredBy]; if (by) by.referred++; });
+    S.rows = Object.keys(rows).map(function (key) {
+      var r = rows[key], m = r.remote ? r.meter : (spend[r.hid] || null);
+      r.copy = copyOf(r.project || thisProject()) || 'this copy';
+      r.capped = r.remote ? !!(m && m.capped) : !!(S.meter && S.meter.capped);
       var owner = r.members.filter(function (x) { return x.role === 'owner'; })[0];
       r.owner = owner ? owner.email : '';
       r.months = m ? m.months : [];
       r.month = r.months.length ? r.months[0].usd : 0;
-      r.cap = m ? m.capNow : (S.meter && S.meter.capped ? S.meter.defaults.cap : null);
+      r.cap = m ? m.capNow : (r.capped ? S.meter.defaults.cap : null);
       r.capSet = m && typeof m.cap === 'number';
       r.note = (m && m.note) || '';
       if (m && m.last_seen > r.lastSeen) r.lastSeen = m.last_seen;
@@ -172,9 +198,9 @@
     var q = S.q.trim().toLowerCase();
     var list = S.rows.filter(function (r) {
       if (!q) return true;
-      return [r.name, r.code, r.owner].concat(r.members.map(function (m) { return m.email; })).join(' ').toLowerCase().indexOf(q) !== -1;
+      return [r.name, r.code, r.owner, r.copy].concat(r.members.map(function (m) { return m.email; })).join(' ').toLowerCase().indexOf(q) !== -1;
     });
-    var key = { name: function (r) { return r.name.toLowerCase(); }, owner: function (r) { return r.owner; },
+    var key = { name: function (r) { return r.name.toLowerCase(); }, copy: function (r) { return r.copy; }, owner: function (r) { return r.owner; },
                 members: function (r) { return r.members.length; }, month: function (r) { return r.month; },
                 cap: function (r) { return r.cap == null ? 1e9 : r.cap; }, links: function (r) { return r.links.length; },
                 referred: function (r) { return r.referred; }, seen: function (r) { return r.lastSeen; } }[S.sort] || function (r) { return r.month; };
@@ -201,11 +227,14 @@
                   ['beta', 'beta', APP_CONFIG.betaCopy && APP_CONFIG.betaCopy.siteUrl]]
       .filter(function (c) { return c[2] && c[0] !== env; });
     // v37.70 — each copy has its own households: one tap opens another copy's list.
-    var others = copies.length ? '<div class="mg-muted" style="margin-top:4px;">Other copies: ' + copies.map(function (c) {
+    var multi = S.rows.some(function (r) { return r.remote; });
+    var others = copies.length ? '<div class="mg-muted" style="margin-top:4px;">' + (multi ? 'Their own pages: ' : 'Other copies: ') + copies.map(function (c) {
         return '<a class="mg-link" href="' + escA(c[2] + '?manage') + '" target="_blank" rel="noopener">' + esc(c[1]) + ' \u2197</a>'; }).join(' · ') + '</div>' : '';
     var head = '<div class="mg-top"><div><div class="mg-title">📊 Households</div><div class="mg-muted">'
-      + esc(env === 'live' ? 'the family’s copy' : env + ' copy') + ' · ' + S.rows.length + ' household' + (S.rows.length === 1 ? '' : 's')
-      + (S.meter ? ' · AI ' + (S.meter.capped ? 'allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)' : 'counted, not capped') : '') + '</div>' + others + '</div>'
+      + (multi ? 'every copy' : esc(env === 'live' ? 'the family’s copy' : env + ' copy')) + ' · ' + S.rows.length + ' household' + (S.rows.length === 1 ? '' : 's')
+      + (multi ? ' (' + copyCounts() + ')' : '')
+      + (!S.meter ? '' : multi ? ' · AI allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first) on the test copy and the beta; the family’s is counted, not capped'
+          : ' · AI ' + (S.meter.capped ? 'allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)' : 'counted, not capped')) + '</div>' + others + '</div>'
       + '<div class="mg-tools"><input id="mgSearch" type="search" placeholder="Search name, identifier or e-mail" value="' + escA(S.q) + '" oninput="mknManage.search(this.value)">'
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
@@ -223,12 +252,13 @@
     var list = sorted();
     var months = (S.meter && S.meter.months) || [];
     var table = '<div class="mg-scroll"><table class="mg-table"><thead><tr>'
-      + th('name', 'Household') + th('owner', 'Owner') + th('members', 'Members') + th('month', 'This month')
+      + th('name', 'Household') + (multi ? th('copy', 'Copy') : '') + th('owner', 'Owner') + th('members', 'Members') + th('month', 'This month')
       + th('cap', 'Cap') + '<th>' + (months.length ? months.slice(1).map(mon).reverse().join(' · ') : 'Before') + '</th>'
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
       + (list.length ? list.map(function (r) {
-          return '<tr class="mg-row' + (S.open === r.hid ? ' mg-open' : '') + '" onclick="mknManage.show(\'' + r.hid + '\')">'
+          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + '" onclick="mknManage.show(\'' + escA(r.key) + '\')">'
             + '<td><div class="mg-name" dir="auto">' + esc(r.name || '(no name)') + '</div><div class="mg-muted mg-code">' + esc(r.code || '—') + '</div></td>'
+            + (multi ? '<td><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
             + '<td class="mg-email">' + esc(r.owner || '—') + '</td>'
             + '<td class="mg-c">' + r.members.length + '</td>'
             + '<td>' + barHtml(r) + '</td>'
@@ -237,19 +267,27 @@
             + '<td>' + (r.links.length ? r.links.map(function (l) { return esc(l.name || l.code); }).join(', ') : '—') + '</td>'
             + '<td class="mg-c">' + (r.referred || '—') + '</td>'
             + '<td>' + ago(r.lastSeen) + '</td></tr>';
-        }).join('') : '<tr><td colspan="9" class="mg-empty">No household matches.</td></tr>')
+        }).join('') : '<tr><td colspan="' + (multi ? 10 : 9) + '" class="mg-empty">No household matches.</td></tr>')
       + '</tbody></table></div>';
     body.innerHTML = head + table + panelHtml();
   }
+  function copyCounts() {
+    var n = {};
+    S.rows.forEach(function (r) { n[r.copy] = (n[r.copy] || 0) + 1; });
+    return Object.keys(n).sort().map(function (c) { return n[c] + ' ' + c; }).join(', ');
+  }
+  function openRow() { return S.rows.filter(function (x) { return x.key === S.open; })[0]; }
   function panelHtml() {
-    var r = S.rows.filter(function (x) { return x.hid === S.open; })[0];
+    var r = openRow();
     if (!r) return '';
+    var url = r.remote ? copyUrl(r.project) : '';
     return '<div class="mg-panel" role="region" aria-label="Household details">'
       + '<div class="mg-ptop"><div><div class="mg-title" dir="auto">' + esc(r.name) + '</div><div class="mg-muted">' + esc(r.code || 'no identifier yet')
-      + ' · founded ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—') + (r.referredBy ? ' · came through ' + esc(r.referredBy) : '') + '</div></div>'
+      + ' · founded ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—') + (r.referredBy ? ' · came through ' + esc(r.referredBy) : '')
+      + (r.remote ? ' · <span class="mg-copy">' + esc(r.copy) + '</span> as of ' + ago(r.reportAt) : '') + '</div></div>'
       + '<button type="button" class="mg-btn" onclick="mknManage.show(null)" aria-label="Close the details">✕</button></div>'
       + '<div class="mg-h">AI allowance</div>'
-      + (r.cap == null && !(S.meter && S.meter.capped) ? '<div class="mg-muted">This copy’s AI is counted, not capped.</div>'
+      + (r.cap == null && !r.capped ? '<div class="mg-muted">' + (r.remote ? 'The ' + esc(r.copy) + ' copy’s' : 'This copy’s') + ' AI is counted, not capped.</div>'
         : '<div class="mg-caprow">' + barHtml(r) + '<input id="mgCap" type="number" min="0" max="1000" step="0.5" value="' + (r.cap == null ? '' : r.cap) + '" aria-label="Monthly allowance in dollars">'
           + '<button type="button" class="mg-btn mg-primary" onclick="mknManage.saveCap()">Save</button>'
           + '<button type="button" class="mg-btn" onclick="mknManage.saveCap(0)" title="Stops its AI; nothing else is affected">Pause AI</button>'
@@ -266,7 +304,9 @@
       + '<div class="mg-h">Your notes</div><textarea id="mgNote" rows="3" dir="auto" placeholder="Only you see these.">' + esc(r.note) + '</textarea>'
       + '<div><button type="button" class="mg-btn" onclick="mknManage.saveNote()">Save the note</button></div>'
       + '<div class="mg-h">Delete</div>'
-      + (mine(r) ? '<div class="mg-muted">This is the household you are in now. To delete it, use ⚙️ → 👥 Family Access → 🗑 Delete this household.</div>'
+      + (r.remote ? '<div class="mg-muted">It lives in the ' + esc(r.copy) + ' copy’s own database, so it is deleted there'
+          + (url ? ': <a class="mg-link" href="' + escA(url) + '" target="_blank" rel="noopener">open the ' + esc(r.copy) + ' copy’s Households \u2197</a>' : '.') + '</div>'
+       : mine(r) ? '<div class="mg-muted">This is the household you are in now. To delete it, use ⚙️ → 👥 Family Access → 🗑 Delete this household.</div>'
                  : '<button type="button" class="mg-btn mg-danger" id="mgDelete" onclick="mknManage.del()">🗑 Delete this household…</button>')
       + '</div>';
   }
@@ -404,19 +444,19 @@
     show: function (hid) { S.open = (hid && S.open !== hid) ? hid : null; render();
       if (S.open) { var p = document.querySelector('#manageOverlay .mg-panel'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
     saveCap: async function (v) {
-      var r = S.rows.filter(function (x) { return x.hid === S.open; })[0];
+      var r = openRow();
       if (!r) return false;
       var cap = v !== undefined ? v : (document.getElementById('mgCap') || {}).value;
       if (cap !== null && cap !== '' && !(Number(cap) >= 0)) { toast('A number of dollars, please.'); return false; }
-      try { await meterSet('set-cap', r.hid, { cap: (cap === null || cap === '') ? null : Number(cap) }); }
+      try { await meterSet('set-cap', r.hid, { cap: (cap === null || cap === '') ? null : Number(cap), project: r.project || undefined }); }
       catch (e) { showServiceError('Could not change the allowance: ' + e.message); return false; }
       toast(cap === null ? 'Back to the default allowance' : Number(cap) === 0 ? '⏸ Its AI is paused' : '✅ Allowance set to $' + Number(cap).toFixed(2));
-      await api.reload(); S.open = r.hid; render();
+      await api.reload(); S.open = r.key; render();
       return true;
     },
     del: async function () {
-      var r = S.rows.filter(function (x) { return x.hid === S.open; })[0];
-      if (!r || mine(r)) return false;
+      var r = openRow();
+      if (!r || r.remote || mine(r)) return false;
       var who = r.members.map(function (m) { return m.email; }).filter(Boolean);
       var typed = await askConfirm({ icon: '🗑', title: 'Delete \u201c' + (r.name || r.code || 'this household') + '\u201d?',
         message: 'Everything in it goes, for everyone in it: its recipes, photos, chats and settings, its links with other households, and its '
@@ -431,6 +471,7 @@
         + (/permission/i.test(String(e && e.message)) ? '\n\nThis copy\u2019s database rules need publishing first (⚙️ → 👥 Family Access → Show rules).' : '')
         + '\n\nWhat was already removed stays removed; run it again to finish.'); return false; }
       syncLog('save', 'Deleted a household from the management app', { name: r.name, code: r.code, items: n });
+      try { await meterSet('forget', r.hid); } catch (e) {}      // v37.71 — and off every copy's page
       S.open = null;
       await api.reload();
       var pid = (window.APP_CONFIG && APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || '';
@@ -441,19 +482,19 @@
       return n;
     },
     saveNote: async function () {
-      var r = S.rows.filter(function (x) { return x.hid === S.open; })[0];
+      var r = openRow();
       if (!r) return false;
-      try { await meterSet('set-note', r.hid, { note: (document.getElementById('mgNote') || {}).value || '' }); }
+      try { await meterSet('set-note', r.hid, { note: (document.getElementById('mgNote') || {}).value || '', project: r.project || undefined }); }
       catch (e) { showServiceError('Could not save the note: ' + e.message); return false; }
       toast('Note saved'); r.note = (document.getElementById('mgNote') || {}).value || '';
       return true;
     },
     csv: function () {
       var months = (S.meter && S.meter.months) || [];
-      var head = ['Household', 'Identifier', 'Owner', 'Members', 'Member e-mails'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
+      var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
         .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes']);
       var lines = [head].concat(sorted().map(function (r) {
-        return [r.name, r.code, r.owner, r.members.length, r.members.map(function (m) { return m.email + ' (' + m.role + ')'; }).join('; ')]
+        return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return m.email + ' (' + m.role + ')'; }).join('; ')]
           .concat(months.map(function (m) { var x = r.months.filter(function (y) { return y.month === m; })[0]; return x ? x.usd.toFixed(4) : '0'; }))
           .concat([r.cap == null ? '' : r.cap, r.links.map(function (l) { return l.name; }).join('; '), r.referred,
                    r.lastSeen ? new Date(r.lastSeen).toISOString().slice(0, 10) : '', r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : '',
@@ -461,7 +502,7 @@
       })).map(function (row) { return row.map(function (c) { c = String(c == null ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(','); });
       var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-      a.download = 'households-' + String((window.APP_CONFIG && APP_CONFIG.environment) || 'live') + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.download = 'households-' + (S.rows.some(function (r) { return r.remote; }) ? 'all' : String((window.APP_CONFIG && APP_CONFIG.environment) || 'live')) + '-' + new Date().toISOString().slice(0, 10) + '.csv';
       document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       return lines.length - 1;
     },

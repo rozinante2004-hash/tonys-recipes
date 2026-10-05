@@ -1277,7 +1277,7 @@ window.SELF_TESTS = [
         var lines=mknManage.csv(); URL.createObjectURL=realUrl;
         if(lines!==2 || !made) throw new Error('the CSV');
         var csvText=await made.text();
-        if(csvText.indexOf('Kitchen A,MKN-AAAA-2222,a@example.com,2')===-1) throw new Error('the CSV rows: '+csvText.slice(0,200));
+        if(!/Kitchen A,MKN-AAAA-2222,[a-z ]+,a@example\.com,2/.test(csvText)) throw new Error('the CSV rows: '+csvText.slice(0,200));
         // v37.60 — rules not yet published: the page SAYS so, and still lists what the server counted.
         var realColl=fakeDb.collection;
         fakeDb.collection=function(c){ return c==='households' ? { get:async function(){ throw new Error('Missing or insufficient permissions.'); } } : realColl(c); };
@@ -1291,6 +1291,73 @@ window.SELF_TESTS = [
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h;
         if(window.mknManage) mknManage.close();
+      }
+    } },
+
+  { id:'management_all_copies', group:'Sharing', name:'📊 One Households page for every copy: each household reports itself once a day, and the owner\u2019s page lists every copy\u2019s with its copy, allowance and notes (v37.71)',
+    test: async()=>{
+      var now=Date.now(), month=new Date().toISOString().slice(0,7), here=String(APP_CONFIG.firebase.projectId);
+      var other=here==='my-kitchen-notes-beta' ? 'tonys-recipes-test' : 'my-kitchen-notes-beta', otherName=other==='my-kitchen-notes-beta' ? 'beta' : 'test';
+      function snap(list){ return { size:list.length, forEach:function(fn){ list.forEach(fn); } }; }
+      function d(id, data, parentHid){ return { id:id, data:function(){ return data; }, ref:{ parent:{ parent:{ id:parentHid } } } }; }
+      var fakeDb={ collection:function(c){ return {
+            doc:function(id){ return { collection:function(){ return { get:async function(){ return snap([d('uA',{ uid:'uA', email:'a@example.com', role:'owner', lastSeen:now-864e5 }), d('uC',{ uid:'uC', email:'c@example.com', role:'viewer' })]); } }; } }; },
+            get:async function(){ return c==='households' ? snap([d('hA',{ name:'Kitchen A', code:'MKN-AAAA-2222', ownerUid:'uA' })]) : snap([]); } }; },
+        collectionGroup:function(c){ return { get:async function(){ return c==='members' ? snap([d('uA',{ uid:'uA', email:'a@example.com', role:'owner' },'hA')]) : snap([]); } }; } };
+      var sent=[], real={ db:window._fbDb, user:window._fbUser, owner:window.isAppOwner, fetch:window.fetch, toast:window.toast, err:window.showServiceError, h:_workerHealth, hh:window._household };
+      var keptRep=null; try{ keptRep=localStorage.getItem(HH_REPORT_KEY+'hA'); localStorage.removeItem(HH_REPORT_KEY+'hA'); }catch(e){}
+      try{
+        window._fbDb=fakeDb; window._fbUser={ uid:'uA', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window.isAppOwner=function(){ return true; }; window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
+        window.fetch=async function(u, init){
+          var b=JSON.parse(init.body); sent.push(b);
+          if(b.action==='household-report') return new Response('{"ok":true}', { status:200 });
+          if(b.action==='meter-admin' && b.op==='list') return new Response(JSON.stringify({ project:here, capped:false, month:month, months:[month,'2026-09','2026-08'], defaults:{ cap:2, firstMonth:4 },
+            households:[ { project:here, capped:false, hid:'hA', name:'Kitchen A', capNow:null, months:[{ month:month, usd:0.5, calls:2 }] },
+              { project:other, capped:true, hid:'hR', name:'Beta Kitchen', code:'MKN-RRRR-5555', capNow:4, cap:null, note:'', reportAt:now-3600e3, months:[{ month:month, usd:1.25, calls:5 },{ month:'2026-09', usd:0, calls:0 },{ month:'2026-08', usd:0, calls:0 }],
+                report:{ name:'Beta Kitchen', code:'MKN-RRRR-5555', members:[{ uid:'uR', email:'r@example.com', role:'owner', lastSeen:now-7200e3 }], links:[{ hid:'hS', name:'Sister', code:'MKN-SSSS-6666' }] } },
+              { project:other, capped:true, hid:'hGone', name:'Never reported', capNow:2, months:[] } ] }), { status:200 });
+          if(b.action==='meter-admin') return new Response('{"ok":true}', { status:200 });
+          return real.fetch.apply(window, arguments);
+        };
+        // 1. The household reports itself — once a day, and only to a Worker that keeps it.
+        window._household={ hid:'hA', role:'owner', name:'Kitchen A', code:'MKN-AAAA-2222', createdAt:5, referredBy:'', links:[{ hid:'hB', name:'Kitchen B', code:'MKN-BBBB-3333' }] };
+        _workerHealth={ ok:true, metering:{ version:1, db:true } };
+        if(await hhReport()!==false || sent.length) throw new Error('reported to a Worker that does not keep reports');
+        _workerHealth={ ok:true, metering:{ version:1, db:true }, reports:true };
+        if(await hhReport()!==true) throw new Error('the report was not sent');
+        var rep=sent.filter(function(b){ return b.action==='household-report'; })[0];
+        if(!rep || rep.hid!=='hA' || rep.idToken!=='tok' || rep.report.members.length!==2 || rep.report.links[0].hid!=='hB' || rep.report.code!=='MKN-AAAA-2222' || rep.report.recipes!==undefined)
+          throw new Error('what was reported: '+JSON.stringify(rep));
+        if(await hhReport()!==false) throw new Error('reported twice in a day');
+        if(await hhReport({ gone:true })!==true || !sent.filter(function(b){ return b.gone===true && b.hid==='hA' && !b.report; }).length) throw new Error('a household being deleted does not say so');
+        // 2. The owner's page lists every copy's.
+        window._household={ hid:'hZ', role:'owner' };
+        var n=await openManagement();
+        if(n!==2) throw new Error('rows: '+n+' (a household that never reported must not be listed)');
+        var list=sent.filter(function(b){ return b.op==='list'; })[0];
+        if(!list || list.all!==true) throw new Error('the page did not ask for every copy');
+        var ov=document.getElementById('manageOverlay'), t=ov.textContent;
+        ['every copy','Copy','Beta Kitchen','r@example.com','$1.25','of $4.00','Sister',otherName].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
+        if(t.indexOf('Never reported')!==-1) throw new Error('a household that never reported is listed');
+        var rR=mknManage._state.rows.filter(function(r){ return r.hid==='hR'; })[0];
+        mknManage.show(rR.key);
+        if(document.getElementById('mgDelete')) throw new Error('another copy\u2019s household offered a delete here');
+        var dl=document.querySelector('#manageOverlay .mg-panel a.mg-link');
+        if(!dl || !/\?manage$/.test(dl.getAttribute('href'))) throw new Error('no way to its own copy\u2019s page to delete it');
+        document.getElementById('mgCap').value='6';
+        await mknManage.saveCap();
+        var setc=sent.filter(function(b){ return b.op==='set-cap'; })[0];
+        if(!setc || setc.project!==other || setc.hid!=='hR' || setc.cap!==6) throw new Error('the allowance was not set in its own copy: '+JSON.stringify(setc));
+        document.getElementById('mgNote').value='beta tester';   // (the panel stays open after Save)
+        await mknManage.saveNote();
+        var setn=sent.filter(function(b){ return b.op==='set-note'; })[0];
+        if(!setn || setn.project!==other) throw new Error('the note: '+JSON.stringify(setn));
+        mknManage.search(otherName); if(document.querySelectorAll('#manageOverlay .mg-row').length!==1) throw new Error('search by copy');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h; window._household=real.hh;
+        try{ if(keptRep) localStorage.setItem(HH_REPORT_KEY+'hA', keptRep); else localStorage.removeItem(HH_REPORT_KEY+'hA'); }catch(e){}
+        if(window.mknManage){ mknManage.search(''); mknManage.close(); }
       }
     } },
 

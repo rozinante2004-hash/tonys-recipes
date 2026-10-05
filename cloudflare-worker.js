@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v61
+// Tony's Recipes — Cloudflare Worker v62
+// v62: ONE HOUSEHOLDS PAGE FOR EVERY COPY. `household-report` (a member of a
+//      household, proved as for AI) keeps a short summary of it — name,
+//      identifier, members, links — in D1 (METER_DB, table `hh_reports`); the
+//      app sends it at most once a day. `meter-admin` list with `all: true`
+//      returns every copy's households (each row says its project), set-cap
+//      and set-note take a `project`, and `forget` (the owner) or a report
+//      with `gone: true` (its own owner, deleting it) drops a household. Other
+//      copies' rows are listed from their reports.
 // v61: NOTES FROM TESTERS, ONE INBOX. `feedback-send` (any signed-in person of
 //      a copy this Worker serves, proved by the Firebase sign-in) keeps the
 //      app's 💬 note in D1 (METER_DB, table `feedback`, with the copy it came
@@ -216,7 +224,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v61';
+const WORKER_VERSION = 'v62';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -638,6 +646,7 @@ async function handleRequest(request, env) {
         // Anthropic refuses unknown fields — the v37 lesson).
         metering: { version: 1, db: !!env.METER_DB },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
+        reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1208,6 +1217,7 @@ async function handleRequest(request, env) {
     // ── meter-me / meter-admin (v60) ─────────────────────────────────────────
     if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
     if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
+    if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
@@ -1469,13 +1479,28 @@ async function meterAction(request, env, body) {
   const owners = csvList(env.OWNER_EMAILS, OWNER_EMAILS_DEFAULT).map(s => s.toLowerCase());
   if (!claims.email_verified || !owners.includes(String(claims.email || '').toLowerCase()))
     return jsonResp({ error: 'METER: only the app\'s owner may see this.' }, 403);
+  // v62 — the owner's page in one copy manages another copy's households.
+  const projects = csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT);
+  const proj = body.project == null || body.project === '' ? claims.aud : String(body.project);
+  if (!projects.includes(proj)) return jsonResp({ error: 'METER: not a copy this server serves.' }, 400);
+  if (body.op === 'forget') {
+    const hid = String(body.hid || '');
+    if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
+    await reportsTable(db);
+    await db.batch([
+      db.prepare('DELETE FROM hh_reports WHERE project = ?1 AND hid = ?2').bind(proj, hid),
+      db.prepare('DELETE FROM ai_households WHERE project = ?1 AND hid = ?2').bind(proj, hid),
+      db.prepare('DELETE FROM ai_spend WHERE project = ?1 AND hid = ?2').bind(proj, hid)
+    ]);
+    return jsonResp({ ok: true });
+  }
   if (body.op === 'set-cap') {
     const hid = String(body.hid || ''), cap = body.cap === null || body.cap === '' ? null : Number(body.cap);
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid) || (cap !== null && !(cap >= 0 && cap <= 1000))) return jsonResp({ error: 'METER: a household and an amount from 0 to 1000.' }, 400);
     await db.batch([
       db.prepare('INSERT INTO ai_households (project, hid, cap, note) VALUES (?1, ?2, ?3, ?4) '
         + 'ON CONFLICT (project, hid) DO UPDATE SET cap = excluded.cap, note = COALESCE(excluded.note, note)')
-        .bind(claims.aud, hid, cap, typeof body.note === 'string' ? body.note.slice(0, 500) : null)
+        .bind(proj, hid, cap, typeof body.note === 'string' ? body.note.slice(0, 500) : null)
     ]);
     return jsonResp({ ok: true, hid, cap });
   }
@@ -1484,24 +1509,103 @@ async function meterAction(request, env, body) {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
     await db.prepare('INSERT INTO ai_households (project, hid, note) VALUES (?1, ?2, ?3) ON CONFLICT (project, hid) DO UPDATE SET note = excluded.note')
-      .bind(claims.aud, hid, String(body.note || '').slice(0, 500)).run();
+      .bind(proj, hid, String(body.note || '').slice(0, 500)).run();
     return jsonResp({ ok: true });
   }
   // list: every household this copy has counted, and its last three months.
+  // v62 — `all: true`: every copy's, counted or reported, each with its project.
   const months = [0, 1, 2].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return utcMonthKey(d.getTime()); });
-  const hs = (await db.prepare('SELECT hid, name, code, created_at, first_seen, last_seen, cap, note FROM ai_households WHERE project = ?1')
-    .bind(claims.aud).all()).results || [];
-  const sp = (await db.prepare('SELECT hid, month, usd, calls FROM ai_spend WHERE project = ?1 AND month >= ?2')
-    .bind(claims.aud, months[2]).all()).results || [];
-  const out = hs.map(h => {
-    const mine = sp.filter(s => s.hid === h.hid);
-    return Object.assign({}, h, {
-      capNow: capped ? capFor(h, month, env) : null,
-      months: months.map(m => { const s = mine.filter(x => x.month === m)[0]; return { month: m, usd: s ? s.usd : 0, calls: s ? s.calls : 0 }; })
+  const want = body.all ? projects : [claims.aud];
+  const cappedSet = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT);
+  await reportsTable(db);
+  const out = [];
+  for (const p of want) {
+    const pCapped = cappedSet.includes(p);
+    const hs = (await db.prepare('SELECT hid, name, code, created_at, first_seen, last_seen, cap, note FROM ai_households WHERE project = ?1')
+      .bind(p).all()).results || [];
+    const sp = (await db.prepare('SELECT hid, month, usd, calls FROM ai_spend WHERE project = ?1 AND month >= ?2')
+      .bind(p, months[2]).all()).results || [];
+    const reps = body.all ? ((await db.prepare('SELECT hid, summary, at FROM hh_reports WHERE project = ?1').bind(p).all()).results || []) : [];
+    const byHid = new Map();
+    hs.forEach(h => byHid.set(h.hid, Object.assign({}, h)));
+    reps.forEach(r => {
+      let sum = null;
+      try { sum = JSON.parse(r.summary); } catch (e) {}
+      const h = byHid.get(r.hid) || { hid: r.hid, name: null, code: null, created_at: null, first_seen: null, last_seen: null, cap: null, note: null };
+      h.report = sum; h.reportAt = r.at;
+      if (sum) { if (!h.name) h.name = sum.name || null; if (!h.code) h.code = sum.code || null; if (!h.created_at) h.created_at = sum.createdAt || null; }
+      byHid.set(r.hid, h);
     });
-  });
-  return jsonResp({ project: claims.aud, capped, month, months, households: out,
+    byHid.forEach(h => {
+      const mine = sp.filter(s => s.hid === h.hid);
+      out.push(Object.assign(h, {
+        project: p, capped: pCapped,
+        capNow: pCapped ? capFor(h, month, env) : null,
+        months: months.map(m => { const s = mine.filter(x => x.month === m)[0]; return { month: m, usd: s ? s.usd : 0, calls: s ? s.calls : 0 }; })
+      }));
+    });
+  }
+  return jsonResp({ project: claims.aud, capped, month, months, households: out, projects: want,
     defaults: { cap: parseFloat(env.AI_CAP_USD) || AI_CAP_USD_DEFAULT, firstMonth: parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT } });
+}
+
+// ─── ONE HOUSEHOLDS PAGE (v62) ───────────────────────────────────────────────
+// Each copy's households live in that copy's own Firebase project, which the
+// owner's page in another copy cannot read. So a household tells this Worker
+// about itself — a member's app sends a short summary at most once a day —
+// and the owner's page (`meter-admin` list, `all: true`) lists every copy's.
+// Only what the page shows is kept: no recipes, no notes.
+let _reportsReady = false;
+async function reportsTable(db) {
+  if (!_reportsReady) {
+    await db.prepare('CREATE TABLE IF NOT EXISTS hh_reports (project TEXT NOT NULL, hid TEXT NOT NULL, summary TEXT, at INTEGER, '
+      + 'PRIMARY KEY (project, hid))').run();
+    _reportsReady = true;
+  }
+}
+function reportSummary(r) {
+  r = r || {};
+  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  const num = v => (typeof v === 'number' && isFinite(v) && v > 0) ? Math.floor(v) : null;
+  const okId = v => /^[A-Za-z0-9]{1,64}$/.test(String(v || ''));
+  return {
+    name: str(r.name, 80), code: str(r.code, 20), createdAt: num(r.createdAt), referredBy: str(r.referredBy, 20) || null,
+    members: (Array.isArray(r.members) ? r.members : []).slice(0, 200).map(m => ({
+      uid: okId(m && m.uid) ? m.uid : null, email: str(m && m.email, 200), name: str(m && m.name, 120),
+      role: str(m && m.role, 20), lastSeen: num(m && m.lastSeen), joinedAt: num(m && m.joinedAt) })),
+    links: (Array.isArray(r.links) ? r.links : []).slice(0, 100).filter(l => l && okId(l.hid)).map(l => ({
+      hid: l.hid, name: str(l.name, 80), code: str(l.code, 20) })),
+    referrals: num(r.referrals) || 0
+  };
+}
+async function householdReport(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'REPORT: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  const hid = String(body.hid || '');
+  if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'REPORT: which household?' }, 400);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'REPORT: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  let hh;
+  try { hh = await meterMembership(claims, hid, body.idToken, env); } catch (e) { return jsonResp({ error: 'REPORT: ' + e.message }, 502); }
+  if (!hh.member) return jsonResp({ error: 'REPORT: you are not in that household.' }, 403);
+  const db = await meterDb(env);
+  await reportsTable(db);
+  // Its owner is deleting it: off the owner's page. Only the summary goes —
+  // never the spending, or any member could reset an allowance this way.
+  if (body.gone) {
+    await db.prepare('DELETE FROM hh_reports WHERE project = ?1 AND hid = ?2').bind(claims.aud, hid).run();
+    return jsonResp({ ok: true, gone: true });
+  }
+  const sum = reportSummary(body.report);
+  if (hh.name) sum.name = hh.name;               // what Firestore says wins
+  if (hh.code) sum.code = hh.code;
+  if (hh.created) sum.createdAt = hh.created;
+  const text = JSON.stringify(sum);
+  if (text.length > 65536) return jsonResp({ error: 'REPORT: too large.' }, 413);
+  await db.prepare('INSERT INTO hh_reports (project, hid, summary, at) VALUES (?1, ?2, ?3, ?4) '
+    + 'ON CONFLICT (project, hid) DO UPDATE SET summary = excluded.summary, at = excluded.at')
+    .bind(claims.aud, hid, text, Date.now()).run();
+  return jsonResp({ ok: true });
 }
 
 // ─── NOTES FROM TESTERS, ONE INBOX (v61) ─────────────────────────────────────
@@ -2059,4 +2163,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v61 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v62 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
