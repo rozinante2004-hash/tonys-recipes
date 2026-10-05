@@ -815,6 +815,20 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.68 + Worker v61 — one inbox for notes; the owner's dot; ✉️.**
+    Tony did not see his beta notes in the family app (each copy kept its
+    own). Worker v61 `feedback-send` keeps every copy's notes in D1
+    (`feedback` table, with the copy's project; who sent it from the
+    verified sign-in, a picture-only screenshot); `meter-admin` ops `notes`,
+    `notes-new`, `note-status`, `note-delete`; health `feedback: true`. The
+    app sends there when health says so (else this copy's Firestore, as
+    before); the Feedback tab merges both (key 's'/'d' + id, a copy label),
+    `feedbackTellOwner` in EVERY copy. The ⚙️ dot (`#feedbackDot`,
+    `feedbackDot(n)`, owner only): red = new notes, green = all read; counted
+    on opening, every 15 minutes, and as notes are marked. The management
+    page's Close sits below the iPhone's status bar (safe-area, sticky).
+    The share-app icon is an envelope ✉️ (its own span, so the translated
+    "Share this app" still applies).
   - **v37.67 — the 💬 note never turns into the list of ways to e-mail.**
     Tony tapped it in the app's first seconds (the app's own `_fbUser` is set
     ~3 s after Firebase signs in) and got the e-mail choices — "the note frame

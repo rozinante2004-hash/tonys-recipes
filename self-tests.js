@@ -1388,6 +1388,7 @@ window.SELF_TESTS = [
         // Signed in: the form; an empty note is refused; a note is kept with exactly the fields the rules accept.
         window._fbUser={ uid:'uT', email:'tester@example.com', displayName:'Tess' }; window._household={ hid:'hT', name:'Tess\u2019s Kitchen' };
         window._fbDb={ collection:function(c){ return { add:async function(d){ added.push({ c:c, d:d }); return { id:'n1' }; } }; } };
+        _workerHealth=false;   // an older Worker: this copy's own database
         openFeedbackForm();
         if(!document.getElementById('feedbackOverlay') || !document.getElementById('fbLog').checked) throw new Error('the form, with the log ticked');
         if(getComputedStyle(document.getElementById('feedbackFab')).display!=='none') throw new Error('the button sits on top of the open form');
@@ -1402,6 +1403,14 @@ window.SELF_TESTS = [
         if(extra.length) throw new Error('fields the rules refuse: '+extra.join(', '));
         if(!d.log || d.log.length>200000) throw new Error('the log: '+(d.log||'').length);
         if(document.getElementById('feedbackOverlay')) throw new Error('the form stayed open');
+        // v37.68 — a Worker that keeps notes (v61): ONE inbox for every copy, the sign-in proving who.
+        var sentToWorker=null; window.fetch=async function(u, init){ sentToWorker=JSON.parse(init.body); return new Response('{"ok":true,"id":7}', { status:200 }); };
+        _workerHealth={ ok:true, feedback:true }; window._fbUser.getIdToken=async function(){ return 'tok'; };
+        openFeedbackForm(); document.getElementById('fbText').value='To the one inbox';
+        if(await sendFeedbackNote()!==true || !sentToWorker || sentToWorker.action!=='feedback-send' || sentToWorker.idToken!=='tok' || sentToWorker.note.text!=='To the one inbox' || added.length!==1)
+          throw new Error('the note did not go to the one inbox: '+JSON.stringify(sentToWorker && Object.assign({}, sentToWorker, { note:'…' })));
+        if(sentToWorker.note.uid!==undefined || sentToWorker.note.email!==undefined) throw new Error('the note names its own sender (the server takes it from the sign-in)');
+        window.fetch=real.fetch;
         // The owner's Feedback tab.
         var notes=[ { id:'n1', uid:'uT', email:'tester@example.com', household:'Tess\u2019s Kitchen', text:'The photo search is lovely', shot:'', log:'L', version:'v37.64', env:'beta', at:Date.now(), status:'new' },
                     { id:'n2', uid:'uU', email:'u@example.com', text:'Done one', at:Date.now()-1000, status:'done' } ];
@@ -1415,13 +1424,21 @@ window.SELF_TESTS = [
         await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
         var t=document.getElementById('manageOverlay').textContent;
         if(t.indexOf('The photo search is lovely')===-1 || t.indexOf('Done one')!==-1 || !/Feedback\s*1/.test(t)) throw new Error('the Feedback tab: '+t.slice(0,300));
-        await mknManage.mark('n1','done');
+        var dot=document.getElementById('feedbackDot');
+        feedbackDot(1);
+        if(!dot || dot.hidden || dot.className!=='fb-dot-new') throw new Error('no red dot on ⚙️ with a new note');
+        await mknManage.mark('dn1','done');
+        if(dot.hidden || dot.className!=='fb-dot-read') throw new Error('the dot did not turn green once every note was read: '+dot.className);
         if(!updated.length || updated[0][0]!=='n1' || updated[0][1].status!=='done') throw new Error('marking it done');
         mknManage.noteFilter('all');
+        window.isAppOwner=function(){ return false; }; feedbackDot(3);
+        if(!dot.hidden) throw new Error('someone other than the owner sees the dot');
+        window.isAppOwner=function(){ return true; };
         if(document.getElementById('manageOverlay').textContent.indexOf('Done one')===-1) throw new Error('"All" does not show the done ones');
       } finally {
         window._featureOverride=real.ov; applyFeatureFlags(); window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err;
         window.sendFeedbackByEmail=real.email; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h; window._household=real.hh;
+        feedbackDot(undefined);   // hidden until the next real count
         try{ if(keptHidden===null) localStorage.removeItem(FB_HIDDEN_KEY); else localStorage.setItem(FB_HIDDEN_KEY, keptHidden);
              if(keptFirst===null) localStorage.removeItem(FB_FIRST_KEY); else localStorage.setItem(FB_FIRST_KEY, keptFirst); }catch(e){}
         var o=document.getElementById('feedbackOverlay'); if(o) o.remove();

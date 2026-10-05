@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v60
+// Tony's Recipes — Cloudflare Worker v61
+// v61: NOTES FROM TESTERS, ONE INBOX. `feedback-send` (any signed-in person of
+//      a copy this Worker serves, proved by the Firebase sign-in) keeps the
+//      app's 💬 note in D1 (METER_DB, table `feedback`, with the copy it came
+//      from); the owner reads, marks and removes them through `meter-admin`
+//      (notes, notes-new, note-status, note-delete) from any copy.
 // v60: AI PER HOUSEHOLD (design step 3). Each AI answer's cost is counted
 //      against the household that asked — proved by the person's Firebase
 //      sign-in (checked against Google's keys) and their membership (read from
@@ -211,7 +216,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v60';
+const WORKER_VERSION = 'v61';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -632,6 +637,7 @@ async function handleRequest(request, env) {
         // strips them before Anthropic (an older one would forward them, and
         // Anthropic refuses unknown fields — the v37 lesson).
         metering: { version: 1, db: !!env.METER_DB },
+        feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1201,6 +1207,7 @@ async function handleRequest(request, env) {
 
     // ── meter-me / meter-admin (v60) ─────────────────────────────────────────
     if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
+    if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
@@ -1472,6 +1479,7 @@ async function meterAction(request, env, body) {
     ]);
     return jsonResp({ ok: true, hid, cap });
   }
+  if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body); if (fr) return fr; }
   if (body.op === 'set-note') {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
@@ -1494,6 +1502,67 @@ async function meterAction(request, env, body) {
   });
   return jsonResp({ project: claims.aud, capped, month, months, households: out,
     defaults: { cap: parseFloat(env.AI_CAP_USD) || AI_CAP_USD_DEFAULT, firstMonth: parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT } });
+}
+
+// ─── NOTES FROM TESTERS, ONE INBOX (v61) ─────────────────────────────────────
+// The app's 💬 note (v37.64) was kept in each copy's own database, so a note
+// sent from the beta was only visible in the beta's management page — Tony
+// reads the family app. Now every copy sends it HERE, into the same D1
+// database as the AI counts (METER_DB, table `feedback`), and the owner's
+// Feedback tab in ANY copy lists them all, with the copy each came from.
+// Who sent it is proved as for AI (the Firebase sign-in, checked here).
+async function feedbackTable(db) {
+  if (!_feedbackReady) {
+    await db.prepare('CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, '
+      + 'name TEXT, hid TEXT, household TEXT, text TEXT, shot TEXT, log TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, '
+      + 'at INTEGER, status TEXT)').run();
+    _feedbackReady = true;
+  }
+}
+let _feedbackReady = false;
+async function feedbackSend(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'FEEDBACK: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'FEEDBACK: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  const n = body.note || {}, str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  const text = str(n.text, 5000).trim();
+  if (!text) return jsonResp({ error: 'FEEDBACK: the note is empty.' }, 400);
+  const shot = str(n.shot, 750000);
+  if (shot && !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(shot)) return jsonResp({ error: 'FEEDBACK: the screenshot is not a picture.' }, 400);
+  const db = await meterDb(env);
+  await feedbackTable(db);
+  const r = await db.prepare('INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) '
+    + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, \'new\')')
+    .bind(claims.aud, claims.sub, str(claims.email, 200), str(n.name, 120), str(n.hid, 64), str(n.household, 120), text, shot,
+          str(n.log, 200000), str(n.version, 20), str(n.env, 20), str(n.device, 300), str(n.lang, 10), Date.now()).run();
+  return jsonResp({ ok: true, id: (r && r.meta && r.meta.last_row_id) || null });
+}
+// The owner's side, through meter-admin: notes (newest 300, every copy),
+// note-status, note-delete, notes-new (how many are new).
+async function feedbackAdmin(env, db, body) {
+  await feedbackTable(db);
+  if (body.op === 'notes') {
+    const rows = (await db.prepare('SELECT id, project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status '
+      + 'FROM feedback ORDER BY at DESC LIMIT 300').all()).results || [];
+    return jsonResp({ notes: rows });
+  }
+  if (body.op === 'notes-new') {
+    const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
+    return jsonResp({ new: (r && r.n) || 0 });
+  }
+  const id = parseInt(body.id, 10);
+  if (!(id > 0)) return jsonResp({ error: 'FEEDBACK: which note?' }, 400);
+  if (body.op === 'note-status') {
+    if (['new', 'seen', 'done'].indexOf(body.status) === -1) return jsonResp({ error: 'FEEDBACK: new, seen or done.' }, 400);
+    await db.prepare('UPDATE feedback SET status = ?1 WHERE id = ?2').bind(body.status, id).run();
+    return jsonResp({ ok: true });
+  }
+  if (body.op === 'note-delete') {
+    await db.prepare('DELETE FROM feedback WHERE id = ?1').bind(id).run();
+    return jsonResp({ ok: true });
+  }
+  return null;
 }
 
 // ─── VIDEO RECIPES (v43, v44) ────────────────────────────────────────────────
@@ -1990,4 +2059,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v60 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v61 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

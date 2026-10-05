@@ -969,6 +969,34 @@ console.log('\nAI per household (v60):');
     const unverified = await token({ sub: 'uT', email: 'rozinante2004@gmail.com', email_verified: false });
     adm = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: unverified }, TEST_ORIGIN), envM);
     expect('…but not with an unconfirmed address', adm.status === 403, 'status ' + adm.status);
+    // v61 — notes from every copy, one inbox.
+    const fb = async (body, origin = TEST_ORIGIN) => { const rr = await worker.fetch(post(body, origin), envM); let dd = null; try { dd = await rr.json(); } catch (e) {} return { status: rr.status, d: dd }; };
+    let f = await fb({ action: 'feedback-send', idToken: tA, note: { text: 'The import was slow', shot: 'data:image/jpeg;base64,AAAA', log: 'L', version: 'v37.68', env: 'test', household: 'Kitchen A', hid: 'hA' } });
+    expect('a signed-in person leaves a note', f.status === 200 && f.d.ok === true, JSON.stringify(f));
+    const fam = await token({ sub: 'uF', aud: 'recipes-f379d', email: 'f@example.com' });
+    f = await fb({ action: 'feedback-send', idToken: fam, note: { text: 'From the family', env: 'live' } }, ORIGIN);
+    expect('…from any copy', f.status === 200, JSON.stringify(f));
+    f = await fb({ action: 'feedback-send', idToken: tA, note: { text: '   ' } });
+    expect('an empty note is refused', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'feedback-send', idToken: tA, note: { text: 'x', shot: 'javascript:alert(1)' } });
+    expect('a "screenshot" that is not a picture is refused', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'feedback-send', idToken: tA.slice(0, -4) + 'AAAA', note: { text: 'forged' } });
+    expect('a forged sign-in cannot leave one', f.status === 401, JSON.stringify(f));
+    const nrow = db.raw.prepare("SELECT * FROM feedback WHERE text = 'The import was slow'").get();
+    expect('…kept with WHO sent it from the sign-in, not from the note', nrow && nrow.uid === 'uA' && nrow.email === 'a@example.com' && nrow.project === 'tonys-recipes-test' && nrow.status === 'new', JSON.stringify(nrow));
+    f = await fb({ action: 'meter-admin', op: 'notes', idToken: tA });
+    expect('nobody but the owner reads them', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes', idToken: tOwner }, ORIGIN);
+    expect('the owner reads every copy\'s notes, from any copy, newest first', f.status === 200 && f.d.notes.length === 2 && f.d.notes.map(n => n.project).sort().join() === 'recipes-f379d,tonys-recipes-test', JSON.stringify(f.d).slice(0, 200));
+    f = await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
+    expect('…counts the new ones', f.d && f.d.new === 2, JSON.stringify(f.d));
+    const id = db.raw.prepare("SELECT id FROM feedback WHERE text = 'From the family'").get().id;
+    f = await fb({ action: 'meter-admin', op: 'note-status', id, status: 'done', idToken: tOwner });
+    expect('…marks one done', f.status === 200 && db.raw.prepare('SELECT status FROM feedback WHERE id = ?').get(id).status === 'done', JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'note-delete', id, idToken: tOwner });
+    expect('…and removes it', f.status === 200 && !db.raw.prepare('SELECT id FROM feedback WHERE id = ?').get(id), JSON.stringify(f));
+    const hh2 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
+    expect('health says notes go here (so the app sends them)', hh2.feedback === true, JSON.stringify(hh2.feedback));
   } finally { globalThis.fetch = realFetch; }
 }
 

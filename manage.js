@@ -2,7 +2,7 @@
 // Tony's own view of every household in THIS copy (family, test or beta — each
 // has its own database): who is in it, what its AI has cost this month and the
 // two before, its allowance (which he can change), who it is linked with, how
-// many new households its 📲 share link brought, and when anyone last opened
+// many new households its ✉️ share link brought, and when anyone last opened
 // the app. Loaded only when he opens it (⚙️ → 📊 Households); nobody else can
 // read any of it — the database rules (appAdmin) and the Worker (OWNER_EMAILS)
 // both check that it is him. It never reads anyone's recipes.
@@ -110,15 +110,32 @@
   }
 
   // v37.64 — notes from the floating 💬 button (feedback/<id>), newest first.
+  // v37.68 — the one inbox (the Worker, every copy) and anything kept in this
+  // copy's own database before it (v37.64–67), together, newest first.
+  var COPY_NAME = { 'recipes-f379d': 'family', 'tonys-recipes-test': 'test', 'my-kitchen-notes-beta': 'beta' };
   async function loadNotes() {
     S.notesError = '';
+    var out = [], errs = [];
     try {
-      var out = [];
-      (await window._fbDb.collection('feedback').orderBy('at', 'desc').limit(300).get()).forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data() || {})); });
-      S.notes = out;
-    } catch (e) { S.notes = []; S.notesError = e.message; }
+      var t = await window._fbUser.getIdToken();
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'meter-admin', op: 'notes', idToken: t }), signal: AbortSignal.timeout(20000) });
+      var d = {}; try { d = await r.json(); } catch (e) {}
+      if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
+      (d.notes || []).forEach(function (n) { out.push(Object.assign({}, n, { key: 's' + n.id, src: 'server', copy: COPY_NAME[n.project] || n.env || n.project })); });
+    } catch (e) { if (!/not set up|METER_DB|Unknown|no messages/i.test(e.message)) errs.push('the server: ' + e.message); }
+    try {
+      (await window._fbDb.collection('feedback').orderBy('at', 'desc').limit(300).get()).forEach(function (doc) {
+        var n = doc.data() || {}; out.push(Object.assign({ id: doc.id }, n, { key: 'd' + doc.id, src: 'db', copy: n.env === 'live' ? 'family' : (n.env || '') }));
+      });
+    } catch (e) { if (!/permission/i.test(e.message) || !out.length) errs.push('this copy\u2019s database: ' + e.message); }
+    out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    S.notes = out; S.notesError = (!out.length && errs.length) ? errs.join('; ') : '';
   }
+  function noteBy(key) { return (S.notes || []).filter(function (n) { return n.key === key; })[0]; }
   function newCount() { return (S.notes || []).filter(function (n) { return n.status === 'new'; }).length; }
+  // v37.68 — the ⚙️ dot follows what is marked here.
+  function syncDot() { if (S.notes && typeof feedbackDot === 'function') feedbackDot(newCount()); }
   function notesHtml() {
     if (S.notesError) return '<div class="mg-note">The notes could not be read: ' + esc(S.notesError)
       + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 👥 Family Access → Show rules).' : '') + '</div>';
@@ -132,20 +149,22 @@
     return filt + list.map(function (n) {
       var subj = encodeURIComponent('Your note about My Kitchen Notes');
       var body = encodeURIComponent('\n\n\u2014 you wrote (' + new Date(n.at || 0).toLocaleString() + '):\n' + (n.text || ''));
-      return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + '" id="mgNote-' + esc(n.id) + '">'
+      var k = esc(n.key);
+      return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + '" id="mgNote-' + k + '">'
         + '<div class="mg-ptop"><div><b class="mg-email">' + esc(n.email || n.uid) + '</b> <span class="mg-muted">' + esc(n.household || '') + '</span>'
+        + (n.copy ? ' <span class="mg-copy">' + esc(n.copy) + '</span>' : '')
         + '<div class="mg-muted">' + new Date(n.at || 0).toLocaleString() + ' · ' + esc(n.version || '') + ' · ' + esc(n.env || '') + ' · ' + esc(n.lang || '') + '</div></div>'
         + '<span class="mg-muted">' + (tag[n.status] || esc(n.status)) + '</span></div>'
         + '<div class="mg-text" dir="auto">' + esc(n.text || '') + '</div>'
         + (n.shot ? '<img class="mg-shot" src="' + escA(n.shot) + '" alt="The tester\u2019s screenshot" onclick="this.classList.toggle(\'mg-big\')">' : '')
         + (n.log ? '<details><summary class="mg-muted">What the app was doing (' + Math.round(n.log.length / 1024) + ' KB)</summary>'
-            + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(\'' + esc(n.id) + '\')">📋 Copy the log</button></details>' : '')
+            + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(\'' + k + '\')">📋 Copy the log</button></details>' : '')
         + '<div class="mg-device mg-muted">' + esc(n.device || '') + '</div>'
         + '<div class="mg-tools" style="margin-top:8px;">'
         + (n.email ? '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '">✉️ Reply by e-mail</a>' : '')
-        + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + esc(n.id) + '\',\'seen\')">👀 Seen</button>' : '')
-        + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + esc(n.id) + '\',\'done\')">✅ Done</button>' : '')
-        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(\'' + esc(n.id) + '\')">🗑</button></div></div>';
+        + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + k + '\',\'seen\')">👀 Seen</button>' : '')
+        + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + k + '\',\'done\')">✅ Done</button>' : '')
+        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(\'' + k + '\')">🗑</button></div></div>';
     }).join('');
   }
 
@@ -237,7 +256,7 @@
       + ((r.asked.length || r.asking.length) ? '<div class="mg-h">Requests waiting</div>'
           + r.asked.map(function (a) { return '<div class="mg-li">from ' + esc(a.from) + ' <span class="mg-muted">' + esc(a.code) + '</span></div>'; }).join('')
           + r.asking.map(function (a) { return '<div class="mg-li">to ' + esc(a.to) + '</div>'; }).join('') : '')
-      + '<div class="mg-h">Shared the app</div><div>' + (r.referred ? r.referred + ' new household' + (r.referred === 1 ? '' : 's') + ' came through its 📲 link' : '<span class="mg-muted">No new households through its link yet.</span>') + '</div>'
+      + '<div class="mg-h">Shared the app</div><div>' + (r.referred ? r.referred + ' new household' + (r.referred === 1 ? '' : 's') + ' came through its ✉️ share link' : '<span class="mg-muted">No new households through its link yet.</span>') + '</div>'
       + '<div class="mg-h">Your notes</div><textarea id="mgNote" rows="3" dir="auto" placeholder="Only you see these.">' + esc(r.note) + '</textarea>'
       + '<div><button type="button" class="mg-btn" onclick="mknManage.saveNote()">Save the note</button></div>'
       + '<div class="mg-h">Delete</div>'
@@ -247,8 +266,10 @@
   }
 
   var CSS = '#manageOverlay{position:fixed;inset:0;z-index:1250;background:var(--cream);color:var(--ink);overflow:auto;font-family:"DM Sans","Heebo",sans-serif;}'
-    + '#manageOverlay .mg-wrap{max-width:1280px;margin:0 auto;padding:16px;}'
-    + '#manageOverlay .mg-bar0{display:flex;justify-content:flex-end;}'
+    + '#manageOverlay .mg-wrap{max-width:1280px;margin:0 auto;padding:16px;padding-top:calc(12px + env(safe-area-inset-top));'
+    + 'padding-left:calc(16px + env(safe-area-inset-left));padding-right:calc(16px + env(safe-area-inset-right));}'
+    // v37.68 — the Close button was under the iPhone's clock and battery: below them, and it stays in reach when scrolling.
+    + '#manageOverlay .mg-bar0{display:flex;justify-content:flex-end;position:sticky;top:0;z-index:5;padding-top:env(safe-area-inset-top);margin-top:calc(-1 * env(safe-area-inset-top));background:var(--cream);}'
     + '.mg-top{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between;margin-bottom:12px;}'
     + '.mg-title{font:700 20px/1.2 "Playfair Display","Frank Ruhl Libre",serif;color:var(--heading);}'
     + '.mg-muted{color:var(--muted);font-size:12px;}.mg-code{font-family:ui-monospace,Menlo,Consolas,monospace;}'
@@ -274,6 +295,7 @@
     + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;}'
     + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
     + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
+    + '.mg-copy{display:inline-block;padding:1px 7px;border-radius:9px;border:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}'
     + '.mg-card{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:12px 14px;margin-bottom:10px;}'
     + '.mg-card.mg-new{border-inline-start:4px solid var(--terracotta-fill);}'
     + '.mg-text{white-space:pre-wrap;margin:8px 0;font-size:14px;line-height:1.5;}'
@@ -337,23 +359,29 @@
         document.body.appendChild(ov);
         ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') api.close(); });
       }
-      loadNotes().then(render);
+      loadNotes().then(function () { render(); syncDot(); });
       return api.reload();
     },
     tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(render); },
     noteFilter: function (f) { S.noteFilter = f; render(); },
-    mark: async function (id, status) {
-      try { await window._fbDb.collection('feedback').doc(id).update({ status: status }); }
-      catch (e) { showServiceError('Could not mark the note: ' + e.message); return false; }
-      (S.notes || []).forEach(function (n) { if (n.id === id) n.status = status; }); render(); return true;
+    mark: async function (key, status) {
+      var n = noteBy(key); if (!n) return false;
+      try {
+        if (n.src === 'server') await meterSet('note-status', '', { id: n.id, status: status });
+        else await window._fbDb.collection('feedback').doc(n.id).update({ status: status });
+      } catch (e) { showServiceError('Could not mark the note: ' + e.message); return false; }
+      n.status = status; render(); syncDot(); return true;
     },
-    delNote: async function (id) {
+    delNote: async function (key) {
+      var n = noteBy(key); if (!n) return false;
       if (await askConfirm({ icon: '🗑', title: 'Remove this note?', message: 'It is gone for good.', okLabel: 'Remove', danger: true }) !== true) return false;
-      try { await window._fbDb.collection('feedback').doc(id).delete(); }
-      catch (e) { showServiceError('Could not remove the note: ' + e.message); return false; }
-      S.notes = (S.notes || []).filter(function (n) { return n.id !== id; }); render(); return true;
+      try {
+        if (n.src === 'server') await meterSet('note-delete', '', { id: n.id });
+        else await window._fbDb.collection('feedback').doc(n.id).delete();
+      } catch (e) { showServiceError('Could not remove the note: ' + e.message); return false; }
+      S.notes = (S.notes || []).filter(function (x) { return x.key !== key; }); render(); syncDot(); return true;
     },
-    copyLog: function (id) { var n = (S.notes || []).filter(function (x) { return x.id === id; })[0]; if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
+    copyLog: function (key) { var n = noteBy(key); if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
     _notes: loadNotes,
     close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; },
     reload: async function () {

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.67 -->
+<!-- Tony's Recipes Collection v37.68 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -274,6 +274,12 @@
   @keyframes fbBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
   @media (prefers-reduced-motion: reduce) { #feedbackFab.fb-shine, #feedbackFab.fb-shine::after { animation: none; } #feedbackFab.fb-shine::after { display: none; } }
   @media print { #feedbackFab { display: none; } }
+  /* v37.68 — the owner's dot on ⚙️: red = notes from testers not yet read; green = all read. */
+  #feedbackDot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid var(--warm-brown, #5C3D2E); box-sizing: content-box; pointer-events: none; }
+  #feedbackDot[hidden] { display: none; }
+  #feedbackDot.fb-dot-new  { background: #E5484D; }
+  #feedbackDot.fb-dot-read { background: #30A46C; }
   /* …and out of the way while any window is open (its own form included). */
   body:has(.modal-overlay.open) #feedbackFab, body:has(#askOverlay) #feedbackFab,
   body:has(#manageOverlay) #feedbackFab { display: none; }
@@ -3957,7 +3963,7 @@ function hhRef(hid) { return hhDb().collection('households').doc(hid || _cloudHi
   } catch(e) {}
 })();
 
-// v37.58 — arrived through someone's 📲 share link (…?ref=MKN-…): kept until
+// v37.58 — arrived through someone's ✉️ share link (…?ref=MKN-…): kept until
 // this person founds a household, and taken out of the address.
 var REF_KEY = 'mkn_ref';
 (function captureRef() {
@@ -5619,7 +5625,19 @@ async function sendFeedbackNote() {
     env: String(APP_CONFIG.environment || 'live'), device: String(navigator.userAgent || '').slice(0, 300),
     lang: (typeof _i18nLang === 'string' ? _i18nLang : 'en'), where: String(location.pathname + location.hash).slice(0, 200),
     at: Date.now(), status: 'new' };
-  try { await hhDb().collection('feedback').add(note); }
+  try {
+    // v37.68 — one inbox for every copy: through the Worker (v61+), which
+    // keeps it with the copy it came from; an older Worker → this copy's own
+    // database, as in v37.64.
+    if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+    if (_workerHealth && _workerHealth.feedback && u.getIdToken) {
+      var send = {}; Object.keys(note).forEach(function(k){ if (['uid', 'email', 'at', 'status'].indexOf(k) === -1) send[k] = note[k]; });
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'feedback-send', idToken: await u.getIdToken(), note: send }), signal: AbortSignal.timeout(30000) });
+      var d = {}; try { d = await r.json(); } catch(e2) {}
+      if (!r.ok || !d.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
+    } else await hhDb().collection('feedback').add(note);
+  }
   catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
     showServiceError('Your note could not be sent: ' + (e && e.message) + '\n\nIt is still in the box \u2014 try Send again in a moment.');
@@ -5633,14 +5651,44 @@ async function sendFeedbackNote() {
 }
 // The app's owner hears about new notes when he opens the app.
 var _fbNewTold = false;
+// v37.68 — in EVERY copy (the family app is where Tony looks): the new notes
+// in the one inbox, plus any kept in this copy's own database before it.
 async function feedbackTellOwner() {
-  if (_fbNewTold || _selfTestRunning || !featureOn('feedbackButton') || typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return 0;
+  if (_fbNewTold || _selfTestRunning || typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return 0;
   _fbNewTold = true;
-  var n = 0;
-  try { n = (await hhDb().collection('feedback').where('status', '==', 'new').limit(100).get()).size; } catch(e) { return 0; }
+  var n = await feedbackCountNew();
   if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000);
+  feedbackDot(n);
   return n;
 }
+async function feedbackCountNew() {
+  var n = 0;
+  try { n += (await hhDb().collection('feedback').where('status', '==', 'new').limit(100).get()).size; } catch(e) {}
+  try {
+    if (_workerHealth === null && typeof checkWorkerHealth === 'function') await checkWorkerHealth();
+    if (_workerHealth && _workerHealth.feedback && window._fbUser) {
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'meter-admin', op: 'notes-new', idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(10000) });
+      var d = await r.json(); if (r.ok && d && d.new) n += d.new;
+    }
+  } catch(e) {}
+  return n;
+}
+// v37.68 — Tony: "a notification dot, at the corner of the Settings icon.
+// Green - All notes read. Red - there are new feedbacks to look into." The
+// owner's only; counted when the app opens, every 15 minutes, and again as he
+// marks notes in the Feedback tab ("seen" and "done" are read).
+function feedbackDot(n) {
+  var d = document.getElementById('feedbackDot');
+  if (!d) return;
+  if (typeof isAppOwner !== 'function' || !isAppOwner() || typeof n !== 'number') { d.hidden = true; return; }
+  d.hidden = false;
+  d.className = n > 0 ? 'fb-dot-new' : 'fb-dot-read';
+  var b = document.getElementById('settingsBtn');
+  if (b) b.setAttribute('aria-label', 'Settings' + (n > 0 ? ' — ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers' : ''));
+}
+setInterval(function(){ if (typeof isAppOwner === 'function' && isAppOwner() && !_selfTestRunning && hhDb()) feedbackCountNew().then(feedbackDot).catch(function(){}); }, 15 * 60e3);
+window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew;
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
 window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedbackNote; window.fbShotPicked = fbShotPicked;
 window.feedbackTellOwner = feedbackTellOwner; window.fbSignedInUser = fbSignedInUser;
@@ -5896,7 +5944,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.67';
+var APP_VERSION = 'v37.68';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8533,7 +8581,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.67</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.68</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8545,7 +8593,7 @@ body.banner-shown .header {
            where the app's own settings already live; a globe in the filter bar
            would read as filtering by language. -->
       <!-- v37.48 — Tony: "Share this App should also be an icon next to the language picker, so it will always be available and visible". -->
-      <button class="help-icon-btn" id="shareAppBtn" onclick="openShareAppModal()" title="Share this app" aria-label="Share this app">📲</button>
+      <button class="help-icon-btn" id="shareAppBtn" onclick="openShareAppModal()" title="Share this app" aria-label="Share this app">✉️</button>
       <div class="drop-group">
         <button class="help-icon-btn" id="langBtn" onclick="toggleLangMenu()" title="Interface language"
                 aria-label="Interface language: English" data-no-i18n style="position:relative;">🌐<span
@@ -8557,7 +8605,7 @@ body.banner-shown .header {
         <!-- v36.56 — no dot. It was the Save Helper's status light; the helper went
              in v35.0 and nothing had coloured the dot since, so it sat there
              grey on every device, meaning nothing, until Tony asked what it was. -->
-        <button class="help-icon-btn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️</button>
+        <button class="help-icon-btn" id="settingsBtn" title="Settings" onclick="toggleDrop('settingsDrop')" style="position:relative;">⚙️<span id="feedbackDot" aria-hidden="true" hidden></span></button>
         <div class="drop-menu" id="settingsDrop" style="min-width:180px;right:0;">
           <button class="drop-item" title="How many recipe cards fit in a row, on this device. Only changes how recipes are shown — nothing is added or removed." onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
           <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
@@ -8641,7 +8689,7 @@ body.banner-shown .header {
           <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make?</button>
           <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()">📲 Share this app</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n>✉️</span> Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
@@ -9218,7 +9266,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.67</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.68</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9282,7 +9330,7 @@ body.banner-shown .header {
   <div class="modal share-app-modal">
     <button class="modal-close" onclick="closeM('shareAppOverlay')">✕</button>
     <div class="modal-header">
-      <div class="modal-header-title">📲 Share This App</div>
+      <div class="modal-header-title"><span aria-hidden="true" data-no-i18n>✉️</span> Share This App</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">Send this link to anyone — they can open it in their browser and install it on their phone or desktop.</div>
     </div>
     <div class="modal-body">
@@ -22895,7 +22943,7 @@ async function swUpdateNow() {
 }
 window.swUpdateNow = swUpdateNow;
 
-// v37.58 — the 📲 share link carries this household's identifier, so a new
+// v37.58 — the ✉️ share link carries this household's identifier, so a new
 // household that arrives through it says who brought it (the management app's
 // "Shared the app"; rewards for sharing come later).
 function appShareUrl() {
