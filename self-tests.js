@@ -1306,8 +1306,9 @@ window.SELF_TESTS = [
           throw new Error('what was reported: '+JSON.stringify(rep));
         if(await hhReport()!==false) throw new Error('reported twice in a day');
         if(await hhReport({ gone:true })!==true || !sent.filter(function(b){ return b.gone===true && b.hid==='hA' && !b.report; }).length) throw new Error('a household being deleted does not say so');
-        // 2. The owner's page lists every copy's.
+        // 2. The owner's page lists every copy's — in the family app (v37.78).
         window._household={ hid:'hZ', role:'owner' };
+        window._allCopiesOverride=true;
         var n=await openManagement();
         if(n!==4) throw new Error('rows: '+n+' (a household that never reported must not be listed; the deleted ones must)');
         var dRows=mknManage._state.rows.filter(function(r){ return r.deleted; });
@@ -1342,8 +1343,17 @@ window.SELF_TESTS = [
         var setn=sent.filter(function(b){ return b.op==='set-note'; })[0];
         if(!setn || setn.project!==other) throw new Error('the note: '+JSON.stringify(setn));
         mknManage.search(otherName); if(document.querySelectorAll('#manageOverlay .mg-row').length!==2) throw new Error('search by copy (its household and its deleted one)');
+        // v37.78 — Tony: the beta's (and the test copy's) page "should only include its own details".
+        mknManage.search(''); mknManage.close(); sent.length=0;
+        window._allCopiesOverride=false;
+        await openManagement();
+        var l2=sent.filter(function(b){ return b.op==='list'; })[0];
+        if(!l2 || l2.all) throw new Error('the beta/test page asked for every copy');
+        if(mknManage._state.rows.some(function(r){ return r.project && r.project!==here; })) throw new Error('the beta/test page lists another copy\u2019s household');
+        if(/every copy/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the beta/test page says "every copy"');
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h; window._household=real.hh;
+        delete window._allCopiesOverride;
         try{ if(keptRep) localStorage.setItem(HH_REPORT_KEY+'hA', keptRep); else localStorage.removeItem(HH_REPORT_KEY+'hA'); }catch(e){}
         if(window.mknManage){ mknManage.search(''); mknManage.close(); }
       }

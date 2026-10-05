@@ -20,11 +20,17 @@
   function roleRank(r) { var o = { owner: 0, admin: 1, editor: 2, viewer: 3 }; return Object.prototype.hasOwnProperty.call(o, r) ? o[r] : 4; }
   function mon(m) { var p = String(m).split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, 1)).toLocaleDateString(undefined, { month: 'short' }); }
 
+  // v37.78 — Tony: the beta's Households "should only include its own
+  // details". Every copy's households are listed in the FAMILY app only.
+  function allCopiesHere() {
+    if (window._allCopiesOverride !== undefined) return !!window._allCopiesOverride;   // the tests
+    return String((window.APP_CONFIG && APP_CONFIG.environment) || 'live') === 'live';
+  }
   async function meterList() {
     if (!window._fbUser) throw new Error('Sign in first.');
     var t = await _fbUser.getIdToken();
     var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-      body: workerBody({ action: 'meter-admin', op: 'list', all: true, idToken: t }), signal: AbortSignal.timeout(15000) });
+      body: workerBody({ action: 'meter-admin', op: 'list', all: allCopiesHere(), idToken: t }), signal: AbortSignal.timeout(15000) });
     var d = {}; try { d = await r.json(); } catch (e) {}
     if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
     return d;
@@ -55,7 +61,7 @@
       // v37.71 — another copy's household: listed from what it reported to the
       // server (Worker v62). One that never reported is not listed: it may be
       // long deleted, and its spending alone says nothing about it.
-      if (h.project && h.project !== here) { if (h.report) remoteRow(rows, h); return; }
+      if (h.project && h.project !== here) { if (h.report && allCopiesHere()) remoteRow(rows, h); return; }
       spend[h.hid] = h;
       // v37.72 — deleted, and kept on the list, marked (Tony: "do not remove
       // these entries"): what the server noted when it went.

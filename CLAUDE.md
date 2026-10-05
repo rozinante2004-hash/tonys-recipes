@@ -815,6 +815,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.78 — white dots; each copy's own households.** Tony: no golden
+    dots — the share symbol is all white on terracotta. And the beta's 📊
+    Households "should only include its own details": every copy's households
+    are listed in the FAMILY app only (`allCopiesHere()` in manage.js — `all`
+    sent, and other projects' rows kept, only when environment is live; tests
+    use `_allCopiesOverride`). Payments/Deployments show in the beta only to
+    the owner's own sign-in (data-owner-only), as before.
   - **v37.77 — the share symbol, in our colours.** Tony sent the modern
     three-dot share symbol ("more modern … make it fit our branding"): a
     terracotta badge (#C1440E), cream lines and middle dot, golden end dots
