@@ -4546,6 +4546,10 @@ function renderLinkRequestsPage() {
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing waiting.</div>';
   var asking = (_household && _household.asking) || [];
   h += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Sent by your household</div>';
+  // Tony looked here for how to ask a household he knows only by its identifier
+  // (it was only under ⋯ More → 🤝 Connect with another household).
+  if (manage) h += '<button type="button" id="lrAskBtn" onclick="openConnectHousehold().then(renderLinkRequestsPage)" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;margin-bottom:8px;">\u2795 Ask a household to link\u2026</button>'
+    + '<div style="font-size:12px;color:var(--muted);margin:-2px 0 8px;">By their identifier (MKN-\u2026) or the e-mail address of anyone in it.</div>';
   h += asking.length ? asking.map(function(a, i){
       return card('<b dir="auto">' + escH(a.label || 'A household') + '</b><div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ waiting for them</div>'
         + (manage ? '<div style="margin-top:8px;"><button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhWithdrawLinkRequest(' + i + ').then(renderLinkRequestsPage)">Withdraw</button></div>' : ''));

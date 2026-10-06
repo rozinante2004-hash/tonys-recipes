@@ -6096,6 +6096,8 @@ window.SELF_TESTS = [
         ['New Kitchen','NEW','MKN-SSSS-7777','Linked Kitchen','Revoke access','Pushy Kitchen','Blocked','Old Refusal','Rejected','Link requests through the app'].forEach(function(w){
           if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
         if(linkNewCount()!==0 || !gearDot.hidden || document.querySelector('#linkRequestsItem > .path-dot')) throw new Error('opening the page did not clear the dots');
+        var ask=document.getElementById('lrAskBtn');
+        if(!ask || !/Ask a household to link/.test(ask.textContent) || !/openConnectHousehold/.test(ask.getAttribute('onclick'))) throw new Error('the page offers no way to ask a household by its identifier');
         // 3. Block from the page: refused, logged, and they are not told.
         window.askConfirm=async function(o){ asked.push(o); return true; };
         await linkReqAct(0,'block');
@@ -6114,7 +6116,7 @@ window.SELF_TESTS = [
         // 6. Everyone in the household sees it; only the owner and admins act.
         _household.role='viewer'; renderLinkRequestsPage();
         var b=document.getElementById('lrBody');
-        if(/Revoke access|Unblock|Block<\/button>/.test(b.innerHTML) || document.getElementById('appRequestsItem') || !/owner or an admin answers/.test(b.textContent))
+        if(/Revoke access|Unblock|Block<\/button>/.test(b.innerHTML) || document.getElementById('appRequestsItem') || document.getElementById('lrAskBtn') || !/owner or an admin answers/.test(b.textContent))
           throw new Error('a viewer is offered the owner’s buttons');
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.hhLoadLinks=real.load; window.toast=real.toast; window.hhSetHome=real.home;
