@@ -23392,10 +23392,15 @@ async function legalAccepted(user) {
   return false;
 }
 // Resolves true (agreed — on with the app) or false (left: signed out).
+// window._legalState: 'checking' → 'shown' → 'ok' | 'left' (what the end-to-end run waits on).
 async function legalGate(user) {
   if (!user || window._selfTestRunning) return true;
-  if (await legalAccepted(user)) return true;
-  return await legalShowGate(user);
+  window._legalState = 'checking';
+  if (await legalAccepted(user)) { window._legalState = 'ok'; return true; }
+  window._legalState = 'shown';
+  var ok = await legalShowGate(user);
+  window._legalState = ok ? 'ok' : 'left';
+  return ok;
 }
 function legalFonts() {
   if (document.getElementById('legalFonts')) return;

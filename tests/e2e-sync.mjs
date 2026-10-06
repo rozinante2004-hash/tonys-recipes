@@ -233,6 +233,16 @@ async function device(label, email, opts = {}) {
       JSON.stringify({ sub: 'uid-' + who.replace(/\W/g, ''), email: who, email_verified: true }));
     await window._fbAuth.signInWithCredential(cred);
   }, email);
+  // v37.83 — the kitchen rules, the first time: agreed to as a person would
+  // (tick "I agree", then "Let's get cookin'!"); a second sign-in goes straight on.
+  await page.waitForFunction(() => window._legalState === 'shown' || window._legalState === 'ok', null, { timeout: 30000 });
+  if (await page.evaluate(() => window._legalState === 'shown')) {
+    await page.waitForSelector('#termsGate #tgAgree', { timeout: 10000 });
+    if (!(await page.isDisabled('#termsGate #tgGo'))) throw new Error(label + ': "Let\'s get cookin\'!" works before agreeing');
+    await page.check('#termsGate #tgAgree');
+    await page.click('#termsGate #tgGo');
+    await page.waitForFunction(() => window._legalState === 'ok' && !document.getElementById('termsGate'), null, { timeout: 10000 });
+  }
   // v37.00 — someone new is welcomed and ASKED: their own collection (named
   // as offered), or an invitation pasted in.
   if (opts.welcome) {
