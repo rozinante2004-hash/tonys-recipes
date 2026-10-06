@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.83 (6 Oct 2026, Tony's yes, CI green on 73785cf; the family's Pages deploy checked: success). Worker v65 deployed by Tony. The first CI run failed: the e2e sync test signed in for real and met the kitchen rules — it now agrees as a person would (window._legalState).**
   - **v37.83 + Worker v65 — the kitchen rules on first sign-in; "delete it
     all"; terms 1.1.** Tony: on first sign-in, the terms as "a page from a
     recipe notebook … hand written with possible stain adornments", an "I
