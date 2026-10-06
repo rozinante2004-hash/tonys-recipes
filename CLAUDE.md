@@ -815,6 +815,19 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.86 — two Self Test failures on Tony's own Chrome (family, v37.84),
+    both the tests assuming a bare browser.** (1) import_facebook_link_alone:
+    the app reads navigator.clipboard.read() FIRST; headless Chrome refuses
+    it, so only readText was stood in for — Tony's Chrome answered with what
+    he had copied. The test now stands in for read too, and removes its
+    stand-ins afterwards. (2) extension_offer: his Chrome HAS the extension,
+    which marks the page (data-mkn-extension-<tag>[-from]); "not installed"
+    steps saw it installed, and tests' clean-up erased the real marks.
+    `_selfTestPark` now sets every data-mkn-extension-* aside for the run and
+    `_selfTestUnpark` restores them. Reproduced exactly (Playwright with
+    clipboard permission, real text on the clipboard, marks set) before the
+    fix; clean after. LESSON: the CI browser has no clipboard and no
+    extension; a test touching either must stand in for all of it.
   - **v37.85 — the translation editor finds every translated word, the
     documents included.** Tony could not find "תנאי שימוש והסרת אחריות" in
     the editor: it was the Hebrew terms page's title, and the documents were

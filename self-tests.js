@@ -788,12 +788,16 @@ window.SELF_TESTS = [
         // 📋 Paste: a copied link is pasted and imported at once.
         if(!document.getElementById('urlPasteBtn')) throw new Error('no 📋 Paste next to the link');
         var ran=0; window.runUrlImport=function(){ ran++; };
+        // v37.86 — the app asks navigator.clipboard.read() FIRST. Headless Chrome refuses it, so only
+        // readText was stood in for; Tony's Chrome answered it with what HE had copied, and the test
+        // never saw its own link. Every clipboard read in this test is now the test's own.
+        var refuse=async function(){ throw new Error('NotAllowed'); };
+        try{ Object.defineProperty(navigator.clipboard, 'read', { value: refuse, configurable:true }); }catch(e){}
         try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return 'https://www.facebook.com/share/r/1AkSMeYV4w/?mibextid=wwXIfr'; }, configurable:true }); }catch(e){}
         inp.value='';
         await pasteLinkAndImport();
         if(ran!==1 || !/facebook\.com\/share\/r\/1AkSMeYV4w/.test(inp.value)) throw new Error('a copied link was not pasted and imported: '+JSON.stringify([ran, inp.value]));
         // v37.26 — Facebook's "Copy link" leaves a LINK, not text (Tony's iPhone: "nothing to paste").
-        var realRead=navigator.clipboard.read;
         try{
           Object.defineProperty(navigator.clipboard, 'read', { value: async function(){ return [{ types:['text/uri-list'], getType: async function(){ return new Blob(['https://www.facebook.com/reel/1234567\n'], { type:'text/uri-list' }); } }]; }, configurable:true });
           Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return ''; }, configurable:true });
@@ -811,7 +815,7 @@ window.SELF_TESTS = [
           inp.dispatchEvent(new Event('paste', { bubbles:true }));
           await new Promise(function(r){ setTimeout(r, 200); });
           if(ran!==1) throw new Error('a link pasted into the box did not import by itself');
-        } finally { try{ closeM('urlImportOverlay'); }catch(e){} try{ Object.defineProperty(navigator.clipboard, 'read', { value: realRead, configurable:true }); }catch(e){} }
+        } finally { try{ closeM('urlImportOverlay'); }catch(e){} try{ Object.defineProperty(navigator.clipboard, 'read', { value: refuse, configurable:true }); }catch(e){} }
         // …the bookmark's code is not a link.
         ran=0;
         try{ Object.defineProperty(navigator.clipboard, 'readText', { value: async function(){ return facebookBookmarkletCode(); }, configurable:true }); }catch(e){}
@@ -819,7 +823,8 @@ window.SELF_TESTS = [
         if(ran) throw new Error('the bookmark code was imported as a link');
       } finally {
         window.fetch=real.fetch; window.extractRecipesFromText=real.extract; window.syncLog=real.log; window.runUrlImport=real.run;
-        try{ if(real.clip) Object.defineProperty(navigator.clipboard, 'readText', { value: real.clip, configurable:true }); }catch(e){}
+        // Remove the stand-ins (own properties), which brings back the browser's own methods.
+        try{ delete navigator.clipboard.readText; delete navigator.clipboard.read; }catch(e){}
         inp.value=''; res.innerHTML='';
       }
     } },
