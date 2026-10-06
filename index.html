@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.82 -->
+<!-- Tony's Recipes Collection v37.83 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -490,6 +490,8 @@
             if (signInBtn) signInBtn.style.display  = 'none';
             if (loginSc)   loginSc.style.display   = 'none';
             if (notice2) notice2.style.display = 'none';
+            // v37.83 — the kitchen rules, agreed to once, before anything else.
+            if (typeof legalGate === 'function' && !(await legalGate(user))) { _autoLoginTimer = null; return; }
             if (typeof setDriveStatus === 'function') setDriveStatus('syncing', '☁️ Syncing…');
             if (typeof renderFilters === 'function') renderFilters();
             if (typeof renderGrid    === 'function') renderGrid();
@@ -4224,7 +4226,8 @@ async function hhReport(opts) {
     var members = [];
     (await hhRef(hid).collection('members').get()).forEach(function(d) {
       var m = d.data() || {};
-      members.push({ uid: m.uid || d.id, email: m.email || '', name: m.name || '', role: m.role || '', lastSeen: m.lastSeen || 0, joinedAt: m.joinedAt || 0 });
+      members.push({ uid: m.uid || d.id, email: m.email || '', name: m.name || '', role: m.role || '', lastSeen: m.lastSeen || 0, joinedAt: m.joinedAt || 0,
+                     termsAt: m.termsAt || 0, termsVersion: m.termsVersion || '' });   // v37.83
     });
     report = { name: _household.name || '', code: _household.code || '', createdAt: _household.createdAt || 0, referredBy: _household.referredBy || '',
       members: members, links: hhLinks().map(function(l){ return { hid: l.hid, name: l.name || '', code: l.code || '' }; }) };
@@ -5091,6 +5094,7 @@ async function householdUse(hid, role) {
   hhRenderAppRequests();
   await hhLoadLinks();                                           // v37.53
   hhNoteSeen();                                                  // v37.58
+  legalNoteOnMembership().catch(function(){});                   // v37.83
   if (!_selfTestRunning) setTimeout(function(){ hhReport().catch(function(){}); }, 6000);   // v37.71
   if (_openManageOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) { _openManageOnSignIn = false; setTimeout(function(){ openManagement(); }, 800); }
   if (typeof deviceOffersCloud === 'function' && !_selfTestRunning) deviceOffersCloud().catch(function(){});   // v37.69
@@ -5519,7 +5523,7 @@ async function accountDelete(opts) {
   if (blocked.length) {
     // v37.75 — Tony: "add some more explanation on why a handover is necessary".
     var many = blocked.length > 1, names = blocked.map(function(x){ return x.name; }).join(', ');
-    await askConfirm({ icon: '\u{1F451}', title: 'Hand ' + (many ? 'these' : 'it') + ' over first',
+    var choice = await askConfirm({ icon: '\u{1F451}', title: 'Hand ' + (many ? 'these' : 'it') + ' over first',
       message: 'You own ' + names + ', and other people are in ' + (many ? 'them' : 'it') + '.\n\n'
         + 'Why this is needed: a collection always has an owner \u2014 the one person who can add and remove people, '
         + 'rename it, and decide what happens to it. If your account went while you are its owner, the others would '
@@ -5529,13 +5533,22 @@ async function accountDelete(opts) {
         + 'Everything stays, for everyone; they become the owner.\n'
         + '\u2022 Or delete ' + (many ? 'them' : 'it') + ' (same place, \u{1F5D1} Delete this household\u2026) \u2014 its recipes go, for everyone.\n\n'
         + 'Then come back here to delete your account.',
-      okLabel: 'OK' });
-    return null;
+      // v37.83 — Tony: for someone in a hurry, "I do not want this account to be
+      // owned by anyone else. Just delete it and all users in my entire household".
+      okLabel: 'OK, I\u2019ll do that first',
+      altLabel: 'I don\u2019t want anyone else to own ' + (many ? 'them' : 'it') + '. Delete ' + (many ? 'them' : 'it') + ' and everyone\u2019s access, with my account', danger: true });
+    if (choice !== 'alt') return null;
+    // The households go too, for everyone in them; the next step says so and asks for DELETE.
+    blocked.forEach(function(x){ x.withOthers = true; alone.push(x); });
+    blocked = [];
   }
   if (!opts.yes && !opts.resumed) {
     var go = await askConfirm({ icon: '⚠️', title: 'Delete your account?',
       message: (alone.length ? 'Deleted with every recipe and photo in ' + (alone.length === 1 ? 'it' : 'them') + ': '
                  + alone.map(function(x){ return x.name; }).join(', ') + '.\n' : '')
+        + (alone.some(function(x){ return x.withOthers; })
+            ? 'Everyone else in ' + alone.filter(function(x){ return x.withOthers; }).map(function(x){ return x.name; }).join(', ')
+              + ' loses it too \u2014 its recipes, photos and chats are gone for them as well. Their own sign-ins stay: they can start a collection of their own.\n' : '')
         + (leave.length ? 'You leave: ' + leave.map(function(x){ return x.name; }).join(', ') + ' (their recipes stay for the others).\n' : '')
         + '\nYour sign-in is removed, and this device is cleared. This cannot be undone.\n\nDownloading your data first is strongly recommended.',
       okLabel: 'Download my data, then continue', altLabel: 'Continue without it', danger: true });
@@ -6408,7 +6421,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.82';
+var APP_VERSION = 'v37.83';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7401,6 +7414,35 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    the iPhone and Android lines showed on Tony's PC although switched off. */
 .drop-menu [hidden] { display: none !important; }
 #settingsDrop .set-head { font-weight: 700; justify-content: space-between; }
+/* v37.83 — the kitchen rules: a page from a recipe notebook. */
+#termsGate { position: fixed; inset: 0; z-index: 10050; background: rgba(60,40,30,.55); display: flex; align-items: center; justify-content: center; padding: 14px; padding-top: calc(14px + env(safe-area-inset-top)); }
+#termsGate .tg-page { position: relative; width: 100%; max-width: 640px; max-height: 94vh; overflow-y: auto; border-radius: 6px 10px 8px 12px;
+  background-color: #fdf8ec; background-image: linear-gradient(90deg, transparent 46px, rgba(193,68,14,.35) 46px, rgba(193,68,14,.35) 48px, transparent 48px),
+  repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px);
+  box-shadow: 0 14px 40px rgba(0,0,0,.35), inset 0 0 60px rgba(160,120,60,.12); padding: 34px 22px 22px 62px; color: #3a2a20; transform: rotate(-.4deg); }
+#termsGate .tg-hand { font-family: 'Caveat', 'Patrick Hand', 'Comic Sans MS', cursive; }
+#termsGate .tg-title { font-size: 34px; font-weight: 700; color: #8a2e0a; line-height: 1.1; }
+#termsGate .tg-sub { font-size: 21px; margin: 4px 0 12px; }
+#termsGate .tg-terms { font-family: 'Patrick Hand', 'Caveat', 'Comic Sans MS', cursive; font-size: 16px; line-height: 28px; max-height: 42vh; overflow-y: auto;
+  padding: 0 8px 6px 0; border-top: 1px dashed rgba(138,46,10,.35); border-bottom: 1px dashed rgba(138,46,10,.35); }
+#termsGate .tg-terms h2 { font-family: 'Caveat', cursive; font-size: 24px; color: #8a2e0a; margin: 14px 0 2px; border: 0; padding: 0; }
+#termsGate .tg-terms p, #termsGate .tg-terms li { font-size: 16px; line-height: 28px; margin: 0 0 4px; }
+#termsGate .tg-terms .box { border: 1.5px dashed rgba(138,46,10,.45); border-radius: 10px; padding: 4px 10px; margin: 8px 0; background: rgba(255,240,200,.45); }
+#termsGate .tg-terms .meta { font-size: 14px; color: #7a6555; }
+#termsGate .tg-terms .caps { font-weight: 400; }
+#termsGate a { color: #a8380a; }
+#termsGate .tg-also { font-size: 19px; margin: 10px 0 6px; }
+#termsGate .tg-check { display: flex; gap: 10px; align-items: flex-start; font-size: 21px; line-height: 1.25; margin: 10px 0 14px; cursor: pointer; }
+#termsGate .tg-check input { width: 22px; height: 22px; margin-top: 3px; accent-color: #c1440e; flex-shrink: 0; }
+#termsGate .tg-go { display: block; width: 100%; padding: 12px; border: none; border-radius: 26px 22px 28px 20px; background: #c1440e; color: #fff;
+  font-family: 'Caveat', 'Patrick Hand', cursive; font-size: 27px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 0 #8a2e0a; }
+#termsGate .tg-go:disabled { background: #cdb9a8; box-shadow: 0 4px 0 #a8968a; cursor: not-allowed; }
+#termsGate .tg-out { display: block; margin: 14px auto 0; background: none; border: none; color: #7a6555; font-family: 'Patrick Hand', cursive; font-size: 16px; text-decoration: underline; cursor: pointer; }
+#termsGate .tg-tape { position: absolute; top: -6px; left: 50%; width: 120px; height: 26px; margin-left: -60px; background: rgba(240,200,120,.55); transform: rotate(-3deg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+#termsGate .tg-ring { position: absolute; right: 10px; top: 8px; width: 110px; height: 110px; pointer-events: none; }
+#termsGate .tg-splash { position: absolute; left: 8px; bottom: 60px; width: 120px; height: 96px; pointer-events: none; }
+@media (max-width: 520px) { #termsGate .tg-page { padding: 30px 14px 18px 44px; background-image: linear-gradient(90deg, transparent 32px, rgba(193,68,14,.35) 32px, rgba(193,68,14,.35) 34px, transparent 34px), repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px); }
+  #termsGate .tg-title { font-size: 30px; } #termsGate .tg-ring { width: 80px; height: 80px; } }
 /* v37.80 — the red dots along the path to something new (pathDots). */
 .path-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; margin-inline-start: auto; margin-inline-end: 4px; }
 #settingsDrop .set-head > .path-dot { margin-inline-end: 8px; }
@@ -9062,7 +9104,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.82</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.83</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9768,7 +9810,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.82</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.83</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -23328,6 +23370,137 @@ function cancelAutoLogin() {
 }
 window.cancelAutoLogin = cancelAutoLogin;
 
+// ─── THE KITCHEN RULES: AGREEING TO THE TERMS ON FIRST SIGN-IN (v37.83) ─────
+// Tony: on a person's first sign-in, the terms "in a stylized and appealing way,
+// possibly looking like a page from a recipe notebook, formatted to look hand
+// written with possible stain adornments", an "I agree" box that wakes the
+// "Let's get cookin'!" button, and "This cooking stuff is not for me. Get me
+// out of here!", which signs them out. Agreeing is recorded on the person
+// (`users/<uid>/prefs/legal`, so they are asked once, on any device) and on
+// their membership of each household they use (`termsAt`, `termsVersion` —
+// what the owner's 📊 Households page shows). A new TERMS_VERSION asks again.
+var TERMS_VERSION = '1.1', TERMS_OK_KEY = 'mkn_terms_ok_';
+function legalAcceptedHere(uid) { try { return localStorage.getItem(TERMS_OK_KEY + uid) === TERMS_VERSION; } catch(e) { return false; } }
+async function legalAccepted(user) {
+  if (!user) return false;
+  if (legalAcceptedHere(user.uid)) return true;
+  try {
+    var d = await hhDb().collection('users').doc(user.uid).collection('prefs').doc('legal').get();
+    var x = d.exists ? (d.data() || {}) : {};
+    if (x.termsVersion === TERMS_VERSION) { try { localStorage.setItem(TERMS_OK_KEY + user.uid, TERMS_VERSION); } catch(e) {} return true; }
+  } catch(e) {}
+  return false;
+}
+// Resolves true (agreed — on with the app) or false (left: signed out).
+async function legalGate(user) {
+  if (!user || window._selfTestRunning) return true;
+  if (await legalAccepted(user)) return true;
+  return await legalShowGate(user);
+}
+function legalFonts() {
+  if (document.getElementById('legalFonts')) return;
+  var l = document.createElement('link');
+  l.id = 'legalFonts'; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&display=swap';
+  document.head.appendChild(l);
+}
+function legalShowGate(user) {
+  legalFonts();
+  return new Promise(function(resolve) {
+    var prev = document.getElementById('termsGate'); if (prev) prev.remove();
+    var ov = document.createElement('div');
+    ov.id = 'termsGate'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'tgTitle');
+    ov.innerHTML = '<div class="tg-page">'
+      + '<div class="tg-tape" aria-hidden="true"></div>'
+      + '<svg class="tg-ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#8a5a2b" stroke-width="7" stroke-dasharray="210 14 40 9" opacity=".16"/><circle cx="62" cy="58" r="40" fill="none" stroke="#8a5a2b" stroke-width="2" opacity=".12"/></svg>'
+      + '<svg class="tg-splash" viewBox="0 0 100 80" aria-hidden="true"><path d="M30 40c-8-14 6-26 20-20 6-12 26-8 24 6 14 2 16 22 2 26 2 14-18 18-24 8-12 8-28 0-22-12-12-2-12-14 0-8z" fill="#c1440e" opacity=".09"/><circle cx="86" cy="18" r="4" fill="#c1440e" opacity=".1"/><circle cx="12" cy="66" r="3" fill="#c1440e" opacity=".1"/></svg>'
+      + '<div class="tg-hand tg-title" id="tgTitle">Before we start cooking…</div>'
+      + '<div class="tg-hand tg-sub">Our kitchen rules — please give them a read. \u{1F373}</div>'
+      + '<div class="tg-terms" id="tgTerms" data-no-i18n tabindex="0" aria-label="Terms of use and disclaimer">⏳ Opening the rules…</div>'
+      + '<div class="tg-hand tg-also">They go with our <a href="#" onclick="event.preventDefault();openLegalDoc(\'privacy\')">Privacy Statement</a> (what we keep, and who sees it).</div>'
+      + '<label class="tg-check tg-hand"><input type="checkbox" id="tgAgree"> I agree to the Terms of Use and Disclaimer and to the Privacy Statement</label>'
+      + '<button type="button" id="tgGo" class="tg-go" disabled>Let’s get cookin’! \u{1F373}</button>'
+      + '<button type="button" id="tgOut" class="tg-out">This cooking stuff is not for me. Get me out of here!</button>'
+      + '</div>';
+    document.body.appendChild(ov);
+    var box = ov.querySelector('#tgAgree'), go = ov.querySelector('#tgGo');
+    box.onchange = function(){ go.disabled = !box.checked; };
+    go.onclick = async function() {
+      if (!box.checked) return;
+      go.disabled = true; go.textContent = '⏳ One moment…';
+      await legalRecord(user);
+      ov.remove();
+      toast('\u{1F373} Welcome to the kitchen!', 4000);
+      resolve(true);
+    };
+    ov.querySelector('#tgOut').onclick = function() {
+      ov.remove();
+      legalLeave();
+      resolve(false);
+    };
+    legalLoadTerms();
+  });
+}
+// The terms themselves, from terms.html (one text: the page and this one).
+async function legalLoadTerms() {
+  var host = document.getElementById('tgTerms');
+  try {
+    var html = await (await fetch('terms.html', { cache: 'no-cache' })).text();
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,style,link,meta,title').forEach(function(n){ n.remove(); });
+    var h1 = doc.querySelector('h1'); if (h1) h1.remove();
+    host = document.getElementById('tgTerms'); if (!host) return;
+    host.innerHTML = doc.body.innerHTML;
+    host.querySelectorAll('a[href]').forEach(function(a){
+      var href = a.getAttribute('href') || '';
+      if (/privacy\.html$/.test(href)) { a.setAttribute('href', '#'); a.onclick = function(e){ e.preventDefault(); openLegalDoc('privacy'); }; }
+      else if (!/^mailto:/.test(href)) { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener'); }
+    });
+  } catch(e) {
+    if (host) host.innerHTML = 'The rules could not be loaded just now. <a href="terms.html" target="_blank" rel="noopener">Read them here</a>.';
+  }
+}
+async function legalRecord(user) {
+  var rec = { termsVersion: TERMS_VERSION, at: Date.now() };
+  try { localStorage.setItem(TERMS_OK_KEY + user.uid, TERMS_VERSION); } catch(e) {}
+  try { await hhDb().collection('users').doc(user.uid).collection('prefs').doc('legal').set(rec); }
+  catch(e) { syncLog('error', 'Could not keep the agreement to the terms', String(e && e.message).slice(0, 160)); }
+  syncLog('save', 'Agreed to the terms', 'v' + TERMS_VERSION);
+  return rec;
+}
+// On the membership of the household in use: what the owner's 📊 Households shows.
+async function legalNoteOnMembership() {
+  if (!_household || !window._fbUser || !hhDb() || _selfTestRunning) return false;
+  if (!legalAcceptedHere(_fbUser.uid)) return false;
+  var k = 'mkn_terms_noted_' + _household.hid;
+  try { if (localStorage.getItem(k) === TERMS_VERSION) return false; } catch(e) {}
+  var at = Date.now();
+  try {
+    var d = await hhDb().collection('users').doc(_fbUser.uid).collection('prefs').doc('legal').get();
+    if (d.exists && (d.data() || {}).at) at = d.data().at;
+  } catch(e) {}
+  try {
+    await hhRef(_household.hid).collection('members').doc(_fbUser.uid).update({ termsAt: at, termsVersion: TERMS_VERSION });
+    try { localStorage.setItem(k, TERMS_VERSION); } catch(e) {}
+    return true;
+  } catch(e) {
+    if (!hhRulesBehind(e, 'Recording agreement to the terms needs the new database rules')) syncLog('error', 'Could not note the agreement on the membership', String(e && e.message).slice(0, 160));
+    return false;
+  }
+}
+// "Get me out of here!": signed out, back at the sign-in screen, no questions.
+function legalLeave() {
+  if (typeof _firestoreUnsubscribe === 'function' && _firestoreUnsubscribe) { try { _firestoreUnsubscribe(); } catch(e) {} _firestoreUnsubscribe = null; }
+  if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
+  window._fbUser = null; window._driveMode = false;
+  var so = document.getElementById('signOutBtn'); if (so) so.style.display = 'none';
+  var si = document.getElementById('signInHeaderBtn'); if (si) si.style.display = 'inline';
+  if (typeof setDriveStatus === 'function') setDriveStatus('', 'Signed out');
+  var ls = document.getElementById('loginScreen'); if (ls) ls.style.display = 'flex';
+  toast('\u{1F44B} No hard feelings — you are signed out. The kitchen is here if you change your mind.', 7000);
+}
+window.legalGate = legalGate; window.legalShowGate = legalShowGate; window.legalAccepted = legalAccepted; window.legalRecord = legalRecord;
+window.legalNoteOnMembership = legalNoteOnMembership; window.legalLeave = legalLeave; window.TERMS_VERSION = TERMS_VERSION;
 async function signOut() {
   if (!await askConfirm({ icon:'👋', title:'Sign out?',
       message:'Your recipes stay safe in the cloud and come back when you sign in again.', okLabel:'Sign out' })) return;

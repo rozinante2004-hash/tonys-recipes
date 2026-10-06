@@ -1,4 +1,6 @@
-// Tony's Recipes — Cloudflare Worker v64
+// Tony's Recipes — Cloudflare Worker v65
+// v65: a household's report keeps, for each member, that they agreed to the
+//      terms (termsAt, termsVersion), for the owner's 📊 Households page.
 // v64: NOTES LEFT BEHIND come to the one inbox. Tony found the beta's notes
 //      in the beta's own database (an app that thought the inbox was missing
 //      kept them there). `meter-admin` `notes-import` (owner only) moves such
@@ -235,7 +237,7 @@
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
 
-const WORKER_VERSION = 'v64';
+const WORKER_VERSION = 'v65';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1584,7 +1586,8 @@ function reportSummary(r) {
     name: str(r.name, 80), code: str(r.code, 20), createdAt: num(r.createdAt), referredBy: str(r.referredBy, 20) || null,
     members: (Array.isArray(r.members) ? r.members : []).slice(0, 200).map(m => ({
       uid: okId(m && m.uid) ? m.uid : null, email: str(m && m.email, 200), name: str(m && m.name, 120),
-      role: str(m && m.role, 20), lastSeen: num(m && m.lastSeen), joinedAt: num(m && m.joinedAt) })),
+      role: str(m && m.role, 20), lastSeen: num(m && m.lastSeen), joinedAt: num(m && m.joinedAt),
+      termsAt: num(m && m.termsAt), termsVersion: str(m && m.termsVersion, 20) || null })),   // v65
     left: [],
     links: (Array.isArray(r.links) ? r.links : []).slice(0, 100).filter(l => l && okId(l.hid)).map(l => ({
       hid: l.hid, name: str(l.name, 80), code: str(l.code, 20) })),
@@ -2228,4 +2231,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v64 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v65 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

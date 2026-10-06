@@ -361,6 +361,11 @@ await check('a member notes when they last opened the app',     updateDoc(doc(ha
 await check('…a number only',                                   updateDoc(doc(hank, 'households/L1/members/hank'), { lastSeen: 'today' }), false);
 await check('…and nothing else with it',                        updateDoc(doc(hank, 'households/L1/members/hank'), { lastSeen: 5, role: 'admin' }), false);
 await check('…only on their own membership',                    updateDoc(doc(hank, 'households/L1/members/gina'), { lastSeen: 5 }), false);
+// v37.83 — and that they agreed to the terms.
+await check('a member records agreeing to the terms',          updateDoc(doc(hank, 'households/L1/members/hank'), { termsAt: Date.now(), termsVersion: '1.1' }), true);
+await check('…as a date and a version only',                   updateDoc(doc(hank, 'households/L1/members/hank'), { termsAt: 'yes', termsVersion: '1.1' }), false);
+await check('…and nothing else with it',                       updateDoc(doc(hank, 'households/L1/members/hank'), { termsAt: 5, role: 'owner' }), false);
+await check('…only on their own membership',                   updateDoc(doc(hank, 'households/L1/members/gina'), { termsAt: 5, termsVersion: '1.1' }), false);
 await check('a household founded through a share link says whose', (() => { const b = writeBatch(frank);
   b.set(doc(frank, 'households/R1'), { name: 'Referred', ownerUid: 'frank', createdAt: 1, referredBy: 'MKN-GGGG-2222' });
   b.set(doc(frank, 'households/R1/members/frank'), { uid: 'frank', role: 'owner', email: 'frank@example.com', joinedAt: 1 }); return b.commit(); })(), true);

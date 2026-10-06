@@ -815,6 +815,28 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.83 + Worker v65 — the kitchen rules on first sign-in; "delete it
+    all"; terms 1.1.** Tony: on first sign-in, the terms as "a page from a
+    recipe notebook … hand written with possible stain adornments", an "I
+    agree" box that wakes "Let's get cookin'!", "This cooking stuff is not for
+    me. Get me out of here!" (signs out), and a record of the agreement on the
+    household. `legalGate(user)` runs in onAuthStateChanged before
+    signInCloudSync (skipped while tests run); the page (`#termsGate`, lined
+    paper, Caveat / Patrick Hand from Google Fonts, SVG coffee ring + splash,
+    tape) holds terms.html's own text (`legalLoadTerms`, DOMParser). Agreeing
+    → `users/<uid>/prefs/legal` {termsVersion, at} + localStorage
+    `mkn_terms_ok_<uid>` (asked once, on any device; a new TERMS_VERSION asks
+    again) and, in householdUse, the membership: `termsAt`, `termsVersion`
+    (rules: a member's own update may touch lastSeen/termsAt/termsVersion).
+    📊 Households shows "📝 agreed to the terms (v1.1) <date>" or "not yet
+    agreed" per member (and the CSV); other copies' via reports (Worker v65
+    keeps termsAt/termsVersion per member). terms.html 1.1: no contact
+    section (it is in the Privacy Statement). Account deletion blocked by a
+    shared household now also offers "I don't want anyone else to own it.
+    Delete it and everyone's access, with my account" → those households are
+    wiped with the account (the next step says everyone else loses it; DELETE
+    still typed). Tests `terms_gate`, extended account deletion; 4 rules checks.
+    NEEDS: rules published in all three copies; Worker v65 deployed.
   - **Released to the family app and the beta: v37.80–v37.82 (6 Oct 2026, Tony's yes, CI green on 6b266a4).** The family's GitHub Pages deploy of it FAILED (actions/deploy-pages: "Fetching artifact metadata failed"), and the family stayed on v37.79 — Tony noticed. Re-running the failed job cannot work ("Multiple artifacts named github-pages … count is 2"); a fresh run does: `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/workflows/deploy.yml/dispatches -f ref=main` (succeeded). AFTER EVERY RELEASE: check that "Deploy to GitHub Pages" for that commit succeeded. The rules (requestLog, member reads, notes, linkTalk) must be published in each copy.
   - **v37.82 — ℹ️ About; the Privacy Statement and the Terms of Use.** Tony:
     under ? an About with the version, whether to update ("Update now" →

@@ -1011,12 +1011,13 @@ console.log('\nAI per household (v60):');
     expect('health says notes go here (so the app sends them)', hh2.feedback === true && hh2.notesImport === true, JSON.stringify(hh2));
     // v62 — one Households page for every copy.
     expect('health says households may report themselves', hh2.reports === true, JSON.stringify(hh2.reports));
-    const report = { name: 'ignored', members: [{ uid: 'uF', email: 'f@example.com', name: 'F', role: 'owner', lastSeen: 1759600000000, extra: 'x' }],
+    const report = { name: 'ignored', members: [{ uid: 'uF', email: 'f@example.com', name: 'F', role: 'owner', lastSeen: 1759600000000, extra: 'x', termsAt: 1759700000000, termsVersion: '1.1' }],
                      links: [{ hid: 'hA', name: 'Kitchen A', code: 'MKN-AAAA-2222' }, { hid: 'bad id!', name: 'x' }], recipes: ['secret'] };
     f = await fb({ action: 'household-report', idToken: fam, hid: 'hF', report }, ORIGIN);
     expect('a member reports their household', f.status === 200 && f.d.ok === true, JSON.stringify(f));
     const rrow = db.raw.prepare("SELECT * FROM hh_reports WHERE hid = 'hF'").get();
     const rsum = rrow && JSON.parse(rrow.summary);
+    expect('v65 — …with each member\'s agreement to the terms', rsum && rsum.members[0].termsAt === 1759700000000 && rsum.members[0].termsVersion === '1.1', JSON.stringify(rsum && rsum.members));
     expect('…kept under its copy, with only what the page shows', rrow && rrow.project === 'recipes-f379d' && rsum.members.length === 1 && rsum.members[0].extra === undefined
       && rsum.links.length === 1 && rsum.recipes === undefined && rsum.name === 'Kitchen A', JSON.stringify(rrow));
     f = await fb({ action: 'household-report', idToken: tB, hid: 'hA', report });

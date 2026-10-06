@@ -86,7 +86,8 @@
     (await db.collectionGroup('members').get()).forEach(function (d) {
       var hid = d.ref.parent.parent.id, m = d.data() || {};
       if (!rows[hid]) return;
-      rows[hid].members.push({ uid: m.uid, email: m.email || '', name: m.name || '', role: m.role || '', lastSeen: m.lastSeen || 0, joinedAt: m.joinedAt || 0 });
+      rows[hid].members.push({ uid: m.uid, email: m.email || '', name: m.name || '', role: m.role || '', lastSeen: m.lastSeen || 0, joinedAt: m.joinedAt || 0,
+                               termsAt: m.termsAt || 0, termsVersion: m.termsVersion || '' });   // v37.83
       if (m.lastSeen > rows[hid].lastSeen) rows[hid].lastSeen = m.lastSeen;
     });
     try {
@@ -326,7 +327,10 @@
       + (r.months.length ? '<div class="mg-muted" style="margin-top:4px;">' + r.months.map(function (m) { return mon(m.month) + ': ' + money(m.usd) + ' (' + m.calls + ' calls)'; }).join(' · ') + '</div>' : '')
       + '<div class="mg-h">' + (r.deleted ? 'Members when it was deleted' : 'Members') + '</div>'
       + r.members.sort(function (a, b) { return roleRank(a.role) - roleRank(b.role); })
-          .map(function (m) { return '<div class="mg-li"><span class="mg-email">' + esc(m.email) + '</span> <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen) + '</span></div>'; }).join('')
+          .map(function (m) { return '<div class="mg-li"><span class="mg-email">' + esc(m.email) + '</span> <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen)
+            // v37.83 — the record that they agreed to the terms (Tony).
+            + ' · ' + (m.termsAt ? '\u{1F4DD} agreed to the terms' + (m.termsVersion ? ' (v' + esc(m.termsVersion) + ')' : '') + ' ' + new Date(m.termsAt).toLocaleDateString() : '<span class="mg-noterms">not yet agreed to the terms</span>')
+            + '</span></div>'; }).join('')
       + leftHtml(r)
       + '<div class="mg-h">Linked with</div>' + (r.links.length ? r.links.map(function (l) { return '<div class="mg-li">' + esc(l.name) + ' <span class="mg-muted">' + esc(l.code) + '</span></div>'; }).join('') : '<div class="mg-muted">Nobody yet.</div>')
       + ((r.asked.length || r.asking.length) ? '<div class="mg-h">Requests waiting</div>'
@@ -367,7 +371,7 @@
     + '.mg-panel{margin-top:14px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:14px 16px;}'
     + '.mg-ptop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}'
     + '.mg-h{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px;}'
-    + '.mg-li{padding:3px 0;}.mg-caprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
+    + '.mg-noterms{color:var(--danger);}.mg-li{padding:3px 0;}.mg-caprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
     + '.mg-caprow input{width:90px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);}'
     + '.mg-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);}'
     + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;}'
@@ -526,10 +530,10 @@
     },
     csv: function () {
       var months = (S.meter && S.meter.months) || [];
-      var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
+      var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails (terms agreed)'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
         .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes', 'Deleted', 'Left']);
       var lines = [head].concat(sorted().map(function (r) {
-        return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return m.email + ' (' + m.role + ')'; }).join('; ')]
+        return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return m.email + ' (' + m.role + (m.termsAt ? ', terms v' + (m.termsVersion || '?') + ' ' + new Date(m.termsAt).toISOString().slice(0, 10) : ', terms not agreed') + ')'; }).join('; ')]
           .concat(months.map(function (m) { var x = r.months.filter(function (y) { return y.month === m; })[0]; return x ? x.usd.toFixed(4) : '0'; }))
           .concat([r.cap == null ? '' : r.cap, r.links.map(function (l) { return l.name; }).join('; '), r.referred,
                    r.lastSeen ? new Date(r.lastSeen).toISOString().slice(0, 10) : '', r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : '',

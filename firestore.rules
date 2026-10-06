@@ -229,9 +229,12 @@ service cloud.firestore {
         // editor or viewer. Nobody changes the uid or the e-mail on file.
         // v37.58 — anyone may note when they last opened the app (`lastSeen`,
         // a number), on their own membership and nothing else of it.
+        // v37.83 — …and that they agreed to the terms (`termsAt`, `termsVersion`).
         allow update: if signedIn() && uid == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen'])
-          && request.resource.data.lastSeen is number;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'termsAt', 'termsVersion'])
+          && request.resource.data.get('lastSeen', 0) is number
+          && request.resource.data.get('termsAt', 0) is number
+          && request.resource.data.get('termsVersion', '') is string && request.resource.data.get('termsVersion', '').size() <= 20;
         allow update: if request.resource.data.uid == resource.data.uid
           && request.resource.data.email == resource.data.email
           && validRole(request.resource.data.role)

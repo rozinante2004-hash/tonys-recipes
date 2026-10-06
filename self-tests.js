@@ -3214,6 +3214,11 @@ window.SELF_TESTS = [
         var said=null; window.askConfirm=async function(o){ said=o; return true; };
         var r=await accountDelete();
         if(r!==null||!said||!/Hand (these|it) over first/.test(said.title)||!/Test home/.test(said.message)) throw new Error('with others in it, deleting the account said: '+JSON.stringify(said));
+        // v37.83 — Tony: or, in a hurry, "Just delete it and all users in my entire household" — said plainly, and DELETE still asked.
+        var seq=[], ans=['alt', false]; window.askConfirm=async function(o){ seq.push(o); return ans.shift(); };
+        r=await accountDelete();
+        if(r!==null || seq.length<2 || !/anyone else to own/.test(seq[0].altLabel||'') || !/Test home/.test(seq[1].message) || !/loses it too/.test(seq[1].message) || !seq[1].danger)
+          throw new Error('deleting it all: '+JSON.stringify(seq.map(function(o){ return [o.title, o.altLabel, (o.message||'').slice(0,120)]; })));
         // v37.06 — proving it is you again asks a password account for its
         // password (hidden as typed), not for a Google sign-in.
         if(typeof accountReauthenticate!=='function') throw new Error('accountReauthenticate not defined');
@@ -6235,6 +6240,67 @@ window.SELF_TESTS = [
       } finally {
         window.fetch=realF; window.swUpdateNow=realUp;
         ['aboutOverlay','legalDocOverlay'].forEach(function(id){ var o=document.getElementById(id); if(o) o.remove(); });
+      }
+    } },
+
+  { id:'terms_gate', group:'UI', name:'📝 The kitchen rules on first sign-in: a notebook page, "I agree" wakes "Let’s get cookin’!", "Get me out of here!" signs out; agreed once, recorded on the person and the membership (v37.83)',
+    test: async()=>{
+      var writes=[], realDb=window._fbDb, realAuth=window._fbAuth, realTest=window._selfTestRunning, realToast=window.toast, realHh=window._household, realUser=window._fbUser;
+      var stored={};
+      var fake={ collection:function(c){ return { doc:function(id){ return {
+          collection:function(sub){ return { doc:function(d){ var path=c+'/'+id+'/'+sub+'/'+d; return {
+            get:async function(){ return { exists:!!stored[path], data:function(){ return stored[path]; } }; },
+            set:async function(x){ stored[path]=x; writes.push([path,x]); },
+            update:async function(x){ writes.push([path,'update',x]); } }; } }; } }; } }; } };
+      var signedOut=0, user={ uid:'uGate', email:'g@example.com' };
+      var lsWas=document.getElementById('loginScreen').style.display, statusWas=(document.getElementById('driveStatus')||{}).innerHTML;
+      try{
+        window._fbDb=fake; window._fbAuth={ signOut:function(){ signedOut++; return Promise.resolve(); } }; window.toast=function(){};
+        try{ localStorage.removeItem(TERMS_OK_KEY+'uGate'); localStorage.removeItem('mkn_terms_noted_hG'); }catch(e){}
+        window._selfTestRunning=false;
+        var p1=legalGate(user); await wait(150);
+        var g=document.getElementById('termsGate');
+        if(!g) throw new Error('a first sign-in is not shown the kitchen rules');
+        var go=document.getElementById('tgGo'), box=document.getElementById('tgAgree');
+        if(!go.disabled) throw new Error('"Let’s get cookin’!" works before agreeing');
+        if(!/Get me out of here/.test(document.getElementById('tgOut').textContent) || !/I agree/.test(g.textContent)) throw new Error('the page lacks its agreement or its way out');
+        for(var i=0;i<30 && /Opening the rules/.test(document.getElementById('tgTerms').textContent);i++) await wait(100);
+        var tt=document.getElementById('tgTerms').textContent;
+        if(!/Disclaimer of warranties/.test(tt) || !/Tel Aviv/.test(tt)) throw new Error('the page does not hold the terms: '+tt.slice(0,120));
+        if(!/Caveat|Patrick Hand/.test(getComputedStyle(document.querySelector('#termsGate .tg-title')).fontFamily)) throw new Error('the page is not hand-written');
+        box.checked=true; box.onchange();
+        if(go.disabled) throw new Error('agreeing did not wake the button');
+        go.click(); _selfTestRunning=true;
+        if(await p1!==true || document.getElementById('termsGate')) throw new Error('agreeing did not let them in');
+        var rec=writes.filter(function(w){ return w[0]==='users/uGate/prefs/legal'; })[0];
+        if(!rec || rec[1].termsVersion!==TERMS_VERSION || !(rec[1].at>0)) throw new Error('the agreement was not recorded on the person: '+JSON.stringify(writes));
+        // Asked once: the next sign-in goes straight in.
+        _selfTestRunning=false;
+        if(await legalGate(user)!==true || document.getElementById('termsGate')) throw new Error('asked again after agreeing');
+        try{ localStorage.removeItem(TERMS_OK_KEY+'uGate'); }catch(e){}
+        if(await legalGate(user)!==true || document.getElementById('termsGate')) throw new Error('asked again on another device');
+        _selfTestRunning=true;
+        // …and on the membership of the household in use (what the owner's 📊 Households shows).
+        window._household={ hid:'hG' }; window._fbUser=user; window.hhRef=window.hhRef;
+        var realRef=window.hhRef; window.hhRef=function(h){ return fake.collection('households').doc(h); };
+        _selfTestRunning=false; var noted=await legalNoteOnMembership(); _selfTestRunning=true; window.hhRef=realRef;
+        var mem=writes.filter(function(w){ return w[0]==='households/hG/members/uGate' && w[1]==='update'; })[0];
+        if(!noted || !mem || mem[2].termsVersion!==TERMS_VERSION || !(mem[2].termsAt>0)) throw new Error('not recorded on the membership: '+JSON.stringify(writes));
+        // "Get me out of here!": signed out, not let in.
+        stored={}; try{ localStorage.removeItem(TERMS_OK_KEY+'uGate'); }catch(e){}
+        _selfTestRunning=false; var p2=legalGate(user); await wait(100); _selfTestRunning=true;
+        document.getElementById('tgOut').click();
+        if(await p2!==false || signedOut!==1 || document.getElementById('termsGate')) throw new Error('"Get me out of here!" did not sign them out');
+        if(getComputedStyle(document.getElementById('loginScreen')).display==='none') throw new Error('leaving did not return to the sign-in screen');
+        // The terms page itself: no contact section (it is in the Privacy Statement).
+        var terms=await (await fetch('terms.html?t='+Date.now(), { cache:'no-store' })).text();
+        if(/mailto:|<h2>\d+\. Contact<\/h2>/.test(terms)) throw new Error('the terms still carry a contact section');
+      } finally {
+        window._fbDb=realDb; window._fbAuth=realAuth; window._selfTestRunning=realTest; window.toast=realToast; window._household=realHh; window._fbUser=realUser;
+        var o=document.getElementById('termsGate'); if(o) o.remove();
+        var ls=document.getElementById('loginScreen'); if(ls) ls.style.display=lsWas;
+        var ds=document.getElementById('driveStatus'); if(ds && statusWas!==undefined) ds.innerHTML=statusWas;
+        try{ localStorage.removeItem(TERMS_OK_KEY+'uGate'); localStorage.removeItem('mkn_terms_noted_hG'); }catch(e){}
       }
     } },
 
