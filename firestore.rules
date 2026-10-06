@@ -93,6 +93,7 @@ service cloud.firestore {
     //   households/{hid}/links/{other}      { hid, name, code, at } — a linked household (v37.53)
     //   homes/{uid}                         { hid, at } — the household a person looks from
     //   linkRequests/{id}                   asking to link (v37.53, below)
+    //   households/{hid}/requestLog/{other} what became of a request, and who is blocked (v37.80)
     //   i18n/{lang}                         interface translations, for EVERY household
     //   users/{uid}/…                       each person's own, and nobody else's
     //
@@ -163,6 +164,8 @@ service cloud.firestore {
     function reqPath(id) { return /databases/$(database)/documents/linkRequests/$(id); }
     // Owner or admin of h, and a plain "no" (not an error) when h is missing.
     function adminOf(h) { return h is string && h != '' && atLeast(h, 'admin'); }
+    // v37.80 — anyone in h (Tony: everyone in a household sees its requests page).
+    function memberOf(h) { return h is string && h != '' && isMember(h); }
     function linkedReader(hid) {
       return signedIn() && exists(homePath())
         && exists(linkPath(hid, get(homePath()).data.hid))
@@ -286,6 +289,21 @@ service cloud.firestore {
       // in the batch that ACCEPTS a request (linkRequests/<from>_<to>, removed in
       // the same batch), by the owner or an admin of the household asked; either
       // side's owner or admin removes the link, both halves at once.
+      // v37.80 — what became of the requests to link with this household (and
+      // the households it blocked): `requestLog/<other>` = { hid, name, code,
+      // status: accepted|rejected|blocked, at, decidedAt, by }. Everyone in it
+      // reads it; the owner and admins write it, as they answer.
+      match /requestLog/{other} {
+        allow read: if isMember(hid) || appAdmin() || beingDeleted(hid);
+        allow create, update: if atLeast(hid, 'admin') && other != hid
+          && request.resource.data.keys().hasOnly(['hid', 'name', 'code', 'status', 'at', 'decidedAt', 'by'])
+          && request.resource.data.hid == other
+          && request.resource.data.status in ['accepted', 'rejected', 'blocked', 'revoked']
+          && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() <= 80
+          && request.resource.data.get('code', '') is string && request.resource.data.get('code', '').size() <= 20
+          && request.resource.data.by == request.auth.uid;
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+      }
       match /links/{other} {
         allow read: if isMember(hid) || appAdmin();
         allow create: if signedIn() && other != hid
@@ -326,8 +344,8 @@ service cloud.firestore {
       allow read: if signedIn() && (
         appAdmin()
         || (verified() && resource.data.get('email', '') == myEmail())
-        || adminOf(resource.data.get('from', ''))
-        || adminOf(resource.data.get('to', '')));
+        || memberOf(resource.data.get('from', ''))
+        || memberOf(resource.data.get('to', '')));
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'email', 'via', 'by', 'at', 'declined', 'toLabel'])
         && request.resource.data.get('declined', false) == false

@@ -1054,11 +1054,22 @@ window.SELF_TESTS = [
         // Firefox, not listed: no Chrome download offered to it.
         setUA(FF); window._extStoresOverride={}; openExtensionOffer();
         if(dlg().querySelector('a[download],#extFolderBtn') || !/coming to Firefox/.test(dlg().textContent)) throw new Error('Firefox is offered the Chrome package');
-        // Installed already: it says so, and offers nothing.
+        // Installed already, and up to date: it says so, and offers nothing. (The latest
+        // version pinned: once the app has read it — 8 s after opening — an older
+        // installed one is rightly offered the update, which made this flaky.)
+        var latestWas=_extLatest; _extLatest='1.4.0';
         setUA(CHROME); document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.4.0'); openExtensionOffer();
         if(!/already installed/.test(dlg().textContent) || dlg().querySelector('a[download],#extFolderBtn,#extStoreLink')) throw new Error('an installed extension is offered again');
+        // v37.80 — in the Chrome Web Store now (the family's): a copy loaded from a folder is offered the store's, which updates itself.
+        window._extStoresOverride={ chrome:'https://chrome.google.com/webstore/detail/x' }; openExtensionOffer();
+        var sl=dlg().querySelector('#extStoreLink');
+        if(!sl || sl.getAttribute('href')!=='https://chrome.google.com/webstore/detail/x' || !/now in the Chrome store/.test(dlg().textContent)) throw new Error('a folder copy is not moved to the store\u2019s');
+        document.documentElement.setAttribute('data-mkn-extension-'+tag+'-from', 'store'); openExtensionOffer();
+        if(!/already installed/.test(dlg().textContent) || dlg().querySelector('#extStoreLink')) throw new Error('the store\u2019s own copy is sent to the store again');
+        _extLatest=latestWas;
       } finally {
-        delete window._extStoresOverride; document.documentElement.removeAttribute('data-mkn-extension-'+tag);
+        delete window._extStoresOverride; document.documentElement.removeAttribute('data-mkn-extension-'+tag); document.documentElement.removeAttribute('data-mkn-extension-'+tag+'-from');
+        if(latestWas!==undefined) _extLatest=latestWas;
         try{ delete navigator.userAgent; }catch(e){}
         var o=dlg(); if(o) o.remove();
       }
@@ -1126,10 +1137,14 @@ window.SELF_TESTS = [
     test: async()=>{
       var seen={}, re=/^MKN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}$/;
       for(var i=0;i<500;i++){ var c=hhNewCode(); if(!re.test(c)) throw new Error('an identifier in the wrong form: '+c); if(seen[c]) throw new Error('the same identifier twice in 500'); seen[c]=1; }
-      if(!document.querySelector('#settingsDrop [onclick*="openMyIdentifier"]') || !document.getElementById('appRequestsItem')) throw new Error('the two ⚙️ items are missing');
+      // v37.80 — the switch moved into ⚙️ → 🏠 My household → 📬 Link requests.
+      if(!document.querySelector('#settingsDrop [onclick*="openMyIdentifier"]') || !document.querySelector('#settingsDrop #linkRequestsItem')) throw new Error('the two ⚙️ items are missing');
       var realHh=window._household, realSet=window.hhSetAppRequests, realAsk=window.askConfirm, wrote=null;
+      var host=document.createElement('div'); host.id='lrBody'; host.style.display='none'; document.body.appendChild(host);
       try{
-        _household={ hid:'h1', role:'owner', name:'Test', code:'MKN-ABCD-2345', appRequests:true };
+        _household={ hid:'h1', role:'owner', name:'Test', code:'MKN-ABCD-2345', appRequests:true, links:[], asking:[] };
+        renderLinkRequestsPage();
+        if(!document.getElementById('appRequestsItem')) throw new Error('the requests page has no switch for requests through the app');
         var shown=openMyIdentifier();
         var big=document.getElementById('myIdentifier');
         if(!big || big.textContent!=='MKN-ABCD-2345') throw new Error('the identifier is not shown');
@@ -1145,7 +1160,7 @@ window.SELF_TESTS = [
         await toggleAppRequests();
         if(wrote!==null) throw new Error('a viewer changed the setting');
       } finally {
-        window._household=realHh; window.hhSetAppRequests=realSet; window.askConfirm=realAsk;
+        window._household=realHh; window.hhSetAppRequests=realSet; window.askConfirm=realAsk; host.remove();
         var o=document.getElementById('askOverlay'); if(o) o.remove(); hhRenderAppRequests();
       }
     } },
@@ -1529,8 +1544,13 @@ window.SELF_TESTS = [
         if(t.indexOf('The photo search is lovely')===-1 || t.indexOf('Done one')!==-1 || !/Feedback\s*1/.test(t)) throw new Error('the Feedback tab: '+t.slice(0,300));
         feedbackDot(1);
         if(!dot || dot.hidden || dot.className!=='fb-dot-new') throw new Error('no red dot on ⚙️ with a new note');
+        // v37.80 — and along the path: 👑 App owner → 📊 Households.
+        if(!document.querySelector('.set-group[data-group="owner"] > .set-head > .path-dot') || !document.querySelector('#settingsDrop [onclick*="openManagement"] > .path-dot'))
+          throw new Error('the red dots do not show the path to the new note');
         await mknManage.mark('dn1','done');
-        if(dot.hidden || dot.className!=='fb-dot-read') throw new Error('the dot did not turn green once every note was read: '+dot.className);
+        // v37.80 — red only: nothing at all once every note is read (Tony).
+        if(!dot.hidden) throw new Error('the dot stays once every note was read: '+dot.className);
+        if(document.querySelector('.set-group[data-group="owner"] > .set-head > .path-dot')) throw new Error('the path still has a dot once every note was read');
         if(!updated.length || updated[0][0]!=='n1' || updated[0][1].status!=='done') throw new Error('marking it done');
         mknManage.noteFilter('all');
         window.isAppOwner=function(){ return false; }; feedbackDot(3);
@@ -6033,6 +6053,76 @@ window.SELF_TESTS = [
         closeM('syncHealthOverlay');
       }
     }) },
+
+  { id:'link_requests_page', group:'Sharing', name:'📬 Link requests: every request kept (waiting, sent, linked, answered), block silently, revoke access, red dots along the path (v37.80)',
+    test: async()=>{
+      var now=Date.now(), updates=[], batchDeletes=[];
+      var store={ log:{ hB:{ hid:'hB', name:'Pushy Kitchen', code:'MKN-BBBB-5555', status:'blocked', at:1, decidedAt:2, by:'u0' } },
+        reqs:[ { id:'hN_hA', d:{ from:'hN', fromName:'New Kitchen', fromCode:'MKN-NNNN-4444', to:'hA', via:'code', at:now-6e4 } },
+               { id:'hB_hA', d:{ from:'hB', fromName:'Pushy Kitchen', fromCode:'MKN-BBBB-5555', to:'hA', via:'code', at:now-5e4 } },
+               { id:'hR_hA', d:{ from:'hR', fromName:'Old Refusal', fromCode:'MKN-RRRR-6666', to:'hA', via:'code', at:now-9e8, declined:true } } ] };
+      function snap(a){ return { size:a.length, forEach:function(f){ a.forEach(f); } }; }
+      function reqDoc(r){ return { id:r.id, data:function(){ return r.d; }, ref:{ update:async function(x){ Object.assign(r.d, x); updates.push([r.id, x]); }, delete:async function(){ store.reqs=store.reqs.filter(function(q){ return q!==r; }); } } }; }
+      var fake={ collection:function(c){
+          if(c==='linkRequests') return { where:function(f,op,v){ return { get:async function(){ return snap(store.reqs.filter(function(r){ return r.d[f]===v; }).map(reqDoc)); } }; } };
+          if(c==='households') return { doc:function(hid){ return { collection:function(sub){
+              if(sub==='requestLog') return { get:async function(){ return snap(Object.keys(store.log).map(function(k){ return { id:k, data:function(){ return store.log[k]; } }; })); },
+                                              doc:function(x){ return { set:async function(d){ store.log[x]=d; } }; } };
+              if(sub==='links') return { get:async function(){ return snap([]); }, doc:function(x){ return { path:hid+'/links/'+x }; } };
+              return { get:async function(){ return snap([]); } }; } }; } };
+          return { get:async function(){ return snap([]); }, where:function(){ return { get:async function(){ return snap([]); } }; } }; },
+        batch:function(){ var ops=[]; return { delete:function(r){ ops.push(r.path); }, set:function(){}, commit:async function(){ batchDeletes.push(ops); } }; } };
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, ask:window.askConfirm, load:window.hhLoadLinks, toast:window.toast, home:window.hhSetHome };
+      var asked=[];
+      try{
+        window._fbDb=fake; window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true }; window.toast=function(){};
+        window._household={ hid:'hA', role:'owner', name:'My Kitchen', code:'MKN-AAAA-2222', appRequests:true,
+          links:[{ hid:'hL', name:'Linked Kitchen', code:'MKN-LLLL-3333', at:now-864e5 }], asking:[{ id:'hA_hS', label:'MKN-SSSS-7777' }] };
+        window.hhLoadLinks=async function(){ return _household.links; }; window.hhSetHome=async function(){};
+        try{ localStorage.removeItem(LINK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
+        // 1. Arriving: the blocked household's request is refused without a word; the new one pops up and lights the path.
+        window.askConfirm=async function(o){ asked.push(o); return false; };   // "Remind me later"
+        await hhCheckLinkRequests(true);
+        if(!updates.some(function(u){ return u[0]==='hB_hA' && u[1].declined===true; })) throw new Error('a blocked household’s request was not quietly refused');
+        if(asked.length!==1 || !/New Kitchen/.test(asked[0].message)) throw new Error('the pop-up: '+asked.map(function(o){ return o.message.slice(0,40); }).join(' | '));
+        if(linkNewCount()!==1) throw new Error('new requests counted: '+linkNewCount());
+        var gearDot=document.getElementById('feedbackDot');
+        if(!gearDot || gearDot.hidden) throw new Error('no red dot on ⚙️ for a new request');
+        if(!document.querySelector('.set-group[data-group="household"] > .set-head > .path-dot') || !document.querySelector('#linkRequestsItem > .path-dot'))
+          throw new Error('the red dots do not lead to 🏠 My household → 📬 Link requests');
+        // 2. The page: everything kept; opening it clears the dots.
+        await openLinkRequests();
+        var t=document.getElementById('linkReqOverlay').textContent;
+        ['New Kitchen','NEW','MKN-SSSS-7777','Linked Kitchen','Revoke access','Pushy Kitchen','Blocked','Old Refusal','Rejected','Link requests through the app'].forEach(function(w){
+          if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
+        if(linkNewCount()!==0 || !gearDot.hidden || document.querySelector('#linkRequestsItem > .path-dot')) throw new Error('opening the page did not clear the dots');
+        // 3. Block from the page: refused, logged, and they are not told.
+        window.askConfirm=async function(o){ asked.push(o); return true; };
+        await linkReqAct(0,'block');
+        if(!store.reqs.filter(function(r){ return r.id==='hN_hA'; })[0].d.declined || (store.log.hN||{}).status!=='blocked' || store.log.hN.by!=='uA') throw new Error('blocking: '+JSON.stringify(store.log.hN));
+        if(!/not told/.test(asked[asked.length-1].message)) throw new Error('the block warning does not say they are not told');
+        // 4. Revoke access to a linked household: both halves go, and the history says so.
+        window.hhLoadLinks=async function(){ _household.links=[]; return []; };
+        if(await hhRevokeLink('hL')!==true) throw new Error('revoking did not go through');
+        var gone=[].concat.apply([], batchDeletes);
+        if(gone.indexOf('hA/links/hL')===-1 || gone.indexOf('hL/links/hA')===-1) throw new Error('the link was not removed on both sides: '+JSON.stringify(gone));
+        if((store.log.hL||{}).status!=='revoked') throw new Error('the history does not say access was revoked');
+        if(!/Access revoked/.test(document.getElementById('linkReqOverlay').textContent)) throw new Error('the page does not show the revoked one');
+        // 5. Unblock.
+        await hhSetBlocked('hB', false);
+        if(store.log.hB.status!=='rejected') throw new Error('unblocking: '+store.log.hB.status);
+        // 6. Everyone in the household sees it; only the owner and admins act.
+        _household.role='viewer'; renderLinkRequestsPage();
+        var b=document.getElementById('lrBody');
+        if(/Revoke access|Unblock|Block<\/button>/.test(b.innerHTML) || document.getElementById('appRequestsItem') || !/owner or an admin answers/.test(b.textContent))
+          throw new Error('a viewer is offered the owner’s buttons');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.hhLoadLinks=real.load; window.toast=real.toast; window.hhSetHome=real.home;
+        try{ localStorage.removeItem(LINK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
+        var o=document.getElementById('linkReqOverlay'); if(o) o.remove();
+        _linkState={ pending:[], declined:[], log:{}, loadedFor:'' }; pathDots({ links:0 });
+      }
+    } },
 
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
     test: async()=>{
@@ -13359,13 +13449,16 @@ window.SELF_TESTS = [
       try {
         duplicateRecipe(testId);
         var copy=recipes.filter(function(r){return r.name==='DupSrc (copy)';})[0];
+        // v37.80 — the copy opens to edit 350 ms LATER: waited for, or it opened in whichever
+        // test ran next (feat_step_timers "left a dialog open: editOverlay", now and then).
+        await wait(450);
+        if(!document.getElementById('editOverlay').classList.contains('open')) throw new Error('the copy was not opened to edit');
         if(recipes.length!==before+1||!copy) throw new Error('no copy was created');
         if(copy.id===testId) throw new Error('copy must get a new id');
         if(copy.cookCount!==0||copy.fav) throw new Error('copy should reset cook count and favourite');
         if(Math.abs(recipes.indexOf(copy)-recipes.findIndex(function(r){return r.id===testId;}))!==1) throw new Error('copy should sit next to the original');
         recipes=recipes.filter(function(r){return r.id!==copy.id;});
-        closeM('editOverlay');
-      } finally { _editFormSnapshot=null; recipes=recipes.filter(function(r){return r.id!==testId&&r.name!=='DupSrc (copy)';}); renderGrid(); }
+      } finally { _editFormSnapshot=null; closeM('editOverlay'); recipes=recipes.filter(function(r){return r.id!==testId&&r.name!=='DupSrc (copy)';}); renderGrid(); }
     } },
   { id:'feat_recipe_delete', group:'CRUD', name:'Per-recipe delete with undo',
     test: async()=>{

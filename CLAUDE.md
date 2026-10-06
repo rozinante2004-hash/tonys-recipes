@@ -815,6 +815,34 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.80 — 📬 Link requests page; block; revoke; red dots along the path;
+    the Chrome Web Store link.** Tony: one place for every request ("granted,
+    rejected and blocked"), a block for "very insistent/harassing" requesters,
+    "Revoke access" for accepted ones, and red dots marking "the entire path to
+    where the new occurrence happened". His answers: pop-up AND dots; a block is
+    silent (the sender sees "waiting"); everyone in the household sees the page
+    (only owner/admins act); red only (the feedback dot's green is gone).
+    ⚙️ → 🏠 My household → 📬 Link requests (`openLinkRequests`): the switch for
+    requests through the app (moved here from ⚙️), Waiting (Accept / Reject /
+    🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access —
+    `hhRevokeLink`, both halves), Answered (accepted-then-removed, rejected,
+    blocked → Unblock, revoked; refusals from before v37.80 too). History in
+    `households/<hid>/requestLog/<other>` {hid,name,code,status,at,decidedAt,by}
+    (rules: members read, owner/admins write, status accepted|rejected|blocked|
+    revoked, by = self); linkRequests now readable by any member of from/to
+    (`memberOf`). A blocked household's request is marked declined on arrival
+    (`hhLoadIncoming` partitions pending / blocked / already-linked). Dots:
+    `pathDots({links, feedback})` → ⚙️ (#feedbackDot), the section head, the
+    item (`.path-dot`); links = pending not yet seen on this device
+    (`mkn_link_seen_<hid>`, set when the page opens); refreshed on open and
+    every 15 min. `feedbackDot(n)` feeds the same path (👑 App owner → 📊
+    Households). Wipes include requestLog. Chrome Web Store (unlisted, 1.6.0):
+    APP_CONFIG.extensionStores.chrome = chrome.google.com/webstore/detail/
+    dofokgilnfbpkjncmnkgfolhpjhpeglk (family only; a folder copy is offered the
+    store's). Fixed two flaky tests: feat_duplicate now waits for the copy's
+    edit form (it opened 350 ms later, inside the next tests), extension_offer
+    pins the latest version. Rules tests: 14 new. NEEDS the rules published in
+    all three copies.
   - **Released to the family app and the beta: v37.77–v37.79 and extension 1.6.1 (6 Oct 2026, Tony's yes, CI green on fafbf97). Tony confirmed three distinct buttons on Facebook.**
   - **Extension 1.6.1 — the beta's button told apart.** Tony saw two buttons
     (family, test), not three: the beta's was the family's twin (same icon, no

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.79 -->
+<!-- Tony's Recipes Collection v37.80 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,7 +125,7 @@
     // v37.46 — the extension's page in each browser's store, once published
     // (empty = not listed yet: the app offers the download instead).
     extensionStores: Object.freeze({
-      chrome:            '',
+      chrome:            'https://chrome.google.com/webstore/detail/dofokgilnfbpkjncmnkgfolhpjhpeglk',   // v37.80 — published (unlisted), 6 Oct 2026
       edge:              '',
       firefox:           ''
     }),
@@ -4263,7 +4263,7 @@ async function hhLoadLinks() {
   try { (await hhRef(_household.hid).collection('links').get()).forEach(function(d){
           var x = d.data() || {}; out.push({ hid: d.id, name: x.name || '', code: x.code || '' }); }); }
   catch(e) { /* rules not published yet: no links */ }
-  if (householdCanManage()) {
+  {   // v37.80 — everyone in the household sees what it asked (the requests page)
     try { (await hhDb().collection('linkRequests').where('from', '==', _household.hid).get()).forEach(function(d){
             var x = d.data() || {}; asking.push({ id: d.id, label: x.toLabel || x.email || '' }); }); }
     catch(e) {}
@@ -4371,21 +4371,72 @@ async function hhPassOnLinkRequests() {
   return n;
 }
 var _linkAsking = false;
+// ─── LINK REQUESTS: THE PAGE, THE HISTORY, BLOCKING (v37.80) ─────────────────
+// Tony: "Do we have a location … where all the join requests are kept? … all
+// requests are kept (granted, rejected and blocked). We should also have the
+// option to block someone from sending join requests via the identifier (for
+// very insistent/harassing requester)." ⚙️ → 🏠 My household → 🤝 Link
+// requests (📬): waiting ones (answered by the owner or an admin), the ones this
+// household sent, and what became of each (`households/<hid>/requestLog/
+// <other>`: accepted, rejected, blocked). A blocked household notices nothing:
+// its request stays "waiting", as a rejected one does, and a new one never
+// reaches anyone here. Everyone in the household sees the page; a new request
+// lights a red dot on ⚙️, on 🏠 My household and on 📬 Link requests until
+// the page is opened (`pathDots`).
+var LINK_SEEN_KEY = 'mkn_link_seen_';
+var _linkState = { pending: [], declined: [], log: {}, loadedFor: '' };
+async function hhLoadIncoming() {
+  var out = { pending: [], declined: [], log: {}, loadedFor: _household ? _household.hid : '' };
+  if (!_household || !hhDb()) return out;
+  try { (await hhRef(_household.hid).collection('requestLog').get()).forEach(function(d){ out.log[d.id] = d.data() || {}; }); } catch(e) {}
+  out.blockedPending = []; out.linkedPending = [];
+  try {
+    (await hhDb().collection('linkRequests').where('to', '==', _household.hid).get()).forEach(function(d){
+      var r = { id: d.id, ref: d.ref, d: d.data() || {} };
+      if (r.d.declined) out.declined.push(r);
+      else if (hhLinks().some(function(l){ return l.hid === r.d.from; })) out.linkedPending.push(r);   // nothing left to do
+      else if ((out.log[r.d.from] || {}).status === 'blocked') { out.blockedPending.push(r); out.declined.push(r); }
+      else out.pending.push(r);
+    });
+  } catch(e) {}
+  _linkState = out;
+  return out;
+}
+function linkSeen() { try { return JSON.parse(localStorage.getItem(LINK_SEEN_KEY + (_household && _household.hid)) || '[]') || []; } catch(e) { return []; } }
+function linkMarkSeen() {
+  try { localStorage.setItem(LINK_SEEN_KEY + _household.hid, JSON.stringify(_linkState.pending.map(function(r){ return r.id; }))); } catch(e) {}
+  linkDotRefresh();
+}
+function linkNewCount() {
+  if (!_household || _linkState.loadedFor !== _household.hid) return 0;
+  var seen = linkSeen();
+  return _linkState.pending.filter(function(r){ return seen.indexOf(r.id) === -1; }).length;
+}
+function linkDotRefresh() { pathDots({ links: linkNewCount() }); }
+async function hhLog(other, name, code, status, at) {
+  var doc = { hid: other, name: String(name || '').slice(0, 80), code: String(code || '').slice(0, 20), status: status,
+              at: at || Date.now(), decidedAt: Date.now(), by: _fbUser.uid };
+  await hhRef(_household.hid).collection('requestLog').doc(other).set(doc);
+  _linkState.log[other] = doc;
+}
 async function hhCheckLinkRequests(force) {
   if (!_household || !hhDb() || !window._fbUser || _linkAsking) return 0;
   if (_selfTestRunning && !force) return 0;
   _linkAsking = true;
   try {
     await hhPassOnLinkRequests();
+    var st = await hhLoadIncoming(), keep = st.pending;
+    if (householdCanManage()) {
+      // Already linked (asked from both sides): nothing left to do. Blocked:
+      // marked as refused, without a word — the sender sees "waiting".
+      for (var j = 0; j < st.linkedPending.length; j++) { try { await st.linkedPending[j].ref.delete(); } catch(e) {} }
+      for (var k = 0; k < st.blockedPending.length; k++) { try { await st.blockedPending[k].ref.update({ declined: true }); } catch(e) {} }
+    }
+    linkDotRefresh();
     if (!householdCanManage()) return 0;
-    var list = [], shown = 0;
-    try { (await hhDb().collection('linkRequests').where('to', '==', _household.hid).get()).forEach(function(d){
-            list.push({ id: d.id, ref: d.ref, d: d.data() || {} }); }); }
-    catch(e) { return 0; }
-    for (var i = 0; i < list.length; i++) {
-      var r = list[i];
-      if (r.d.declined) continue;
-      if (hhLinks().some(function(l){ return l.hid === r.d.from; })) { try { await r.ref.delete(); } catch(e) {} continue; }
+    var shown = 0;
+    for (var i = 0; i < keep.length; i++) {
+      var r = keep[i];
       var later = 0;
       try { later = +localStorage.getItem(LINK_LATER_KEY + r.id) || 0; } catch(e) {}
       if (later && Date.now() - later < 864e5) continue;
@@ -4400,18 +4451,26 @@ async function hhAnswerLinkRequest(r) {
   var who = (r.d.fromName || 'A household') + (r.d.fromCode ? ' (' + r.d.fromCode + ')' : '');
   var a = await askConfirm({ icon: '\u{1F91D}', title: 'A request to link kitchens',
     message: who + ' would like to link with your kitchen.\n\nOnce linked, each of you sees the other’s recipes — read-only; '
-      + 'nothing is copied or changed. Either of you can remove the link at any time in ⚙️ → 🏠 My household → \u{1F465} Family Access.',
+      + 'nothing is copied or changed. Either of you can remove the link at any time in ⚙️ → 🏠 My household → \u{1F465} Family Access.'
+      + '\n\nEvery request is kept in ⚙️ → 🏠 My household → \u{1F4EC} Link requests, where you can also block a household.',
     okLabel: 'Accept', altLabel: 'Reject', cancelLabel: 'Remind me later' });
   if (a === true) return hhAcceptLink(r);
-  if (a === 'alt') {
-    try { await r.ref.update({ declined: true }); } catch(e) {}
-    try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
-    toast('Rejected. They are not told.', 5000);
-    return 'rejected';
-  }
+  if (a === 'alt') return hhRejectLink(r);
   try { localStorage.setItem(LINK_LATER_KEY + r.id, String(Date.now())); } catch(e) {}
   toast('⏰ It will ask again tomorrow.', 4000);
   return 'later';
+}
+async function hhRejectLink(r, block) {
+  try { await r.ref.update({ declined: true }); } catch(e) {}
+  try { await hhLog(r.d.from, r.d.fromName, r.d.fromCode, block ? 'blocked' : 'rejected', r.d.at); }
+  catch(e) { if (!hhRulesBehind(e, 'Keeping requests and blocks needs the new database rules')) syncLog('error', 'Could not note the answer to a link request', String(e && e.message).slice(0, 160)); }
+  try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
+  _linkState.pending = _linkState.pending.filter(function(x){ return x.id !== r.id; });
+  if (!_linkState.declined.some(function(x){ return x.id === r.id; })) _linkState.declined.push(r);
+  linkDotRefresh();
+  toast(block ? '\u{1F6AB} Blocked. They are not told, and nothing more from them reaches you.' : 'Rejected. They are not told.', 6000);
+  syncLog('save', block ? 'Blocked a household' : 'Rejected a link request', r.d.fromCode || r.d.fromName || '');
+  return block ? 'blocked' : 'rejected';
 }
 async function hhAcceptLink(r) {
   var from = r.d.from, me = _household, name = String(r.d.fromName || r.d.fromCode || '').slice(0, 80), b = hhDb().batch();
@@ -4421,6 +4480,9 @@ async function hhAcceptLink(r) {
   try { await b.commit(); }
   catch(e) { showServiceError('Could not link the two households: ' + (e && e.message)); return 'error'; }
   try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
+  try { await hhLog(from, name, r.d.fromCode, 'accepted', r.d.at); } catch(e) {}
+  _linkState.pending = _linkState.pending.filter(function(x){ return x.id !== r.id; });
+  linkDotRefresh();
   syncLog('save', 'Linked with a household', { name: name, code: r.d.fromCode || '' });
   await hhLoadLinks(); await hhSetHome();
   if (typeof renderFilters === 'function') renderFilters();
@@ -4428,6 +4490,153 @@ async function hhAcceptLink(r) {
   toast('\u{1F91D} Linked with ' + name + ' — their recipes are under \u{1F91D} ' + name + ' among the filters.', 9000);
   return 'accepted';
 }
+// Block (or unblock) a household from the page's history.
+async function hhSetBlocked(other, on) {
+  if (!householdCanManage()) return false;
+  var lg = _linkState.log[other] || {}, dr = _linkState.declined.filter(function(x){ return x.d.from === other; })[0];
+  var name = lg.name || (dr && dr.d.fromName) || '', code = lg.code || (dr && dr.d.fromCode) || '';
+  if (on && await askConfirm({ icon: '\u{1F6AB}', title: 'Block ' + (name || code || 'this household') + '?',
+      message: 'Nothing more from them reaches you: their requests stay “waiting” on their side, and they are not told. You can unblock them here at any time.',
+      okLabel: 'Block', danger: true }) !== true) return false;
+  try { await hhLog(other, name, code, on ? 'blocked' : 'rejected', lg.at || (dr && dr.d.at)); }
+  catch(e) { if (!hhRulesBehind(e, 'Blocking needs the new database rules')) showServiceError('Could not ' + (on ? 'block' : 'unblock') + ': ' + (e && e.message)); return false; }
+  toast(on ? '\u{1F6AB} Blocked' : 'Unblocked — their next request reaches you again.', 5000);
+  renderLinkRequestsPage();
+  return true;
+}
+async function openLinkRequests() {
+  if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return null; }
+  var prev = document.getElementById('linkReqOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'linkReqOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="lrTitle" style="max-width:560px;text-align:start;max-height:88vh;overflow-y:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="lrTitle">\u{1F4EC} Link requests</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'linkReqOverlay\').remove()">✕</button></div>'
+    + '<div id="lrBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading the requests…</div></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  await hhLoadLinks(); await hhLoadIncoming();
+  renderLinkRequestsPage();
+  linkMarkSeen();
+  return ov;
+}
+function renderLinkRequestsPage() {
+  var body = document.getElementById('lrBody');
+  if (!body) return;
+  var manage = householdCanManage(), st = _linkState, seen = linkSeen();
+  var when = function(t){ return t ? new Date(t).toLocaleDateString() : ''; };
+  var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
+  var card = function(inner, isNew){ return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;' + (isNew ? 'border-inline-start:4px solid var(--danger);' : '') + '">' + inner + '</div>'; };
+  var who = function(name, code){ return '<b dir="auto">' + escH(name || code || 'A household') + '</b>' + (code && name ? ' <span style="color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px;">' + escH(code) + '</span>' : ''); };
+  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Households that asked to link kitchens with yours, the ones yours asked, and what became of each.'
+    + (manage ? '' : ' The owner or an admin answers them.') + '</div>';
+  // v37.80 — the switch moved here from ⚙️ (v37.49): requests by identifier, allowed or not.
+  var appReq = '\u{1F91D} Link requests through the app: ' + ((_household && _household.appRequests === false) ? 'blocked' : 'allowed');
+  h += manage ? '<button type="button" id="appRequestsItem" onclick="toggleAppRequests().then(renderLinkRequestsPage)" title="Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive." style="' + btn + 'width:100%;text-align:start;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);margin-bottom:6px;">' + appReq + '</button>'
+              : '<div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;">' + appReq + '</div>';
+  h += '<div class="mg-h" style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:10px 0 6px;">Waiting for an answer</div>';
+  h += st.pending.length ? st.pending.map(function(r, i){
+      var isNew = seen.indexOf(r.id) === -1;
+      return card(who(r.d.fromName, r.d.fromCode) + (isNew ? ' <span style="color:var(--danger);font-size:11px;font-weight:700;">NEW</span>' : '')
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">asked ' + escH(when(r.d.at)) + (r.d.via === 'email' ? ' · by e-mail' : ' · by identifier') + '</div>'
+        + (manage ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
+            + '<button type="button" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;" onclick="linkReqAct(' + i + ',\'accept\')">Accept</button>'
+            + '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="linkReqAct(' + i + ',\'reject\')">Reject</button>'
+            + '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="linkReqAct(' + i + ',\'block\')">\u{1F6AB} Block</button></div>' : ''), isNew);
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing waiting.</div>';
+  var asking = (_household && _household.asking) || [];
+  h += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Sent by your household</div>';
+  h += asking.length ? asking.map(function(a, i){
+      return card('<b dir="auto">' + escH(a.label || 'A household') + '</b><div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ waiting for them</div>'
+        + (manage ? '<div style="margin-top:8px;"><button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhWithdrawLinkRequest(' + i + ').then(renderLinkRequestsPage)">Withdraw</button></div>' : ''));
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">None.</div>';
+  // Tony: "an option to Revoke access, for requests that were accepted" —
+  // every household linked with this one now, whichever side asked.
+  var links = hhLinks();
+  h += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Linked now</div>';
+  h += links.length ? links.map(function(l){
+      var lg = st.log[l.hid] || {};
+      return card('<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><div>' + who(l.name, l.code)
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">\u{1F91D} each sees the other\u2019s recipes' + (lg.decidedAt || l.at ? ' \u00b7 since ' + escH(when(lg.decidedAt || l.at)) : '') + '</div></div>'
+        + (manage ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhRevokeLink(\'' + escA(l.hid) + '\')">Revoke access</button>' : '') + '</div>');
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">None.</div>';
+  // What became of each: the log, and refusals from before it (v37.53–79).
+  // An accepted one still linked is above, under "Linked now".
+  var past = Object.keys(st.log).filter(function(k){ return !(st.log[k].status === 'accepted' && links.some(function(l){ return l.hid === k; })); })
+    .map(function(k){ var x = st.log[k]; return { hid: k, name: x.name, code: x.code, status: x.status, at: x.decidedAt || x.at }; });
+  st.declined.forEach(function(r){ if (!st.log[r.d.from]) past.push({ hid: r.d.from, name: r.d.fromName, code: r.d.fromCode, status: 'rejected', at: r.d.at }); });
+  past.sort(function(a, b){ return (b.at || 0) - (a.at || 0); });
+  var TAG = { accepted: '\u2705 Accepted \u2014 the link was removed since', rejected: '\u2716 Rejected', blocked: '\u{1F6AB} Blocked', revoked: '\u21a9\ufe0e Access revoked' };
+  h += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Answered</div>';
+  h += past.length ? past.map(function(x){
+      var act = !manage ? '' : x.status === 'blocked'
+        ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhSetBlocked(\'' + escA(x.hid) + '\', false)">Unblock</button>'
+        : x.status !== 'accepted' ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhSetBlocked(\'' + escA(x.hid) + '\', true)">\u{1F6AB} Block</button>' : '';
+      return card('<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><div>' + who(x.name, x.code)
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + (TAG[x.status] || escH(x.status)) + (x.at ? ' · ' + escH(when(x.at)) : '') + '</div></div>' + act + '</div>');
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing yet.</div>';
+  body.innerHTML = h;
+}
+// Revoke access: the link goes, both halves (hhRemoveLink asks first), and the
+// history says so — from where they can be blocked too.
+async function hhRevokeLink(other) {
+  if (!householdCanManage()) return false;
+  var i = -1;
+  hhLinks().forEach(function(l, k){ if (l.hid === other) i = k; });
+  if (i < 0) return false;
+  var l = hhLinks()[i], lg = _linkState.log[other] || {};
+  if (!await hhRemoveLink(i)) return false;
+  try { await hhLog(other, l.name, l.code, 'revoked', lg.at || l.at); }
+  catch(e) { if (!hhRulesBehind(e, 'Keeping the history needs the new database rules')) syncLog('error', 'Could not note a revoked link', String(e && e.message).slice(0, 160)); }
+  syncLog('save', 'Revoked a linked household\u2019s access', l.code || l.name || '');
+  renderLinkRequestsPage();
+  return true;
+}
+window.hhRevokeLink = hhRevokeLink;
+async function linkReqAct(i, what) {
+  var r = _linkState.pending[i];
+  if (!r || !householdCanManage()) return false;
+  if (what === 'accept') await hhAcceptLink(r);
+  else if (what === 'block') {
+    if (await askConfirm({ icon: '\u{1F6AB}', title: 'Block ' + (r.d.fromName || r.d.fromCode || 'this household') + '?',
+        message: 'Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.',
+        okLabel: 'Block', danger: true }) !== true) return false;
+    await hhRejectLink(r, true);
+  } else await hhRejectLink(r);
+  renderLinkRequestsPage();
+  return true;
+}
+window.openLinkRequests = openLinkRequests; window.renderLinkRequestsPage = renderLinkRequestsPage; window.linkReqAct = linkReqAct;
+window.hhSetBlocked = hhSetBlocked; window.hhLoadIncoming = hhLoadIncoming; window.linkNewCount = linkNewCount; window.hhRejectLink = hhRejectLink;
+
+// ─── RED DOTS ALONG THE PATH (v37.80) ────────────────────────────────────────
+// Tony: "the red dots should indicate the entire path to where the new
+// occurrence happened" — ⚙️, the section, the item. Red only: nothing when all
+// is seen (v37.68's green "all read" went). Each source sets its own count.
+var _pathDots = { links: 0, feedback: 0 };
+var PATH_DOTS = {
+  links:    ['.set-group[data-group="household"] > .set-head', '#linkRequestsItem'],
+  feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]']
+};
+function pathDots(counts) {
+  Object.keys(counts || {}).forEach(function(k){ _pathDots[k] = Math.max(0, +counts[k] || 0); });
+  var any = 0;
+  Object.keys(PATH_DOTS).forEach(function(k){
+    var n = _pathDots[k] || 0; any += n;
+    PATH_DOTS[k].forEach(function(sel){
+      var el = document.querySelector(sel); if (!el) return;
+      var dot = el.querySelector(':scope > .path-dot');
+      if (n && !dot) { dot = document.createElement('span'); dot.className = 'path-dot'; dot.setAttribute('aria-hidden', 'true'); dot.setAttribute('data-no-i18n', ''); el.appendChild(dot); }
+      if (!n && dot) dot.remove();
+    });
+  });
+  var d = document.getElementById('feedbackDot');
+  if (d) { d.hidden = !any; d.className = any ? 'fb-dot-new' : ''; }
+  var b = document.getElementById('settingsBtn');
+  if (b) b.setAttribute('aria-label', 'Settings' + (any ? ' — something new' : ''));
+  return any;
+}
+window.pathDots = pathDots;
 async function hhRemoveLink(i) {
   var l = hhLinks()[i];
   if (!l || !householdCanManage()) return false;
@@ -5075,6 +5284,11 @@ async function householdWipe(hid, onStep) {
   var rq = await hhRef(hid).collection('requests').get(), rrefs = [];
   rq.forEach(function(d){ rrefs.push(d.ref); });
   await inBatches(rrefs);
+  try {   // v37.80 — what became of its link requests, and whom it blocked
+    var lg = await hhRef(hid).collection('requestLog').get(), lgrefs = [];
+    lg.forEach(function(d){ lgrefs.push(d.ref); });
+    await inBatches(lgrefs);
+  } catch(e) {}
   // v37.53 — its links (both halves) and its link requests, sent and received.
   try {
     var ls = await hhRef(hid).collection('links').get(), lrefs = [];
@@ -5786,16 +6000,17 @@ async function feedbackCountNew() {
 // Green - All notes read. Red - there are new feedbacks to look into." The
 // owner's only; counted when the app opens, every 15 minutes, and again as he
 // marks notes in the Feedback tab ("seen" and "done" are read).
+// v37.80 — on the red path (pathDots): ⚙️ → 👑 App owner → 📊 Households, and
+// the 💬 Feedback tab's count there. Red only: nothing once all are read.
 function feedbackDot(n) {
-  var d = document.getElementById('feedbackDot');
-  if (!d) return;
-  if (typeof isAppOwner !== 'function' || !isAppOwner() || typeof n !== 'number' || !feedbackInboxHere()) { d.hidden = true; return; }
-  d.hidden = false;
-  d.className = n > 0 ? 'fb-dot-new' : 'fb-dot-read';
-  var b = document.getElementById('settingsBtn');
-  if (b) b.setAttribute('aria-label', 'Settings' + (n > 0 ? ' — ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers' : ''));
+  var on = typeof isAppOwner === 'function' && isAppOwner() && typeof n === 'number' && feedbackInboxHere();
+  return pathDots({ feedback: on ? n : 0 });
 }
-setInterval(function(){ if (typeof isAppOwner === 'function' && isAppOwner() && !_selfTestRunning && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackDot).catch(function(){}); }, 15 * 60e3);
+setInterval(function(){
+  if (_selfTestRunning) return;
+  if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackDot).catch(function(){});
+  if (_household && hhDb()) hhLoadIncoming().then(linkDotRefresh).catch(function(){});   // v37.80 — new link requests
+}, 15 * 60e3);
 window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew;
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
 window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedbackNote; window.fbShotPicked = fbShotPicked;
@@ -6053,7 +6268,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.79';
+var APP_VERSION = 'v37.80';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7046,6 +7261,9 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    the iPhone and Android lines showed on Tony's PC although switched off. */
 .drop-menu [hidden] { display: none !important; }
 #settingsDrop .set-head { font-weight: 700; justify-content: space-between; }
+/* v37.80 — the red dots along the path to something new (pathDots). */
+.path-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; margin-inline-start: auto; margin-inline-end: 4px; }
+#settingsDrop .set-head > .path-dot { margin-inline-end: 8px; }
 #settingsDrop .set-head::after { content: '›'; font-size: 16px; line-height: 1; color: var(--muted); transition: transform 0.15s; }
 [dir="rtl"] #settingsDrop .set-head::after { content: '‹'; }
 #settingsDrop .set-group.open > .set-head::after { transform: rotate(90deg); }
@@ -8704,7 +8922,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.79</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.80</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -8750,7 +8968,7 @@ body.banner-shown .header {
             <div class="set-body">
               <button class="drop-item" title="Who shares this collection and what each person can do: add people, invitation links, roles, renaming and handing over the household." onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
               <button class="drop-item" data-layout-only="households" title="Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address." onclick="closeDrop('settingsDrop');openMyIdentifier()">🪪 Display my personal identifier</button>
-              <button class="drop-item" data-layout-only="households" id="appRequestsItem" title="Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive." onclick="closeDrop('settingsDrop');toggleAppRequests()">🤝 Link requests through the app: allowed</button>
+              <button class="drop-item" data-layout-only="households" id="linkRequestsItem" title="Households that asked to link kitchens with yours, the ones yours asked, and what became of each — accept, reject or block. Requests through the app can be switched off there." onclick="closeDrop('settingsDrop');openLinkRequests()">📬 Link requests</button>
               <button class="drop-item" title="What you have at home, so recipe ideas can use it." onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
             </div>
           </div>
@@ -9410,7 +9628,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.79</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.80</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

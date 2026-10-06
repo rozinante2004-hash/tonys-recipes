@@ -240,11 +240,29 @@ await check('…nor carry anything else',                      setDoc(doc(gina, 
 await check('the owner asks by identifier',                  setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina')), true);
 await check('…and sees it waiting',                          getDocs(query(collection(gina, 'linkRequests'), where('from', '==', 'L1'))), true);
 await check('the household asked: its owner sees it',        getDocs(query(collection(ivy, 'linkRequests'), where('to', '==', 'L2'))), true);
-await check('…its readers do not',                           getDocs(query(collection(jo, 'linkRequests'), where('to', '==', 'L2'))), false);
+// v37.80 — everyone in a household sees its requests page (Tony); only the owner and admins answer.
+await check('…and its readers too (the requests page)',      getDocs(query(collection(jo, 'linkRequests'), where('to', '==', 'L2'))), true);
+await check('…and the asking household\'s readers theirs',  getDocs(query(collection(hank, 'linkRequests'), where('from', '==', 'L1'))), true);
+await check('…but a reader cannot refuse it',                updateDoc(doc(jo, 'linkRequests/L1_L2'), { declined: true }), false);
 await check('…nor does a stranger',                          getDoc(doc(carol, 'linkRequests/L1_L2')), false);
 await check('the sender cannot change it',                   updateDoc(doc(gina, 'linkRequests/L1_L2'), { to: 'L3' }), false);
 await check('the owner asked marks it refused',              updateDoc(doc(ivy, 'linkRequests/L1_L2'), { declined: true }), true);
 await check('…and nothing else',                             updateDoc(doc(ivy, 'linkRequests/L1_L2'), { fromName: 'X' }), false);
+// v37.80 — what became of each request, and who is blocked: households/<hid>/requestLog/<other>.
+const logOf = (status, by, extra) => Object.assign({ hid: 'L1', name: 'Coded', code: 'MKN-GGGG-2222', status, at: 1, decidedAt: 2, by }, extra || {});
+await check('the owner asked keeps what became of it',       setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('rejected', 'ivy')), true);
+await check('…blocks the household',                         setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy')), true);
+await check('…accepted and revoked are kept too',            Promise.all([setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('revoked', 'ivy')),
+                                                                          setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('accepted', 'ivy'))]), true);
+await check('…in her own name only',                         setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'jo')), false);
+await check('…with a known answer only',                     setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('maybe', 'ivy')), false);
+await check('…about another household, under its own id',    setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy', { hid: 'L3' })), false);
+await check('…and nothing else in it',                       setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy', { note: 'x' })), false);
+await check('a reader of the household reads it',            getDocs(collection(jo, 'households/L2/requestLog')), true);
+await check('…but cannot write it',                          setDoc(doc(jo, 'households/L2/requestLog/L1'), logOf('accepted', 'jo')), false);
+await check('…nor can a stranger read it',                   getDocs(collection(carol, 'households/L2/requestLog')), false);
+await check('…nor the household that asked',                 getDocs(collection(gina, 'households/L2/requestLog')), false);
+await check('the owner clears an entry',                     deleteDoc(doc(ivy, 'households/L2/requestLog/L1')), true);
 const accept = (db, extra) => { const b = writeBatch(db);
   b.set(doc(db, 'households/L2/links/L1'), { hid: 'L1', name: 'Coded', code: 'MKN-GGGG-2222', at: 1 });
   b.set(doc(db, 'households/L1/links/L2'), { hid: 'L2', name: 'Coded', code: 'MKN-HHHH-3333', at: 1 });
