@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.77–v37.79 and extension 1.6.1 (6 Oct 2026, Tony's yes, CI green on fafbf97). Tony confirmed three distinct buttons on Facebook.**
   - **Extension 1.6.1 — the beta's button told apart.** Tony saw two buttons
     (family, test), not three: the beta's was the family's twin (same icon, no
     ring) and its floating reel button sat exactly ON the family's (both
