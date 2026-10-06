@@ -815,6 +815,31 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.84 — every window translatable; the privacy statement and the
+    terms in all ten languages.** Tony: in Hebrew, the privacy statement and
+    terms stayed English, "both the button and the content", and "run a scan
+    on the entire app". The scan (draw each window built only on demand,
+    list its texts the dictionary never saw) found 16 windows / ~90 phrases:
+    About, the kitchen-rules page, 📬 Link requests (and its conversations),
+    the feedback form, the three device offers, the extension offer, the log
+    nudge, the import-error and error windows, the e-mail window, labels that
+    exist only inside a question (📤 Share it, Reject, Dismiss, Next/Skip/
+    Tour). Fix: I18N_HARVEST step `i18nHarvestDemand()` draws each of them
+    hidden (body.i18n-harvesting) and removes it — SYNCHRONOUSLY, because the
+    translation editor's harvest runs in the background and a stand-in
+    household must never be visible to the live app across an await (the
+    first, async version left About open under the next self-test). Labels
+    that depend on browser/copy/state are in I18N_EXTRA. Names, identifiers
+    and the © line carry data-no-i18n. Scan after: only test sample text.
+    Documents: privacy.<l>.html and terms.<l>.html for he ar ru fr es de it
+    pt zh ja (LEGAL_LANGS; `legalFile(which)` picks by _i18nLang, English
+    otherwise; the kitchen-rules page loads the same file and takes its dir).
+    Each says the English text prevails and links to it; terms link to the
+    same-language privacy page. WHEN privacy.html OR terms.html CHANGES, ALL
+    TEN TRANSLATIONS CHANGE IN THE SAME COMMIT (test `legal_translated`
+    checks sections, list items, rows, version, direction and links).
+    Tony must re-run 🌐 "finish it" after release so the new phrases are
+    translated.
   - **Released to the family app and the beta: v37.83 (6 Oct 2026, Tony's yes, CI green on 73785cf; the family's Pages deploy checked: success). Worker v65 deployed by Tony. The first CI run failed: the e2e sync test signed in for real and met the kitchen rules — it now agrees as a person would (window._legalState).**
   - **v37.83 + Worker v65 — the kitchen rules on first sign-in; "delete it
     all"; terms 1.1.** Tony: on first sign-in, the terms as "a page from a

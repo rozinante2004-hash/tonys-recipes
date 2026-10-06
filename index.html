@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.83 -->
+<!-- Tony's Recipes Collection v37.84 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4550,7 +4550,7 @@ function renderLinkRequestsPage() {
   var when = function(t){ return t ? new Date(t).toLocaleDateString() : ''; };
   var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
   var card = function(inner, isNew){ return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;' + (isNew ? 'border-inline-start:4px solid var(--danger);' : '') + '">' + inner + '</div>'; };
-  var who = function(name, code){ return '<b dir="auto">' + escH(name || code || 'A household') + '</b>' + (code && name ? ' <span style="color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px;">' + escH(code) + '</span>' : ''); };
+  var who = function(name, code){ return '<b dir="auto"' + (name || code ? ' data-no-i18n' : '') + '>' + escH(name || code || 'A household') + '</b>' + (code && name ? ' <span data-no-i18n style="color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px;">' + escH(code) + '</span>' : ''); };
   var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Households that asked to link kitchens with yours, the ones yours asked, and what became of each.'
     + (manage ? '' : ' The owner or an admin answers them.') + '</div>';
   // v37.80 — the switch moved here from ⚙️ (v37.49): requests by identifier, allowed or not.
@@ -4575,7 +4575,7 @@ function renderLinkRequestsPage() {
   if (manage) h += '<button type="button" id="lrAskBtn" onclick="openConnectHousehold().then(renderLinkRequestsPage)" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;margin-bottom:8px;">\u2795 Ask a household to link\u2026</button>'
     + '<div style="font-size:12px;color:var(--muted);margin:-2px 0 8px;">By their identifier (MKN-\u2026) or the e-mail address of anyone in it.</div>';
   h += asking.length ? asking.map(function(a, i){
-      return card('<b dir="auto">' + escH(a.label || 'A household') + '</b><div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ waiting for them</div>'
+      return card('<b dir="auto"' + (a.label ? ' data-no-i18n' : '') + '>' + escH(a.label || 'A household') + '</b><div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ waiting for them</div>'
         + (a.to ? talkHtml(a.to, a.note, _household.hid) : (a.note ? '<div style="font-size:12.5px;margin-top:6px;" dir="auto">\u{1F4AC} Your note: <span data-no-i18n>' + escH(a.note) + '</span></div>' : ''))
         + (manage ? '<div style="margin-top:8px;"><button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhWithdrawLinkRequest(' + i + ').then(renderLinkRequestsPage)">Withdraw</button></div>' : ''));
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">None.</div>';
@@ -4702,7 +4702,7 @@ function talkHtml(other, note, noteFrom, noteName) {
     return '<div style="display:flex;justify-content:' + (mine ? 'flex-end' : 'flex-start') + ';margin:4px 0;">'
       + '<div style="max-width:82%;padding:7px 10px;border-radius:10px;font-size:13px;line-height:1.45;white-space:pre-wrap;'
       + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">' + escH(mine ? 'You' : (m.name || 'They')) + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || 'They') + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
       + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div></div></div>';
   }).join('');
   return '<details class="lr-talk" style="margin-top:8px;"' + (_talkOpen[other] ? ' open' : '') + ' ontoggle="if(this.open) talkMarkSeen(\'' + escA(other) + '\')">'
@@ -6421,7 +6421,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.83';
+var APP_VERSION = 'v37.84';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7414,6 +7414,10 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    the iPhone and Android lines showed on Tony's PC although switched off. */
 .drop-menu [hidden] { display: none !important; }
 #settingsDrop .set-head { font-weight: 700; justify-content: space-between; }
+/* v37.84 — windows drawn only so the translator can read them (i18nHarvestDemand). */
+body.i18n-harvesting #aboutOverlay, body.i18n-harvesting #termsGate, body.i18n-harvesting #linkReqOverlay, body.i18n-harvesting #feedbackOverlay,
+body.i18n-harvesting #deviceOfferOverlay, body.i18n-harvesting #extOfferOverlay, body.i18n-harvesting #logNudge, body.i18n-harvesting #importErrorModal,
+body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverlay { visibility: hidden !important; }
 /* v37.83 — the kitchen rules: a page from a recipe notebook. */
 #termsGate { position: fixed; inset: 0; z-index: 10050; background: rgba(60,40,30,.55); display: flex; align-items: center; justify-content: center; padding: 14px; padding-top: calc(14px + env(safe-area-inset-top)); }
 #termsGate .tg-page { position: relative; width: 100%; max-width: 640px; max-height: 94vh; overflow-y: auto; border-radius: 6px 10px 8px 12px;
@@ -9104,7 +9108,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.83</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.84</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9810,7 +9814,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.83</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.84</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11785,8 +11789,63 @@ var I18N_HARVEST = [
   // The ingredient editor's own rows: the Amount and Ingredient name
   // placeholders and the indent/remove buttons live nowhere else.
   ['the ingredient editor', function(){ loadIngsTable([{ a: '1', n: '·' }, { sub: '·' }]); }],
-  ['the converter',         function(){ i18nHarvestCalc(); }]
+  ['the converter',         function(){ i18nHarvestCalc(); }],
+  // v37.84 — Tony: About, the kitchen rules and the privacy/terms buttons stayed
+  // English in Hebrew; a scan of every window built on demand found 16 such.
+  ['the windows opened on demand', function(){ i18nHarvestDemand(); }]
 ];
+// Each is drawn hidden (body.i18n-harvesting), catalogued, and removed — all in
+// ONE synchronous run. The harvest can be running in the background (the
+// translation editor starts it and carries on), so nothing may wait in here:
+// while it waits the app is live, and the stand-in household below would be
+// the one it saw. Read-only: no reader or writer is called.
+function i18nHarvestDemand() {
+  var keep = { hh: window._household, user: window._fbUser, ls: _linkState, talk: _talk, open: _talkOpen, recipes: recipes };
+  var gone = ['aboutOverlay', 'termsGate', 'linkReqOverlay', 'feedbackOverlay', 'deviceOfferOverlay', 'extOfferOverlay',
+              'logNudge', 'importErrorModal', 'serviceErrorOverlay', 'emailModalOverlay'];
+  var clear = function(){ gone.forEach(function(id){ var o = document.getElementById(id); if (o) o.remove(); }); };
+  var fixtureId = 888701;
+  document.body.classList.add('i18n-harvesting');
+  try {
+    var steps = [
+      function(){ openAbout(); },                        // drawn at once; its version check finds no window and stops
+      function(){ legalShowGate({ uid: 'i18n-harvest' }); },
+      function(){
+        // The Link requests page, drawn straight from a stand-in state (openLinkRequests would read Firestore).
+        window._fbUser = window._fbUser || { uid: 'i18n-harvest', email: 'someone@example.invalid' };
+        window._household = { hid: 'hH', role: 'owner', name: '\u00b7', code: '', appRequests: true,
+          links: [{ hid: 'hL', name: '\u00b7', code: '', at: 1 }], asking: [{ id: 'hH_hT', to: 'hT', label: '\u00b7', note: '' }] };
+        _linkState = { loadedFor: 'hH', pending: [{ id: 'hN_hH', ref: {}, d: { from: 'hN', fromName: '\u00b7', via: 'code', at: 1 } }],
+          declined: [{ id: 'hR_hH', ref: {}, d: { from: 'hR', fromName: '\u00b7', at: 1 } }],
+          log: { hB: { hid: 'hB', name: '\u00b7', status: 'blocked', at: 1, decidedAt: 2 }, hV: { hid: 'hV', name: '\u00b7', status: 'revoked', at: 1, decidedAt: 2 },
+                 hA: { hid: 'hA', name: '\u00b7', status: 'accepted', at: 1, decidedAt: 2 } } };
+        _talk = { 'hH_hN': [{ from: 'hN', name: '\u00b7', text: '\u00b7', at: 1 }] }; _talkOpen = {};   // closed: an open <details> fires a toggle later
+        var ov = document.createElement('div'); ov.id = 'linkReqOverlay'; ov.className = 'modal-overlay open';
+        ov.innerHTML = '<div class="ask-card"><div id="lrBody"></div></div>';
+        document.body.appendChild(ov);
+        renderLinkRequestsPage(); i18nCollect();
+        _household.role = 'viewer'; renderLinkRequestsPage();
+      },
+      function(){ openFeedbackForm(); },
+      function(){ deviceOfferDialog('ios', true); i18nCollect(); deviceOfferDialog('android', true); i18nCollect(); deviceOfferDialog('computer', true); },
+      function(){ openExtensionOffer(); },
+      function(){ showLogNudge([{ title: '\u00b7', level: 'bad' }]); },
+      function(){ showImportError('\u00b7'); },
+      function(){ showServiceError('\u00b7'); },
+      function(){ recipes = [normalizeRecipe({ id: fixtureId, name: '\u00b7', ingredients: [{ a: '1', n: '\u00b7' }], steps: ['\u00b7'] })].concat(keep.recipes); showEmailModal(fixtureId); }
+    ];
+    for (var i = 0; i < steps.length; i++) {
+      try { steps[i](); i18nCollect(); } catch(e) { dlog('[i18n] could not draw an on-demand window', e && e.message); }
+      clear();
+    }
+  } finally {
+    clear();
+    recipes = keep.recipes;
+    window._household = keep.hh; window._fbUser = keep.user; _linkState = keep.ls; _talk = keep.talk; _talkOpen = keep.open;
+    document.body.classList.remove('i18n-harvesting');
+  }
+}
+window.i18nHarvestDemand = i18nHarvestDemand;
 // openCalcModal() builds the category row and then opens the panel, so the
 // open has to be undone — the same contract every other entry here keeps.
 function i18nHarvestCalc() {
@@ -12380,7 +12439,18 @@ var I18N_EXTRA = [
   'The Worker refused this origin. Add this site to ALLOWED_ORIGINS on the Worker.',
   'Too many requests in the last minute. This is the Worker\u2019s own rate limit — wait a minute.',
   'The Worker is missing configuration.',
-  'Worker error {1}'
+  'Worker error {1}',
+  // v37.84 — labels that only exist inside a question (askConfirm), or only for
+  // another browser, copy or state than the one the harvest runs in.
+  '📤 Share it', 'Reject', 'Dismiss', 'Next', 'Skip', 'Tour', 'Service Error', 'Will ask for Gmail permission on first use',
+  'Test copy', 'Beta', 'Version', '⏳ Checking for a newer version…', '✅ This is the latest version.',
+  'Could not check for a newer version just now (offline?).', '🆕 Version {1} is available — please update.', '↻ Update now',
+  '🧩 Chrome extension (Save-recipe button)', '🧩 Edge extension (Save-recipe button)', '🧩 Firefox extension (Save-recipe button)',
+  '🧩 Brave extension (Save-recipe button)', '🧩 Opera extension (Save-recipe button)', '🧩 Vivaldi extension (Save-recipe button)',
+  '🧩 Safari extension (Save-recipe button)', '🧩 Browser extension (Save-recipe button)',
+  '🤝 Link requests through the app: blocked', 'Waiting for an answer', 'Nothing waiting.', 'None.', 'Nothing yet.',
+  'Accept', '🚫 Block', 'Unblock', 'Revoke access', 'Withdraw', 'Send anyway', 'Edit it', 'Personal details?',
+  'Add a note? (optional)', 'Send the request', '⏳ One moment…', 'You'
 ];
 function i18nRegisterExtra() {
   I18N_EXTRA.forEach(function(str) {
@@ -23450,15 +23520,18 @@ function legalShowGate(user) {
 async function legalLoadTerms() {
   var host = document.getElementById('tgTerms');
   try {
-    var html = await (await fetch('terms.html', { cache: 'no-cache' })).text();
+    var r = await fetch(legalFile('terms'), { cache: 'no-cache' });
+    if (!r.ok) r = await fetch('terms.html', { cache: 'no-cache' });   // a language without its translation yet
+    var html = await r.text();
     var doc = new DOMParser().parseFromString(html, 'text/html');
     doc.querySelectorAll('script,style,link,meta,title').forEach(function(n){ n.remove(); });
     var h1 = doc.querySelector('h1'); if (h1) h1.remove();
     host = document.getElementById('tgTerms'); if (!host) return;
     host.innerHTML = doc.body.innerHTML;
+    var dir = doc.documentElement.getAttribute('dir'); if (dir) host.setAttribute('dir', dir);
     host.querySelectorAll('a[href]').forEach(function(a){
       var href = a.getAttribute('href') || '';
-      if (/privacy\.html$/.test(href)) { a.setAttribute('href', '#'); a.onclick = function(e){ e.preventDefault(); openLegalDoc('privacy'); }; }
+      if (/privacy(\.[a-z]{2})?\.html$/.test(href)) { a.setAttribute('href', '#'); a.onclick = function(e){ e.preventDefault(); openLegalDoc('privacy'); }; }
       else if (!/^mailto:/.test(href)) { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener'); }
     });
   } catch(e) {
@@ -23699,7 +23772,7 @@ async function openAbout() {
     + '<button type="button" id="aboutPrivacyPanel" style="' + row + '" onclick="showPrivacyPanel()">\u{1F512} What leaves this device</button>'
     + '<button type="button" id="aboutPrivacyDoc" style="' + row + '" onclick="openLegalDoc(\'privacy\')">\u{1F4DC} Privacy statement</button>'
     + '<button type="button" id="aboutTermsDoc" style="' + row + '" onclick="openLegalDoc(\'terms\')">⚖️ Terms of use and disclaimer</button>'
-    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;">© 2026 Tony Schvekher · <a href="mailto:tony.schvekher@gmail.com" style="color:var(--terracotta);">tony.schvekher@gmail.com</a></div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;" data-no-i18n>© 2026 Tony Schvekher · <a href="mailto:tony.schvekher@gmail.com" style="color:var(--terracotta);">tony.schvekher@gmail.com</a></div>'
     + '</div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
@@ -23721,9 +23794,19 @@ async function aboutCheckUpdate() {
   box.innerHTML = '<span style="color:var(--ok-text,#2e7d32);">✅ This is the latest version.</span>';
   return 'latest';
 }
+// v37.84 — Tony: "translate them in all the supported languages". Each
+// document in each language is its own page (privacy.<lang>.html,
+// terms.<lang>.html), opened in the interface's language; the English text
+// prevails, and each translation says so.
+var LEGAL_LANGS = ['he', 'ar', 'ru', 'fr', 'es', 'de', 'it', 'pt', 'zh', 'ja'];
+function legalFile(which) {
+  var base = which === 'terms' ? 'terms' : 'privacy', l = typeof _i18nLang === 'string' ? _i18nLang : 'en';
+  return base + (LEGAL_LANGS.indexOf(l) !== -1 ? '.' + l : '') + '.html';
+}
+window.legalFile = legalFile;
 // The documents, inside the app (they are this copy's own pages).
 function openLegalDoc(which) {
-  var file = which === 'terms' ? 'terms.html' : 'privacy.html';
+  var file = legalFile(which);
   var title = which === 'terms' ? 'Terms of use and disclaimer' : 'Privacy statement';
   var prev = document.getElementById('legalDocOverlay'); if (prev) prev.remove();
   var ov = document.createElement('div');

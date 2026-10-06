@@ -6222,9 +6222,9 @@ window.SELF_TESTS = [
         // The documents open inside the app — above the sign-in screen too.
         openLegalDoc('privacy');
         var fr=document.getElementById('legalDocFrame');
-        if(!fr || fr.getAttribute('src')!=='privacy.html' || parseInt(document.getElementById('legalDocOverlay').style.zIndex,10)<=9999) throw new Error('the privacy statement does not open in the app');
+        if(!fr || fr.getAttribute('src')!==legalFile('privacy') || parseInt(document.getElementById('legalDocOverlay').style.zIndex,10)<=9999) throw new Error('the privacy statement does not open in the app');
         openLegalDoc('terms');
-        if(document.getElementById('legalDocFrame').getAttribute('src')!=='terms.html') throw new Error('the terms do not open');
+        if(document.getElementById('legalDocFrame').getAttribute('src')!==legalFile('terms')) throw new Error('the terms do not open');
         if(!document.getElementById('loginTermsLink') || !document.getElementById('loginPrivacyDocLink')) throw new Error('signing in does not mention the terms and the privacy statement');
         // What the documents say, and that the privacy statement names every service the app sends to.
         window.fetch=realF;
@@ -6266,7 +6266,8 @@ window.SELF_TESTS = [
         if(!/Get me out of here/.test(document.getElementById('tgOut').textContent) || !/I agree/.test(g.textContent)) throw new Error('the page lacks its agreement or its way out');
         for(var i=0;i<30 && /Opening the rules/.test(document.getElementById('tgTerms').textContent);i++) await wait(100);
         var tt=document.getElementById('tgTerms').textContent;
-        if(!/Disclaimer of warranties/.test(tt) || !/Tel Aviv/.test(tt)) throw new Error('the page does not hold the terms: '+tt.slice(0,120));
+        if(document.querySelectorAll('#tgTerms h2').length!==16 || (legalFile('terms')==='terms.html' && (!/Disclaimer of warranties/.test(tt) || !/Tel Aviv/.test(tt)))) throw new Error('the page does not hold the terms: '+tt.slice(0,120));
+        if(legalFile('terms')!=='terms.html' && document.getElementById('tgTerms').getAttribute('dir')!==(i18nIsRTL() ? 'rtl' : 'ltr')) throw new Error('the translated terms keep the wrong direction');
         if(!/Caveat|Patrick Hand/.test(getComputedStyle(document.querySelector('#termsGate .tg-title')).fontFamily)) throw new Error('the page is not hand-written');
         box.checked=true; box.onchange();
         if(go.disabled) throw new Error('agreeing did not wake the button');
@@ -6302,6 +6303,34 @@ window.SELF_TESTS = [
         var ds=document.getElementById('driveStatus'); if(ds && statusWas!==undefined) ds.innerHTML=statusWas;
         try{ localStorage.removeItem(TERMS_OK_KEY+'uGate'); localStorage.removeItem('mkn_terms_noted_hG'); }catch(e){}
       }
+    } },
+
+  { id:'legal_translated', group:'UI', name:'🌐 The privacy statement and the terms in every interface language: same sections, same version, right direction, linking to each other, the English prevailing (v37.84)',
+    test: async()=>{
+      var get=async function(f){ var r=await fetch(f+'?t='+Date.now(), { cache:'no-store' }); if(!r.ok) throw new Error(f+' is missing'); return new DOMParser().parseFromString(await r.text(), 'text/html'); };
+      var en={ privacy:await get('privacy.html'), terms:await get('terms.html') };
+      var realLang=_i18nLang;
+      try{
+        for(var i=0;i<LEGAL_LANGS.length;i++){
+          var l=LEGAL_LANGS[i];
+          _i18nLang=l;
+          if(legalFile('privacy')!=='privacy.'+l+'.html' || legalFile('terms')!=='terms.'+l+'.html') throw new Error('the '+l+' interface does not open its own documents');
+          for(var doc of ['privacy','terms']){
+            var d=await get(doc+'.'+l+'.html'), f=doc+'.'+l+'.html';
+            if(d.documentElement.lang!==l) throw new Error(f+' does not say it is in '+l);
+            if(d.documentElement.dir!==(l==='he'||l==='ar' ? 'rtl' : 'ltr')) throw new Error(f+' runs in the wrong direction');
+            if(d.querySelectorAll('h2').length!==en[doc].querySelectorAll('h2').length || d.querySelectorAll('li').length!==en[doc].querySelectorAll('li').length || d.querySelectorAll('tr').length!==en[doc].querySelectorAll('tr').length) throw new Error(f+' does not have the English text’s sections');
+            var ev=/Version (\d+\.\d+)/.exec(en[doc].querySelector('.meta').textContent)[1];
+            if(d.querySelector('.meta').textContent.indexOf(ev)===-1) throw new Error(f+' is not a translation of version '+ev);
+            if(!d.querySelector('a[href="'+doc+'.html"][lang="en"]')) throw new Error(f+' does not point to the English text, which prevails');
+            if(d.body.textContent.indexOf('Tony Schvekher')===-1) throw new Error(f+' does not name the operator');
+            d.querySelectorAll('a[href^="privacy"]:not([lang="en"])').forEach(function(a){ if(a.getAttribute('href')!=='privacy.'+l+'.html') throw new Error(f+' links to '+a.getAttribute('href')+' instead of the same language'); });
+            if(doc==='privacy') ['tony.schvekher@gmail.com','Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
+          }
+        }
+        _i18nLang='en';
+        if(legalFile('privacy')!=='privacy.html') throw new Error('English does not open the English text');
+      } finally { _i18nLang=realLang; }
     } },
 
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
@@ -10721,7 +10750,12 @@ window.SELF_TESTS = [
        [/Logging/,           'the logging panel'],
        [/unsent local edits|Sync Health|last successful sync/i, 'Sync Health'],
        [/Nothing is sold/,   'What leaves this device'],
-       [/Export chat|Without media/, 'the WhatsApp export manual']
+       [/Export chat|Without media/, 'the WhatsApp export manual'],
+       // v37.84 — windows drawn only on demand, which Tony found English in Hebrew.
+       [/Terms of use and disclaimer/, 'About'],
+       [/Get me out of here/, 'the kitchen rules page'],
+       [/Ask a household to link/, 'the Link requests page'],
+       [/Will ask for Gmail permission/, 'the e-mail window']
        // The self-test screen was on this list until v36.53, when Tony decided
        // it stays English. The opposite is asserted further down.
       ].forEach(function(pair){
