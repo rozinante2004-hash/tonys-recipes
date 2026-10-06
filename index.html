@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.84 -->
+<!-- Tony's Recipes Collection v37.85 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6421,7 +6421,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.84';
+var APP_VERSION = 'v37.85';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9108,7 +9108,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.84</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.85</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9814,7 +9814,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.84</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.85</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14201,6 +14201,7 @@ window.i18nPlaceholderChild = i18nPlaceholderChild; window.i18nEdges = i18nEdges
 // device in the family reads.
 var _i18nEdLang = 'en';       // the language being edited
 var _i18nEdDraft = null;      // { english: translation }, unsaved
+var _i18nEdDocBase = {};    // v37.85 — { document key: shipped wording } for the language being edited
 var _i18nEdDirty = false;
 var I18N_ED_PAGE = 120;       // rows drawn at once; 600 live inputs is a phone tax
 
@@ -14224,7 +14225,16 @@ async function openI18nEditor() {
   var s = document.getElementById('i18nEdSearch'); if (s) s.value = '';
   var g = document.getElementById('i18nEdOnlyGaps'); if (g) g.checked = false;
   document.getElementById('i18nOverlay').classList.add('open');
+  _i18nEdDocBase = {};
   i18nEdRender();
+  // v37.85 — the privacy statement and the terms, passage by passage, with
+  // their shipped wording where the dictionary holds no correction.
+  var docBase = await legalDocBase(lang);
+  if (_i18nEdLang === lang && _i18nEdDraft) {
+    _i18nEdDocBase = docBase;
+    Object.keys(docBase).forEach(function(k){ if (!_i18nEdDraft[k]) _i18nEdDraft[k] = docBase[k]; });
+    i18nEdInvalidate(); i18nEdRender();
+  }
   // …and again once the unopened panels have been drawn, so the table lists
   // every string the app has rather than every string it happens to be showing.
   await i18nForgetSelfTestWords();
@@ -14280,6 +14290,7 @@ function i18nEdKeys() {
   var selfTest = i18nSelfTestWords();
   i18nFullCatalogue().forEach(function(k){ if (!selfTest[k]) seen[k] = 1; });
   i18nMissingList().forEach(function(k){ if (!selfTest[k]) seen[k] = 1; });
+  Object.keys(_i18nEdDocBase || {}).forEach(function(k){ seen[k] = 1; });   // v37.85 — the documents' passages
   var live = Object.keys(seen);
   // The live keys indexed by their normalised form, so the "already ported"
   // test below can be asked about words rather than about punctuation. Built
@@ -14731,7 +14742,15 @@ async function i18nEdSave() {
   if (!_i18nEdDraft) return;
   if (!_i18nEdDirty) { toast('Nothing has been changed.'); return; }
   var lang = _i18nEdLang, name = i18nLangName(lang);
-  var doc = { lang: lang, strings: _i18nEdDraft, count: Object.keys(_i18nEdDraft).length,
+  // v37.85 — a document passage is kept only when it was corrected: the
+  // shipped wording stays in its page, and a later fix there is not masked.
+  var strings = {};
+  Object.keys(_i18nEdDraft).forEach(function(k) {
+    var base = (_i18nEdDocBase || {})[k];
+    if (base !== undefined && String(_i18nEdDraft[k]).replace(/\s+/g, ' ').trim() === base) return;
+    strings[k] = _i18nEdDraft[k];
+  });
+  var doc = { lang: lang, strings: strings, count: Object.keys(strings).length,
               updatedAt: Date.now(), by: (window._fbUser && window._fbUser.email) || '', edited: true };
   var where = await i18nWriteCloud(lang, doc);
   // The live interface follows immediately — the point of an editor you can see
@@ -23526,6 +23545,7 @@ async function legalLoadTerms() {
     var doc = new DOMParser().parseFromString(html, 'text/html');
     doc.querySelectorAll('script,style,link,meta,title').forEach(function(n){ n.remove(); });
     var h1 = doc.querySelector('h1'); if (h1) h1.remove();
+    legalApplyDict(doc, _i18nDict);                                      // v37.85 — corrections from the editor
     host = document.getElementById('tgTerms'); if (!host) return;
     host.innerHTML = doc.body.innerHTML;
     var dir = doc.documentElement.getAttribute('dir'); if (dir) host.setAttribute('dir', dir);
@@ -23804,6 +23824,51 @@ function legalFile(which) {
   return base + (LEGAL_LANGS.indexOf(l) !== -1 ? '.' + l : '') + '.html';
 }
 window.legalFile = legalFile;
+// v37.85 — Tony: "the editor should find any word that is translated, no matter
+// where". Every passage of a translated document carries data-k, its key in
+// the interface dictionary ("📜 Privacy statement · <the English words>"; see
+// tools/legal-keys.py). The editor lists them like any phrase; a correction is
+// stored under that key and shown in place of the shipped wording — here for
+// the kitchen-rules page, and by legal-i18n.js (the same rule) in the pages.
+var LEGAL_KEY_PREFIX = { privacy: '📜 Privacy statement · ', terms: '⚖️ Terms · ' };
+function legalApplyDict(root, dict) {
+  if (!root || !dict) return 0;
+  var norm = function(x){ return String(x || '').replace(/\s+/g, ' ').trim(); };
+  var n = 0;
+  Array.prototype.forEach.call(root.querySelectorAll('[data-k]'), function(el) {
+    var t = dict[el.getAttribute('data-k')];
+    if (typeof t !== 'string' || !norm(t) || norm(t) === norm(el.textContent)) return;
+    var marks = Array.prototype.filter.call(el.children, function(c){ return c.tagName !== 'BR'; });
+    var parts = [norm(t)];
+    marks.forEach(function(m) {
+      var w = norm(m.textContent); if (!w) return;
+      for (var i = 0; i < parts.length; i++) {
+        if (typeof parts[i] !== 'string') continue;
+        var at = parts[i].indexOf(w); if (at === -1) continue;
+        parts.splice(i, 1, parts[i].slice(0, at), m.cloneNode(true), parts[i].slice(at + w.length)); return;
+      }
+    });
+    el.textContent = '';
+    parts.forEach(function(x){ el.appendChild(typeof x === 'string' ? el.ownerDocument.createTextNode(x) : x); });
+    n++;
+  });
+  return n;
+}
+// The shipped wording of both documents in one language: { key: words }.
+async function legalDocBase(lang) {
+  var out = {};
+  if (LEGAL_LANGS.indexOf(lang) === -1) return out;
+  for (var which of ['privacy', 'terms']) {
+    try {
+      var r = await fetch(which + '.' + lang + '.html', { cache: 'no-cache' });
+      if (!r.ok) continue;
+      var d = new DOMParser().parseFromString(await r.text(), 'text/html');
+      d.querySelectorAll('[data-k]').forEach(function(el){ out[el.getAttribute('data-k')] = el.textContent.replace(/\s+/g, ' ').trim(); });
+    } catch(e) {}
+  }
+  return out;
+}
+window.legalApplyDict = legalApplyDict; window.legalDocBase = legalDocBase;
 // The documents, inside the app (they are this copy's own pages).
 function openLegalDoc(which) {
   var file = legalFile(which);
@@ -23819,6 +23884,9 @@ function openLegalDoc(which) {
     + '<iframe id="legalDocFrame" src="' + escA(file) + '" title="' + escA(title) + '" style="flex:1;border:0;width:100%;background:#fff;"></iframe></div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
+  // Corrections made in the editor show at once, before they are published.
+  var fr = ov.querySelector('#legalDocFrame');
+  fr.onload = function(){ try { if (fr.contentWindow.mknLegalApply) fr.contentWindow.mknLegalApply(_i18nDict || {}); } catch(e) {} };
   return ov;
 }
 window.openAbout = openAbout; window.aboutCheckUpdate = aboutCheckUpdate; window.openLegalDoc = openLegalDoc;

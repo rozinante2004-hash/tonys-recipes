@@ -6326,11 +6326,60 @@ window.SELF_TESTS = [
             if(d.body.textContent.indexOf('Tony Schvekher')===-1) throw new Error(f+' does not name the operator');
             d.querySelectorAll('a[href^="privacy"]:not([lang="en"])').forEach(function(a){ if(a.getAttribute('href')!=='privacy.'+l+'.html') throw new Error(f+' links to '+a.getAttribute('href')+' instead of the same language'); });
             if(doc==='privacy') ['tony.schvekher@gmail.com','Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
+            // v37.85 — every passage is tied to its English twin (tools/legal-keys.py), or the editor cannot offer it.
+            var sel='h1,h2,h3,p,li,th,td,div.box,div.meta', words=function(el){ return el.textContent.replace(/\s+/g,' ').trim(); };
+            var enB=Array.prototype.filter.call(en[doc].querySelectorAll(sel), function(el){ return !el.closest('[data-no-k]'); });
+            var trB=Array.prototype.filter.call(d.querySelectorAll(sel), function(el){ return !el.closest('[data-no-k]'); });
+            if(trB.length!==enB.length) throw new Error(f+' has '+trB.length+' passages, the English '+enB.length+' — run tools/legal-keys.py');
+            trB.forEach(function(el,j){ var want=LEGAL_KEY_PREFIX[doc]+words(enB[j]); if(el.getAttribute('data-k')!==want) throw new Error(f+' passage '+(j+1)+' is not keyed to its English twin — run tools/legal-keys.py'); });
+            if(!d.querySelector('script[src="legal-i18n.js"]')) throw new Error(f+' does not load legal-i18n.js, so corrections never show');
           }
         }
         _i18nLang='en';
         if(legalFile('privacy')!=='privacy.html') throw new Error('English does not open the English text');
       } finally { _i18nLang=realLang; }
+    } },
+
+  { id:'legal_corrections', group:'UI', name:'✏️ The translation editor finds every passage of the privacy statement and the terms; a correction shows on the kitchen-rules page and in the document, and only corrections are saved (v37.85)',
+    test: async()=>{
+      var real={ lang:_i18nLang, dict:_i18nDict, edLang:_i18nEdLang, draft:_i18nEdDraft, base:_i18nEdDocBase, dirty:_i18nEdDirty, write:window.i18nWriteCloud, toast:window.toast };
+      var rowsEl=document.getElementById('i18nEdRows'), rowsWas=rowsEl ? rowsEl.innerHTML : null;   // saving redraws the editor's rows
+      var kTitle=LEGAL_KEY_PREFIX.terms+'Terms of Use and Disclaimer';
+      var kAgree=Object.keys(await legalDocBase('ar')).filter(function(k){ return k.indexOf(LEGAL_KEY_PREFIX.terms+'These terms are an agreement')===0; })[0];
+      try{
+        var base=await legalDocBase('ar');
+        if(Object.keys(base).length<100 || !base[kTitle] || !kAgree) throw new Error('the Arabic documents\' passages cannot be read: '+Object.keys(base).length);
+        // The editor lists them as live phrases, not orphans, and its search finds them.
+        _i18nEdLang='ar'; _i18nEdDocBase=base; _i18nEdDraft={}; Object.keys(base).forEach(function(k){ _i18nEdDraft[k]=base[k]; });
+        i18nEdInvalidate(); var info=i18nEdInfo();
+        if(info.all.indexOf(kTitle)===-1 || info.orphan(kTitle)) throw new Error('the editor does not offer the terms\' title as a phrase');
+        // A correction keeps the passage's link around the same words.
+        var linkWords=new DOMParser().parseFromString(await (await fetch('terms.ar.html',{cache:'no-store'})).text(),'text/html').querySelector('[data-k="'+kAgree.replace(/"/g,'\\"')+'"] a').textContent;
+        var dict={}; dict[kTitle]='عنوان مصحَّح'; dict[kAgree]='نص مصحَّح يذكر '+linkWords+' هنا.';
+        var parsed=new DOMParser().parseFromString(await (await fetch('terms.ar.html',{cache:'no-store'})).text(),'text/html');
+        if(legalApplyDict(parsed, dict)!==2) throw new Error('the corrections were not applied');
+        if(parsed.querySelector('h1').textContent!=='عنوان مصحَّح') throw new Error('the corrected title does not show');
+        var a=parsed.querySelector('[data-k="'+kAgree.replace(/"/g,'\\"')+'"] a');
+        if(!a || a.textContent!==linkWords || !/privacy\.ar\.html/.test(a.getAttribute('href'))) throw new Error('the correction lost the link to the privacy statement');
+        // Saving keeps the corrections only: shipped wording stays in its page.
+        _i18nEdDraft[kTitle]='عنوان مصحَّح'; _i18nEdDirty=true;
+        var saved=null; window.i18nWriteCloud=async function(l, d){ saved=d; return 'cloud'; }; window.toast=function(){};
+        await i18nEdSave();
+        if(!saved || saved.strings[kTitle]!=='عنوان مصحَّح') throw new Error('the correction was not saved');
+        var docKeys=Object.keys(saved.strings).filter(function(k){ return k.indexOf(LEGAL_KEY_PREFIX.terms)===0 || k.indexOf(LEGAL_KEY_PREFIX.privacy)===0; });
+        if(docKeys.length!==1) throw new Error('unchanged passages were saved too: '+docKeys.length);
+        // The document window applies the app's own dictionary as soon as the page has loaded.
+        _i18nLang='ar'; _i18nDict=dict;
+        openLegalDoc('terms');
+        var fr=document.getElementById('legalDocFrame'), h='';
+        for(var i=0;i<40;i++){ await wait(100); try{ h=fr.contentDocument.querySelector('h1').textContent; }catch(e){} if(h==='عنوان مصحَّح') break; }
+        if(h!=='عنوان مصحَّح') throw new Error('the document window does not show the correction: '+h);
+      } finally {
+        _i18nLang=real.lang; _i18nDict=real.dict; _i18nEdLang=real.edLang; _i18nEdDraft=real.draft; _i18nEdDocBase=real.base; _i18nEdDirty=real.dirty;
+        window.i18nWriteCloud=real.write; window.toast=real.toast; i18nEdInvalidate();
+        if(rowsEl) rowsEl.innerHTML=rowsWas; try{ renderLangMenu(); }catch(e){}
+        var o=document.getElementById('legalDocOverlay'); if(o) o.remove();
+      }
     } },
 
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',

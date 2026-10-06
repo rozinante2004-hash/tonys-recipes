@@ -815,6 +815,28 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.85 — the translation editor finds every translated word, the
+    documents included.** Tony could not find "תנאי שימוש והסרת אחריות" in
+    the editor: it was the Hebrew terms page's title, and the documents were
+    not in the dictionary. He: "the editor should find any word that is
+    translated, no matter where". Now every passage of privacy.<l>.html and
+    terms.<l>.html carries data-k = its dictionary key ("📜 Privacy
+    statement · <English words>" / "⚖️ Terms · …", LEGAL_KEY_PREFIX), written
+    by `python3 tools/legal-keys.py` (pairs blocks h1/h2/h3/p/li/th/td/
+    div.box/div.meta with the English page in order; the translation note is
+    data-no-k; fails if the structure differs). The translated pages ARE the
+    source now — edit them, then run the tool. The editor loads the shipped
+    wording (`legalDocBase`) as live rows; i18nEdSave stores a document
+    passage only when it differs from the page, so later fixes to a page are
+    not masked. Corrections show: on the kitchen-rules page
+    (`legalApplyDict`), in the in-app document window (the app passes its
+    dictionary to the page's `mknLegalApply` on load), and in a page opened
+    on its own (legal-i18n.js reads i18n/<lang>.json). Inline bold, links
+    and <bdi> are put back around the same words. Also: Hebrew terms title
+    → "תנאי שימוש והגבלת אחריות" (Tony's wording), §10 → "שלילת מצגים
+    והתחייבויות" (§11 is already "הגבלת אחריות"). Test `legal_corrections`;
+    `legal_translated` checks every key. Searching ~2,600 entries is a
+    plain scan, instant — Tony asked whether to index it: not needed.
   - **Released to the family app and the beta: v37.84 (6 Oct 2026, Tony's yes, CI green on a1ede81; released as a60f49f = that + the languages Tony published from the family app, JSON only; the family's Pages deploy checked: success).**
   - **v37.84 — every window translatable; the privacy statement and the
     terms in all ten languages.** Tony: in Hebrew, the privacy statement and
