@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.84 (6 Oct 2026, Tony's yes, CI green on a1ede81; released as a60f49f = that + the languages Tony published from the family app, JSON only; the family's Pages deploy checked: success).**
   - **v37.84 — every window translatable; the privacy statement and the
     terms in all ten languages.** Tony: in Hebrew, the privacy statement and
     terms stayed English, "both the button and the content", and "run a scan
