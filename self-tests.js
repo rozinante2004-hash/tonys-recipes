@@ -6387,6 +6387,31 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'i18n_edit_only_where_held', group:'UI', name:'✏️ Translations are edited only in the copy that holds them; elsewhere the owner is told where (v37.87)',
+    test: async()=>{
+      var real={ owner:window.isAppOwner, user:window._fbUser, own:window.i18nCentralIsOwn, toast:window.toast }, said='';
+      try{
+        window.isAppOwner=function(){ return true; }; window._fbUser={ uid:'uO', email:'owner@example.com' }; window.toast=function(m){ said=String(m||''); };
+        // The family copy holds them (in the test and beta builds this is stood in for).
+        var family=(APP_CONFIG.languageSource||{}).projectId===APP_CONFIG.firebase.projectId;
+        if(family!==i18nCentralIsOwn()) throw new Error('which copy holds the translations is misjudged');
+        window.i18nCentralIsOwn=function(){ return true; };
+        if(!i18nCanEdit()) throw new Error('the owner cannot edit in the copy that holds the translations');
+        // Tony's case: the test copy, its own project, the family's translations.
+        window.i18nCentralIsOwn=function(){ return false; };
+        if(i18nCanEdit()) throw new Error('the test copy offers to edit translations it does not hold — the edits vanish');
+        renderLangMenu();
+        if(!document.getElementById('i18nEditElsewhere') || document.getElementById('i18nUpdateAllBtn')) throw new Error('the menu does not say where translations are edited');
+        await openI18nEditor();
+        if(document.getElementById('i18nOverlay').classList.contains('open') || !/family app/.test(said)) throw new Error('the editor opened, or did not say where: '+said);
+        said=''; await i18nUpdateAll();
+        if(!/family app/.test(said)) throw new Error('Update all did not say where: '+said);
+      } finally {
+        window.i18nCentralIsOwn=real.own; window.isAppOwner=real.owner; window._fbUser=real.user; window.toast=real.toast;
+        try{ renderLangMenu(); }catch(e){}
+      }
+    } },
+
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
     test: async()=>{
       var real={ ask:window.askConfirm, fetch:window.fetch, user:window._fbUser, toast:window.toast }, asked=[], sent=[];
@@ -11814,6 +11839,10 @@ window.SELF_TESTS = [
 
   { id:'i18n_languages_menu_badge_update_all', group:'UI', name:'Ready languages, the 🌐 badge, and Update all (v36.64)',
     test: async()=>{
+      // v37.87 — editing happens only in the copy that holds the translations; this test is that copy
+      // (the test build's own project is not, which is right for the app and not for this test).
+      var _ownWas=window.i18nCentralIsOwn; window.i18nCentralIsOwn=function(){ return true; };
+      try{ return await (async()=>{
       ['i18nUpdateAll','i18nIndexFetch','i18nSupportedLangs','i18nRenderBadge'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       // Everything touched is parked: Tony's device has real languages, a real
       // known-list and real "still missing" lists.
@@ -11907,6 +11936,7 @@ window.SELF_TESTS = [
         try{ progressClose(); }catch(e){}
         renderLangMenu();
       }
+      })(); } finally { window.i18nCentralIsOwn=_ownWas; }
     } },
 
   { id:'i18n_cards_follow_the_real_switch', group:'UI', name:'Cards change language through the 🌐 menu, both ways (v36.67)',
@@ -11947,6 +11977,10 @@ window.SELF_TESTS = [
 
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
+      // v37.87 — editing happens only in the copy that holds the translations; this test is that copy
+      // (the test build's own project is not, which is right for the app and not for this test).
+      var _ownWas=window.i18nCentralIsOwn; window.i18nCentralIsOwn=function(){ return true; };
+      try{ return await (async()=>{
       ['openI18nEditor','i18nEdRender','i18nEdEdit','i18nEdSave','i18nEdRecommend','i18nEdTake']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       if(!document.getElementById('i18nOverlay'))
@@ -12124,6 +12158,7 @@ window.SELF_TESTS = [
         try{ i18nRevertAll(); }catch(e){}
         i18nInstall(prevLang, prevDict);
       }
+      })(); } finally { window.i18nCentralIsOwn=_ownWas; }
     } },
 
   { id:'i18n_never_touches_a_recipe', group:'UI', name:'Translating the interface never touches a recipe (v36.31)',

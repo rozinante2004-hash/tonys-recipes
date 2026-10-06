@@ -57,7 +57,12 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
 (async () => {
   const { chromium } = loadPlaywright();
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  // v37.87 — A LIVED-IN BROWSER. CI's was bare: nothing on the clipboard, no
+  // extension, no remembered folder. Tony's has all three, and two tests that
+  // passed here failed on his Chrome. The clipboard may be read, so it can hold
+  // something; see LIVED_IN below for the rest.
+  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
 
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(String(e.message)));
@@ -162,6 +167,20 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     // English interface, metric units, the sync state, the backup record, and
     // cloud writes held back. Before this the runner parked nothing.
     const langBefore = (typeof window.i18nLang === 'function') ? window.i18nLang() : 'en';
+    // LIVED_IN: what a real person's browser has before the Self Test starts —
+    // something copied, the extension installed (it marks the page), and the
+    // folder the extension was unzipped into. The suite must run as on a bare
+    // browser regardless, and hand all of it back untouched.
+    const tag = (typeof window.extTag === 'function') ? window.extTag() : 'live';
+    const LIVED_IN = {
+      clip: 'Copied earlier by the person running this: not a link, and well over forty characters long.',
+      marks: { ['data-mkn-extension-' + tag]: '1.6.1', ['data-mkn-extension-' + tag + '-from']: 'store' },
+      folder: { where: 'Documents › My Kitchen Notes extension', handle: null, at: 1 }
+    };
+    let clipSet = false;
+    try { await navigator.clipboard.writeText(LIVED_IN.clip); clipSet = true; } catch (e) {}
+    Object.keys(LIVED_IN.marks).forEach(k => document.documentElement.setAttribute(k, LIVED_IN.marks[k]));
+    window._extFolder = LIVED_IN.folder;
     const parked = (typeof window._selfTestPark === 'function') ? await window._selfTestPark() : null;
     // see note 3 — the app raises this flag around its own run, and anything
     // that behaves differently while tests are running is invisible here unless
@@ -242,11 +261,16 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     }
     if (hasFlag) window._selfTestRunning = false;
     if (parked) window._selfTestUnpark(parked);
+    const livedInLost = [];
+    Object.keys(LIVED_IN.marks).forEach(k => { if (document.documentElement.getAttribute(k) !== LIVED_IN.marks[k]) livedInLost.push('the extension\'s mark ' + k); });
+    if (window._extFolder !== LIVED_IN.folder) livedInLost.push('the remembered extension folder');
+    if (clipSet) { let c = null; try { c = await navigator.clipboard.readText(); } catch (e) {} if (c !== LIVED_IN.clip) livedInLost.push('what was on the clipboard'); }
+    Object.keys(LIVED_IN.marks).forEach(k => document.documentElement.removeAttribute(k));
     const langAfter = (typeof window.i18nLang === 'function') ? window.i18nLang() : 'en';
     return {
       langBefore, langAfter,
       tests: out,
-      sawSelfTestFlag: hasFlag,
+      sawSelfTestFlag: hasFlag, livedInLost, clipSet,
       suiteStillOpen: !!(overlay && overlay.classList.contains('open')),
       leftOpen: Array.from(document.querySelectorAll('.open')).map(e => e.id).filter(Boolean)
     };
@@ -278,6 +302,12 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     console.log(`✗ HYGIENE: the interface started in "${results.langBefore}" and was left in "${results.langAfter}".`);
     hygiene++;
   }
+  // …and one that does not hand back the person's own browser state.
+  if (results.livedInLost.length) {
+    console.log(`✗ HYGIENE: the run did not give back ${results.livedInLost.join(', ')}.`);
+    hygiene++;
+  }
+  if (!results.clipSet) console.log('(the clipboard could not be filled here — the clipboard part of the lived-in browser was skipped)');
   const stranded = results.leftOpen.filter(id => id !== 'selfTestOverlay');
   if (stranded.length) {
     console.log(`✗ HYGIENE: dialogs left open: ${stranded.join(', ')} — close them in finally, not try.`);

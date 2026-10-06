@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.86 -->
+<!-- Tony's Recipes Collection v37.87 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2341,9 +2341,12 @@ async function _selfTestPark() {
   var _extMarks = {};
   Array.prototype.forEach.call(document.documentElement.attributes, function(a){ if (/^data-mkn-extension-/.test(a.name)) _extMarks[a.name] = a.value; });
   Object.keys(_extMarks).forEach(function(n){ document.documentElement.removeAttribute(n); });
+  // …and so does the folder the extension was unzipped into (remembered per copy):
+  // with it, the offer rightly says "It is in <folder>" instead of the download.
+  var _extFolderWas = window._extFolder; window._extFolder = null;
   return { langWas: _langWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
            backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas,
-           recipesWas: _recipesWas, extMarks: _extMarks };
+           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas };
 }
 function _selfTestUnpark(p) {
   if (!p) return;
@@ -2351,6 +2354,7 @@ function _selfTestUnpark(p) {
     Array.prototype.slice.call(document.documentElement.attributes).forEach(function(a){ if (/^data-mkn-extension-/.test(a.name)) document.documentElement.removeAttribute(a.name); });
     Object.keys(p.extMarks).forEach(function(n){ document.documentElement.setAttribute(n, p.extMarks[n]); });
   }
+  if ('extFolderWas' in p) window._extFolder = p.extFolderWas;
   // The real connection back BEFORE anything else can save. A test that
   // swapped in its own fake and restored "the previous one" restored the
   // guard, which is why this assigns rather than trusting the chain.
@@ -6431,7 +6435,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.86';
+var APP_VERSION = 'v37.87';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9118,7 +9122,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.86</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.87</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9824,7 +9828,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.86</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.87</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13617,6 +13621,9 @@ function renderLangMenu() {
   // missing. Admins only — it writes the shared translations.
   if (i18nCanEdit() && supported.length)
     h += '<button class="drop-item" id="i18nUpdateAllBtn" onclick="closeDrop(\'langMenu\');i18nUpdateAll()">🔄 Update all supported languages</button>';
+  // v37.87 — in the test and beta copies the owner is told where editing is.
+  if (!i18nCanEdit() && isAppOwner() && !i18nCentralIsOwn())
+    h += '<div class="drop-item" id="i18nEditElsewhere" style="cursor:default;color:var(--muted);font-size:12.5px;white-space:normal;">✏️ ' + escH(i18nEditElsewhereNote()) + '</div>';
   h += '<button class="drop-item" onclick="closeDrop(\'langMenu\');addLanguage()">➕ Add a language…</button>'
      + (i18nCanEdit()
         ? '<button class="drop-item" onclick="closeDrop(\'langMenu\');openI18nEditor()">✏️ Edit translations…</button>'
@@ -13725,7 +13732,10 @@ function i18nCanEdit() {
     // v36.85 — in the household layout the translations are app-wide and the
     // rules let only the app's own admins write them; v36.97 — so they are in
     // the first layout too (i18n/…, the same place), and so is who edits them.
-    return isAppOwner();
+    // v37.87 — and only in the copy that holds them. Tony corrected Hebrew in
+    // the test copy: it was saved in the test project, which nothing reads —
+    // every copy shows the family's (languageSource) — so it vanished.
+    return isAppOwner() && i18nCentralIsOwn();
   } catch(e) { return false; }
 }
 window.i18nCanEdit = i18nCanEdit;
@@ -13893,7 +13903,7 @@ function i18nMissingFor(lang) {
   try { return JSON.parse(localStorage.getItem(i18nMissKey(lang)) || '[]') || []; } catch(e) { return []; }
 }
 async function i18nUpdateAll() {
-  if (!i18nCanEdit()) { toast('Updating the shared translations needs full access.'); return null; }
+  if (!i18nCanEdit()) { toast(isAppOwner() && !i18nCentralIsOwn() ? i18nEditElsewhereNote() : 'Updating the shared translations needs full access.', 7000); return null; }
   try { await i18nIndexFetch(); } catch(e) {}
   var langs = i18nSupportedLangs();
   if (!langs.length) { toast('No language has been translated yet — 🌐 → pick one to start.'); return null; }
@@ -14215,9 +14225,12 @@ var _i18nEdDocBase = {};    // v37.85 — { document key: shipped wording } for 
 var _i18nEdDirty = false;
 var I18N_ED_PAGE = 120;       // rows drawn at once; 600 live inputs is a phone tax
 
+function i18nEditElsewhereNote() {
+  return 'The translations are edited in the family app — every copy shows those.';
+}
 async function openI18nEditor() {
   if (!i18nCanEdit()) {
-    toast('Editing the shared translations needs full access.', 5000);
+    toast(isAppOwner() && !i18nCentralIsOwn() ? i18nEditElsewhereNote() : 'Editing the shared translations needs full access.', 7000);
     return;
   }
   var lang = _i18nLang;

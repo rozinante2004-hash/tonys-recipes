@@ -815,6 +815,23 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.87 — translations edited only where they live; the Self Test on a
+    lived-in browser.** (1) Tony fixed Hebrew labels in the TEST copy's
+    editor: saved to tonys-recipes-test/i18n/he, which nothing reads — every
+    copy shows the family's (languageSource) — so they vanished. Now
+    `i18nCanEdit()` = isAppOwner() && i18nCentralIsOwn(); elsewhere the 🌐
+    menu says "✏️ The translations are edited in the family app", and the
+    editor / Update all say so. Tests that exercise editing stand in for
+    i18nCentralIsOwn (the test build is not the holding copy). His three
+    Hebrew edits must be redone in the family app. (2) v37.86's test copy
+    still failed extension_offer on his Chrome: the copy REMEMBERS the folder
+    the extension was unzipped into (window._extFolder, IndexedDB), and then
+    the offer shows "It is in <folder>" — no download. `_selfTestPark` sets
+    it aside too. (3) tests/run-self-tests.js now runs every suite on a
+    LIVED-IN browser: clipboard permission with text on it, the extension's
+    marks, a remembered folder — set before parking, and the run fails
+    (HYGIENE) unless all three come back untouched. Against the released
+    v37.84 it reproduces Tony's two family failures exactly.
   - **v37.86 — two Self Test failures on Tony's own Chrome (family, v37.84),
     both the tests assuming a bare browser.** (1) import_facebook_link_alone:
     the app reads navigator.clipboard.read() FIRST; headless Chrome refuses
