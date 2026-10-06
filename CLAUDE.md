@@ -815,7 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
-  - **Released to the family app and the beta: v37.80–v37.82 (6 Oct 2026, Tony's yes, CI green on 6b266a4).** The rules (requestLog, member reads, notes, linkTalk) must be published in each copy.
+  - **Released to the family app and the beta: v37.80–v37.82 (6 Oct 2026, Tony's yes, CI green on 6b266a4).** The family's GitHub Pages deploy of it FAILED (actions/deploy-pages: "Fetching artifact metadata failed"), and the family stayed on v37.79 — Tony noticed. Re-running the failed job cannot work ("Multiple artifacts named github-pages … count is 2"); a fresh run does: `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/workflows/deploy.yml/dispatches -f ref=main` (succeeded). AFTER EVERY RELEASE: check that "Deploy to GitHub Pages" for that commit succeeded. The rules (requestLog, member reads, notes, linkTalk) must be published in each copy.
   - **v37.82 — ℹ️ About; the Privacy Statement and the Terms of Use.** Tony:
     under ? an About with the version, whether to update ("Update now" →
     `swUpdateNow`), What leaves this device, a privacy statement and a
