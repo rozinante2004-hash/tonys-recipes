@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.87 (7 Oct 2026, Tony's yes, CI green on c8310da, which includes v37.85 and v37.86; the family's Pages deploy checked: success).**
   - **v37.87 — translations edited only where they live; the Self Test on a
     lived-in browser.** (1) Tony fixed Hebrew labels in the TEST copy's
     editor: saved to tonys-recipes-test/i18n/he, which nothing reads — every
