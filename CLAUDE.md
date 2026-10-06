@@ -815,6 +815,25 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.82 — ℹ️ About; the Privacy Statement and the Terms of Use.** Tony:
+    under ? an About with the version, whether to update ("Update now" →
+    `swUpdateNow`), What leaves this device, a privacy statement and a
+    disclaimer, "as watertight as possible". His answers: Israeli law, Tel Aviv
+    courts; operator Tony Schvekher, private individual; 16+ (younger only in a
+    parent's household); ONE statement for the app and the extension.
+    `privacy.html` and `terms.html` (repo root, served by every copy; English
+    prevails), opened in the app by `openLegalDoc` (iframe, z above the sign-in
+    screen). `openAbout` / `aboutCheckUpdate` (version.json, no-store). The ?
+    window's bottom link is now ℹ️ About (What leaves this device moved inside).
+    The sign-in screen now says the collection is in the app's cloud database
+    (NOT "your own Google account" / "nothing kept on our servers" — untrue
+    since the household layout) and "By signing in you agree to the Terms of
+    Use and the Privacy Statement"; the privacy panel's wording likewise.
+    privacy-extension.html (the store's link) points to the full statement.
+    RULE: privacy.html must list every service the app sends data to — the
+    `about_and_legal` test checks the providers named in privacyEntries and
+    the Worker's (Gemini, relays …) appear in it. Told Tony: have an Israeli
+    lawyer review before going public; nothing waives mandatory consumer law.
   - **v37.81 — a note with a link request; households talk about a link.**
     Tony: "an option to add a note to the request … a dialog between the
     requester and the requested … without divulging personal information".

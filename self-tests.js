@@ -6197,6 +6197,47 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'about_and_legal', group:'UI', name:'ℹ️ About under ?: the version and whether to update (with Update now), what leaves this device, the privacy statement and the terms — agreed to at sign-in (v37.82)',
+    test: async()=>{
+      var realF=window.fetch, realUp=window.swUpdateNow, updated=0;
+      try{
+        if(!document.querySelector('#helpOverlay #helpAboutLink')) throw new Error('? has no ℹ️ About');
+        var serverV='v99.1';
+        window.fetch=async function(u){ if(/version\.json/.test(String(u))) { if(serverV===null) throw new Error('offline'); return new Response(JSON.stringify({ version:serverV }), { status:200 }); } return realF.apply(window, arguments); };
+        window.swUpdateNow=function(){ updated++; };
+        await openAbout();
+        var ov=document.getElementById('aboutOverlay');
+        if(!ov || document.getElementById('aboutVersion').textContent!==APP_VERSION) throw new Error('About does not say which version runs');
+        if(!/v99\.1 is available/.test(ov.textContent) || !document.getElementById('aboutUpdateNow')) throw new Error('a newer version is not offered: '+document.getElementById('aboutUpdate').textContent);
+        document.getElementById('aboutUpdateNow').click();
+        if(updated!==1) throw new Error('Update now does not update');
+        serverV=APP_VERSION; if(await aboutCheckUpdate()!=='latest' || !/latest version/.test(ov.textContent)) throw new Error('an up-to-date app is not said to be');
+        serverV=null; if(await aboutCheckUpdate()!=='unknown') throw new Error('offline is not said');
+        ['aboutPrivacyPanel','aboutPrivacyDoc','aboutTermsDoc'].forEach(function(id){ if(!document.getElementById(id)) throw new Error('About has no '+id); });
+        // The documents open inside the app — above the sign-in screen too.
+        openLegalDoc('privacy');
+        var fr=document.getElementById('legalDocFrame');
+        if(!fr || fr.getAttribute('src')!=='privacy.html' || parseInt(document.getElementById('legalDocOverlay').style.zIndex,10)<=9999) throw new Error('the privacy statement does not open in the app');
+        openLegalDoc('terms');
+        if(document.getElementById('legalDocFrame').getAttribute('src')!=='terms.html') throw new Error('the terms do not open');
+        if(!document.getElementById('loginTermsLink') || !document.getElementById('loginPrivacyDocLink')) throw new Error('signing in does not mention the terms and the privacy statement');
+        // What the documents say, and that the privacy statement names every service the app sends to.
+        window.fetch=realF;
+        var priv=await (await fetch('privacy.html?t='+Date.now(), { cache:'no-store' })).text(), terms=await (await fetch('terms.html?t='+Date.now(), { cache:'no-store' })).text();
+        ['Tony Schvekher','tony.schvekher@gmail.com','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
+          if(priv.indexOf(w)===-1) throw new Error('the privacy statement does not mention '+w); });
+        ['Tony Schvekher','Tel Aviv','State of Israel','as is','allerg','AI','indemnif','privacy.html','Effective date'].forEach(function(w){
+          if(terms.indexOf(w)===-1) throw new Error('the terms do not mention '+w); });
+        // The app must not claim what the statement contradicts.
+        var src=await (await fetch(new URL('index.html?t='+Date.now(), location.href), { cache:'no-store' })).text();
+        var markup=src.replace(/<!--[\s\S]*?-->/g,'').replace(/^\s*\/\/.*$/gm,'');
+        if(/your own Firebase project|in <strong>your own<\/strong> Google account|Nothing is kept on this app/.test(markup)) throw new Error('the app still says the collection is in the person’s own Google account');
+      } finally {
+        window.fetch=realF; window.swUpdateNow=realUp;
+        ['aboutOverlay','legalDocOverlay'].forEach(function(id){ var o=document.getElementById(id); if(o) o.remove(); });
+      }
+    } },
+
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
     test: async()=>{
       var real={ ask:window.askConfirm, fetch:window.fetch, user:window._fbUser, toast:window.toast }, asked=[], sent=[];
@@ -10340,9 +10381,10 @@ window.SELF_TESTS = [
           throw new Error('the privacy panel sits below the login screen that links to it');
       } finally { closeM('privacyOverlay'); }
 
-      // v37.75 — Tony: at the bottom of the ? window, not in ⚙️ Troubleshooting.
-      var hl=document.getElementById('helpPrivacyLink');
-      if(!hl || !document.getElementById('helpOverlay').contains(hl)) throw new Error('it is not at the bottom of the ? window');
+      // v37.75 — Tony: under ?, not in ⚙️ Troubleshooting; v37.82 — inside ? → ℹ️ About.
+      var hl=document.getElementById('helpAboutLink');
+      if(!hl || !document.getElementById('helpOverlay').contains(hl)) throw new Error('? has no ℹ️ About');
+      if(!/showPrivacyPanel/.test(String(openAbout))) throw new Error('About does not open it');
       if(document.querySelector('#settingsDrop button[onclick*="showPrivacyPanel"]')) throw new Error('it is still in ⚙️');
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       // The comment beside the change quotes the old sentence on purpose. The

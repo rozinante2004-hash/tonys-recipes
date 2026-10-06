@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.81 -->
+<!-- Tony's Recipes Collection v37.82 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6408,7 +6408,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.81';
+var APP_VERSION = 'v37.82';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9062,7 +9062,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.81</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.82</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9768,7 +9768,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.81</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.82</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -9821,9 +9821,12 @@ body.banner-shown .header {
              passes through the app's own Cloudflare Worker. Nothing is KEPT
              there, which is the claim that survives — and the full list of what
              goes where is now one tap away. -->
-        <div class="login-privacy">🔒 Your recipes are stored in <strong>your own</strong> Google account (Firebase cloud).<br>
-          Nothing is kept on this app's servers — though some features do send a recipe through them.
-          <a href="#" onclick="event.preventDefault();showPrivacyPanel();return false;" style="color:var(--terracotta);text-decoration:underline;">What leaves this device</a>.</div>
+        <!-- v37.82 — true to privacy.html: the collection is in the app's cloud database, seen by the
+             household and the households it links with; and signing in accepts the terms. -->
+        <div class="login-privacy">🔒 Your recipes are kept in the app’s cloud database, seen only by your household and the households you choose to link with.
+          <a href="#" onclick="event.preventDefault();showPrivacyPanel();return false;" style="color:var(--terracotta);text-decoration:underline;">What leaves this device</a>.<br>
+          By signing in you agree to the <a href="#" id="loginTermsLink" onclick="event.preventDefault();openLegalDoc('terms');return false;" style="color:var(--terracotta);text-decoration:underline;">Terms of Use</a>
+          and the <a href="#" id="loginPrivacyDocLink" onclick="event.preventDefault();openLegalDoc('privacy');return false;" style="color:var(--terracotta);text-decoration:underline;">Privacy Statement</a>.</div>
   </div>
 </div>
 
@@ -10234,9 +10237,10 @@ body.banner-shown .header {
     </div>
     <div id="helpAnswer" style="display:none;" class="help-answer"></div>
     <div id="helpLoading" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🤔 Thinking...</div>
-    <!-- v37.75 — Tony: not troubleshooting; at the bottom of ?. -->
+    <!-- v37.82 — Tony: "a button under ? called About" — the version (and an update), what leaves
+         this device (v37.75's link moved in there), the privacy statement and the terms. -->
     <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:10px;text-align:center;">
-      <button type="button" id="helpPrivacyLink" onclick="closeM('helpOverlay');showPrivacyPanel()" title="Who receives what, and when. Read-only — changes nothing." style="background:none;border:none;color:var(--terracotta);font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:8px;">🔒 What leaves this device</button>
+      <button type="button" id="helpAboutLink" onclick="closeM('helpOverlay');openAbout()" title="The app's version, updates, privacy and terms." style="background:none;border:none;color:var(--terracotta);font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:8px;">ℹ️ About</button>
     </div>
   </div>
 </div>
@@ -23497,6 +23501,66 @@ if ('serviceWorker' in navigator) {
 // handler, which serves the CACHED document and merely refreshes the cache for
 // next time — so the button visibly did nothing and the user had to reload twice
 // without being told. Dropping the caches first makes the reload hit the network.
+// ─── ABOUT (v37.82) ──────────────────────────────────────────────────────────
+// Tony: under ?, an About: the version, "an indication whether it should be
+// upgraded to a higher version (and if possible an Update now button)", what
+// leaves this device, a privacy statement and a disclaimer. The two documents
+// are the app's own pages (privacy.html, terms.html), shown inside the app.
+async function openAbout() {
+  var prev = document.getElementById('aboutOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'aboutOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '1260';
+  var row = 'display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:11px 12px;margin-top:8px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--heading);font:inherit;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" style="max-width:440px;text-align:start;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="aboutTitle">ℹ️ About</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'aboutOverlay\').remove()">✕</button></div>'
+    + '<div style="margin-top:6px;font-size:15px;font-weight:700;color:var(--heading);" data-no-i18n>My Kitchen Notes</div>'
+    + (function(){ var e = String(APP_CONFIG.environment || 'live'); return e === 'live' ? '' : '<div style="font-size:13px;color:var(--muted);">' + (e === 'beta' ? 'Beta' : 'Test copy') + '</div>'; })()
+    + '<div style="margin-top:10px;font-size:14px;">Version <b id="aboutVersion" data-no-i18n>' + escH(APP_VERSION) + '</b></div>'
+    + '<div id="aboutUpdate" style="font-size:13px;color:var(--muted);margin-top:4px;">⏳ Checking for a newer version…</div>'
+    + '<button type="button" id="aboutPrivacyPanel" style="' + row + '" onclick="showPrivacyPanel()">\u{1F512} What leaves this device</button>'
+    + '<button type="button" id="aboutPrivacyDoc" style="' + row + '" onclick="openLegalDoc(\'privacy\')">\u{1F4DC} Privacy statement</button>'
+    + '<button type="button" id="aboutTermsDoc" style="' + row + '" onclick="openLegalDoc(\'terms\')">⚖️ Terms of use and disclaimer</button>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;">© 2026 Tony Schvekher · <a href="mailto:tony.schvekher@gmail.com" style="color:var(--terracotta);">tony.schvekher@gmail.com</a></div>'
+    + '</div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  await aboutCheckUpdate();
+  return ov;
+}
+async function aboutCheckUpdate() {
+  var box = document.getElementById('aboutUpdate');
+  if (!box) return null;
+  var server = null;
+  try { var r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); server = String(((await r.json()) || {}).version || ''); } catch(e) {}
+  box = document.getElementById('aboutUpdate'); if (!box) return null;
+  if (!server) { box.textContent = 'Could not check for a newer version just now (offline?).'; return 'unknown'; }
+  if (versionIsNewer(server, APP_VERSION)) {
+    box.innerHTML = '<div style="color:var(--danger);font-weight:600;">\u{1F195} Version <span data-no-i18n>' + escH(server) + '</span> is available — please update.</div>'
+      + '<button type="button" id="aboutUpdateNow" onclick="swUpdateNow()" style="margin-top:8px;padding:9px 16px;border:none;border-radius:8px;background:var(--terracotta-fill);color:#fff;font-weight:700;cursor:pointer;min-height:40px;">↻ Update now</button>';
+    return 'update';
+  }
+  box.innerHTML = '<span style="color:var(--ok-text,#2e7d32);">✅ This is the latest version.</span>';
+  return 'latest';
+}
+// The documents, inside the app (they are this copy's own pages).
+function openLegalDoc(which) {
+  var file = which === 'terms' ? 'terms.html' : 'privacy.html';
+  var title = which === 'terms' ? 'Terms of use and disclaimer' : 'Privacy statement';
+  var prev = document.getElementById('legalDocOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'legalDocOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '10060';   // above the sign-in screen, which links here too
+  ov.innerHTML = '<div role="dialog" aria-modal="true" aria-label="' + escA(title) + '" style="background:var(--card-bg);border-radius:14px;width:94%;max-width:780px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.25);">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);">'
+    + '<b style="color:var(--heading);">' + escH(title) + '</b>'
+    + '<span style="display:flex;gap:8px;align-items:center;"><a href="' + escA(file) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--terracotta);">Open in a new tab ↗</a>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'legalDocOverlay\').remove()">✕</button></span></div>'
+    + '<iframe id="legalDocFrame" src="' + escA(file) + '" title="' + escA(title) + '" style="flex:1;border:0;width:100%;background:#fff;"></iframe></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  return ov;
+}
+window.openAbout = openAbout; window.aboutCheckUpdate = aboutCheckUpdate; window.openLegalDoc = openLegalDoc;
 async function swUpdateNow() {
   var banner = document.getElementById('swUpdateBanner');
   if (banner) banner.style.display = 'none';
@@ -27379,9 +27443,9 @@ function renderPrivacyPanel() {
   var host = document.getElementById('privacyBody');
   if (host) {
     var h = '<div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px;">'
-      + 'Your recipes live on this device and in your own Firebase project. Everything below is a '
-      + 'service this app can send something to, and exactly what it sends. Nothing here keeps a copy '
-      + 'of your collection.</div>';
+      + 'Your recipes live on this device and in the app\u2019s cloud database (Google Firebase). Everything below is a '
+      + 'service this app can send something to, and exactly what it sends. The full details are in the '
+      + 'Privacy statement (? \u2192 \u2139\ufe0f About).</div>';
     privacyEntries().forEach(function(e) {
       h += '<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:9px;'
          + (e.on ? '' : 'opacity:0.6;') + '">'
@@ -27392,8 +27456,8 @@ function renderPrivacyPanel() {
     });
     h += '<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:12px;">'
        + '<strong>Nothing is sold, shared or used for advertising</strong>, and no analytics of any kind '
-       + 'are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device and is '
-       + 'never uploaded, not even into a backup.</div>';
+       + 'are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, '
+       + 'is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.</div>';
     host.innerHTML = h;
   }
 }
