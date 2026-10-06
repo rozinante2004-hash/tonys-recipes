@@ -237,7 +237,13 @@ await check('…nor on someone else\'s behalf',                setDoc(doc(gina, 
 await check('…nor her own household',                        setDoc(doc(gina, 'linkRequests/L1_L1'), byCode('L1', 'L1', 'gina')), false);
 await check('…nor one that takes no requests through the app', setDoc(doc(gina, 'linkRequests/L1_L3'), byCode('L1', 'L3', 'gina')), false);
 await check('…nor carry anything else',                      setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina', { role: 'admin' })), false);
-await check('the owner asks by identifier',                  setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina')), true);
+await check('…nor a note over 500 characters (v37.81)',      setDoc(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina', { note: 'x'.repeat(501) })), false);
+await check('…nor the first message without the request',    setDoc(doc(gina, 'linkTalk/L1_L2/messages/m0'), { from: 'L1', name: 'Coded', text: 'Hi!', at: 1, by: 'gina' }), false);
+await check('the owner asks by identifier, with a note — and the note as the first message, in one batch', (async () => {
+  const b = writeBatch(gina);
+  b.set(doc(gina, 'linkRequests/L1_L2'), byCode('L1', 'L2', 'gina', { note: 'Hi! We met at the market.' }));
+  b.set(doc(gina, 'linkTalk/L1_L2/messages/m0'), { from: 'L1', name: 'Coded', text: 'Hi! We met at the market.', at: 1, by: 'gina' });
+  await b.commit(); })(), true);
 await check('…and sees it waiting',                          getDocs(query(collection(gina, 'linkRequests'), where('from', '==', 'L1'))), true);
 await check('the household asked: its owner sees it',        getDocs(query(collection(ivy, 'linkRequests'), where('to', '==', 'L2'))), true);
 // v37.80 — everyone in a household sees its requests page (Tony); only the owner and admins answer.
@@ -257,7 +263,8 @@ await check('…accepted and revoked are kept too',            Promise.all([setD
 await check('…in her own name only',                         setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'jo')), false);
 await check('…with a known answer only',                     setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('maybe', 'ivy')), false);
 await check('…about another household, under its own id',    setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy', { hid: 'L3' })), false);
-await check('…and nothing else in it',                       setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy', { note: 'x' })), false);
+await check('…with the request\'s note (v37.81)',            setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy', { note: 'Hi from Dana' })), true);
+await check('…and nothing else in it',                       setDoc(doc(ivy, 'households/L2/requestLog/L1'), logOf('blocked', 'ivy', { phone: 'x' })), false);
 await check('a reader of the household reads it',            getDocs(collection(jo, 'households/L2/requestLog')), true);
 await check('…but cannot write it',                          setDoc(doc(jo, 'households/L2/requestLog/L1'), logOf('accepted', 'jo')), false);
 await check('…nor can a stranger read it',                   getDocs(collection(carol, 'households/L2/requestLog')), false);
@@ -276,6 +283,22 @@ await check('the owner asked accepts: both halves, one batch', accept(ivy), true
 await check('both households see the link',                  Promise.all([getDocs(collection(hank, 'households/L1/links')), getDocs(collection(jo, 'households/L2/links'))]), true);
 await check('a stranger does not',                           getDocs(collection(carol, 'households/L1/links')), false);
 await check('nobody changes a link',                         updateDoc(doc(gina, 'households/L1/links/L2'), { name: 'X' }), false);
+// v37.81 — two households talking about a link: linkTalk/<a>_<b>/messages (a < b).
+const msg = (from, by, extra) => Object.assign({ from, name: 'Coded', text: 'Hello from the next street!', at: 5, by }, extra || {});
+await check('the owner writes to the linked household',      setDoc(doc(gina, 'linkTalk/L1_L2/messages/m1'), msg('L1', 'gina')), true);
+await check('…and so does anyone in it (Tony)',               setDoc(doc(hank, 'linkTalk/L1_L2/messages/m2'), msg('L1', 'hank')), true);
+await check('…and the other household answers',              setDoc(doc(jo, 'linkTalk/L1_L2/messages/m3'), msg('L2', 'jo')), true);
+await check('both households read it',                       Promise.all([getDocs(collection(hank, 'linkTalk/L1_L2/messages')), getDocs(collection(jo, 'linkTalk/L1_L2/messages'))]), true);
+await check('…a stranger does not',                          getDocs(collection(carol, 'linkTalk/L1_L2/messages')), false);
+await check('nobody writes for a household they are not in', setDoc(doc(gina, 'linkTalk/L1_L2/messages/m4'), msg('L2', 'gina')), false);
+await check('…or under another household\'s name',           setDoc(doc(gina, 'linkTalk/L1_L2/messages/m4'), msg('L1', 'gina', { name: 'Tony\'s Kitchen' })), false);
+await check('…or as someone else',                           setDoc(doc(gina, 'linkTalk/L1_L2/messages/m4'), msg('L1', 'hank')), false);
+await check('…or more than 500 characters',                  setDoc(doc(gina, 'linkTalk/L1_L2/messages/m4'), msg('L1', 'gina', { text: 'x'.repeat(501) })), false);
+await check('…or anything else in it',                       setDoc(doc(gina, 'linkTalk/L1_L2/messages/m4'), msg('L1', 'gina', { phone: '050' })), false);
+await check('…or with the pair the wrong way round',         setDoc(doc(gina, 'linkTalk/L2_L1/messages/m4'), msg('L1', 'gina')), false);
+await check('…or to a household with no request or link',    setDoc(doc(gina, 'linkTalk/L1_L3/messages/m4'), msg('L1', 'gina')), false);
+await check('a message is never changed',                    updateDoc(doc(gina, 'linkTalk/L1_L2/messages/m1'), { text: 'edited' }), false);
+await check('…nor removed',                                  deleteDoc(doc(gina, 'linkTalk/L1_L2/messages/m1')), false);
 await check('hank says where he looks from: his household',  setDoc(doc(hank, 'homes/hank'), { hid: 'L1', at: 1 }), true);
 await check('…never one he is not in',                       setDoc(doc(hank, 'homes/hank'), { hid: 'L2', at: 1 }), false);
 await check('…nor for someone else',                         setDoc(doc(hank, 'homes/jo'), { hid: 'L1', at: 1 }), false);

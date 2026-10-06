@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.80 -->
+<!-- Tony's Recipes Collection v37.81 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4261,11 +4261,11 @@ async function hhLoadLinks() {
   if (!_household || !hhDb()) return [];
   var out = [], asking = [];
   try { (await hhRef(_household.hid).collection('links').get()).forEach(function(d){
-          var x = d.data() || {}; out.push({ hid: d.id, name: x.name || '', code: x.code || '' }); }); }
+          var x = d.data() || {}; out.push({ hid: d.id, name: x.name || '', code: x.code || '', at: x.at || 0 }); }); }
   catch(e) { /* rules not published yet: no links */ }
   {   // v37.80 — everyone in the household sees what it asked (the requests page)
     try { (await hhDb().collection('linkRequests').where('from', '==', _household.hid).get()).forEach(function(d){
-            var x = d.data() || {}; asking.push({ id: d.id, label: x.toLabel || x.email || '' }); }); }
+            var x = d.data() || {}; asking.push({ id: d.id, label: x.toLabel || x.email || '', to: x.to || '', note: x.note || '', at: x.at || 0 }); }); }
     catch(e) {}
   }
   _household.links = out; _household.asking = asking;
@@ -4286,10 +4286,12 @@ function hhLinkTarget(text) {
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return { email: t.toLowerCase() };
   return null;
 }
-async function hhSendLinkRequest(text) {
+async function hhSendLinkRequest(text, note) {
   var tg = hhLinkTarget(text), me = _household, db = hhDb();
   if (!tg) return { ok: false, msg: 'That is neither an identifier (MKN-…) nor an e-mail address.' };
   var base = { from: me.hid, fromName: me.name || '', fromCode: me.code || '', by: _fbUser.uid, at: Date.now() };
+  note = String(note || '').trim().slice(0, 500);
+  if (note) base.note = note;   // v37.81
   if (tg.code) {
     if (tg.code === me.code) return { ok: false, msg: 'That is your own household’s identifier.' };
     var c;
@@ -4302,7 +4304,15 @@ async function hhSendLinkRequest(text) {
     if (had) return { ok: false, msg: 'You are already linked with ' + hhLinkName(had) + '.' };
     var ref = db.collection('linkRequests').doc(me.hid + '_' + to);
     try { if ((await ref.get()).exists) return { ok: true, via: 'code', again: true, label: tg.code }; } catch(e) {}
-    try { await ref.set(Object.assign({ to: to, via: 'code', toLabel: tg.code }, base)); }
+    try {
+      // v37.81 — the note is also the conversation's first message (same batch:
+      // the rules let a message through only between households with a request).
+      var bq = db.batch();
+      bq.set(ref, Object.assign({ to: to, via: 'code', toLabel: tg.code }, base));
+      if (note) bq.set(db.collection('linkTalk').doc(talkPair(me.hid, to)).collection('messages').doc(),
+                       { from: me.hid, name: me.name || '', text: note, at: base.at, by: _fbUser.uid });
+      await bq.commit();
+    }
     catch(e) { return { ok: false, blocked: true,
       msg: 'This household does not take requests through the app. Ask them by e-mail instead: type the address of anyone in it.' }; }
     syncLog('save', 'Asked to link with a household', tg.code);
@@ -4329,7 +4339,13 @@ async function openConnectHousehold() {
       + 'Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.',
     input: '', placeholder: 'MKN-XXXX-XXXX  /  name@example.com', okLabel: 'Send' });
   if (typeof t !== 'string' || !t.trim()) return null;
-  var r = await hhSendLinkRequest(t);
+  // v37.81 — Tony: "an option to add a note to the request".
+  var note = await askConfirm({ icon: '\u{1F4AC}', title: 'Add a note? (optional)',
+    message: 'A few words for them — who you are, why you\u2019d like to link. They see it with your request, signed with your household\u2019s name.',
+    input: '', placeholder: 'e.g. Hi, it\u2019s Dana from the cooking class!', okLabel: 'Send the request' });
+  if (typeof note !== 'string') return null;
+  if (!await talkPrivacyOk(note)) return null;
+  var r = await hhSendLinkRequest(t, note);
   if (!r.ok) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: r.msg, okLabel: 'OK' }); return r; }
   await hhLoadLinks(); householdRenderBar();
   if (r.via === 'code') {
@@ -4363,6 +4379,7 @@ async function hhPassOnLinkRequests() {
     var copy = { from: x.from, fromName: x.fromName || '', fromCode: x.fromCode || '', to: _household.hid,
                  via: 'email', by: x.by, at: x.at || Date.now() };
     if (x.toLabel) copy.toLabel = x.toLabel;
+    if (x.note) copy.note = x.note;   // v37.81
     var b = hhDb().batch();
     b.set(hhDb().collection('linkRequests').doc(x.from + '_' + _household.hid), copy);
     b.delete(docs[i].ref);
@@ -4412,10 +4429,12 @@ function linkNewCount() {
   var seen = linkSeen();
   return _linkState.pending.filter(function(r){ return seen.indexOf(r.id) === -1; }).length;
 }
-function linkDotRefresh() { pathDots({ links: linkNewCount() }); }
-async function hhLog(other, name, code, status, at) {
+function linkDotRefresh() { pathDots({ links: linkNewCount() + talkNewCount() }); }
+async function hhLog(other, name, code, status, at, note) {
   var doc = { hid: other, name: String(name || '').slice(0, 80), code: String(code || '').slice(0, 20), status: status,
               at: at || Date.now(), decidedAt: Date.now(), by: _fbUser.uid };
+  note = note || (_linkState.log[other] || {}).note;
+  if (note) doc.note = String(note).slice(0, 500);
   await hhRef(_household.hid).collection('requestLog').doc(other).set(doc);
   _linkState.log[other] = doc;
 }
@@ -4426,6 +4445,7 @@ async function hhCheckLinkRequests(force) {
   try {
     await hhPassOnLinkRequests();
     var st = await hhLoadIncoming(), keep = st.pending;
+    await talkLoad();   // v37.81 — the conversations, for the dots
     if (householdCanManage()) {
       // Already linked (asked from both sides): nothing left to do. Blocked:
       // marked as refused, without a word — the sender sees "waiting".
@@ -4462,7 +4482,7 @@ async function hhAnswerLinkRequest(r) {
 }
 async function hhRejectLink(r, block) {
   try { await r.ref.update({ declined: true }); } catch(e) {}
-  try { await hhLog(r.d.from, r.d.fromName, r.d.fromCode, block ? 'blocked' : 'rejected', r.d.at); }
+  try { await hhLog(r.d.from, r.d.fromName, r.d.fromCode, block ? 'blocked' : 'rejected', r.d.at, r.d.note); }
   catch(e) { if (!hhRulesBehind(e, 'Keeping requests and blocks needs the new database rules')) syncLog('error', 'Could not note the answer to a link request', String(e && e.message).slice(0, 160)); }
   try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
   _linkState.pending = _linkState.pending.filter(function(x){ return x.id !== r.id; });
@@ -4480,7 +4500,7 @@ async function hhAcceptLink(r) {
   try { await b.commit(); }
   catch(e) { showServiceError('Could not link the two households: ' + (e && e.message)); return 'error'; }
   try { localStorage.removeItem(LINK_LATER_KEY + r.id); } catch(e) {}
-  try { await hhLog(from, name, r.d.fromCode, 'accepted', r.d.at); } catch(e) {}
+  try { await hhLog(from, name, r.d.fromCode, 'accepted', r.d.at, r.d.note); } catch(e) {}
   _linkState.pending = _linkState.pending.filter(function(x){ return x.id !== r.id; });
   linkDotRefresh();
   syncLog('save', 'Linked with a household', { name: name, code: r.d.fromCode || '' });
@@ -4515,7 +4535,7 @@ async function openLinkRequests() {
     + '<div id="lrBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading the requests…</div></div></div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
-  await hhLoadLinks(); await hhLoadIncoming();
+  await hhLoadLinks(); await hhLoadIncoming(); await talkLoad();
   renderLinkRequestsPage();
   linkMarkSeen();
   return ov;
@@ -4539,6 +4559,7 @@ function renderLinkRequestsPage() {
       var isNew = seen.indexOf(r.id) === -1;
       return card(who(r.d.fromName, r.d.fromCode) + (isNew ? ' <span style="color:var(--danger);font-size:11px;font-weight:700;">NEW</span>' : '')
         + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">asked ' + escH(when(r.d.at)) + (r.d.via === 'email' ? ' · by e-mail' : ' · by identifier') + '</div>'
+        + talkHtml(r.d.from, r.d.note, r.d.from, r.d.fromName)
         + (manage ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
             + '<button type="button" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;" onclick="linkReqAct(' + i + ',\'accept\')">Accept</button>'
             + '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="linkReqAct(' + i + ',\'reject\')">Reject</button>'
@@ -4552,6 +4573,7 @@ function renderLinkRequestsPage() {
     + '<div style="font-size:12px;color:var(--muted);margin:-2px 0 8px;">By their identifier (MKN-\u2026) or the e-mail address of anyone in it.</div>';
   h += asking.length ? asking.map(function(a, i){
       return card('<b dir="auto">' + escH(a.label || 'A household') + '</b><div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ waiting for them</div>'
+        + (a.to ? talkHtml(a.to, a.note, _household.hid) : (a.note ? '<div style="font-size:12.5px;margin-top:6px;" dir="auto">\u{1F4AC} Your note: <span data-no-i18n>' + escH(a.note) + '</span></div>' : ''))
         + (manage ? '<div style="margin-top:8px;"><button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhWithdrawLinkRequest(' + i + ').then(renderLinkRequestsPage)">Withdraw</button></div>' : ''));
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">None.</div>';
   // Tony: "an option to Revoke access, for requests that were accepted" —
@@ -4562,7 +4584,8 @@ function renderLinkRequestsPage() {
       var lg = st.log[l.hid] || {};
       return card('<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><div>' + who(l.name, l.code)
         + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">\u{1F91D} each sees the other\u2019s recipes' + (lg.decidedAt || l.at ? ' \u00b7 since ' + escH(when(lg.decidedAt || l.at)) : '') + '</div></div>'
-        + (manage ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhRevokeLink(\'' + escA(l.hid) + '\')">Revoke access</button>' : '') + '</div>');
+        + (manage ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhRevokeLink(\'' + escA(l.hid) + '\')">Revoke access</button>' : '') + '</div>'
+        + talkHtml(l.hid, lg.note, l.hid, l.name));
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">None.</div>';
   // What became of each: the log, and refusals from before it (v37.53–79).
   // An accepted one still linked is above, under "Linked now".
@@ -4577,7 +4600,8 @@ function renderLinkRequestsPage() {
         ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhSetBlocked(\'' + escA(x.hid) + '\', false)">Unblock</button>'
         : x.status !== 'accepted' ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhSetBlocked(\'' + escA(x.hid) + '\', true)">\u{1F6AB} Block</button>' : '';
       return card('<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><div>' + who(x.name, x.code)
-        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + (TAG[x.status] || escH(x.status)) + (x.at ? ' · ' + escH(when(x.at)) : '') + '</div></div>' + act + '</div>');
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + (TAG[x.status] || escH(x.status)) + (x.at ? ' · ' + escH(when(x.at)) : '') + '</div></div>' + act + '</div>'
+        + (x.status === 'rejected' ? talkHtml(x.hid, (st.log[x.hid] || {}).note, x.hid, x.name) : ''));
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing yet.</div>';
   body.innerHTML = h;
 }
@@ -4597,6 +4621,118 @@ async function hhRevokeLink(other) {
   return true;
 }
 window.hhRevokeLink = hhRevokeLink;
+// ─── TALKING ABOUT A LINK (v37.81) ───────────────────────────────────────────
+// Tony: "an option of a dialog between the requester and the requested …
+// without divulging personal information like phone numbers, emails". Each
+// request — waiting, sent, rejected — and each link has a short thread on the
+// 📬 page (`linkTalk/<a>_<b>/messages`), signed with the HOUSEHOLD's name,
+// written by anyone in it (his choice), text only, 500 characters. A phone
+// number, an e-mail address or a link draws a warning, and is then theirs to
+// send ("it should be their choice not ours"). A rejected household can still
+// write until it is blocked; a blocked one's messages are never shown; revoking
+// a link ends its thread. A new message lights the same red dots as a request.
+var TALK_SEEN_KEY = 'mkn_talk_seen_';
+var _talk = {}, _talkOpen = {};
+function talkPair(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
+function talkBlocked(hid) { return ((_linkState.log || {})[hid] || {}).status === 'blocked'; }
+function talkPairsNow() {
+  if (!_household) return [];
+  var set = {};
+  (_linkState.pending || []).forEach(function(r){ set[r.d.from] = 1; });
+  (_linkState.declined || []).forEach(function(r){ if (!talkBlocked(r.d.from)) set[r.d.from] = 1; });
+  hhLinks().forEach(function(l){ set[l.hid] = 1; });
+  ((_household && _household.asking) || []).forEach(function(a){ if (a.to) set[a.to] = 1; });
+  return Object.keys(set).filter(function(h){ return h && h !== _household.hid && !talkBlocked(h); });
+}
+async function talkLoad() {
+  if (!_household || !hhDb()) return _talk;
+  var others = talkPairsNow();
+  for (var i = 0; i < others.length; i++) {
+    var pair = talkPair(_household.hid, others[i]), list = [];
+    try {
+      (await hhDb().collection('linkTalk').doc(pair).collection('messages').orderBy('at').limit(200).get())
+        .forEach(function(d){ var m = d.data() || {}; m.id = d.id; list.push(m); });
+      _talk[pair] = list;
+    } catch(e) { /* the rules not published yet: no conversation */ }
+  }
+  return _talk;
+}
+function talkSeenMap() { try { return JSON.parse(localStorage.getItem(TALK_SEEN_KEY + (_household && _household.hid)) || '{}') || {}; } catch(e) { return {}; } }
+function talkNewIn(other) {
+  if (!_household || talkBlocked(other)) return 0;
+  var pair = talkPair(_household.hid, other), seen = talkSeenMap()[pair] || 0;
+  return (_talk[pair] || []).filter(function(m){ return m.from !== _household.hid && (m.at || 0) > seen; }).length;
+}
+function talkNewCount() { return talkPairsNow().reduce(function(n, h){ return n + talkNewIn(h); }, 0); }
+function talkMarkSeen(other) {
+  if (!_household || !other) return;   // a thread drawn open says so a moment later — the household may be gone by then
+  var pair = talkPair(_household.hid, other), map = talkSeenMap(), last = 0;
+  (_talk[pair] || []).forEach(function(m){ if ((m.at || 0) > last) last = m.at; });
+  map[pair] = Math.max(last, map[pair] || 0);
+  try { localStorage.setItem(TALK_SEEN_KEY + _household.hid, JSON.stringify(map)); } catch(e) {}
+  _talkOpen[other] = true;
+  var badge = document.getElementById('talkNew-' + other); if (badge) badge.remove();
+  linkDotRefresh();
+}
+// Personal details: said, never stopped (Tony).
+function talkPersonal(text) {
+  var t = String(text || ''), what = [];
+  if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(t)) what.push('an e-mail address');
+  if ((t.match(/\+?\d[\d\s().\-]{6,}\d/g) || []).some(function(x){ return x.replace(/\D/g, '').length >= 8; })) what.push('a phone number');
+  if (/(https?:\/\/|www\.|wa\.me\/|t\.me\/|\b[a-z0-9-]+\.(com|net|org|co\.il|io|me)\b)/i.test(t)) what.push('a link');
+  return what;
+}
+async function talkPrivacyOk(text) {
+  var what = talkPersonal(text);
+  if (!what.length) return true;
+  return await askConfirm({ icon: '\u{1F512}', title: 'Personal details?',
+    message: 'This looks like it includes ' + what.join(' and ') + '. Everyone in both households will see it. Send it anyway?',
+    okLabel: 'Send anyway', cancelLabel: 'Edit it' }) === true;
+}
+function talkHtml(other, note, noteFrom, noteName) {
+  if (!_household || !other || talkBlocked(other)) return '';
+  var me = _household.hid, pair = talkPair(me, other), msgs = (_talk[pair] || []).slice();
+  if (!msgs.length && note) msgs = [{ from: noteFrom, name: noteName || '', text: note, at: 0 }];   // a note that came by e-mail, before it reached a household
+  var n = talkNewIn(other), when = function(t){ return t ? new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''; };
+  var list = msgs.map(function(m){
+    var mine = m.from === me;
+    return '<div style="display:flex;justify-content:' + (mine ? 'flex-end' : 'flex-start') + ';margin:4px 0;">'
+      + '<div style="max-width:82%;padding:7px 10px;border-radius:10px;font-size:13px;line-height:1.45;white-space:pre-wrap;'
+      + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">' + escH(mine ? 'You' : (m.name || 'They')) + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
+      + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div></div></div>';
+  }).join('');
+  return '<details class="lr-talk" style="margin-top:8px;"' + (_talkOpen[other] ? ' open' : '') + ' ontoggle="if(this.open) talkMarkSeen(\'' + escA(other) + '\')">'
+    + '<summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--heading);">\u{1F4AC} Conversation' + (msgs.length ? ' (' + msgs.length + ')' : '')
+    + (n ? ' <span id="talkNew-' + escA(other) + '" style="color:var(--danger);font-weight:700;">• ' + n + ' new</span>' : '') + '</summary>'
+    + '<div style="margin-top:6px;">' + (list || '<div style="font-size:12.5px;color:var(--muted);">No messages yet.</div>')
+    + '<div style="display:flex;gap:6px;margin-top:6px;align-items:flex-end;">'
+    + '<textarea id="talkIn-' + escA(other) + '" rows="2" maxlength="500" dir="auto" placeholder="Write to them… (signed with your household’s name)" '
+    + 'style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);font:inherit;font-size:13px;resize:vertical;"></textarea>'
+    + '<button type="button" onclick="talkSend(\'' + escA(other) + '\')" style="padding:8px 12px;border-radius:8px;border:none;background:var(--terracotta-fill);color:#fff;font-weight:600;cursor:pointer;min-height:36px;">Send</button></div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-top:4px;">Everyone in both households can read this. Only your household’s name is shown — no one’s name, e-mail or phone number.</div>'
+    + '</div></details>';
+}
+async function talkSend(other) {
+  var box = document.getElementById('talkIn-' + other), text = box ? box.value.trim() : '';
+  if (!text || !_household || !window._fbUser) return false;
+  if (!await talkPrivacyOk(text)) { if (box) box.focus(); return false; }
+  var pair = talkPair(_household.hid, other);
+  var m = { from: _household.hid, name: _household.name || '', text: text.slice(0, 500), at: Date.now(), by: _fbUser.uid };
+  try { var ref = await hhDb().collection('linkTalk').doc(pair).collection('messages').add(m); m.id = ref && ref.id; }
+  catch(e) {
+    if (!hhRulesBehind(e, 'Talking about a link needs the new database rules'))
+      showServiceError('Your message could not be sent: ' + (e && e.message) + '\n\nIt is still in the box.');
+    return false;
+  }
+  (_talk[pair] = _talk[pair] || []).push(m);
+  talkMarkSeen(other);
+  syncLog('save', 'Wrote to a household about linking', { chars: m.text.length });
+  renderLinkRequestsPage();
+  return true;
+}
+window.talkSend = talkSend; window.talkMarkSeen = talkMarkSeen; window.talkLoad = talkLoad; window.talkPersonal = talkPersonal;
+window.talkNewCount = talkNewCount; window.talkPair = talkPair; window.talkPrivacyOk = talkPrivacyOk; window.talkHtml = talkHtml;
 async function linkReqAct(i, what) {
   var r = _linkState.pending[i];
   if (!r || !householdCanManage()) return false;
@@ -6013,7 +6149,7 @@ function feedbackDot(n) {
 setInterval(function(){
   if (_selfTestRunning) return;
   if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackDot).catch(function(){});
-  if (_household && hhDb()) hhLoadIncoming().then(linkDotRefresh).catch(function(){});   // v37.80 — new link requests
+  if (_household && hhDb()) hhLoadIncoming().then(talkLoad).then(linkDotRefresh).catch(function(){});   // v37.80/81 — new link requests and messages
 }, 15 * 60e3);
 window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew;
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
@@ -6272,7 +6408,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.80';
+var APP_VERSION = 'v37.81';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8926,7 +9062,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.80</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.81</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9632,7 +9768,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.80</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.81</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

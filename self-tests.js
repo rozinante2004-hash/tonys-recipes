@@ -1667,9 +1667,11 @@ window.SELF_TESTS = [
         if(!r.ok || !q || q.to!=='hB' || q.fromName!=='Kitchen A' || q.fromCode!=='MKN-AAAA-2222' || q.via!=='code') throw new Error('the request was not written: '+JSON.stringify(q));
         // By e-mail, to Jo, who only reads in Kitchen B: the app offers to tell her.
         var told=null; window.shareMessage=async function(o){ told=o; };
-        window.askConfirm=async function(){ return 'jo@example.com'; };
+        // (v37.81 — then "Add a note?", left empty.)
+        var prompts=[]; window.askConfirm=async function(o){ prompts.push(o); return prompts.length===1 ? 'jo@example.com' : ''; };
         _household={ hid:'hC', role:'owner', name:'Kitchen C', code:'MKN-CCCC-4444' };
         r=await openConnectHousehold();
+        if(prompts.length<2 || !/note/i.test(prompts[1].title)) throw new Error('no chance to add a note to the request');
         if(!r || !r.ok || !store['linkRequests/hC:jo@example.com'] || !told || told.to!=='jo@example.com') throw new Error('asking by e-mail: '+JSON.stringify(r));
         window.askConfirm=async function(o){ asked.push(o); return answers.length?answers.shift():false; };
         // Jo opens the app: the request is passed on to Kitchen B, without a word to her.
@@ -6123,6 +6125,75 @@ window.SELF_TESTS = [
         try{ localStorage.removeItem(LINK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
         var o=document.getElementById('linkReqOverlay'); if(o) o.remove();
         _linkState={ pending:[], declined:[], log:{}, loadedFor:'' }; pathDots({ links:0 });
+      }
+    } },
+
+  { id:'link_talk', group:'Sharing', name:'💬 Talking about a link: a note with the request, a thread per household signed with its name, a warning (never a block) for personal details, red dots for new messages (v37.81)',
+    test: async()=>{
+      var now=Date.now(), added=[], batchSets=[];
+      var store={ log:{ hB:{ hid:'hB', name:'Pushy Kitchen', code:'MKN-BBBB-5555', status:'blocked', at:1, decidedAt:2, by:'u0' } },
+        reqs:[ { id:'hN_hA', d:{ from:'hN', fromName:'New Kitchen', fromCode:'MKN-NNNN-4444', to:'hA', via:'code', at:now-6e4, note:'Hi! We met at the market.' } } ],
+        talk:{ 'hA_hN':[ { from:'hN', name:'New Kitchen', text:'Hi! We met at the market.', at:now-6e4 } ],
+               'hA_hB':[ { from:'hB', name:'Pushy Kitchen', text:'ANSWER ME', at:now-1e3 } ],
+               'hA_hS':[ { from:'hA', name:'My Kitchen', text:'Hello, it is us from the bakery', at:now-9e4 } ] } };
+      function snap(a){ return { size:a.length, forEach:function(f){ a.forEach(f); } }; }
+      var fake={ collection:function(c){
+          if(c==='linkRequests') return { where:function(f,op,v){ return { get:async function(){ return snap(store.reqs.filter(function(r){ return r.d[f]===v; }).map(function(r){ return { id:r.id, data:function(){ return r.d; }, ref:{ update:async function(){}, delete:async function(){} } }; })); } }; },
+                                           doc:function(id){ return { path:'linkRequests/'+id, get:async function(){ return { exists:false }; } }; } };
+          if(c==='codes') return { doc:function(code){ return { get:async function(){ return { exists:code==='MKN-TTTT-6666', data:function(){ return { hid:'hT' }; } }; } }; } };
+          if(c==='linkTalk') return { doc:function(pair){ return { collection:function(){ return {
+              orderBy:function(){ return { limit:function(){ return { get:async function(){ return snap((store.talk[pair]||[]).map(function(m,i){ return { id:'m'+i, data:function(){ return Object.assign({}, m); } }; })); } }; } }; },
+              add:async function(m){ added.push([pair, m]); return { id:'new' }; },
+              doc:function(){ return { path:'linkTalk/'+pair+'/messages/x' }; } }; } }; } };
+          if(c==='households') return { doc:function(hid){ return { collection:function(sub){
+              if(sub==='requestLog') return { get:async function(){ return snap(Object.keys(store.log).map(function(k){ return { id:k, data:function(){ return store.log[k]; } }; })); } };
+              return { get:async function(){ return snap([]); } }; } }; } };
+          return { get:async function(){ return snap([]); }, where:function(){ return { get:async function(){ return snap([]); } }; } }; },
+        batch:function(){ return { set:function(ref, d){ batchSets.push([ref.path, d]); }, commit:async function(){} }; } };
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, ask:window.askConfirm, load:window.hhLoadLinks, toast:window.toast };
+      var asked=[];
+      try{
+        window._fbDb=fake; window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true }; window.toast=function(){};
+        window._household={ hid:'hA', role:'viewer', name:'My Kitchen', code:'MKN-AAAA-2222', appRequests:true, links:[],
+          asking:[{ id:'hA_hS', to:'hS', label:'MKN-SSSS-7777', note:'Hello, it is us from the bakery' }] };
+        window.hhLoadLinks=async function(){ return _household.links; };
+        try{ localStorage.removeItem(TALK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_SEEN_KEY+'hA'); }catch(e){}
+        // 1. Personal details are noticed — and said, never stopped.
+        if(talkPersonal('Bake at 180 for 45 minutes, 2 eggs').length) throw new Error('a recipe line was taken for personal details');
+        ['call 050-123-4567','write to dana@example.com','see wa.me/972501234567','www.example.com'].forEach(function(t){ if(!talkPersonal(t).length) throw new Error('not noticed: '+t); });
+        // 2. Arriving: the note is the first message; a blocked household's messages are not counted.
+        window.askConfirm=async function(o){ asked.push(o); return false; };
+        await hhCheckLinkRequests(true);
+        if(talkNewCount()!==1) throw new Error('new messages counted: '+talkNewCount());
+        if(!document.querySelector('#linkRequestsItem > .path-dot')) throw new Error('a new message does not light the path');
+        // 3. The page: threads, signed with the households' names; the blocked one's message never shown.
+        await openLinkRequests();
+        var t=document.getElementById('linkReqOverlay').textContent;
+        ['Hi! We met at the market.','New Kitchen','1 new','Hello, it is us from the bakery','Conversation'].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
+        if(t.indexOf('ANSWER ME')!==-1) throw new Error('a blocked household’s message is shown');
+        if(/a@example\.com|uA/.test(t)) throw new Error('a person’s details are shown');
+        talkMarkSeen('hN');
+        if(talkNewCount()!==0 || document.querySelector('#linkRequestsItem > .path-dot')) throw new Error('reading the thread did not clear the dot');
+        // 4. Anyone in the household writes (a viewer here); a phone number asks first.
+        document.getElementById('talkIn-hN').value='Lovely! Call me on 050-123-4567';
+        asked=[]; window.askConfirm=async function(o){ asked.push(o); return false; };
+        if(await talkSend('hN')!==false || added.length) throw new Error('sent although "Edit it" was chosen');
+        if(!asked.length || !/a phone number/.test(asked[0].message) || !/Send anyway/.test(asked[0].okLabel)) throw new Error('no warning about the phone number');
+        window.askConfirm=async function(o){ return true; };
+        if(await talkSend('hN')!==true || !added.length) throw new Error('"Send anyway" did not send');
+        var m=added[0][1];
+        if(added[0][0]!=='hA_hN' || m.from!=='hA' || m.name!=='My Kitchen' || m.by!=='uA' || !/050-123-4567/.test(m.text) || m.email!==undefined) throw new Error('the message: '+JSON.stringify(added[0]));
+        // 5. A request with a note: the note travels with it, and opens the conversation (one batch).
+        _household.role='owner';
+        var r=await hhSendLinkRequest('MKN-TTTT-6666', 'Hi from the bakery!');
+        if(!r.ok) throw new Error('the request: '+JSON.stringify(r));
+        var req=batchSets.filter(function(x){ return x[0]==='linkRequests/hA_hT'; })[0], first=batchSets.filter(function(x){ return /^linkTalk\/hA_hT\/messages\//.test(x[0]); })[0];
+        if(!req || req[1].note!=='Hi from the bakery!' || !first || first[1].text!=='Hi from the bakery!' || first[1].from!=='hA') throw new Error('the note: '+JSON.stringify(batchSets));
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.hhLoadLinks=real.load; window.toast=real.toast;
+        try{ localStorage.removeItem(TALK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
+        var o=document.getElementById('linkReqOverlay'); if(o) o.remove();
+        _linkState={ pending:[], declined:[], log:{}, loadedFor:'' }; _talk={}; _talkOpen={}; pathDots({ links:0 });
       }
     } },
 

@@ -94,6 +94,7 @@ service cloud.firestore {
     //   homes/{uid}                         { hid, at } — the household a person looks from
     //   linkRequests/{id}                   asking to link (v37.53, below)
     //   households/{hid}/requestLog/{other} what became of a request, and who is blocked (v37.80)
+    //   linkTalk/{a}_{b}/messages/{id}      two households talking about a link (v37.81)
     //   i18n/{lang}                         interface translations, for EVERY household
     //   users/{uid}/…                       each person's own, and nobody else's
     //
@@ -296,7 +297,8 @@ service cloud.firestore {
       match /requestLog/{other} {
         allow read: if isMember(hid) || appAdmin() || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'admin') && other != hid
-          && request.resource.data.keys().hasOnly(['hid', 'name', 'code', 'status', 'at', 'decidedAt', 'by'])
+          && request.resource.data.keys().hasOnly(['hid', 'name', 'code', 'status', 'at', 'decidedAt', 'by', 'note'])
+          && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 500
           && request.resource.data.hid == other
           && request.resource.data.status in ['accepted', 'rejected', 'blocked', 'revoked']
           && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() <= 80
@@ -347,7 +349,9 @@ service cloud.firestore {
         || memberOf(resource.data.get('from', ''))
         || memberOf(resource.data.get('to', '')));
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'email', 'via', 'by', 'at', 'declined', 'toLabel'])
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'email', 'via', 'by', 'at', 'declined', 'toLabel', 'note'])
+        // v37.81 — an optional note with the request (Tony).
+        && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 500
         && request.resource.data.get('declined', false) == false
         && request.resource.data.get('toLabel', '') is string && request.resource.data.get('toLabel', '').size() <= 120
         && request.resource.data.fromName == get(hh(request.resource.data.from)).data.name
@@ -392,6 +396,36 @@ service cloud.firestore {
         || (verified() && resource.data.get('email', '') == myEmail())
         || adminOf(resource.data.get('from', ''))
         || adminOf(resource.data.get('to', '')));
+    }
+
+    // v37.81 — TALKING ABOUT A LINK (Tony: "a dialog between the requester and
+    // the requested … without divulging personal information"). Two households
+    // with a request between them, or a link, write to each other:
+    // `linkTalk/<a>_<b>/messages/<id>` (a < b) = { from, name, text, at, by },
+    // signed with the household's own name (never a person's), by anyone in
+    // it; everyone in either household reads it. Nothing is changed or removed
+    // afterwards. Blocking hides a household's messages in the app.
+    function talkOther(pair, from) { return pair.split('_')[0] == from ? pair.split('_')[1] : pair.split('_')[0]; }
+    function talkRelated(pair, from) {
+      let other = talkOther(pair, from);
+      return existsAfter(reqPath(from + '_' + other)) || exists(reqPath(other + '_' + from))
+        || exists(linkPath(from, other));
+    }
+    match /linkTalk/{pair}/messages/{mid} {
+      allow read: if signedIn() && pair.split('_').size() == 2
+        && (memberOf(pair.split('_')[0]) || memberOf(pair.split('_')[1]));
+      allow create: if signedIn() && pair.split('_').size() == 2
+        && pair.split('_')[0] < pair.split('_')[1]
+        && request.resource.data.keys().hasOnly(['from', 'name', 'text', 'at', 'by'])
+        && request.resource.data.from in pair.split('_')
+        && isMember(request.resource.data.from)
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.name == get(hh(request.resource.data.from)).data.name
+        && request.resource.data.text is string && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500
+        && request.resource.data.at is int
+        && talkRelated(pair, request.resource.data.from);
+      allow update, delete: if false;
     }
 
     // A member finding their own memberships across households — the app asks

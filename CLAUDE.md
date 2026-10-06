@@ -815,6 +815,27 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.81 — a note with a link request; households talk about a link.**
+    Tony: "an option to add a note to the request … a dialog between the
+    requester and the requested … without divulging personal information".
+    His answers: personal details WARN, never block ("it should be their
+    choice not ours"); anyone in the household writes; a rejected household
+    can still write until blocked; the thread stays once linked. Sending
+    (`openConnectHousehold`) asks "Add a note? (optional)" → `note` on the
+    request (≤500; copied on e-mail pass-on and into requestLog) and, by
+    identifier, also the first message — same batch (rules: `existsAfter` the
+    request). `linkTalk/<a>_<b>/messages` (a < b; `talkPair`) {from, name =
+    the household's real name, text ≤500, at, by}: members of either side read;
+    a member of `from` writes, only while a request or link joins the two;
+    never edited or removed. 📬 page: a 💬 Conversation thread under Waiting,
+    Sent (by identifier), Linked now and Rejected (`talkHtml`; "You" / the
+    household's name — no person's name, e-mail or phone); blocked ones are
+    hidden and not counted. `talkPersonal` notices e-mails, phone numbers
+    (≥8 digits) and links → "Send anyway / Edit it". New messages from the
+    other side (per device, `mkn_talk_seen_<hid>`) join the red-dot path
+    (`linkDotRefresh` = requests + messages). The page also has "➕ Ask a
+    household to link…" (Tony looked there; ⋯ More keeps it too). Tests:
+    `link_talk`; 17 more rules checks. NEEDS the rules published in all three.
   - **v37.80 — 📬 Link requests page; block; revoke; red dots along the path;
     the Chrome Web Store link.** Tony: one place for every request ("granted,
     rejected and blocked"), a block for "very insistent/harassing" requesters,
