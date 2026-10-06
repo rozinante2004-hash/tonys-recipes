@@ -6412,6 +6412,106 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a British voice; never while typing; on by default (v37.88)',
+    test: async()=>{
+      var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on') }, spoken=[];
+      var inp=null;
+      try{
+        // 14 animals, each with a side-on head, a head turned to you, and legs (or a hop).
+        if(FARM_ANIMALS.length<14) throw new Error('only '+FARM_ANIMALS.length+' animals');
+        FARM_ANIMALS.forEach(function(a){
+          var d=document.createElement('div'); d.innerHTML=farmArt(a);
+          if(!d.querySelector('.head.side') || !d.querySelector('.head.front') || !(d.querySelector('.leg') || d.querySelector('.hop'))) throw new Error(a.id+' cannot walk or turn its head');
+        });
+        // On by default, and the line is under How it looks.
+        localStorage.removeItem('mkn_farm_on');
+        farmRefreshSettings();
+        var box=document.getElementById('farmToggle');
+        if(!box || !box.checked || !box.closest('.set-group[data-group="look"]')) throw new Error('the setting is not under How it looks, ticked');
+        // What Tony chose: only the goose, and only "Not yet!" of two sentences.
+        if(!farmUseConfig({ sayings:[{ t:'Not yet!', on:true }, { t:'Never this one', on:false }], animals:['goose'], minMinutes:2, maxMinutes:4 })) throw new Error('a choice was refused');
+        for(var i=0;i<20;i++){ if(farmPickAnimal().id!=='goose' || farmPickSaying()!=='Not yet!') throw new Error('an animal or sentence that is not ticked came'); }
+        for(i=0;i<50;i++){ var w=farmWait(); if(w<2*60000 || w>4*60000) throw new Error('waited '+w+' ms, outside 2–4 minutes'); }
+        // A visit: across the screen, and gone at the end.
+        if(window.speechSynthesis) speechSynthesis.speak=function(u){ spoken.push([u.text, u.lang]); };
+        var el=farmVisit(null, { ms:1500, ltr:true });
+        if(!el || el._farm.animal!=='goose' || getComputedStyle(el).position!=='fixed' || !el.hasAttribute('data-no-i18n')) throw new Error('the visitor is not the goose, on top of the app, in English');
+        await wait(120); var x1=el.getBoundingClientRect().left; await wait(250);
+        if(!(el.getBoundingClientRect().left>x1)) throw new Error('it does not walk');
+        // Tapped: it stops, turns, speaks.
+        el.click(); await wait(320);
+        if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
+        if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || spoken[0][1]!=='en-GB')) throw new Error('it did not speak in British English: '+JSON.stringify(spoken));
+        var stopped=el.getBoundingClientRect().left; await wait(200);
+        if(Math.abs(el.getBoundingClientRect().left-stopped)>1) throw new Error('it kept walking while it spoke');
+        for(i=0;i<40 && el.isConnected && el.querySelector('.fv-art').classList.contains('turned');i++) await wait(100);
+        if(el.querySelector('.fv-art').classList.contains('turned')) throw new Error('it did not turn back');
+        for(i=0;i<40 && el.isConnected;i++) await wait(100);
+        if(el.isConnected) throw new Error('it did not leave the screen');
+        // Never while someone is typing: the visit waits.
+        inp=document.createElement('input'); inp.type='text'; document.body.appendChild(inp); inp.focus();
+        if(!farmTyping()) throw new Error('typing is not noticed');
+        var wasRunning=window._selfTestRunning; window._selfTestRunning=false;
+        try{ farmTick(); } finally { window._selfTestRunning=wasRunning; }
+        if(document.querySelector('.farm-visitor')) throw new Error('an animal came while someone was typing');
+        // Switched off: none come, and none is waiting.
+        farmSetEnabled(false);
+        if(localStorage.getItem('mkn_farm_on')!=='0' || box.checked) throw new Error('switching off did not stick');
+      } finally {
+        if(window.speechSynthesis && real.speak) speechSynthesis.speak=real.speak;
+        if(inp) inp.remove();
+        farmClear();
+        if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
+        if(real.on===null) localStorage.removeItem('mkn_farm_on'); else localStorage.setItem('mkn_farm_on', real.on);
+        window._farmCfg=null; try{ farmUseConfig(JSON.parse(real.cfg||'null')); }catch(e){}
+        farmSchedule(); farmRefreshSettings();
+      }
+    } },
+
+  { id:'farm_owner_window', group:'UI', name:'🐄 The farm visitors are chosen by the app’s owner, in the family app, for everyone: sentences, animals and how often (v37.88)',
+    test: async()=>{
+      var real={ owner:window.isAppOwner, user:window._fbUser, own:window.i18nCentralIsOwn, doc:window.cloudDoc, toast:window.toast, cfg:localStorage.getItem('mkn_farm_cfg') }, said='', wrote=[];
+      try{
+        window.toast=function(m){ said=String(m||''); };
+        // Not the owner: no button, no window.
+        window.isAppOwner=function(){ return false; }; window._fbUser={ uid:'uF', email:'someone@example.com' };
+        farmRefreshSettings();
+        if(document.getElementById('farmOwnerItem').style.display!=='none') throw new Error('someone who is not the owner is offered the window');
+        if(openFarmSettings() || document.getElementById('farmOverlay')) throw new Error('the window opened for someone who is not the owner');
+        // The owner, in the copy that holds the app's words.
+        window.isAppOwner=function(){ return true; }; window.i18nCentralIsOwn=function(){ return true; };
+        farmRefreshSettings();
+        if(document.getElementById('farmOwnerItem').style.display==='none') throw new Error('the owner has no window');
+        window.cloudDoc=function(name){ return { set:async function(d){ wrote.push([name, d]); } }; };
+        var ov=openFarmSettings();
+        if(!ov || ov.querySelectorAll('#farmAnimals input').length!==FARM_ANIMALS.length || !document.getElementById('farmMin')) throw new Error('the window lacks the animals or the frequency');
+        // Change things: one sentence off, a new one, the pig out, every 1–2 minutes.
+        var rows=ov.querySelectorAll('#farmSayings .fv-row');
+        rows[1].querySelector('.fv-on').checked=false;
+        farmAddSaying(); var last=ov.querySelectorAll('#farmSayings .fv-text'); last[last.length-1].value='Mind the gravy!';
+        ov.querySelector('#farmAnimals input[value="pig"]').checked=false;
+        document.getElementById('farmMin').value='1'; document.getElementById('farmMax').value='2';
+        // A wait that ends before it starts is refused.
+        document.getElementById('farmMax').value='0';
+        if(await farmSettingsSave() || wrote.length) throw new Error('an impossible frequency was saved');
+        document.getElementById('farmMax').value='2';
+        if(!(await farmSettingsSave())) throw new Error('saving failed: '+said);
+        var w=wrote[0];
+        if(!w || w[0]!=='i18n__farm') throw new Error('not saved where every copy reads it: '+(w&&w[0]));
+        var d=w[1];
+        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2) throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
+        if(farmConfig().maxMinutes!==2 || document.getElementById('farmOverlay')) throw new Error('the choice was not taken up here, or the window stayed open');
+        // In the test or beta copy, the owner is told where to choose.
+        window.i18nCentralIsOwn=function(){ return false; };
+        if(openFarmSettings() || !/family app/.test(said)) throw new Error('outside the family app it did not say where: '+said);
+      } finally {
+        window.isAppOwner=real.owner; window._fbUser=real.user; window.i18nCentralIsOwn=real.own; window.cloudDoc=real.doc; window.toast=real.toast;
+        var o=document.getElementById('farmOverlay'); if(o) o.remove();
+        if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
+        window._farmCfg=null; farmSchedule(); farmRefreshSettings();
+      }
+    } },
+
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
     test: async()=>{
       var real={ ask:window.askConfirm, fetch:window.fetch, user:window._fbUser, toast:window.toast }, asked=[], sent=[];
@@ -10172,8 +10272,12 @@ window.SELF_TESTS = [
       // real features (shortcuts and the browser extension, help in the
       // person's language, household identifiers, linked households) and the
       // page reached 1601 KB.
+      // Raised to 1800 in v37.88, the same way: v37.54–v37.87 added ~100 KB of
+      // real features (link requests and conversations, About and the kitchen
+      // rules, translating every window) and v37.88 the farm visitors — 14
+      // hand-drawn animals, ~60 KB of them — and the page reached 1760 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 1700) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 1800) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
