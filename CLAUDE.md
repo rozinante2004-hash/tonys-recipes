@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.80–v37.82 (6 Oct 2026, Tony's yes, CI green on 6b266a4).** The rules (requestLog, member reads, notes, linkTalk) must be published in each copy.
   - **v37.82 — ℹ️ About; the Privacy Statement and the Terms of Use.** Tony:
     under ? an About with the version, whether to update ("Update now" →
     `swUpdateNow`), What leaves this device, a privacy statement and a
