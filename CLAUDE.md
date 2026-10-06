@@ -815,6 +815,30 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.88 — the farm visitors.** Tony: now and then a cartoon farm animal
+    strolls across the app (5–10 s, a different route each time); tapped, it
+    turns its head to you and speaks in a British voice, then walks on. 14
+    animals, hand-drawn SVG (FARM_ANIMALS: id, name, pitch, viewBox — all
+    170 wide, so one scale; legs .leg a/b swing, .bob/.peck/.waddle/.hop;
+    .head.side / .head.front swap when .turned). His answers: (1) what they
+    say, which may come and HOW OFTEN are his, for everyone in every copy —
+    owner-only window ⚙️ → 🎨 How it looks → "🐄 The farm visitors…"
+    (i18nCanEdit(): owner, in the copy holding the app's words), saved to
+    i18n/_farm (cloudDoc(i18nDocId('_farm'))) — the i18n collection is
+    already public-read/admin-write, so NO RULES CHANGE; every copy reads it
+    with i18nCentralGet and keeps it in localStorage mkn_farm_cfg. Shape
+    {sayings:[{t,on}], animals:[ids], minMinutes, maxMinutes, at, by};
+    defaults 10 sentences, all 14, 10–180 min. (2) Always English, en-GB
+    voice (the device's own; farmVoice prefers Google UK English / Daniel…)
+    — he may change this later. (3) Never while typing (a focused text
+    field, or a key in the last 8 s): the visit waits 30 s and tries again.
+    Everyone: "🐑 Let a farm animal wander by now and then" (on by default,
+    this device, mkn_farm_on). The wait runs only while the app is visible
+    and restarts when it opens; never during a Self Test; one at a time.
+    The visitor is data-no-i18n (English); the owner window is harvested for
+    translation. Page budget raised to 1800 KB (the drawings are ~60 KB).
+    Tests `farm_visitors`, `farm_owner_window`. Gallery shown to Tony:
+    https://claude.ai/artifact/SJpomh5unjqa9No7hoXBpn (the first six).
   - **Released to the family app and the beta: v37.87 (7 Oct 2026, Tony's yes, CI green on c8310da, which includes v37.85 and v37.86; the family's Pages deploy checked: success).**
   - **v37.87 — translations edited only where they live; the Self Test on a
     lived-in browser.** (1) Tony fixed Hebrew labels in the TEST copy's
