@@ -1,6 +1,6 @@
 {
  "source": "recipes-f379d/i18n/*",
- "publishedAt": 1791325141933,
+ "publishedAt": 1791386574008,
  "requestedBy": "",
  "langs": {
   "ar": {
@@ -20,7 +20,7 @@
    "count": 1937
   },
   "he": {
-   "at": 1791323211324,
+   "at": 1791386547100,
    "count": 2479
   },
   "it": {
