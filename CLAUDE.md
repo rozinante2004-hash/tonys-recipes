@@ -815,6 +815,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **Released to the family app and the beta: v37.88 (7 Oct 2026, Tony's yes, CI green on 7857a9f; the family's Pages deploy checked: success).**
   - **v37.88 — the farm visitors.** Tony: now and then a cartoon farm animal
     strolls across the app (5–10 s, a different route each time); tapped, it
     turns its head to you and speaks in a British voice, then walks on. 14
