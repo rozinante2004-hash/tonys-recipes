@@ -6522,6 +6522,11 @@ window.SELF_TESTS = [
         farmAddSaying(); var last=ov.querySelectorAll('#farmSayings .fv-text'); last[last.length-1].value='Mind the gravy!';
         ov.querySelector('#farmAnimals input[value="pig"]').checked=false;
         document.getElementById('farmMin').value='1'; document.getElementById('farmMax').value='2';
+        // "Send one across now" leaves the window open (v37.92, Tony).
+        farmTryOne();
+        var sent=!!document.querySelector('.farm-visitor'), stayed=!!document.getElementById('farmOverlay');
+        farmClear();
+        if(!sent || !stayed) throw new Error('send one across now: '+(sent?'':'no animal came; ')+(stayed?'':'the window closed'));
         // A wait that ends before it starts is refused.
         document.getElementById('farmMax').value='0';
         if(await farmSettingsSave() || wrote.length) throw new Error('an impossible frequency was saved');
