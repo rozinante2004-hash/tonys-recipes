@@ -6438,8 +6438,8 @@ window.SELF_TESTS = [
         for(var i=0;i<20;i++){ if(farmPickAnimal().id!=='goose' || farmPickSaying()!=='Not yet!') throw new Error('an animal or sentence that is not ticked came'); }
         for(i=0;i<50;i++){ var w=farmWait(); if(w<2*60000 || w>4*60000) throw new Error('waited '+w+' ms, outside 2–4 minutes'); }
         // A visit: across the screen, and gone at the end.
-        if(window.speechSynthesis) speechSynthesis.speak=function(u){ spoken.push([u.text, u.lang]); };
-        var el=farmVisit(null, { ms:1500, ltr:true });
+        if(window.speechSynthesis) speechSynthesis.speak=function(u){ spoken.push([u.text, u.lang, u.pitch]); };
+        var el=farmVisit(null, { speed:1500, stops:0, ltr:true }); await el._farm.ready;
         if(!el || el._farm.animal!=='goose' || getComputedStyle(el).position!=='fixed' || !el.hasAttribute('data-no-i18n')) throw new Error('the visitor is not the goose, on top of the app, in English');
         await wait(120); var x1=el.getBoundingClientRect().left; await wait(250);
         if(!(el.getBoundingClientRect().left>x1)) throw new Error('it does not walk');
@@ -6447,12 +6447,32 @@ window.SELF_TESTS = [
         el.click(); await wait(320);
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
         if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || spoken[0][1]!=='en-GB')) throw new Error('it did not speak in British English: '+JSON.stringify(spoken));
+        if(window.speechSynthesis && !(spoken[0][2]>=1.2)) throw new Error('the voice is not raised, like a cartoon\u2019s: pitch '+spoken[0][2]);
         var stopped=el.getBoundingClientRect().left; await wait(200);
         if(Math.abs(el.getBoundingClientRect().left-stopped)>1) throw new Error('it kept walking while it spoke');
         for(i=0;i<40 && el.isConnected && el.querySelector('.fv-art').classList.contains('turned');i++) await wait(100);
         if(el.querySelector('.fv-art').classList.contains('turned')) throw new Error('it did not turn back');
         for(i=0;i<40 && el.isConnected;i++) await wait(100);
         if(el.isConnected) throw new Error('it did not leave the screen');
+        // v37.91 — three looks, one for everyone (3D cartoon to begin with); each can walk and turn.
+        if(farmDefaultConfig().style!=='cartoon') throw new Error('3D cartoon is not the look to begin with');
+        for(var si=0; si<FARM_STYLES.length; si++){
+          var sv=farmVisit('goose', { style:FARM_STYLES[si], speed:3000, stops:0 }); await sv._farm.ready;
+          var ok=FARM_STYLES[si]==='pixel' ? (sv.querySelector('.pxA svg') && sv.querySelector('.pxB svg') && sv.querySelector('.pxF svg'))
+                                            : (sv.querySelector('.head.side') && sv.querySelector('.head.front') && sv.querySelector('.leg'));
+          sv.remove();
+          if(!ok) throw new Error('the goose cannot walk or turn in '+FARM_STYLES[si]);
+        }
+        // The legs set the pace: one step moves the body one stride, so the feet do not slide.
+        var wv=farmVisit('cow', { style:'cartoon', stops:0, ltr:true }); await wv._farm.ready;
+        var f=wv._farm, art=wv.querySelector('.fv-art');
+        if(!(f.step>=.26 && f.step<=.36) || Math.abs(f.speed - f.stride/f.step)>.5 || art.style.getPropertyValue('--fv-t')!==f.step.toFixed(3)+'s' || !(f.stride>5)) throw new Error('the pace does not follow the legs: '+JSON.stringify(f));
+        wv.remove();
+        // …and it stops now and then to look around.
+        var rv=farmVisit('pig', { style:'story', speed:600, stops:1 }); await rv._farm.ready;
+        var looked=false; for(i=0;i<40 && rv.isConnected && !looked;i++){ await wait(60); looked=rv.classList.contains('fv-look') && !rv.querySelector('.fv-art').classList.contains('walking'); }
+        rv.remove();
+        if(!looked) throw new Error('it never stopped to look around');
         // Never while someone is typing: the visit waits.
         inp=document.createElement('input'); inp.type='text'; document.body.appendChild(inp); inp.focus();
         if(!farmTyping()) throw new Error('typing is not noticed');
@@ -6490,6 +6510,12 @@ window.SELF_TESTS = [
         window.cloudDoc=function(name){ return { set:async function(d){ wrote.push([name, d]); } }; };
         var ov=openFarmSettings();
         if(!ov || ov.querySelectorAll('#farmAnimals input').length!==FARM_ANIMALS.length || !document.getElementById('farmMin')) throw new Error('the window lacks the animals or the frequency');
+        // v37.91 — one look for everyone, chosen with a switch; each animal shown once, in that look.
+        var radios=ov.querySelectorAll('input[name="farmStyle"]');
+        if(radios.length!==3 || ov.querySelector('input[name="farmStyle"]:checked').value!=='cartoon') throw new Error('the three looks are not offered, 3D cartoon first');
+        var px=ov.querySelector('input[name="farmStyle"][value="pixel"]'); px.checked=true; px.onchange();
+        for(var k=0;k<40 && !ov.querySelector('#farmAnimals .fv-thumb .fv-px');k++) await wait(50);
+        if(ov.querySelectorAll('#farmAnimals .fv-thumb .fv-px').length!==FARM_ANIMALS.length) throw new Error('the animals are not shown in the look that is ticked');
         // Change things: one sentence off, a new one, the pig out, every 1–2 minutes.
         var rows=ov.querySelectorAll('#farmSayings .fv-row');
         rows[1].querySelector('.fv-on').checked=false;
@@ -6504,7 +6530,7 @@ window.SELF_TESTS = [
         var w=wrote[0];
         if(!w || w[0]!=='i18n__farm') throw new Error('not saved where every copy reads it: '+(w&&w[0]));
         var d=w[1];
-        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2) throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
+        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2 || d.style!=='pixel') throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
         if(farmConfig().maxMinutes!==2 || document.getElementById('farmOverlay')) throw new Error('the choice was not taken up here, or the window stayed open');
         // In the test or beta copy, the owner is told where to choose.
         window.i18nCentralIsOwn=function(){ return false; };
@@ -10281,8 +10307,11 @@ window.SELF_TESTS = [
       // real features (link requests and conversations, About and the kitchen
       // rules, translating every window) and v37.88 the farm visitors — 14
       // hand-drawn animals, ~60 KB of them — and the page reached 1760 KB.
+      // Raised to 1900 in v37.91, the same way: the farm visitors gained two
+      // more looks for every animal (3D cartoon drawings, ~45 KB, and pixel
+      // art made from the storybook ones) and the page reached 1808 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 1800) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 1900) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

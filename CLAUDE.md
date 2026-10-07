@@ -815,7 +815,39 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
-  - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — awaiting his pick.
+  - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.91 — the farm visitors get three looks, and walk.** Tony: "include
+    the following styles for all animals: 3D cartoon, Storybook and Pixel art
+    … keep one copy of each animal, and allow selection of the style"; "match
+    the speed the animal walks to the movement of the legs … they all look like
+    they are floating"; "pitch of the voice … higher, like in cartoons". His
+    answers: ONE style for every animal ("it's like a theme"); 3D cartoon is the
+    starting style; a natural walk with pauses — but Pixel art jittery; the
+    rabbit hops.
+    - `farmCfg.style` ∈ `FARM_STYLES = ['cartoon','story','pixel']`, saved
+      with the rest of `i18n/_farm` (no rules change). The owner window has a
+      "How they look" radio group; `farmThumbs(style)` redraws the one row of
+      animal checkboxes in that look.
+    - Cartoon drawings are `farmToonArt` (gradients, big eyes, grins — after
+      the cow pictures Tony sent). Storybook is the v37.88 art unchanged.
+    - **Pixel art has no canvas and no image files**: `farmPixel(a)` renders
+      the storybook SVG off screen and samples it on a 50-column grid with
+      `isPointInFill`/`isPointInStroke` (through `getScreenCTM().inverse()`),
+      then writes one `<path>` of row runs per colour — three frames (two
+      walking, one facing). Cached per animal; all 14 take ~0.3 s. **Trap
+      already sprung:** a vertical stroke (a bird's leg) has a zero-width box,
+      so the per-shape prefilter must be padded by half the stroke width or the
+      legs vanish.
+    - **Pace follows the legs**: stride = 2·leg·scale·sin(24°) (the swing is
+      ±24°), a step lasts 0.26–0.36 s, speed = stride/step, and `--fv-t` drives
+      every leg/bob/nod animation so they agree. The rabbit's stride is half its
+      width, one hop per beat. 0–2 stops of 0.8–1.7 s per crossing (`fv-look`).
+      Pixel art moves in 2-cell jumps every 110 ms. `farmVisit(id, opts)`
+      returns the element with `el._farm` = {ready, speed, stride, step, ms,
+      animal, style}; tests pass `{speed, stops:0, ltr}`.
+    - Voice: `rate 1.02`, `pitch` 1.2–2 (1.45 for a normal animal).
+    - Page budget raised to 1900 KB on purpose (1808 KB). Tests:
+      `farm_visitors`, `farm_owner_window`.
   - **v37.90 — the agreement is with the "My Kitchen Notes Team".** Tony: not
     between him and the user but between "My Kitchen Notes Team, which is a
     private group" and the user. Told him (he agreed): an unregistered group

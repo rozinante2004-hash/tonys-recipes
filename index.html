@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.90 -->
+<!-- Tony's Recipes Collection v37.91 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6435,7 +6435,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.90';
+var APP_VERSION = 'v37.91';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7431,17 +7431,42 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 /* v37.88 — the farm visitors: a cartoon animal strolls across now and then. */
 .farm-visitor { position: fixed; left: 0; top: 0; width: 132px; z-index: 10040; cursor: pointer; will-change: transform; -webkit-tap-highlight-color: transparent; }
 @media (max-width: 520px) { .farm-visitor { width: 104px; } }
+@media (min-width: 1000px) { .farm-visitor { width: 150px; } }
 .farm-visitor .fv-flip { transform: scaleX(var(--fv-dir, 1)); }
 .fv-art svg, .fv-thumb svg { display: block; width: 100%; height: auto; overflow: visible; }
 .fv-art .leg, .fv-art .head, .fv-art .bob, .fv-art .peck, .fv-art .waddle, .fv-art .hop { transform-box: fill-box; }
 .fv-art .leg { transform-origin: 50% 0; }
-.fv-art.walking .leg.a { animation: fvSwing .48s ease-in-out infinite alternate; }
-.fv-art.walking .leg.b { animation: fvSwing .48s ease-in-out infinite alternate-reverse; }
-.fv-art.walking .bob { animation: fvBob .24s ease-in-out infinite alternate; }
-.fv-art.walking .peck { animation: fvPeck .48s ease-in-out infinite alternate; }
-.fv-art.walking .waddle { animation: fvWaddle .48s ease-in-out infinite alternate; transform-origin: 50% 100%; }
-.fv-art.walking .hop { animation: fvHop .4s ease-in-out infinite alternate; }
-@keyframes fvSwing { from { transform: rotate(-17deg); } to { transform: rotate(17deg); } }
+.fv-art { --fv-t: .3s; }
+/* v37.91 — the pace comes from the legs (farmWalk sets --fv-t, seconds per step):
+   one swing per step, one bob per step, a nod and a swish per stride. */
+.fv-art .nod, .fv-art .tail, .fv-art .shadow { transform-box: fill-box; }
+.fv-art.walking .leg.a { animation: fvSwing var(--fv-t) ease-in-out infinite alternate; }
+.fv-art.walking .leg.b { animation: fvSwing var(--fv-t) ease-in-out infinite alternate-reverse; }
+.fv-art.walking .bob, .fv-art.walking .move { animation: fvBob calc(var(--fv-t) / 2) ease-in-out infinite alternate; }
+.fv-art.walking .peck { animation: fvPeck var(--fv-t) ease-in-out infinite alternate; }
+.fv-art.walking .waddle { animation: fvWaddle var(--fv-t) ease-in-out infinite alternate; transform-origin: 50% 100%; }
+.fv-art.walking .hop, .fv-hopper .fv-art.walking .move, .fv-hopper .fv-art.walking .fv-px { animation: fvHop var(--fv-t) ease-in-out infinite alternate; }
+.fv-art.walking .nod { transform-origin: 20% 90%; animation: fvNod var(--fv-t) ease-in-out infinite alternate; animation-delay: calc(var(--fv-t) / -3); }
+.fv-art.walking .tail { transform-origin: 90% 0; animation: fvSwish calc(var(--fv-t) * 2) ease-in-out infinite alternate; }
+.fv-art.walking .shadow { transform-origin: 50% 50%; animation: fvShadow calc(var(--fv-t) / 2) ease-in-out infinite alternate; }
+.fv-look .fv-art .nod, .fv-look .fv-s-story .head.side, .fv-s-story.fv-look .head.side { animation: fvLook 1.1s ease-in-out infinite alternate; transform-origin: 30% 80%; }
+@keyframes fvSwing { from { transform: rotate(-24deg); } to { transform: rotate(24deg); } }
+@keyframes fvNod { from { transform: rotate(-3.5deg); } to { transform: rotate(3deg) translateY(-1px); } }
+@keyframes fvSwish { from { transform: rotate(-12deg); } to { transform: rotate(16deg); } }
+@keyframes fvShadow { from { transform: scaleX(1.03); } to { transform: scaleX(.95); } }
+@keyframes fvLook { from { transform: rotate(-7deg); } to { transform: rotate(6deg); } }
+/* Pixel art: two frames swapped once a step, a jerky hop, and the face-on frame when tapped. */
+.fv-px { position: relative; }
+.fv-px > div { width: 100%; }
+.fv-px .pxB, .fv-px .pxF { position: absolute; inset: 0; visibility: hidden; }
+.fv-art.walking .fv-px { animation: fvPxBob var(--fv-t) steps(1) infinite; }
+.fv-art.walking .pxA { animation: fvPxA calc(var(--fv-t) * 2) steps(1) infinite; }
+.fv-art.walking .pxB { animation: fvPxB calc(var(--fv-t) * 2) steps(1) infinite; }
+.fv-art.turned .pxA, .fv-art.turned .pxB { visibility: hidden !important; animation: none !important; }
+.fv-art.turned .pxF { visibility: visible; }
+@keyframes fvPxA { 0% { visibility: visible; } 50% { visibility: hidden; } }
+@keyframes fvPxB { 0% { visibility: hidden; } 50% { visibility: visible; } }
+@keyframes fvPxBob { 0% { transform: translateY(0); } 50% { transform: translateY(-4%); } }
 @keyframes fvBob { from { transform: translateY(0); } to { transform: translateY(-2.5px); } }
 @keyframes fvPeck { from { transform: translateX(-2px); } to { transform: translateX(4px); } }
 @keyframes fvWaddle { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
@@ -7456,7 +7481,7 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
   text-align: center; transition: opacity .15s ease, transform .2s cubic-bezier(.3,1.6,.6,1); }
 .fv-bubble::after { content: ""; position: absolute; left: 34%; top: 100%; border: 8px solid transparent; border-top-color: #26301f; }
 .farm-visitor.fv-said .fv-bubble { opacity: 1; transform: translate(-50%, -82%) scale(1); }
-@media (prefers-reduced-motion: reduce) { .fv-art.walking .leg, .fv-art.walking .bob, .fv-art.walking .peck, .fv-art.walking .waddle, .fv-art.walking .hop { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .fv-art.walking *, .fv-look .fv-art * { animation: none !important; } .fv-art.walking .pxB { visibility: hidden; } }
 .fv-card { max-width: 600px; text-align: start; max-height: 88vh; overflow-y: auto; }
 .fv-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 4px; }
 .fv-h { font-size: 13px; font-weight: 700; color: var(--heading); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .4px; }
@@ -7473,6 +7498,9 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .fv-pick span:last-child { min-width: 0; }
 .fv-thumb { flex: none; width: 44px; }
 .fv-thumb .head.front { display: none; }
+.fv-styles { display: flex; flex-wrap: wrap; gap: 6px; }
+.fv-style { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 13.5px; cursor: pointer; }
+.fv-style input { accent-color: var(--terracotta); }
 /* v37.84 — windows drawn only so the translator can read them (i18nHarvestDemand). */
 body.i18n-harvesting #aboutOverlay, body.i18n-harvesting #termsGate, body.i18n-harvesting #linkReqOverlay, body.i18n-harvesting #feedbackOverlay,
 body.i18n-harvesting #deviceOfferOverlay, body.i18n-harvesting #extOfferOverlay, body.i18n-harvesting #logNudge, body.i18n-harvesting #importErrorModal,
@@ -9167,7 +9195,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.90</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.91</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9876,7 +9904,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.90</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.91</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -23621,10 +23649,356 @@ function farmArt(a) {
   return '<svg viewBox="' + a.vb + '" aria-hidden="true" focusable="false"><g class="fv-' + a.id + '">' + a.svg + '</g></svg>';
 }
 
+// ── THE 3D CARTOON LOOK (v37.91) ─────────────────────────────────────────────
+// Tony's pictures: Pixar-ish caricatures — a big head on a small body, glossy
+// eyes, a huge muzzle and a toothy grin. Walking, the head is three-quarters
+// to the viewer, grinning; tapped (.turned), it faces you, eyes wide, mouth an
+// open "O". Built from shared parts so all 14 read as one family. Every id is
+// suffixed by a per-drawing number, since one page can hold several.
+var _farmToonN = 0;
+function farmToonParts(u) {
+  var R = function(id, a, b, c, cx, cy) { return '<radialGradient id="' + id + u + '" cx="' + (cx || '38%') + '" cy="' + (cy || '30%') + '" r="75%"><stop offset="0" stop-color="' + a + '"/><stop offset=".55" stop-color="' + b + '"/><stop offset="1" stop-color="' + c + '"/></radialGradient>'; };
+  var P = {
+    u: u, R: R,
+    g: function(id){ return 'url(#' + id + u + ')'; },
+    eye: function(x, y, rx, ry, look, bar) {
+      return '<ellipse cx="' + x + '" cy="' + y + '" rx="' + rx + '" ry="' + ry + '" fill="url(#ew' + u + ')" stroke="#3a2a22" stroke-width="1.2"/>'
+        + (bar ? '<circle cx="' + (x + look) + '" cy="' + (y + 1) + '" r="' + (rx * .66) + '" fill="url(#ir' + u + ')"/><rect x="' + (x + look - rx * .45) + '" y="' + (y + .2) + '" width="' + (rx * .9) + '" height="' + (rx * .3) + '" rx="' + (rx * .15) + '" fill="#120c09"/>'
+             : '<circle cx="' + (x + look) + '" cy="' + (y + 1) + '" r="' + (rx * .68) + '" fill="url(#ir' + u + ')"/><circle cx="' + (x + look) + '" cy="' + (y + 1) + '" r="' + (rx * .36) + '" fill="#120c09"/>')
+        + '<circle cx="' + (x + look - rx * .28) + '" cy="' + (y - ry * .3) + '" r="' + (rx * .26) + '" fill="#fff"/><circle cx="' + (x + look + rx * .25) + '" cy="' + (y + ry * .25) + '" r="' + (rx * .12) + '" fill="#fff" opacity=".9"/>';
+    },
+    brow: function(x, y, w, lift, col) { return '<path d="M' + (x - w) + ' ' + y + ' q' + w + ' ' + (-lift) + ' ' + (w * 2) + ' 0" fill="none" stroke="' + (col || '#3a2a22') + '" stroke-width="2.5" stroke-linecap="round"/>'; },
+    // An open, toothy grin under a muzzle: top edge at y, half-width w, depth d.
+    grin: function(cx, y, w, d, tongue) {
+      return '<path d="M' + (cx - w) + ' ' + y + ' Q' + cx + ' ' + (y + d * 2.1) + ' ' + (cx + w) + ' ' + (y - 1) + ' Q' + cx + ' ' + (y + d * .55) + ' ' + (cx - w) + ' ' + y + ' Z" fill="#6e2a26"/>'
+        + '<path d="M' + (cx - w * .8) + ' ' + (y + 1.2) + ' Q' + cx + ' ' + (y + d * .75) + ' ' + (cx + w * .8) + ' ' + (y + .4) + ' L' + (cx + w * .74) + ' ' + (y + 4.4) + ' Q' + cx + ' ' + (y + d * .75 + 4) + ' ' + (cx - w * .74) + ' ' + (y + 5) + ' Z" fill="#fffdf7"/>'
+        + (tongue ? '<path d="M' + (cx + w * .2) + ' ' + (y + d * .9) + ' C' + (cx + w * .3) + ' ' + (y + d * 2.4) + ' ' + (cx + w * 1.05) + ' ' + (y + d * 2.6) + ' ' + (cx + w * 1.1) + ' ' + (y + d * 1.4) + ' Z" fill="#ea7d86" stroke="#b4505a" stroke-width="1"/>'
+                  : '<ellipse cx="' + cx + '" cy="' + (y + d * 1.35) + '" rx="' + (w * .38) + '" ry="' + (d * .4) + '" fill="#e57a7a"/>');
+    },
+    oh: function(cx, cy, rx, ry) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="#6e2a26"/><ellipse cx="' + cx + '" cy="' + (cy + ry * .45) + '" rx="' + (rx * .62) + '" ry="' + (ry * .38) + '" fill="#e57a7a"/>'; },
+    shadow: function(cx, rx) { return '<ellipse class="shadow" cx="' + cx + '" cy="150" rx="' + rx + '" ry="5" fill="#000" opacity=".22" filter="url(#sb' + u + ')"/>'; },
+    leg: function(cls, x, y, w, fill, foot, footFill) {
+      var h = 150 - y;
+      return '<g class="leg ' + cls + '"><rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + (h - 4) + '" rx="' + (w / 2) + '" fill="' + fill + '"/>'
+        + (foot === 'paw' ? '<ellipse cx="' + (x + w / 2) + '" cy="' + 146.5 + '" rx="' + (w * .7) + '" ry="4" fill="' + (footFill || fill) + '"/>'
+                          : '<rect x="' + (x - 1.5) + '" y="140" width="' + (w + 3) + '" height="10" rx="4.5" fill="' + (footFill || 'url(#hf' + u + ')') + '"/>') + '</g>';
+    },
+    birdLeg: function(cls, x, y, col) {
+      return '<g class="leg ' + cls + '"><path d="M' + x + ' ' + y + ' L' + x + ' 145" stroke="' + col + '" stroke-width="5" stroke-linecap="round"/><path d="M' + x + ' 145 L' + (x - 9) + ' 149.5 M' + x + ' 145 L' + (x + 10) + ' 148.5 M' + x + ' 145 L' + (x + 1) + ' 150" stroke="' + col + '" stroke-width="3.6" stroke-linecap="round"/></g>';
+    },
+    ear: function(x, y, rx, ry, rot, outer, inner) {
+      return '<g transform="rotate(' + rot + ' ' + x + ' ' + y + ')"><ellipse cx="' + x + '" cy="' + y + '" rx="' + rx + '" ry="' + ry + '" fill="' + outer + '"/>' + (inner ? '<ellipse cx="' + x + '" cy="' + (y + ry * .1) + '" rx="' + (rx * .62) + '" ry="' + (ry * .55) + '" fill="' + inner + '"/>' : '') + '</g>';
+    },
+    defs: function(pal) {
+      return '<defs>' + R('bd', pal.body[0], pal.body[1], pal.body[2]) + R('fc', (pal.face || pal.body)[0], (pal.face || pal.body)[1], (pal.face || pal.body)[2])
+        + R('pt', (pal.patch || pal.body)[0], (pal.patch || pal.body)[1], (pal.patch || pal.body)[2])
+        + R('mz', (pal.muzzle || ['#ffd8cf', '#f4a596', '#d47667'])[0], (pal.muzzle || ['#ffd8cf', '#f4a596', '#d47667'])[1], (pal.muzzle || ['#ffd8cf', '#f4a596', '#d47667'])[2])
+        + R('er', '#ffd0cc', '#f4a6aa', '#e08890', '50%', '50%') + R('ew', '#ffffff', '#f4f1ed', '#ddd7d0', '40%', '35%')
+        + R('ir', (pal.iris || ['#a0703f', '#6b4226', '#2e1a0c'])[0], (pal.iris || ['#a0703f', '#6b4226', '#2e1a0c'])[1], (pal.iris || ['#a0703f', '#6b4226', '#2e1a0c'])[2], '40%', '35%')
+        + R('bk', '#ffd27a', '#f5a62e', '#c97412') + R('rd', '#ff7a6a', '#e0372b', '#a51d16')
+        + '<linearGradient id="hn' + u + '" x1="0" x2="1"><stop offset="0" stop-color="#fbf3df"/><stop offset="1" stop-color="#c9b48c"/></linearGradient>'
+        + '<linearGradient id="hf' + u + '" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="' + (pal.hoof || ['#6a5a50', '#2a211c'])[0] + '"/><stop offset="1" stop-color="' + (pal.hoof || ['#6a5a50', '#2a211c'])[1] + '"/></linearGradient>'
+        + '<filter id="sb' + u + '" x="-30%" y="-100%" width="160%" height="300%"><feGaussianBlur stdDeviation="3"/></filter>' + (pal.extra || '') + '</defs>';
+    }
+  };
+  return P;
+}
+function farmToonSvg(vb, P, pal, body) { return '<svg viewBox="' + vb + '" aria-hidden="true" focusable="false">' + P.defs(pal) + body + '</svg>'; }
+
+var FARM_TOON = {
+  cow: function(P) {
+    var g = P.g, pal = { body: ['#ffffff', '#f2efea', '#c9c2b8'], patch: ['#4a4441', '#2a2523', '#141110'] };
+    var horn = function(x, y, d){ return '<path d="M' + x + ' ' + y + ' C' + (x - 4 * d) + ' ' + (y - 9) + ' ' + (x - 3 * d) + ' ' + (y - 15) + ' ' + (x + 3 * d) + ' ' + (y - 19) + ' C' + (x + 3 * d) + ' ' + (y - 12) + ' ' + (x + 6 * d) + ' ' + (y - 6) + ' ' + (x + 9 * d) + ' ' + (y - 1) + ' Z" fill="' + g('hn') + '"/>'; };
+    var tuft = function(x, y){ return '<g fill="none" stroke="#3b3533" stroke-width="3.6" stroke-linecap="round"><path d="M' + x + ' ' + y + ' C' + (x - 3) + ' ' + (y - 10) + ' ' + (x + 2) + ' ' + (y - 15) + ' ' + (x + 8) + ' ' + (y - 12) + '"/><path d="M' + (x + 5) + ' ' + (y + 1) + ' C' + (x + 8) + ' ' + (y - 9) + ' ' + (x + 15) + ' ' + (y - 9) + ' ' + (x + 15) + ' ' + (y - 4) + '"/><path d="M' + (x - 5) + ' ' + (y + 1) + ' C' + (x - 12) + ' ' + (y - 5) + ' ' + (x - 12) + ' ' + (y - 11) + ' ' + (x - 7) + ' ' + (y - 12) + '"/></g>'; };
+    var bodyPath = 'M46 110 C46 90 64 84 88 84 C112 84 130 90 130 110 C130 128 112 134 88 134 C64 134 46 128 46 110 Z';
+    return farmToonSvg('24 8 180 148', P, pal, P.shadow(100, 56)
+      + '<g class="move">' + P.leg('b', 58, 116, 14, g('bd')) + P.leg('a', 102, 116, 14, g('bd'))
+      + '<g class="tail"><path d="M48 104 C36 108 34 122 38 132" fill="none" stroke="#cfc8be" stroke-width="3.5" stroke-linecap="round"/><ellipse cx="38" cy="136" rx="5" ry="7" fill="#3b3533"/></g>'
+      + '<path d="' + bodyPath + '" fill="' + g('bd') + '"/><clipPath id="cb' + P.u + '"><path d="' + bodyPath + '"/></clipPath>'
+      + '<g clip-path="url(#cb' + P.u + ')" fill="' + g('pt') + '"><path d="M44 96 C52 84 72 86 74 100 C76 114 58 120 50 112 C42 108 40 102 44 96 Z"/><ellipse cx="100" cy="124" rx="13" ry="8"/><ellipse cx="98" cy="90" rx="8" ry="5"/></g>'
+      + '<ellipse cx="76" cy="94" rx="15" ry="5" fill="#fff" opacity=".45"/>' + P.leg('a', 72, 118, 14, g('bd')) + P.leg('b', 116, 118, 14, g('bd'))
+      + '<g class="nod"><g class="head side">' + P.ear(190, 58, 21, 10.5, -22, g('bd'), g('er')) + horn(136, 34, 1) + horn(164, 31, -1) + P.ear(110, 62, 21, 10.5, 20, g('bd'), g('er'))
+      + '<ellipse cx="148" cy="60" rx="35" ry="31" fill="' + g('bd') + '"/><path d="M118 50 C121 34 143 34 147 48 C150 62 132 70 124 64 C118 60 116 55 118 50 Z" fill="' + g('pt') + '"/>' + tuft(150, 31)
+      + P.eye(135, 52, 11, 13, 3.2) + P.eye(159, 51, 10.5, 12.5, 3.2) + P.brow(135, 36, 9, 6) + P.brow(160, 35, 8.5, 6)
+      + '<ellipse cx="156" cy="88" rx="31" ry="20" fill="' + g('mz') + '"/><ellipse cx="147" cy="79" rx="11" ry="4.5" fill="#fff" opacity=".4"/>'
+      + '<ellipse cx="146" cy="84" rx="3.6" ry="5" transform="rotate(-12 146 84)" fill="#7a3a33"/><ellipse cx="168" cy="83" rx="3.4" ry="4.8" transform="rotate(12 168 83)" fill="#7a3a33"/>' + P.grin(157, 94, 21, 7)
+      + '</g><g class="head front">' + P.ear(108, 62, 21, 10.5, 16, g('bd'), g('er')) + P.ear(196, 62, 21, 10.5, -16, g('bd'), g('er')) + horn(136, 34, 1) + horn(168, 34, -1)
+      + '<ellipse cx="152" cy="60" rx="35" ry="31" fill="' + g('bd') + '"/><path d="M122 50 C125 34 147 34 150 48 C152 62 136 70 128 64 C122 60 120 55 122 50 Z" fill="' + g('pt') + '"/>' + tuft(152, 31)
+      + P.eye(139, 50, 12, 14.5, 0) + P.eye(165, 50, 12, 14.5, 0) + P.brow(139, 30, 9, 9) + P.brow(165, 30, 9, 9)
+      + '<ellipse cx="152" cy="88" rx="32" ry="20" fill="' + g('mz') + '"/><ellipse cx="143" cy="79" rx="11" ry="4.5" fill="#fff" opacity=".4"/><ellipse cx="141" cy="84" rx="3.8" ry="5" fill="#7a3a33"/><ellipse cx="163" cy="84" rx="3.8" ry="5" fill="#7a3a33"/>'
+      + P.oh(152, 100, 7.5, 8.5) + '</g></g></g>');
+  },
+  sheep: function(P) {
+    var g = P.g, pal = { body: ['#ffffff', '#f1ece4', '#c9bfb0'], face: ['#fbf1e4', '#f0dcc4', '#c9a882'], iris: ['#9a6a40', '#5a3820', '#24140a'] };
+    var balls = [[48,104,10],[62,104,19],[78,92,21],[100,88,21],[118,96,19],[122,112,17],[104,122,19],[82,124,19],[64,118,17],[92,106,27]];
+    var cap = function(x, y){ return [[x - 16, y + 4, 11], [x, y - 3, 14], [x + 16, y + 4, 11]].map(function(b){ return '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] + '" fill="' + g('bd') + '"/>'; }).join(''); };
+    return farmToonSvg('24 8 180 148', P, pal, P.shadow(96, 52)
+      + '<g class="move">' + P.leg('b', 60, 122, 12, '#4a423e') + P.leg('a', 106, 122, 12, '#4a423e')
+      + balls.map(function(b){ return '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] + '" fill="' + g('bd') + '"/>'; }).join('') + '<ellipse cx="86" cy="84" rx="13" ry="5" fill="#fff" opacity=".55"/>'
+      + P.leg('a', 74, 122, 12, '#4a423e') + P.leg('b', 120, 122, 12, '#4a423e')
+      + '<g class="nod"><g class="head side">' + P.ear(184, 66, 17, 8.5, -18, g('fc'), g('er')) + P.ear(118, 70, 17, 8.5, 20, g('fc'), g('er'))
+      + '<ellipse cx="152" cy="72" rx="28" ry="31" fill="' + g('fc') + '"/>' + cap(150, 44)
+      + P.eye(141, 66, 10, 12, 3) + P.eye(162, 65, 9.5, 11.5, 3) + P.brow(141, 51, 8, 5, '#8a6a52') + P.brow(162, 50, 7.5, 5, '#8a6a52')
+      + '<ellipse cx="158" cy="86" rx="10" ry="6.5" fill="' + g('mz') + '"/>' + P.grin(157, 93, 13, 5)
+      + '</g><g class="head front">' + P.ear(118, 70, 17, 8.5, 16, g('fc'), g('er')) + P.ear(188, 70, 17, 8.5, -16, g('fc'), g('er'))
+      + '<ellipse cx="153" cy="72" rx="28" ry="31" fill="' + g('fc') + '"/>' + cap(153, 44)
+      + P.eye(142, 65, 11, 13, 0) + P.eye(164, 65, 11, 13, 0) + P.brow(142, 47, 8, 8, '#8a6a52') + P.brow(164, 47, 8, 8, '#8a6a52')
+      + '<ellipse cx="153" cy="85" rx="10" ry="6.5" fill="' + g('mz') + '"/>' + P.oh(153, 97, 5.5, 6.5) + '</g></g></g>');
+  },
+  pig: function(P) {
+    var g = P.g, pal = { body: ['#ffe4ea', '#f7b4c4', '#d98299'], muzzle: ['#ffd0db', '#f39ab0', '#d1708b'], hoof: ['#c0697f', '#7a3346'] };
+    var blush = function(x, y){ return '<ellipse cx="' + x + '" cy="' + y + '" rx="6" ry="3.4" fill="#ff7f9f" opacity=".45"/>'; };
+    return farmToonSvg('24 8 180 148', P, pal, P.shadow(98, 54)
+      + '<g class="move">' + P.leg('b', 60, 122, 14, g('bd')) + P.leg('a', 104, 122, 14, g('bd'))
+      + '<path class="tail" d="M46 100 c-11 -2 -13 -13 -5 -15 c8 -2 8 10 -2 10" fill="none" stroke="#d98299" stroke-width="3.4" stroke-linecap="round"/>'
+      + '<ellipse cx="90" cy="108" rx="47" ry="30" fill="' + g('bd') + '"/><ellipse cx="80" cy="92" rx="20" ry="6" fill="#fff" opacity=".45"/>'
+      + P.leg('a', 74, 124, 14, g('bd')) + P.leg('b', 118, 124, 14, g('bd'))
+      + '<g class="nod"><g class="head side"><path d="M166 50 L190 34 L184 62 Z" fill="' + g('bd') + '"/><path d="M171 50 L185 41 L181 57 Z" fill="' + g('er') + '"/>'
+      + '<ellipse cx="150" cy="74" rx="33" ry="29" fill="' + g('bd') + '"/><path d="M134 52 L114 36 L120 64 Z" fill="' + g('bd') + '"/><path d="M130 52 L118 42 L121 59 Z" fill="' + g('er') + '"/>'
+      + P.eye(139, 64, 9.5, 11, 3) + P.eye(161, 63, 9, 10.5, 3) + P.brow(139, 50, 8, 5) + P.brow(161, 49, 7.5, 5)
+      + '<ellipse cx="164" cy="86" rx="17" ry="13" fill="' + g('mz') + '"/><ellipse cx="158" cy="86" rx="2.8" ry="4.4" fill="#9b4560"/><ellipse cx="170" cy="86" rx="2.8" ry="4.4" fill="#9b4560"/>'
+      + blush(134, 82) + P.grin(157, 99, 14, 6)
+      + '</g><g class="head front"><path d="M134 54 L116 30 L124 62 Z" fill="' + g('bd') + '"/><path d="M131 54 L120 37 L125 58 Z" fill="' + g('er') + '"/><path d="M166 54 L184 30 L176 62 Z" fill="' + g('bd') + '"/><path d="M169 54 L180 37 L175 58 Z" fill="' + g('er') + '"/>'
+      + '<ellipse cx="150" cy="74" rx="33" ry="29" fill="' + g('bd') + '"/>' + P.eye(139, 62, 10.5, 12.5, 0) + P.eye(161, 62, 10.5, 12.5, 0) + P.brow(139, 45, 8, 8) + P.brow(161, 45, 8, 8)
+      + '<ellipse cx="150" cy="86" rx="17" ry="12" fill="' + g('mz') + '"/><ellipse cx="144" cy="86" rx="2.8" ry="4.4" fill="#9b4560"/><ellipse cx="156" cy="86" rx="2.8" ry="4.4" fill="#9b4560"/>'
+      + blush(128, 82) + blush(172, 82) + P.oh(150, 103, 5.5, 6) + '</g></g></g>');
+  },
+  goat: function(P) {
+    var g = P.g, pal = { body: ['#ffffff', '#efeae2', '#c3baae'], patch: ['#e2c194', '#c99a68', '#8c6236'], muzzle: ['#f6e6dc', '#e6cfc2', '#c0a596'], iris: ['#f0d27a', '#c9a23a', '#7a5a14'] };
+    var horn = function(x, d){ return '<path d="M' + x + ' 34 C' + (x - 2 * d) + ' 20 ' + (x - 14 * d) + ' 12 ' + (x - 22 * d) + ' 18" fill="none" stroke="' + g('hn') + '" stroke-width="7" stroke-linecap="round"/><path d="M' + x + ' 34 C' + (x - 2 * d) + ' 20 ' + (x - 14 * d) + ' 12 ' + (x - 22 * d) + ' 18" fill="none" stroke="#a8946c" stroke-width="7" stroke-linecap="round" stroke-dasharray="1.5 4" opacity=".6"/>'; };
+    return farmToonSvg('24 4 180 152', P, pal, P.shadow(98, 52)
+      + '<g class="move">' + P.leg('b', 60, 110, 10, g('bd')) + P.leg('a', 106, 110, 10, g('bd'))
+      + '<path class="tail" d="M50 90 L40 76 L54 84 Z" fill="' + g('bd') + '"/>'
+      + '<rect x="46" y="84" width="88" height="40" rx="20" fill="' + g('bd') + '"/><path d="M62 86 C80 82 112 82 126 88 C118 98 74 100 62 86 Z" fill="' + g('pt') + '"/>'
+      + P.leg('a', 74, 112, 10.5, g('bd')) + P.leg('b', 120, 112, 10.5, g('bd'))
+      + '<g class="nod"><g class="head side">' + P.ear(184, 52, 18, 7, 10, g('bd'), g('er')) + horn(150, 1) + horn(166, 1) + P.ear(116, 54, 18, 7, -10, g('bd'), g('er'))
+      + '<ellipse cx="152" cy="62" rx="27" ry="31" fill="' + g('bd') + '"/>' + P.eye(142, 54, 9.5, 11.5, 3, true) + P.eye(162, 53, 9, 11, 3, true)
+      + P.brow(142, 39, 7.5, 5) + P.brow(162, 38, 7, 5) + '<ellipse cx="160" cy="80" rx="15" ry="11" fill="' + g('mz') + '"/><ellipse cx="155" cy="78" rx="2" ry="3" fill="#6b4a3a"/><ellipse cx="166" cy="78" rx="2" ry="3" fill="#6b4a3a"/>'
+      + P.grin(160, 85, 11, 5) + '<path d="M156 94 L158 112 L165 94 Z" fill="' + g('pt') + '"/>'
+      + '</g><g class="head front">' + P.ear(120, 56, 18, 7, -6, g('bd'), g('er')) + P.ear(186, 56, 18, 7, 6, g('bd'), g('er')) + horn(146, 1) + horn(160, -1)
+      + '<ellipse cx="153" cy="62" rx="27" ry="31" fill="' + g('bd') + '"/>' + P.eye(143, 54, 10, 12, 0, true) + P.eye(163, 54, 10, 12, 0, true) + P.brow(143, 37, 8, 8) + P.brow(163, 37, 8, 8)
+      + '<ellipse cx="153" cy="80" rx="15" ry="11" fill="' + g('mz') + '"/><ellipse cx="148" cy="78" rx="2" ry="3" fill="#6b4a3a"/><ellipse cx="158" cy="78" rx="2" ry="3" fill="#6b4a3a"/>'
+      + P.oh(153, 89, 4.5, 5) + '<path d="M149 96 L153 114 L157 96 Z" fill="' + g('pt') + '"/></g></g></g>');
+  },
+  horse: function(P) {
+    var g = P.g, pal = { body: ['#e8a774', '#c27a47', '#7e4522'], muzzle: ['#f6d0ac', '#e3ad80', '#b97d52'], patch: ['#5a3a26', '#3b2416', '#1e1209'] };
+    var sock = function(cls, x, y){ return '<g class="leg ' + cls + '"><rect x="' + x + '" y="' + y + '" width="12" height="' + (146 - y) + '" rx="6" fill="' + g('bd') + '"/><rect x="' + x + '" y="128" width="12" height="13" fill="#fbf4ea"/><rect x="' + (x - 1.5) + '" y="140" width="15" height="10" rx="4.5" fill="url(#hf' + P.u + ')"/></g>'; };
+    var mane = '<path d="M122 84 C124 64 132 46 144 30 L152 34 C142 50 136 66 136 86 Z" fill="' + g('pt') + '"/>';
+    return farmToonSvg('24 -6 180 162', P, pal, P.shadow(96, 54)
+      + '<g class="move">' + sock('b', 58, 104) + sock('a', 106, 104)
+      + '<path class="tail" d="M50 86 C34 92 32 116 40 130 C44 114 46 102 58 92 Z" fill="' + g('pt') + '"/>'
+      + '<rect x="46" y="78" width="92" height="40" rx="20" fill="' + g('bd') + '"/><path d="M120 84 L138 44 L160 50 L144 92 Z" fill="' + g('bd') + '"/>' + mane
+      + '<ellipse cx="78" cy="86" rx="16" ry="4.5" fill="#fff" opacity=".35"/>' + sock('a', 72, 106) + sock('b', 120, 106)
+      + '<g class="nod"><g class="head side"><path d="M168 26 L178 6 L184 30 Z" fill="' + g('bd') + '"/><path d="M134 28 L136 6 L150 24 Z" fill="' + g('bd') + '"/><path d="M138 24 L139 12 L146 23 Z" fill="' + g('er') + '"/>'
+      + '<ellipse cx="156" cy="42" rx="25" ry="27" fill="' + g('bd') + '"/><path d="M144 14 C150 8 160 10 160 22 C154 18 148 20 142 24 Z" fill="' + g('pt') + '"/>'
+      + '<path d="M158 22 C162 30 162 44 160 56 L154 56 C154 44 154 32 158 22 Z" fill="#fbf4ea" opacity=".9"/>'
+      + P.eye(146, 36, 9.5, 11.5, 3) + P.eye(168, 35, 9, 11, 3) + P.brow(146, 22, 8, 5) + P.brow(168, 21, 7.5, 5)
+      + '<ellipse cx="163" cy="66" rx="25" ry="17" fill="' + g('mz') + '"/><ellipse cx="153" cy="62" rx="3.2" ry="4.6" fill="#5a2f1a"/><ellipse cx="174" cy="61" rx="3" ry="4.4" fill="#5a2f1a"/>'
+      + '<path d="M146 72 Q164 90 182 70 Q164 78 146 72 Z" fill="#6e2a26"/><path d="M149 73 L179 71 L178 77 Q164 81 150 78 Z" fill="#fffdf7"/><path d="M156 74 L156 79 M163 74 L163 80 M170 73 L170 79" stroke="#d8d0c0" stroke-width="1"/>'
+      + '</g><g class="head front"><path d="M134 30 L132 8 L148 24 Z" fill="' + g('bd') + '"/><path d="M137 26 L136 14 L144 24 Z" fill="' + g('er') + '"/><path d="M174 30 L176 8 L160 24 Z" fill="' + g('bd') + '"/><path d="M171 26 L172 14 L164 24 Z" fill="' + g('er') + '"/>'
+      + '<ellipse cx="154" cy="42" rx="26" ry="27" fill="' + g('bd') + '"/><path d="M142 16 C148 8 160 8 166 16 C160 14 152 16 146 22 Z" fill="' + g('pt') + '"/><rect x="151" y="22" width="6" height="32" rx="3" fill="#fbf4ea" opacity=".9"/>'
+      + P.eye(143, 36, 10.5, 12.5, 0) + P.eye(165, 36, 10.5, 12.5, 0) + P.brow(143, 19, 8, 8) + P.brow(165, 19, 8, 8)
+      + '<ellipse cx="154" cy="66" rx="25" ry="17" fill="' + g('mz') + '"/><ellipse cx="145" cy="62" rx="3.2" ry="4.6" fill="#5a2f1a"/><ellipse cx="163" cy="62" rx="3.2" ry="4.6" fill="#5a2f1a"/>' + P.oh(154, 76, 6, 6.5) + '</g></g></g>');
+  },
+  donkey: function(P) {
+    var g = P.g, pal = { body: ['#d8d2ca', '#a8a199', '#6f6961'], muzzle: ['#fbf8f3', '#e6e1d8', '#bdb6aa'], patch: ['#6a645d', '#4b4640', '#2a2622'] };
+    var ears = function(x1, r1, x2, r2){ return P.ear(x1, 18, 6, 20, r1, g('bd'), g('er')) + P.ear(x2, 18, 6, 20, r2, g('bd'), g('er')); };
+    return farmToonSvg('24 -8 180 164', P, pal, P.shadow(96, 54)
+      + '<g class="move">' + P.leg('b', 60, 110, 12, g('bd')) + P.leg('a', 106, 110, 12, g('bd'))
+      + '<g class="tail"><path d="M50 92 C42 100 40 114 42 124" stroke="#6f6961" stroke-width="3.5" fill="none" stroke-linecap="round"/><ellipse cx="42" cy="128" rx="4.5" ry="7" fill="' + g('pt') + '"/></g>'
+      + '<rect x="46" y="82" width="90" height="40" rx="20" fill="' + g('bd') + '"/><ellipse cx="92" cy="114" rx="34" ry="6" fill="#ece8e1"/><path d="M120 88 L134 56 L156 62 L144 96 Z" fill="' + g('bd') + '"/><path d="M124 86 L136 54 L142 56 L131 88 Z" fill="' + g('pt') + '"/>'
+      + P.leg('a', 74, 112, 12, g('bd')) + P.leg('b', 120, 112, 12, g('bd'))
+      + '<g class="nod"><g class="head side">' + ears(140, -18, 164, 14)
+      + '<ellipse cx="154" cy="54" rx="27" ry="27" fill="' + g('bd') + '"/>' + P.eye(144, 46, 9.5, 11.5, 3) + P.eye(166, 45, 9, 11, 3) + P.brow(144, 32, 8, 5) + P.brow(166, 31, 7.5, 5)
+      + '<ellipse cx="162" cy="74" rx="24" ry="16" fill="' + g('mz') + '"/><ellipse cx="152" cy="70" rx="3" ry="4.4" fill="#4b4640"/><ellipse cx="172" cy="69" rx="2.8" ry="4.2" fill="#4b4640"/>' + P.grin(162, 80, 17, 6)
+      + '</g><g class="head front">' + ears(138, -20, 168, 20)
+      + '<ellipse cx="153" cy="54" rx="27" ry="27" fill="' + g('bd') + '"/>' + P.eye(142, 46, 10.5, 12.5, 0) + P.eye(164, 46, 10.5, 12.5, 0) + P.brow(142, 29, 8, 8) + P.brow(164, 29, 8, 8)
+      + '<ellipse cx="153" cy="74" rx="24" ry="16" fill="' + g('mz') + '"/><ellipse cx="145" cy="70" rx="3" ry="4.4" fill="#4b4640"/><ellipse cx="161" cy="70" rx="3" ry="4.4" fill="#4b4640"/>' + P.oh(153, 84, 6, 6.5) + '</g></g></g>');
+  },
+  sheepdog: function(P) {
+    var g = P.g, pal = { body: ['#ffffff', '#f2efe9', '#c8c2b8'], patch: ['#4a4441', '#26221f', '#0e0c0b'], muzzle: ['#ffffff', '#f2efe9', '#c8c2b8'], iris: ['#c08a4a', '#7a4a1e', '#2e1a0a'] };
+    return farmToonSvg('24 8 180 148', P, pal, P.shadow(96, 50)
+      + '<g class="move">' + P.leg('b', 60, 114, 11, g('bd'), 'paw') + P.leg('a', 106, 114, 11, g('bd'), 'paw')
+      + '<path class="tail" d="M50 96 C30 96 26 116 36 124 C38 112 44 106 56 104 Z" fill="' + g('pt') + '"/><ellipse cx="34" cy="122" rx="5" ry="5" fill="#fff"/>'
+      + '<rect x="46" y="88" width="86" height="34" rx="17" fill="' + g('pt') + '"/><path d="M118 92 C134 94 140 108 132 122 L114 122 C118 112 116 100 112 94 Z" fill="' + g('bd') + '"/>'
+      + P.leg('a', 74, 116, 11.5, g('bd'), 'paw') + P.leg('b', 120, 116, 11.5, g('bd'), 'paw')
+      + '<g class="nod"><g class="head side"><path d="M168 46 L186 32 L182 60 Z" fill="' + g('pt') + '"/><path d="M128 46 L130 26 L146 40 Z" fill="' + g('pt') + '"/>'
+      + '<ellipse cx="152" cy="66" rx="30" ry="28" fill="' + g('pt') + '"/><path d="M150 40 C156 52 158 62 168 72 L148 80 C150 66 148 52 150 40 Z" fill="' + g('bd') + '"/>'
+      + P.eye(140, 60, 9.5, 11.5, 3) + P.eye(164, 59, 9, 11, 3) + P.brow(140, 46, 8, 5, '#d8d2c8') + P.brow(164, 45, 7.5, 5, '#d8d2c8')
+      + '<ellipse cx="164" cy="80" rx="18" ry="12" fill="' + g('mz') + '"/><ellipse cx="172" cy="74" rx="6" ry="4.6" fill="#111"/><ellipse cx="170" cy="72.6" rx="2" ry="1.2" fill="#fff" opacity=".6"/>'
+      + P.grin(160, 84, 13, 6, true)
+      + '</g><g class="head front"><path d="M126 48 L126 24 L144 40 Z" fill="' + g('pt') + '"/><path d="M178 48 L178 24 L160 40 Z" fill="' + g('pt') + '"/>'
+      + '<ellipse cx="152" cy="66" rx="30" ry="28" fill="' + g('pt') + '"/><path d="M148 40 L156 40 L162 74 L142 74 Z" fill="' + g('bd') + '"/>'
+      + P.eye(140, 60, 10.5, 12.5, 0) + P.eye(164, 60, 10.5, 12.5, 0) + P.brow(140, 43, 8, 8, '#d8d2c8') + P.brow(164, 43, 8, 8, '#d8d2c8')
+      + '<ellipse cx="152" cy="80" rx="17" ry="12" fill="' + g('mz') + '"/><ellipse cx="152" cy="75" rx="6" ry="4.6" fill="#111"/>' + P.oh(152, 88, 5, 5.5) + '</g></g></g>');
+  },
+  llama: function(P) {
+    var g = P.g, pal = { body: ['#fffaf0', '#f2e6cc', '#c9b58e'], muzzle: ['#fbf1de', '#ead7b4', '#c4a97a'], iris: ['#7a5a40', '#4a3220', '#1e120a'] };
+    var fluff = function(xs, y, r){ return xs.map(function(x){ return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + g('bd') + '"/>'; }).join(''); };
+    var ears = function(a, b){ a -= 4; b += 4; return '<path d="M' + a + ' 2 C' + (a - 6) + ' -12 ' + (a - 2) + ' -20 ' + (a + 4) + ' -14 C' + (a + 6) + ' -8 ' + (a + 5) + ' -2 ' + (a + 4) + ' 4 Z" fill="' + g('bd') + '"/>'
+      + '<path d="M' + b + ' 4 C' + (b - 2) + ' -8 ' + (b - 3) + ' -16 ' + (b + 4) + ' -18 C' + (b + 8) + ' -12 ' + (b + 7) + ' -4 ' + (b + 5) + ' 4 Z" fill="' + g('bd') + '"/>'; };
+    return farmToonSvg('24 -24 180 180', P, pal, P.shadow(94, 50)
+      + '<g class="move">' + P.leg('b', 58, 112, 10, g('bd')) + P.leg('a', 104, 112, 10, g('bd'))
+      + '<ellipse class="tail" cx="46" cy="94" rx="7" ry="10" fill="' + g('bd') + '"/>'
+      + fluff([56, 72, 88, 104, 118], 86, 11) + '<rect x="44" y="84" width="88" height="38" rx="19" fill="' + g('bd') + '"/>'
+      + '<rect x="70" y="86" width="40" height="22" rx="4" fill="#c4553a"/><rect x="70" y="93" width="40" height="3" fill="#f2c14e"/><rect x="70" y="99" width="40" height="3" fill="#2f7d8c"/>'
+      + '<rect x="114" y="28" width="22" height="70" rx="11" fill="' + g('bd') + '"/>'
+      + P.leg('a', 72, 114, 10.5, g('bd')) + P.leg('b', 118, 114, 10.5, g('bd'))
+      + '<g class="nod"><g class="head side">' + ears(120, 140)
+      + '<ellipse cx="138" cy="22" rx="29" ry="29" fill="' + g('bd') + '"/>' + fluff([124, 138, 152], -4, 10)
+      + P.eye(128, 18, 10.5, 12.5, 3) + P.eye(151, 17, 10, 12, 3) + '<path d="M123 8 l-2 -3 M129 7 l0 -4 M135 8 l2 -3" stroke="#3a2a22" stroke-width="1.4" stroke-linecap="round"/>'
+      + '<ellipse cx="150" cy="42" rx="19" ry="12" fill="' + g('mz') + '"/><ellipse cx="145" cy="38" rx="2" ry="3" fill="#6b5638"/><ellipse cx="157" cy="37" rx="2" ry="3" fill="#6b5638"/>'
+      + P.grin(151, 45, 13, 5.5)
+      + '</g><g class="head front">' + ears(116, 144)
+      + '<ellipse cx="136" cy="22" rx="29" ry="29" fill="' + g('bd') + '"/>' + fluff([122, 136, 150], -4, 10)
+      + P.eye(125, 18, 11.5, 13.5, 0) + P.eye(147, 18, 11.5, 13.5, 0) + P.brow(125, 0, 8, 7) + P.brow(147, 0, 8, 7)
+      + '<ellipse cx="136" cy="42" rx="19" ry="12" fill="' + g('mz') + '"/><ellipse cx="130" cy="38" rx="2" ry="3" fill="#6b5638"/><ellipse cx="142" cy="38" rx="2" ry="3" fill="#6b5638"/>' + P.oh(136, 50, 5, 5.5) + '</g></g></g>');
+  },
+  rabbit: function(P) {
+    var g = P.g, pal = { body: ['#f2d4b4', '#cfa47b', '#93673f'], face: ['#f8e0c4', '#d9b088', '#9a6e44'], muzzle: ['#ffffff', '#f6ece0', '#d8c6b0'], iris: ['#6a4a8a', '#3a2650', '#14081e'] };
+    var teeth = function(x, y){ return '<rect x="' + (x - 5) + '" y="' + y + '" width="10" height="9" rx="2" fill="#fffdf7" stroke="#cbbba8" stroke-width=".8"/><path d="M' + x + ' ' + y + ' L' + x + ' ' + (y + 9) + '" stroke="#cbbba8" stroke-width=".8"/>'; };
+    return farmToonSvg('24 4 180 152', P, pal, P.shadow(96, 46)
+      + '<g class="move"><circle cx="54" cy="114" r="10" fill="#fffaf2"/>'
+      + '<ellipse cx="86" cy="118" rx="36" ry="26" fill="' + g('bd') + '"/><ellipse cx="102" cy="126" rx="15" ry="13" fill="#f6ead8"/><ellipse cx="72" cy="142" rx="22" ry="8" fill="' + g('bd') + '"/>'
+      + '<g class="leg a"><rect x="104" y="128" width="10" height="18" rx="5" fill="' + g('bd') + '"/></g><g class="leg b"><rect x="116" y="128" width="10" height="18" rx="5" fill="' + g('bd') + '"/></g>'
+      + '<g class="nod"><g class="head side">' + P.ear(154, 34, 8, 26, 12, g('fc'), g('er')) + P.ear(136, 34, 8.5, 27, -10, g('fc'), g('er'))
+      + '<ellipse cx="146" cy="80" rx="29" ry="27" fill="' + g('fc') + '"/>' + P.eye(136, 72, 10, 12, 3) + P.eye(158, 71, 9.5, 11.5, 3)
+      + '<ellipse cx="156" cy="90" rx="14" ry="9" fill="' + g('mz') + '"/><ellipse cx="160" cy="85" rx="4" ry="3" fill="#ef8aa0"/>'
+      + '<path d="M146 94 Q156 104 168 93 Q157 97 146 94 Z" fill="#6e2a26"/>' + teeth(157, 94) + '<path d="M168 88 L184 85 M168 91 L184 93" stroke="#8a6a50" stroke-width="1"/>'
+      + '</g><g class="head front">' + P.ear(134, 32, 8.5, 27, -10, g('fc'), g('er')) + P.ear(158, 32, 8.5, 27, 10, g('fc'), g('er'))
+      + '<ellipse cx="146" cy="80" rx="29" ry="27" fill="' + g('fc') + '"/>' + P.eye(135, 72, 10.5, 12.5, 0) + P.eye(157, 72, 10.5, 12.5, 0) + P.brow(135, 56, 7, 7) + P.brow(157, 56, 7, 7)
+      + '<ellipse cx="146" cy="90" rx="14" ry="9" fill="' + g('mz') + '"/><ellipse cx="146" cy="85" rx="4" ry="3" fill="#ef8aa0"/>' + P.oh(146, 97, 5, 5.5) + teeth(146, 91)
+      + '<path d="M130 88 L114 85 M130 91 L114 93 M162 88 L178 85 M162 91 L178 93" stroke="#8a6a50" stroke-width="1"/></g></g></g>');
+  },
+  hen: function(P) { return farmToonBird(P, { body: ['#f6b27a', '#d9773e', '#9a4a1f'], wing: '#b85a24', tail: ['#7d3519', '#9a4521'], legs: '#f0b43a', comb: 3 }); },
+  rooster: function(P) { return farmToonBird(P, { body: ['#ffd27a', '#e9a23b', '#a8641a'], wing: '#c46a1e', breast: '#3a3028', tail: ['#1f4a38', '#2f6a4f', '#c4552a'], sickle: true, legs: '#f0b43a', comb: 4 }); },
+  turkey: function(P) { return farmToonBird(P, { body: ['#8a6040', '#5a3a24', '#2e1c10'], wing: '#4a2e1c', legs: '#c79c8a', fan: true, head: ['#d6ecff', '#a9cbe6', '#6a8ca8'], snood: true }); },
+  duck: function(P) { return farmToonBird(P, { body: ['#ffffff', '#f3f4f2', '#c3c8cc'], wing: '#e6e9ec', legs: '#f39a2b', bill: true, neck: 'short', web: true }); },
+  goose: function(P) { return farmToonBird(P, { body: ['#cfc7bb', '#a59c8f', '#6f665a'], belly: '#f0ece5', wing: '#8f877b', legs: '#f08a2a', bill: true, neck: 'long', web: true }); }
+};
+// Hen, rooster, turkey, duck and goose share a body: a plump teardrop on two legs.
+function farmToonBird(P, o) {
+  var g = P.g, u = P.u;
+  var pal = { body: o.body, face: o.head || o.body, iris: ['#7a5236', '#4a2e18', '#1a0e06'], extra: '' };
+  var long = o.neck === 'long', hy = long ? 26 : 56, hx = long ? 134 : 138;
+  var feet = function(cls, x){ return o.web ? '<g class="leg ' + cls + '"><path d="M' + x + ' 116 L' + x + ' 144" stroke="' + o.legs + '" stroke-width="5" stroke-linecap="round"/><path d="M' + x + ' 143 C' + (x - 7) + ' 146 ' + (x - 9) + ' 150 ' + (x - 7) + ' 150.5 L' + (x + 9) + ' 150.5 C' + (x + 9) + ' 148 ' + (x + 5) + ' 145 ' + x + ' 143 Z" fill="' + o.legs + '"/></g>' : P.birdLeg(cls, x, 116, o.legs); };
+  var comb = function(x, y, n){ var r = ''; for (var i = 0; i < n; i++) r += '<circle cx="' + (x - (n - 1) * 5.5 + i * 11) + '" cy="' + (y - 4 - (i === 0 || i === n - 1 ? 0 : 4)) + '" r="' + (i === 0 || i === n - 1 ? 7.5 : 9) + '" fill="' + g('rd') + '"/>'; return r; };
+  var beakSide = o.bill
+    ? '<path d="M' + (hx + 18) + ' ' + (hy + 6) + ' C' + (hx + 33) + ' ' + (hy + 2) + ' ' + (hx + 40) + ' ' + (hy + 6) + ' ' + (hx + 40) + ' ' + (hy + 10) + ' L' + (hx + 16) + ' ' + (hy + 12) + ' Z" fill="' + g('bk') + '"/><path d="M' + (hx + 16) + ' ' + (hy + 14) + ' L' + (hx + 36) + ' ' + (hy + 14) + ' C' + (hx + 34) + ' ' + (hy + 20) + ' ' + (hx + 24) + ' ' + (hy + 22) + ' ' + (hx + 16) + ' ' + (hy + 18) + ' Z" fill="' + g('bk') + '"/><path d="M' + (hx + 17) + ' ' + (hy + 12.5) + ' L' + (hx + 37) + ' ' + (hy + 12.5) + '" stroke="#6e2a26" stroke-width="2.4"/>'
+    : '<path d="M' + (hx + 16) + ' ' + (hy + 2) + ' L' + (hx + 34) + ' ' + (hy + 7) + ' L' + (hx + 16) + ' ' + (hy + 11) + ' Z" fill="' + g('bk') + '"/><path d="M' + (hx + 16) + ' ' + (hy + 13) + ' L' + (hx + 30) + ' ' + (hy + 14) + ' L' + (hx + 16) + ' ' + (hy + 19) + ' Z" fill="' + g('bk') + '"/><path d="M' + (hx + 16) + ' ' + (hy + 12) + ' L' + (hx + 30) + ' ' + (hy + 12.5) + '" stroke="#6e2a26" stroke-width="2.2"/>';
+  var beakFront = o.bill
+    ? '<ellipse cx="' + hx + '" cy="' + (hy + 13) + '" rx="14" ry="5" fill="' + g('bk') + '"/><ellipse cx="' + hx + '" cy="' + (hy + 21) + '" rx="11" ry="4.6" fill="' + g('bk') + '"/><ellipse cx="' + hx + '" cy="' + (hy + 17) + '" rx="6" ry="3" fill="#6e2a26"/>'
+    : '<path d="M' + (hx - 6) + ' ' + (hy + 9) + ' L' + (hx + 6) + ' ' + (hy + 9) + ' L' + hx + ' ' + (hy + 16) + ' Z" fill="' + g('bk') + '"/><path d="M' + (hx - 5) + ' ' + (hy + 19) + ' L' + (hx + 5) + ' ' + (hy + 19) + ' L' + hx + ' ' + (hy + 26) + ' Z" fill="' + g('bk') + '"/><ellipse cx="' + hx + '" cy="' + (hy + 17.5) + '" rx="4" ry="2.2" fill="#6e2a26"/>';
+  var fan = o.fan ? '<g transform="translate(78 96)">' + [-70, -46, -23, 0, 23, 46, 70].map(function(a, i){ return '<g transform="rotate(' + a + ')"><ellipse cx="0" cy="-38" rx="12" ry="38" fill="' + (i % 2 ? '#a8693a' : '#7a4a2a') + '"/><ellipse cx="0" cy="-62" rx="10" ry="3.5" fill="#3a2414"/><ellipse cx="0" cy="-70" rx="9" ry="6" fill="#ecd9b0"/></g>'; }).join('') + '</g>' : '';
+  var tail = o.sickle ? '<path d="M66 92 C44 74 40 44 60 32 C56 52 60 68 76 82 Z" fill="' + o.tail[0] + '"/><path d="M62 98 C38 90 30 66 40 52 C44 70 56 82 72 88 Z" fill="' + o.tail[1] + '"/><path d="M64 102 C46 104 36 92 36 80 C44 90 56 96 70 96 Z" fill="' + o.tail[2] + '"/>'
+           : o.tail ? '<path d="M64 94 C48 80 48 60 58 54 C62 66 68 76 76 82 Z" fill="' + o.tail[0] + '"/><path d="M66 98 C50 90 44 76 50 66 C56 76 64 84 76 88 Z" fill="' + o.tail[1] + '"/>'
+           : '<path d="M62 98 L40 86 L64 88 Z" fill="' + g('bd') + '"/>';
+  var neck = long ? '<path d="M118 100 C124 78 116 56 130 38" stroke="' + g('bd') + '" stroke-width="20" fill="none" stroke-linecap="round"/>' : '';
+  return farmToonSvg(long ? '24 -14 180 170' : '24 14 180 142', P, pal, P.shadow(100, 44)
+    + '<g class="move">' + fan + tail + feet('b', 106) + neck
+    + '<ellipse cx="98" cy="102" rx="38" ry="28" fill="' + g('bd') + '"/>' + (o.breast ? '<ellipse cx="118" cy="110" rx="16" ry="15" fill="' + o.breast + '"/>' : '') + (o.belly ? '<ellipse cx="104" cy="118" rx="28" ry="9" fill="' + o.belly + '"/>' : '')
+    + '<path d="M76 98 C88 86 110 88 116 102 C106 114 86 114 76 98 Z" fill="' + o.wing + '"/><ellipse cx="88" cy="88" rx="14" ry="4.5" fill="#fff" opacity=".35"/>' + feet('a', 92)
+    + '<g class="nod"><g class="head side">' + (o.comb ? comb(hx, hy - 20, o.comb) : '')
+    + '<circle cx="' + hx + '" cy="' + hy + '" r="29" fill="' + g('fc') + '"/>' + P.eye(hx - 7, hy - 5, 10.5, 12.5, 3) + P.eye(hx + 15, hy - 6, 10, 12, 3) + P.brow(hx - 7, hy - 21, 8, 5) + P.brow(hx + 15, hy - 22, 7.5, 5)
+    + beakSide + (o.comb ? '<ellipse cx="' + (hx + 18) + '" cy="' + (hy + 24) + '" rx="4.5" ry="7.5" fill="' + g('rd') + '"/>' : '')
+    + (o.snood ? '<path d="M' + (hx + 16) + ' ' + (hy - 4) + ' C' + (hx + 22) + ' ' + hy + ' ' + (hx + 24) + ' ' + (hy + 10) + ' ' + (hx + 21) + ' ' + (hy + 20) + ' C' + (hx + 18) + ' ' + (hy + 12) + ' ' + (hx + 16) + ' ' + (hy + 6) + ' ' + (hx + 14) + ' ' + hy + ' Z" fill="' + g('rd') + '"/><ellipse cx="' + (hx + 12) + '" cy="' + (hy + 26) + '" rx="5" ry="8" fill="' + g('rd') + '"/>' : '')
+    + '</g><g class="head front">' + (o.comb ? comb(hx, hy - 21, o.comb) : '')
+    + '<circle cx="' + hx + '" cy="' + hy + '" r="30" fill="' + g('fc') + '"/>' + P.eye(hx - 11, hy - 5, 11.5, 13.5, 0) + P.eye(hx + 11, hy - 5, 11.5, 13.5, 0) + P.brow(hx - 11, hy - 23, 8, 8) + P.brow(hx + 11, hy - 23, 8, 8)
+    + beakFront + (o.comb ? '<ellipse cx="' + (hx - 4) + '" cy="' + (hy + 32) + '" rx="3.6" ry="6.5" fill="' + g('rd') + '"/><ellipse cx="' + (hx + 4) + '" cy="' + (hy + 32) + '" rx="3.6" ry="6.5" fill="' + g('rd') + '"/>' : '')
+    + (o.snood ? '<path d="M' + (hx + 3) + ' ' + (hy - 6) + ' C' + (hx + 7) + ' ' + (hy + 2) + ' ' + (hx + 7) + ' ' + (hy + 14) + ' ' + (hx + 5) + ' ' + (hy + 22) + ' C' + (hx + 3) + ' ' + (hy + 14) + ' ' + (hx + 2) + ' ' + (hy + 4) + ' ' + (hx + 1) + ' ' + (hy - 4) + ' Z" fill="' + g('rd') + '"/><ellipse cx="' + hx + '" cy="' + (hy + 32) + '" rx="5" ry="8" fill="' + g('rd') + '"/>' : '')
+    + '</g></g></g>');
+}
+function farmToonArt(id) {
+  var f = FARM_TOON[id]; if (!f) return '';
+  return f(farmToonParts('t' + (++_farmToonN)));
+}
+
+// ── THREE LOOKS, ONE FOR EVERYONE (v37.91) ───────────────────────────────────
+// Tony: "include the following styles for all animals: 3D cartoon, Storybook
+// and Pixel art … a single style for all animals. It's like a theme." His
+// choice (config.style) is for everyone; 3D cartoon until he picks another.
+var FARM_STYLES = ['cartoon', 'story', 'pixel'];
+var FARM_STYLE_NAMES = { cartoon: '3D cartoon', story: 'Storybook', pixel: 'Pixel art' };
+function farmStyle() { var s = farmConfig().style; return FARM_STYLES.indexOf(s) !== -1 ? s : 'cartoon'; }
+function farmVectorArt(a, style) { return style === 'cartoon' ? farmToonArt(a.id) : farmArt(a); }
+// Pixel art is made from the Storybook drawing, by the app itself: each cell of
+// a grid takes the colour of the topmost shape under its centre (isPointInFill,
+// so no canvas and nothing a browser could refuse to read back), then the
+// sprite gets a dark outline. Three frames: legs apart one way, the other way,
+// and standing with the head turned to you. Made once per animal per visit.
+var FARM_PX_COLS = 50, _farmPxCache = {};
+function farmPixel(a) {
+  if (_farmPxCache[a.id]) return _farmPxCache[a.id];
+  return (_farmPxCache[a.id] = new Promise(function(resolve) {
+    var host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + (FARM_PX_COLS * 6) + 'px;visibility:hidden;pointer-events:none;';
+    document.body.appendChild(host);
+    try {
+      var frame = function(ang, front) {
+        host.innerHTML = farmArt(a);
+        var svg = host.querySelector('svg');
+        svg.style.width = '100%'; svg.style.height = 'auto'; svg.style.display = 'block';
+        var drop = svg.querySelector(front ? '.head.side' : '.head.front'); if (drop) drop.remove();
+        Array.prototype.forEach.call(svg.querySelectorAll('.leg'), function(l) {
+          var b = l.getBBox(), sign = /\ba\b/.test(l.getAttribute('class') || '') ? 1 : -1;
+          l.setAttribute('transform', 'rotate(' + (ang * sign) + ' ' + (b.x + b.width / 2) + ' ' + b.y + ')');
+        });
+        var box = svg.getBoundingClientRect(), cell = box.width / FARM_PX_COLS, rows = Math.round(box.height / cell);
+        var shapes = Array.prototype.filter.call(svg.querySelectorAll('rect,circle,ellipse,path,polygon'), function(sh) {
+          var cs = getComputedStyle(sh);
+          return cs.display !== 'none' && Number(cs.opacity) >= .5 && !(sh.closest('[opacity]') && Number(sh.closest('[opacity]').getAttribute('opacity')) < .5);
+        }).reverse().map(function(sh) {
+          var cs = getComputedStyle(sh), r = sh.getBoundingClientRect();
+          // The box is the shape's geometry only: a straight line is 0 wide, so its stroke is added.
+          var pad = /^rgb/.test(cs.stroke) ? parseFloat(cs.strokeWidth) * sh.getScreenCTM().a / 2 + 1 : 0;
+          return { el: sh, fill: /^rgb/.test(cs.fill) ? cs.fill : null, stroke: /^rgb/.test(cs.stroke) && cs.strokeWidth !== '0px' ? cs.stroke : null,
+                   inv: sh.getScreenCTM().inverse(), x0: r.left - pad, y0: r.top - pad, x1: r.right + pad, y1: r.bottom + pad };
+        });
+        var pt = svg.createSVGPoint(), grid = [];
+        for (var y = 0; y < rows; y++) {
+          grid.push([]);
+          for (var x = 0; x < FARM_PX_COLS; x++) {
+            var px = box.left + (x + .5) * cell, py = box.top + (y + .5) * cell, col = null;
+            for (var i = 0; i < shapes.length && !col; i++) {
+              var sh = shapes[i];
+              if (px < sh.x0 || px > sh.x1 || py < sh.y0 || py > sh.y1) continue;
+              pt.x = px; pt.y = py; var p = pt.matrixTransform(sh.inv);
+              if (sh.fill && sh.el.isPointInFill(p)) col = sh.fill;
+              else if (sh.stroke && sh.el.isPointInStroke(p)) col = sh.stroke;
+            }
+            grid[y].push(col);
+          }
+        }
+        var out = [];       // a one-cell dark outline round the sprite
+        for (y = 0; y < rows; y++) for (x = 0; x < FARM_PX_COLS; x++) if (!grid[y][x] && [[1,0],[-1,0],[0,1],[0,-1]].some(function(d){ return grid[y + d[1]] && grid[y + d[1]][x + d[0]]; })) out.push([x, y]);
+        out.forEach(function(c){ grid[c[1]][c[0]] = 'rgb(42, 36, 32)'; });
+        var paths = {};     // one path per colour, row by row
+        for (y = 0; y < rows; y++) for (x = 0; x < FARM_PX_COLS; x++) {
+          var c = grid[y][x]; if (!c) continue;
+          var run = 1; while (x + run < FARM_PX_COLS && grid[y][x + run] === c) run++;
+          paths[c] = (paths[c] || '') + 'M' + x + ' ' + y + 'h' + run + 'v1h-' + run + 'z';
+          x += run - 1;
+        }
+        return '<svg viewBox="0 0 ' + FARM_PX_COLS + ' ' + rows + '" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'
+          + Object.keys(paths).map(function(c){ return '<path fill="' + c + '" d="' + paths[c] + '"/>'; }).join('') + '</svg>';
+      };
+      resolve({ a: frame(18, false), b: frame(-18, false), f: frame(0, true) });
+    } catch(e) { resolve(null); }
+    finally { host.remove(); }
+  }));
+}
+function farmPixelHtml(px) {
+  return '<div class="fv-px"><div class="pxA">' + px.a + '</div><div class="pxB">' + px.b + '</div><div class="pxF">' + px.f + '</div></div>';
+}
+function farmArtFor(a, style) {      // a promise of the drawing in a look
+  if (style !== 'pixel') return Promise.resolve(farmVectorArt(a, style));
+  return farmPixel(a).then(function(px){ return px ? farmPixelHtml(px) : farmArt(a); });
+}
+
 // ── What Tony chose (i18n/_farm), kept on the device between visits.
 function farmDefaultConfig() {
   return { sayings: FARM_SAYINGS_DEFAULT.map(function(t){ return { t: t, on: true }; }),
-           animals: FARM_ANIMALS.map(function(a){ return a.id; }), minMinutes: FARM_MIN_DEFAULT, maxMinutes: FARM_MAX_DEFAULT };
+           animals: FARM_ANIMALS.map(function(a){ return a.id; }), minMinutes: FARM_MIN_DEFAULT, maxMinutes: FARM_MAX_DEFAULT, style: 'cartoon' };
 }
 function farmCleanConfig(c) {
   if (!c || typeof c !== 'object') return null;
@@ -23635,7 +24009,7 @@ function farmCleanConfig(c) {
   if (!(lo >= 1)) lo = FARM_MIN_DEFAULT;
   if (!(hi >= 1)) hi = FARM_MAX_DEFAULT;
   lo = Math.min(lo, FARM_MINUTES_CAP); hi = Math.min(Math.max(hi, lo), FARM_MINUTES_CAP);
-  return { sayings: s.slice(0, 40), animals: known, minMinutes: lo, maxMinutes: hi, at: Number(c.at) || 0 };
+  return { sayings: s.slice(0, 40), animals: known, minMinutes: lo, maxMinutes: hi, style: FARM_STYLES.indexOf(c.style) !== -1 ? c.style : 'cartoon', at: Number(c.at) || 0 };
 }
 var _farmCfg = null;
 function farmConfig() {
@@ -23683,7 +24057,9 @@ function farmSay(text, pitch) {
     speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(text);
     var v = farmVoice(); if (v) u.voice = v;
-    u.lang = 'en-GB'; u.rate = 0.92; u.pitch = pitch || 1;
+    // v37.91 — Tony: "higher, like in cartoons". Each animal keeps its own
+    // relative pitch, all of them raised (the speech pitch scale ends at 2).
+    u.lang = 'en-GB'; u.rate = 1.02; u.pitch = Math.max(1.2, Math.min(2, 1.45 + ((pitch || 1) - 1) * .6));
     speechSynthesis.speak(u);
     return true;
   } catch(e) { return false; }
@@ -23734,43 +24110,90 @@ document.addEventListener('visibilitychange', function() {
 
 // ── The visit: across the screen in 5–10 s, from either side, higher or
 // lower, wandering a little. Tapped: it stops, turns to you, speaks, walks on.
+// ── The visit (v37.91 — Tony: "match the speed the animal walks to the
+// movement of the legs … as if they are actually walking/roaming"). The legs
+// set the pace: one step moves the body as far as a leg swings (2·L·sin 24°,
+// L measured from the drawing), so the feet do not slide; a step takes
+// 0.26–0.36 s; Rosie hops, about half her length a hop. Now and then it stops
+// to look around, then walks on. Pixel art moves in jumps, a few times a
+// second, like an old game. Tapped: it stops, turns to you, speaks, walks on.
+var FARM_SWING = 24 * Math.PI / 180;
 function farmVisit(id, opts) {
   opts = opts || {};
   var a = (id && farmAnimal(id)) || farmPickAnimal();
+  var style = FARM_STYLES.indexOf(opts.style) !== -1 ? opts.style : farmStyle();
   var prev = document.querySelector('.farm-visitor'); if (prev) prev.remove();
   var el = document.createElement('div');
-  el.className = 'farm-visitor'; el.setAttribute('data-no-i18n', '');
+  el.className = 'farm-visitor fv-s-' + style + (a.id === 'rabbit' ? ' fv-hopper' : '');
+  el.setAttribute('data-no-i18n', '');
   el.setAttribute('role', 'button'); el.setAttribute('aria-label', a.name + ' — tap to say hello');
-  el.innerHTML = '<div class="fv-flip"><div class="fv-art walking">' + farmArt(a) + '</div></div><div class="fv-bubble"></div>';
+  el.innerHTML = '<div class="fv-flip"><div class="fv-art"></div></div><div class="fv-bubble"></div>';
+  el.style.visibility = 'hidden';
   document.body.appendChild(el);
-  var W = window.innerWidth, H = window.innerHeight, w = el.offsetWidth || 120, h = el.offsetHeight || 100;
+  el._farm = { animal: a.id, style: style };
+  el._farm.ready = farmArtFor(a, style).then(function(html) {
+    if (!el.isConnected) return;
+    el.querySelector('.fv-art').innerHTML = html;
+    farmWalk(el, a, style, opts);
+  });
+  return el;
+}
+function farmWalk(el, a, style, opts) {
+  var art = el.querySelector('.fv-art');
+  var W = window.innerWidth, H = window.innerHeight, w = el.offsetWidth || 130, h = el.offsetHeight || 100;
   var rnd = function(lo, hi){ return lo + Math.random() * (hi - lo); };
+  // The stride, from the drawing: its leg length in viewBox units, scaled to the screen.
+  var vbw = 170, legU = 40, svg = style === 'pixel' ? null : art.querySelector('svg');
+  if (svg) {
+    var vb = String(svg.getAttribute('viewBox') || '').split(/\s+/).map(Number); if (vb[2]) vbw = vb[2];
+    var leg = svg.querySelector('.leg'); try { if (leg) legU = Math.max(14, leg.getBBox().height); } catch(e) {}
+  }
+  var hopper = a.id === 'rabbit';
+  var step = opts.step || rnd(.26, .36);                                   // seconds per step
+  var stride = hopper ? w * .5 : 2 * legU * (w / vbw) * Math.sin(FARM_SWING); // px the body moves per step
+  var speed = opts.speed || stride / step;                                 // px per second (a test may hurry it)
+  art.style.setProperty('--fv-t', step.toFixed(3) + 's');
   var ltr = opts.ltr !== undefined ? !!opts.ltr : Math.random() < 0.5;
   el.style.setProperty('--fv-dir', ltr ? '1' : '-1');
   var x0 = ltr ? -w - 10 : W + 10, x1 = ltr ? W + 10 : -w - 10;
   var top = Math.max(8, H * 0.1), bottom = Math.max(top + 10, H - h - 8);
-  var y0 = rnd(top, bottom), y1 = Math.min(bottom, Math.max(top, y0 + rnd(-0.25, 0.25) * H));
-  var wave = rnd(0, 26), waves = rnd(0.6, 2.2), ms = opts.ms || rnd(5000, 10000);
-  var t = 0, last = performance.now(), paused = false;
-  el._farm = { animal: a.id, ms: ms };
+  var y0 = rnd(top, bottom), y1 = Math.min(bottom, Math.max(top, y0 + rnd(-.15, .15) * H));
+  var wave = rnd(0, 6), waves = rnd(.5, 1.5);
+  var walkMs = Math.abs(x1 - x0) / speed * 1000;
+  var stops = [], n = opts.stops !== undefined ? opts.stops : (Math.random() < .3 ? 0 : Math.random() < .65 ? 1 : 2);
+  for (var i = 0; i < n; i++) stops.push({ at: rnd(.2, .8), ms: rnd(800, 1700) });
+  stops.sort(function(p, q){ return p.at - q.at; });
+  var jumpy = style === 'pixel', cell = w / 25, lastDraw = 0;
+  var t = 0, last = performance.now(), tapped = false, restUntil = 0;
+  el._farm.speed = speed; el._farm.stride = stride; el._farm.step = step; el._farm.ms = walkMs;
+  art.classList.add('walking');
+  el.style.visibility = '';
   el.addEventListener('click', function(e) {
     e.stopPropagation();
-    if (paused) return;
-    paused = true;
-    farmOuch(el, a).then(function(){ last = performance.now(); paused = false; });
+    if (tapped) return;
+    tapped = true;
+    farmOuch(el, a).then(function(){ last = performance.now(); tapped = false; });
   });
   function frame(now) {
     if (!el.isConnected) return;
-    if (!paused) t += (now - last) / ms;
-    last = now;
+    var dt = now - last; last = now;
+    if (!tapped) {
+      if (restUntil) {
+        if (now >= restUntil) { restUntil = 0; el.classList.remove('fv-look'); art.classList.add('walking'); }
+      } else {
+        t += dt / walkMs;
+        if (stops.length && t >= stops[0].at) { restUntil = now + stops.shift().ms; art.classList.remove('walking'); el.classList.add('fv-look'); }
+      }
+    }
     var p = Math.min(t, 1);
     var x = x0 + (x1 - x0) * p;
     var y = y0 + (y1 - y0) * (p * p * (3 - 2 * p)) + Math.sin(p * Math.PI * 2 * waves) * wave;
-    el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+    if (jumpy) {                       // pixel art: in two-cell jumps, a few times a second
+      if (now - lastDraw >= 110 || p >= 1) { lastDraw = now; el.style.transform = 'translate(' + (Math.round(x / (cell * 2)) * cell * 2).toFixed(0) + 'px,' + (Math.round(y / cell) * cell).toFixed(0) + 'px)'; }
+    } else el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
     if (p < 1) requestAnimationFrame(frame); else el.remove();
   }
   requestAnimationFrame(frame);
-  return el;
 }
 function farmOuch(el, a) {
   var art = el.querySelector('.fv-art'), bubble = el.querySelector('.fv-bubble');
@@ -23815,15 +24238,26 @@ function farmSettingsDraw() {
     + '<button type="button" class="fv-add" id="farmAddSaying" onclick="farmAddSaying()">➕ Add a sentence</button>'
     + '<div class="fv-h">How often</div><div class="fv-often">Between <input type="number" id="farmMin" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.minMinutes + '" aria-label="Shortest wait, in minutes"> and '
     + '<input type="number" id="farmMax" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.maxMinutes + '" aria-label="Longest wait, in minutes"> minutes apart, picked at random, counted while the app is open.</div>'
+    + '<div class="fv-h">How they look</div><div class="fv-styles" role="radiogroup" aria-label="How they look">'
+    + FARM_STYLES.map(function(st){ return '<label class="fv-style"><input type="radio" name="farmStyle" value="' + st + '"' + (c.style === st ? ' checked' : '') + ' onchange="farmThumbs(this.value)"> ' + escH(FARM_STYLE_NAMES[st]) + '</label>'; }).join('') + '</div>'
     + '<div class="fv-h">Who may visit</div><div class="fv-grid" id="farmAnimals">'
     + FARM_ANIMALS.map(function(a){ return '<label class="fv-pick"><input type="checkbox" value="' + a.id + '"' + (c.animals.indexOf(a.id) !== -1 ? ' checked' : '') + '>'
-        + '<span class="fv-thumb">' + farmArt(a) + '</span><span>' + escH(a.name) + '</span></label>'; }).join('') + '</div>'
+        + '<span class="fv-thumb" data-animal="' + a.id + '"></span><span>' + escH(a.name) + '</span></label>'; }).join('') + '</div>'
     + '<div class="ask-actions" style="margin-top:14px;"><button type="button" class="ask-btn" id="farmSave" onclick="farmSettingsSave()">Save for everyone</button>'
     + '<button type="button" class="ask-btn ghost" id="farmTry" onclick="farmTryOne()">\u{1F440} Send one across now</button>'
     + '<button type="button" class="ask-btn ghost" onclick="document.getElementById(\'farmOverlay\').remove()">Cancel</button></div></div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
+  farmThumbs(c.style);
   return ov;
+}
+// Each animal once, drawn in the look that is ticked.
+function farmThumbs(style) {
+  Array.prototype.forEach.call(document.querySelectorAll('#farmAnimals .fv-thumb'), function(t) {
+    var a = farmAnimal(t.getAttribute('data-animal'));
+    t.className = 'fv-thumb fv-s-' + style;
+    farmArtFor(a, style).then(function(html){ if (t.className === 'fv-thumb fv-s-' + style) t.innerHTML = '<div class="fv-art">' + html + '</div>'; });
+  });
 }
 function farmAddSaying() {
   var host = document.getElementById('farmSayings'); if (!host) return;
@@ -23836,13 +24270,14 @@ function farmSettingsRead() {
   }).filter(function(s){ return s.t; });
   var animals = Array.prototype.filter.call(document.querySelectorAll('#farmAnimals input'), function(i){ return i.checked; }).map(function(i){ return i.value; });
   var lo = Math.round(Number((document.getElementById('farmMin') || {}).value)), hi = Math.round(Number((document.getElementById('farmMax') || {}).value));
-  return { sayings: sayings, animals: animals, minMinutes: lo, maxMinutes: hi };
+  var st = document.querySelector('#farmOverlay input[name="farmStyle"]:checked');
+  return { sayings: sayings, animals: animals, minMinutes: lo, maxMinutes: hi, style: st ? st.value : farmStyle() };
 }
 function farmTryOne() {
   var pick = farmSettingsRead();
   var ids = pick.animals.length ? pick.animals : farmConfig().animals;
   var ov = document.getElementById('farmOverlay'); if (ov) ov.remove();
-  farmVisit(ids[Math.floor(Math.random() * ids.length)]);
+  farmVisit(ids[Math.floor(Math.random() * ids.length)], { style: pick.style });
 }
 async function farmSettingsSave() {
   var pick = farmSettingsRead();
@@ -23851,7 +24286,7 @@ async function farmSettingsSave() {
   if (!(pick.minMinutes >= 1) || !(pick.maxMinutes >= pick.minMinutes) || pick.maxMinutes > FARM_MINUTES_CAP) {
     toast('How often: two whole numbers of minutes, the second not smaller than the first, at most ' + FARM_MINUTES_CAP + ' (a day).', 7000); return false;
   }
-  var doc = { sayings: pick.sayings.slice(0, 40), animals: pick.animals, minMinutes: pick.minMinutes, maxMinutes: pick.maxMinutes,
+  var doc = { sayings: pick.sayings.slice(0, 40), animals: pick.animals, minMinutes: pick.minMinutes, maxMinutes: pick.maxMinutes, style: pick.style,
               at: Date.now(), by: (window._fbUser && window._fbUser.email) || '' };
   try { await cloudDoc(i18nDocId(FARM_DOC)).set(doc); }
   catch(e) { showServiceError('The farm visitors could not be saved:\n\n' + ((e && e.message) || String(e))); return false; }
@@ -23865,7 +24300,8 @@ window.farmVisit = farmVisit; window.farmSetEnabled = farmSetEnabled; window.ope
 window.farmSettingsSave = farmSettingsSave; window.farmAddSaying = farmAddSaying; window.farmTryOne = farmTryOne; window.farmSay = farmSay;
 window.farmConfig = farmConfig; window.farmUseConfig = farmUseConfig; window.farmPickAnimal = farmPickAnimal; window.farmPickSaying = farmPickSaying;
 window.farmTyping = farmTyping; window.farmWait = farmWait; window.farmTick = farmTick; window.farmClear = farmClear; window.FARM_ANIMALS = FARM_ANIMALS;
-window.farmRefreshSettings = farmRefreshSettings; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
+window.farmRefreshSettings = farmRefreshSettings; window.farmThumbs = farmThumbs; window.farmPixel = farmPixel; window.farmToonArt = farmToonArt;
+window.farmArtFor = farmArtFor; window.farmStyle = farmStyle; window.FARM_STYLES = FARM_STYLES; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
 farmLoadConfig().then(function(){ farmSchedule(); });   // the pace may be Tony's; until it is read, the device's copy of it
 
 // ─── THE KITCHEN RULES: AGREEING TO THE TERMS ON FIRST SIGN-IN (v37.83) ─────
