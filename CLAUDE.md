@@ -815,6 +815,20 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.90 — the agreement is with the "My Kitchen Notes Team".** Tony: not
+    between him and the user but between "My Kitchen Notes Team, which is a
+    private group" and the user. Told him (he agreed): an unregistered group
+    usually cannot itself be a party, and Israeli Amendment 13 / the GDPR
+    require naming who answers for the data — so the TERMS name the Team
+    ("a private group in Israel", the "Team"; §12 indemnifies "the Team and
+    its members"), and the PRIVACY STATEMENT says the Team operates the App
+    and the controller is Tony Schvekher, "who acts for the Team"; §4 "the
+    Operator" → "the Team"; contact "My Kitchen Notes Team (Tony
+    Schvekher)". All ten translations changed in the same commit (scratch
+    team.py did exact replacements; tools/legal-keys.py re-keyed). Terms
+    1.2 / privacy 1.1, effective 7 Oct 2026; TERMS_VERSION '1.2' — so
+    everyone is shown the kitchen rules once more and agrees again. The ©
+    line in About still reads Tony Schvekher (copyright needs a person).
   - **v37.89 — the kitchen rules page in Hebrew (and Arabic).** Tony asked to
     check the Hebrew page. Words: all translated, RTL right, terms in
     Hebrew. Two fixes: (1) the hand-written fonts (Caveat, Patrick Hand)

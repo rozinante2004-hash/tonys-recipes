@@ -6236,7 +6236,9 @@ window.SELF_TESTS = [
         var priv=await (await fetch('privacy.html?t='+Date.now(), { cache:'no-store' })).text(), terms=await (await fetch('terms.html?t='+Date.now(), { cache:'no-store' })).text();
         ['Tony Schvekher','tony.schvekher@gmail.com','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
           if(priv.indexOf(w)===-1) throw new Error('the privacy statement does not mention '+w); });
-        ['Tony Schvekher','Tel Aviv','State of Israel','as is','allerg','AI','indemnif','privacy.html','Effective date'].forEach(function(w){
+        // v37.90 — the agreement is with the My Kitchen Notes Team; the privacy statement still names who answers for the data.
+        if(terms.indexOf('Tony Schvekher')!==-1 || priv.indexOf('acts for the Team')===-1) throw new Error('the terms still name a person, or the privacy statement no longer names who answers for the data');
+        ['My Kitchen Notes Team','private group','Tel Aviv','State of Israel','as is','allerg','AI','indemnif','privacy.html','Effective date'].forEach(function(w){
           if(terms.indexOf(w)===-1) throw new Error('the terms do not mention '+w); });
         // The app must not claim what the statement contradicts.
         var src=await (await fetch(new URL('index.html?t='+Date.now(), location.href), { cache:'no-store' })).text();
@@ -6331,7 +6333,7 @@ window.SELF_TESTS = [
             var ev=/Version (\d+\.\d+)/.exec(en[doc].querySelector('.meta').textContent)[1];
             if(d.querySelector('.meta').textContent.indexOf(ev)===-1) throw new Error(f+' is not a translation of version '+ev);
             if(!d.querySelector('a[href="'+doc+'.html"][lang="en"]')) throw new Error(f+' does not point to the English text, which prevails');
-            if(d.body.textContent.indexOf('Tony Schvekher')===-1) throw new Error(f+' does not name the operator');
+            if(d.body.textContent.indexOf(doc==='terms' ? 'My Kitchen Notes Team' : 'Tony Schvekher')===-1) throw new Error(f+' does not name '+(doc==='terms' ? 'the Team it is an agreement with' : 'who answers for the data'));
             d.querySelectorAll('a[href^="privacy"]:not([lang="en"])').forEach(function(a){ if(a.getAttribute('href')!=='privacy.'+l+'.html') throw new Error(f+' links to '+a.getAttribute('href')+' instead of the same language'); });
             if(doc==='privacy') ['tony.schvekher@gmail.com','Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
             // v37.85 — every passage is tied to its English twin (tools/legal-keys.py), or the editor cannot offer it.
