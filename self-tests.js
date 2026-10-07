@@ -6447,7 +6447,7 @@ window.SELF_TESTS = [
         el.click(); await wait(320);
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
         if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || spoken[0][1]!=='en-GB')) throw new Error('it did not speak in British English: '+JSON.stringify(spoken));
-        if(window.speechSynthesis && !(spoken[0][2]>=1.2)) throw new Error('the voice is not raised, like a cartoon\u2019s: pitch '+spoken[0][2]);
+        if(window.speechSynthesis && !(spoken[0][2]>=1.7)) throw new Error('the voice is not raised, like a cartoon\u2019s: pitch '+spoken[0][2]);
         var stopped=el.getBoundingClientRect().left; await wait(200);
         if(Math.abs(el.getBoundingClientRect().left-stopped)>1) throw new Error('it kept walking while it spoke');
         for(i=0;i<40 && el.isConnected && el.querySelector('.fv-art').classList.contains('turned');i++) await wait(100);

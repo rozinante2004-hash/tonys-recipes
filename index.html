@@ -24046,7 +24046,9 @@ function farmVoice() {
   if (_farmVoice || !window.speechSynthesis) return _farmVoice;
   var vs = speechSynthesis.getVoices() || [];
   var gb = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); });
-  var prefer = ['Google UK English Male', 'Daniel', 'Arthur', 'Oliver', 'Ryan', 'George', 'Google UK English Female', 'Serena', 'Kate', 'Sonia', 'Libby'];
+  // v37.93 — Tony: "more high pitched". The pitch scale stops at 2, so the
+  // higher British voices come first; the deeper ones only if nothing else.
+  var prefer = ['Google UK English Female', 'Serena', 'Kate', 'Sonia', 'Libby', 'Stephanie', 'Martha', 'Google UK English Male', 'Daniel', 'Arthur', 'Oliver', 'Ryan', 'George'];
   for (var i = 0; i < prefer.length && !_farmVoice; i++) _farmVoice = gb.filter(function(v){ return v.name.indexOf(prefer[i]) !== -1; })[0] || null;
   return (_farmVoice = _farmVoice || gb[0] || null);
 }
@@ -24059,7 +24061,7 @@ function farmSay(text, pitch) {
     var v = farmVoice(); if (v) u.voice = v;
     // v37.91 — Tony: "higher, like in cartoons". Each animal keeps its own
     // relative pitch, all of them raised (the speech pitch scale ends at 2).
-    u.lang = 'en-GB'; u.rate = 1.02; u.pitch = Math.max(1.2, Math.min(2, 1.45 + ((pitch || 1) - 1) * .6));
+    u.lang = 'en-GB'; u.rate = 1.06; u.pitch = Math.max(1.7, Math.min(2, 1.85 + ((pitch || 1) - 1) * .4));   // v37.93 — Tony: higher still. 2 is the browser's top.
     speechSynthesis.speak(u);
     return true;
   } catch(e) { return false; }

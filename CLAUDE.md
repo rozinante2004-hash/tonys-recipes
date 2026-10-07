@@ -816,9 +816,14 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
-  - **v37.93 — the toggle reads "🐑 Farm guests?"** Tony's wording, replacing
+  - **v37.93 — the toggle reads "🐑 Farm guests?", and higher voices.** Tony's wording, replacing
     "Let a farm animal wander by now and then". New string: it needs Update
     all supported languages in the family app.
+    Tony: "make the animal's voices more high pitched" — pitch now
+    1.85 + (animal − 1)·0.4, kept in 1.7–2 (2 is the browser's top), rate
+    1.06, and the higher British voices (Google UK English Female, Serena,
+    Kate, Sonia, Libby…) are preferred over the male ones, since pitch alone
+    cannot go further. `farm_visitors` asks for pitch ≥ 1.7.
   - **Released to the family app and the beta: v37.92 (7 Oct 2026, Tony's yes, CI green on f3df960; shipped as d9129cb with the published languages; the family's Pages deploy checked: success).**
   - **v37.92 — "Send one across now" keeps the window open.** Tony: "Please
     do not close the modal". The visitor (z-index 10040) walks over the window
@@ -901,7 +906,7 @@ found only because a test was written first and disagreed with the code.
     with i18nCentralGet and keeps it in localStorage mkn_farm_cfg. Shape
     {sayings:[{t,on}], animals:[ids], minMinutes, maxMinutes, at, by};
     defaults 10 sentences, all 14, 10–180 min. (2) Always English, en-GB
-    voice (the device's own; farmVoice prefers Google UK English / Daniel…)
+    voice (the device's own; farmVoice prefers the higher British voices since v37.93 — Google UK English Female, Serena, Kate…)
     — he may change this later. (3) Never while typing (a focused text
     field, or a key in the last 8 s): the visit waits 30 s and tries again.
     Everyone: "🐑 Farm guests?" (v37.93; was "Let a farm animal wander by now and then") (on by default,
