@@ -816,6 +816,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v37.92 (7 Oct 2026, Tony's yes, CI green on f3df960; shipped as d9129cb with the published languages; the family's Pages deploy checked: success).**
   - **v37.92 — "Send one across now" keeps the window open.** Tony: "Please
     do not close the modal". The visitor (z-index 10040) walks over the window
     (200) and can be tapped there. Test: `farm_owner_window`.
