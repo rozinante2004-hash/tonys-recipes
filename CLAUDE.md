@@ -815,6 +815,22 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.46 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
+  - **v37.89 — the kitchen rules page in Hebrew (and Arabic).** Tony asked to
+    check the Hebrew page. Words: all translated, RTL right, terms in
+    Hebrew. Two fixes: (1) the hand-written fonts (Caveat, Patrick Hand)
+    have no Hebrew/Arabic, so it fell back to print. Added Google Fonts
+    Playpen Sans Hebrew / Arabic (cursive) for title, sub, checkbox,
+    buttons and headings, and Varela Round (rounded print) for the long
+    terms text in Hebrew — cursive was hard going there (Tony was shown
+    both). Fonts load per character (unicode-range), so English keeps
+    Caveat/Patrick Hand. (2) "They go with our <a>Privacy Statement</a>"
+    → "They go with <a>our Privacy Statement</a>": Hebrew needs "הצהרת
+    הפרטיות שלנו" in one piece; the link's own key ("Privacy Statement" →
+    "הצהרת פרטיות", a title) could not carry the article. Two new phrases
+    → Tony runs 🔄 Update all supported languages after release.
+    PREVIEWING WEB FONTS HERE: the sandbox browser cannot reach Google
+    Fonts; page.route() the fonts.googleapis/gstatic requests and fulfil
+    them with curl (which goes through the proxy). See kit/gatehe.mjs.
   - **Released to the family app and the beta: v37.88 (7 Oct 2026, Tony's yes, CI green on 7857a9f; the family's Pages deploy checked: success).**
   - **v37.88 — the farm visitors.** Tony: now and then a cartoon farm animal
     strolls across the app (5–10 s, a different route each time); tapped, it

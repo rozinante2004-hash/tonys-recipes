@@ -6274,6 +6274,9 @@ window.SELF_TESTS = [
         if(document.querySelectorAll('#tgTerms h2').length!==16 || (legalFile('terms')==='terms.html' && (!/Disclaimer of warranties/.test(tt) || !/Tel Aviv/.test(tt)))) throw new Error('the page does not hold the terms: '+tt.slice(0,120));
         if(legalFile('terms')!=='terms.html' && document.getElementById('tgTerms').getAttribute('dir')!==(i18nIsRTL() ? 'rtl' : 'ltr')) throw new Error('the translated terms keep the wrong direction');
         if(!/Caveat|Patrick Hand/.test(getComputedStyle(document.querySelector('#termsGate .tg-title')).fontFamily)) throw new Error('the page is not hand-written');
+        // v37.89 — hand-written in Hebrew and Arabic too, and "our" inside the link (one phrase to translate).
+        if(!/Playpen Sans Hebrew/.test(getComputedStyle(document.querySelector('#termsGate .tg-title')).fontFamily) || !/Varela Round/.test(getComputedStyle(document.getElementById('tgTerms')).fontFamily) || !/Playpen Sans Arabic/.test(getComputedStyle(document.getElementById('tgTerms')).fontFamily)) throw new Error('Hebrew and Arabic fall back to print');
+        if((g.querySelector('.tg-also a')||{}).textContent!=='our Privacy Statement') throw new Error('the privacy link is not "our Privacy Statement"');
         box.checked=true; box.onchange();
         if(go.disabled) throw new Error('agreeing did not wake the button');
         go.click(); _selfTestRunning=true;
