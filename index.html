@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.93 -->
+<!-- Tony's Recipes Collection v37.94 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6123,10 +6123,11 @@ async function feedbackTellOwner() {
   _fbNewTold = true;
   try { await feedbackMoveToInbox(); } catch(e) {}
   if (!feedbackInboxHere()) { feedbackDot(null); return 0; }
+  feedbackKnown(null);                       // v37.94 — the last count straight away, while the inbox is asked
   var n = await feedbackCountNew();
   if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000);
-  feedbackDot(n);
-  return n;
+  feedbackKnown(n);
+  return n || 0;
 }
 // Notes kept in this copy's own database (v37.64–67, or by an app that
 // thought the inbox missing) go to the inbox — each removed here only once
@@ -6150,18 +6151,32 @@ async function feedbackMoveToInbox() {
   if (moved) syncLog('save', 'Moved notes from this copy\u2019s database to the one inbox', { notes: moved });
   return moved;
 }
+// v37.94 — Tony: "The red dot … disappears when I reload a new version. It
+// should never disappear if there are unseen messages." An inbox that could not
+// be asked (just after an update the Worker or the sign-in may not answer yet)
+// is now "not known" (null), never "nothing new"; the last count is kept on the
+// device and shown until a real answer replaces it.
 async function feedbackCountNew() {
   var n = 0;
   try { n += (await hhDb().collection('feedback').where('status', '==', 'new').limit(100).get()).size; } catch(e) {}
   try {
     if (_workerHealth === null && typeof checkWorkerHealth === 'function') await checkWorkerHealth();
-    if (_workerHealth && _workerHealth.feedback && window._fbUser) {
+    if (!_workerHealth || !window._fbUser) return null;
+    if (_workerHealth.feedback) {
       var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
         body: workerBody({ action: 'meter-admin', op: 'notes-new', idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(10000) });
-      var d = await r.json(); if (r.ok && d && d.new) n += d.new;
+      var d = await r.json();
+      if (!r.ok || !d) return null;
+      n += d.new || 0;
     }
-  } catch(e) {}
+  } catch(e) { return null; }
   return n;
+}
+var FB_NEW_KEY = 'mkn_fb_new', _fbLastNew = null;
+function feedbackKnown(n) {      // a real count — or null: show the last one known
+  if (typeof n === 'number') { _fbLastNew = n; try { localStorage.setItem(FB_NEW_KEY, String(n)); } catch(e) {} }
+  else if (_fbLastNew === null) { try { var c = parseInt(localStorage.getItem(FB_NEW_KEY), 10); if (c >= 0) _fbLastNew = c; } catch(e) {} }
+  return feedbackDot(_fbLastNew === null ? undefined : _fbLastNew);
 }
 // v37.68 — Tony: "a notification dot, at the corner of the Settings icon.
 // Green - All notes read. Red - there are new feedbacks to look into." The
@@ -6175,10 +6190,10 @@ function feedbackDot(n) {
 }
 setInterval(function(){
   if (_selfTestRunning) return;
-  if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackDot).catch(function(){});
+  if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackKnown).catch(function(){});
   if (_household && hhDb()) hhLoadIncoming().then(talkLoad).then(linkDotRefresh).catch(function(){});   // v37.80/81 — new link requests and messages
 }, 15 * 60e3);
-window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew;
+window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew; window.feedbackKnown = feedbackKnown;
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
 window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedbackNote; window.fbShotPicked = fbShotPicked;
 window.feedbackTellOwner = feedbackTellOwner; window.fbSignedInUser = fbSignedInUser;
@@ -6435,7 +6450,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.93';
+var APP_VERSION = 'v37.94';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9195,7 +9210,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.93</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.94</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9904,7 +9919,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.93</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.94</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24053,16 +24068,47 @@ function farmVoice() {
   return (_farmVoice = _farmVoice || gb[0] || null);
 }
 try { if (window.speechSynthesis && speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', function(){ _farmVoice = null; farmVoice(); }); } catch(e) {}
+// v37.94 — Tony: the first time an animal (or 🔊) speaks, nothing is heard;
+// from the second time on it works. Chrome loads its voices only when first
+// asked, and on Linux the speech engine is started by the first utterance,
+// which it may drop. So: ask for the voices as soon as the app starts, wake the
+// engine with a silent utterance at the first touch or key, never cancel and
+// speak in the same moment, keep the utterance referenced (Chrome may let
+// it go unspoken otherwise), and if it still has not started, say it once more.
+try { if (window.speechSynthesis) farmVoice(); } catch(e) {}
+var _farmWarm = false, _farmUtter = null;
+function farmWarm() {
+  if (_farmWarm || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
+  _farmWarm = true;
+  try { farmVoice(); var w = new SpeechSynthesisUtterance(' '); w.volume = 0; w.lang = 'en-GB'; speechSynthesis.speak(w); } catch(e) {}
+}
+document.addEventListener('pointerdown', farmWarm, true);
+document.addEventListener('keydown', farmWarm, true);
+function farmUtterance(text, pitch) {
+  var u = new SpeechSynthesisUtterance(text);
+  var v = farmVoice(); if (v) u.voice = v;
+  // v37.91 — Tony: "higher, like in cartoons". Each animal keeps its own
+  // relative pitch, all of them raised (the speech pitch scale ends at 2).
+  u.lang = 'en-GB'; u.rate = 1.06; u.pitch = Math.max(1.7, Math.min(2, 1.85 + ((pitch || 1) - 1) * .4));   // v37.93 — Tony: higher still. 2 is the browser's top.
+  return u;
+}
 function farmSay(text, pitch) {
   try {
     if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
-    speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    var v = farmVoice(); if (v) u.voice = v;
-    // v37.91 — Tony: "higher, like in cartoons". Each animal keeps its own
-    // relative pitch, all of them raised (the speech pitch scale ends at 2).
-    u.lang = 'en-GB'; u.rate = 1.06; u.pitch = Math.max(1.7, Math.min(2, 1.85 + ((pitch || 1) - 1) * .4));   // v37.93 — Tony: higher still. 2 is the browser's top.
-    speechSynthesis.speak(u);
+    var u = farmUtterance(text, pitch), started = false;
+    u.onstart = function(){ started = true; };
+    _farmUtter = u;
+    function go() {
+      if (_farmUtter !== u) return;
+      speechSynthesis.speak(u);
+      setTimeout(function(){
+        if (started || _farmUtter !== u || speechSynthesis.speaking || speechSynthesis.pending) return;
+        var again = farmUtterance(text, pitch); _farmUtter = again;      // dropped: once more
+        speechSynthesis.speak(again);
+      }, 900);
+    }
+    if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(go, 80); }
+    else go();
     return true;
   } catch(e) { return false; }
 }
@@ -24174,7 +24220,13 @@ function farmWalk(el, a, style, opts) {
     e.stopPropagation();
     if (tapped) return;
     tapped = true;
-    farmOuch(el, a).then(function(){ last = performance.now(); tapped = false; });
+    // v37.94 — Tony: "When stopping and looking at me, its legs should stop
+    // moving." The whole walk stops (not only some parts paused) and starts again after.
+    art.classList.remove('walking'); el.classList.remove('fv-look');
+    farmOuch(el, a).then(function(){
+      last = performance.now(); tapped = false;
+      if (restUntil) el.classList.add('fv-look'); else art.classList.add('walking');
+    });
   });
   function frame(now) {
     if (!el.isConnected) return;

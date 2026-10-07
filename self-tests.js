@@ -1446,7 +1446,7 @@ window.SELF_TESTS = [
     test: async()=>{
       var real={ ov:Object.assign({}, window._featureOverride), db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError,
                  email:window.sendFeedbackByEmail, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, hh:window._household };
-      var keptHidden=null, keptFirst=null; try{ keptHidden=localStorage.getItem(FB_HIDDEN_KEY); keptFirst=localStorage.getItem(FB_FIRST_KEY); }catch(e){}
+      var keptHidden=null, keptFirst=null, keptNew=null, keptLast=_fbLastNew; try{ keptHidden=localStorage.getItem(FB_HIDDEN_KEY); keptFirst=localStorage.getItem(FB_FIRST_KEY); keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
       var added=[], updated=[], deleted=[];
       try{
         window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
@@ -1547,6 +1547,10 @@ window.SELF_TESTS = [
         await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
         var t=document.getElementById('manageOverlay').textContent;
         if(t.indexOf('The photo search is lovely')===-1 || t.indexOf('Done one')!==-1 || !/Feedback\s*1/.test(t)) throw new Error('the Feedback tab: '+t.slice(0,300));
+        // v37.94 — Reply in Gmail (a new tab, filled in), and the e-mail app beside it.
+        var gm=document.querySelector('#mgNote-dn1 a[href^="https://mail.google.com/"]'), ma=document.querySelector('#mgNote-dn1 a[href^="mailto:"]');
+        if(!gm || gm.target!=='_blank' || gm.href.indexOf('to=tester%40example.com')===-1 || gm.href.indexOf('su=Your%20note')===-1 || gm.href.indexOf(encodeURIComponent('The photo search is lovely'))===-1 || !ma)
+          throw new Error('replying: '+(gm ? gm.href.slice(0,200) : 'no Gmail button')+(ma ? '' : '; no e-mail app button'));
         feedbackDot(1);
         if(!dot || dot.hidden || dot.className!=='fb-dot-new') throw new Error('no red dot on ⚙️ with a new note');
         // v37.80 — and along the path: 👑 App owner → 📊 Households.
@@ -1562,10 +1566,28 @@ window.SELF_TESTS = [
         if(!dot.hidden) throw new Error('someone other than the owner sees the dot');
         window.isAppOwner=function(){ return true; };
         if(document.getElementById('manageOverlay').textContent.indexOf('Done one')===-1) throw new Error('"All" does not show the done ones');
+        // v37.94 — Tony: the dot went away after loading a new version. The device
+        // remembers the last count and shows it at once; an inbox that cannot be
+        // asked leaves it as it is; only a real count of none clears it.
+        _fbLastNew=null; localStorage.setItem(FB_NEW_KEY,'2'); feedbackKnown(null);
+        if(dot.hidden) throw new Error('the remembered count was not shown when the app opened');
+        _workerHealth={ ok:true, feedback:true };
+        window.fetch=async function(){ return new Response('{"error":"down"}', { status:502 }); };
+        var cnt=await feedbackCountNew();
+        if(cnt!==null) throw new Error('an inbox that did not answer was counted as '+cnt);
+        feedbackKnown(cnt);
+        if(dot.hidden) throw new Error('an inbox that did not answer hid the dot');
+        window.fetch=async function(){ return new Response('{"ok":true,"new":0}', { status:200 }); };
+        feedbackKnown(await feedbackCountNew());
+        if(!dot.hidden || localStorage.getItem(FB_NEW_KEY)!=='0') throw new Error('a real count of none did not clear the dot');
+        window.fetch=real.fetch;
       } finally {
         window._featureOverride=real.ov; applyFeatureFlags(); window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err;
         window.sendFeedbackByEmail=real.email; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h; window._household=real.hh;
-        feedbackDot(undefined);   // hidden until the next real count
+        // v37.94 — the owner's real dot comes back after the Self Test (it was hidden until the next count, 15 minutes).
+        _fbLastNew=keptLast;
+        try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
+        feedbackKnown(null);
         try{ if(keptHidden===null) localStorage.removeItem(FB_HIDDEN_KEY); else localStorage.setItem(FB_HIDDEN_KEY, keptHidden);
              if(keptFirst===null) localStorage.removeItem(FB_FIRST_KEY); else localStorage.setItem(FB_FIRST_KEY, keptFirst); }catch(e){}
         var o=document.getElementById('feedbackOverlay'); if(o) o.remove();
@@ -6450,8 +6472,13 @@ window.SELF_TESTS = [
         if(window.speechSynthesis && !(spoken[0][2]>=1.7)) throw new Error('the voice is not raised, like a cartoon\u2019s: pitch '+spoken[0][2]);
         var stopped=el.getBoundingClientRect().left; await wait(200);
         if(Math.abs(el.getBoundingClientRect().left-stopped)>1) throw new Error('it kept walking while it spoke');
+        // v37.94 — Tony: its legs stop too while it looks at you.
+        var legNow=el.querySelector('.fv-art .leg');
+        if(el.querySelector('.fv-art').classList.contains('walking') || (legNow && getComputedStyle(legNow).animationName!=='none')) throw new Error('its legs kept moving while it stood and spoke');
         for(i=0;i<40 && el.isConnected && el.querySelector('.fv-art').classList.contains('turned');i++) await wait(100);
         if(el.querySelector('.fv-art').classList.contains('turned')) throw new Error('it did not turn back');
+        await wait(350);
+        if(el.isConnected && !el.querySelector('.fv-art').classList.contains('walking')) throw new Error('it did not walk on after speaking');
         for(i=0;i<40 && el.isConnected;i++) await wait(100);
         if(el.isConnected) throw new Error('it did not leave the screen');
         // v37.91 — three looks, one for everyone (3D cartoon to begin with); each can walk and turn.
@@ -6482,6 +6509,16 @@ window.SELF_TESTS = [
         // Switched off: none come, and none is waiting.
         farmSetEnabled(false);
         if(localStorage.getItem('mkn_farm_on')!=='0' || box.checked) throw new Error('switching off did not stick');
+        // v37.94 — Tony: the first sentence was never heard. A sentence the browser
+        // drops (it never starts) is said once more; one that starts is said once.
+        if(window.speechSynthesis){
+          var calls=0; speechSynthesis.speak=function(u){ calls++; };
+          farmSay('Steady on!', 1); await wait(1150);
+          if(calls!==2) throw new Error('a dropped sentence was not said again: '+calls+' tries');
+          calls=0; speechSynthesis.speak=function(u){ calls++; if(u.onstart) u.onstart(); };
+          farmSay('Steady on!', 1); await wait(1150);
+          if(calls!==1) throw new Error('a sentence that was heard was said '+calls+' times');
+        }
       } finally {
         if(window.speechSynthesis && real.speak) speechSynthesis.speak=real.speak;
         if(inp) inp.remove();

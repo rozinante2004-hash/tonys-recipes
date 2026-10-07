@@ -816,6 +816,34 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.94 — four of Tony's reports.**
+    - **The first sentence was never heard** (a visitor tapped, or 🔊 in the
+      window); the second always was. Chrome loads its voices only when first
+      asked, and on Linux the speech engine starts with the first utterance and
+      may drop it. Now: `farmVoice()` runs as the app starts; the first touch or
+      key speaks a silent utterance (`farmWarm`); `farmSay` never cancels and
+      speaks in the same moment (80 ms apart), keeps the utterance in
+      `_farmUtter`, and if it has neither started nor is queued after 0.9 s it
+      says it once more. Test: `farm_visitors` (a dropped sentence is said
+      twice; one that starts, once).
+    - **The legs kept moving while the animal faced him.** `.turned` paused
+      only some of the parts (not the cartoon ones); the tap now takes off
+      `walking` (and `fv-look`) and puts it back when it walks on.
+    - **Reply by e-mail did nothing** on his Linux: Chrome hands `mailto:` to the
+      computer ("Launched external handler") and none is set. The Feedback tab
+      now has ✉️ Reply in Gmail (mail.google.com/mail/?view=cm&fs=1&to=&su=&body=,
+      new tab) and 📨 E-mail app (the mailto: link). Thunderbird would answer
+      mailto: once the desktop names it:
+      `xdg-mime default thunderbird.desktop x-scheme-handler/mailto`.
+    - **The red feedback dot vanished after loading a new version.** Two
+      causes: the Self Test (which he runs after each update) ended with
+      `feedbackDot(undefined)` — hidden until the next count, 15 minutes later —
+      and a count that failed (Worker or sign-in not ready) was counted as 0.
+      Now `feedbackCountNew` returns null when the inbox could not be asked;
+      `feedbackKnown(n)` keeps the last real count on the device
+      (`mkn_fb_new`) and shows it at once on opening, until a real count
+      replaces it; the Feedback tab's own count is real too (unless only part
+      of the notes could be read); the Self Test puts the owner's dot back.
   - **Released to the family app and the beta: v37.93 (7 Oct 2026, Tony's yes, CI green on 45b7cfb; the family's Pages deploy checked: success).**
   - **v37.93 — the toggle reads "🐑 Farm guests?", and higher voices.** Tony's wording, replacing
     "Let a farm animal wander by now and then". New string: it needs Update

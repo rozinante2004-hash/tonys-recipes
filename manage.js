@@ -168,12 +168,13 @@
       });
     } catch (e) { if (!/permission/i.test(e.message) || !out.length) errs.push('this copy\u2019s database: ' + e.message); }
     out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
-    S.notes = out; S.notesError = (!out.length && errs.length) ? errs.join('; ') : '';
+    S.notes = out; S.notesError = (!out.length && errs.length) ? errs.join('; ') : ''; S.notesPartial = errs.length > 0;
   }
   function noteBy(key) { return (S.notes || []).filter(function (n) { return n.key === key; })[0]; }
   function newCount() { return (S.notes || []).filter(function (n) { return n.status === 'new'; }).length; }
   // v37.68 — the ⚙️ dot follows what is marked here.
-  function syncDot() { if (S.notes && typeof feedbackDot === 'function') feedbackDot(newCount()); }
+  // v37.94 — what is counted here is a real count: kept on the device too (feedbackKnown).
+  function syncDot() { if (S.notes && !S.notesError && !S.notesPartial) { if (typeof feedbackKnown === 'function') feedbackKnown(newCount()); else if (typeof feedbackDot === 'function') feedbackDot(newCount()); } }
   function notesHtml() {
     if (S.notesError) return '<div class="mg-note">The notes could not be read: ' + esc(S.notesError)
       + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 🏠 My household → 👥 Family Access → Show rules).' : '') + '</div>';
@@ -199,7 +200,11 @@
             + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(\'' + k + '\')">📋 Copy the log</button></details>' : '')
         + '<div class="mg-device mg-muted">' + esc(n.device || '') + '</div>'
         + '<div class="mg-tools" style="margin-top:8px;">'
-        + (n.email ? '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '">✉️ Reply by e-mail</a>' : '')
+        // v37.94 — Tony: Reply by e-mail did nothing (the browser hands mailto: to the
+        // computer, and his has no e-mail app set for it). Gmail opens in a new tab, filled in;
+        // the e-mail app stays beside it for computers where it is set up.
+        + (n.email ? '<a class="mg-btn" target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(n.email) + '&su=' + subj + '&body=' + body + '">✉️ Reply in Gmail</a>'
+            + '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '" title="Opens the e-mail app this computer is set to use">📨 E-mail app</a>' : '')
         + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + k + '\',\'seen\')">👀 Seen</button>' : '')
         + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + k + '\',\'done\')">✅ Done</button>' : '')
         + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(\'' + k + '\')">🗑</button></div></div>';
