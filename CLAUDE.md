@@ -816,6 +816,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v37.91 (7 Oct 2026, Tony's yes, CI green on c4a6b3b; the family's Pages deploy checked: success).** Preview of the three looks: https://claude.ai/artifact/QF98CoC4QoVSXUW6UeTSy9
   - **v37.91 — the farm visitors get three looks, and walk.** Tony: "include
     the following styles for all animals: 3D cartoon, Storybook and Pixel art
     … keep one copy of each animal, and allow selection of the style"; "match
