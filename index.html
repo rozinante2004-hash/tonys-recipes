@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.00 -->
+<!-- Tony's Recipes Collection v38.01 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6642,7 +6642,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.00';
+var APP_VERSION = 'v38.01';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9402,7 +9402,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.00</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.01</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10113,7 +10113,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.00</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.01</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24298,7 +24298,8 @@ var FARM_VOICE_PREFER = {
   male:   ['Google UK English Male', 'Daniel', 'Arthur', 'Oliver', 'Ryan', 'George', 'Thomas'],
   female: ['Google UK English Female', 'Serena', 'Kate', 'Sonia', 'Libby', 'Stephanie', 'Martha', 'Hazel', 'Susan', 'Amy', 'Emma']
 };
-var FARM_VOICE_TUNE = { male: { pitch: 1.0, rate: 1.0 }, female: { pitch: 1.1, rate: 1.0 }, child: { pitch: 1.5, rate: 1.08 } };
+// v38.01 — Tony: "please make the male's voice deeper" — pitch 0.7 (was 1.0), a touch slower.
+var FARM_VOICE_TUNE = { male: { pitch: 0.7, rate: 0.94 }, female: { pitch: 1.1, rate: 1.0 }, child: { pitch: 1.5, rate: 1.08 } };
 function farmVoiceKind(kind) {
   if (kind === 'random') return ['male', 'female', 'child'][Math.floor(Math.random() * 3)];
   return FARM_VOICE_TUNE[kind] ? kind : 'female';
@@ -24338,7 +24339,7 @@ function farmUtterance(text, pitch, kind) {
   var k = FARM_VOICE_TUNE[kind] ? kind : 'female', t = FARM_VOICE_TUNE[k];
   var u = new SpeechSynthesisUtterance(text);
   var v = farmVoice(k); if (v) u.voice = v;
-  u.lang = 'en-GB'; u.rate = t.rate; u.pitch = Math.max(0.7, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
+  u.lang = 'en-GB'; u.rate = t.rate; u.pitch = Math.max(0.55, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
   return u;
 }
 // voice: male | female | child | random — the farm window's choice by default.
@@ -24567,7 +24568,7 @@ function farmSettingsDraw() {
         + '<span class="fv-thumb" data-animal="' + a.id + '"></span><span>' + escH(a.name) + '</span></label>'; }).join('') + '</div>'
     + '<div class="ask-actions" style="margin-top:14px;"><button type="button" class="ask-btn" id="farmSave" onclick="farmSettingsSave()">Save for everyone</button>'
     + '<button type="button" class="ask-btn ghost" id="farmTry" onclick="farmTryOne()">\u{1F440} Send one across now</button>'
-    + '<button type="button" class="ask-btn ghost" onclick="document.getElementById(\'farmOverlay\').remove()">Cancel</button></div></div>';
+    + '<button type="button" class="ask-btn ghost" id="farmCancel" onclick="document.getElementById(\'farmOverlay\').remove()">Cancel</button></div></div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
   farmThumbs(c.style);
@@ -24615,11 +24616,22 @@ async function farmSettingsSave() {
   }
   var doc = { sayings: pick.sayings.slice(0, 40), animals: pick.animals, minMinutes: pick.minMinutes, maxMinutes: pick.maxMinutes, style: pick.style, voice: pick.voice,
               at: Date.now(), by: (window._fbUser && window._fbUser.email) || '' };
+  var btn = document.getElementById('farmSave');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try { await cloudDoc(i18nDocId(FARM_DOC)).set(doc); }
-  catch(e) { showServiceError('The farm visitors could not be saved:\n\n' + ((e && e.message) || String(e))); return false; }
+  catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save for everyone'; }
+    showServiceError('The farm visitors could not be saved:\n\n' + ((e && e.message) || String(e))); return false;
+  }
   farmUseConfig(doc); _farmCentralCfg = farmCleanConfig(doc);    // v37.99 — what is saved is what is known
   farmSchedule();                                   // the new pace, here at once; elsewhere from their next start
-  var ov = document.getElementById('farmOverlay'); if (ov) ov.remove();
+  // v38.01 — Tony: "Please do not close the modal after clicking save for everyone."
+  // The window stays open; the button says it is saved, and Cancel becomes Close.
+  if (btn) {
+    btn.disabled = false; btn.textContent = '✅ Saved';
+    clearTimeout(btn._back); btn._back = setTimeout(function(){ if (btn.isConnected) btn.textContent = 'Save for everyone'; }, 2500);
+  }
+  var cl = document.getElementById('farmCancel'); if (cl) cl.textContent = 'Close';
   toast('✅ Saved — every copy uses these from now on', 5000);
   return true;
 }

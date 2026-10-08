@@ -6703,7 +6703,7 @@ window.SELF_TESTS = [
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
         if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || spoken[0][1]!=='en-GB')) throw new Error('it did not speak in British English: '+JSON.stringify(spoken));
         // v37.99 — Tony: the voice was breaking (pitch at the browser's top). Natural pitches now.
-        if(window.speechSynthesis && !(spoken[0][2]>=0.7 && spoken[0][2]<=1.8)) throw new Error('the voice is pushed too far: pitch '+spoken[0][2]);
+        if(window.speechSynthesis && !(spoken[0][2]>=0.55 && spoken[0][2]<=1.8)) throw new Error('the voice is pushed too far: pitch '+spoken[0][2]);
         var stopped=el.getBoundingClientRect().left; await wait(200);
         if(Math.abs(el.getBoundingClientRect().left-stopped)>1) throw new Error('it kept walking while it spoke');
         // v37.94 — Tony: its legs stop too while it looks at you.
@@ -6750,6 +6750,10 @@ window.SELF_TESTS = [
           await wait(250);
           if(heard.length<3 || !(heard[0].p<heard[1].p && heard[1].p<heard[2].p) || heard[2].p>1.8 || !(heard[2].r>heard[1].r))
             throw new Error('male, female and child do not sound different (and natural): '+JSON.stringify(heard));
+          // v38.01 — Tony: "make the male's voice deeper" — well below the female, never below 0.55 (the breaking point's other end).
+          if(!(heard[0].p<=0.8 && heard[0].p>=0.55 && heard[0].r<heard[1].r)) throw new Error('the male voice is not deeper: '+JSON.stringify(heard[0]));
+          heard=[]; farmSay('Hello', 0.75, 'male'); await wait(150);
+          if(!heard.length || heard[0].p<0.55) throw new Error('the deepest animal pushes the male voice too low: '+JSON.stringify(heard));
           var kinds={}; for(var vi=0; vi<60; vi++) kinds[farmVoiceKind('random')]=1;
           if(Object.keys(kinds).sort().join()!=='child,female,male') throw new Error('"a different one each time" does not use all three: '+Object.keys(kinds));
           if(farmVoiceKind('nonsense')!=='female' || farmDefaultConfig().voice!=='female') throw new Error('the voice to begin with is not the female one');
@@ -6852,7 +6856,10 @@ window.SELF_TESTS = [
         if(!w || w[0]!=='i18n__farm') throw new Error('not saved where every copy reads it: '+(w&&w[0]));
         var d=w[1];
         if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2 || d.style!=='pixel' || d.voice!=='child') throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
-        if(farmConfig().maxMinutes!==2 || document.getElementById('farmOverlay')) throw new Error('the choice was not taken up here, or the window stayed open');
+        // v38.01 — Tony: "do not close the modal after clicking save for everyone".
+        if(farmConfig().maxMinutes!==2 || !document.getElementById('farmOverlay')) throw new Error('the choice was not taken up here, or the window closed');
+        if(!/Saved/.test(document.getElementById('farmSave').textContent) || document.getElementById('farmSave').disabled || document.getElementById('farmCancel').textContent!=='Close')
+          throw new Error('after saving: the button says '+document.getElementById('farmSave').textContent+', the other '+document.getElementById('farmCancel').textContent);
         // In the test or beta copy, the owner is told where to choose.
         window.i18nCentralIsOwn=function(){ return false; };
         if(openFarmSettings() || !/family app/.test(said)) throw new Error('outside the family app it did not say where: '+said);

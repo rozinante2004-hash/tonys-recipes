@@ -834,6 +834,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.01 — the farm window stays open after saving; a deeper male voice.**
+    - Tony: "Please do not close the 🐄 The farm visitors modal after clicking save for
+      everyone." farmSettingsSave keeps the window: the button says "Saving…", then
+      "✅ Saved" for 2.5 s; Cancel becomes Close (`#farmCancel`). Test: farm_owner_window.
+    - Tony: "please make the male's voice deeper" — FARM_VOICE_TUNE.male pitch 0.7 (was 1.0),
+      rate 0.94; the floor in farmUtterance is 0.55 (was 0.7) so the deeper animals keep
+      their ±0.3 shade. Test: farm_visitors (male ≤ 0.8, ≥ 0.55, slower than the female).
   - **v38.00 + Worker v68 — 📲 Reply in app, buttons that press, and Tony's name out of sight.**
     - Tony: "add another option to reply, in addition to ✉️ Reply in Gmail / 📨 E-mail app —
       Reply in App. This will send a note directly to the sender's app and will be received
