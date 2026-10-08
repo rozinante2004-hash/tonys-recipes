@@ -1,0 +1,56 @@
+name: Submit the extension to the Chrome Web Store
+
+# The store copy of the extension uploads itself and is submitted for Google's
+# review when a release that changes it reaches `main` — only on Tony's yes.
+# Google still reviews every version. Needs the repository secret CWS_KEY (the
+# JSON key of store-publisher@recipes-f379d.iam.gserviceaccount.com, linked in
+# the store dashboard's Settings); without it the job says so and does nothing.
+# Not triggered by changes to this file itself: run it by hand the first time.
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["extension/**", "tools/build-extension.mjs"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-extension
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    env:
+      CWS_KEY: ${{ secrets.CWS_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Is the key there?
+        id: key
+        run: |
+          if [ -z "$CWS_KEY" ]; then
+            echo "::warning::CWS_KEY is not set — the extension was NOT sent to the Chrome Web Store. Add it under Settings → Secrets and variables → Actions."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The same package the app offers (downloads/), built afresh — and it must match.
+      - name: Build the store copy
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          node tools/build-extension.mjs live
+          cmp dist-extension/my-kitchen-notes-extension.zip downloads/my-kitchen-notes-extension.zip
+
+      - name: Upload and submit for review
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          npm install --no-audit --no-fund --no-save google-auth-library@9 >/dev/null
+          node tools/publish-extension.mjs

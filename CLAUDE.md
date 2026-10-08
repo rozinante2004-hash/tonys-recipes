@@ -834,6 +834,19 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **The extension submits itself to the Chrome Web Store (8 Oct 2026).**
+    `.github/workflows/deploy-extension.yml` (push to main changing extension/**
+    or tools/build-extension.mjs; or by hand): builds the live copy, `cmp`s it
+    with downloads/, then `tools/publish-extension.mjs` — CWS API v2 (fetchStatus;
+    skip if the version is already there; upload/v2 …:upload; v2 …:publish) as
+    `store-publisher@recipes-f379d.iam.gserviceaccount.com` (secret CWS_KEY;
+    linked in the store dashboard's Settings; Chrome Web Store API enabled in
+    recipes-f379d). Publisher 5fd04159-8a6d-424b-b8e9-641af5297186 (in the
+    dashboard's address), item dofokgilnfbpkjncmnkgfolhpjhpeglk. Google still
+    reviews; a NEW permission needs its reason in the dashboard by hand. The
+    response shapes were not checked against Google's docs (blocked here): read
+    the first run's log. The dashboard now has Items / Settings under
+    PUBLISHER — "Account" is only the person's profile.
   - **Released to the family app and the beta: v37.97 (8 Oct 2026, Tony's yes, CI green on 8c5b320; Pages: success). Worker v67 published by GitHub (run 37836089721, live check with database and storage: success); rules republished (37836089715: success). Extension 1.7: Tony uploads it to the Chrome Web Store by hand (new permission); store auto-publish proposed (CWS API v2, service account `store-publisher`, secret CWS_KEY, waiting for his Publisher ID).**
   - **v37.97 + Worker v67 + extension 1.7 (8 Oct 2026).** Tony found a
     stranger's household in the family app ("CWS's Kitchen Notes",
