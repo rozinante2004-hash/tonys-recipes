@@ -834,6 +834,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **First automatic rules publish: 8 Oct 2026, run 37831582675, success** —
+    v37.96's rules to recipes-f379d, tonys-recipes-test, my-kitchen-notes-beta
+    (each read back). The first try failed: the secret had been pasted from a
+    browser's formatted JSON view (`type⇥"service_account"`); publish-rules.mjs
+    now says so in plain words. Job logs: this environment cannot follow
+    GitHub's log redirect — use the GitHub connector's get_job_logs.
   - **Rules published by Tony in all three copies (8 Oct 2026): v37.95's and
     v37.96's.** He asked for the same as the Worker for the rules:
     deploy-rules.yml + tools/publish-rules.mjs, waiting for FIREBASE_RULES_KEY.
