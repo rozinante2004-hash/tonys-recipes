@@ -816,6 +816,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v37.95 (8 Oct 2026, Tony's yes, CI green on 9ba6b8a; the family's Pages deploy checked: success). Worker v66: NOT yet pasted by Tony; rules: NOT yet published.**
   - **v37.95 + Worker v66 — security audit (8 Oct 2026; report: AUDIT-2026-10-security.md).**
     Tony asked whether to harden against hacking/reverse engineering, then for
     a full audit. Obfuscation: no point — the repository is PUBLIC; what
