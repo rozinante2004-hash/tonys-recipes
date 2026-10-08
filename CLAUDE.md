@@ -834,6 +834,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v38.00 + v38.01 (8 Oct 2026, Tony's yes, CI green on 633acef; Pages: success). Worker v68 published itself (Deploy the Worker 37853407026: checks, publish, live health says v68 — success). No rules or extension change.**
   - **v38.01 — the farm window stays open after saving; a deeper male voice.**
     - Tony: "Please do not close the 🐄 The farm visitors modal after clicking save for
       everyone." farmSettingsSave keeps the window: the button says "Saving…", then
