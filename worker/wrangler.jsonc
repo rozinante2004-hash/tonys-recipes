@@ -1,0 +1,30 @@
+// The Cloudflare Worker's settings, so it can be published from GitHub
+// (.github/workflows/deploy-worker.yml) instead of pasted in the dashboard.
+// Kept in worker/ rather than the repository's root, so Cloudflare Pages (the
+// test copy, the beta) never mistakes it for the site's own settings.
+//
+// Nothing secret is here. The API keys (ANTHROPIC_API_KEY, GEMINI_API_KEY,
+// PIXABAY_API_KEY, YOUTUBE_API_KEY …) stay in Cloudflare → the Worker →
+// Settings → Variables & Secrets; a deploy never touches secrets.
+{
+  "name": "lively-bread-273a",
+  "main": "../cloudflare-worker.js",
+  "account_id": "4dbc420100c13bf94fda83047ce0a7ac",
+  "compatibility_date": "2026-05-06",
+  "workers_dev": true,
+  // Plain variables set here; any other plain variable set in the dashboard is kept.
+  "keep_vars": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://tonys-recipes-test.pages.dev",
+    "APP_SHARED_KEY": "tonys-recipes-web-v1"
+  },
+  // The AI spending, notes and household reports (v60+).
+  "d1_databases": [
+    { "binding": "METER_DB", "database_id": "4ca9eeaa-221f-4afa-a2f3-b85f8942a66b" }
+  ],
+  // Rate limits, spend counts, and Bring!'s 15-minute import pages.
+  "kv_namespaces": [
+    { "binding": "BRING_KV", "id": "8c950e5009b34afca800fea2ce69eb1b" }
+  ],
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,65 @@
+name: Deploy the Worker
+
+# The Cloudflare Worker publishes itself when a release that changes it reaches
+# `main` (the family's copy) — which happens only on Tony's yes. Before this,
+# Tony pasted cloudflare-worker.js into the Cloudflare dashboard by hand.
+# Needs the repository secret CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers"
+# token); without it the job says so and does nothing.
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["cloudflare-worker.js", "worker/wrangler.jsonc", ".github/workflows/deploy-worker.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Is the Cloudflare token there?
+        id: token
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set — the Worker was NOT published. Add it under Settings → Secrets and variables → Actions."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Never publish a Worker that fails its own checks.
+      - name: Worker checks (CORS, origin, app key, sign-in, metering)
+        if: steps.token.outputs.ok == 'true'
+        run: node tests/worker-cors.mjs
+
+      - name: Publish
+        if: steps.token.outputs.ok == 'true'
+        run: npx --yes wrangler@4 deploy --config worker/wrangler.jsonc
+
+      # The Worker says which version it is; it must be the one just published.
+      - name: Check the live Worker answers with this version
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          want=$(grep -oE "^const WORKER_VERSION = '[^']+'" cloudflare-worker.js | grep -oE "v[0-9]+")
+          for i in 1 2 3 4 5 6; do
+            got=$(curl -s -X POST -H 'Content-Type: application/json' -d '{"action":"health"}' \
+                  https://lively-bread-273a.rozinante2004.workers.dev/ | grep -oE '"version":"v[0-9]+"' | grep -oE 'v[0-9]+')
+            echo "live: $got, published: $want"
+            [ "$got" = "$want" ] && exit 0
+            sleep 10
+          done
+          echo "::error::the live Worker does not report $want"; exit 1

@@ -99,8 +99,17 @@ requirement, not a nice-to-have.
   no build step. CDN scripts in `<head>`: Firebase compat 12.19.0 (v36.74; was 10.12.0), GSI. **xlsx and
   mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
   `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
-- `cloudflare-worker.js` is pasted into the Cloudflare dashboard, **not** deployed
-  from the repo. It proxies Anthropic, photo search, YouTube, Instagram and Bring!.
+- `cloudflare-worker.js` — the Worker (Anthropic, photo search, YouTube,
+  Instagram, Bring!'s import, metering). **Since 8 Oct 2026 it publishes itself**:
+  `.github/workflows/deploy-worker.yml` runs when a push to `main` changes it (or
+  `worker/wrangler.jsonc`) — i.e. only on Tony's yes — runs `tests/worker-cors.mjs`,
+  `wrangler deploy --config worker/wrangler.jsonc`, then checks the live `health`
+  reports the file's WORKER_VERSION. Secret `CLOUDFLARE_API_TOKEN` (Tony's "Edit
+  Cloudflare Workers" token) in GitHub; the API keys stay in Cloudflare. The config
+  is in `worker/` so Cloudflare Pages never takes it for the site's. A binding or
+  plain variable added in the dashboard must be added to `worker/wrangler.jsonc`
+  too, or the next deploy drops the binding (plain vars are kept: `keep_vars`).
+  After a release that changes the Worker, check the "Deploy the Worker" run.
 - `firestore.rules` is the canonical rules file; the app fetches it and substitutes
   `{{READ}}` / `{{WRITE}}` / `{{ADMIN}}`. Edit the structure there, not in `index.html`.
 - `whatsapp/` holds exported chat `.txt`/`.zip` files. The app LISTS the folder over
@@ -816,6 +825,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Worker publishes itself (8 Oct 2026).** Tony: Cloudflare kept suggesting
+    Wrangler settings; he gave the account id, the BRING_KV id, the D1 id and
+    the compatibility date (2026-05-06), and put CLOUDFLARE_API_TOKEN in GitHub.
+    Worker v66 was pasted by him before this. `worker/wrangler.jsonc` +
+    `deploy-worker.yml` (see Conventions). Dry run checked here: the four
+    bindings it has in the dashboard (BRING_KV, METER_DB, ALLOWED_ORIGINS,
+    APP_SHARED_KEY).
   - **Released to the family app and the beta: v37.96 (8 Oct 2026, Tony's yes, CI green on a485eb7; the family's Pages deploy checked: success).** Rules to publish, then 🔒 in the family's Households window.
   - **v37.96 — the family's copy by invitation only (Tony chose "b").** After
     the audit: anyone could sign in at the family app's address, start a
