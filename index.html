@@ -5103,12 +5103,13 @@ async function householdUse(hid, role) {
   _household = { hid: hid, role: role, name: h.name || '', ownerUid: h.ownerUid || '',
                  code: h.code || '', appRequests: h.appRequests !== false,   // v37.49
                  createdAt: h.createdAt || 0, referredBy: h.referredBy || '' };   // v37.71
-  await householdLoadMembers();
   // v37.98 — the page says "a household is open here" (never which, nor who):
   // the store extension (1.7.1) sends recipes to the family app only once it has
   // seen this on the family app's page — a stranger who merely opens the address
-  // never gets this far (by invitation only, v37.96).
-  try { document.documentElement.setAttribute('data-mkn-member', '1'); } catch(e) {}
+  // never gets this far (by invitation only, v37.96). Reading the household is
+  // already proof of membership (the rules let only members read it).
+  if (snap.exists) { try { document.documentElement.setAttribute('data-mkn-member', '1'); } catch(e) {} }
+  await householdLoadMembers();
   try { await hhEnsureCode(); } catch(e) {
     if (!hhRulesBehind(e, 'The household gets its identifier once the new database rules are published'))
       syncLog('error', 'Could not give the household its identifier', String(e && e.message).slice(0, 160));
