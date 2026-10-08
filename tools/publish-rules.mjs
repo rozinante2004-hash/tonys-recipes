@@ -34,8 +34,17 @@ if (process.argv.includes('--dry-run')) process.exit(0);
 
 const key = process.env.FIREBASE_RULES_KEY;
 if (!key) throw new Error('FIREBASE_RULES_KEY is not set');
+// 8 Oct 2026 — the first key pasted was the file as a browser SHOWS it (a table:
+// `type⇥"service_account"`), not the file's text. Say so, never print the key.
+let credentials;
+try { credentials = JSON.parse(key.trim()); } catch (e) { credentials = null; }
+if (!credentials || credentials.type !== 'service_account' || !credentials.private_key || !credentials.client_email) {
+  console.log('::error::FIREBASE_RULES_KEY is not the key file\'s text. It must start with { and "type": "service_account". '
+    + 'Open the downloaded .json in a TEXT EDITOR (not a browser — or in Firefox, its "Raw Data" tab), select all, copy, and paste that.');
+  process.exit(1);
+}
 const { GoogleAuth } = await import('google-auth-library');
-const auth = new GoogleAuth({ credentials: JSON.parse(key), scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+const auth = new GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 const client = await auth.getClient();
 const api = 'https://firebaserules.googleapis.com/v1/';
 
