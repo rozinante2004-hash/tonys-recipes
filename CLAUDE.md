@@ -834,6 +834,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v37.98 (8 Oct 2026, Tony's yes, CI green on ab769de; Pages: success). The store job (37845283688) uploaded 1.7.1 and submitted it: state PENDING_REVIEW — the store took it although 1.7.0 had been submitted (the newer package replaced it in review).**
   - **Store: 1.7.0 in Google's review (8 Oct 2026)** — the job uploaded it, Tony
     typed the storage reason and submitted. The store takes one version for
     review at a time, so publish-extension.mjs now STOPS (notice, exit 0) when
