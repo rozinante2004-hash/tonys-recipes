@@ -834,6 +834,19 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.98 + extension 1.7.1 — the store copy switches to the family app
+    only for a member.** Tony: "How can we avoid someone trying to connect to
+    the Family app?" (The extension is not the gate — invitation only, the
+    rules and the Worker are.) 1.7 switched on a mere visit to the family
+    app's address; 1.7.1's appmark.js waits (MutationObserver) for
+    `data-mkn-member="1"` on <html>, which the app sets in householdUse once a
+    household is open (removed by signOutNow) — never which household or who.
+    Tests: extension.mjs (a plain visit does not switch; a member page does),
+    e2e-sync (households: the mark after founding).
+    - First store-job run (37839297633): logged in, read the item, UPLOADED
+      1.7.0 (uploadState SUCCEEDED); :publish refused — INVALID_ITEM_METADATA
+      ("does not meet the requirements … Developer Dashboard"): the storage
+      permission's reason, which Tony adds in the dashboard (Privacy).
   - **The extension submits itself to the Chrome Web Store (8 Oct 2026).**
     `.github/workflows/deploy-extension.yml` (push to main changing extension/**
     or tools/build-extension.mjs; or by hand): builds the live copy, `cmp`s it

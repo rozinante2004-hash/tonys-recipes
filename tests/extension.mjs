@@ -93,7 +93,9 @@ try {
   await ctx.route('https://www.tiktok.com/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: tiktok }));
   await ctx.route(APP + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
   await ctx.route(APP_LIVE + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>the beta</title>' }));
-  await ctx.route(APP_FAMILY + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>family app</title>' }));
+  // 1.7.1 — the family app marks its page once a household is open (?member=1 here, a moment after loading).
+  await ctx.route(APP_FAMILY + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>family app</title>'
+    + (/member=1/.test(r.request().url()) ? '<script>setTimeout(function(){ document.documentElement.setAttribute("data-mkn-member", "1"); }, 300);</script>' : '') }));
   const page = await ctx.newPage();
   await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('.mkn-save').length >= 4, null, { timeout: 15000 }).catch(() => {});
@@ -213,17 +215,27 @@ try {
   await page.goto(APP_LIVE, { waitUntil: 'load' });
   await page.waitForTimeout(300);
   const markBeta = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-beta'), document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
-  // … and on the family app's under the family's — and from then on sends there.
+  // … and on the family app's under the family's.
   await page.goto(APP_FAMILY, { waitUntil: 'load' });
   await page.waitForTimeout(300);
   const markLive = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
+  // 1.7.1 — Tony: opening the family app's address is NOT enough to send there.
+  await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.querySelectorAll('.mkn-save').length >= 4, null, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const [opVisit] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('#p1 .mkn-save:not(:has-text("TEST"))')]);
+  ok('1.7.1: merely opening the family app\'s address does not make the store copy send there', opVisit.url().startsWith(APP_LIVE) && !opVisit.url().startsWith(APP_FAMILY), opVisit.url().slice(0, 80));
+  await opVisit.close();
+  // … only a household opened there for the person (the app's mark) does.
+  await page.goto(APP_FAMILY + '?member=1', { waitUntil: 'load' });
+  await page.waitForTimeout(800);
   ok('1.4: on each app\'s own page, that build says it is installed — and only that one', markTest[0] === VERSION && !markTest[1] && markLive[0] === VERSION && !markLive[1], JSON.stringify([markTest, markLive]));
   ok('1.7: the store copy says so on the beta\'s pages too, under the beta\'s name', markBeta[0] === VERSION && !markBeta[1] && !markBeta[2], JSON.stringify(markBeta));
   await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('.mkn-save').length >= 4, null, { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(300);
   const [opFam2] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('#p1 .mkn-save:not(:has-text("TEST"))')]);
-  ok('1.7: once the family app was opened in this browser, the store copy sends there', opFam2.url().startsWith(APP_FAMILY) && /share-text=/.test(opFam2.url()), opFam2.url().slice(0, 80));
+  ok('1.7.1: once the family app has opened a household here, the store copy sends there', opFam2.url().startsWith(APP_FAMILY) && /share-text=/.test(opFam2.url()), opFam2.url().slice(0, 80));
   await opFam2.close();
   await page.goto('https://recipes.example/lemon-drizzle', { waitUntil: 'load' });
   ok('…and nothing on any other site', !(await page.evaluate(() => [...document.documentElement.attributes].some(a => /^data-mkn-extension/.test(a.name)))));

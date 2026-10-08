@@ -293,6 +293,8 @@ try {
     A = await device('A (owner)', OWNER, { ready: 'household', welcome: 'own' });
     const h = await inPage(A, () => householdOf());
     ok('the owner, signing in for the first time, founds a household', h && h.role === 'owner', JSON.stringify(h));
+    // v37.98 — the page says a household is open here (the store extension 1.7.1 reads it on the family app).
+    ok('…and the page says a household is open (data-mkn-member)', await inPage(A, () => document.documentElement.getAttribute('data-mkn-member') === '1'));
     HID = h.hid;
     await fillHousehold(HID);
     await A.page.reload({ waitUntil: 'domcontentloaded' });

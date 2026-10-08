@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.97 -->
+<!-- Tony's Recipes Collection v37.98 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5104,6 +5104,11 @@ async function householdUse(hid, role) {
                  code: h.code || '', appRequests: h.appRequests !== false,   // v37.49
                  createdAt: h.createdAt || 0, referredBy: h.referredBy || '' };   // v37.71
   await householdLoadMembers();
+  // v37.98 — the page says "a household is open here" (never which, nor who):
+  // the store extension (1.7.1) sends recipes to the family app only once it has
+  // seen this on the family app's page — a stranger who merely opens the address
+  // never gets this far (by invitation only, v37.96).
+  try { document.documentElement.setAttribute('data-mkn-member', '1'); } catch(e) {}
   try { await hhEnsureCode(); } catch(e) {
     if (!hhRulesBehind(e, 'The household gets its identifier once the new database rules are published'))
       syncLog('error', 'Could not give the household its identifier', String(e && e.message).slice(0, 160));
@@ -6494,7 +6499,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.97';
+var APP_VERSION = 'v37.98';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9254,7 +9259,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.97</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.98</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9963,7 +9968,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.97</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.98</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24583,6 +24588,7 @@ async function signOut() {
 }
 // v37.96 — the same without asking (a newcomer the family's copy cannot take).
 function signOutNow() {
+  try { document.documentElement.removeAttribute('data-mkn-member'); } catch(e) {}   // v37.98
   if (_firestoreUnsubscribe) { _firestoreUnsubscribe(); _firestoreUnsubscribe = null; }
   if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser = null; window._driveMode = false;
