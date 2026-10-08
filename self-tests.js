@@ -1658,6 +1658,162 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'feedback_reply_in_app', group:'Sharing', name:'📲 Reply in app: Tony answers a note from the Feedback tab, the answer goes to the writer’s own app; the tab’s buttons press like the app’s own (v38.00)',
+    test: async()=>{
+      if(!feedbackInboxHere()) return;          // the notes are read in the family app only
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth };
+      var sent=[], shown='', toasts=[];
+      try{
+        window.toast=function(m){ toasts.push(String(m)); }; window.showServiceError=function(m){ shown=String(m); };
+        window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        var at=Date.now()-3600e3, oldWorker=false;
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          sent.push(b);
+          if(b.op==='notes') return new Response(JSON.stringify({ notes:[
+              { id:5, project:'my-kitchen-notes-beta', uid:'uT', email:'tester@example.com', household:'Tess’s Kitchen', text:'The import is slow', at:at, status:'new', env:'beta' },
+              { id:6, project:'my-kitchen-notes-beta', uid:'', email:'', text:'No writer known', at:at-1, status:'new', env:'beta' } ],
+            replies:[ { id:1, note_id:5, text:'An earlier answer', at:at+60e3, read_at:at+120e3 } ] }), { status:200 });
+          if(b.op==='note-reply') return new Response(oldWorker ? '{"households":[]}' : JSON.stringify({ ok:true, reply:{ id:2, note_id:b.id, text:b.text, at:Date.now(), read_at:null } }), { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 });
+        };
+        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
+        var card=document.getElementById('mgNote-s5');
+        if(!card) throw new Error('the note is not in the Feedback tab');
+        var btn=Array.prototype.filter.call(card.querySelectorAll('button'), function(x){ return /Reply in app/.test(x.textContent); })[0];
+        if(!btn) throw new Error('no 📲 Reply in app button beside Reply in Gmail');
+        if(!card.querySelector('a[href^="https://mail.google.com/"]') || !card.querySelector('a[href^="mailto:"]')) throw new Error('Reply in Gmail and the e-mail app went');
+        var other=document.getElementById('mgNote-s6');
+        if(other && /Reply in app/.test(other.textContent)) throw new Error('offered for a note whose writer is not known');
+        if(!/An earlier answer/.test(card.textContent) || !/read/.test(card.querySelector('.mg-reply').textContent)) throw new Error('the answers already sent, and whether read, are not shown');
+        // v38.00 — Tony: the buttons "are just painted on". Raised, lifted under the pointer, pressed when clicked.
+        var css=(document.getElementById('mgCss')||{}).textContent||'';
+        if(!/\.mg-btn:active\{[^}]*translateY\(2px\)/.test(css) || !/\.mg-btn:hover\{[^}]*translateY\(-1px\)/.test(css) || !/\.mg-tab:hover\{/.test(css)) throw new Error('the buttons do not respond to the pointer and to clicks');
+        if(getComputedStyle(btn).boxShadow==='none') throw new Error('the buttons are flat');
+        // The answer box: empty is refused; then sent to the writer's app.
+        btn.click();
+        var ta=document.getElementById('mgReplyText');
+        if(!ta || !document.getElementById('mgReplySend')) throw new Error('no box to write the answer in');
+        var before=sent.length;
+        if(await mknManage.replySend('s5')!==false || sent.slice(before).some(function(b){ return b.op==='note-reply'; })) throw new Error('an empty answer was sent');
+        ta=document.getElementById('mgReplyText'); ta.value='Thank you — fixed in the next version'; ta.dispatchEvent(new Event('input'));
+        if(await mknManage.replySend('s5')!==true) throw new Error('the answer was not sent: '+shown);
+        var rb=sent.filter(function(b){ return b.op==='note-reply'; }).pop();
+        if(!rb || rb.action!=='meter-admin' || rb.id!==5 || rb.text!=='Thank you — fixed in the next version' || rb.idToken!=='tok') throw new Error('what was sent: '+JSON.stringify(rb));
+        card=document.getElementById('mgNote-s5');
+        if(document.getElementById('mgReplyText')) throw new Error('the box stayed open');
+        if(!/fixed in the next version/.test(card.textContent) || !/not read yet/.test(card.textContent)) throw new Error('the answer sent is not shown under the note');
+        if(mknManage._state.notes.filter(function(n){ return n.key==='s5'; })[0].status!=='seen') throw new Error('a new note answered is still new');
+        // An older Worker (before v68) does not keep it: said so, and the answer stays in the box.
+        oldWorker=true; shown='';
+        mknManage.replyOpen('s5'); ta=document.getElementById('mgReplyText'); ta.value='Kept'; ta.dispatchEvent(new Event('input'));
+        if(await mknManage.replySend('s5')!==false || !/could not be sent/.test(shown) || document.getElementById('mgReplyText').value!=='Kept') throw new Error('an answer the server did not keep: '+shown);
+        mknManage.replyCancel();
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        if(window.mknManage) mknManage.close();
+        feedbackKnown(null);
+      }
+    } },
+
+  { id:'feedback_answer_arrives', group:'Sharing', name:'📨 An answer to my note comes up in my app like a link request — OK, Write back, Remind me later — with red dots on the way to it until read; nobody named (v38.00)',
+    test: async()=>{
+      var real={ user:window._fbUser, auth:window._fbAuth, fetch:window.fetch, h:_workerHealth, ask:window.askConfirm, toast:window.toast, form:window.openFeedbackForm,
+                 ov:Object.assign({}, window._featureOverride), reps:Object.assign({}, _fbReplies), err:window.showServiceError, hh:window._household, db:window._fbDb };
+      var keys=[FB_REPLY_NEW_KEY+'uR', FB_REPLY_LATER_KEY+'11', FB_REPLY_LATER_KEY+'12', FB_HIDDEN_KEY], kept={};
+      keys.forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      var server=[ { id:11, note_id:5, text:'Fixed it — thank you', note_text:'The import is slow', note_at:Date.now()-864e5, at:Date.now()-3600e3, read_at:null } ];
+      var calls=[], asked=[], answer=false, toasts=[], down=false;
+      function helpDot(){ return !!document.querySelector('.set-group[data-group="help"] > .set-head > .path-dot'); }
+      try{
+        window._fbUser={ uid:'uR', email:'r@example.com', getIdToken:async function(){ return 'tokR'; } };
+        _workerHealth={ ok:true, replies:true };
+        window.toast=function(m){ toasts.push(String(m)); };
+        window.askConfirm=async function(o){ asked.push(o); return answer; };
+        var formOpened=0; window.openFeedbackForm=function(){ formOpened++; };
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          calls.push(b);
+          if(down) return new Response('{"error":"down"}', { status:502 });
+          if(b.action!=='feedback-replies') return new Response('{}', { status:404 });
+          (b.read||[]).forEach(function(id){ server.forEach(function(x){ if(x.id===id && !x.read_at) x.read_at=Date.now(); }); });
+          return new Response(JSON.stringify({ replies:server.map(function(x){ return Object.assign({}, x); }) }), { status:200 });
+        };
+        keys.forEach(function(k){ if(k!==FB_HIDDEN_KEY) localStorage.removeItem(k); });
+        _fbReplies.list=[]; _fbReplies.loaded=false; _fbReplies.uid='';
+        // 1. It comes up when the app opens, like a link request. "Remind me later": a day.
+        answer=false;
+        if(await fbRepliesCheck(true)!==1 || asked.length!==1) throw new Error('the answer did not come up');
+        var o=asked[0];
+        if(calls[0].action!=='feedback-replies' || calls[0].idToken!=='tokR') throw new Error('asked the server: '+JSON.stringify(calls[0]));
+        if(o.title!=='An answer to your note' || o.message.indexOf('Fixed it')===-1 || o.message.indexOf('The import is slow')===-1 || o.okLabel!=='OK' || !/Write back/.test(o.altLabel) || o.cancelLabel!=='Remind me later')
+          throw new Error('the window: '+JSON.stringify(o));
+        if(/Tony/.test(o.title+o.message)) throw new Error('names Tony (he asked not to be named)');
+        if(!localStorage.getItem(FB_REPLY_LATER_KEY+'11')) throw new Error('Remind me later was not kept');
+        // The red dots: ⚙️, 💬 Help and feedback, 📨 Answers to my notes.
+        var dot=document.getElementById('feedbackDot'), item=document.getElementById('fbRepliesItem');
+        if(!item || item.hidden) throw new Error('📨 Answers to my notes is not in ⚙️ → 💬 Help and feedback');
+        if(!helpDot() || !item.querySelector('.path-dot') || !dot || dot.hidden) throw new Error('the red dots do not show the way to the answer');
+        // Asked again within the day: not shown, the dot stays.
+        asked=[];
+        if(await fbRepliesCheck(true)!==0 || asked.length) throw new Error('shown again before tomorrow');
+        if(!helpDot()) throw new Error('the dot went although it is not read');
+        // 2. The device remembers: the server not answering (just after an update) never clears the dot.
+        _fbReplies.loaded=false; _fbReplies.list=[]; pathDots({ replies:0 });
+        down=true; await fbRepliesCheck(true); down=false;
+        if(!helpDot()) throw new Error('the server not answering hid the dot');
+        // 3. The floating 💬 shows it too, and opens the answers.
+        window._featureOverride.feedbackButton=true; applyFeatureFlags(); localStorage.removeItem(FB_HIDDEN_KEY);
+        await fbRepliesLoad();
+        var fab=renderFeedbackButton(); fbRepliesDot();
+        if(!fab || !fab.querySelector('.fab-dot')) throw new Error('no dot on the floating 💬');
+        // 4. Read: OK marks it read on the server, and every dot goes.
+        localStorage.removeItem(FB_REPLY_LATER_KEY+'11'); answer=true; asked=[]; calls=[];
+        if(await fbRepliesCheck(true)!==1) throw new Error('not shown again after the day');
+        if(!calls.some(function(b){ return (b.read||[]).indexOf(11)!==-1; })) throw new Error('not marked read on the server');
+        if(helpDot() || (item.querySelector('.path-dot')) || fab.querySelector('.fab-dot')) throw new Error('the dots stay once it is read');
+        if(localStorage.getItem(FB_REPLY_NEW_KEY+'uR')!=='0') throw new Error('the device still counts it as new');
+        if(item.hidden) throw new Error('📨 Answers to my notes went (it keeps the answers read)');
+        // 5. A second answer: Write back opens the note form; the list window shows both and reads them.
+        server.push({ id:12, note_id:6, text:'Second answer', note_text:'Another', note_at:Date.now()-1000, at:Date.now(), read_at:null });
+        answer='alt'; asked=[];
+        await fbRepliesCheck(true);
+        if(formOpened!==1 || !server[1].read_at) throw new Error('Write back: the form, and read');
+        server[1].read_at=null;
+        var ov=await openFbReplies();
+        var t=ov.textContent;
+        if(t.indexOf('Fixed it')===-1 || t.indexOf('Second answer')===-1 || t.indexOf('The import is slow')===-1) throw new Error('the list: '+t.slice(0,200));
+        if(/Tony/.test(t)) throw new Error('the list names Tony');
+        for(var w=0; w<20 && !server[1].read_at; w++) await new Promise(function(r){ setTimeout(r, 25); });
+        if(!server[1].read_at) throw new Error('opening the list did not read them');
+        ov.remove();
+        // 6. Tony: "I do not like my name appearing much" — not in the note form, nor in its thank-you.
+        window.openFeedbackForm=real.form;
+        window._household={ hid:'hR', name:'R' };
+        window._fbDb=window._fbDb||{};
+        window.fetch=async function(){ return new Response('{"ok":true,"id":3}', { status:200 }); };
+        openFeedbackForm();
+        if(/Tony/.test(document.getElementById('feedbackOverlay').textContent)) throw new Error('the note form names Tony');
+        document.getElementById('fbText').value='x'; toasts=[];
+        if(await sendFeedbackNote()!==true) throw new Error('the note was not sent');
+        if(!toasts.length || /Tony/.test(toasts.join(' ')) || !/sent/.test(toasts.join(' '))) throw new Error('the thank-you: '+toasts.join(' | '));
+      } finally {
+        window._fbUser=real.user; window._fbAuth=real.auth; window.fetch=real.fetch; _workerHealth=real.h; window.askConfirm=real.ask; window.toast=real.toast;
+        window.openFeedbackForm=real.form; window.showServiceError=real.err; window._household=real.hh; window._fbDb=real.db;
+        window._featureOverride=real.ov; applyFeatureFlags();
+        Object.keys(real.reps).forEach(function(k){ _fbReplies[k]=real.reps[k]; });
+        keys.forEach(function(k){ try{ if(kept[k]===null || kept[k]===undefined) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); }catch(e){} });
+        var o2=document.getElementById('feedbackOverlay'); if(o2) o2.remove();
+        var o3=document.getElementById('fbRepliesOverlay'); if(o3) o3.remove();
+        renderFeedbackButton(); fbRepliesDot();
+      }
+    } },
+
   { id:'shortcut_not_offered_twice', group:'UI', name:'📱 The iPhone shortcut is not offered again: the account remembers, and a recipe arriving through it proves it is there (v37.69)',
     test: async()=>{
       var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)';

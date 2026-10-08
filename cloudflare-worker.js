@@ -1,4 +1,14 @@
-// Tony's Recipes — Cloudflare Worker v67
+// Tony's Recipes — Cloudflare Worker v68
+// v68: AN ANSWER TO A NOTE, IN THE SENDER'S OWN APP. Tony: "Reply in App. This
+//      will send a note directly to the sender's app and will be received
+//      exactly as a join request, with the red dot and all." The owner's
+//      `meter-admin` `note-reply` (id, text) keeps the answer in D1
+//      (METER_DB, table `feedback_replies`) for the note's writer — their
+//      copy and their account, with a few words of what they wrote, so it
+//      still makes sense if the note is deleted. `notes` now lists the answers
+//      too. `feedback-replies` (any signed-in person, proved as for AI) gives
+//      a person their own answers, and with `read: [ids]` marks those read.
+//      Health: `replies`.
 // v67: THE FAMILY'S COPY HAS AN ALLOWANCE TOO — $10 a month per household
 //      (Tony, after a stranger's household turned up there), changeable per
 //      household and pausable from 📊 Households like the beta's. AI_CAP_BY_PROJECT
@@ -266,7 +276,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v67';
+const WORKER_VERSION = 'v68';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -642,6 +652,7 @@ async function handleRequest(request, env) {
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
+        replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1099,6 +1110,7 @@ async function handleRequest(request, env) {
     // ── meter-me / meter-admin (v60) ─────────────────────────────────────────
     if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
     if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
+    if (body.action === 'feedback-replies') return await feedbackReplies(request, env, body);   // v68
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
@@ -1435,7 +1447,7 @@ async function meterAction(request, env, body) {
     ]);
     return jsonResp({ ok: true, hid, cap });
   }
-  if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body); if (fr) return fr; }
+  if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body, claims); if (fr) return fr; }
   if (body.op === 'set-note') {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
@@ -1584,6 +1596,10 @@ async function feedbackTable(db) {
     await db.prepare('CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, '
       + 'name TEXT, hid TEXT, household TEXT, text TEXT, shot TEXT, log TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, '
       + 'at INTEGER, status TEXT)').run();
+    // v68 — the owner's answers, each for one person in one copy.
+    await db.prepare('CREATE TABLE IF NOT EXISTS feedback_replies (id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER, project TEXT, '
+      + 'uid TEXT, text TEXT, note_text TEXT, note_at INTEGER, from_email TEXT, at INTEGER, read_at INTEGER)').run();
+    await db.prepare('CREATE INDEX IF NOT EXISTS feedback_replies_to ON feedback_replies (project, uid)').run();
     _feedbackReady = true;
   }
 }
@@ -1608,12 +1624,15 @@ async function feedbackSend(request, env, body) {
 }
 // The owner's side, through meter-admin: notes (newest 300, every copy),
 // note-status, note-delete, notes-new (how many are new).
-async function feedbackAdmin(env, db, body) {
+async function feedbackAdmin(env, db, body, claims) {
   await feedbackTable(db);
   if (body.op === 'notes') {
     const rows = (await db.prepare('SELECT id, project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status '
       + 'FROM feedback ORDER BY at DESC LIMIT 300').all()).results || [];
-    return jsonResp({ notes: rows });
+    // v68 — the answers sent to these notes, and whether each has been read.
+    const replies = (await db.prepare('SELECT id, note_id, text, at, read_at FROM feedback_replies '
+      + 'WHERE note_id IN (SELECT id FROM feedback ORDER BY at DESC LIMIT 300) ORDER BY at').all()).results || [];
+    return jsonResp({ notes: rows, replies });
   }
   // v64 — a note kept in a copy's own database (before the inbox, or by an
   // app that thought it missing), moved here by the owner's app. Its writer,
@@ -1651,7 +1670,40 @@ async function feedbackAdmin(env, db, body) {
     await db.prepare('DELETE FROM feedback WHERE id = ?1').bind(id).run();
     return jsonResp({ ok: true });
   }
+  // v68 — an answer, kept for the note's writer (their copy, their account).
+  // A new note is marked seen: it has been read to be answered.
+  if (body.op === 'note-reply') {
+    const text = String(body.text == null ? '' : body.text).slice(0, 5000).trim();
+    if (!text) return jsonResp({ error: 'FEEDBACK: the answer is empty.' }, 400);
+    const n = await db.prepare('SELECT id, project, uid, text, at FROM feedback WHERE id = ?1').bind(id).first();
+    if (!n) return jsonResp({ error: 'FEEDBACK: that note is not in the inbox any more.' }, 404);
+    if (!n.uid || !n.project) return jsonResp({ error: 'FEEDBACK: that note does not say who wrote it.' }, 400);
+    const at = Date.now();
+    const r = await db.prepare('INSERT INTO feedback_replies (note_id, project, uid, text, note_text, note_at, from_email, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)')
+      .bind(id, n.project, n.uid, text, String(n.text || '').slice(0, 300), n.at || 0, String((claims && claims.email) || '').slice(0, 200), at).run();
+    await db.prepare("UPDATE feedback SET status = 'seen' WHERE id = ?1 AND status = 'new'").bind(id).run();
+    return jsonResp({ ok: true, reply: { id: (r && r.meta && r.meta.last_row_id) || null, note_id: id, text, at, read_at: null } });
+  }
   return null;
+}
+// v68 — a person's own answers from the owner (newest 50), in the copy they
+// signed in to. `read: [ids]` marks those read — only their own.
+async function feedbackReplies(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'FEEDBACK: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'FEEDBACK: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  const db = await meterDb(env);
+  await feedbackTable(db);
+  const ids = (Array.isArray(body.read) ? body.read : []).map(x => parseInt(x, 10)).filter(x => x > 0).slice(0, 50);
+  if (ids.length) {
+    const now = Date.now();
+    await db.batch(ids.map(x => db.prepare('UPDATE feedback_replies SET read_at = ?1 WHERE id = ?2 AND project = ?3 AND uid = ?4 AND read_at IS NULL')
+      .bind(now, x, claims.aud, claims.sub)));
+  }
+  const rows = (await db.prepare('SELECT id, note_id, text, note_text, note_at, at, read_at FROM feedback_replies '
+    + 'WHERE project = ?1 AND uid = ?2 ORDER BY at DESC LIMIT 50').bind(claims.aud, claims.sub).all()).results || [];
+  return jsonResp({ replies: rows });
 }
 
 // ─── VIDEO RECIPES (v43, v44) ────────────────────────────────────────────────
@@ -2148,4 +2200,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v67 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v68 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

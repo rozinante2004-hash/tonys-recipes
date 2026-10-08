@@ -867,7 +867,7 @@ console.log('\nAI per household (v60):');
       bind: (...a) => stmt(sql, a),
       first: async () => raw.prepare(sql).get(...(args || [])) || null,
       all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
-      run: async () => { raw.prepare(sql).run(...(args || [])); return { success: true }; },
+      run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid) } }; },
       _run() { raw.prepare(sql).run(...(args || [])); }
     });
     return { raw, prepare: (sql) => stmt(sql, []), batch: async (list) => { raw.exec('BEGIN'); try { list.forEach(s => s._run()); raw.exec('COMMIT'); } catch (e) { raw.exec('ROLLBACK'); throw e; } return []; } };
@@ -1040,6 +1040,38 @@ console.log('\nAI per household (v60):');
     expect('the owner reads every copy\'s notes, from any copy, newest first', f.status === 200 && f.d.notes.length === 2 && f.d.notes.map(n => n.project).sort().join() === 'recipes-f379d,tonys-recipes-test', JSON.stringify(f.d).slice(0, 200));
     f = await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
     expect('…counts the new ones', f.d && f.d.new === 2, JSON.stringify(f.d));
+    // v68 — the owner answers a note in its writer's own app.
+    const slowId = nrow.id;
+    f = await fb({ action: 'meter-admin', op: 'note-reply', id: slowId, text: 'Thanks — fixed in the next version', idToken: tA });
+    expect('v68: nobody but the owner answers a note', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'note-reply', id: slowId, text: '   ', idToken: tOwner }, ORIGIN);
+    expect('v68: an empty answer is refused', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'note-reply', id: 999999, text: 'x', idToken: tOwner }, ORIGIN);
+    expect('v68: an answer to a note no longer there is refused', f.status === 404, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'note-reply', id: slowId, text: 'Thanks — fixed in the next version', idToken: tOwner }, ORIGIN);
+    const rrow1 = db.raw.prepare('SELECT * FROM feedback_replies WHERE note_id = ?').get(slowId);
+    expect('v68: the owner answers from the family app — kept for the writer\'s copy and account, with what they wrote',
+      f.status === 200 && f.d.ok && f.d.reply.id > 0 && rrow1 && rrow1.project === 'tonys-recipes-test' && rrow1.uid === 'uA'
+      && rrow1.note_text === 'The import was slow' && rrow1.from_email === 'rozinante2004@gmail.com' && rrow1.read_at === null, JSON.stringify([f, rrow1]));
+    expect('v68: …and the note, new until now, is marked seen', db.raw.prepare('SELECT status FROM feedback WHERE id = ?').get(slowId).status === 'seen');
+    f = await fb({ action: 'meter-admin', op: 'notes', idToken: tOwner }, ORIGIN);
+    expect('v68: the owner\'s list shows the answers with their notes', f.d.replies && f.d.replies.length === 1 && f.d.replies[0].note_id === slowId && f.d.replies[0].read_at === null, JSON.stringify(f.d.replies));
+    f = await fb({ action: 'feedback-replies', idToken: tA });
+    expect('v68: the writer\'s app gets the answer', f.status === 200 && f.d.replies.length === 1 && f.d.replies[0].text === 'Thanks — fixed in the next version'
+      && f.d.replies[0].note_text === 'The import was slow' && f.d.replies[0].read_at === null, JSON.stringify(f));
+    f = await fb({ action: 'feedback-replies', idToken: tB });
+    expect('v68: …and nobody else does', f.status === 200 && f.d.replies.length === 0, JSON.stringify(f));
+    const tAfam = await token({ sub: 'uA', aud: 'recipes-f379d', email: 'a@example.com' });
+    f = await fb({ action: 'feedback-replies', idToken: tAfam }, ORIGIN);
+    expect('v68: …nor the same account in another copy', f.status === 200 && f.d.replies.length === 0, JSON.stringify(f));
+    f = await fb({ action: 'feedback-replies', idToken: tB, read: [rrow1.id] });
+    expect('v68: someone else cannot mark it read', db.raw.prepare('SELECT read_at FROM feedback_replies WHERE id = ?').get(rrow1.id).read_at === null, JSON.stringify(f));
+    f = await fb({ action: 'feedback-replies', idToken: tA.slice(0, -4) + 'AAAA' });
+    expect('v68: a forged sign-in gets nothing', f.status === 401, JSON.stringify(f));
+    f = await fb({ action: 'feedback-replies', idToken: tA, read: [rrow1.id, 'x', -3] });
+    expect('v68: the writer marks it read', f.status === 200 && f.d.replies[0].read_at > 0, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes', idToken: tOwner }, ORIGIN);
+    expect('v68: …and the owner sees that it was read', f.d.replies[0].read_at > 0, JSON.stringify(f.d.replies));
     const id = db.raw.prepare("SELECT id FROM feedback WHERE text = 'From the family'").get().id;
     f = await fb({ action: 'meter-admin', op: 'note-status', id, status: 'done', idToken: tOwner });
     expect('…marks one done', f.status === 200 && db.raw.prepare('SELECT status FROM feedback WHERE id = ?').get(id).status === 'done', JSON.stringify(f));
@@ -1058,6 +1090,7 @@ console.log('\nAI per household (v60):');
     expect('…only from a copy this server serves', f.status === 400, JSON.stringify(f));
     const hh2 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
     expect('health says notes go here (so the app sends them)', hh2.feedback === true && hh2.notesImport === true, JSON.stringify(hh2));
+    expect('v68: health says answers can be asked for', hh2.replies === true, JSON.stringify(hh2));
     // v62 — one Households page for every copy.
     expect('health says households may report themselves', hh2.reports === true, JSON.stringify(hh2.reports));
     const report = { name: 'ignored', members: [{ uid: 'uF', email: 'f@example.com', name: 'F', role: 'owner', lastSeen: 1759600000000, extra: 'x', termsAt: 1759700000000, termsVersion: '1.1' }],

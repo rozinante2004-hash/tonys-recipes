@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.99 -->
+<!-- Tony's Recipes Collection v38.00 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -279,6 +279,13 @@
   @keyframes fbBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
   @media (prefers-reduced-motion: reduce) { #feedbackFab.fb-shine, #feedbackFab.fb-shine::after { animation: none; } #feedbackFab.fb-shine::after { display: none; } }
   @media print { #feedbackFab { display: none; } }
+  /* v38.00 — an answer to a note is waiting (inside the circle: the button clips its corners). */
+  #feedbackFab .fab-dot { position: absolute; top: 6px; right: 6px; width: 12px; height: 12px; border-radius: 50%;
+    background: #E5484D; border: 2px solid #fff; box-sizing: border-box; pointer-events: none; z-index: 1; }
+  .fr-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 10px; background: var(--card-bg); }
+  .fr-card.fr-new { border-inline-start: 4px solid var(--terracotta-fill, #C1440E); }
+  .fr-text { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: var(--ink); }
+  .fr-wrote { white-space: pre-wrap; font-size: 13px; color: var(--muted); font-style: italic; }
   /* v37.68 — the owner's dot on ⚙️: red = notes from testers not yet read; green = all read. */
   #feedbackDot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%;
     border: 2px solid var(--warm-brown, #5C3D2E); box-sizing: content-box; pointer-events: none; }
@@ -4770,10 +4777,11 @@ window.hhSetBlocked = hhSetBlocked; window.hhLoadIncoming = hhLoadIncoming; wind
 // Tony: "the red dots should indicate the entire path to where the new
 // occurrence happened" — ⚙️, the section, the item. Red only: nothing when all
 // is seen (v37.68's green "all read" went). Each source sets its own count.
-var _pathDots = { links: 0, feedback: 0 };
+var _pathDots = { links: 0, feedback: 0, replies: 0 };
 var PATH_DOTS = {
   links:    ['.set-group[data-group="household"] > .set-head', '#linkRequestsItem'],
-  feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]']
+  feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]'],
+  replies:  ['.set-group[data-group="help"] > .set-head', '#fbRepliesItem']      // v38.00 — an answer to my note
 };
 function pathDots(counts) {
   Object.keys(counts || {}).forEach(function(k){ _pathDots[k] = Math.max(0, +counts[k] || 0); });
@@ -5133,6 +5141,7 @@ async function householdUse(hid, role) {
   householdRenderBar();
   if (typeof renderFilters === 'function' && document.getElementById('filterBar')) try { renderFilters(); } catch(e) {}
   hhCheckLinkRequests().catch(function(){});
+  if (typeof fbRepliesCheck === 'function' && !_selfTestRunning) setTimeout(function(){ fbRepliesCheck().catch(function(){}); }, 3000);   // v38.00
   if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
   if (typeof renderAccessMembers === 'function') try { renderAccessMembers(); } catch(e) {}
   householdBrand();
@@ -6064,8 +6073,9 @@ function renderFeedbackButton() {
     b.setAttribute('aria-label', 'Send a note about the app');
     b.title = 'Send a note about the app';
     b.textContent = '\u{1F4AC}';
-    b.onclick = function(){ openFeedbackForm(); };
+    b.onclick = function(){ if (typeof fbRepliesNew === 'function' && b.querySelector('.fab-dot')) openFbReplies(); else openFeedbackForm(); };   // v38.00
     document.body.appendChild(b);
+    if (typeof fbRepliesDot === 'function') setTimeout(fbRepliesDot, 0);
   }
   var first = 0;
   try { first = +localStorage.getItem(FB_FIRST_KEY) || 0; if (!first) { first = Date.now(); localStorage.setItem(FB_FIRST_KEY, String(first)); } } catch(e) {}
@@ -6108,7 +6118,7 @@ function openFeedbackForm() {
   ov.id = 'feedbackOverlay'; ov.className = 'modal-overlay open';
   ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="fbTitle" style="max-width:480px;text-align:start;">'
     + '<div class="ask-title" id="fbTitle">\u{1F4AC} A note about the app</div>'
-    + '<div class="ask-body" style="text-align:start;">What works, what doesn’t, what you wish it did — anything helps. It goes straight to Tony.</div>'
+    + '<div class="ask-body" style="text-align:start;">What works, what doesn’t, what you wish it did — anything helps.</div>'
     + '<textarea id="fbText" dir="auto" rows="5" maxlength="5000" placeholder="Your note" style="width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border:1.5px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--ink);font:inherit;font-size:14px;"></textarea>'
     + '<input type="file" id="fbShotIn" accept="image/*" style="display:none" onchange="fbShotPicked(this)">'
     + '<button type="button" id="fbShotBtn" class="ask-btn ghost" style="margin-top:8px;" onclick="document.getElementById(\'fbShotIn\').click()">\u{1F5BC} Add a screenshot</button>'
@@ -6124,7 +6134,7 @@ function openFeedbackForm() {
 async function sendFeedbackNote() {
   var t = document.getElementById('fbText'), text = t ? t.value.trim() : '';
   if (!text) { toast('Write a few words first.'); if (t) t.focus(); return false; }
-  if (!fbSignedInUser() || !hhDb()) { toast('Sign in first, so Tony knows who wrote \u2014 your note stays here.', 7000); return false; }
+  if (!fbSignedInUser() || !hhDb()) { toast('Sign in first, so we know who wrote \u2014 your note stays here.', 7000); return false; }
   var btn = document.getElementById('fbSend'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   var withLog = (document.getElementById('fbLog') || {}).checked;
   var log = '';
@@ -6156,8 +6166,9 @@ async function sendFeedbackNote() {
     return false;
   }
   var ov = document.getElementById('feedbackOverlay'); if (ov) ov.remove();
-  syncLog('save', 'Sent a note to Tony', { chars: text.length, screenshot: !!_fbShot, log: !!log });
-  toast('\u{1F49C} Thank you — your note is with Tony.', 6000);
+  syncLog('save', 'Sent a note about the app', { chars: text.length, screenshot: !!_fbShot, log: !!log });
+  // v38.00 — Tony: "I do not like my name appearing much" — not in what the testers see.
+  toast('\u{1F49C} Thank you — your note was sent successfully.', 6000);
   _fbShot = '';
   return true;
 }
@@ -6242,6 +6253,7 @@ setInterval(function(){
   if (_selfTestRunning) return;
   if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackKnown).catch(function(){});
   if (_household && hhDb()) hhLoadIncoming().then(talkLoad).then(linkDotRefresh).catch(function(){});   // v37.80/81 — new link requests and messages
+  if (fbSignedInUser()) fbRepliesLoad().catch(function(){});   // v38.00 — answers to my notes (the dot; the window when the app opens)
 }, 15 * 60e3);
 window.feedbackDot = feedbackDot; window.feedbackCountNew = feedbackCountNew; window.feedbackKnown = feedbackKnown;
 window.feedbackButtonOn = feedbackButtonOn; window.renderFeedbackButton = renderFeedbackButton; window.toggleFeedbackButton = toggleFeedbackButton;
@@ -6249,6 +6261,136 @@ window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedba
 window.feedbackTellOwner = feedbackTellOwner; window.fbSignedInUser = fbSignedInUser;
 window.feedbackInboxHere = feedbackInboxHere; window.feedbackMoveToInbox = feedbackMoveToInbox;
 document.addEventListener('DOMContentLoaded', function(){ try { renderFeedbackButton(); } catch(e) {} });
+
+// ─── ANSWERS TO NOTES (v38.00, Worker v68) ──────────────────────────────────
+// Tony: "Reply in App. This will send a note directly to the sender's app and
+// will be received exactly as a join request, with the red dot and all." His
+// answer (📊 Households → 💬 Feedback → 📲 Reply in app) waits in the Worker,
+// the one inbox for every copy. The writer's app asks for it when it opens and
+// every 15 minutes; each new one comes up as a link request does (OK, ✍️ Write
+// back, Remind me later — a day) and a red dot marks the way to it — ⚙️ →
+// 💬 Help and feedback → 📨 Answers to my notes, and the floating 💬 — until
+// it is read. Read on one device is read on all (the Worker keeps it). The
+// writer is never shown who answered by name (Tony: "I do not like my name
+// appearing much").
+var FB_REPLY_LATER_KEY = 'mkn_fb_reply_later_', FB_REPLY_NEW_KEY = 'mkn_fb_reply_new_';
+var _fbReplies = { list: [], loaded: false, asking: false, uid: '' };
+function fbRepliesNew() { return _fbReplies.list.filter(function(x){ return !x.read_at; }); }
+// The dot: the real count once the Worker has answered, the last one known
+// until then (v37.94's lesson — never "nothing new" just because nobody answered).
+function fbRepliesDot() {
+  var u = fbSignedInUser(), key = FB_REPLY_NEW_KEY + ((u && u.uid) || ''), n = 0;
+  if (!u) n = 0;
+  else if (_fbReplies.loaded && _fbReplies.uid === u.uid) { n = fbRepliesNew().length; try { localStorage.setItem(key, String(n)); } catch(e) {} }
+  else { try { n = parseInt(localStorage.getItem(key), 10) || 0; } catch(e) {} }
+  var item = document.getElementById('fbRepliesItem');
+  if (item) item.hidden = !(n || (_fbReplies.loaded && _fbReplies.list.length));
+  var fab = document.getElementById('feedbackFab');
+  if (fab) {
+    var d = fab.querySelector('.fab-dot');
+    if (n && !d) { d = document.createElement('span'); d.className = 'fab-dot'; d.setAttribute('aria-hidden', 'true'); fab.appendChild(d); }
+    if (!n && d) d.remove();
+    fab.setAttribute('aria-label', n ? 'An answer to your note is waiting' : 'Send a note about the app');
+  }
+  pathDots({ replies: n });
+  return n;
+}
+// Ask the Worker for this person's answers; `read` marks those ids read first.
+async function fbRepliesLoad(read) {
+  var u = fbSignedInUser();
+  if (!u || !u.getIdToken) return null;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+  if (!(_workerHealth && _workerHealth.replies)) return null;
+  var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+    body: workerBody({ action: 'feedback-replies', idToken: await u.getIdToken(), read: read || [] }), signal: AbortSignal.timeout(15000) });
+  var d = {}; try { d = await r.json(); } catch(e) {}
+  if (!r.ok || !d || !Array.isArray(d.replies)) return null;
+  _fbReplies.list = d.replies; _fbReplies.loaded = true; _fbReplies.uid = u.uid;
+  fbRepliesDot();
+  return d.replies;
+}
+async function fbRepliesRead(ids) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) return true;
+  var now = Date.now();
+  _fbReplies.list.forEach(function(x){ if (ids.indexOf(x.id) !== -1 && !x.read_at) x.read_at = now; });
+  ids.forEach(function(id){ try { localStorage.removeItem(FB_REPLY_LATER_KEY + id); } catch(e) {} });
+  fbRepliesDot();
+  try { return !!(await fbRepliesLoad(ids)); } catch(e) { return false; }
+}
+// When the app opens (after the household): each new answer, oldest first.
+async function fbRepliesCheck(force) {
+  if (_fbReplies.asking || (_selfTestRunning && !force) || !fbSignedInUser()) return 0;
+  _fbReplies.asking = true;
+  try {
+    fbRepliesDot();
+    if (!await fbRepliesLoad()) return 0;
+    var fresh = fbRepliesNew().slice().sort(function(a, b){ return (a.at || 0) - (b.at || 0); }), shown = 0;
+    for (var i = 0; i < fresh.length; i++) {
+      var later = 0;
+      try { later = +localStorage.getItem(FB_REPLY_LATER_KEY + fresh[i].id) || 0; } catch(e) {}
+      if (later && Date.now() - later < 864e5) continue;
+      for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);
+      if (fresh[i].read_at) continue;              // read meanwhile (the list window)
+      shown++;
+      await fbReplyShow(fresh[i]);
+    }
+    return shown;
+  } finally { _fbReplies.asking = false; }
+}
+function fbReplyWrote(x) {
+  return x.note_text ? '\n\n— You wrote' + (x.note_at ? ' on ' + new Date(x.note_at).toLocaleDateString() : '') + ':\n“'
+    + x.note_text + (String(x.note_text).length >= 300 ? '…' : '') + '”' : '';
+}
+async function fbReplyShow(x) {
+  var a = await askConfirm({ icon: '\u{1F4AC}', title: 'An answer to your note',
+    message: String(x.text || '') + fbReplyWrote(x)
+      + '\n\nEvery answer is kept in ⚙️ → \u{1F4AC} Help and feedback → \u{1F4E8} Answers to my notes.',
+    okLabel: 'OK', altLabel: '✍️ Write back', cancelLabel: 'Remind me later' });
+  if (a === true || a === 'alt') {
+    await fbRepliesRead([x.id]);
+    syncLog('save', 'Read an answer to a note', { id: x.id });
+    if (a === 'alt') openFeedbackForm();
+    return a === 'alt' ? 'write' : 'read';
+  }
+  try { localStorage.setItem(FB_REPLY_LATER_KEY + x.id, String(Date.now())); } catch(e) {}
+  toast('⏰ It will show again tomorrow.', 4000);
+  return 'later';
+}
+// ⚙️ → 💬 Help and feedback → 📨 Answers to my notes: every answer, newest
+// first; opening it reads them all.
+async function openFbReplies() {
+  var prev = document.getElementById('fbRepliesOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'fbRepliesOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="frTitle" style="max-width:560px;text-align:start;max-height:88vh;overflow-y:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="frTitle">\u{1F4E8} Answers to my notes</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'fbRepliesOverlay\').remove()">✕</button></div>'
+    + '<div id="frBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading the answers…</div></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  var list = null;
+  try { list = await fbRepliesLoad(); } catch(e) {}
+  var body = document.getElementById('frBody');
+  if (!body) return ov;
+  if (!list) list = _fbReplies.loaded ? _fbReplies.list : null;
+  if (!list) { body.innerHTML = '<div class="access-email" style="padding:10px 0;">The answers could not be read just now. Try again in a moment.</div>'; return ov; }
+  var unread = list.filter(function(x){ return !x.read_at; }).map(function(x){ return x.id; });
+  body.innerHTML = (list.length ? list.map(function(x){
+      return '<div class="fr-card' + (x.read_at ? '' : ' fr-new') + '">'
+        + '<div class="access-email" style="margin-bottom:4px;">' + escH(new Date(x.at || 0).toLocaleString()) + (x.read_at ? '' : ' · <b style="color:var(--terracotta);">new</b>') + '</div>'
+        + '<div class="fr-text" dir="auto" data-no-i18n>' + escH(x.text || '') + '</div>'
+        + (x.note_text ? '<div class="access-email" style="margin-top:6px;">You wrote' + (x.note_at ? ' on ' + escH(new Date(x.note_at).toLocaleDateString()) : '') + ':</div>'
+            + '<div class="fr-wrote" dir="auto" data-no-i18n>' + escH(x.note_text) + (String(x.note_text).length >= 300 ? '…' : '') + '</div>' : '')
+        + '</div>';
+    }).join('') : '<div class="access-email" style="padding:10px 0;">No answers yet.</div>')
+    + '<div class="ask-actions" style="margin-top:12px;"><button type="button" class="ask-btn" onclick="document.getElementById(\'fbRepliesOverlay\').remove();openFeedbackForm()">✍️ Write a note</button>'
+    + '<button type="button" class="ask-btn ghost" onclick="document.getElementById(\'fbRepliesOverlay\').remove()">Close</button></div>';
+  if (unread.length) fbRepliesRead(unread).catch(function(){});
+  return ov;
+}
+window.fbRepliesCheck = fbRepliesCheck; window.fbRepliesLoad = fbRepliesLoad; window.fbRepliesRead = fbRepliesRead;
+window.fbRepliesDot = fbRepliesDot; window.fbReplyShow = fbReplyShow; window.openFbReplies = openFbReplies;
 
 
 // ─── MOVING THE FAMILY'S COLLECTION INTO A HOUSEHOLD (WP-D, v36.86) ─────────
@@ -6500,7 +6642,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.99';
+var APP_VERSION = 'v38.00';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9260,7 +9402,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.99</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.00</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9340,6 +9482,8 @@ body.banner-shown .header {
             <div class="set-body">
               <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
               <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
+              <!-- v38.00 — answers to the notes this person sent (shown once there is one) -->
+              <button class="drop-item" id="fbRepliesItem" hidden title="The answers to the notes you sent about the app." onclick="closeDrop('settingsDrop');openFbReplies()">📨 Answers to my notes</button>
               <button class="drop-item" data-feature="feedbackButton" id="feedbackFabItem" title="Show or hide the floating 💬 button" onclick="closeDrop('settingsDrop');toggleFeedbackButton()">💬 Feedback button: shown</button>
             </div>
           </div>
@@ -9969,7 +10113,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.99</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.00</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -22645,7 +22789,7 @@ async function sweepOrphanPhotos() {
   }
   if (denied) {
     showServiceError('DELETE_NOT_PERMITTED: ' + denied + ' photo document(s) could not be removed — deleting from the '
-      + 'shared collection is reserved for admins. Ask Tony to run this, or to give your account the admin role.');
+      + 'shared collection is reserved for admins. Ask an admin to run this, or to give your account the admin role.');
   } else {
     toast('\u{1F9F9} Removed ' + removed + ' orphaned photo document' + (removed!==1?'s':''));
   }
@@ -22789,7 +22933,7 @@ async function saveToFirestore() {
       showServiceError('DELETE_NOT_PERMITTED: ' + delRes.denied.length + ' recipe(s) were removed on '
         + 'this device, but your account is not allowed to delete from the shared collection — '
         + 'that is reserved for admins.\n\nThey are still in the cloud, so they will come back the '
-        + 'next time this device syncs. Ask Tony to delete them, or to give your account the admin '
+        + 'next time this device syncs. Ask an admin to delete them, or to give your account the admin '
         + 'role in ⚙️ Settings → 👥 Family Access.');
       return;
     }
@@ -24641,6 +24785,8 @@ async function signOut() {
 // v37.96 — the same without asking (a newcomer the family's copy cannot take).
 function signOutNow() {
   try { document.documentElement.removeAttribute('data-mkn-member'); } catch(e) {}   // v37.98
+  try { _fbReplies.list = []; _fbReplies.loaded = false; _fbReplies.uid = ''; pathDots({ replies: 0 });   // v38.00
+        var fd = document.querySelector('#feedbackFab .fab-dot'); if (fd) fd.remove(); } catch(e) {}
   if (_firestoreUnsubscribe) { _firestoreUnsubscribe(); _firestoreUnsubscribe = null; }
   if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser = null; window._driveMode = false;

@@ -834,6 +834,33 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.00 + Worker v68 — 📲 Reply in app, buttons that press, and Tony's name out of sight.**
+    - Tony: "add another option to reply, in addition to ✉️ Reply in Gmail / 📨 E-mail app —
+      Reply in App. This will send a note directly to the sender's app and will be received
+      exactly as a join request, with the red dot and all." A note may come from any copy, and
+      the family app cannot write into the beta's database, so the answer travels through the
+      Worker: `meter-admin` `note-reply` (owner; D1 table `feedback_replies`: note_id, project,
+      uid, text, note_text (300 chars of what they wrote), note_at, from_email, at, read_at);
+      `notes` returns `replies` too; `feedback-replies` (any signed-in person: their own, in the
+      copy they signed in to; `read: [ids]` marks read). Health: `replies`.
+    - manage.js: 📲 Reply in app (inbox notes with a known writer) opens a box under the note;
+      sent answers are listed under it, "✓ read …" or "not read yet"; a new note answered
+      becomes seen. An older Worker's answer (no `reply`) is "not sent", the text kept.
+    - index.html (every copy): `fbRepliesCheck` 3 s after the household loads — each unread
+      answer in askConfirm like a link request (OK / ✍️ Write back / Remind me later = a day,
+      `mkn_fb_reply_later_<id>`); red dots ⚙️ → 💬 Help and feedback → 📨 Answers to my notes
+      (`#fbRepliesItem`, hidden until there is one; PATH_DOTS.replies) and on the floating 💬
+      (`.fab-dot`; a tap then opens the answers). The count is kept per account
+      (`mkn_fb_reply_new_<uid>`) so a server that does not answer never clears the dot. Every
+      15 minutes: the dot only. Read on one device = read on all (the Worker keeps it).
+    - Tony: the buttons in that window "are just painted on and do not behave like the buttons
+      at the top of the app" — `.mg-btn` now has the app's raised lip, lifts on hover, presses
+      on click (`:active` translateY(2px)), focus ring, dark-mode lip; tabs and column heads
+      highlight.
+    - Tony: "I do not like my name appearing much" — the note's thank-you is "your note was sent
+      successfully", the form no longer says "It goes straight to Tony", "so we know who wrote",
+      the answer window names nobody, and two old messages say "Ask an admin".
+    - Tests: `feedback_reply_in_app`, `feedback_answer_arrives` (346 pass each), 14 Worker checks.
   - **Released to the family app and the beta: v37.99 (8 Oct 2026, Tony's yes, CI green on f90255f — with the `stor_firebase` fix; Pages: success). No Worker, rules or extension change, so only the Pages deploy ran.**
   - **v37.99 also: `stor_firebase` read `shared/meta`** — the first layout's.
     Tony's beta Self Test (v37.98): "shared/meta is missing". In the household

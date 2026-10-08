@@ -9,7 +9,8 @@
 (function () {
   'use strict';
   var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false,
-            tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null };
+            tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null,
+            replies: {}, replying: null, replyDraft: '', replySending: false };
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
@@ -168,6 +169,9 @@
       var d = {}; try { d = await r.json(); } catch (e) {}
       if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
       (d.notes || []).forEach(function (n) { out.push(Object.assign({}, n, { key: 's' + n.id, src: 'server', copy: COPY_NAME[n.project] || n.env || n.project })); });
+      // v38.00 — the answers sent to them in the writers' apps (Worker v68).
+      S.replies = {};
+      (d.replies || []).forEach(function (x) { (S.replies[x.note_id] = S.replies[x.note_id] || []).push(x); });
     } catch (e) { if (!/not set up|METER_DB|Unknown|no messages/i.test(e.message)) errs.push('the server: ' + e.message); }
     try {
       (await window._fbDb.collection('feedback').orderBy('at', 'desc').limit(300).get()).forEach(function (doc) {
@@ -208,16 +212,37 @@
         + (n.log ? '<details><summary class="mg-muted">What the app was doing (' + Math.round(n.log.length / 1024) + ' KB)</summary>'
             + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(' + kj + ')">📋 Copy the log</button></details>' : '')
         + '<div class="mg-device mg-muted">' + esc(n.device || '') + '</div>'
+        + repliesHtml(n)
         + '<div class="mg-tools" style="margin-top:8px;">'
         // v37.94 — Tony: Reply by e-mail did nothing (the browser hands mailto: to the
         // computer, and his has no e-mail app set for it). Gmail opens in a new tab, filled in;
         // the e-mail app stays beside it for computers where it is set up.
         + (n.email ? '<a class="mg-btn" target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(n.email) + '&su=' + subj + '&body=' + body + '">✉️ Reply in Gmail</a>'
             + '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '" title="Opens the e-mail app this computer is set to use">📨 E-mail app</a>' : '')
+        // v38.00 — Tony: "Reply in App … received exactly as a join request, with the red dot and all."
+        + (canReplyInApp(n) && S.replying !== n.key ? '<button type="button" class="mg-btn" onclick="mknManage.replyOpen(' + kj + ')" title="Your answer comes up in their app, like a link request, with a red dot until they read it">📲 Reply in app</button>' : '')
         + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'seen\')">👀 Seen</button>' : '')
         + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'done\')">✅ Done</button>' : '')
-        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(' + kj + ')">🗑</button></div></div>';
+        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(' + kj + ')">🗑</button></div>'
+        + (S.replying === n.key ? replyBoxHtml(n, kj) : '') + '</div>';
     }).join('');
+  }
+  // v38.00 — a note from the inbox, with its writer known, can be answered in their app.
+  function canReplyInApp(n) { return n.src === 'server' && !!n.uid && !!n.project; }
+  function repliesHtml(n) {
+    var list = n.src === 'server' ? (S.replies[n.id] || []) : [];
+    return list.map(function (x) {
+      return '<div class="mg-reply"><div class="mg-muted">📲 Your answer in their app · ' + new Date(x.at || 0).toLocaleString() + ' · '
+        + (x.read_at ? '<span class="mg-read">✓ read ' + new Date(x.read_at).toLocaleString() + '</span>' : 'not read yet') + '</div>'
+        + '<div class="mg-text" dir="auto">' + esc(x.text || '') + '</div></div>';
+    }).join('');
+  }
+  function replyBoxHtml(n, kj) {
+    return '<div class="mg-replybox"><div class="mg-muted">Your answer to ' + esc(n.email || 'them') + ' — it comes up in their app (' + esc(n.copy || '') + ') the next time they open it, with a red dot until they read it.</div>'
+      + '<textarea id="mgReplyText" rows="4" dir="auto" maxlength="5000" placeholder="Your answer" oninput="mknManage.replyDraft(this.value)">' + esc(S.replyDraft) + '</textarea>'
+      + '<div class="mg-tools"><button type="button" class="mg-btn mg-primary" id="mgReplySend"' + (S.replySending ? ' disabled' : '') + ' onclick="mknManage.replySend(' + kj + ')">'
+      + (S.replySending ? 'Sending…' : '📲 Send to their app') + '</button>'
+      + '<button type="button" class="mg-btn" onclick="mknManage.replyCancel()">Cancel</button></div></div>';
   }
 
   function sorted() {
@@ -379,6 +404,29 @@
     + '.mg-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--heading);cursor:pointer;font-size:13px;min-height:36px;}'
     + '.mg-primary{background:var(--terracotta-fill);color:#fff;border-color:transparent;}'
     + '.mg-danger{color:var(--danger);border-color:var(--danger);}'
+    // v38.00 — Tony: the buttons here "are just painted on and do not behave like the buttons at the
+    // top of the app". The app's own raised look: a lip below, lifted under the pointer, pressed down
+    // when clicked; a ring for the keyboard; dimmed while it works.
+    + '.mg-btn{box-shadow:0 3px 0 #c8c0b5,0 4px 5px rgba(0,0,0,.10);transform:translateY(0);transition:transform .08s ease,box-shadow .08s ease,background .12s ease;'
+    + 'font-weight:600;-webkit-tap-highlight-color:transparent;user-select:none;}'
+    + '.mg-btn:hover{background:var(--note-bg);box-shadow:0 3px 0 #c8c0b5,0 5px 8px rgba(0,0,0,.14);transform:translateY(-1px);}'
+    + '.mg-btn:active{box-shadow:0 1px 0 #c8c0b5;transform:translateY(2px);}'
+    + '.mg-btn.mg-primary{box-shadow:0 3px 0 #7a2b08,0 4px 5px rgba(0,0,0,.18);}'
+    + '.mg-btn.mg-primary:hover{background:#c94410;box-shadow:0 3px 0 #7a2b08,0 5px 8px rgba(0,0,0,.24);}'
+    + '.mg-btn.mg-primary:active{background:#a83a0c;box-shadow:0 1px 0 #7a2b08;}'
+    + '.mg-btn.mg-danger{box-shadow:0 3px 0 #b3261e55,0 4px 5px rgba(0,0,0,.10);}'
+    + '.mg-btn.mg-danger:hover{background:#fdecea;}.mg-btn.mg-danger:active{box-shadow:0 1px 0 #b3261e55;}'
+    + '.mg-btn:focus-visible,.mg-tab:focus-visible,.mg-sort:focus-visible{outline:3px solid var(--terracotta);outline-offset:2px;}'
+    + '.mg-btn:disabled{opacity:.55;cursor:wait;transform:none;box-shadow:0 1px 0 #c8c0b5;}'
+    + ':root[data-theme="dark"] .mg-btn{box-shadow:0 3px 0 #0d0a08,0 4px 5px rgba(0,0,0,.35);}'
+    + ':root[data-theme="dark"] .mg-btn:hover{background:#33291F;box-shadow:0 3px 0 #0d0a08,0 5px 8px rgba(0,0,0,.45);}'
+    + ':root[data-theme="dark"] .mg-btn:active{box-shadow:0 1px 0 #0d0a08;}'
+    + ':root[data-theme="dark"] .mg-btn.mg-danger:hover{background:#3A1F1C;}'
+    + '@media (prefers-reduced-motion:reduce){.mg-btn,.mg-btn:hover,.mg-btn:active{transform:none;transition:none;}}'
+    + '.mg-reply{margin-top:8px;padding:8px 10px;border-inline-start:3px solid var(--terracotta-fill);background:var(--note-bg);border-radius:6px;}'
+    + '.mg-reply .mg-text{margin:4px 0 0;}.mg-read{color:var(--ok-text);font-weight:600;}'
+    + '.mg-replybox{margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:8px;}'
+    + '#mgReplyText{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin:6px 0;font:inherit;font-size:14px;}'
     + '.mg-note{background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:8px 12px;margin-bottom:10px;font-size:13px;border-radius:6px;}'
     + '.mg-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);}'
     + '.mg-table{width:100%;min-width:900px;border-collapse:collapse;font-size:13px;}.mg-table th{text-align:start;background:var(--card-bg);position:sticky;top:0;border-bottom:1px solid var(--border);padding:0;white-space:nowrap;}'
@@ -394,8 +442,10 @@
     + '.mg-noterms{color:var(--danger);}.mg-li{padding:3px 0;}.mg-caprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
     + '.mg-caprow input{width:90px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);}'
     + '.mg-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);}'
-    + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;}'
+    + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;border-radius:8px 8px 0 0;transition:background .12s ease,color .12s ease;}'
+    + '.mg-tab:hover{background:var(--note-bg);color:var(--heading);}.mg-tab:active{background:var(--border);}'
     + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
+    + '.mg-sort:hover{background:var(--note-bg);}.mg-sort:active{background:var(--border);}'
     + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
     + '.mg-deleted{opacity:.62;}.mg-deleted .mg-name{text-decoration:line-through;}.mg-gone{color:var(--danger);font-size:12px;margin-top:2px;}'
     + '.mg-link{color:var(--terracotta);font-weight:600;text-decoration:none;}'
@@ -491,6 +541,39 @@
       S.notes = (S.notes || []).filter(function (x) { return x.key !== key; }); render(); syncDot(); return true;
     },
     copyLog: function (key) { var n = noteBy(key); if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
+    // v38.00 — 📲 Reply in app: the answer box under the note, then to their app (Worker v68).
+    replyOpen: function (key) {
+      var n = noteBy(key); if (!n || !canReplyInApp(n)) return false;
+      if (S.replying !== key) S.replyDraft = '';
+      S.replying = key; render();
+      var t = document.getElementById('mgReplyText'); if (t) t.focus();
+      return true;
+    },
+    replyDraft: function (v) { S.replyDraft = String(v || ''); },
+    replyCancel: function () { S.replying = null; S.replyDraft = ''; render(); },
+    replySend: async function (key) {
+      var n = noteBy(key); if (!n || !canReplyInApp(n) || S.replySending) return false;
+      var t = document.getElementById('mgReplyText'); if (t) S.replyDraft = t.value;
+      var text = S.replyDraft.trim();
+      if (!text) { toast('Write your answer first.'); if (t) t.focus(); return false; }
+      S.replySending = true; render();
+      var d;
+      try {
+        d = await meterSet('note-reply', '', { id: n.id, text: text });
+        // an older Worker (before v68) does not know the answer, and says something else
+        if (!d || !d.ok || !d.reply) throw new Error('the server did not keep it — it needs Worker v68 or newer');
+      } catch (e) {
+        S.replySending = false; render();
+        showServiceError('Your answer could not be sent: ' + e.message + '\n\nIt is still in the box.');
+        return false;
+      }
+      (S.replies[n.id] = S.replies[n.id] || []).push(d.reply);
+      if (n.status === 'new') n.status = 'seen';
+      S.replySending = false; S.replying = null; S.replyDraft = '';
+      render(); syncDot();
+      toast('📲 Sent — it comes up in their app the next time they open it.', 6000);
+      return true;
+    },
     _notes: loadNotes,
     close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; },
     reload: async function () {
