@@ -357,13 +357,17 @@ window.SELF_TESTS = [
     test: async()=>{
       if(!window._fbUser) throw new Error('Not signed in to Firebase — sign in first');
       if(!window._fbDb)   throw new Error('Firestore not initialised');
-      // A lightweight read of `shared/meta` — a live document this app writes on
-      // every save. Until v32.3 this read `shared/recipes`, which is now deleted;
-      // a read of a MISSING document still resolves, so that form of the check
-      // would have passed against an entirely empty collection.
-      const snap=await window._fbDb.collection('shared').doc('meta').get();
+      // A lightweight read of the collection's `meta` — a live document this app
+      // writes on every save. Until v32.3 this read `shared/recipes`, which is now
+      // deleted; a read of a MISSING document still resolves, so that form of the
+      // check would have passed against an entirely empty collection.
+      // v37.99 — Tony's beta report: "shared/meta is missing". In the household
+      // layout it is households/<hid>/state/meta (cloudDocPath); the family app
+      // only passed because its old `shared` collection was kept after the move.
+      const where=cloudDocPath('meta').join('/');
+      const snap=await cloudDoc('meta').get();
       if(!snap) throw new Error('Firestore read returned nothing');
-      if(!snap.exists) throw new Error('shared/meta is missing — either the collection has never been written, or the rules refuse this account');
+      if(!snap.exists) throw new Error(where+' is missing — either nothing has been saved to this collection yet, or the rules refuse this account');
     }
   },
 

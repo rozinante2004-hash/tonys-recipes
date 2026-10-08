@@ -834,6 +834,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.99 also: `stor_firebase` read `shared/meta`** — the first layout's.
+    Tony's beta Self Test (v37.98): "shared/meta is missing". In the household
+    layout it is households/<hid>/state/meta (`cloudDoc('meta')`); the family
+    app passed only because its old `shared` collection was kept after the
+    move. CI skips this test (no Firebase), so it is checked by Tony's runs.
+    Next version after v37.99 is v38.00 (as v36.99 → v37.00).
   - **v37.99 — the farm visitors: the owner's choice kept, and a voice to choose.**
     - Tony: "the selection of the animals are reset with each new version". The
       saved choice (i18n/_farm) was right (read 8 Oct: 13 animals, pig off,
