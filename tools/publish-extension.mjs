@@ -44,12 +44,29 @@ if (new RegExp('"' + version.replace(/\./g, '\\.') + '"').test(JSON.stringify(st
   process.exit(0);
 }
 
+// 1b. The store takes one version for review at a time (8 Oct 2026: 1.7.0 was in
+// review when 1.7.1 was released). Another one waiting: say so, and stop — run
+// this job again once Google has approved it.
+const waiting = /PENDING_REVIEW|IN_REVIEW|UNDER_REVIEW|PENDING_PUBLICATION/i.test(JSON.stringify(status));
+if (waiting) {
+  console.log('::notice::another version is still in Google\'s review — ' + version + ' is not sent now. '
+    + 'Run "Submit the extension to the Chrome Web Store" again (Actions → Run workflow) once that one is approved.');
+  process.exit(0);
+}
+
 // 2. Upload.
 let up;
 try {
   up = (await client.request({ url: base + 'upload/v2/' + path + ':upload', method: 'POST',
     headers: { 'Content-Type': 'application/zip' }, body: zip })).data;
-} catch (e) { console.log('::error::the upload was refused — ' + say(e)); process.exit(1); }
+} catch (e) {
+  const m = say(e);
+  if (/review/i.test(m)) {     // the store's own words, when the check above did not see it
+    console.log('::notice::the store will not take ' + version + ' while another version is in review — run this job again once that one is approved. (' + m.slice(0, 300) + ')');
+    process.exit(0);
+  }
+  console.log('::error::the upload was refused — ' + m); process.exit(1);
+}
 console.log('uploaded: ' + JSON.stringify(up).slice(0, 600));
 if (/FAIL/i.test(String(up.uploadState || up.state || ''))) { console.log('::error::the store did not take the package'); process.exit(1); }
 
