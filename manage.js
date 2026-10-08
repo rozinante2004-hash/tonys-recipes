@@ -9,7 +9,7 @@
 (function () {
   'use strict';
   var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false,
-            tab: 'households', notes: null, notesError: '', noteFilter: 'open' };
+            tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null };
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   function ago(t) {
@@ -56,6 +56,8 @@
     catch (e) { S.loadError = String((e && e.message) || e); }
     S.meter = null; S.meterError = '';
     try { S.meter = await meterList(); } catch (e) { S.meterError = e.message; }
+    // v37.96 — whether newcomers may start a household in THIS copy.
+    try { S.founding = typeof hhFoundingOpen === 'function' ? await hhFoundingOpen(true) : null; } catch (e) { S.founding = null; }
     var spend = {}, here = thisProject();
     if (S.meter) (S.meter.households || []).forEach(function (h) {
       // v37.71 — another copy's household: listed from what it reported to the
@@ -262,6 +264,11 @@
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
     if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
       + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 🏠 My household → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
+    // v37.96 — Tony (security audit, "b"): newcomers by invitation only, per copy.
+    if (S.founding !== null) head += '<div class="mg-muted" id="mgFounding" style="margin:6px 0 2px;">New households in this copy: <b>'
+      + (S.founding ? 'anyone who signs in may start one' : 'by invitation only') + '</b> '
+      + '<button type="button" class="mg-btn" id="mgFoundingBtn" style="min-height:28px;padding:3px 10px;" onclick="mknManage.setFounding(' + (S.founding ? 'false' : 'true') + ')">'
+      + (S.founding ? '🔒 Invitation only' : '🔓 Let anyone start one') + '</button></div>';
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
       + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
     var nc = newCount();
@@ -439,6 +446,11 @@
   }
 
   var api = window.mknManage = {
+    // v37.96 — newcomers by invitation only (or not), in this copy.
+    setFounding: async function (open) {
+      try { await hhSetFoundingOpen(!!open); S.founding = !!open; render(); toast(open ? 'Anyone who signs in may start a household here.' : 'New households here: by invitation only.'); return true; }
+      catch (e) { toast('Could not change it: ' + ((e && e.message) || e) + (/permission/i.test(String(e && e.message)) ? ' — publish this copy\u2019s database rules first.' : ''), 8000); return false; }
+    },
     open: async function () {
       if (typeof isAppOwner === 'function' && !isAppOwner()) { toast('Only the app’s owner can open this.'); return false; }
       if (!document.getElementById('mgCss')) { var st = document.createElement('style'); st.id = 'mgCss'; st.textContent = CSS; document.head.appendChild(st); }

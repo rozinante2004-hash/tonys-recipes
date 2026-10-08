@@ -51,10 +51,11 @@ nothing. Protection has to come from what the Worker and the database rules allo
 
 ## Still open
 
-- 🟠 **The family app is open to anyone.** Any Google account can sign in at the family app's
-  address and start a household there. The family copy is never capped, so a stranger gets AI up
-  to the Worker's ceilings (300 calls/day, 3,000/month) and free database storage. This is
-  Tony's decision; see the options in the conversation.
+- ✅ **The family app was open to anyone** — any Google account could sign in at its address,
+  start a household, and get the never-capped AI and free storage. **v37.96 (Tony chose "b"):**
+  each copy has a switch, "New households in this copy", in 📊 Households; closed, only the app's
+  owner may start one (the rules refuse anyone else) and a newcomer is pointed to My Kitchen Notes
+  (the beta). Tony closes it in the family app once the rules are published.
 - 🟡 **Third-party relays** (allorigins, corsproxy.io, codetabs) are still the fallback when the
   Worker can't fetch a page. They see the address and could alter the page. Impact is limited:
   everything is escaped, and nothing is saved without "Add". (September's S3.)

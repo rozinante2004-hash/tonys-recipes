@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.95 -->
+<!-- Tony's Recipes Collection v37.96 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5076,7 +5076,10 @@ async function householdEnter(user) {
       var got = await householdWelcome(user);
       if (got) list = await householdMemberships(user);
     }
-    if (!list.length) list = [{ hid: await householdFound(user, householdDefaultName(user)), role: 'owner' }];
+    if (!list.length) {
+      if (!(await householdMayFound())) return false;   // v37.96 — by invitation only here (the welcome signed them out)
+      list = [{ hid: await householdFound(user, householdDefaultName(user)), role: 'owner' }];
+    }
     _householdList = list;
     var want = null;
     try { want = localStorage.getItem(HOUSEHOLD_KEY); } catch(e) {}
@@ -5778,21 +5781,55 @@ function householdCodeFrom(text) {
   if (m) return m[1];
   return /^[A-Za-z0-9_-]{16,64}$/.test(t) ? t : null;
 }
+// v37.96 — Tony (security audit, his choice "b"): the family's copy takes
+// newcomers BY INVITATION ONLY — anyone could sign in at its address, start a
+// household, and use the never-capped AI and the storage. `config/founding`
+// { open, by, at } in each copy's database, set from 📊 Households; absent =
+// open (the beta and the test copy, as before). The rules refuse a new
+// household while it is closed, except to the app's owner; the app says so first.
+var _hhFoundingOpen = null;
+async function hhFoundingOpen(fresh) {
+  if (_hhFoundingOpen !== null && !fresh) return _hhFoundingOpen;
+  var open = true;
+  try { var d = await hhDb().collection('config').doc('founding').get(); if (d.exists && (d.data() || {}).open === false) open = false; } catch(e) {}
+  return (_hhFoundingOpen = open);
+}
+async function hhSetFoundingOpen(open) {
+  if (typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return false;
+  await hhDb().collection('config').doc('founding').set({ open: !!open, by: String((window._fbUser && _fbUser.email) || ''), at: Date.now() });
+  _hhFoundingOpen = !!open;
+  syncLog('save', open ? 'New households: anyone may start one' : 'New households: by invitation only');
+  return true;
+}
+// Whether THIS person may start a household here.
+async function householdMayFound() {
+  if (typeof isAppOwner === 'function' && isAppOwner()) return true;
+  return await hhFoundingOpen();
+}
+// Closed to newcomers: say where to go instead, and sign out.
+function householdElsewhereUrl() { return String((APP_CONFIG.betaCopy && APP_CONFIG.betaCopy.siteUrl) || ''); }
+window.hhFoundingOpen = hhFoundingOpen; window.hhSetFoundingOpen = hhSetFoundingOpen; window.householdMayFound = householdMayFound;
+
 async function householdWelcome(user) {
   // One question at a time: an open dialog (the language offer) is answered first.
   for (var w = 0; w < 600 && document.getElementById('askOverlay'); w++) await wait(200);
   var brand = String(APP_CONFIG.brandName || 'My Kitchen Notes');
+  var mayFound = await householdMayFound(), elsewhere = householdElsewhereUrl();
   for (var tries = 0; tries < 20; tries++) {
     // v37.10 — Tony: warn when something cannot work yet, and why. Someone
     // whose address is not confirmed cannot be let into a household that
     // added that address — so they are told, and offered the e-mail again.
     var unconfirmed = user && user.emailVerified === false;
-    var choices = [
+    var choices = mayFound ? [
       { value: 'own',  label: '\u{1F3E0} Start my own collection' },
       { value: 'join', label: '\u{1F517} I have an invitation' }
-    ];
+    ] : [
+      { value: 'join', label: '\u{1F517} I have an invitation' }
+    ].concat(elsewhere ? [{ value: 'elsewhere', label: '\u{1F373} Keep my own recipes in My Kitchen Notes' }] : []);
     if (unconfirmed) choices.push({ value: 'confirm', label: '\u2709\ufe0f Someone added my address \u2014 confirm it first' });
-    var v = await askChoice('Keep every recipe you love in one place \u2014 and share them with the people you cook with.'
+    var v = await askChoice((mayFound ? 'Keep every recipe you love in one place \u2014 and share them with the people you cook with.'
+        : 'This is a private family kitchen: you come in with the invitation you were sent.'
+          + (elsewhere ? ' To keep recipes of your own, use My Kitchen Notes \u2014 free, and the same app.' : ''))
       + (unconfirmed ? '\n\nWere you added to someone\u2019s collection by your address? It opens once you confirm ' + user.email
           + ' from the e-mail we sent (look in spam too). An invitation link works right away.' : ''),
       choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand });
@@ -5816,6 +5853,13 @@ async function householdWelcome(user) {
       try { var hid = await householdJoinByInvite(user, code); try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
             toast('✅ You have joined the household', 6000); return hid; }
       catch(e) { await askConfirm({ icon: '⚠️', title: 'Could not join', message: e.message, okLabel: 'OK' }); continue; }
+    }
+    // v37.96 — closed to newcomers: elsewhere (or dismissed) — signed out here.
+    if (!mayFound) {
+      if (v === 'elsewhere' && elsewhere) { try { window.open(elsewhere, '_blank', 'noopener'); } catch(e) {} }
+      if (v !== 'elsewhere' && v != null) continue;
+      signOutNow();
+      return null;
     }
     // Their own — named as they like (or, dismissed, as it always was).
     var name = v === 'own'
@@ -6450,7 +6494,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.95';
+var APP_VERSION = 'v37.96';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9210,7 +9254,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.95</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.96</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9919,7 +9963,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.95</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.96</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24535,6 +24579,10 @@ window.legalNoteOnMembership = legalNoteOnMembership; window.legalLeave = legalL
 async function signOut() {
   if (!await askConfirm({ icon:'👋', title:'Sign out?',
       message:'Your recipes stay safe in the cloud and come back when you sign in again.', okLabel:'Sign out' })) return;
+  signOutNow();
+}
+// v37.96 — the same without asking (a newcomer the family's copy cannot take).
+function signOutNow() {
   if (_firestoreUnsubscribe) { _firestoreUnsubscribe(); _firestoreUnsubscribe = null; }
   if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser = null; window._driveMode = false;

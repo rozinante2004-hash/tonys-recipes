@@ -108,6 +108,13 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function hh(hid) { return /databases/$(database)/documents/households/$(hid); }
     function memberPath(hid, uid) { return /databases/$(database)/documents/households/$(hid)/members/$(uid); }
+    // v37.96 — may newcomers start a household in this copy? `config/founding`
+    // { open } — absent means open (the beta, the test copy); the family's copy
+    // is closed by its owner (Tony's choice after the security audit).
+    function foundingOpen() {
+      return !exists(/databases/$(database)/documents/config/founding)
+        || get(/databases/$(database)/documents/config/founding).data.get('open', true) == true;
+    }
     function isMember(hid) { return signedIn() && exists(memberPath(hid, request.auth.uid)); }
     function myRole(hid) { return get(memberPath(hid, request.auth.uid)).data.role; }
     function rank(r) {
@@ -182,6 +189,7 @@ service cloud.firestore {
       // households in link requests and conversations, and must never carry a quote.
       allow create: if signedIn()
         && hid.matches('^[A-Za-z0-9]{1,64}$')
+        && (foundingOpen() || appAdmin())                      // v37.96 — by invitation only, when closed
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly(hhKeys())
         && (request.resource.data.get('code', null) == null || codeFor(hid, request.resource.data.code))
@@ -527,6 +535,16 @@ service cloud.firestore {
         && request.resource.data.expiresAt is timestamp
         && atLeast(request.resource.data.hid, 'admin');
       allow delete: if signedIn() && atLeast(resource.data.hid, 'admin');
+    }
+
+    // v37.96 — the copy's own settings, chosen by the app's owner: `founding`
+    // { open, by, at } (see foundingOpen). Anyone signed in reads them (the app
+    // says "by invitation only" before trying); only the owner writes.
+    match /config/{doc} {
+      allow read: if signedIn();
+      allow write: if appAdmin() && doc == 'founding'
+        && request.resource.data.keys().hasOnly(['open', 'by', 'at'])
+        && request.resource.data.open is bool;
     }
 
     // Interface translations: one copy for everyone, so no household pays to

@@ -418,6 +418,17 @@ await check('a household owner who is not an app admin cannot', setDoc(doc(carol
 await check('my own settings',                      setDoc(doc(bob, 'users/bob/prefs/ui'), { theme: 'dark' }), true);
 await check('not someone else\'s',                  getDoc(doc(carol, 'users/bob/prefs/ui')), false);
 
+// v37.96 — the family's copy by invitation only (Tony's choice after the security audit).
+console.log('New households by invitation only');
+await check('anyone signed in reads the copy\'s settings',  getDoc(doc(carol, 'config/founding')), true);
+await check('…but only the app\'s owner sets them',           setDoc(doc(carol, 'config/founding'), { open: true, by: 'carol', at: 1 }), false);
+await check('the owner closes the copy to newcomers',          setDoc(doc(alice, 'config/founding'), { open: false, by: 'alice@example.com', at: 1 }), true);
+await check('…nothing else goes in it',                        setDoc(doc(alice, 'config/founding'), { open: false, extra: 1 }), false);
+await check('closed: a newcomer cannot start a household',      found(carol, 'hClosed1', 'carol'), false);
+await check('closed: the app\'s owner still can',              found(alice, 'hClosed2', 'alice'), true);
+await check('the owner opens it again',                        setDoc(doc(alice, 'config/founding'), { open: true, by: 'alice@example.com', at: 2 }), true);
+await check('open: a newcomer starts one',                     found(carol, 'hOpen1', 'carol'), true);
+
 await env.cleanup();
 console.log(failures ? failures + ' household rules check(s) FAILED' : 'all household rules checks passed');
 process.exit(failures ? 1 : 0);

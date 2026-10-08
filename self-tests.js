@@ -3356,6 +3356,18 @@ window.SELF_TESTS = [
         window.householdFound=async function(u,n){ named=n; return 'H-NEW'; };
         if(await householdWelcome({ uid:'u', displayName:'New Person' })!=='H-NEW' || named!=='Our kitchen') throw new Error('starting a collection did not use the chosen name: '+named);
         _hhJustFounded=false;
+        // v37.96 — a copy closed to newcomers (the family's): no "start my own";
+        // the invitation, or My Kitchen Notes instead — and signed out here.
+        var realMay=window.householdMayFound, realOut=window.signOutNow, realOpen=window.open, offered=null, out=0, opened=null; named=null;
+        try{
+          window.householdMayFound=async function(){ return false; };
+          window.askChoice=async function(msg, ch){ offered=ch.map(function(c){ return c.value; }); return 'elsewhere'; };
+          window.signOutNow=function(){ out++; }; window.open=function(u){ opened=u; return null; };
+          var got=await householdWelcome({ uid:'u', email:'stranger@x.test', emailVerified:true });
+          if(!offered || offered.indexOf('own')!==-1 || offered.indexOf('join')===-1) throw new Error('closed to newcomers, yet offered: '+offered);
+          if(got!==null || named!==null || out!==1) throw new Error('closed to newcomers: a household was started, or they stayed signed in');
+          if(APP_CONFIG.betaCopy && opened!==APP_CONFIG.betaCopy.siteUrl) throw new Error('My Kitchen Notes was not opened: '+opened);
+        } finally { window.householdMayFound=realMay; window.signOutNow=realOut; window.open=realOpen; }
         // An empty collection teaches, and the examples are offered, not imposed.
         recipes=[]; activeCat='All'; renderGrid();
         var empty=document.getElementById('firstRunEmpty');
