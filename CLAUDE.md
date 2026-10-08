@@ -112,6 +112,15 @@ requirement, not a nice-to-have.
   After a release that changes the Worker, check the "Deploy the Worker" run.
 - `firestore.rules` is the canonical rules file; the app fetches it and substitutes
   `{{READ}}` / `{{WRITE}}` / `{{ADMIN}}`. Edit the structure there, not in `index.html`.
+  **It publishes itself** (8 Oct 2026): `.github/workflows/deploy-rules.yml` runs
+  when a push to `main` changes it — only on Tony's yes — runs both rules suites
+  on the emulator, then `tools/publish-rules.mjs` (Firebase Rules REST API:
+  new ruleset, release `cloud.firestore`, read back) to all three projects, the
+  placeholders filled as the app does in the household layout (the owner
+  alone). Secret `FIREBASE_RULES_KEY`: the JSON key of `rules-publisher@recipes-
+  f379d.iam.gserviceaccount.com`, "Firebase Rules Admin" in each project.
+  `--dry-run` fills and checks without publishing. Family Access → Show rules
+  still works by hand.
 - `whatsapp/` holds exported chat `.txt`/`.zip` files. The app LISTS the folder over
   the GitHub contents API (5f.7), so `index.json` is optional — it only supplies group
   labels now. See `whatsapp/UPLOAD-FROM-IPHONE.md` for the Share-sheet Shortcut.
@@ -825,6 +834,9 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Rules published by Tony in all three copies (8 Oct 2026): v37.95's and
+    v37.96's.** He asked for the same as the Worker for the rules:
+    deploy-rules.yml + tools/publish-rules.mjs, waiting for FIREBASE_RULES_KEY.
   - **Worker publishes itself (8 Oct 2026).** Tony: Cloudflare kept suggesting
     Wrangler settings; he gave the account id, the BRING_KV id, the D1 id and
     the compatibility date (2026-05-06), and put CLOUDFLARE_API_TOKEN in GitHub.

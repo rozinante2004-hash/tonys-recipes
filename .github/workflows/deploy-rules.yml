@@ -1,0 +1,68 @@
+name: Publish the database rules
+
+# firestore.rules publishes itself to the three Firebase projects (the family's,
+# the test copy's, the beta's) when a release that changes it reaches `main` —
+# only on Tony's yes. Before this, Tony pasted it into each Firebase console
+# (Family Access → Show rules). Needs the repository secret FIREBASE_RULES_KEY:
+# the JSON key of a service account with "Firebase Rules Admin" in all three
+# projects. Without it the job says so and does nothing.
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["firestore.rules", "tools/publish-rules.mjs", ".github/workflows/deploy-rules.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-rules
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_RULES_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Is the key there?
+        id: key
+        run: |
+          if [ -z "$FIREBASE_RULES_KEY" ]; then
+            echo "::warning::FIREBASE_RULES_KEY is not set — the rules were NOT published. Add it under Settings → Secrets and variables → Actions."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Never publish rules that fail their own checks (the same two suites CI runs).
+      - name: Rules checks (emulator)
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          mkdir -p /tmp/rules && cd /tmp/rules
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10 >/dev/null
+          sed -e "s/{{READ}}/'a@b'/g; s/{{WRITE}}/'a@b'/g; s/{{ADMIN}}/'a@b'/g; s/{{APP_ADMINS}}/'a@b'/g" "$GITHUB_WORKSPACE/firestore.rules" > boot.rules
+          echo '{"firestore":{"rules":"boot.rules"},"emulators":{"firestore":{"port":8085},"ui":{"enabled":false}}}' > firebase.json
+          mkdir -p tests && cp "$GITHUB_WORKSPACE/tests/firestore-rules.test.mjs" "$GITHUB_WORKSPACE/tests/firestore-households-rules.test.mjs" tests/
+          cp "$GITHUB_WORKSPACE/firestore.rules" ./
+          npx firebase emulators:exec --only firestore --project demo-rules "node tests/firestore-rules.test.mjs"
+          npx firebase emulators:exec --only firestore --project demo-households "node tests/firestore-households-rules.test.mjs"
+
+      - name: Publish to the three projects
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          npm install --no-audit --no-fund --no-save google-auth-library@9 >/dev/null
+          node tools/publish-rules.mjs
