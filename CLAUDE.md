@@ -834,6 +834,31 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.97 + Worker v67 + extension 1.7 (8 Oct 2026).** Tony found a
+    stranger's household in the family app ("CWS's Kitchen Notes",
+    cwsacn07@gmail.com, founded 6 Oct, no share link, $0.01 of AI; he is
+    deleting it) and asked:
+    - **The family's copy gets an allowance: $10 a month per household,
+      changeable, with Pause AI.** Worker v67: `AI_CAP_BY_PROJECT` (JSON,
+      default {"recipes-f379d":10}; no first-month extra); `isCapped` = strict
+      (CAPPED_PROJECTS: test, beta — refuse when the counting fails) or an own
+      allowance (the family's — carries on when the counting fails, as before).
+      `capFor(row, month, env, project)`; meter-admin's `defaults.byProject`.
+      manage.js: the header and a household's default use it (`ownCap`,
+      `defCap`, `famCap`, `capWords`); the panel's Save / Pause AI appear for
+      the family's households now that the Worker says `capped`. Tony's own
+      household is capped at $10 too — he raises it in its panel if needed.
+    - **The store extension leads to the beta (1.7.0).** One store item serves
+      both: `MKN_APP` = the beta, `MKN_FAMILY_APP` = the family app (live build
+      only); appmark.js on the family app's pages sets chrome.storage
+      `mknFamily` (and marks 'live'), on the beta's marks 'beta'; shared.js
+      `mknSendToNow()` / `MKN_SENDTO`; background's onInstalled sets
+      mknFamily for an update from 1.0–1.6 (those came from the family app);
+      the options page can switch. New permission `storage` (STORE.md has the
+      justification). The beta now offers the store listing
+      (environments.json). A family member who installs it fresh should open
+      (or reload) the family app once. Tony must upload the new zip to the
+      Chrome Web Store. tests/extension.mjs: 4 new checks.
   - **First automatic rules publish: 8 Oct 2026, run 37831582675, success** —
     v37.96's rules to recipes-f379d, tonys-recipes-test, my-kitchen-notes-beta
     (each read back). The first try failed: the secret had been pasted from a

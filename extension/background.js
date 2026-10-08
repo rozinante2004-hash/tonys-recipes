@@ -26,18 +26,24 @@ async function mknSendFromTab(tab) {
     return;
   }
   // Opened by the extension itself, so no pop-up blocker can stop it.
-  chrome.tabs.create({ url: mknAppAddress(MKN_APP, got.text, got.url), index: tab.index + 1 });
+  chrome.tabs.create({ url: mknAppAddress(await mknSendToNow(), got.text, got.url), index: tab.index + 1 });
 }
 chrome.action.onClicked.addListener(mknSendFromTab);
-chrome.runtime.onInstalled.addListener(function () {
+chrome.runtime.onInstalled.addListener(function (details) {
+  // 1.7 — whoever had the store copy before 1.7 got it from the family app (the
+  // listing was the family's): they keep sending there.
+  try {
+    if (mknFamilyOn() && details && details.reason === 'update' && /^1\.[0-6]\./.test(String(details.previousVersion || '')))
+      chrome.storage.local.set({ mknFamily: true });
+  } catch (e) {}
   chrome.contextMenus.removeAll(function () {
     chrome.contextMenus.create({ id: 'mkn-page', title: '📘 Save recipe to ' + MKN_APP_NAME, contexts: ['page', 'selection'] });
     chrome.contextMenus.create({ id: 'mkn-link', title: '📘 Import this link into ' + MKN_APP_NAME, contexts: ['link'] });
   });
 });
-chrome.contextMenus.onClicked.addListener(function (info, tab) {
+chrome.contextMenus.onClicked.addListener(async function (info, tab) {
   if (info.menuItemId === 'mkn-link' && info.linkUrl) {
-    chrome.tabs.create({ url: MKN_APP.replace(/#.*$/, '') + '?url=' + encodeURIComponent(info.linkUrl) });
+    chrome.tabs.create({ url: (await mknSendToNow()).replace(/#.*$/, '') + '?url=' + encodeURIComponent(info.linkUrl) });
     return;
   }
   if (info.menuItemId === 'mkn-page') mknSendFromTab(tab);

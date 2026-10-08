@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v66
+// Tony's Recipes — Cloudflare Worker v67
+// v67: THE FAMILY'S COPY HAS AN ALLOWANCE TOO — $10 a month per household
+//      (Tony, after a stranger's household turned up there), changeable per
+//      household and pausable from 📊 Households like the beta's. AI_CAP_BY_PROJECT
+//      (JSON, default {"recipes-f379d":10}) gives a copy its own allowance, with
+//      no first-month extra. Only the test copy and the beta are STRICT (refuse
+//      when the counting itself fails); the family's carries on then, as before.
 // v66: NO AI WITHOUT A SIGN-IN, ON ANY COPY. Tony asked whether the app needs
 //      hardening. The app's code is public (its GitHub repository), so the app
 //      key and the family's address prove nothing: anyone could send the
@@ -260,7 +266,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v66';
+const WORKER_VERSION = 'v67';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1155,8 +1161,12 @@ async function handleRequest(request, env) {
 //
 //   METER_PROJECTS   Firebase projects whose sign-ins count (default: the
 //                    family's and the test copy's; add the beta's)
-//   CAPPED_PROJECTS  …of those, the ones with an allowance (default: the test
-//                    copy; add the beta's). The family's is counted, not capped.
+//   CAPPED_PROJECTS  …of those, the STRICT ones: an allowance, and an AI call is
+//                    refused when it cannot be counted (default: the test copy
+//                    and the beta).
+//   AI_CAP_BY_PROJECT a copy's own monthly allowance, JSON (default
+//                    {"recipes-f379d":10} — the family's, v67): counted and
+//                    capped, but it carries on when the counting fails.
 //   CAPPED_ORIGINS   pages of capped copies: an AI call from one WITHOUT a
 //                    sign-in is refused (default: the test copy's address)
 //   AI_CAP_USD       the monthly allowance (2); AI_CAP_FIRST_USD the first
@@ -1167,6 +1177,15 @@ const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test,my-kitchen-note
 const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test,my-kitchen-notes-beta';
 const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev,https://my-kitchen-notes-beta.pages.dev';
 const OWNER_EMAILS_DEFAULT = 'rozinante2004@gmail.com';
+const AI_CAP_BY_PROJECT_DEFAULT = { 'recipes-f379d': 10 };      // v67 — the family's, per household per month
+function projectCap(project, env) {
+  let m = AI_CAP_BY_PROJECT_DEFAULT;
+  if (env.AI_CAP_BY_PROJECT) { try { m = JSON.parse(env.AI_CAP_BY_PROJECT); } catch (e) {} }
+  const v = m && typeof m[project] === 'number' ? m[project] : null;
+  return v !== null && v >= 0 ? v : null;
+}
+function isStrict(project, env) { return csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT).includes(project); }
+function isCapped(project, env) { return isStrict(project, env) || projectCap(project, env) !== null; }
 const AI_MODELS_DEFAULT = 'claude-sonnet-,claude-haiku-';      // v66
 const BRING_RETIRED = ['bring-add', 'bring-lists', 'bring-token-status', 'bring-settoken'];   // v66
 const AI_MAX_TOKENS_DEFAULT = 32000;                             // v66
@@ -1289,8 +1308,10 @@ async function meterDb(env) {
 function allowanceResp(msg, status) {
   return jsonResp({ error: 'AI_ALLOWANCE: ' + msg, rateLimited: true, allowance: true }, status || 429);
 }
-function capFor(row, month, env) {
+function capFor(row, month, env, project) {
   if (row && typeof row.cap === 'number') return row.cap;                    // set in the management app
+  const own = projectCap(project, env);                                      // v67 — the copy's own (the family's)
+  if (own !== null) return own;
   const started = row && (row.created_at || row.first_seen);
   const first = !started || utcMonthKey(started) === month;
   return first ? (parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT)
@@ -1308,7 +1329,9 @@ async function meterStart(request, env, body) {
   if (!token || !hid) return { resp: allowanceResp('sign in to use the AI — it is counted per household.', 401) };
   let aud = '';
   try { aud = jwtPart(String(token).split('.')[1]).aud || ''; } catch (e) {}
-  const capped = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT).includes(aud) || cappedOrigin;
+  // v67 — capped: has an allowance. strict: also refuses when it cannot count.
+  const strict = isStrict(aud, env) || cappedOrigin;
+  const capped = strict || projectCap(aud, env) !== null;
   // Who is asking must be proved before anything else — on every copy.
   let claims, hh;
   try {
@@ -1321,9 +1344,9 @@ async function meterStart(request, env, body) {
   try {
     hh = await meterMembership(claims, hid, token, env);
   } catch (e) {
-    // The household could not be READ (Firestore did not answer): a capped copy
+    // The household could not be READ (Firestore did not answer): a strict copy
     // refuses; the family's carries on for a proven sign-in, as before.
-    if (capped) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
+    if (strict) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
       + (e && e.message) + '). Reload the app and try again.', 403) };
     return {};
   }
@@ -1334,7 +1357,7 @@ async function meterStart(request, env, body) {
       + 'ON h.project = ?1 AND h.hid = ?2 LEFT JOIN ai_spend s ON s.project = ?1 AND s.hid = ?2 AND s.month = ?3')
       .bind(claims.aud, hid, month).first() || {};
     if (!row.created_at && hh.created) row.created_at = hh.created;
-    const spent = row.usd || 0, cap = capFor(row, month, env);
+    const spent = row.usd || 0, cap = capFor(row, month, env, claims.aud);
     const ctx = { db, project: claims.aud, hid, month, capped, cap, spent, name: hh.name, code: hh.code, created: hh.created };
     if (capped && spent >= cap) {
       return { resp: allowanceResp('this month\'s AI allowance for your household is used up ($' + spent.toFixed(2)
@@ -1343,8 +1366,8 @@ async function meterStart(request, env, body) {
     return { ctx };
   } catch (e) {
     // Spend that cannot be counted is what an allowance exists to stop — on a
-    // capped copy. The family's copy is only counted, so it carries on.
-    if (capped) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
+    // strict copy. The family's carries on (v67: it has an allowance, not strict).
+    if (strict) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
       + (e && e.message) + '). Reload the app and try again.', 403) };
     return {};
   }
@@ -1373,7 +1396,7 @@ async function meterAction(request, env, body) {
   try { claims = await verifyIdToken(body.idToken, env); }
   catch (e) { return jsonResp({ error: 'METER: your sign-in could not be checked (' + e.message + ').' }, 401); }
   const db = await meterDb(env), month = utcMonthKey(Date.now());
-  const capped = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT).includes(claims.aud);
+  const capped = isCapped(claims.aud, env);
   if (body.action === 'meter-me') {
     const hid = String(body.hid || '');
     let hh;
@@ -1383,7 +1406,7 @@ async function meterAction(request, env, body) {
       + 'ON h.project = ?1 AND h.hid = ?2 LEFT JOIN ai_spend s ON s.project = ?1 AND s.hid = ?2 AND s.month = ?3')
       .bind(claims.aud, hid, month).first() || {};
     if (!row.created_at && hh.created) row.created_at = hh.created;
-    return jsonResp({ month, usd: row.usd || 0, calls: row.calls || 0, cap: capped ? capFor(row, month, env) : null });
+    return jsonResp({ month, usd: row.usd || 0, calls: row.calls || 0, cap: capped ? capFor(row, month, env, claims.aud) : null });
   }
   // meter-admin
   const owners = csvList(env.OWNER_EMAILS, OWNER_EMAILS_DEFAULT).map(s => s.toLowerCase());
@@ -1424,11 +1447,10 @@ async function meterAction(request, env, body) {
   // v62 — `all: true`: every copy's, counted or reported, each with its project.
   const months = [0, 1, 2].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return utcMonthKey(d.getTime()); });
   const want = body.all ? projects : [claims.aud];
-  const cappedSet = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT);
   await reportsTable(db);
   const out = [];
   for (const p of want) {
-    const pCapped = cappedSet.includes(p);
+    const pCapped = isCapped(p, env);
     const hs = (await db.prepare('SELECT hid, name, code, created_at, first_seen, last_seen, cap, note FROM ai_households WHERE project = ?1')
       .bind(p).all()).results || [];
     const sp = (await db.prepare('SELECT hid, month, usd, calls FROM ai_spend WHERE project = ?1 AND month >= ?2')
@@ -1448,13 +1470,14 @@ async function meterAction(request, env, body) {
       const mine = sp.filter(s => s.hid === h.hid);
       out.push(Object.assign(h, {
         project: p, capped: pCapped,
-        capNow: pCapped ? capFor(h, month, env) : null,
+        capNow: pCapped ? capFor(h, month, env, p) : null,
         months: months.map(m => { const s = mine.filter(x => x.month === m)[0]; return { month: m, usd: s ? s.usd : 0, calls: s ? s.calls : 0 }; })
       }));
     });
   }
   return jsonResp({ project: claims.aud, capped, month, months, households: out, projects: want,
-    defaults: { cap: parseFloat(env.AI_CAP_USD) || AI_CAP_USD_DEFAULT, firstMonth: parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT } });
+    defaults: { cap: parseFloat(env.AI_CAP_USD) || AI_CAP_USD_DEFAULT, firstMonth: parseFloat(env.AI_CAP_FIRST_USD) || AI_CAP_FIRST_USD_DEFAULT,
+                byProject: Object.fromEntries(projects.map(q => [q, projectCap(q, env)]).filter(x => x[1] !== null)) } });   // v67
 }
 
 // ─── ONE HOUSEHOLDS PAGE (v62) ───────────────────────────────────────────────
@@ -2125,4 +2148,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v66 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v67 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

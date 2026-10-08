@@ -115,7 +115,7 @@
     try {
       var got = await collect(post);
       if (got.text.length < 20) { alert('No text found in this post. Select the recipe text, then press the button again.'); return; }
-      mknOpenApp(MKN_APP, got.text, got.url);
+      mknOpenApp(MKN_SENDTO || MKN_APP, got.text, got.url);   // 1.7 — the beta, or the family app
     } finally { btn.disabled = false; label.textContent = was; btn.classList.remove('open'); }
   }
   // The toolbar button / right-click menu on these sites ask this script, so

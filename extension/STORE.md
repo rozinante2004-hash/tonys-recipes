@@ -29,6 +29,14 @@ My Kitchen Notes recipe collection, at the user’s click.
 - **activeTab + scripting:** the toolbar button, its shortcut and the right-click menu read the recipe on the page
   the user is on, only when the user asks.
 - **contextMenus:** the “Save recipe” / “Import this link” entries in the right-click menu.
+- **storage (1.7):** one setting, kept in the browser: whether recipes go to My Kitchen Notes or to the family's
+  copy of the app (chosen by opening the family's copy, or on the options page). Nothing else is stored.
+
+### 1.7 upload (8 Oct 2026)
+The store copy now leads to My Kitchen Notes (the beta); it sends to the family's app only for whoever has opened
+that app in the same browser (and for everyone who had 1.6 or earlier — they got it from the family app). Upload
+`dist-extension/my-kitchen-notes-extension.zip` (or `downloads/my-kitchen-notes-extension.zip`) as a new version
+of the existing item; in **Privacy practices → Permission justification** add the `storage` line above.
 - No host permissions beyond those three sites; no remote code; no analytics.
 
 ## Data use (the Web Store’s form)

@@ -959,7 +959,8 @@ console.log('\nAI per household (v60):');
     // The family's copy: counted, never capped, and nothing breaks without a sign-in.
     const tF = await token({ sub: 'uF', aud: 'recipes-f379d' });
     for (let i = 0; i < 7; i++) r = await ai({ idToken: tF, hid: 'hF' }, ORIGIN);
-    expect('the family\'s copy is counted but never capped ($2.80, still answering)', r.status === 200 && Math.abs(r.d._meter.usd - 2.8) < 1e-9 && r.d._meter.cap === null, JSON.stringify(r));
+    // v67 — Tony: the family's copy has an allowance too, $10 a month per household.
+    expect('v67: the family\'s copy is counted, with its own $10 allowance ($2.80, still answering)', r.status === 200 && Math.abs(r.d._meter.usd - 2.8) < 1e-9 && r.d._meter.cap === 10, JSON.stringify(r));
     // v66 — Tony asked about hardening: the family's address and the app key are
     // public (the repository is), so on the family's copy too there is no AI
     // without a sign-in that checks out and membership of the household.
@@ -997,6 +998,21 @@ console.log('\nAI per household (v60):');
     expect('the owner raises a household\'s cap', adm.ok === true && adm.cap === 5, JSON.stringify(adm));
     r = await ai({ idToken: tA, hid: 'hA' });
     expect('…and the household answers again', r.status === 200 && r.d._meter.cap === 5, JSON.stringify(r));
+    // v67 — the family's copy: $10 a month per household, paused or changed by the owner.
+    members['hP/uP'] = true;
+    const tP = await token({ sub: 'uP', aud: 'recipes-f379d' });
+    adm = await (await worker.fetch(post({ action: 'meter-admin', op: 'set-cap', project: 'recipes-f379d', hid: 'hP', cap: 0, idToken: tOwner }, TEST_ORIGIN), envM)).json();
+    let callsP = anthropicCalls;
+    r = await ai({ idToken: tP, hid: 'hP' }, ORIGIN);
+    expect('v67: the owner pauses a family household\'s AI ($0): refused, before any cost', adm.ok && r.status === 429 && /allowance/.test(r.d.error) && anthropicCalls === callsP, JSON.stringify(r));
+    await worker.fetch(post({ action: 'meter-admin', op: 'set-cap', project: 'recipes-f379d', hid: 'hP', cap: null, idToken: tOwner }, TEST_ORIGIN), envM);
+    for (let i = 0; i < 25; i++) r = await ai({ idToken: tP, hid: 'hP' }, ORIGIN);     // $0.40 each → $10.00 after 25
+    callsP = anthropicCalls;
+    r = await ai({ idToken: tP, hid: 'hP' }, ORIGIN);
+    expect('v67: back to the default, a family household stops at $10', r.status === 429 && /\$10\.00/.test(r.d.error) && anthropicCalls === callsP, JSON.stringify(r));
+    await worker.fetch(post({ action: 'meter-admin', op: 'set-cap', project: 'recipes-f379d', hid: 'hP', cap: 50, idToken: tOwner }, TEST_ORIGIN), envM);
+    r = await ai({ idToken: tP, hid: 'hP' }, ORIGIN);
+    expect('v67: …and goes on when the owner raises it', r.status === 200 && r.d._meter.cap === 50, JSON.stringify(r));
     const list = await (await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tOwner }, TEST_ORIGIN), envM)).json();
     const hA = (list.households || []).filter(h => h.hid === 'hA')[0];
     expect('the owner lists every household with this month and the two before', hA && hA.capNow === 5 && hA.months.length === 3 && Math.abs(hA.months[0].usd - 2.4) < 1e-9 && list.capped === true, JSON.stringify(list).slice(0, 300));
@@ -1083,7 +1099,7 @@ console.log('\nAI per household (v60):');
     const rows = (f.d && f.d.households) || [];
     const rowOf = (p, h) => rows.filter(x => x.project === p && x.hid === h)[0];
     expect('the owner, in the family app, lists every copy\'s households', f.status === 200 && rowOf('tonys-recipes-test', 'hA') && rowOf('recipes-f379d', 'hF') && rowOf('my-kitchen-notes-beta', 'hR'), JSON.stringify(rows.map(x => x.project + '/' + x.hid)));
-    expect('…each with its copy\'s allowance (the family never capped)', rowOf('tonys-recipes-test', 'hA').capNow === 5 && rowOf('recipes-f379d', 'hF').capNow === null && rowOf('my-kitchen-notes-beta', 'hR').capped === true, JSON.stringify(rows).slice(0, 400));
+    expect('…each with its copy\'s allowance (v67: the family\'s $10)', rowOf('tonys-recipes-test', 'hA').capNow === 5 && rowOf('recipes-f379d', 'hF').capNow === 10 /* v67 */ && rowOf('my-kitchen-notes-beta', 'hR').capped === true, JSON.stringify(rows).slice(0, 400));
     expect('…the counted ones with their months, the reported ones with their members', Math.abs(rowOf('recipes-f379d', 'hF').months[0].usd - 3.0) < 1e-9 /* $2.80 + v66's one Haiku call, $0.20 */ && rowOf('recipes-f379d', 'hF').report.members[0].email === 'f@example.com' && rowOf('my-kitchen-notes-beta', 'hR').name === 'Kitchen A', JSON.stringify(rowOf('recipes-f379d', 'hF')));
     f = await fb({ action: 'meter-admin', op: 'list', idToken: famOwner }, ORIGIN);
     expect('without `all`, only this copy (as before)', f.d.households.every(x => x.project === 'recipes-f379d'), JSON.stringify(f.d.households.map(x => x.project)));

@@ -35,7 +35,14 @@ const base = {
 };
 const cfg = Object.assign({}, base, envs[which] || {});
 if (!cfg.siteOrigin || !cfg.sitePath) { console.error('could not find the site address'); process.exit(1); }
-const app = cfg.siteOrigin + cfg.sitePath;
+// 1.7 — Tony: the store copy (live) leads to My Kitchen Notes (the beta), not
+// the family's app; the family app is where it sends for whoever has opened the
+// family app in that browser (extension/shared.js, appmark.js).
+const familyApp = cfg.siteOrigin + cfg.sitePath;
+const betaCfg = Object.assign({}, base, envs.beta || {});
+const app = which === 'live' ? betaCfg.siteOrigin + betaCfg.sitePath : familyApp;
+const familyTo = which === 'live' ? familyApp : '';
+if (which === 'live' && app === familyApp) { console.error('the beta\'s address is missing from tools/environments.json'); process.exit(1); }
 
 const out = path.join(repo, 'dist-extension', which);
 fs.rmSync(out, { recursive: true, force: true });
@@ -55,12 +62,13 @@ for (const f of fs.readdirSync(path.join(src, 'icons'))) fs.copyFileSync(path.jo
   // first upload, 1.6) — say so here, not at the store.
   if (m0.description.length > 132) throw new Error('manifest description is ' + m0.description.length + ' characters; the Chrome Web Store allows 132');
   if (m0.name.length + ' (TEST)'.length > 75) throw new Error('manifest name too long for the store (75)');
-  m0.content_scripts.forEach(cs => { cs.matches = cs.matches.map(x => x === 'APP_PAGES' ? app + '*' : x); });
+  m0.content_scripts.forEach(cs => { cs.matches = [].concat.apply([], cs.matches.map(x => x === 'APP_PAGES' ? [app + '*'].concat(familyTo ? [familyTo + '*'] : []) : [x])); });
   fs.writeFileSync(mp, JSON.stringify(m0, null, 2) + '\n');
 }
 fs.writeFileSync(path.join(out, 'config.js'),
   '// Written by tools/build-extension.mjs (' + which + ').\n'
   + 'var MKN_APP = ' + JSON.stringify(app) + ';\n'
+  + 'var MKN_FAMILY_APP = ' + JSON.stringify(familyTo) + ';\n'
   + 'var MKN_APP_NAME = ' + JSON.stringify('My Kitchen Notes' + LABEL) + ';\n'
   + 'var MKN_TAG = ' + JSON.stringify(which) + ';\n');
 if (which !== 'live') {
@@ -105,4 +113,4 @@ fs.copyFileSync(zip, path.join(repo, 'downloads', 'my-kitchen-notes-extension' +
 fs.writeFileSync(path.join(repo, 'downloads', 'extension-version.json'),
   JSON.stringify({ version: JSON.parse(fs.readFileSync(path.join(src, 'manifest.json'), 'utf8')).version }) + '\n');
 console.log('built the extension (' + which + ') → ' + path.relative(repo, out) + ', ' + path.relative(repo, ffOut)
-  + ', downloads/my-kitchen-notes-extension' + tag + '.zip — sends recipes to ' + app);
+  + ', downloads/my-kitchen-notes-extension' + tag + '.zip — sends recipes to ' + app + (familyTo ? ' (the family app, ' + familyTo + ', once opened in that browser)' : ''));

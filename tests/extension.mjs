@@ -26,6 +26,10 @@ for (const d of [ext, extLive]) if (!fs.existsSync(path.join(d, 'manifest.json')
 const VERSION = JSON.parse(fs.readFileSync(path.join(repo, 'extension', 'manifest.json'), 'utf8')).version;
 const appOf = d => (/MKN_APP = "([^"]+)"/.exec(fs.readFileSync(path.join(d, 'config.js'), 'utf8')) || [])[1];
 const APP = appOf(ext), APP_LIVE = appOf(extLive);
+// 1.7 — the store copy (live) sends to My Kitchen Notes (the beta), and to the
+// family app once this browser has opened it.
+const APP_FAMILY = (/MKN_FAMILY_APP = "([^"]+)"/.exec(fs.readFileSync(path.join(extLive, 'config.js'), 'utf8')) || [])[1];
+if (!APP_FAMILY || APP_FAMILY === APP_LIVE) { console.error('the store build has no family app beside the beta'); process.exit(2); }
 
 let failures = 0;
 const ok = (name, cond, detail) => { if (cond) console.log('  ok   ' + name); else { failures++; console.log('  FAIL ' + name + (detail ? ' — ' + detail : '')); } };
@@ -88,7 +92,8 @@ try {
     body: /\/reels\//.test(r.request().url()) ? reels : insta }));
   await ctx.route('https://www.tiktok.com/**', r => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: tiktok }));
   await ctx.route(APP + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
-  await ctx.route(APP_LIVE + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>family app</title>' }));
+  await ctx.route(APP_LIVE + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>the beta</title>' }));
+  await ctx.route(APP_FAMILY + '**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>family app</title>' }));
   const page = await ctx.newPage();
   await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('.mkn-save').length >= 4, null, { timeout: 15000 }).catch(() => {});
@@ -106,7 +111,7 @@ try {
   await page.mouse.move(0, 0);
   ok('…placed under the post\'s text', await page.evaluate(() => { const m = document.querySelector('#p1 [data-ad-comet-preview="message"]'); return !!m && !!m.nextElementSibling && m.nextElementSibling.classList.contains('mkn-save'); }));
   const [opFam] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('#p1 .mkn-save:not(:has-text("TEST"))')]);
-  ok('the family build\'s button sends to the family app', opFam.url().startsWith(APP_LIVE) && /share-text=/.test(opFam.url()), opFam.url().slice(0, 80));
+  ok('1.7: the store build\'s button sends to My Kitchen Notes (the beta), not the family app', opFam.url().startsWith(APP_LIVE) && !opFam.url().startsWith(APP_FAMILY) && /share-text=/.test(opFam.url()), opFam.url().slice(0, 80));
   await opFam.close();
 
   const [opened] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('#p1 .mkn-save:has-text("TEST")')]);
@@ -204,10 +209,22 @@ try {
   await page.waitForTimeout(300);
   const markTest = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-test'), document.documentElement.getAttribute('data-mkn-extension-live')]);
   ok('1.6: …and that it was loaded from a folder (a store copy says "store")', await page.evaluate(() => document.documentElement.getAttribute('data-mkn-extension-test-from')) === 'folder');
+  // 1.7 — the store copy on the beta's pages says so under the beta's name …
   await page.goto(APP_LIVE, { waitUntil: 'load' });
+  await page.waitForTimeout(300);
+  const markBeta = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-beta'), document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
+  // … and on the family app's under the family's — and from then on sends there.
+  await page.goto(APP_FAMILY, { waitUntil: 'load' });
   await page.waitForTimeout(300);
   const markLive = await page.evaluate(() => [document.documentElement.getAttribute('data-mkn-extension-live'), document.documentElement.getAttribute('data-mkn-extension-test')]);
   ok('1.4: on each app\'s own page, that build says it is installed — and only that one', markTest[0] === VERSION && !markTest[1] && markLive[0] === VERSION && !markLive[1], JSON.stringify([markTest, markLive]));
+  ok('1.7: the store copy says so on the beta\'s pages too, under the beta\'s name', markBeta[0] === VERSION && !markBeta[1] && !markBeta[2], JSON.stringify(markBeta));
+  await page.goto('https://www.facebook.com/', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.querySelectorAll('.mkn-save').length >= 4, null, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const [opFam2] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }), page.click('#p1 .mkn-save:not(:has-text("TEST"))')]);
+  ok('1.7: once the family app was opened in this browser, the store copy sends there', opFam2.url().startsWith(APP_FAMILY) && /share-text=/.test(opFam2.url()), opFam2.url().slice(0, 80));
+  await opFam2.close();
   await page.goto('https://recipes.example/lemon-drizzle', { waitUntil: 'load' });
   ok('…and nothing on any other site', !(await page.evaluate(() => [...document.documentElement.attributes].some(a => /^data-mkn-extension/.test(a.name)))));
 } finally {

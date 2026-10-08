@@ -38,6 +38,25 @@ function mknCleanText(s) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+// 1.7 — Tony: the store copy leads to My Kitchen Notes (the beta), not to the
+// family's app — except for the family: once this browser has opened the family
+// app (appmark.js notes it), recipes go there. Kept in chrome.storage, read once
+// and followed, so a click still opens the app at once (no pop-up blocker).
+var MKN_SENDTO = (typeof MKN_APP === 'string') ? MKN_APP : '';
+function mknFamilyOn() { return typeof MKN_FAMILY_APP === 'string' && !!MKN_FAMILY_APP; }
+function mknSendToNow() {
+  return new Promise(function (resolve) {
+    if (!mknFamilyOn()) return resolve(MKN_APP);
+    try { chrome.storage.local.get('mknFamily', function (o) { resolve(o && o.mknFamily ? MKN_FAMILY_APP : MKN_APP); }); }
+    catch (e) { resolve(MKN_APP); }
+  });
+}
+try {
+  if (mknFamilyOn() && typeof chrome !== 'undefined' && chrome.storage) {
+    mknSendToNow().then(function (u) { MKN_SENDTO = u; });
+    chrome.storage.onChanged.addListener(function (c) { if (c.mknFamily) MKN_SENDTO = c.mknFamily.newValue ? MKN_FAMILY_APP : MKN_APP; });
+  }
+} catch (e) {}
 function mknAppAddress(app, text, url) {
   return app.replace(/#.*$/, '') + '#share-text=' + encodeURIComponent(text) + '&share-url=' + encodeURIComponent(url || location.href);
 }

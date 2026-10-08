@@ -12,6 +12,11 @@
             tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null };
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
+  // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
+  function ownCap(project) { var b = S.meter && S.meter.defaults && S.meter.defaults.byProject; return b && typeof b[project] === 'number' ? b[project] : null; }
+  function defCap(project) { var o = ownCap(project); return o != null ? o : S.meter.defaults.cap; }
+  function famCap() { return ownCap(Object.keys(COPY_NAME).filter(function (k) { return COPY_NAME[k] === 'family'; })[0]); }
+  function capWords(project) { var o = ownCap(project); return o != null ? '$' + o + '/month per household' : '$' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)'; }
   function ago(t) {
     if (!t) return '—';
     var d = (Date.now() - t) / 864e5;
@@ -141,7 +146,7 @@
       r.owner = owner ? owner.email : '';
       r.months = m ? m.months : [];
       r.month = r.months.length ? r.months[0].usd : 0;
-      r.cap = m ? m.capNow : (r.capped ? S.meter.defaults.cap : null);
+      r.cap = m ? m.capNow : (r.capped ? defCap(r.project || thisProject()) : null);
       r.capSet = m && typeof m.cap === 'number';
       r.note = (m && m.note) || '';
       if (m && m.last_seen > r.lastSeen) r.lastSeen = m.last_seen;
@@ -257,8 +262,9 @@
     var head = '<div class="mg-top"><div><div class="mg-title">📊 Households</div><div class="mg-muted">'
       + (multi ? 'every copy' : esc(env === 'live' ? 'the family’s copy' : env + ' copy')) + ' · ' + (S.rows.length - nDel) + ' household' + (S.rows.length - nDel === 1 ? '' : 's')
       + (multi ? ' (' + copyCounts() + ')' : '') + (nDel ? ' \u00b7 ' + nDel + ' deleted' : '')
-      + (!S.meter ? '' : multi ? ' · AI allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first) on the test copy and the beta; the family’s is counted, not capped'
-          : ' · AI ' + (S.meter.capped ? 'allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first)' : 'counted, not capped')) + '</div>' + others + '</div>'
+      + (!S.meter ? '' : multi ? ' · AI allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first) on the test copy and the beta; '
+            + (famCap() != null ? 'the family’s $' + famCap() + '/month' : 'the family’s is counted, not capped')
+          : ' · AI ' + (S.meter.capped ? 'allowance ' + capWords(thisProject()) : 'counted, not capped')) + '</div>' + others + '</div>'
       + '<div class="mg-tools"><input id="mgSearch" type="search" placeholder="Search name, identifier or e-mail" value="' + escA(S.q) + '" oninput="mknManage.search(this.value)">'
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
