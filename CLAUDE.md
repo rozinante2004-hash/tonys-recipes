@@ -837,6 +837,11 @@ found only because a test was written first and disagreed with the code.
   - **Rules published by Tony in all three copies (8 Oct 2026): v37.95's and
     v37.96's.** He asked for the same as the Worker for the rules:
     deploy-rules.yml + tools/publish-rules.mjs, waiting for FIREBASE_RULES_KEY.
+  - **First automatic Worker publish: 8 Oct 2026, run 37828034566, success** (v66
+    republished from f16dbb1 with Tony's yes; the live health said v66). The
+    check now also requires `"db":true` and `"rateLimiting":true` (METER_DB and
+    BRING_KV still bound). This environment cannot reach workers.dev — read the
+    job's log instead.
   - **Worker publishes itself (8 Oct 2026).** Tony: Cloudflare kept suggesting
     Wrangler settings; he gave the account id, the BRING_KV id, the D1 id and
     the compatibility date (2026-05-06), and put CLOUDFLARE_API_TOKEN in GitHub.
