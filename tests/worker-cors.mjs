@@ -293,7 +293,7 @@ console.log('\nSpend guard rails (v39):');
       async put(k, v) { this.writes++; if (opts.putThrows) throw new Error('KV write limit'); store.set(k, v); },
     };
   }
-  const aiBody = () => ({ model: 'm', max_tokens: 10, messages: [], appKey: 'secret-k' });
+  const aiBody = () => ({ model: 'claude-haiku-4-5', max_tokens: 10, messages: [], appKey: 'secret-k' });   // v66: a model the app uses
   const photoBody = () => ({ action: 'photo-search', query: 'soup', appKey: 'secret-k' });
   // Nothing here should ever reach the real Anthropic API. Without this a
   // mutation that lets a call THROUGH makes a live network request and comes
@@ -481,6 +481,10 @@ console.log('\nphoto-fetch (v40):');
     const html = await ask('https://example.com/oops');
     expect('an HTML page is refused, not relayed', html.status === 415, `got ${html.status}`);
     expect('and says what came back instead', /not an image/.test((await html.json()).error || ''), 'unclear message');
+    // v66 — nor SVG: an "image" that can carry a script.
+    serve('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>', { 'Content-Type': 'image/svg+xml' });
+    const svg = await ask('https://example.com/pic.svg');
+    expect('v66: an SVG is refused (it can carry a script)', svg.status === 415, `got ${svg.status}`);
 
     // Size. A Worker that will stream an arbitrary file of any size on request
     // is a bandwidth amplifier.
@@ -841,10 +845,16 @@ console.log('\nvideo-file (v44):');
   } finally { globalThis.fetch = realFetch; }
 }
 
-console.log('\nBring! set-token secret:');
-const noSecret = await worker.fetch(post({ action: 'bring-settoken', token: 't', secret: 'x' }), env);
-expect('closed when BRING_SETTOKEN_SECRET is unset', noSecret.status === 503,
-  `got ${noSecret.status} — an unset secret must CLOSE the endpoint, never fall back to a default`);
+// v66 — sending straight to a Bring! list is retired (Tony): the four actions
+// that used the family's Bring! token answer 410 to everyone — the set-token one
+// even with its old secret (it is in the public repository) and a secret set.
+console.log('\nBring! direct sending retired (v66):');
+for (const action of ['bring-settoken', 'bring-add', 'bring-lists', 'bring-token-status']) {
+  const rr = await worker.fetch(post({ action, token: 'a.b.c', secret: 'tonys-recipes-2024', items: [{ name: 'milk' }], appKey: 'secret-k' }),
+    { BRING_SETTOKEN_SECRET: 'tonys-recipes-2024', BRING_TOKEN: 'a.b.c', BRING_API_KEY: 'k', BRING_LIST_UUID: 'l', BRING_USER_UUID: 'u', APP_SHARED_KEY: 'secret-k' });
+  let dd = {}; try { dd = await rr.json(); } catch (e) {}
+  expect(action + ' is retired', rr.status === 410 && /^BRING_RETIRED/.test(dd.error || ''), `got ${rr.status} ${JSON.stringify(dd)}`);
+}
 
 // v60 — AI per household. Real RS256 tokens signed with a key made here, a real
 // SQLite standing in for D1 (node:sqlite), Firestore and Anthropic faked.
@@ -950,8 +960,31 @@ console.log('\nAI per household (v60):');
     const tF = await token({ sub: 'uF', aud: 'recipes-f379d' });
     for (let i = 0; i < 7; i++) r = await ai({ idToken: tF, hid: 'hF' }, ORIGIN);
     expect('the family\'s copy is counted but never capped ($2.80, still answering)', r.status === 200 && Math.abs(r.d._meter.usd - 2.8) < 1e-9 && r.d._meter.cap === null, JSON.stringify(r));
+    // v66 — Tony asked about hardening: the family's address and the app key are
+    // public (the repository is), so on the family's copy too there is no AI
+    // without a sign-in that checks out and membership of the household.
+    let callsNow = anthropicCalls;
     r = await ai({}, ORIGIN);
-    expect('…and works without a sign-in, as before', r.status === 200, JSON.stringify(r));
+    expect('v66: the family\'s copy without a sign-in is refused (its address proves nothing)', r.status === 401 && /sign in/.test(r.d.error) && anthropicCalls === callsNow, JSON.stringify(r));
+    r = await ai({ idToken: tF.slice(0, -4) + 'AAAA', hid: 'hF' }, ORIGIN);
+    expect('v66: …and with a forged sign-in', r.status === 403 && /signature/.test(r.d.error) && anthropicCalls === callsNow, JSON.stringify(r));
+    r = await ai({ idToken: await token({ sub: 'uStranger', aud: 'recipes-f379d' }), hid: 'hF' }, ORIGIN);
+    expect('v66: …and for someone signed in who is not in the household', r.status === 403 && /not in that household/.test(r.d.error) && anthropicCalls === callsNow, JSON.stringify(r));
+    // Only the COUNTING failing (Firestore not answering) still lets a proven sign-in through there.
+    const realFetch3 = globalThis.fetch;
+    globalThis.fetch = async (url, init) => String(url).startsWith('https://fs.test/') && /uF2/.test(String(url))
+      ? new Response('{}', { status: 500 }) : realFetch3(url, init);
+    r = await ai({ idToken: await token({ sub: 'uF2', aud: 'recipes-f379d' }), hid: 'hF' }, ORIGIN);
+    globalThis.fetch = realFetch3;
+    expect('v66: …but a proven sign-in whose household cannot be read carries on there, as before', r.status === 200 && anthropicCalls === callsNow + 1, JSON.stringify(r));
+    // Only what the app asks for: its models, its sizes.
+    callsNow = anthropicCalls;
+    r = await ai({ idToken: tF, hid: 'hF', model: 'claude-opus-5' }, ORIGIN);
+    expect('v66: a model the app does not use is refused, before any cost', r.status === 400 && /not one this app uses/.test(r.d.error) && anthropicCalls === callsNow, JSON.stringify(r));
+    r = await ai({ idToken: tF, hid: 'hF', max_tokens: 100000 }, ORIGIN);
+    expect('v66: an answer longer than the app ever asks for is refused', r.status === 400 && /more than this app asks for/.test(r.d.error) && anthropicCalls === callsNow, JSON.stringify(r));
+    r = await ai({ idToken: tF, hid: 'hF', model: 'claude-haiku-4-5', max_tokens: 24000 }, ORIGIN);
+    expect('v66: a long answer (24000 tokens, Haiku) goes through', r.status === 200 && anthropicCalls === callsNow + 1, JSON.stringify(r));
     r = await ai({}, TEST_ORIGIN, { ANTHROPIC_API_KEY: 'sk-test', ALLOWED_ORIGINS: TEST_ORIGIN });
     expect('without METER_DB nothing changes (the test copy works unsigned)', r.status === 200, JSON.stringify(r));
     // meter-me and meter-admin
@@ -1051,7 +1084,7 @@ console.log('\nAI per household (v60):');
     const rowOf = (p, h) => rows.filter(x => x.project === p && x.hid === h)[0];
     expect('the owner, in the family app, lists every copy\'s households', f.status === 200 && rowOf('tonys-recipes-test', 'hA') && rowOf('recipes-f379d', 'hF') && rowOf('my-kitchen-notes-beta', 'hR'), JSON.stringify(rows.map(x => x.project + '/' + x.hid)));
     expect('…each with its copy\'s allowance (the family never capped)', rowOf('tonys-recipes-test', 'hA').capNow === 5 && rowOf('recipes-f379d', 'hF').capNow === null && rowOf('my-kitchen-notes-beta', 'hR').capped === true, JSON.stringify(rows).slice(0, 400));
-    expect('…the counted ones with their months, the reported ones with their members', Math.abs(rowOf('recipes-f379d', 'hF').months[0].usd - 2.8) < 1e-9 && rowOf('recipes-f379d', 'hF').report.members[0].email === 'f@example.com' && rowOf('my-kitchen-notes-beta', 'hR').name === 'Kitchen A', JSON.stringify(rowOf('recipes-f379d', 'hF')));
+    expect('…the counted ones with their months, the reported ones with their members', Math.abs(rowOf('recipes-f379d', 'hF').months[0].usd - 3.0) < 1e-9 /* $2.80 + v66's one Haiku call, $0.20 */ && rowOf('recipes-f379d', 'hF').report.members[0].email === 'f@example.com' && rowOf('my-kitchen-notes-beta', 'hR').name === 'Kitchen A', JSON.stringify(rowOf('recipes-f379d', 'hF')));
     f = await fb({ action: 'meter-admin', op: 'list', idToken: famOwner }, ORIGIN);
     expect('without `all`, only this copy (as before)', f.d.households.every(x => x.project === 'recipes-f379d'), JSON.stringify(f.d.households.map(x => x.project)));
     f = await fb({ action: 'meter-admin', op: 'set-cap', project: 'my-kitchen-notes-beta', hid: 'hR', cap: 7, idToken: famOwner }, ORIGIN);

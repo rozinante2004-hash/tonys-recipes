@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.94 -->
+<!-- Tony's Recipes Collection v37.95 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -175,7 +175,7 @@
     features: Object.freeze({
       whatsapp: true,     // chats: sync, "Ask my WhatsApp groups", "Recipes hiding in my chats"
       bring:    true,     // Bring!: open the chosen ingredients in the person's own Bring! app (official import, v36.89)
-      bringDirect: true,  // …and send them straight to THIS household's Bring! list (token kept on the Worker)
+      bringDirect: false, // v37.95 — retired (Tony: "the official sending to Bring works great"); Worker v66 refuses it
       gmail:    true,     // Send a recipe by e-mail through your Gmail
       feedbackButton: false,  // v37.64 — the floating 💬 note to Tony (the beta and the test copy)
       selfTestForAll: false   // v37.75 — 🧪 Self Test for everyone (the beta and the test copy); the owner always
@@ -4601,7 +4601,7 @@ function renderLinkRequestsPage() {
       var lg = st.log[l.hid] || {};
       return card('<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><div>' + who(l.name, l.code)
         + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">\u{1F91D} each sees the other\u2019s recipes' + (lg.decidedAt || l.at ? ' \u00b7 since ' + escH(when(lg.decidedAt || l.at)) : '') + '</div></div>'
-        + (manage ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhRevokeLink(\'' + escA(l.hid) + '\')">Revoke access</button>' : '') + '</div>'
+        + (manage ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhRevokeLink(' + jsA(l.hid) + ')">Revoke access</button>' : '') + '</div>'
         + talkHtml(l.hid, lg.note, l.hid, l.name));
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">None.</div>';
   // What became of each: the log, and refusals from before it (v37.53–79).
@@ -4614,8 +4614,8 @@ function renderLinkRequestsPage() {
   h += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Answered</div>';
   h += past.length ? past.map(function(x){
       var act = !manage ? '' : x.status === 'blocked'
-        ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhSetBlocked(\'' + escA(x.hid) + '\', false)">Unblock</button>'
-        : x.status !== 'accepted' ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhSetBlocked(\'' + escA(x.hid) + '\', true)">\u{1F6AB} Block</button>' : '';
+        ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="hhSetBlocked(' + jsA(x.hid) + ', false)">Unblock</button>'
+        : x.status !== 'accepted' ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="hhSetBlocked(' + jsA(x.hid) + ', true)">\u{1F6AB} Block</button>' : '';
       return card('<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><div>' + who(x.name, x.code)
         + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + (TAG[x.status] || escH(x.status)) + (x.at ? ' · ' + escH(when(x.at)) : '') + '</div></div>' + act + '</div>'
         + (x.status === 'rejected' ? talkHtml(x.hid, (st.log[x.hid] || {}).note, x.hid, x.name) : ''));
@@ -4719,14 +4719,14 @@ function talkHtml(other, note, noteFrom, noteName) {
       + '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || 'They') + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
       + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div></div></div>';
   }).join('');
-  return '<details class="lr-talk" style="margin-top:8px;"' + (_talkOpen[other] ? ' open' : '') + ' ontoggle="if(this.open) talkMarkSeen(\'' + escA(other) + '\')">'
+  return '<details class="lr-talk" style="margin-top:8px;"' + (_talkOpen[other] ? ' open' : '') + ' ontoggle="if(this.open) talkMarkSeen(' + jsA(other) + ')">'
     + '<summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--heading);">\u{1F4AC} Conversation' + (msgs.length ? ' (' + msgs.length + ')' : '')
     + (n ? ' <span id="talkNew-' + escA(other) + '" style="color:var(--danger);font-weight:700;">• ' + n + ' new</span>' : '') + '</summary>'
     + '<div style="margin-top:6px;">' + (list || '<div style="font-size:12.5px;color:var(--muted);">No messages yet.</div>')
     + '<div style="display:flex;gap:6px;margin-top:6px;align-items:flex-end;">'
     + '<textarea id="talkIn-' + escA(other) + '" rows="2" maxlength="500" dir="auto" placeholder="Write to them… (signed with your household’s name)" '
     + 'style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);font:inherit;font-size:13px;resize:vertical;"></textarea>'
-    + '<button type="button" onclick="talkSend(\'' + escA(other) + '\')" style="padding:8px 12px;border-radius:8px;border:none;background:var(--terracotta-fill);color:#fff;font-weight:600;cursor:pointer;min-height:36px;">Send</button></div>'
+    + '<button type="button" onclick="talkSend(' + jsA(other) + ')" style="padding:8px 12px;border-radius:8px;border:none;background:var(--terracotta-fill);color:#fff;font-weight:600;cursor:pointer;min-height:36px;">Send</button></div>'
     + '<div style="font-size:11px;color:var(--muted);margin-top:4px;">Everyone in both households can read this. Only your household’s name is shown — no one’s name, e-mail or phone number.</div>'
     + '</div></details>';
 }
@@ -6450,7 +6450,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.94';
+var APP_VERSION = 'v37.95';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9210,7 +9210,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.94</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.95</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9919,7 +9919,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.94</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.95</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -10631,7 +10631,7 @@ function renderFilters() {
     + '<button class="filter-btn collection-btn' + (showCollectionsOnly ? ' active' : '') + '" onclick="toggleCollectionsFilter()">📚 Collections</button>'
     // v37.53 — a linked household's recipes, one chip per link (its name is data)
     + hhLinks().map(function(l) {
-        return '<button class="filter-btn linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(\'' + escA(l.hid) + '\')"'
+        return '<button class="filter-btn linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(' + jsA(l.hid) + ')"'
           + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('')
     + (function(){ var n = recipes.filter(function(r){ return !r.photo; }).length;
         return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (<span data-no-i18n>' + n + '</span>)</button>' : ''; })()
@@ -10671,7 +10671,7 @@ function renderFilters() {
   document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3 + frame4;
   var mob = document.getElementById('mobileLinkedBtns');
   if (mob) mob.innerHTML = hhLinks().map(function(l) {
-    return '<button class="mobile-filter-toggle linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(\'' + escA(l.hid) + '\')"'
+    return '<button class="mobile-filter-toggle linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(' + jsA(l.hid) + ')"'
       + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('');
   if (typeof updateMobileButtons === 'function') updateMobileButtons();
   // Update sticky top position after render
@@ -15853,7 +15853,7 @@ function collectionSectionsHtml(r) {
 // makes them reach the right thing — see findRecipeRef.
 function partActionsHtml(coll, p) {
   var ref = partRef(coll.id, p.uid);
-  var q = '&quot;' + escA(ref) + '&quot;';
+  var q = jsA(ref);   // v37.95
   var cooked = p.cookCount
     ? '<span class="cooked-pill" style="font-size:11px;">🍳 ' + p.cookCount + '</span>' : '';
   return '<div class="part-actions">'
@@ -15869,10 +15869,10 @@ function partActionsHtml(coll, p) {
     + '<button class="action-btn" onclick="toggleShare(' + q + ')">📤 Share</button>'
     + '<button class="action-btn action-btn-bring" data-feature="bring" '
     + 'onclick="openBringModal(' + q + ')">🛒 Bring!</button>'
-    + '<button class="action-btn" onclick="promotePartToRecipe(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)" '
+    + '<button class="action-btn" onclick="promotePartToRecipe(' + coll.id + ',' + jsA(p.uid) + ')" '
     + 'title="Make this a recipe of its own">⤴ Make its own</button>'
     + '<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" '
-    + 'onclick="removePartFromCollection(' + coll.id + ',&quot;' + escA(p.uid) + '&quot;)">🗑 Remove</button>'
+    + 'onclick="removePartFromCollection(' + coll.id + ',' + jsA(p.uid) + ')">🗑 Remove</button>'
     + cooked
     + '</div></div>';
 }
@@ -16470,7 +16470,7 @@ function drawView(){
                 return '<div class="cook-log-entry">'
                   + '<div class="cook-log-head"><span>' + new Date(e.at).toLocaleDateString() + '</span>'
                   + (e.rating ? '<span class="rating-stars">' + stars(e.rating) + '</span>' : '')
-                  + '<button class="cook-log-del" onclick="deleteCookLogEntry(' + r.id + ',&quot;' + escA(e.id) + '&quot;)" title="Remove this note">✕</button></div>'
+                  + '<button class="cook-log-del" onclick="deleteCookLogEntry(' + r.id + ',' + jsA(e.id) + ')" title="Remove this note">✕</button></div>'
                   + (e.note ? '<div class="cook-log-note" dir="auto">' + escH(e.note) + '</div>' : '')
                   + '</div>';
               }).join('')}</div></details>` : '');
@@ -17580,6 +17580,7 @@ async function importFromFile(event){
       }
       b64 = btoa(b64);
       toast('🤖 Extracting text from PDF…');
+      await aiPrepare();                                   // v37.95 — a fresh sign-in (Worker v66)
       var resp = await fetch(WORKER_ENDPOINT, {
         method:'POST', headers: workerHeaders(),
         body: workerBody({
@@ -18549,6 +18550,22 @@ window.aiCachePut = aiCachePut; window.clearAiCache = clearAiCache;
 // sat at exactly the same level as the real instructions. It is also the only
 // shape prompt caching can work in, because a cached prefix has to be
 // byte-identical across calls and a concatenated question never is.
+// v37.57 — know whether the Worker meters (once a session), and send a
+// sign-in that is fresh (Firebase renews it if it is about to expire).
+// v37.70 — Tony shared a reel into the beta from WhatsApp: the import asked
+// the AI in the app's first seconds, before the household was open, so the
+// Worker had no household to count it against and refused. A metering
+// Worker now waits (up to 20 s) for the sign-in and the household.
+// v37.95 — one step for every AI call, the photo, PDF and screenshot readers
+// too (they call the Worker directly): Worker v66 refuses an AI call without a
+// sign-in that checks out on every copy, the family's included.
+async function aiPrepare() {
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+  if (aiMeterOn() && cloudLayout() === 'households') await aiWaitForHousehold(20000);
+  var _who = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
+  if (aiMeterOn() && _who && _who.getIdToken) { try { window._aiIdToken = await _who.getIdToken(); } catch(e) {} }
+}
+window.aiPrepare = aiPrepare;
 async function aiCall(prompt, maxTokens=2000, tools=null, model=null, system=null) {
   // Cache lookup — skipped for tool calls, whose answers depend on live data.
   var _ck = tools ? null : aiCacheKey(prompt, maxTokens, model, system);
@@ -18642,16 +18659,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
   syncLog('ai', 'AI call: ' + Math.round(prompt.length / 1000) + 'k chars in, '
     + maxTokens + ' tokens out, ' + Math.round(budget / 1000) + 's budget');
 
-  // v37.57 — know whether the Worker meters (once a session), and send a
-  // sign-in that is fresh (Firebase renews it if it is about to expire).
-  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
-  // v37.70 — Tony shared a reel into the beta from WhatsApp: the import asked
-  // the AI in the app's first seconds, before the household was open, so the
-  // Worker had no household to count it against and refused. A metering
-  // Worker now waits (up to 20 s) for the sign-in and the household.
-  if (aiMeterOn() && cloudLayout() === 'households') await aiWaitForHousehold(20000);
-  var _who = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
-  if (aiMeterOn() && _who && _who.getIdToken) { try { window._aiIdToken = await _who.getIdToken(); } catch(e) {} }
+  await aiPrepare();
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const body = {
@@ -18782,10 +18790,14 @@ function showServiceError(message, actions) {
     // Remove prefix tags
     line = line.replace(/^(BILLING:|API_KEY:)/, '').trim();
     if (!line) return;
-    // Make URLs clickable
-    line = line.replace(/(https?:\/\/[^\s]+)/g, function(url) {
-      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="color:var(--info-text);text-decoration:underline;">' + url + '</a>';
-    });
+    // Make URLs clickable. v37.95 (security audit) — everything else is
+    // ESCAPED first: an error can carry words from outside (an address someone
+    // sent, a server's reply), and this went into the page as HTML.
+    line = line.split(/(https?:\/\/[^\s<>"']+)/).map(function(part, i) {
+      if (i % 2 === 0) return escH(part);
+      var href = safeUrl(part);
+      return href ? '<a href="' + escA(href) + '" target="_blank" rel="noopener noreferrer" style="color:var(--info-text);text-decoration:underline;">' + escH(part) + '</a>' : escH(part);
+    }).join('');
     html += '<div style="font-size:13px;color:var(--ink);margin-bottom:6px;line-height:1.6;">' + line + '</div>';
   });
 
@@ -19175,6 +19187,13 @@ function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 // and never emits <br>, so a crafted value can't break out of the attribute.
 function escA(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 window.escA = escA;
+// v37.95 — a value as a JavaScript STRING inside an on…="…" attribute. escA
+// alone is not enough there: the browser decodes &#39; back into ' before the
+// handler runs, so a value with a quote in it (a household identifier chosen
+// by whoever made the household) could end the string and run its own code.
+// JSON.stringify makes it a JS string literal; escA then keeps it inside the attribute.
+function jsA(s){ return escA(JSON.stringify(String(s == null ? '' : s))); }
+window.jsA = jsA;
 // A URL safe to put in href/src. Escaping alone does not help against
 // `javascript:` — the quotes are never broken, the scheme is the payload. Only
 // http/https/mailto/data-image survive; anything else becomes empty, so the link
@@ -20066,7 +20085,7 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   }).join('');
   var stepsHtml = previewStepsHtml(parsed.steps);
   if (originalPhoto) parsed._originalPhoto = originalPhoto;
-  var encodedParsed = JSON.stringify(parsed).replace(/"/g,'&quot;');
+  var encodedParsed = escA(JSON.stringify(parsed));   // v37.95 — escA, not only quotes: a literal "&quot;" in the text would otherwise end the string
   var origPhotoHtml = originalPhoto
     ? '<div style="margin-top:8px;">'
       + '<button class="action-btn" onclick="showOriginalPhotoPreview(this)">📸 Show Original</button>'
@@ -21170,13 +21189,22 @@ function normalizeRecipe(r) {
   // still disagree and the collision is caught.
   if (!r.uid && (typeof r.id === 'number' || typeof r.id === 'string') && r.id !== '')
     r.uid = 'legacy-' + r.id;
+  // v37.95 (security audit) — the id is written into the page's buttons as a
+  // bare number (onclick="openAddModal(42)"). A recipe can come from another
+  // household, a backup or an import, so an id that is not a number would be
+  // code there: a number in a string becomes the number, anything else a new
+  // number (the uid above stays the recipe's identity).
+  if (r.id != null && !(typeof r.id === 'number' && isFinite(r.id))) {
+    r.id = (typeof r.id === 'string' && /^\d{1,16}$/.test(r.id)) ? Number(r.id) : Date.now() + Math.floor(Math.random() * 1e6);
+  }
   if (typeof r.name !== 'string')  r.name = String(r.name == null ? 'Untitled recipe' : r.name);
   if (typeof r.emoji !== 'string' || !r.emoji) r.emoji = '🍽️';
   if (typeof r.category !== 'string' || !r.category) r.category = 'Dinner';
   if (['Easy','Medium','Hard'].indexOf(r.difficulty) === -1) r.difficulty = 'Medium';
   if (typeof r.prep !== 'string') r.prep = r.prep == null ? '—' : String(r.prep);
   if (typeof r.servings !== 'string') r.servings = r.servings == null ? '—' : String(r.servings);
-  if (typeof r.bg !== 'string' || !r.bg) r.bg = BGS[0];
+  // v37.95 — the card colour goes into a style attribute: a colour, never url(…) or a second rule.
+  if (typeof r.bg !== 'string' || !r.bg || !/^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|(rgb|hsl)a?\([\d\s.,%]+\))$/.test(r.bg.trim())) r.bg = BGS[0];
   if (typeof r.photo !== 'string') r.photo = '';
   r.fav = !!r.fav;
 
@@ -24878,6 +24906,7 @@ async function processCameraImage(event) {
       var base64 = compressed.split(',')[1];
       var sizeKB = Math.round(base64.length * 0.75 / 1024);
       res.innerHTML = spinner('Step 1: Reading text (2500px, ' + sizeKB + 'KB)...');
+      await aiPrepare();                                   // v37.95 — a fresh sign-in (Worker v66)
       const step1 = await fetch(WORKER_ENDPOINT, {
         method: 'POST', headers: workerHeaders(),
         body: workerBody({ model: AI_MODEL, max_tokens: 1500,
@@ -24975,6 +25004,7 @@ async function processScreenshots(files) {
       var url = await readFileAsDataUrl(files[i]);
       if (!i) { imgEl.src = url; imgEl.style.display = 'block'; }
       var small = await resizeImageForVision(url, 2500, 0.95);
+      await aiPrepare();                                   // v37.95 — a fresh sign-in (Worker v66)
       var r1 = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
         body: workerBody({ model: AI_MODEL, max_tokens: 2500, messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: small.split(',')[1] } },
@@ -26041,6 +26071,7 @@ async function updateBringToken(token) {
 
 window.addEventListener('message',function(event){
   var allowed=[APP_CONFIG.siteOrigin,'https://web.getbring.com'];
+  if(!featureOn('bringDirect')) return;   // v37.95 — retired
   if(!allowed.includes(event.origin)) return; if(!event.data||!event.data.bringToken) return;
   clearTimeout(window._bringRelayTimeout); clearInterval(_bringTokenCheckInterval);
   if(_bringPopup&&!_bringPopup.closed) _bringPopup.close();
@@ -28398,7 +28429,7 @@ function renderWaSources(){
   var LABEL = { cloud: '🔄 synced', remote: '☁️ folder', local: '📱 this device' };
   var btn = 'flex-shrink:0;background:none;border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--muted);cursor:pointer;';
   el.innerHTML = idx.map(function(e){
-    var esc = escA(e.id).replace(/'/g, "\\'");
+    var esc = jsA(e.id);   // v37.95 — a JS string, safe inside the attribute
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
       + '<div style="flex:1;min-width:0;">'
       + '<div dir="auto" style="unicode-bidi:plaintext;font-size:13px;color:var(--ink);font-weight:600;">' + escH(e.group) + '</div>'
@@ -28408,9 +28439,9 @@ function renderWaSources(){
       // Only offered where it does something: a chat already in the cloud has
       // nowhere to be pushed to.
       + (e.source !== 'cloud'
-          ? '<button onclick="waPushToCloud(\'' + esc + '\')" title="Copy this chat to the cloud so your other devices can read it" style="' + btn + '">☁️ Sync</button>'
+          ? '<button onclick="waPushToCloud(' + esc + ')" title="Copy this chat to the cloud so your other devices can read it" style="' + btn + '">☁️ Sync</button>'
           : '')
-      + '<button onclick="waRemove(\'' + esc + '\')" style="' + btn + '">Remove</button>'
+      + '<button onclick="waRemove(' + esc + ')" style="' + btn + '">Remove</button>'
       + '</div>';
   }).join('');
 }
@@ -30348,10 +30379,10 @@ function showSaveAsVideoBookmark(url, suggestedName, emoji) {
     + '<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px;">Would you like to save this as a video bookmark? You can open it later and add recipe details manually.</div>'
     + '<div style="margin-bottom:10px;">'
     + '<label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">NAME</label>'
-    + '<input id="bookmarkNameInput" class="form-input" value="' + escH(name) + '" style="width:100%;box-sizing:border-box;">'
+    + '<input id="bookmarkNameInput" class="form-input" value="' + escA(name) + '" style="width:100%;box-sizing:border-box;">'   // v37.95 — escA: a page's title may hold a quote
     + '</div>'
     + '<div style="display:flex;gap:8px;">'
-    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escH(url) + '" data-emoji="' + (emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
+    + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escA(url) + '" data-emoji="' + escA(emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
     + (emoji||'🎥') + ' Save as bookmark</button>'
     + '<button onclick="clearUrlImportResult()" style="padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>'
     + '</div>'

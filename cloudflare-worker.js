@@ -1,4 +1,25 @@
-// Tony's Recipes — Cloudflare Worker v65
+// Tony's Recipes — Cloudflare Worker v66
+// v66: NO AI WITHOUT A SIGN-IN, ON ANY COPY. Tony asked whether the app needs
+//      hardening. The app's code is public (its GitHub repository), so the app
+//      key and the family's address prove nothing: anyone could send the
+//      Worker an AI request with the family's Origin header and no sign-in, and
+//      the family's copy let it through, uncounted — up to the daily/monthly
+//      ceilings, on any model and any size the caller chose. Now, with METER_DB
+//      set, every AI call needs a Firebase sign-in that checks out AND
+//      membership of the household it names; the family's copy is still
+//      counted and never capped, and if only the COUNTING fails there (Firestore
+//      or D1 down) a proven member carries on, as before. And only the models
+//      the app uses (Sonnet and Haiku; AI_MODELS to change) at no more than
+//      AI_MAX_TOKENS (32000) — so a stolen sign-in buys little.
+//      SENDING STRAIGHT TO A BRING! LIST IS RETIRED (Tony: "the official sending
+//      to Bring works great"). bring-add / bring-lists / bring-token-status /
+//      bring-settoken answered anyone with the public app key, with the family's
+//      own Bring! token — and bring-settoken's old secret is in the public
+//      repository. They now answer 410. Bring!'s official import
+//      (bring-recipe-page and its GET page) stays. Remove BRING_TOKEN,
+//      BRING_SETTOKEN_SECRET, BRING_LIST_UUID and BRING_USER_UUID from the
+//      Worker's settings, and the `accessToken` key from BRING_KV.
+//      photo-fetch no longer passes SVG (a picture that can carry a script).
 // v65: a household's report keeps, for each member, that they agreed to the
 //      terms (termsAt, termsVersion), for the owner's 📊 Households page.
 // v64: NOTES LEFT BEHIND come to the one inbox. Tony found the beta's notes
@@ -207,16 +228,11 @@
 // v29: multi-source photo search (Pixabay + Pexels + Unsplash)
 // Prior: YouTube Data API, Instagram oEmbed, KV file-download store
 //
-// ── BRING SETUP (one-time) ───────────────────────────────────────────────────
-// Add these in Cloudflare → Worker → Settings → Variables & Secrets:
-//   BRING_TOKEN     – current Bring! access token (or leave unset and let the
-//                     bookmarklet/relay store it in KV, which takes precedence)
-//   BRING_API_KEY   – the X-BRING-API-KEY value
-//   BRING_LIST_UUID – the shopping list to add items to
-//   BRING_USER_UUID – your Bring! user uuid
-// Nothing Bring!-related is hard-coded here any more, so this file is safe to
-// commit publicly. The token that used to be hard-coded here is still in git
-// history, but it was rotated on 1 Aug 2026 and the leaked value is now dead.
+// ── BRING! (v66) ─────────────────────────────────────────────────────────────
+// Only Bring!'s official import is served (bring-recipe-page, and the GET page
+// Bring!'s servers read; BRING_KV holds those pages for 15 minutes). Sending
+// straight to a list is retired, so BRING_TOKEN, BRING_API_KEY, BRING_LIST_UUID,
+// BRING_USER_UUID and BRING_SETTOKEN_SECRET are no longer read — remove them.
 //
 // ── VIDEO RECIPES (v43, optional) ────────────────────────────────────────────
 //   GEMINI_API_KEY  – a key from https://aistudio.google.com/apikey . Leave the
@@ -236,8 +252,15 @@
 // They are the ceiling on the API bill if the app key ever leaks. Raise them if
 // a real day's use gets close; `health` reports the current counts to a caller
 // that presents the app key.
+//
+// ── WHAT AN AI CALL MAY ASK FOR (v66, optional) ──────────────────────────────
+//   AI_MODELS       – model name beginnings allowed, comma-separated
+//                     (default: claude-sonnet-,claude-haiku-). Add a family
+//                     here if the app's AI_MODEL / AI_MODEL_SMALL ever moves to it.
+//   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
+//                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v65';
+const WORKER_VERSION = 'v66';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -250,28 +273,6 @@ const VIDEO_RECIPE_PROMPT =
   + 'language — do not translate. Where an amount is neither said nor shown, write the '
   + 'ingredient without one: never guess a quantity. Plain text only. If there is no '
   + 'recipe in the video, answer exactly: NO RECIPE';
-const BRING_API_V2 = 'https://api.getbring.com/rest/v2';
-
-function bringHeaders(env) {
-  return {
-    'X-BRING-CLIENT':        'WebApp',
-    'X-BRING-CLIENT-SOURCE': 'webApp',
-    'X-BRING-COUNTRY':       env.BRING_COUNTRY || 'IL',
-    'X-BRING-API-KEY':       env.BRING_API_KEY || '',
-    'Origin':                'https://web.getbring.com',
-    'Referer':               'https://web.getbring.com/',
-  };
-}
-
-// Human-readable error when Bring! config is missing, instead of a confusing 401.
-function bringConfigError(missing) {
-  return jsonResp({
-    error: 'BRING_CONFIG: Bring! is not configured on the server. Missing: ' + missing.join(', ')
-      + '.\n\nAdd them in Cloudflare → your Worker → Settings → Variables & Secrets, then redeploy.',
-    needsConfig: true
-  }, 503);
-}
-
 // ─── Access control (v34) ───────────────────────────────────────────────────
 // This Worker forwards to the Anthropic API on Tony's key, and its URL ships in
 // index.html, which is a public repo. With `Access-Control-Allow-Origin: *`, no
@@ -531,32 +532,6 @@ function extractYouTubeId(url) {
   return null;
 }
 
-// KV (refreshed by the bookmarklet/relay) wins; otherwise fall back to the env var.
-async function getToken(env) {
-  if (env.BRING_KV) {
-    try {
-      const stored = await env.BRING_KV.get('accessToken');
-      if (stored) return stored;
-    } catch(e) {}
-  }
-  return env.BRING_TOKEN || '';
-}
-
-// Decode a JWT payload without verifying it — we only want the `exp` claim so
-// the app can report the *real* expiry instead of guessing from a per-device
-// localStorage value that goes stale the moment the token is refreshed
-// somewhere else (which is exactly what made the app cry "expired" wrongly).
-function decodeJwtExp(token) {
-  try {
-    const parts = String(token).split('.');
-    if (parts.length !== 3) return null;
-    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    const payload = JSON.parse(atob(b64));
-    return typeof payload.exp === 'number' ? payload.exp : null;
-  } catch (e) { return null; }
-}
-
 // v36 — CORS is applied CENTRALLY, in one place, on the way out.
 //
 // v34 changed jsonResp's default from '*' to 'null' and threaded the real
@@ -618,16 +593,16 @@ async function handleRequest(request, env) {
     try { body = JSON.parse(await request.text()); }
     catch(e) { return jsonResp({ error: 'Invalid JSON' }, 400, corsHeaders); }
 
+    // v66 — sending straight to the family's Bring! list is retired (above).
+    if (BRING_RETIRED.indexOf(body.action) !== -1) {
+      return jsonResp({ error: 'BRING_RETIRED: sending straight to a Bring! list is no longer offered — use "Open in Bring!" (Bring!\'s own import).' }, 410, corsHeaders);
+    }
+
     // health is deliberately open: the app pings it to tell "Worker down" apart
     // from "Worker refusing me", and it reveals nothing and costs nothing.
     if (body.action !== 'health') {
-      // bring-settoken comes from a bookmarklet running on web.getbring.com, so
-      // it cannot satisfy the origin or app-key checks. Its own secret is what
-      // authenticates it — see below, where the insecure default was removed.
-      if (body.action !== 'bring-settoken') {
-        if (!appKeyOk(request, env, body)) {
-          return jsonResp({ error: 'FORBIDDEN: missing or wrong app key.' }, 403, corsHeaders);
-        }
+      if (!appKeyOk(request, env, body)) {
+        return jsonResp({ error: 'FORBIDDEN: missing or wrong app key.' }, 403, corsHeaders);
       }
       const limited = await rateLimited(request, env, body.action);
       if (limited) return limited;
@@ -669,8 +644,7 @@ async function handleRequest(request, env) {
           unsplash: !!env.UNSPLASH_ACCESS_KEY,
           youtube: !!env.YOUTUBE_API_KEY,
           videoAi: !!env.GEMINI_API_KEY,
-          bringToken: !!(env.BRING_KV || env.BRING_TOKEN),
-          bringSetToken: !!env.BRING_SETTOKEN_SECRET
+          bring: !!env.BRING_KV          // v66 — Bring!'s own import only
         }
       }, 200, corsHeaders);
     }
@@ -943,118 +917,6 @@ async function handleRequest(request, env) {
       }
     }
 
-    // ── bring-add ─────────────────────────────────────────────────────────────
-    if (body.action === 'bring-add') {
-      const { items, listUuid } = body;
-      if (!items || !items.length) return jsonResp({ error: 'No items' }, 400);
-      const targetList = listUuid || env.BRING_LIST_UUID;
-      const token = await getToken(env);
-      const missing = [];
-      if (!token) missing.push('BRING_TOKEN (or a token in KV)');
-      if (!env.BRING_API_KEY) missing.push('BRING_API_KEY');
-      if (!targetList) missing.push('BRING_LIST_UUID');
-      if (missing.length) return bringConfigError(missing);
-      try {
-        const results = [];
-        for (const item of items) {
-          const form = new URLSearchParams();
-          form.append('purchase', item.name);
-          form.append('specification', item.spec || '');
-          const r = await fetch(BRING_API_V2 + '/bringlists/' + targetList, {
-            method: 'PUT',
-            headers: { ...bringHeaders(env), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: form.toString()
-          });
-          results.push({ item: item.name, status: r.status, ok: r.ok });
-          if (r.status === 401) break;
-        }
-        const expired = results.some(r => r.status === 401);
-        if (expired) return jsonResp({ success: false, tokenExpired: true }, 401);
-        return jsonResp({ success: results.every(r => r.ok), results, listUuid: targetList });
-      } catch(err) { return jsonResp({ error: err.message }, 500); }
-    }
-
-    // ── bring-lists ───────────────────────────────────────────────────────────
-    if (body.action === 'bring-lists') {
-      const token = await getToken(env);
-      const missing = [];
-      if (!token) missing.push('BRING_TOKEN (or a token in KV)');
-      if (!env.BRING_API_KEY) missing.push('BRING_API_KEY');
-      if (!env.BRING_USER_UUID) missing.push('BRING_USER_UUID');
-      if (missing.length) return bringConfigError(missing);
-      try {
-        const r = await fetch(BRING_API_V2 + '/bringlists/' + env.BRING_USER_UUID, {
-          headers: { ...bringHeaders(env), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-        });
-        const text = await r.text();
-        let data = {};
-        try { data = JSON.parse(text); } catch(e) {}
-        return jsonResp({ status: r.status, ok: r.ok, lists: data.lists ? data.lists.map(l => ({ name: l.name, uuid: l.listUuid })) : [] });
-      } catch(err) { return jsonResp({ error: err.message }, 500); }
-    }
-
-    // ── bring-token-status ────────────────────────────────────────────────────
-    // The single source of truth for "is the Bring! token still good?".
-    // Returns the token's real expiry (from its JWT `exp`) plus, on request,
-    // a live probe against the Bring! API. No token material is returned.
-    if (body.action === 'bring-token-status') {
-      const token = await getToken(env);
-      if (!token) {
-        return jsonResp({ configured: false, valid: false, exp: null, daysLeft: null,
-                          reason: 'No Bring! token stored (KV empty and BRING_TOKEN unset).' });
-      }
-      const exp = decodeJwtExp(token);
-      const now = Math.floor(Date.now() / 1000);
-      const secondsLeft = exp === null ? null : exp - now;
-      const out = {
-        configured: true,
-        exp,
-        daysLeft: secondsLeft === null ? null : Math.floor(secondsLeft / 86400),
-        secondsLeft,
-        expired: secondsLeft === null ? null : secondsLeft <= 0,
-        source: env.BRING_KV ? 'kv-or-env' : 'env',
-      };
-      // Optional live check — the JWT may be structurally valid but revoked.
-      if (body.probe && env.BRING_API_KEY && env.BRING_USER_UUID) {
-        try {
-          const r = await fetch(BRING_API_V2 + '/bringlists/' + env.BRING_USER_UUID, {
-            headers: { ...bringHeaders(env), 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-          });
-          out.probed = true;
-          out.valid = r.ok;
-          out.probeStatus = r.status;
-          if (r.status === 401) out.expired = true;
-        } catch (err) {
-          out.probed = false;
-          out.probeError = err.message;
-        }
-      }
-      if (out.valid === undefined) out.valid = out.expired === false;
-      return jsonResp(out);
-    }
-
-    // ── bring-settoken ────────────────────────────────────────────────────────
-    if (body.action === 'bring-settoken') {
-      const { token, secret } = body;
-      // Override with a BRING_SETTOKEN_SECRET env var if you want a different one
-      // (the default matches the bookmarklet the app generates today).
-      // The old fallback secret was committed in a PUBLIC repo, so if the env
-      // var was unset anyone could overwrite the shared Bring! token. No default:
-      // unset now means the endpoint is closed, which is the safe direction.
-      if (!env.BRING_SETTOKEN_SECRET) {
-        return jsonResp({ error: 'BRING_SETTOKEN_SECRET is not set on the Worker, so this endpoint is closed. Set it in Cloudflare → Settings → Variables & Secrets.' }, 503, corsHeaders);
-      }
-      if (secret !== env.BRING_SETTOKEN_SECRET) return jsonResp({ error: 'Unauthorized' }, 403, corsHeaders);
-      if (!token || token.split('.').length !== 3) return jsonResp({ error: 'Invalid token' }, 400);
-      if (env.BRING_KV) {
-        try {
-          await env.BRING_KV.put('accessToken', token);
-          return jsonResp({ success: true, message: 'Token updated in KV' });
-        } catch(e) {}
-      }
-      return jsonResp({ success: false, message: 'KV not available' });
-    }
-
     // ── photo-search ──────────────────────────────────────────────────────────
     // Multi-source: Pixabay (PIXABAY_API_KEY), Pexels (PEXELS_API_KEY),
     // Unsplash (UNSPLASH_ACCESS_KEY). The app cycles sources via a "See more" button.
@@ -1096,7 +958,7 @@ async function handleRequest(request, env) {
       }
       if (!r.ok) return jsonResp({ error: 'PHOTO_FETCH: the image host answered ' + r.status }, 502);
       const ct = (r.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
-      if (ct.indexOf('image/') !== 0) {
+      if (ct.indexOf('image/') !== 0 || ct === 'image/svg+xml') {   // v66 — no SVG: a picture that can carry a script
         // Not an image. Saying so beats handing the app an HTML error page to
         // compress into a recipe photo.
         return jsonResp({ error: 'PHOTO_FETCH: that address returned "' + (ct || 'nothing') + '", not an image' }, 415);
@@ -1252,6 +1114,8 @@ async function handleRequest(request, env) {
         if (k === 'appKey' || k === 'action' || k === 'idToken' || k === 'hid') return;
         forwarded[k] = body[k];
       });
+      const refused = aiRequestRefused(forwarded, env);           // v66
+      if (refused) return refused;
       const metered = await meterStart(request, env, body);
       if (metered.resp) return metered.resp;
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1303,6 +1167,21 @@ const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test,my-kitchen-note
 const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test,my-kitchen-notes-beta';
 const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev,https://my-kitchen-notes-beta.pages.dev';
 const OWNER_EMAILS_DEFAULT = 'rozinante2004@gmail.com';
+const AI_MODELS_DEFAULT = 'claude-sonnet-,claude-haiku-';      // v66
+const BRING_RETIRED = ['bring-add', 'bring-lists', 'bring-token-status', 'bring-settoken'];   // v66
+const AI_MAX_TOKENS_DEFAULT = 32000;                             // v66
+// v66 — only what the app itself asks for: a model it uses, an answer no
+// longer than its own longest. → a refusal Response, or null to go ahead.
+function aiRequestRefused(forwarded, env) {
+  const model = String(forwarded.model || '');
+  const allowed = csvList(env.AI_MODELS, AI_MODELS_DEFAULT);
+  if (!allowed.some(function(p){ return p && model.indexOf(p) === 0; }))
+    return jsonResp({ error: 'AI_REQUEST: the model "' + model.slice(0, 60) + '" is not one this app uses (AI_MODELS on the Worker).' }, 400);
+  const most = parseInt(env.AI_MAX_TOKENS || '', 10) || AI_MAX_TOKENS_DEFAULT;
+  if (!(Number(forwarded.max_tokens) > 0 && Number(forwarded.max_tokens) <= most))
+    return jsonResp({ error: 'AI_REQUEST: an answer of ' + forwarded.max_tokens + ' tokens is more than this app asks for (AI_MAX_TOKENS ' + most + ').' }, 400);
+  return null;
+}
 const AI_CAP_USD_DEFAULT = 2, AI_CAP_FIRST_USD_DEFAULT = 4;
 // USD per million tokens — the same table as the app's AI_PRICES (index.html).
 // A model missing here is priced at the dearest rate, so a cap is never
@@ -1424,17 +1303,32 @@ async function meterStart(request, env, body) {
   const origin = request.headers.get('Origin') || '';
   const cappedOrigin = csvList(env.CAPPED_ORIGINS, CAPPED_ORIGINS_DEFAULT).includes(origin);
   if (!env.METER_DB) return {};
-  if (!token || !hid) {
-    return cappedOrigin ? { resp: allowanceResp('sign in to use the AI here — it is counted per household.', 401) } : {};
-  }
+  // v66 — on EVERY copy: no sign-in, no AI (the family's address and the app
+  // key are public, so they prove nothing).
+  if (!token || !hid) return { resp: allowanceResp('sign in to use the AI — it is counted per household.', 401) };
   let aud = '';
   try { aud = jwtPart(String(token).split('.')[1]).aud || ''; } catch (e) {}
   const capped = csvList(env.CAPPED_PROJECTS, CAPPED_PROJECTS_DEFAULT).includes(aud) || cappedOrigin;
+  // Who is asking must be proved before anything else — on every copy.
+  let claims, hh;
   try {
     if (!/^[A-Za-z0-9]{1,64}$/.test(String(hid))) throw new Error('not a household');
-    const claims = await verifyIdToken(token, env);
-    const hh = await meterMembership(claims, hid, token, env);
-    if (!hh.member) throw new Error('you are not in that household');
+    claims = await verifyIdToken(token, env);
+  } catch (e) {
+    return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
+      + (e && e.message) + '). Reload the app and try again.', 403) };
+  }
+  try {
+    hh = await meterMembership(claims, hid, token, env);
+  } catch (e) {
+    // The household could not be READ (Firestore did not answer): a capped copy
+    // refuses; the family's carries on for a proven sign-in, as before.
+    if (capped) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance ('
+      + (e && e.message) + '). Reload the app and try again.', 403) };
+    return {};
+  }
+  if (!hh.member) return { resp: allowanceResp('the AI could not be checked against your household\'s allowance (you are not in that household). Reload the app and try again.', 403) };
+  try {
     const db = await meterDb(env), month = utcMonthKey(Date.now());
     const row = await db.prepare('SELECT h.cap, h.created_at, h.first_seen, s.usd FROM (SELECT 1) LEFT JOIN ai_households h '
       + 'ON h.project = ?1 AND h.hid = ?2 LEFT JOIN ai_spend s ON s.project = ?1 AND s.hid = ?2 AND s.month = ?3')
@@ -2231,4 +2125,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v65 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v66 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

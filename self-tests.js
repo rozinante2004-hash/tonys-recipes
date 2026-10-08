@@ -728,7 +728,7 @@ window.SELF_TESTS = [
 
   { id:'import_enter_and_screenshots', group:'Import/Export', name:'Enter imports a pasted link; screenshots are read like pasted text; a phone leads with screenshots (v37.21, v37.22)',
     test: async()=>{
-      var real={ run:window.runUrlImport, fetch:window.fetch, apply:window.applyParsedRecipe, mm:window.matchMedia, log:window.syncLog };
+      var real={ run:window.runUrlImport, fetch:window.fetch, apply:window.applyParsedRecipe, mm:window.matchMedia, log:window.syncLog, wh:_workerHealth };
       try{
         window.syncLog=function(){};
         // Enter in the link box does what the button does.
@@ -743,7 +743,9 @@ window.SELF_TESTS = [
         var j=joinShotTexts(['שכבה שנייה\nמצרכים:\n• 120 גרם שוקולד מריר\n• 120 גרם שוקולד חלב', '• 120 גרם שוקולד חלב\n• 100 גרם ממרח\nאופן הכנה:']);
         if(j.split('120 גרם שוקולד חלב').length!==2 || !/100 גרם ממרח/.test(j)) throw new Error('overlapping lines were not counted once: '+JSON.stringify(j));
         var calls=[], opened=null, parsedRuns=0, realOpen=window.openFreehandModal, realRun=window.runFreehandImport;
-        window.fetch=async function(u, init){ var b=JSON.parse(init.body); calls.push(b);
+        window.fetch=async function(u, init){ var b=JSON.parse(init.body);
+          if(!b.messages) return { ok:true, json:async function(){ return { ok:true }; } };   // v37.95 — aiPrepare's health check first
+          calls.push(b);
           return { ok:true, json:async function(){ return { content:[{ text:'line of shot '+calls.length+' with enough words to count' }] }; } }; };
         window.openFreehandModal=function(t, src){ opened={ t:t, src:src }; };
         window.runFreehandImport=async function(){ parsedRuns++; };
@@ -766,6 +768,7 @@ window.SELF_TESTS = [
         firstBtn=document.querySelector('#videoRecipeFallback button');
         if(!firstBtn || !/Facebook bookmark/.test(firstBtn.textContent)) throw new Error('on a computer the first choice is: '+(firstBtn && firstBtn.textContent));
       } finally {
+        _workerHealth=real.wh;   // v37.95 — aiPrepare may have asked the fake Worker
         window.runUrlImport=real.run; window.fetch=real.fetch; window.applyParsedRecipe=real.apply; window.matchMedia=real.mm; _shotMode=false; window.syncLog=real.log;
         _shotSourceUrl=''; var r=document.getElementById('urlImportResult'); if(r) r.innerHTML='';
       }
@@ -1168,6 +1171,61 @@ window.SELF_TESTS = [
         window._household=realHh; window.hhSetAppRequests=realSet; window.askConfirm=realAsk; host.remove();
         var o=document.getElementById('askOverlay'); if(o) o.remove(); hhRenderAppRequests();
       }
+    } },
+
+  { id:'security_escaping', group:'Security', name:'🔒 What other people write cannot become code: handler arguments, recipe ids and colours, error messages (v37.95 security audit)',
+    test: async()=>{
+      var evil="x');window.__pwn=1;//\"<b>", hit=null;
+      window.__pwn=0;
+      // 1. A value with quotes, as a handler's argument: it arrives whole, and runs nothing.
+      var box=document.createElement('div'); box.style.display='none'; document.body.appendChild(box);
+      try{
+        window.__stArg=function(v){ hit=v; };
+        box.innerHTML='<button onclick="__stArg(' + jsA(evil) + ')">x</button>';
+        box.querySelector('button').click();
+        if(hit!==evil || window.__pwn) throw new Error('a quoted value as an argument: got '+JSON.stringify(hit)+(window.__pwn?' and it RAN code':''));
+      } finally { box.remove(); delete window.__stArg; }
+      // …and the old way is gone from the page and the owner's window.
+      var src=await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var man=await (await fetch(new URL('manage.js?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      [['index.html',src],['manage.js',man]].forEach(function(f){
+        if(/\\'' \+ esc[AH]?\(/.test(f[1]) || /&quot;' \+ escA\(/.test(f[1])) throw new Error(f[0]+' still puts an escaped value between quotes in a handler (use jsA)');
+      });
+      // 2. A recipe's id goes into buttons as a bare number; its colour into a style.
+      var r=normalizeRecipe({ id:"1);window.__pwn=1;//", name:'x', bg:'red;background-image:url(https://e.example/t.png)' });
+      if(typeof r.id!=='number' || !isFinite(r.id)) throw new Error('a recipe id that is not a number was kept: '+r.id);
+      if(normalizeRecipe({ id:'42', name:'x' }).id!==42) throw new Error('a number in a string did not become the number');
+      if(normalizeRecipe({ id:7, name:'x', bg:'#EAF5E9' }).bg!=='#EAF5E9') throw new Error('a real colour was changed');
+      if(r.bg!==BGS[0]) throw new Error('a colour carrying a second rule was kept: '+r.bg);
+      // 3. Error messages are text, links only http(s).
+      var realOv=document.getElementById('serviceErrorOverlay'); if(realOv) realOv.remove();
+      showServiceError('Could not read <img src=x onerror="window.__pwn=1"> from https://e.example/a"onmouseover="window.__pwn=1 today');
+      var ov=document.getElementById('serviceErrorOverlay');
+      try{
+        if(!ov) throw new Error('no error window');
+        if(ov.querySelector('img') || ov.querySelector('[onmouseover]') || ov.querySelector('[onerror]')) throw new Error('an error message became HTML');
+        var a=ov.querySelector('a[href^="https://e.example/a"]');
+        if(!a || a.getAttribute('href').indexOf('"')!==-1) throw new Error('the address was not a plain link');
+      } finally { if(ov) ov.remove(); }
+      if(window.__pwn) throw new Error('code ran');
+    } },
+
+  { id:'ai_calls_prove_who', group:'Sharing', name:'🤖 Every AI call proves who is asking first: the photo, PDF and screenshot readers too (v37.95, Worker v66)',
+    test: async()=>{
+      // Worker v66 refuses an AI call without a sign-in that checks out, on every
+      // copy. aiCall prepares one (aiPrepare); a reader that calls the Worker
+      // directly must do the same, or it fails for whoever's sign-in has aged.
+      var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+      var lines = src.split('\n'), bad = [];
+      lines.forEach(function(l, i){
+        if (!/fetch\(WORKER_(ENDPOINT|URL)/.test(l)) return;
+        var call = lines.slice(i, i + 4).join(' ');
+        if (!/model\s*:/.test(call)) return;                       // not an AI call
+        var before = lines.slice(Math.max(0, i - 40), i).join('\n');
+        if (!/await aiPrepare\(\)/.test(before)) bad.push(i + 1);
+      });
+      if (bad.length) throw new Error('an AI call without aiPrepare() before it, line(s) '+bad.join(', '));
+      if (typeof aiPrepare !== 'function') throw new Error('aiPrepare is missing');
     } },
 
   { id:'ai_per_household', group:'Sharing', name:'🤖 AI per household: the sign-in goes only to a Worker that meters; the allowance is said plainly, never retried (v37.57)',
@@ -3880,7 +3938,10 @@ window.SELF_TESTS = [
       };
       // (0) All on in the LIVE app — the household keeps everything. (The test
       // copy has Bring! off on purpose; the run itself switches all on.)
+      // v37.95 — except sending straight to a Bring! list, retired everywhere
+      // (Tony: "the official sending to Bring works great"; Worker v66 refuses it).
       if(APP_CONFIG.environment==='live') Object.keys(ENTRY).forEach(function(f){
+        if(f==='bringDirect'){ if(APP_CONFIG.features[f]!==false) throw new Error('sending straight to a Bring! list is retired, yet on in the live app'); return; }
         if(APP_CONFIG.features[f]!==true) throw new Error(f+' is off in the live app — Tony’s household uses it'); });
       if(featureOn('nonsense')) throw new Error('an unknown feature name reads as ON');
       // (1) Every button that reaches a feature carries its mark — in the SOURCE,

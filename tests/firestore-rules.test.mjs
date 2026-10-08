@@ -87,7 +87,8 @@ await check('a reader cannot record a backup',        setDoc(doc(as(READER), 'sh
 await check('a reader can read the backup record',    getDoc(doc(as(READER), 'shared/backups')), true);
 
 console.log('Legacy per-user documents');
-await check('you can write your own user document',  setDoc(doc(as(WRITER), 'users/writer/x/y'), { a: 1 }), true);
+await check('v37.95: your own settings may be written', setDoc(doc(as(WRITER), 'users/writer/prefs/legal'), { a: 1 }), true);
+await check('v37.95: …but nothing else under users/ (free storage for anyone)', setDoc(doc(as(WRITER), 'users/writer/x/y'), { a: 1 }), false);
 await check("you cannot write someone else's",       setDoc(doc(as(WRITER), 'users/reader/x/y'), { a: 1 }), false);
 
 await env.cleanup();

@@ -177,7 +177,11 @@ service cloud.firestore {
       allow read: if isMember(hid) || appAdmin();
       // Founding a household: you are its owner, and your own owner membership
       // is written in the same batch (so a household never exists ownerless).
+      // v37.95 (security audit) — a household's id is letters and digits (the
+      // app's own are Firestore's 20-character ids): it travels to other
+      // households in link requests and conversations, and must never carry a quote.
       allow create: if signedIn()
+        && hid.matches('^[A-Za-z0-9]{1,64}$')
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly(hhKeys())
         && (request.resource.data.get('code', null) == null || codeFor(hid, request.resource.data.code))
@@ -461,7 +465,7 @@ service cloud.firestore {
     // and the test copy). Anyone signed in may leave one, as themselves; only
     // the owner reads them, marks them seen/done, or removes them.
     match /feedback/{id} {
-      allow create: if signedIn()
+      allow create: if signedIn() && id.matches('^[A-Za-z0-9]{1,64}$')   // v37.95 — shown in the owner's window
         && request.resource.data.keys().hasOnly(['uid', 'email', 'name', 'hid', 'household', 'text', 'shot', 'log',
                                                  'version', 'env', 'device', 'lang', 'where', 'at', 'status'])
         && request.resource.data.uid == request.auth.uid
@@ -535,10 +539,18 @@ service cloud.firestore {
     }
 
 
-    // Legacy per-user documents (owner only). Kept for data written before the
-    // collection became shared; nothing writes here any more.
+    // Per-person documents (owner only): legacy data from before the collection
+    // became shared, and a person's own settings — `prefs/legal` (the kitchen
+    // rules they agreed to, v37.83) and `prefs/offers` (v37.69). v37.95
+    // (security audit): anything else written here was anyone's free storage on
+    // the project's bill, so only those named settings may be written, and small.
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/prefs/{pref} {
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && pref in ['legal', 'offers', 'ui']
+        && request.resource.data.keys().size() <= 40;
     }
   }
 }

@@ -27,7 +27,7 @@ the Worker, the sign-in pages, CI and the test copy — is in
 | `whatsapp/` | Where the app looks for WhatsApp chats to answer cooking questions from, and the guides for sending one from an iPhone. **It must never hold a chat export** — they are other people's messages; `.gitignore` blocks them and chats travel through Firestore instead. See [`whatsapp/README.md`](whatsapp/README.md). |
 | `tools/` | `build.js` + `environments.json` (build the test copy), `make-test-icons.mjs`, and the WhatsApp-guide generators. |
 | `tests/` | The headless runners CI uses — Self Test driver, Firestore rules, end-to-end sync, Worker, contrast, phone layout, accessibility. |
-| `bring-relay.html`, `filename-test.html` | Standalone helper pages — a Bring! token refresh relay, and a bench for the three browser download routes (kept as a regression check; see CLAUDE.md on the locale that once broke all three). |
+| `filename-test.html` | A standalone bench for the three browser download routes (kept as a regression check; see CLAUDE.md on the locale that once broke all three). |
 
 ## Deploying
 

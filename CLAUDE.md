@@ -816,6 +816,53 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.95 + Worker v66 — security audit (8 Oct 2026; report: AUDIT-2026-10-security.md).**
+    Tony asked whether to harden against hacking/reverse engineering, then for
+    a full audit. Obfuscation: no point — the repository is PUBLIC; what
+    matters is what the server and the rules let a stranger do.
+    - **AI without a sign-in (Worker v66).** The family's copy let any caller
+      with the family's Origin header (and the public app key) use the AI,
+      uncounted, any model, any size. Now with METER_DB: no verified sign-in +
+      membership of the household named → refused on EVERY copy; the family
+      stays counted, never capped, and carries on only when the counting
+      itself fails for a PROVEN member. `aiRequestRefused`: models must begin
+      with AI_MODELS (claude-sonnet-, claude-haiku-), max_tokens ≤ AI_MAX_TOKENS
+      (32000; the app's largest asks 8000). App: `aiPrepare()` (health,
+      household, fresh token) before every AI call — aiCall and the PDF, photo
+      and screenshot readers; self-test `ai_calls_prove_who` scans for any
+      `fetch(WORKER_…)` with a `model:` and no `await aiPrepare()` before it.
+    - **Bring! direct sending retired** (Tony: "the official sending to Bring
+      works great"): `bringDirect: false` in the family copy too; Worker v66
+      answers 410 BRING_RETIRED to bring-add/-lists/-token-status/-settoken
+      (they used the family's Bring! token for anyone with the app key, and
+      bring-settoken's old secret was in bring-relay.html — deleted). The
+      bringDirect code in index.html is still there behind the switch.
+    - **XSS: a value inside an on…="…" handler.** escA turns ' into &#39;,
+      which the browser decodes BEFORE the handler runs — so `fn(\'' + escA(x)
+      + '\')` was injectable wherever x came from someone else: household ids
+      (link requests, conversations, linked filters — any signed-in person can
+      found a household with any id), feedback note ids in the OWNER's window
+      (manage.js, escH there — not even escA), WhatsApp chat ids, part uids.
+      Now `jsA(x)` = escA(JSON.stringify(x)) everywhere; never quote a value
+      by hand inside a handler. Recipe ids go into handlers BARE
+      (`openAddModal(${r.id})`), so normalizeRecipe makes any non-number id a
+      number (uid keeps identity); r.bg must be a plain colour (it goes in a
+      style). The import preview's `encodedParsed` is escA'd (was quotes
+      only); showServiceError escapes its text (it linkified raw HTML); the
+      video-bookmark name/url are escA'd. Self-test `security_escaping`.
+    - **Rules:** a household id must match ^[A-Za-z0-9]{1,64}$ on create;
+      `feedback/{id}` the same; `users/{uid}/…` is read/delete, and only
+      `prefs/legal|offers|ui` (≤ 40 fields) may be written (anyone signed in
+      could otherwise store anything on the project's bill). NEEDS publishing
+      in all three projects.
+    - photo-fetch refuses SVG. The frame guard (v36.59) was already there —
+      a duplicate I added was removed; `sec_audit_block1` checks it is first.
+    - OPEN, asked Tony: anyone can sign in to the family app's address and
+      found a household there, and the family's copy is never capped, so a
+      stranger gets AI up to the Worker's ceilings. Options in the report.
+    - Tony to do: paste Worker v66; remove BRING_TOKEN, BRING_API_KEY,
+      BRING_LIST_UUID, BRING_USER_UUID, BRING_SETTOKEN_SECRET and KV
+      `accessToken`; publish the rules in the three projects.
   - **Released to the family app and the beta: v37.94 (7 Oct 2026, Tony's yes, CI green on 891e540; shipped as 18fb258 with the published languages; the family's Pages deploy checked: success).**
   - **v37.94 — four of Tony's reports.**
     - **The first sentence was never heard** (a visitor tapped, or 🔊 in the

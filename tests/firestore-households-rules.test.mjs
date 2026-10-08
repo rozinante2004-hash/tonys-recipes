@@ -43,6 +43,8 @@ await check('alice founds h1, as its owner',                 found(alice, 'h1', 
 await check('a household cannot be founded without its owner',
             setDoc(doc(carol, 'households/hx'), { name: 'X', ownerUid: 'carol', createdAt: 1 }), false);
 await check('nobody founds a household in someone else\'s name', found(carol, 'hy', 'alice'), false);
+// v37.95 (security audit) — an id that could carry a quote into another household's page.
+await check('v37.95: a household id with a quote in it is refused', found(carol, "x');alert(1);", 'carol'), false);
 await check('bob cannot make himself owner of h1',            join(bob, 'h1', 'bob', 'owner'), false);
 await check('bob cannot read h1 before he is in it',          getDoc(doc(bob, 'households/h1')), false);
 
@@ -397,6 +399,7 @@ await check('…not in someone else\'s name',                    setDoc(doc(caro
 await check('…not signed out',                                 setDoc(doc(nobody, 'feedback/n3'), note('carol')), false);
 await check('…not empty',                                      setDoc(doc(carol, 'feedback/n4'), note('carol', { text: '' })), false);
 await check('…not already marked done',                        setDoc(doc(carol, 'feedback/n5'), note('carol', { status: 'done' })), false);
+await check('v37.95: …not under an id that could carry a quote into the owner\'s window', setDoc(doc(carol, "feedback/x');alert(1);"), note('carol')), false);
 await check('…and nothing else with it',                       setDoc(doc(carol, 'feedback/n6'), note('carol', { role: 'admin' })), false);
 await check('the sender cannot read notes back',               getDoc(doc(carol, 'feedback/n1')), false);
 await check('…nor can anyone else',                            getDocs(collection(bob, 'feedback')), false);

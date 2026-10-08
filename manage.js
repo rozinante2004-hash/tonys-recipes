@@ -188,7 +188,9 @@
     return filt + list.map(function (n) {
       var subj = encodeURIComponent('Your note about My Kitchen Notes');
       var body = encodeURIComponent('\n\n\u2014 you wrote (' + new Date(n.at || 0).toLocaleString() + '):\n' + (n.text || ''));
-      var k = esc(n.key);
+      // v37.95 — the key carries a document's id (anyone signed in may choose one): as an
+      // attribute it is escA'd, as a handler's argument a JS string (jsA).
+      var k = escA(n.key), kj = jsA(n.key);
       return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + '" id="mgNote-' + k + '">'
         + '<div class="mg-ptop"><div><b class="mg-email">' + esc(n.email || n.uid) + '</b> <span class="mg-muted">' + esc(n.household || '') + '</span>'
         + (n.copy ? ' <span class="mg-copy">' + esc(n.copy) + '</span>' : '')
@@ -197,7 +199,7 @@
         + '<div class="mg-text" dir="auto">' + esc(n.text || '') + '</div>'
         + (n.shot ? '<img class="mg-shot" src="' + escA(n.shot) + '" alt="The tester\u2019s screenshot" onclick="this.classList.toggle(\'mg-big\')">' : '')
         + (n.log ? '<details><summary class="mg-muted">What the app was doing (' + Math.round(n.log.length / 1024) + ' KB)</summary>'
-            + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(\'' + k + '\')">📋 Copy the log</button></details>' : '')
+            + '<pre class="mg-log">' + esc(n.log) + '</pre><button type="button" class="mg-btn" onclick="mknManage.copyLog(' + kj + ')">📋 Copy the log</button></details>' : '')
         + '<div class="mg-device mg-muted">' + esc(n.device || '') + '</div>'
         + '<div class="mg-tools" style="margin-top:8px;">'
         // v37.94 — Tony: Reply by e-mail did nothing (the browser hands mailto: to the
@@ -205,9 +207,9 @@
         // the e-mail app stays beside it for computers where it is set up.
         + (n.email ? '<a class="mg-btn" target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(n.email) + '&su=' + subj + '&body=' + body + '">✉️ Reply in Gmail</a>'
             + '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '" title="Opens the e-mail app this computer is set to use">📨 E-mail app</a>' : '')
-        + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + k + '\',\'seen\')">👀 Seen</button>' : '')
-        + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(\'' + k + '\',\'done\')">✅ Done</button>' : '')
-        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(\'' + k + '\')">🗑</button></div></div>';
+        + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'seen\')">👀 Seen</button>' : '')
+        + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'done\')">✅ Done</button>' : '')
+        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(' + kj + ')">🗑</button></div></div>';
     }).join('');
   }
 
@@ -279,7 +281,7 @@
       + th('cap', 'Cap') + '<th>' + (months.length ? months.slice(1).map(mon).reverse().join(' · ') : 'Before') + '</th>'
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
       + (list.length ? list.map(function (r) {
-          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + '" onclick="mknManage.show(\'' + escA(r.key) + '\')">'
+          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + '" onclick="mknManage.show(' + jsA(r.key) + ')">'
             + '<td><div class="mg-name" dir="auto">' + esc(r.name || '(no name)') + '</div><div class="mg-muted mg-code">' + esc(r.code || '—') + '</div>'
             + (r.deleted ? '<div class="mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '</div>' : '')
             + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '') + '</td>'

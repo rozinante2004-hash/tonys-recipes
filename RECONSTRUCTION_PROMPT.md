@@ -36,7 +36,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v37.94` — app. **Worker: v65**, deployed separately and versioned separately
+**Current version:** `v37.95` — app. **Worker: v65**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -110,7 +110,7 @@ slide‑up modal animation.
 | `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
 | `version.json` | `{"version": "v36.93"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
-| `bring-relay.html` | Helper page for refreshing the Bring! token. Opens `web.getbring.com` in a **tab** (a popup has no bookmarks bar) and shows the bookmarklet plus a copyable console one-liner. |
+| ~~`bring-relay.html`~~ | Removed in v37.95: sending straight to a Bring! list was retired (Worker v66 answers 410); Bring!'s official import remains. |
 | `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
 | `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
 | `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
