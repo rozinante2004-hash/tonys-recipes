@@ -834,6 +834,25 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v37.99 — the farm visitors: the owner's choice kept, and a voice to choose.**
+    - Tony: "the selection of the animals are reset with each new version". The
+      saved choice (i18n/_farm) was right (read 8 Oct: 13 animals, pig off,
+      saved 21:16 by him) — but anything that set `_farmCfg` to null with no
+      device copy (the Self Tests' clean-up does: farm_visitors puts back a
+      missing `mkn_farm_cfg` by removing it) fell back to farmDefaultConfig —
+      EVERY animal ticked — until the next reload; opening the window then and
+      saving wrote that back. Now `_farmCentralCfg` (set by farmLoadConfig and by
+      saving) comes before the default in farmConfig, and openFarmSettings reads
+      the saved choice afresh (`ov._fresh`) and redraws if it differs and nothing
+      was touched. Test: `farm_choice_kept`.
+    - Tony: "Something with the voices is off. It is breaking" — v37.93's pitch
+      1.7–2 (the browser's top) with the higher voice. Now FARM_VOICE_TUNE: male
+      1.0, female 1.1, child 1.5 (rate 1.08; the female voice — browsers have
+      no child voices), ±0.3 of the animal's own pitch, never above 1.8; the farm
+      window's "Their voice" (Male / Female / Child / A different one each time —
+      `random`, one per tap) with a 🔊; `farmCfg.voice` (default female),
+      `farmVoice(kind)` keeps one male and one female British voice.
+      Tests: farm_visitors, farm_owner_window.
   - **Released to the family app and the beta: v37.98 (8 Oct 2026, Tony's yes, CI green on ab769de; Pages: success). The store job (37845283688) uploaded 1.7.1 and submitted it: state PENDING_REVIEW — the store took it although 1.7.0 had been submitted (the newer package replaced it in review).**
   - **Store: 1.7.0 in Google's review (8 Oct 2026)** — the job uploaded it, Tony
     typed the storage reason and submitted. The store takes one version for

@@ -6542,7 +6542,8 @@ window.SELF_TESTS = [
         el.click(); await wait(320);
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
         if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || spoken[0][1]!=='en-GB')) throw new Error('it did not speak in British English: '+JSON.stringify(spoken));
-        if(window.speechSynthesis && !(spoken[0][2]>=1.7)) throw new Error('the voice is not raised, like a cartoon\u2019s: pitch '+spoken[0][2]);
+        // v37.99 — Tony: the voice was breaking (pitch at the browser's top). Natural pitches now.
+        if(window.speechSynthesis && !(spoken[0][2]>=0.7 && spoken[0][2]<=1.8)) throw new Error('the voice is pushed too far: pitch '+spoken[0][2]);
         var stopped=el.getBoundingClientRect().left; await wait(200);
         if(Math.abs(el.getBoundingClientRect().left-stopped)>1) throw new Error('it kept walking while it spoke');
         // v37.94 — Tony: its legs stop too while it looks at you.
@@ -6582,6 +6583,17 @@ window.SELF_TESTS = [
         // Switched off: none come, and none is waiting.
         farmSetEnabled(false);
         if(localStorage.getItem('mkn_farm_on')!=='0' || box.checked) throw new Error('switching off did not stick');
+        // v37.99 — the voice chosen in the farm window: male, female, child — or a different one each time.
+        if(window.speechSynthesis){
+          var heard=[]; speechSynthesis.speak=function(u){ heard.push({ p:u.pitch, r:u.rate }); if(u.onstart) u.onstart(); };
+          farmSay('Hello', 1, 'male'); farmSay('Hello', 1, 'female'); farmSay('Hello', 1, 'child');
+          await wait(250);
+          if(heard.length<3 || !(heard[0].p<heard[1].p && heard[1].p<heard[2].p) || heard[2].p>1.8 || !(heard[2].r>heard[1].r))
+            throw new Error('male, female and child do not sound different (and natural): '+JSON.stringify(heard));
+          var kinds={}; for(var vi=0; vi<60; vi++) kinds[farmVoiceKind('random')]=1;
+          if(Object.keys(kinds).sort().join()!=='child,female,male') throw new Error('"a different one each time" does not use all three: '+Object.keys(kinds));
+          if(farmVoiceKind('nonsense')!=='female' || farmDefaultConfig().voice!=='female') throw new Error('the voice to begin with is not the female one');
+        }
         // v37.94 — Tony: the first sentence was never heard. A sentence the browser
         // drops (it never starts) is said once more; one that starts is said once.
         if(window.speechSynthesis){
@@ -6600,6 +6612,36 @@ window.SELF_TESTS = [
         if(real.on===null) localStorage.removeItem('mkn_farm_on'); else localStorage.setItem('mkn_farm_on', real.on);
         window._farmCfg=null; try{ farmUseConfig(JSON.parse(real.cfg||'null')); }catch(e){}
         farmSchedule(); farmRefreshSettings();
+      }
+    } },
+
+  { id:'farm_choice_kept', group:'UI', name:'🐄 The farm visitors keep what the owner saved: not lost to a Self Test or a new version, and the window shows it (v37.99)',
+    test: async()=>{
+      // Tony: "the selection of the animals are reset with each new version".
+      var real={ get:window.i18nCentralGet, cfg:localStorage.getItem('mkn_farm_cfg'), central:window._farmCentralCfg, owner:window.isAppOwner, own:window.i18nCentralIsOwn, user:window._fbUser };
+      var saved={ sayings:[{ t:'Not yet!', on:true }], animals:['goose','pig'], minMinutes:3, maxMinutes:9, style:'story', voice:'child' };
+      try{
+        window.i18nCentralGet=async function(){ return JSON.parse(JSON.stringify(saved)); };
+        localStorage.removeItem('mkn_farm_cfg'); window._farmCfg=null;
+        var got=await farmLoadConfig();
+        if(!got || farmConfig().animals.join()!=='goose,pig') throw new Error('the saved choice was not read: '+JSON.stringify(farmConfig().animals));
+        // A Self Test practising with its own animals, then putting back a device with no copy of its own:
+        farmUseConfig({ sayings:[{ t:'x', on:true }], animals:['cow'], minMinutes:1, maxMinutes:2 });
+        window._farmCfg=null; localStorage.removeItem('mkn_farm_cfg');
+        if(farmConfig().animals.join()!=='goose,pig') throw new Error('it fell back to every animal: '+farmConfig().animals.length);
+        // The owner's window shows what is SAVED, read afresh — not a stale copy.
+        window.isAppOwner=function(){ return true; }; window.i18nCentralIsOwn=function(){ return true; };
+        window._fbUser={ uid:'uO', email:'owner@example.com' };
+        window._farmCfg=farmCleanConfig({ sayings:[{ t:'x', on:true }], animals:FARM_ANIMALS.map(function(a){ return a.id; }), minMinutes:1, maxMinutes:2 });
+        var ov=openFarmSettings(); await ov._fresh;
+        var ticked=Array.prototype.map.call(document.querySelectorAll('#farmAnimals input:checked'), function(i){ return i.value; }).sort().join();
+        var voice=(document.querySelector('#farmOverlay input[name="farmVoice"]:checked')||{}).value;
+        if(ticked!=='goose,pig' || voice!=='child') throw new Error('the window shows '+ticked+' / '+voice+', not what is saved');
+      } finally {
+        window.i18nCentralGet=real.get; window.isAppOwner=real.owner; window.i18nCentralIsOwn=real.own; window._farmCentralCfg=real.central; window._fbUser=real.user;
+        var o=document.getElementById('farmOverlay'); if(o) o.remove();
+        if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
+        window._farmCfg=null; farmSchedule();
       }
     } },
 
@@ -6624,6 +6666,10 @@ window.SELF_TESTS = [
         var radios=ov.querySelectorAll('input[name="farmStyle"]');
         if(radios.length!==3 || ov.querySelector('input[name="farmStyle"]:checked').value!=='cartoon') throw new Error('the three looks are not offered, 3D cartoon first');
         var px=ov.querySelector('input[name="farmStyle"][value="pixel"]'); px.checked=true; px.onchange();
+        // v37.99 — the voice: four choices, the saved one ticked; the child chosen here.
+        var vr=ov.querySelectorAll('input[name="farmVoice"]');
+        if(vr.length!==4 || ov.querySelector('input[name="farmVoice"]:checked').value!==(farmConfig().voice||'female')) throw new Error('the four voices are not offered, the saved one ticked');
+        ov.querySelector('input[name="farmVoice"][value="child"]').checked=true;
         for(var k=0;k<40 && !ov.querySelector('#farmAnimals .fv-thumb .fv-px');k++) await wait(50);
         if(ov.querySelectorAll('#farmAnimals .fv-thumb .fv-px').length!==FARM_ANIMALS.length) throw new Error('the animals are not shown in the look that is ticked');
         // Change things: one sentence off, a new one, the pig out, every 1–2 minutes.
@@ -6645,7 +6691,7 @@ window.SELF_TESTS = [
         var w=wrote[0];
         if(!w || w[0]!=='i18n__farm') throw new Error('not saved where every copy reads it: '+(w&&w[0]));
         var d=w[1];
-        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2 || d.style!=='pixel') throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
+        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2 || d.style!=='pixel' || d.voice!=='child') throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
         if(farmConfig().maxMinutes!==2 || document.getElementById('farmOverlay')) throw new Error('the choice was not taken up here, or the window stayed open');
         // In the test or beta copy, the owner is told where to choose.
         window.i18nCentralIsOwn=function(){ return false; };

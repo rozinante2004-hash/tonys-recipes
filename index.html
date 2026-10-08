@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v37.98 -->
+<!-- Tony's Recipes Collection v37.99 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6500,7 +6500,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v37.98';
+var APP_VERSION = 'v37.99';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9260,7 +9260,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.98</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.99</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9969,7 +9969,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.98</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v37.99</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24091,7 +24091,7 @@ function farmArtFor(a, style) {      // a promise of the drawing in a look
 // ── What Tony chose (i18n/_farm), kept on the device between visits.
 function farmDefaultConfig() {
   return { sayings: FARM_SAYINGS_DEFAULT.map(function(t){ return { t: t, on: true }; }),
-           animals: FARM_ANIMALS.map(function(a){ return a.id; }), minMinutes: FARM_MIN_DEFAULT, maxMinutes: FARM_MAX_DEFAULT, style: 'cartoon' };
+           animals: FARM_ANIMALS.map(function(a){ return a.id; }), minMinutes: FARM_MIN_DEFAULT, maxMinutes: FARM_MAX_DEFAULT, style: 'cartoon', voice: 'female' };
 }
 function farmCleanConfig(c) {
   if (!c || typeof c !== 'object') return null;
@@ -24102,13 +24102,19 @@ function farmCleanConfig(c) {
   if (!(lo >= 1)) lo = FARM_MIN_DEFAULT;
   if (!(hi >= 1)) hi = FARM_MAX_DEFAULT;
   lo = Math.min(lo, FARM_MINUTES_CAP); hi = Math.min(Math.max(hi, lo), FARM_MINUTES_CAP);
-  return { sayings: s.slice(0, 40), animals: known, minMinutes: lo, maxMinutes: hi, style: FARM_STYLES.indexOf(c.style) !== -1 ? c.style : 'cartoon', at: Number(c.at) || 0 };
+  return { sayings: s.slice(0, 40), animals: known, minMinutes: lo, maxMinutes: hi, style: FARM_STYLES.indexOf(c.style) !== -1 ? c.style : 'cartoon',
+           voice: FARM_VOICES.indexOf(c.voice) !== -1 ? c.voice : 'female', at: Number(c.at) || 0 };
 }
 var _farmCfg = null;
+// v37.99 — Tony: "the selection of the animals are reset with each new version".
+// The family's saved choice (i18n/_farm, read at start) is kept apart here, so
+// nothing — a Self Test practising with its own animals, a device without its
+// copy — can fall back to the default (every animal ticked) while it is known.
+var _farmCentralCfg = null;
 function farmConfig() {
   if (_farmCfg) return _farmCfg;
   try { _farmCfg = farmCleanConfig(JSON.parse(localStorage.getItem(FARM_CFG_KEY) || 'null')); } catch(e) {}
-  return _farmCfg || farmDefaultConfig();
+  return _farmCfg || _farmCentralCfg || farmDefaultConfig();
 }
 function farmUseConfig(c) {
   var clean = farmCleanConfig(c);
@@ -24121,8 +24127,10 @@ async function farmLoadConfig() {
   try {
     var c = i18nCentral();
     var d = c ? await i18nCentralGet(c.prefix + FARM_DOC) : null;   // public, from the family's project; nothing during a Self Test
-    if (d) farmUseConfig(d);
+    var clean = d ? farmCleanConfig(d) : null;
+    if (clean) { _farmCentralCfg = clean; farmUseConfig(clean); return clean; }
   } catch(e) {}
+  return null;
 }
 function farmPickSaying() {
   var on = farmConfig().sayings.filter(function(s){ return s.on; });
@@ -24134,18 +24142,36 @@ function farmPickAnimal() {
 }
 
 // ── The voice: this device's own British English voice.
-var _farmVoice = null;
-function farmVoice() {
-  if (_farmVoice || !window.speechSynthesis) return _farmVoice;
-  var vs = speechSynthesis.getVoices() || [];
-  var gb = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); });
-  // v37.93 — Tony: "more high pitched". The pitch scale stops at 2, so the
-  // higher British voices come first; the deeper ones only if nothing else.
-  var prefer = ['Google UK English Female', 'Serena', 'Kate', 'Sonia', 'Libby', 'Stephanie', 'Martha', 'Google UK English Male', 'Daniel', 'Arthur', 'Oliver', 'Ryan', 'George'];
-  for (var i = 0; i < prefer.length && !_farmVoice; i++) _farmVoice = gb.filter(function(v){ return v.name.indexOf(prefer[i]) !== -1; })[0] || null;
-  return (_farmVoice = _farmVoice || gb[0] || null);
+// v37.99 — Tony: "Something with the voices is off. It is breaking … add the
+// option to select the voice … Male, Female, Child & Random". v37.93 had pushed
+// the pitch to the browser's top (2) on top of a higher voice — the speech then
+// cracks. Now natural pitches, and the voice chosen in the farm window
+// (farmCfg.voice). Browsers have no child voices: a child is the female voice,
+// raised a little — never near the top. Random picks one of the three per tap.
+var FARM_VOICES = ['male', 'female', 'child', 'random'];
+var FARM_VOICE_NAMES = { male: 'Male', female: 'Female', child: 'Child', random: 'A different one each time' };
+var FARM_VOICE_PREFER = {
+  male:   ['Google UK English Male', 'Daniel', 'Arthur', 'Oliver', 'Ryan', 'George', 'Thomas'],
+  female: ['Google UK English Female', 'Serena', 'Kate', 'Sonia', 'Libby', 'Stephanie', 'Martha', 'Hazel', 'Susan', 'Amy', 'Emma']
+};
+var FARM_VOICE_TUNE = { male: { pitch: 1.0, rate: 1.0 }, female: { pitch: 1.1, rate: 1.0 }, child: { pitch: 1.5, rate: 1.08 } };
+function farmVoiceKind(kind) {
+  if (kind === 'random') return ['male', 'female', 'child'][Math.floor(Math.random() * 3)];
+  return FARM_VOICE_TUNE[kind] ? kind : 'female';
 }
-try { if (window.speechSynthesis && speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', function(){ _farmVoice = null; farmVoice(); }); } catch(e) {}
+var _farmVoices = {};
+function farmVoice(kind) {
+  var key = kind === 'male' ? 'male' : 'female';            // a child speaks with the female voice
+  if (_farmVoices[key] || !window.speechSynthesis) return _farmVoices[key] || null;
+  var vs = speechSynthesis.getVoices() || [];
+  var gb = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); }), en = vs.filter(function(v){ return /^en/i.test(v.lang); });
+  var prefer = FARM_VOICE_PREFER[key], found = null;
+  [gb, en].forEach(function(list) {
+    for (var i = 0; i < prefer.length && !found; i++) found = list.filter(function(v){ return v.name.indexOf(prefer[i]) !== -1; })[0] || null;
+  });
+  return (_farmVoices[key] = found || gb[0] || en[0] || null);
+}
+try { if (window.speechSynthesis && speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', function(){ _farmVoices = {}; farmVoice('female'); farmVoice('male'); }); } catch(e) {}
 // v37.94 — Tony: the first time an animal (or 🔊) speaks, nothing is heard;
 // from the second time on it works. Chrome loads its voices only when first
 // asked, and on Linux the speech engine is started by the first utterance,
@@ -24153,27 +24179,30 @@ try { if (window.speechSynthesis && speechSynthesis.addEventListener) speechSynt
 // engine with a silent utterance at the first touch or key, never cancel and
 // speak in the same moment, keep the utterance referenced (Chrome may let
 // it go unspoken otherwise), and if it still has not started, say it once more.
-try { if (window.speechSynthesis) farmVoice(); } catch(e) {}
+try { if (window.speechSynthesis) farmVoice('female'); } catch(e) {}
 var _farmWarm = false, _farmUtter = null;
 function farmWarm() {
   if (_farmWarm || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
   _farmWarm = true;
-  try { farmVoice(); var w = new SpeechSynthesisUtterance(' '); w.volume = 0; w.lang = 'en-GB'; speechSynthesis.speak(w); } catch(e) {}
+  try { farmVoice('female'); var w = new SpeechSynthesisUtterance(' '); w.volume = 0; w.lang = 'en-GB'; speechSynthesis.speak(w); } catch(e) {}
 }
 document.addEventListener('pointerdown', farmWarm, true);
 document.addEventListener('keydown', farmWarm, true);
-function farmUtterance(text, pitch) {
+// kind: male | female | child (already chosen — see farmSay). Each animal keeps
+// a little of its own pitch around the voice's (v37.88), never above 1.8.
+function farmUtterance(text, pitch, kind) {
+  var k = FARM_VOICE_TUNE[kind] ? kind : 'female', t = FARM_VOICE_TUNE[k];
   var u = new SpeechSynthesisUtterance(text);
-  var v = farmVoice(); if (v) u.voice = v;
-  // v37.91 — Tony: "higher, like in cartoons". Each animal keeps its own
-  // relative pitch, all of them raised (the speech pitch scale ends at 2).
-  u.lang = 'en-GB'; u.rate = 1.06; u.pitch = Math.max(1.7, Math.min(2, 1.85 + ((pitch || 1) - 1) * .4));   // v37.93 — Tony: higher still. 2 is the browser's top.
+  var v = farmVoice(k); if (v) u.voice = v;
+  u.lang = 'en-GB'; u.rate = t.rate; u.pitch = Math.max(0.7, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
   return u;
 }
-function farmSay(text, pitch) {
+// voice: male | female | child | random — the farm window's choice by default.
+function farmSay(text, pitch, voice) {
   try {
     if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
-    var u = farmUtterance(text, pitch), started = false;
+    var kind = farmVoiceKind(voice || farmConfig().voice);          // random: picked once per tap
+    var u = farmUtterance(text, pitch, kind), started = false;
     u.onstart = function(){ started = true; };
     _farmUtter = u;
     function go() {
@@ -24181,7 +24210,7 @@ function farmSay(text, pitch) {
       speechSynthesis.speak(u);
       setTimeout(function(){
         if (started || _farmUtter !== u || speechSynthesis.speaking || speechSynthesis.pending) return;
-        var again = farmUtterance(text, pitch); _farmUtter = again;      // dropped: once more
+        var again = farmUtterance(text, pitch, kind); _farmUtter = again;      // dropped: once more
         speechSynthesis.speak(again);
       }, 900);
     }
@@ -24349,12 +24378,26 @@ function farmRefreshSettings() {
 }
 function openFarmSettings() {
   if (!i18nCanEdit()) { toast(isAppOwner() && !i18nCentralIsOwn() ? 'The farm visitors are chosen in the family app — every copy uses those.' : 'Only the app’s owner chooses the farm visitors.', 7000); return null; }
-  return farmSettingsDraw();
+  var ov = farmSettingsDraw();
+  // v37.99 — what is SAVED, read afresh: if it differs from what was drawn and
+  // nothing was touched yet, the window shows the saved choice.
+  var touched = false;
+  ov.addEventListener('input', function(){ touched = true; }, true);
+  ov.addEventListener('change', function(){ touched = true; }, true);
+  ov._fresh = farmLoadConfig().then(function(saved) {
+    if (!saved || touched || !ov.isConnected) return false;
+    var now = farmSettingsRead();
+    if (JSON.stringify([now.animals.slice().sort(), now.style, now.voice, now.minMinutes, now.maxMinutes]) === JSON.stringify([saved.animals.slice().sort(), saved.style, saved.voice, saved.minMinutes, saved.maxMinutes])
+        && JSON.stringify(now.sayings) === JSON.stringify(saved.sayings)) return false;
+    farmSettingsDraw();
+    return true;
+  });
+  return ov;
 }
 function farmSayingRow(s) {
   return '<div class="fv-row"><input type="checkbox" class="fv-on" aria-label="Use this sentence"' + (s.on ? ' checked' : '') + '>'
     + '<input type="text" class="fv-text" maxlength="80" data-no-i18n value="' + escA(s.t) + '" aria-label="What the animal says">'
-    + '<button type="button" class="fv-hear" title="Hear it" aria-label="Hear it" onclick="farmSay(this.parentNode.querySelector(\'.fv-text\').value, 1)">\u{1F50A}</button>'
+    + '<button type="button" class="fv-hear" title="Hear it" aria-label="Hear it" onclick="farmSay(this.parentNode.querySelector(\'.fv-text\').value, 1, farmWindowVoice())">\u{1F50A}</button>'
     + '<button type="button" class="fv-del" title="Remove" aria-label="Remove" onclick="this.parentNode.remove()">✕</button></div>';
 }
 function farmSettingsDraw() {
@@ -24372,6 +24415,9 @@ function farmSettingsDraw() {
     + '<input type="number" id="farmMax" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.maxMinutes + '" aria-label="Longest wait, in minutes"> minutes apart, picked at random, counted while the app is open.</div>'
     + '<div class="fv-h">How they look</div><div class="fv-styles" role="radiogroup" aria-label="How they look">'
     + FARM_STYLES.map(function(st){ return '<label class="fv-style"><input type="radio" name="farmStyle" value="' + st + '"' + (c.style === st ? ' checked' : '') + ' onchange="farmThumbs(this.value)"> ' + escH(FARM_STYLE_NAMES[st]) + '</label>'; }).join('') + '</div>'
+    + '<div class="fv-h">Their voice</div><div class="fv-styles" role="radiogroup" aria-label="Their voice">'
+    + FARM_VOICES.map(function(v){ return '<label class="fv-style"><input type="radio" name="farmVoice" value="' + v + '"' + ((c.voice || 'female') === v ? ' checked' : '') + '> ' + escH(FARM_VOICE_NAMES[v]) + '</label>'; }).join('')
+    + '<button type="button" class="fv-hear" id="farmVoiceHear" title="Hear it" aria-label="Hear this voice" onclick="farmSay(farmPickSaying(), 1, farmWindowVoice())">\u{1F50A}</button></div>'
     + '<div class="fv-h">Who may visit</div><div class="fv-grid" id="farmAnimals">'
     + FARM_ANIMALS.map(function(a){ return '<label class="fv-pick"><input type="checkbox" value="' + a.id + '"' + (c.animals.indexOf(a.id) !== -1 ? ' checked' : '') + '>'
         + '<span class="fv-thumb" data-animal="' + a.id + '"></span><span>' + escH(a.name) + '</span></label>'; }).join('') + '</div>'
@@ -24403,7 +24449,12 @@ function farmSettingsRead() {
   var animals = Array.prototype.filter.call(document.querySelectorAll('#farmAnimals input'), function(i){ return i.checked; }).map(function(i){ return i.value; });
   var lo = Math.round(Number((document.getElementById('farmMin') || {}).value)), hi = Math.round(Number((document.getElementById('farmMax') || {}).value));
   var st = document.querySelector('#farmOverlay input[name="farmStyle"]:checked');
-  return { sayings: sayings, animals: animals, minMinutes: lo, maxMinutes: hi, style: st ? st.value : farmStyle() };
+  return { sayings: sayings, animals: animals, minMinutes: lo, maxMinutes: hi, style: st ? st.value : farmStyle(), voice: farmWindowVoice() };
+}
+// The voice ticked in the farm window (the saved one when it is not open).
+function farmWindowVoice() {
+  var v = document.querySelector('#farmOverlay input[name="farmVoice"]:checked');
+  return v ? v.value : (farmConfig().voice || 'female');
 }
 function farmTryOne() {
   var pick = farmSettingsRead();
@@ -24418,11 +24469,11 @@ async function farmSettingsSave() {
   if (!(pick.minMinutes >= 1) || !(pick.maxMinutes >= pick.minMinutes) || pick.maxMinutes > FARM_MINUTES_CAP) {
     toast('How often: two whole numbers of minutes, the second not smaller than the first, at most ' + FARM_MINUTES_CAP + ' (a day).', 7000); return false;
   }
-  var doc = { sayings: pick.sayings.slice(0, 40), animals: pick.animals, minMinutes: pick.minMinutes, maxMinutes: pick.maxMinutes, style: pick.style,
+  var doc = { sayings: pick.sayings.slice(0, 40), animals: pick.animals, minMinutes: pick.minMinutes, maxMinutes: pick.maxMinutes, style: pick.style, voice: pick.voice,
               at: Date.now(), by: (window._fbUser && window._fbUser.email) || '' };
   try { await cloudDoc(i18nDocId(FARM_DOC)).set(doc); }
   catch(e) { showServiceError('The farm visitors could not be saved:\n\n' + ((e && e.message) || String(e))); return false; }
-  farmUseConfig(doc);
+  farmUseConfig(doc); _farmCentralCfg = farmCleanConfig(doc);    // v37.99 — what is saved is what is known
   farmSchedule();                                   // the new pace, here at once; elsewhere from their next start
   var ov = document.getElementById('farmOverlay'); if (ov) ov.remove();
   toast('✅ Saved — every copy uses these from now on', 5000);
@@ -24433,7 +24484,7 @@ window.farmSettingsSave = farmSettingsSave; window.farmAddSaying = farmAddSaying
 window.farmConfig = farmConfig; window.farmUseConfig = farmUseConfig; window.farmPickAnimal = farmPickAnimal; window.farmPickSaying = farmPickSaying;
 window.farmTyping = farmTyping; window.farmWait = farmWait; window.farmTick = farmTick; window.farmClear = farmClear; window.FARM_ANIMALS = FARM_ANIMALS;
 window.farmRefreshSettings = farmRefreshSettings; window.farmThumbs = farmThumbs; window.farmPixel = farmPixel; window.farmToonArt = farmToonArt;
-window.farmArtFor = farmArtFor; window.farmStyle = farmStyle; window.FARM_STYLES = FARM_STYLES; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
+window.farmArtFor = farmArtFor; window.farmWindowVoice = farmWindowVoice; window.farmVoiceKind = farmVoiceKind; window.farmLoadConfig = farmLoadConfig; window.farmStyle = farmStyle; window.FARM_STYLES = FARM_STYLES; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
 farmLoadConfig().then(function(){ farmSchedule(); });   // the pace may be Tony's; until it is read, the device's copy of it
 
 // ─── THE KITCHEN RULES: AGREEING TO THE TERMS ON FIRST SIGN-IN (v37.83) ─────
