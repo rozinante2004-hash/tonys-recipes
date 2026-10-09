@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.02 -->
+<!-- Tony's Recipes Collection v38.03 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6385,8 +6385,9 @@ function fbReplyWrote(x) {
     + x.note_text + (String(x.note_text).length >= 300 ? '…' : '') + '”' : '';
 }
 async function fbReplyShow(x) {
-  var a = await askConfirm({ icon: '\u{1F4AC}', title: 'An answer to your note',
-    message: String(x.text || '') + fbReplyWrote(x)
+  // v38.03 — the answer itself framed (Tony: it "just blends into the card").
+  var a = await askConfirm({ icon: '\u{1F4AC}', title: 'An answer to your note', quote: String(x.text || ''),
+    message: fbReplyWrote(x).replace(/^\n\n/, '')
       + '\n\nEvery answer is kept in ⚙️ → \u{1F4AC} Help and feedback → \u{1F4E8} Answers to my notes.',
     okLabel: 'OK', altLabel: '✍️ Write back', cancelLabel: 'Remind me later' });
   if (a === true || a === 'alt') {
@@ -6421,7 +6422,7 @@ async function openFbReplies() {
   body.innerHTML = (list.length ? list.map(function(x){
       return '<div class="fr-card' + (x.read_at ? '' : ' fr-new') + '">'
         + '<div class="access-email" style="margin-bottom:4px;">' + escH(new Date(x.at || 0).toLocaleString()) + (x.read_at ? '' : ' · <b style="color:var(--terracotta);">new</b>') + '</div>'
-        + '<div class="fr-text" dir="auto" data-no-i18n>' + escH(x.text || '') + '</div>'
+        + '<div class="fr-text ask-quote" dir="auto" data-no-i18n>' + escH(x.text || '') + '</div>'
         + (x.note_text ? '<div class="access-email" style="margin-top:6px;">You wrote' + (x.note_at ? ' on ' + escH(new Date(x.note_at).toLocaleDateString()) : '') + ':</div>'
             + '<div class="fr-wrote" dir="auto" data-no-i18n>' + escH(x.note_text) + (String(x.note_text).length >= 300 ? '…' : '') + '</div>' : '')
         + '</div>';
@@ -6684,7 +6685,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.02';
+var APP_VERSION = 'v38.03';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7966,6 +7967,11 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .ask-icon { font-size: 32px; text-align: center; margin-bottom: 6px; }
 .ask-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 18px; color: var(--heading); text-align: center; margin-bottom: 8px; }
 .ask-body { font-size: 13px; color: var(--muted); line-height: 1.65; text-align: center; margin-bottom: 16px; white-space: pre-wrap; unicode-bidi: plaintext; }
+/* v38.03 — Tony: an answer "just blends into the card with the rest of the text". Framed and warm, so it catches the eye. */
+.ask-quote { font-size: 15px; line-height: 1.55; color: var(--ink); text-align: start; white-space: pre-wrap; unicode-bidi: plaintext;
+  background: rgba(212,168,67,0.16); border: 1.5px solid rgba(193,68,14,0.35); border-inline-start: 5px solid var(--terracotta, #C1440E);
+  border-radius: 10px; padding: 10px 14px; margin: 4px 0 12px; max-height: 40vh; overflow-y: auto; }
+:root[data-theme="dark"] .ask-quote { background: rgba(212,168,67,0.12); border-color: rgba(232,120,74,0.45); border-inline-start-color: var(--terracotta); }
 .ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
 .ask-actions { display: flex; flex-direction: column; gap: 8px; }
 .ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta-fill); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
@@ -9444,7 +9450,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.02</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.03</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10155,7 +10161,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.02</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.03</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -19268,6 +19274,8 @@ function askConfirm(opts) {
       '<div class="ask-card">'
       + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
       + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
+      // v38.03 — someone's own words (an answer to a note), framed, never translated.
+      + (opts.quote ? '<div class="ask-quote" dir="auto" data-no-i18n>' + escH(opts.quote) + '</div>' : '')
       + '<div class="ask-body" dir="auto">' + escH(opts.message || '') + '</div>'
       + (opts.input !== undefined
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'

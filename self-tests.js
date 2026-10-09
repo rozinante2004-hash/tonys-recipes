@@ -1763,8 +1763,16 @@ window.SELF_TESTS = [
         if(await fbRepliesCheck(true)!==1 || asked.length!==1) throw new Error('the answer did not come up');
         var o=asked[0];
         if(calls[0].action!=='feedback-replies' || calls[0].idToken!=='tokR') throw new Error('asked the server: '+JSON.stringify(calls[0]));
-        if(o.title!=='An answer to your note' || o.message.indexOf('Fixed it')===-1 || o.message.indexOf('The import is slow')===-1 || o.okLabel!=='OK' || !/Write back/.test(o.altLabel) || o.cancelLabel!=='Remind me later')
+        if(o.title!=='An answer to your note' || o.quote!=='Fixed it \u2014 thank you' || o.message.indexOf('The import is slow')===-1 || o.okLabel!=='OK' || !/Write back/.test(o.altLabel) || o.cancelLabel!=='Remind me later')
           throw new Error('the window: '+JSON.stringify(o));
+        // v38.03 — Tony: the answer "just blends into the card". It is framed, apart from the rest.
+        if(o.message.indexOf('Fixed it')!==-1) throw new Error('the answer is in the plain text, not framed');
+        var realAsk=window.askConfirm; window.askConfirm=real.ask;
+        var shownAsk=askConfirm({ title:'t', quote:'Fixed it', message:'m' });
+        var q=document.querySelector('#askOverlay .ask-quote'), qs=q && getComputedStyle(q), bs=getComputedStyle(document.querySelector('#askOverlay .ask-body'));
+        var framed=q && q.textContent==='Fixed it' && q.hasAttribute('data-no-i18n') && parseFloat(qs.borderInlineStartWidth||qs.borderLeftWidth)>=4 && qs.backgroundColor!==bs.backgroundColor && parseFloat(qs.fontSize)>parseFloat(bs.fontSize);
+        document.getElementById('askCancel').click(); await shownAsk; window.askConfirm=realAsk;
+        if(!framed) throw new Error('the answer is not framed: '+(qs ? [qs.borderLeftWidth, qs.backgroundColor, qs.fontSize].join(' ') : 'no frame'));
         if(/Tony/.test(o.title+o.message)) throw new Error('names Tony (he asked not to be named)');
         if(!localStorage.getItem(FB_REPLY_LATER_KEY+'11')) throw new Error('Remind me later was not kept');
         // The red dots: ⚙️, 💬 Help and feedback, 📨 Answers to my notes.
