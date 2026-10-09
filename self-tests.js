@@ -6896,6 +6896,56 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'farm_grab', group:'UI', name:'🐑 A farm visitor can be grabbed (mouse or finger) and put anywhere: silent while held, then on from there across the screen — longer if need be; a tap still makes it speak (v38.07)',
+    test: async()=>{
+      var spoke=[], realSay=window.farmSay, el=null;
+      function pe(type, x, y, kind){ document.body.dispatchEvent(new PointerEvent(type, { pointerId:7, pointerType:kind||'mouse', isPrimary:true, button:0, buttons:type==='pointerup'?0:1, clientX:x, clientY:y, bubbles:true, cancelable:true })); }
+      function down(x, y, kind){ el.dispatchEvent(new PointerEvent('pointerdown', { pointerId:7, pointerType:kind||'mouse', isPrimary:true, button:0, buttons:1, clientX:x, clientY:y, bubbles:true, cancelable:true })); }
+      try{
+        window.farmSay=function(t){ spoke.push(t); };
+        el=farmVisit('cow', { style:'cartoon', stops:0, ltr:true, speed:200 }); await el._farm.ready;
+        await wait(250);
+        var W=window.innerWidth, H=window.innerHeight, r0=el.getBoundingClientRect(), cx=r0.left+r0.width/2, cy=r0.top+r0.height/2;
+        if(getComputedStyle(el).touchAction!=='none') throw new Error('a finger on it would scroll the page instead of moving it');
+        // A few pixels is not a grab.
+        down(cx, cy); pe('pointermove', cx+3, cy+2);
+        if(el.classList.contains('fv-held')) throw new Error('lifted by a wobble of a few pixels');
+        // Grabbed and moved: it follows, lifted, legs still, silent.
+        var to={ x:Math.round(W*.3), y:Math.round(H*.35) };
+        pe('pointermove', cx+(to.x-r0.left)/2, cy+(to.y-r0.top)/2); pe('pointermove', cx+(to.x-r0.left), cy+(to.y-r0.top));
+        await wait(80);
+        var r1=el.getBoundingClientRect();
+        if(!el.classList.contains('fv-held') || el.querySelector('.fv-art').classList.contains('walking')) throw new Error('held, it is not lifted, or it keeps walking');
+        if(Math.abs(r1.left-to.x)>18 || Math.abs(r1.top-to.y)>18) throw new Error('it does not follow the pointer: at '+[Math.round(r1.left),Math.round(r1.top)]+', not '+[to.x,to.y]);
+        await wait(250);
+        var r2=el.getBoundingClientRect();
+        if(Math.abs(r2.left-r1.left)>2) throw new Error('held still, it walked away');
+        if(spoke.length || el.classList.contains('fv-said')) throw new Error('it spoke while held (Tony: grabbed, they say nothing)');
+        // Let go: the click that ends a grab is not a tap; it walks on from where it was put.
+        pe('pointerup', cx+(to.x-r0.left), cy+(to.y-r0.top)); el.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+        await wait(400);
+        var r3=el.getBoundingClientRect();
+        if(spoke.length) throw new Error('letting go made it speak');
+        if(el.classList.contains('fv-held') || !el.querySelector('.fv-art').classList.contains('walking')) throw new Error('let go, it does not walk on');
+        if(!(r3.left>r1.left+25) || Math.abs(r3.top-r1.top)>H*.12) throw new Error('it does not walk on from where it was put: '+[Math.round(r1.left),Math.round(r3.left)]);
+        // Put down behind where it set off (a finger this time): a longer way, still to the far side.
+        var ms1=el._farm.ms, r4=el.getBoundingClientRect(), c4={ x:r4.left+r4.width/2, y:r4.top+r4.height/2 };
+        down(c4.x, c4.y, 'touch'); pe('pointermove', c4.x-200, c4.y, 'touch'); pe('pointermove', 5, c4.y, 'touch');
+        await wait(60);
+        pe('pointerup', 5, c4.y, 'touch');
+        await wait(300);
+        if(!(el._farm.ms>ms1) || el._farm.dropped!==2) throw new Error('put down further back, its way across is not longer: '+[Math.round(ms1), Math.round(el._farm.ms)]);
+        if(!(el.getBoundingClientRect().left<W*.3)) throw new Error('it was not put down where the finger left it');
+        // A tap (no movement) still makes it speak.
+        var r5=el.getBoundingClientRect();
+        down(r5.left+r5.width/2, r5.top+r5.height/2); pe('pointerup', r5.left+r5.width/2, r5.top+r5.height/2); el.click();
+        await wait(350);
+        if(!spoke.length) throw new Error('a tap no longer makes it speak');
+      } finally {
+        window.farmSay=realSay; if(el) el.remove();
+      }
+    } },
+
   { id:'farm_choice_kept', group:'UI', name:'🐄 The farm visitors keep what the owner saved: not lost to a Self Test or a new version, and the window shows it (v37.99)',
     test: async()=>{
       // Tony: "the selection of the animals are reset with each new version".

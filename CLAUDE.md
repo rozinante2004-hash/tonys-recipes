@@ -834,6 +834,15 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.07 — the farm animals can be grabbed (Tony's list, item 1).** Pointer events on the
+    visitor: a press that moves more than 6 px is a grab — `fv-held` (lifted, tilted, shadow,
+    legs still, never speaks), follows the pointer (window listeners in the capture phase, and
+    setPointerCapture), clamped to the screen; let go, the walk starts again from there to the
+    same far side (x1 kept, a new y1 near the drop, walkMs from the new distance, stops dropped,
+    `_farm.dropped` counts). The click that ends a grab is not a tap (`justDragged`, cleared by
+    the next press); a press that does not move still makes it speak. `touch-action: none` so
+    a finger moves the animal, not the page. Test: farm_grab (mouse and touch; a real Playwright
+    mouse drag checked too).
   - **Released to the family app and the beta: v38.06 (9 Oct 2026, Tony's yes, CI green on 64385d1; Pages: success).**
     The extension job, run by hand: screenshots ×2 and the privacy policy (1709 characters) added;
     the homepage was throttled (429) and set by a second run a minute later. The AMO page is complete.
@@ -856,9 +865,7 @@ found only because a test was written first and disagreed with the code.
       recipe page, a linked household's recipe, the shared page, collection parts, suggestion cards.
       Test: source_words_and_link.
   - **TONY'S LIST (9 Oct 2026) — to do after the Firefox extension, in this order unless he says otherwise:**
-    1. **Farm animals can be grabbed and moved** with the mouse or a finger, anywhere on the screen;
-       they carry on from there and finish their walk across, even if the way is longer. Grabbing
-       is silent — a click or tap still makes them speak.
+    1. ~~Farm animals can be grabbed and moved~~ — done in v38.07.
     2. **Multiplying a recipe scales the method too:** "add 2 spoons of milk" says 4 when the
        ingredients are doubled.
     3. **The recipe page can be enlarged on a computer** — by dragging a corner, or by clicking it

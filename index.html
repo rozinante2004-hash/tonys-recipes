@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.06 -->
+<!-- Tony's Recipes Collection v38.07 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6690,7 +6690,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.06';
+var APP_VERSION = 'v38.07';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7684,6 +7684,12 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 #settingsDrop .set-head { font-weight: 700; justify-content: space-between; }
 /* v37.88 — the farm visitors: a cartoon animal strolls across now and then. */
 .farm-visitor { position: fixed; left: 0; top: 0; width: 132px; z-index: 10040; cursor: pointer; will-change: transform; -webkit-tap-highlight-color: transparent; }
+/* v38.07 — Tony: "I should be able to grab them with the mouse or my finger and move them".
+   A finger on an animal moves the animal, not the page; held, it is lifted off the ground. */
+.farm-visitor { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.farm-visitor * { -webkit-user-drag: none; }
+.farm-visitor.fv-held { cursor: grabbing; filter: drop-shadow(0 14px 10px rgba(0,0,0,.28)); }
+.farm-visitor.fv-held .fv-flip { transform: scaleX(var(--fv-dir, 1)) translateY(-6px) rotate(calc(var(--fv-dir, 1) * -4deg)); transition: transform .12s ease-out; }
 @media (max-width: 520px) { .farm-visitor { width: 104px; } }
 @media (min-width: 1000px) { .farm-visitor { width: 150px; } }
 .farm-visitor .fv-flip { transform: scaleX(var(--fv-dir, 1)); }
@@ -9454,7 +9460,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.06</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.07</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10165,7 +10171,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.06</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.07</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24531,11 +24537,62 @@ function farmWalk(el, a, style, opts) {
   stops.sort(function(p, q){ return p.at - q.at; });
   var jumpy = style === 'pixel', cell = w / 25, lastDraw = 0;
   var t = 0, last = performance.now(), tapped = false, restUntil = 0;
+  var held = null, justDragged = false, posX = x0, posY = y0;
   el._farm.speed = speed; el._farm.stride = stride; el._farm.step = step; el._farm.ms = walkMs;
   art.classList.add('walking');
   el.style.visibility = '';
+  // v38.07 — Tony: grab an animal "with the mouse or my finger and move them somewhere else
+  // on the screen. They should continue from there and finish their walk across the screen
+  // even if it make their passage longer. If I'm grabbing them, they should not say nothing,
+  // as opposed to clicking them." A press that moves more than a few pixels is a grab:
+  // the animal is lifted, follows the pointer, silent; let go, it walks on from there to
+  // the side it was heading for. A press that does not move is a tap, as before.
+  var GRAB = 6;
+  function onMove(e) {
+    if (!held || e.pointerId !== held.id) return;
+    var dx = e.clientX - held.sx, dy = e.clientY - held.sy;
+    if (!held.moving) {
+      if (Math.abs(dx) < GRAB && Math.abs(dy) < GRAB) return;
+      held.moving = true;
+      restUntil = 0; el.classList.remove('fv-look'); art.classList.remove('walking');
+      el.classList.add('fv-held');
+    }
+    if (e.cancelable) e.preventDefault();
+    var Wn = window.innerWidth, Hn = window.innerHeight;
+    held.x = Math.max(-w * .5, Math.min(Wn - w * .5, held.ex + dx));
+    held.y = Math.max(0, Math.min(Hn - h, held.ey + dy));
+  }
+  function onUp(e) {
+    if (!held || e.pointerId !== held.id) return;
+    window.removeEventListener('pointermove', onMove, true);
+    window.removeEventListener('pointerup', onUp, true);
+    window.removeEventListener('pointercancel', onUp, true);
+    var was = held; held = null;
+    if (!was.moving) return;                         // a tap: the click that follows speaks
+    justDragged = true; setTimeout(function(){ justDragged = false; }, 400);
+    el.classList.remove('fv-held');
+    // On from where it was put down, to the far side it was walking to — however far that is now.
+    var Hn = window.innerHeight;
+    x0 = was.x; y0 = was.y;
+    y1 = Math.max(Math.max(8, Hn * .1), Math.min(Math.max(8, Hn - h - 8), y0 + rnd(-.1, .1) * Hn));
+    walkMs = Math.max(400, Math.abs(x1 - x0) / speed * 1000);
+    wave = Math.min(wave, 4); t = 0; stops = []; last = performance.now();
+    el._farm.ms = walkMs; el._farm.dropped = (el._farm.dropped || 0) + 1;
+    if (!tapped) art.classList.add('walking');
+  }
+  el.addEventListener('pointerdown', function(e) {
+    if (held || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    justDragged = false;                                     // a new press: only a grab's own click is not a tap
+    if (e.pointerType === 'mouse') e.preventDefault();     // no picture-drag ghost, no text selection
+    held = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ex: posX, ey: posY, x: posX, y: posY, moving: false };
+    try { el.setPointerCapture(e.pointerId); } catch(err) {}
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+  });
   el.addEventListener('click', function(e) {
     e.stopPropagation();
+    if (justDragged) { justDragged = false; return; }   // the end of a grab is not a tap
     if (tapped) return;
     tapped = true;
     // v37.94 — Tony: "When stopping and looking at me, its legs should stop
@@ -24543,12 +24600,19 @@ function farmWalk(el, a, style, opts) {
     art.classList.remove('walking'); el.classList.remove('fv-look');
     farmOuch(el, a).then(function(){
       last = performance.now(); tapped = false;
+      if (held && held.moving) return;
       if (restUntil) el.classList.add('fv-look'); else art.classList.add('walking');
     });
   });
   function frame(now) {
     if (!el.isConnected) return;
     var dt = now - last; last = now;
+    if (held && held.moving) {                      // held: where the pointer is, and nowhere else
+      posX = held.x; posY = held.y;
+      el.style.transform = 'translate(' + posX.toFixed(1) + 'px,' + posY.toFixed(1) + 'px)';
+      requestAnimationFrame(frame);
+      return;
+    }
     if (!tapped) {
       if (restUntil) {
         if (now >= restUntil) { restUntil = 0; el.classList.remove('fv-look'); art.classList.add('walking'); }
@@ -24560,6 +24624,7 @@ function farmWalk(el, a, style, opts) {
     var p = Math.min(t, 1);
     var x = x0 + (x1 - x0) * p;
     var y = y0 + (y1 - y0) * (p * p * (3 - 2 * p)) + Math.sin(p * Math.PI * 2 * waves) * wave;
+    posX = x; posY = y;
     if (jumpy) {                       // pixel art: in two-cell jumps, a few times a second
       if (now - lastDraw >= 110 || p >= 1) { lastDraw = now; el.style.transform = 'translate(' + (Math.round(x / (cell * 2)) * cell * 2).toFixed(0) + 'px,' + (Math.round(y / cell) * cell).toFixed(0) + 'px)'; }
     } else el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
