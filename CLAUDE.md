@@ -834,6 +834,13 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.04 — only the newest read of the notes counts.** CI (v38.02, the stand-in Hebrew pass)
+    failed feedback_reply_in_app once: "Cannot read properties of null (reading 'textContent')"
+    — the note on show vanished. A loadNotes started by an EARLIER window (feedback_notes opens
+    and closes it) finished late and replaced S.notes. manage.js: `_notesGen` — a read overtaken
+    by a newer one, or still under way when the window closes (close() bumps it), is dropped;
+    S.replies is set with S.notes at the end. Test (in feedback_reply_in_app): a held read,
+    released after close + reopen, must not replace the notes — fails on the old manage.js.
   - **v38.03 — the answer to a note, framed.** Tony (screenshot of the pop-up): "please highlight
     the reply's text … or put some kind of frame around it, so it will catch the eye. Currently it
     just blends into the card." askConfirm takes `quote` (someone's own words: framed `.ask-quote` —

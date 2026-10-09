@@ -1683,10 +1683,12 @@ window.SELF_TESTS = [
             if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
             return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
           collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
-        var at=Date.now()-3600e3, oldWorker=false;
+        var at=Date.now()-3600e3, oldWorker=false, hold=null;
         window.fetch=async function(u, init){
           var b={}; try{ b=JSON.parse(init.body); }catch(e){}
           sent.push(b);
+          if(b.op==='notes' && hold){ var h=hold; hold=null; await h.p;
+            return new Response(JSON.stringify({ notes:[{ id:99, project:'my-kitchen-notes-beta', uid:'uZ', email:'stale@example.com', text:'A stale read', at:at, status:'new' }], replies:[] }), { status:200 }); }
           if(b.op==='notes') return new Response(JSON.stringify({ notes:[
               { id:5, project:'my-kitchen-notes-beta', uid:'uT', email:'tester@example.com', household:'Tess’s Kitchen', text:'The import is slow', at:at, status:'new', env:'beta' },
               { id:6, project:'my-kitchen-notes-beta', uid:'', email:'', text:'No writer known', at:at-1, status:'new', env:'beta' } ],
@@ -1694,7 +1696,13 @@ window.SELF_TESTS = [
           if(b.op==='note-reply') return new Response(oldWorker ? '{"households":[]}' : JSON.stringify({ ok:true, reply:{ id:2, note_id:b.id, text:b.text, at:Date.now(), read_at:null } }), { status:200 });
           return new Response('{"error":"METER: not set up"}', { status:503 });
         };
+        // v38.04 — a read still under way when the window closes never replaces a newer one (CI caught a
+        // late read from an earlier window replacing the notes on show).
+        var release; hold={ p:new Promise(function(r){ release=r; }) };
+        await openManagement(); mknManage.close();
         await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
+        release(); await new Promise(function(r){ setTimeout(r, 80); });
+        if(/A stale read/.test(document.getElementById('manageOverlay').textContent) || mknManage._state.notes.some(function(n){ return n.id===99; })) throw new Error('a stale read replaced the notes on show');
         var card=document.getElementById('mgNote-s5');
         if(!card) throw new Error('the note is not in the Feedback tab');
         var btn=Array.prototype.filter.call(card.querySelectorAll('button'), function(x){ return /Reply in app/.test(x.textContent); })[0];

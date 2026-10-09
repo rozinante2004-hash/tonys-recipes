@@ -159,9 +159,13 @@
   // v37.68 — the one inbox (the Worker, every copy) and anything kept in this
   // copy's own database before it (v37.64–67), together, newest first.
   var COPY_NAME = { 'recipes-f379d': 'family', 'tonys-recipes-test': 'test', 'my-kitchen-notes-beta': 'beta' };
+  // v38.04 — only the newest read counts: one still under way when the window closes, or
+  // overtaken by a newer one, is dropped (CI: a late read from an earlier window replaced
+  // the notes the Feedback tab was showing).
+  var _notesGen = 0;
   async function loadNotes() {
-    S.notesError = '';
-    var out = [], errs = [];
+    var gen = ++_notesGen;
+    var out = [], errs = [], replies = {};
     try {
       var t = await window._fbUser.getIdToken();
       var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
@@ -170,16 +174,17 @@
       if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
       (d.notes || []).forEach(function (n) { out.push(Object.assign({}, n, { key: 's' + n.id, src: 'server', copy: COPY_NAME[n.project] || n.env || n.project })); });
       // v38.00 — the answers sent to them in the writers' apps (Worker v68).
-      S.replies = {};
-      (d.replies || []).forEach(function (x) { (S.replies[x.note_id] = S.replies[x.note_id] || []).push(x); });
+      (d.replies || []).forEach(function (x) { (replies[x.note_id] = replies[x.note_id] || []).push(x); });
     } catch (e) { if (!/not set up|METER_DB|Unknown|no messages/i.test(e.message)) errs.push('the server: ' + e.message); }
     try {
       (await window._fbDb.collection('feedback').orderBy('at', 'desc').limit(300).get()).forEach(function (doc) {
         var n = doc.data() || {}; out.push(Object.assign({ id: doc.id }, n, { key: 'd' + doc.id, src: 'db', copy: n.env === 'live' ? 'family' : (n.env || '') }));
       });
     } catch (e) { if (!/permission/i.test(e.message) || !out.length) errs.push('this copy\u2019s database: ' + e.message); }
+    if (gen !== _notesGen) return false;
     out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
-    S.notes = out; S.notesError = (!out.length && errs.length) ? errs.join('; ') : ''; S.notesPartial = errs.length > 0;
+    S.notes = out; S.replies = replies; S.notesError = (!out.length && errs.length) ? errs.join('; ') : ''; S.notesPartial = errs.length > 0;
+    return true;
   }
   function noteBy(key) { return (S.notes || []).filter(function (n) { return n.key === key; })[0]; }
   function newCount() { return (S.notes || []).filter(function (n) { return n.status === 'new'; }).length; }
@@ -575,7 +580,7 @@
       return true;
     },
     _notes: loadNotes,
-    close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; },
+    close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; _notesGen++; },
     reload: async function () {
       S.loading = true; render();
       try { await load(); }
