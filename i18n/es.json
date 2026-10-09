@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1791506460582,
- "count": 2054,
+ "updatedAt": 1791572039102,
+ "count": 2056,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -761,6 +761,7 @@
   "Restored {1} hidden item{2}": "{1} elemento{2} oculto{2} restaurado{2}",
   "Revoke access": "Revocar acceso",
   "Rosie the rabbit": "Rosie, el conejo",
+  "Running {1}/{2}…": "Ejecutando {1}/{2}…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT: la nube {1} no terminó en {2} segundos. Todo está guardado en este dispositivo y no se perdió nada. Esto suele deberse a una conexión lenta o bloqueada, o a una subida inusualmente grande — restaurar fotos puede pesar un par de megabytes. Prueba ⚙️ Ajustes → Sincronizar ahora cuando la conexión mejore.",
   "Salad": "Ensalada",
   "Save": "Guardar",
@@ -1504,6 +1505,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Iniciando sesión automáticamente en {1} segundos…",
   "⏳ Unzipping the extension…": "⏳ Descomprimiendo la extensión…",
   "⏳ waiting for them": "⏳ esperando respuesta",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ Pausado en {1}/{2} — el navegador frena las pestañas que no están en primer plano. Sigue en cuanto esta pestaña vuelva a estar activa.",
   "▦ Grid": "▦ Cuadrícula",
   "▶ Execute Selected": "▶ Ejecutar selección",
   "▶ Run Again": "▶ Volver a ejecutar",

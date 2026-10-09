@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791506466782,
- "count": 2392,
+ "updatedAt": 1791572037725,
+ "count": 2394,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -951,6 +951,7 @@
   "Revoke access": "Отозвать доступ",
   "Rosie the rabbit": "Крольчиха Рози",
   "Rows are numbered, and dismissing does not reshuffle them ({1}f.{2})": "Строки пронумерованы, скрытие не меняет их порядок ({1}f.{2})",
+  "Running {1}/{2}…": "Выполняется {1}/{2}…",
   "Running {1}…": "Выполняется {1}…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT: облачная {1} не завершилась за {2} секунд. Всё сохранено на этом устройстве, ничего не потеряно. Обычно это медленное или заблокированное соединение, либо необычно большая загрузка — восстановление фото может занимать пару мегабайт. Попробуйте ⚙️ Настройки → Синхронизировать сейчас, когда соединение станет лучше.",
   "Salad": "Салат",
@@ -1826,6 +1827,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Автовход через {1} сек…",
   "⏳ Unzipping the extension…": "⏳ Распаковка расширения…",
   "⏳ waiting for them": "⏳ ждём ответа",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ Приостановлено на {1}/{2} — браузер замедляет работу вкладки, если она не активна. Процесс продолжится, когда вкладка снова станет активной.",
   "▦ Grid": "▦ Плитка",
   "▶ Execute Selected": "▶ Выполнить выбранное",
   "▶ Run Again": "▶ Повторить",

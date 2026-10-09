@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1791506456785,
- "count": 2086,
+ "updatedAt": 1791572038003,
+ "count": 2088,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -768,6 +768,7 @@
   "Restored {1} hidden item{2}": "已恢复 {1} 个隐藏项{2}",
   "Revoke access": "撤销访问权限",
   "Rosie the rabbit": "兔子罗西",
+  "Running {1}/{2}…": "正在运行 {1}/{2}…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT：云端{1}未能在 {2} 秒内完成。所有内容都已保存在本设备上，不会丢失。这通常是网络较慢或受限，或是上传内容较大（恢复照片可能有一兆多）造成的。请在网络较好时前往 ⚙️ 设置 → 立即同步 重试。",
   "Salad": "沙拉",
   "Save": "保存",
@@ -1520,6 +1521,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ 将在 {1} 秒后自动登录…",
   "⏳ Unzipping the extension…": "⏳ 正在解压扩展程序…",
   "⏳ waiting for them": "⏳ 等待对方",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ 已暂停，{1}/{2} — 浏览器会限制不在前台的标签页。切回此标签页后会继续。",
   "▦ Grid": "▦ 网格",
   "▶ Execute Selected": "▶ 执行所选",
   "▶ Run Again": "▶ 再次运行",

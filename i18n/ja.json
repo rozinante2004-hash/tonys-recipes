@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1791506458228,
- "count": 2404,
+ "updatedAt": 1791572039915,
+ "count": 2406,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -954,6 +954,7 @@
   "Revoke access": "アクセスを取り消す",
   "Rosie the rabbit": "うさぎのロージー",
   "Rows are numbered, and dismissing does not reshuffle them ({1}f.{2})": "行には番号がついていて、閉じても順番は入れ替わりません（{1}f.{2}）",
+  "Running {1}/{2}…": "{1}/{2} を実行中…",
   "Running {1}…": "{1}を実行中…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT：クラウド{1}が{2}秒以内に完了しませんでした。データはすべてこの端末に保存されているので、何も失われていません。通信が遅い、またはブロックされていることが原因です。写真の復元は数メガバイトになることもあります。通信状態が良いときに ⚙️ 設定 → 今すぐ同期 を試してください。",
   "Salad": "サラダ",
@@ -1834,6 +1835,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ {1}秒後に自動でサインインします…",
   "⏳ Unzipping the extension…": "⏳ 拡張機能を展開中…",
   "⏳ waiting for them": "⏳ 相手の応答待ち",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ {1}/{2} で一時停止中 — タブが前面にないと、ブラウザが処理を止めてしまいます。このタブを前面に戻すと再開します。",
   "▦ Grid": "▦ グリッド",
   "▶ Execute Selected": "▶ 選択項目を実行",
   "▶ Run Again": "▶ 再実行",
