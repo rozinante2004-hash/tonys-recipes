@@ -681,9 +681,20 @@ window.SELF_TESTS = [
         window.fetch=async function(u){ if(/version\.json/.test(String(u))) return { json:async function(){ return { version:server }; } }; return real.fetch.apply(window, arguments); };
         try{ sessionStorage.removeItem(SHARE_UPDATE_KEY); }catch(e){}
         // Newer on the server: update, and come back to the SAME shared link.
+        // v38.05 — waited for (Firefox is slower than half a second), and the stand-in that
+        // navigates is the one in place when the call began, so nothing can leave the page.
         newestAppThen(href, function(){ ran++; });
-        await new Promise(function(r){ setTimeout(r, 500); });
+        for(var w=0; w<40 && !went; w++) await new Promise(function(r){ setTimeout(r, 100); });
         if(went!==href || ran) throw new Error('an older app did not update first and return to the link: '+JSON.stringify([went, ran]));
+        // The stand-in in place when the call began is the one used, whatever stands there when it ends
+        // (a different stand-in here, never none: nothing in this test may really navigate).
+        var stand=window._navigateForTest, late=null; went=null;
+        try{ sessionStorage.removeItem(SHARE_UPDATE_KEY); }catch(e){}
+        newestAppThen(href, function(){ ran++; });
+        window._navigateForTest=function(u){ late=u; };
+        for(var w2=0; w2<40 && !went && !late; w2++) await new Promise(function(r){ setTimeout(r, 100); });
+        window._navigateForTest=stand;
+        if(went!==href || late) throw new Error('the reload went by what stood in at the end, not at the start: '+JSON.stringify([went, late]));
         // Back from that reload (say the deploy is still in flight): imported, not updated again.
         went=null;
         newestAppThen(href, function(){ ran++; });
