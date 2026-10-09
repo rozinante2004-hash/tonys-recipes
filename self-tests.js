@@ -671,6 +671,38 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'method_scales_with_recipe', group:'UI', name:'✖️ Multiplying a recipe multiplies the amounts in its method too — "2 spoons of milk" says 4 at ×2; times, heat and tin sizes stay (v38.08)',
+    test: async()=>{
+      var real={ recipes:recipes.slice(), mult:viewMult };
+      var id=987655, r={ id:id, name:'Pancakes', category:'Breakfast', emoji:'🥞', bg:'#f5e6d3', prep:'20m', servings:'4', difficulty:'Easy',
+        ingredients:[{a:'2',n:'eggs'},{a:'500',n:'ml milk'},{a:'1',n:'can chickpeas'}],
+        steps:['Add 2 spoons of milk and stir.', 'Bake at 180°C for 25 minutes in a 26 cm pan.', 'Whisk 2 eggs with 1/2 cup sugar.', 'Pour into 2 tins.', 'Add 1 can chickpeas.', 'מוסיפים 2 כפות חלב ואופים 30 דקות ב-180 מעלות.'], tags:[] };
+      var kept=null; try{ kept=localStorage.getItem('scale_'+id); }catch(e){}
+      var stepsNow=function(){ return Array.prototype.map.call(document.querySelectorAll('#viewOverlay .steps-list .step-text'), function(x){
+        var c=x.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('button,br'), function(b){ b.remove(); }); return c.textContent; }); };
+      try{
+        recipes.push(r); try{ localStorage.removeItem('scale_'+id); }catch(e){}
+        openView(id); await wait(250);
+        var s1=stepsNow();
+        if(s1[0]!=='Add 2 spoons of milk and stir.' || document.querySelector('#viewOverlay .step-scaled')) throw new Error('at ×1 the method changed: '+s1[0]);
+        setMult(2); await wait(150);
+        var s2=stepsNow();
+        var want=['Add 4 spoons of milk and stir.', 'Bake at 180°C for 25 minutes in a 26 cm pan.', 'Whisk 4 eggs with 1 cup sugar.', 'Pour into 2 tins.', 'Add 2 cans chickpeas.', 'מוסיפים 4 כפות חלב ואופים 30 דקות ב-180 מעלות.'];
+        want.forEach(function(w, i){ if(s2[i]!==w) throw new Error('step '+(i+1)+' at ×2: "'+s2[i]+'" — expected "'+w+'"'); });
+        var mk=document.querySelector('#viewOverlay .step-scaled');
+        if(!mk || mk.textContent!=='4' || !/recipe says 2/.test(mk.getAttribute('title')||'')) throw new Error('a multiplied amount is not marked with what it was');
+        setMult(0.5); await wait(150);
+        if(stepsNow()[0]!=='Add 1 spoons of milk and stir.' && stepsNow()[0]!=='Add 1 spoon of milk and stir.') throw new Error('at ×½: '+stepsNow()[0]);
+        setMult(1); await wait(150);
+        if(stepsNow()[0]!=='Add 2 spoons of milk and stir.' || document.querySelector('#viewOverlay .step-scaled')) throw new Error('back at ×1 the method did not return as written');
+        if(r.steps[0]!=='Add 2 spoons of milk and stir.') throw new Error('the recipe itself was changed (only what is shown should be)');
+      } finally {
+        closeM('viewOverlay'); viewMult=real.mult;
+        recipes.length=0; real.recipes.forEach(function(x){ recipes.push(x); });
+        try{ if(kept===null) localStorage.removeItem('scale_'+id); else localStorage.setItem('scale_'+id, kept); }catch(e){}
+      }
+    } },
+
   { id:'source_words_and_link', group:'UI', name:'🔗 A source with words and an address links the address — "Loosely based on https://…" opens that page, not the app (v38.06)',
     test: async()=>{
       var cases=[

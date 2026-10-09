@@ -834,6 +834,18 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.08 — multiplying a recipe multiplies the method's amounts (Tony's list, item 2).**
+    `scaleStepHtml(txt, viewMult, stepIngWords(ings))` in stepLinesHtml (the recipe view and each
+    part of a collection; shown only — the recipe is not changed; edit/translate/share keep the
+    text as written). An amount = a number (12, 1.5, 1,5, 1/2, 1 1/2, ½, 1½, ranges 2-3) followed
+    by a measure (STEP_UNITS, English and Hebrew) or by a word of the recipe's own ingredients
+    (one adjective between allowed: "3 large carrots"; Hebrew ה/ו/ב prefix: "הביצים"). A container
+    (STEP_CONTAINERS: tins, cans, jars, קופסה …) only with "of"/an ingredient after it — "pour into
+    2 tins" stays. Not touched: times, °, cm, "Serves 4", step numbers, "9x13". Rounded by fmtAmt
+    like the ingredients; the measure agrees (STEP_PLURAL: tin→tins, cup→cup at ×½, כוס→כוסות,
+    שן→שיני). Each is `.step-scaled` (bold, dotted), its title "×2 — the recipe says 2 …".
+    Times and heat still not converted to imperial in the method (only multiplied amounts).
+    Test: method_scales_with_recipe.
   - **v38.07 — the farm animals can be grabbed (Tony's list, item 1).** Pointer events on the
     visitor: a press that moves more than 6 px is a grab — `fv-held` (lifted, tilted, shadow,
     legs still, never speaks), follows the pointer (window listeners in the capture phase, and
@@ -866,8 +878,7 @@ found only because a test was written first and disagreed with the code.
       Test: source_words_and_link.
   - **TONY'S LIST (9 Oct 2026) — to do after the Firefox extension, in this order unless he says otherwise:**
     1. ~~Farm animals can be grabbed and moved~~ — done in v38.07.
-    2. **Multiplying a recipe scales the method too:** "add 2 spoons of milk" says 4 when the
-       ingredients are doubled.
+    2. ~~Multiplying a recipe scales the method too~~ — done in v38.08.
     3. **The recipe page can be enlarged on a computer** — by dragging a corner, or by clicking it
        (on a phone it is full size already).
     4. ~~A source with words and a link~~ — done in v38.06.
