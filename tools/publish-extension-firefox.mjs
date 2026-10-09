@@ -81,6 +81,18 @@ async function listing() {
     console.log((await policyNow()) ? 'privacy policy added (' + text.length + ' characters)'
       : '::warning::the privacy policy could not be set through the API (' + r.status + ': ' + say(r) + ') — it can be added by hand on the add-on\'s page in the Developer Hub');
   }
+  // v38.13 — Tony: the page says "… by Tony". The name after "by" is the AMO account's display
+  // name (its profile, not the add-on): set to My Kitchen Notes, and read back.
+  const AUTHOR = process.env.AMO_AUTHOR_NAME || 'My Kitchen Notes';
+  const me = await amo('accounts/profile/');
+  if (me.status !== 200 || !me.d || !me.d.id) console.log('::warning::the account could not be read (' + me.status + ') — the name after "by" not checked');
+  else if (me.d.display_name === AUTHOR) console.log('shown as: by ' + AUTHOR);
+  else {
+    const r = await amo('accounts/account/' + me.d.id + '/', { method: 'PATCH', json: { display_name: AUTHOR } });
+    const again = await amo('accounts/profile/');
+    console.log(again.d && again.d.display_name === AUTHOR ? 'shown as: by ' + AUTHOR + ' (was "' + me.d.display_name + '")'
+      : '::warning::the name after "by" could not be changed (' + r.status + ': ' + say(r) + ') — on addons.mozilla.org: your name at the top → Edit My Profile → Display Name');
+  }
   // Its homepage: My Kitchen Notes, where the store copy sends recipes.
   if (!a.d.homepage) {
     const home = 'https://my-kitchen-notes-beta.pages.dev/';
