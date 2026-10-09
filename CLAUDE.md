@@ -834,6 +834,10 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v38.06 (9 Oct 2026, Tony's yes, CI green on 64385d1; Pages: success).**
+    The extension job, run by hand: screenshots ×2 and the privacy policy (1709 characters) added;
+    the homepage was throttled (429) and set by a second run a minute later. The AMO page is complete.
+    Writes to AMO are now spaced 2.5 s apart.
   - **v38.06 — Firefox in the app, the AMO page filled in, and a source's address linked.**
     - Mozilla listed the add-on (Tony: the page says "Add to Firefox"). `extensionStores.firefox`
       (index.html; the beta's in tools/environments.json; the test copy has none). Each browser is

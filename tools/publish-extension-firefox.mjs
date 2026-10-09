@@ -36,7 +36,11 @@ function token() {
   const body = b64u(JSON.stringify({ iss: ISS, jti: randomUUID(), iat: now, exp: now + 120 }));
   return head + '.' + body + '.' + createHmac('sha256', SECRET).update(head + '.' + body).digest('base64url');
 }
+let _lastWrite = 0;
 async function amo(path, opts = {}) {
+  // 9 Oct 2026 — AMO throttled the third change in a row ("Request was throttled. Expected
+  // available in 58 seconds"): changes are spaced out a little.
+  if (opts.method && opts.method !== 'GET') { const wait = _lastWrite + 2500 - Date.now(); if (wait > 0) await new Promise((r) => setTimeout(r, wait)); _lastWrite = Date.now(); }
   const headers = Object.assign({ Authorization: 'JWT ' + token() }, opts.json ? { 'Content-Type': 'application/json' } : {});
   const r = await fetch(API + path, { method: opts.method || 'GET', headers, body: opts.json ? JSON.stringify(opts.json) : opts.form });
   let d = null; const text = await r.text(); try { d = JSON.parse(text); } catch (e) { d = { raw: text.slice(0, 400) }; }
