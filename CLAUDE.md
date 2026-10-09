@@ -834,6 +834,23 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.06 — Firefox in the app, the AMO page filled in, and a source's address linked.**
+    - Mozilla listed the add-on (Tony: the page says "Add to Firefox"). `extensionStores.firefox`
+      (index.html; the beta's in tools/environments.json; the test copy has none). Each browser is
+      offered only its own store (extStoreUrl by extBrowser) — Tony: "suggest only the relevant
+      extension depending on the browser"; checked as Firefox and as Chrome with the real config.
+    - extInstalledFrom(): in Firefox always 'store' — Mozilla adds no update_url, so appmark.js says
+      "folder", and the app would have told a store copy to move to the store. Test: extension offer.
+    - Tony could not find where AMO keeps the privacy policy and screenshots: publish-extension-firefox.mjs
+      `listing()` (also when the version is already there) adds the two 1280×800 store screenshots
+      (previews), the privacy policy text from extension/PRIVACY.md (PATCH eula_policy, checked by
+      reading it back; else PATCH addon; else a warning to add it by hand), and the homepage (the beta) —
+      only what is missing. Checked against the stand-in AMO. Run the job by hand after the release.
+    - Tony's list, item 4: a source "Loosely based on https://food.walla.co.il/item/3333782?r=1" opened
+      the app (the recipe page gave anything not starting with http "#"). sourceUrlIn/sourceHtml: the
+      address inside the words is linked, the words kept (trailing punctuation left out); used on the
+      recipe page, a linked household's recipe, the shared page, collection parts, suggestion cards.
+      Test: source_words_and_link.
   - **TONY'S LIST (9 Oct 2026) — to do after the Firefox extension, in this order unless he says otherwise:**
     1. **Farm animals can be grabbed and moved** with the mouse or a finger, anywhere on the screen;
        they carry on from there and finish their walk across, even if the way is longer. Grabbing
@@ -842,11 +859,8 @@ found only because a test was written first and disagreed with the code.
        ingredients are doubled.
     3. **The recipe page can be enlarged on a computer** — by dragging a corner, or by clicking it
        (on a phone it is full size already).
-    4. **A source with words and a link:** a duplicated recipe's source "Loosely based on
-       https://food.walla.co.il/item/3333782?r=1" opened the app itself when clicked. Link the
-       address inside the text (and keep the words).
-    - And: once Mozilla lists the Firefox add-on, put https://addons.mozilla.org/firefox/addon/my-kitchen-notes/
-      in `extensionStores.firefox` (index.html, and the beta's in tools/environments.json).
+    4. ~~A source with words and a link~~ — done in v38.06.
+    - ~~Firefox store link in the app~~ — done in v38.06.
   - **Firefox add-on created (9 Oct 2026, 16:37 UTC):** the job, run by hand after Tony added
     AMO_JWT_ISSUER / AMO_JWT_SECRET — lint 0/0/0, Mozilla's check passed, "submitted: a new add-on",
     slug `my-kitchen-notes` → https://addons.mozilla.org/firefox/addon/my-kitchen-notes/.

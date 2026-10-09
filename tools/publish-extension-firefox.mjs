@@ -44,6 +44,47 @@ async function amo(path, opts = {}) {
 }
 const say = (x) => JSON.stringify(x.d).slice(0, 900);
 
+// v38.06 — Tony could not find where AMO keeps the privacy policy and the screenshots.
+// The job puts them on the add-on's page itself, once: what is there already is left alone.
+const tr = (v) => (v && typeof v === 'object') ? Object.values(v).filter(Boolean).join('') : String(v || '');
+async function listing() {
+  const id = encodeURIComponent(guid);
+  const a = await amo('addons/addon/' + id + '/');
+  if (a.status !== 200) { console.log('::warning::the listing could not be read (' + a.status + ') — screenshots and privacy policy not checked'); return; }
+  // Screenshots: the Chrome listing's two (1280×800).
+  const have = a.d.previews || [];
+  if (have.length) console.log('screenshots: ' + have.length + ' already on the page');
+  else {
+    const shots = ['store-1-button.png', 'store-2-in-the-app.png'];
+    for (let i = 0; i < shots.length; i++) {
+      const fd = new FormData();
+      fd.append('image', new Blob([readFileSync(new URL('extension/store/' + shots[i], root))], { type: 'image/png' }), shots[i]);
+      fd.append('position', String(i));
+      const r = await amo('addons/addon/' + id + '/previews/', { method: 'POST', form: fd });
+      console.log(r.status < 300 ? 'screenshot added: ' + shots[i] : '::warning::screenshot ' + shots[i] + ' not added (' + r.status + '): ' + say(r));
+    }
+  }
+  // The privacy policy: AMO keeps the text itself — extension/PRIVACY.md, as plain text.
+  const policyNow = async () => { const p = await amo('addons/addon/' + id + '/eula_policy/'); return p.status === 200 ? tr(p.d.privacy_policy) : null; };
+  const before = await policyNow();
+  if (before) console.log('privacy policy: already on the page');
+  else {
+    const text = readFileSync(new URL('extension/PRIVACY.md', root), 'utf8')
+      .replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const body = { privacy_policy: { 'en-US': text } };
+    let r = await amo('addons/addon/' + id + '/eula_policy/', { method: 'PATCH', json: body });
+    if (!(await policyNow())) r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: body });
+    console.log((await policyNow()) ? 'privacy policy added (' + text.length + ' characters)'
+      : '::warning::the privacy policy could not be set through the API (' + r.status + ': ' + say(r) + ') — it can be added by hand on the add-on\'s page in the Developer Hub');
+  }
+  // Its homepage: My Kitchen Notes, where the store copy sends recipes.
+  if (!a.d.homepage) {
+    const home = 'https://my-kitchen-notes-beta.pages.dev/';
+    const r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: { homepage: { 'en-US': home } } });
+    console.log(r.status < 300 ? 'homepage set: ' + home : '::warning::homepage not set (' + r.status + '): ' + say(r));
+  }
+}
+
 // 1. Is the add-on there yet, and does it already have this version?
 let addon = await amo('addons/addon/' + encodeURIComponent(guid) + '/');
 if (addon.status === 401 || addon.status === 403) {
@@ -56,6 +97,7 @@ if (!isNew) {
   const vs = await amo('addons/addon/' + encodeURIComponent(guid) + '/versions/?filter=all_with_unlisted&page_size=50');
   if ((vs.d && vs.d.results || []).some((v) => v.version === version)) {
     console.log('version ' + version + ' is already on addons.mozilla.org — nothing to upload');
+    await listing();
     process.exit(0);
   }
 }
@@ -105,6 +147,7 @@ if (isNew) {
 }
 if (res.status >= 300) { console.log('::error::uploaded and checked, but not submitted (' + res.status + '): ' + say(res)); process.exit(1); }
 
+await listing();
 const slug = (res.d && (res.d.slug || (res.d.addon && res.d.addon.slug))) || (addon.d && addon.d.slug) || 'my-kitchen-notes';
 console.log('submitted: ' + (isNew ? 'a new add-on' : 'version ' + version) + ' — its page: https://addons.mozilla.org/firefox/addon/' + slug + '/');
 console.log('::notice::Firefox: ' + (isNew ? 'the add-on is on addons.mozilla.org' : 'version ' + version + ' is submitted') + ' — https://addons.mozilla.org/firefox/addon/' + slug + '/ (Mozilla signs it after its check; a person may review it later).');

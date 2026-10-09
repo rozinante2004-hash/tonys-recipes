@@ -671,6 +671,38 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'source_words_and_link', group:'UI', name:'🔗 A source with words and an address links the address — "Loosely based on https://…" opens that page, not the app (v38.06)',
+    test: async()=>{
+      var cases=[
+        ['Loosely based on https://food.walla.co.il/item/3333782?r=1', 'https://food.walla.co.il/item/3333782?r=1', 'Loosely based on '],
+        ['https://example.com/cake', 'https://example.com/cake', ''],
+        ['מבוסס על https://food.walla.co.il/item/3333782?r=1.', 'https://food.walla.co.il/item/3333782?r=1', 'מבוסס על '],
+        ['(see https://example.com/a/b), thanks', 'https://example.com/a/b', '(see '],
+        ['Grandma Rosa', '', ''],
+        ['javascript:alert(1) and https://ok.example/x', 'https://ok.example/x', 'javascript:alert(1) and ']
+      ];
+      cases.forEach(function(c){
+        if(sourceUrlIn(c[0])!==c[1]) throw new Error('the address in "'+c[0]+'": '+sourceUrlIn(c[0]));
+        var div=document.createElement('div'); div.innerHTML=sourceHtml(c[0]);
+        var as=div.querySelectorAll('a');
+        if(c[1] ? (as.length!==1 || as[0].getAttribute('href')!==c[1] || as[0].target!=='_blank' || as[0].textContent!==c[1]) : as.length) throw new Error('the link for "'+c[0]+'": '+div.innerHTML);
+        if(div.textContent!==c[0]) throw new Error('the words were changed: '+div.textContent);
+        if(c[2] && div.firstChild.nodeType!==3) throw new Error('the words before the address are not plain text: '+div.innerHTML);
+      });
+      // The recipe page: the address is the link, never "#" (the app itself).
+      var real={ recipes:recipes.slice() };
+      var r={ id:987654, name:'Copy of a cake', category:'Dessert', emoji:'🍰', bg:'#f5e6d3', prep:'1h', servings:'8', difficulty:'Easy',
+              ingredients:[{a:'1',n:'egg'}], steps:['Bake.'], source:'Loosely based on https://food.walla.co.il/item/3333782?r=1', tags:[] };
+      try{
+        recipes.push(r); openView(r.id); await wait(300);
+        var sd=document.getElementById('srcDisplay-'+r.id), a=sd && sd.querySelector('a');
+        if(!a || a.getAttribute('href')!=='https://food.walla.co.il/item/3333782?r=1' || !/Loosely based on/.test(sd.textContent)) throw new Error('the recipe page: '+(sd ? sd.innerHTML.slice(0,200) : 'no source line'));
+        if(sd.querySelector('a[href="#"]')) throw new Error('the source still links to the app itself');
+      } finally {
+        closeM('viewOverlay'); recipes.length=0; real.recipes.forEach(function(x){ recipes.push(x); });
+      }
+    } },
+
   { id:'share_updates_the_app_first', group:'Import/Export', name:'A link shared into an older app: the app updates itself and imports the same link — nothing asked (v37.34)',
     test: async()=>{
       var real={ fetch:window.fetch, log:window.syncLog, toast:window.toast };
@@ -1078,6 +1110,19 @@ window.SELF_TESTS = [
         // Firefox, not listed: no Chrome download offered to it.
         setUA(FF); window._extStoresOverride={}; openExtensionOffer();
         if(dlg().querySelector('a[download],#extFolderBtn') || !/coming to Firefox/.test(dlg().textContent)) throw new Error('Firefox is offered the Chrome package');
+        // v38.06 — listed by Mozilla: one button to its page.
+        window._extStoresOverride={ firefox:'https://addons.mozilla.org/firefox/addon/my-kitchen-notes/' }; openExtensionOffer();
+        var fl=dlg().querySelector('#extStoreLink');
+        if(!fl || fl.getAttribute('href')!=='https://addons.mozilla.org/firefox/addon/my-kitchen-notes/' || !/Add to Firefox/.test(fl.textContent) || dlg().querySelector('a[download],#extFolderBtn')) throw new Error('Firefox is not offered its store: '+dlg().textContent.slice(0,160));
+        // …and installed from there: Mozilla adds no update_url, so the extension says "folder" — in Firefox it is the store's,
+        // never "move to the store" (Firefox keeps only signed extensions).
+        var ffLatest=_extLatest; _extLatest='9.9.9';
+        document.documentElement.setAttribute('data-mkn-extension-'+tag, '1.7.1'); document.documentElement.setAttribute('data-mkn-extension-'+tag+'-from', 'folder');
+        try{
+          if(extInstalledFrom()!=='store') throw new Error('in Firefox the installed extension is not taken as the store’s');
+          openExtensionOffer();
+          if(/now in the Firefox store|Remove/.test(dlg().textContent) || dlg().querySelector('a[download],#extFolderBtn,#extStoreLink')) throw new Error('Firefox’s own store copy is told to move to the store: '+dlg().textContent.slice(0,200));
+        } finally { _extLatest=ffLatest; document.documentElement.removeAttribute('data-mkn-extension-'+tag); document.documentElement.removeAttribute('data-mkn-extension-'+tag+'-from'); }
         // Installed already, and up to date: it says so, and offers nothing. (The latest
         // version pinned: once the app has read it — 8 s after opening — an older
         // installed one is rightly offered the update, which made this flaky.)

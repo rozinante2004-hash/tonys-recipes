@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.05 -->
+<!-- Tony's Recipes Collection v38.06 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -127,7 +127,7 @@
     extensionStores: Object.freeze({
       chrome:            'https://chrome.google.com/webstore/detail/dofokgilnfbpkjncmnkgfolhpjhpeglk',   // v37.80 — published (unlisted), 6 Oct 2026
       edge:              '',
-      firefox:           ''
+      firefox:           'https://addons.mozilla.org/firefox/addon/my-kitchen-notes/'   // v38.06 — listed by Mozilla, 9 Oct 2026
     }),
     githubRepo:          'rozinante2004-hash/tonys-recipes',
     siteOrigin:          'https://rozinante2004-hash.github.io',
@@ -5024,7 +5024,6 @@ function openLinkedRecipe(i) {
   var l = hhLinks().filter(function(x){ return x.hid === _linkedShow; })[0] || {};
   var c = _linkCache[_linkedShow] || { photos: {} };
   var src = c.photos[r.id] || (/^https?:/i.test(r.photo || '') ? r.photo : '');
-  var href = typeof safeUrl === 'function' ? safeUrl(r.source) : '';
   _linkedViewing = { r: r, hid: _linkedShow, photo: src };
   document.getElementById('linkedViewModal').innerHTML =
       '<div style="position:sticky;top:max(60px, env(safe-area-inset-top) + 52px);display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">'
@@ -5040,8 +5039,7 @@ function openLinkedRecipe(i) {
           : '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi><bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>'
           + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
     +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> '
-          + (href ? '<a href="' + escA(href) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);" data-no-i18n>' + escH(r.source) + '</a>'
-                  : '<span data-no-i18n>' + escH(r.source) + '</span>') + '</div>' : '')
+          + '<span dir="auto" data-no-i18n>' + sourceHtml(r.source) + '</span></div>' : '')
     +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + escH(r.notes) + '</div>' : '')
     +   linkedLinesHtml(r)
     +   '<div class="recipe-actions" style="margin-top:16px;">'
@@ -6692,7 +6690,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.05';
+var APP_VERSION = 'v38.06';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -6874,10 +6872,9 @@ function rHtml(r) {
     '<div style="font-size:12px;font-weight:700;color:#8B6914;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Notes</div>' +
     '<div dir="auto"' + langAttr(r.notes) + ' style="font-size:14px;color:#1C1A18;line-height:1.6;unicode-bidi:plaintext;">' + escH(r.notes) + '</div></div>' : '';
 
-  var srcHref = safeUrl(r.source);
   var sourceBlock = r.source
     ? '<div style="margin-top:8px;font-size:12px;color:#6F6A60;">Source: '
-      + (srcHref ? '<a href="' + escA(srcHref) + '" style="color:#C1440E;">' + escH(r.source) + '</a>' : escH(r.source))
+      + sourceHtml(r.source, 'color:#C1440E;')
       + '</div>'
     : '';
 
@@ -9457,7 +9454,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.05</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.06</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10168,7 +10165,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.05</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.06</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16055,13 +16052,10 @@ function collectionSectionsHtml(r) {
     // v36.11 — each recipe's OWN source, shown per recipe rather than once for
     // the whole collection. A round-up's entries each point at a different
     // page, and a clip has nothing else at all.
-    var href = typeof safeUrl === 'function' ? safeUrl(p.source) : (/^https?:\/\//i.test(p.source) ? p.source : '');
     var srcLine = p.source
       ? '<div style="font-size:11.5px;margin-top:3px;word-break:break-all;">'
         + '<span style="color:var(--muted);">Source: </span>'
-        + (href
-            ? '<a href="' + escA(href) + '" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">' + escH(p.source) + '</a>'
-            : '<span style="color:var(--muted);">' + escH(p.source) + '</span>')
+        + '<span dir="auto" data-no-i18n' + (sourceUrlIn(p.source) ? '' : ' style="color:var(--muted);"') + '>' + sourceHtml(p.source) + '</span>'
         + '</div>'
       : '';
     // A clip IS its link. Drawing two empty columns headed Ingredients and
@@ -16658,7 +16652,7 @@ function drawView(){
           : `<bdi>🍽 <span dir="auto" data-no-i18n>${escH(r.servings)}</span> servings</bdi>`}
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><bdi style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</bdi><span id="srcDisplay-${r.id}">${r.source ? `<a href="${escA(/^https?:\/\//i.test(r.source) ? r.source : '#')}" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);">${escH(r.source)}</a>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><bdi style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</bdi><span id="srcDisplay-${r.id}">${r.source ? `<span dir="auto" data-no-i18n style="word-break:break-word;">${sourceHtml(r.source)}</span>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<div class="nutrition-title">Nutrition per 100g</div>
@@ -18399,7 +18393,7 @@ function renderSuggestions(suggestions, containerId) {
       <div class="sug-card-body" dir="auto">
         <em>${escH(s.why||'')}</em><br><br>
         <strong>Key ingredients:</strong> ${(s.ingredients||[]).slice(0,5).map(i=>escH(i.n)).join(', ')}${(s.ingredients||[]).length>5?' &amp; more':''}
-        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<a href="${escA(safeUrl(s.source) || '#')}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--terracotta);">${escH(s.source)}</a>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
+        <br><br><span style="font-size:11px;color:var(--muted);font-weight:500;">Source: </span>${s.source ? `<span style="font-size:11px;" data-no-i18n>${sourceHtml(s.source, 'font-size:11px;color:var(--terracotta);')}</span>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">AI generated</span>`}
       </div>
       <div class="sug-card-footer">
         <button class="sug-add-btn" id="sugadd-${containerId}-${i}" onclick="addSuggestion(${i},'${containerId}')">+ Add to My Recipes</button>
@@ -19461,6 +19455,21 @@ function safeUrl(u){
   return s;                                        // relative or protocol-less
 }
 window.safeUrl = safeUrl;
+// v38.06 — Tony: a source of "Loosely based on https://food.walla.co.il/item/3333782?r=1"
+// opened the app itself — only a source that IS an address was linked (anything else
+// got "#", this page). The address inside the words is linked; the words stay as written.
+function sourceUrlIn(src) {
+  var m = String(src == null ? '' : src).match(/https?:\/\/[^\s<>"'\u201C\u201D]+/i);
+  return m ? m[0].replace(/[).,;:!?\]]+$/, '') : '';     // a sentence's own full stop is not the address's
+}
+function sourceHtml(src, style) {
+  var s = String(src == null ? '' : src), u = sourceUrlIn(s);
+  if (!u) return escH(s);
+  var i = s.indexOf(u);
+  return escH(s.slice(0, i)) + '<a href="' + escA(u) + '" target="_blank" rel="noopener noreferrer" style="' + escA(style || 'color:var(--terracotta);') + '">'
+    + escH(u) + '</a>' + escH(s.slice(i + u.length));
+}
+window.sourceUrlIn = sourceUrlIn; window.sourceHtml = sourceHtml;
 function rndEmoji(){return EMOJIS[Math.floor(Math.random()*EMOJIS.length)];}
 function rndBg(){return BGS[Math.floor(Math.random()*BGS.length)];}
 
@@ -30320,7 +30329,13 @@ var EXT_BROWSER_NAME = { chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', ope
 function extTag() { var e = String(APP_CONFIG.environment || 'live'); return e === 'beta' ? 'beta' : e === 'live' ? 'live' : 'test'; }
 function extInstalledVersion() { return document.documentElement.getAttribute('data-mkn-extension-' + extTag()) || ''; }
 // v37.52 (extension 1.6) — 'store' (updates itself) or 'folder' (by hand); '' before 1.6.
-function extInstalledFrom() { return document.documentElement.getAttribute('data-mkn-extension-' + extTag() + '-from') || ''; }
+function extInstalledFrom() {
+  var f = document.documentElement.getAttribute('data-mkn-extension-' + extTag() + '-from') || '';
+  // v38.06 — Firefox keeps only extensions Mozilla signed (its store, which updates them; one
+  // loaded from a folder is a developer's, gone at the next start). Mozilla adds no update_url,
+  // so the extension says "folder" there: in Firefox it is the store's.
+  return f && extBrowser() === 'firefox' ? 'store' : f;
+}
 function extStoreUrl(b) {
   var st = window._extStoresOverride || APP_CONFIG.extensionStores || {};
   var u = b === 'edge' ? st.edge : b === 'firefox' ? st.firefox : /^(chrome|brave|vivaldi|opera)$/.test(b) ? st.chrome : '';
