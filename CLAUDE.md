@@ -835,7 +835,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
-  - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony adds ANTHROPIC_API_KEY and the Cloud Datastore User role on 10 Oct — then run the job by hand (Actions → Translate new phrases → Run workflow) for the ~21 phrases waiting.**
+  - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then run the job by hand (Actions → Translate new phrases → Run workflow) for the ~21 phrases waiting.**
   - **v38.14 — new phrases are translated by GitHub after each release (no more "please run Update all
     supported languages").** Tony: "Is there a way you could run Update all supported languages in the
     family app once it is updated instead of every time asking me to do it?"
@@ -849,8 +849,23 @@ found only because a test was written first and disagreed with the code.
       → read again and merge), updateMask strings/count/updatedAt/by ("GitHub, after vX"), and
       i18n/_index langs.<lang> {at,count}; then it dispatches publish-languages (force=false).
       More than 600 gaps in one language = something is wrong: it stops.
-    - Needs: secret ANTHROPIC_API_KEY, and the FIREBASE_RULES_KEY service account given
+    - Needs: a way to reach Anthropic, and the FIREBASE_RULES_KEY service account given
       "Cloud Datastore User" on recipes-f379d (Tony). Without them: a warning, nothing done.
+    - **Anthropic by Workload Identity Federation (Tony, 9 Oct: Console suggested it while he made
+      the key).** Preferred — no key stored anywhere. The job (`id-token: write`) asks GitHub for its
+      signed identity (audience https://api.anthropic.com) and trades it at
+      https://api.anthropic.com/v1/oauth/token (grant jwt-bearer + federation_rule_id, organization_id,
+      service_account_id[, workspace_id]) for a ten-minute Bearer token, cached and reused for every
+      call. The four IDs are NOT secrets — repository VARIABLES ANTHROPIC_FEDERATION_RULE_ID /
+      _ORGANIZATION_ID / _SERVICE_ACCOUNT_ID / _WORKSPACE_ID. The rule in Claude Console (Settings →
+      Workload identity → GitHub Actions): issuer https://token.actions.githubusercontent.com,
+      subject `repo:rozinante2004-hash/tonys-recipes:ref:refs/heads/main`, audience
+      https://api.anthropic.com, Default workspace. Refused → 401 "Authentication failed"; the reason
+      is on the Console's History tab. ANTHROPIC_API_KEY still works as the fallback.
+    - A run in which every AI call failed now FAILS with the reason (the app's own code swallowed the
+      errors and the job used to end "the new phrases are in the shared translations"). Stand-in:
+      federation (1 identity, 1 exchange, Bearer on every call), refused federation (exit 1 with the
+      reason, nothing written), API key, and the race — all as expected.
     - Checked against a stand-in Firestore + Anthropic (scratch fake-store-ai.mjs): plain, and an admin
       edit made between read and write — kept ("שלי"), the job re-read and merged.
     - The probe found phrases no harvest could ever see (written by code): the answers window, Edge's

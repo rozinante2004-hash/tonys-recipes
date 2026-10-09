@@ -7,7 +7,9 @@
  * instead of every time asking me to do it? … it is delaying the publication of
  * the new translation to when I'm available to do it."
  *
- *     ANTHROPIC_API_KEY=… FIREBASE_RULES_KEY='<service account JSON>' node tools/translate-new.mjs
+ *     FIREBASE_RULES_KEY='<service account JSON>' node tools/translate-new.mjs   (in GitHub: Anthropic by
+ *       Workload Identity Federation — ANTHROPIC_FEDERATION_RULE_ID/_ORGANIZATION_ID/_SERVICE_ACCOUNT_ID
+ *       [/_WORKSPACE_ID] and the job's id-token — or else ANTHROPIC_API_KEY)
  *     node tools/translate-new.mjs --dry-run      what each language lacks; no AI, nothing written
  *
  * The app does the work itself. A hidden Chromium opens this checkout's
@@ -44,6 +46,37 @@ const projectId = field('projectId'), prefix = field('prefix'), indexPath = fiel
 if (!projectId || !prefix || !indexPath) { console.error('index.html has no complete languageSource'); process.exit(1); }
 const DOCS = process.env.LANG_SOURCE_BASE || `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/`;
 const AI_URL = process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages';
+const TOKEN_URL = process.env.ANTHROPIC_TOKEN_URL || 'https://api.anthropic.com/v1/oauth/token';
+
+// ── Anthropic: Workload Identity Federation (preferred), or an API key ─────────
+// Tony, creating the key: Anthropic suggested Workload Identity Federation. With it
+// no key is stored anywhere: this run asks GitHub for its own signed identity
+// (repo + branch), and Anthropic, checking it against the federation rule Tony set
+// up (this repository's `main` only), hands back a token that lasts ten minutes.
+const WIF = { rule: process.env.ANTHROPIC_FEDERATION_RULE_ID, org: process.env.ANTHROPIC_ORGANIZATION_ID,
+  sa: process.env.ANTHROPIC_SERVICE_ACCOUNT_ID, ws: process.env.ANTHROPIC_WORKSPACE_ID };
+const API_KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
+const wifReady = () => !!(WIF.rule && WIF.org && WIF.sa && process.env.ACTIONS_ID_TOKEN_REQUEST_URL && process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN);
+let _ant = { token: '', until: 0 };
+async function anthropicAuth() {
+  if (wifReady()) {
+    if (_ant.token && Date.now() < _ant.until - 60000) return { authorization: 'Bearer ' + _ant.token };
+    const gh = await fetch(process.env.ACTIONS_ID_TOKEN_REQUEST_URL + '&audience=' + encodeURIComponent('https://api.anthropic.com'),
+      { headers: { Authorization: 'Bearer ' + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN } });
+    const jwt = gh.ok ? (await gh.json()).value : '';
+    if (!jwt) throw new Error('GitHub gave this run no identity token (' + gh.status + ') — the workflow needs "id-token: write"');
+    const ex = { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt,
+      federation_rule_id: WIF.rule, organization_id: WIF.org, service_account_id: WIF.sa };
+    if (WIF.ws) ex.workspace_id = WIF.ws;
+    const r = await fetch(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ex) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.access_token) throw new Error('Anthropic did not accept this run\'s identity (' + r.status + ') — the reason is on Claude Console → Settings → Workload identity → History');
+    _ant = { token: d.access_token, until: Date.now() + (d.expires_in || 600) * 1000 };
+    return { authorization: 'Bearer ' + _ant.token };
+  }
+  if (API_KEY) return { 'x-api-key': API_KEY };
+  throw new Error('no way to reach Anthropic: neither Workload Identity Federation (ANTHROPIC_FEDERATION_RULE_ID, …) nor ANTHROPIC_API_KEY');
+}
 
 // ── Firestore, by REST (reading needs nothing: the rules let anyone read them) ──
 function val(v) {
@@ -147,14 +180,18 @@ try {
   }
 
   // 3. Translated by the app's own code; its AI calls answered from here.
-  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
-  if (!key) { console.log('::error::ANTHROPIC_API_KEY is not set — nothing translated'); process.exit(1); }
-  let calls = 0, inTok = 0, outTok = 0;
-  await page.exposeFunction('__ciAI', async (prompt, maxTokens, mdl, system) => {
+  if (!wifReady() && !API_KEY) { console.log('::error::no way to reach Anthropic (Workload Identity Federation or ANTHROPIC_API_KEY) — nothing translated'); process.exit(1); }
+  console.log('Anthropic by ' + (wifReady() ? 'Workload Identity Federation (no key stored)' : 'API key'));
+  let calls = 0, inTok = 0, outTok = 0, aiError = '';
+  // The app's own code catches a failed AI call and carries on; the reason is kept
+  // here, so a run that translated nothing says why instead of looking fine.
+  await page.exposeFunction('__ciAI', (prompt, maxTokens, mdl, system) => askAnthropic(prompt, maxTokens, mdl, system)
+    .catch(e => { aiError = (e && e.message) || String(e); throw e; }));
+  async function askAnthropic(prompt, maxTokens, mdl, system) {
     const body = { model: mdl || model, max_tokens: maxTokens || 2000, messages: [{ role: 'user', content: prompt }] };
     if (system) body.system = system;
     for (let attempt = 1; ; attempt++) {
-      const r = await fetch(AI_URL, { method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch(AI_URL, { method: 'POST', headers: Object.assign({ 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, await anthropicAuth()), body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
         calls++; inTok += (d.usage && d.usage.input_tokens) || 0; outTok += (d.usage && d.usage.output_tokens) || 0;
@@ -163,7 +200,7 @@ try {
       if ((r.status === 429 || r.status >= 500) && attempt < 5) { await new Promise(s => setTimeout(s, 4000 * attempt)); continue; }
       throw new Error('Anthropic answered ' + r.status + ': ' + JSON.stringify(d).slice(0, 300));
     }
-  });
+  }
   await page.evaluate(() => { window.aiCall = function (prompt, maxTokens, tools, model, system) { return window.__ciAI(prompt, maxTokens, model || null, system || null); }; });
   const results = [];
   for (const p of plan.filter(x => x.gaps.length)) {
@@ -179,6 +216,7 @@ try {
 
   // 4. Added to the central translations — to what is there NOW, never over it.
   const now = Date.now();
+  let wrote = 0;
   for (const r of results) {
     const n = Object.keys(r.filled).length;
     if (!n) { console.log(`  ${r.lang}: nothing came back` + (r.missing ? ` (${r.missing} still missing)` : '')); continue; }
@@ -194,10 +232,14 @@ try {
       if (w === 'changed') { console.log(`  ${r.lang}: changed meanwhile — reading it again`); continue; }
       await patchDoc(indexPath, { langs: { mapValue: { fields: { [r.lang]: { mapValue: { fields: { at: fsInt(now), count: fsInt(Object.keys(strings).length) } } } } } } }, null, ['langs.' + r.lang]);
       console.log(`  ${r.lang}: +${added}` + (r.missing ? ` (${r.missing} could not be translated)` : ''));
+      wrote += added;
       break;
     }
   }
-  console.log('::notice::Languages: the new phrases are in the shared translations — publish-languages puts them in i18n/*.json.');
+  if (aiError && !wrote) throw new Error('nothing was translated — ' + aiError);
+  if (aiError) console.log('::warning::some phrases were not translated — ' + aiError);
+  console.log(wrote ? '::notice::Languages: the new phrases are in the shared translations — publish-languages puts them in i18n/*.json.'
+    : 'Languages: nothing new to add.');
 } catch (e) {
   console.log('::error::' + (e && e.message || e));
   exitCode = 1;

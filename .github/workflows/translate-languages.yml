@@ -7,10 +7,14 @@ name: Translate new phrases
 # browser (tools/translate-new.mjs) — and ADDED to the central translations.
 # "Publish languages" then puts them in i18n/*.json, as after a run in the app.
 #
-# Needs two repository secrets: ANTHROPIC_API_KEY (the translations' AI), and
-# FIREBASE_RULES_KEY (already there for the rules) whose service account also
-# has the "Cloud Datastore User" role on recipes-f379d. Without them the job
-# says so and does nothing. "Run workflow" on this page runs it at once.
+# Anthropic (the translations' AI): by Workload Identity Federation — no key
+# stored; this run's GitHub identity is exchanged for a ten-minute token, allowed
+# by the federation rule in Claude Console for this repository's `main` only. Its
+# four IDs (not secrets) are repository variables: ANTHROPIC_FEDERATION_RULE_ID,
+# ANTHROPIC_ORGANIZATION_ID, ANTHROPIC_SERVICE_ACCOUNT_ID, ANTHROPIC_WORKSPACE_ID.
+# (Or else a secret ANTHROPIC_API_KEY.) And FIREBASE_RULES_KEY (already there for
+# the rules), whose service account also needs "Cloud Datastore User" on
+# recipes-f379d. Without them the job says so and does nothing.
 
 on:
   push:
@@ -21,6 +25,7 @@ on:
 permissions:
   contents: read
   actions: write
+  id-token: write      # this run's GitHub identity, for Anthropic's federation
 
 concurrency:
   group: translate-languages
@@ -31,6 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
+      ANTHROPIC_ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
+      ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
+      ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
       FIREBASE_RULES_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
     steps:
       - uses: actions/checkout@v5
@@ -44,8 +53,8 @@ jobs:
       - name: Are the keys there?
         id: key
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$FIREBASE_RULES_KEY" ]; then
-            echo "::warning::ANTHROPIC_API_KEY or FIREBASE_RULES_KEY is not set — the new phrases were NOT translated. Add them under Settings → Secrets and variables → Actions (or run 🔄 Update all supported languages in the family app)."
+          if { [ -z "$ANTHROPIC_FEDERATION_RULE_ID" ] && [ -z "$ANTHROPIC_API_KEY" ]; } || [ -z "$FIREBASE_RULES_KEY" ]; then
+            echo "::warning::No way to reach Anthropic (the federation's repository variables, or ANTHROPIC_API_KEY), or FIREBASE_RULES_KEY is missing — the new phrases were NOT translated (🔄 Update all supported languages in the family app still works)."
             echo "ok=false" >> "$GITHUB_OUTPUT"
           else
             echo "ok=true" >> "$GITHUB_OUTPUT"
