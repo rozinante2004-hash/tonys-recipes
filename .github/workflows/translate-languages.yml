@@ -1,0 +1,70 @@
+name: Translate new phrases
+
+# v38.14 — Tony: "Is there a way you could run Update all supported languages in
+# the family app once it is updated instead of every time asking me to do it?"
+# When a release reaches `main` (Tony's yes), the app's new phrases are
+# translated into every published language — by the app's own code, in a hidden
+# browser (tools/translate-new.mjs) — and ADDED to the central translations.
+# "Publish languages" then puts them in i18n/*.json, as after a run in the app.
+#
+# Needs two repository secrets: ANTHROPIC_API_KEY (the translations' AI), and
+# FIREBASE_RULES_KEY (already there for the rules) whose service account also
+# has the "Cloud Datastore User" role on recipes-f379d. Without them the job
+# says so and does nothing. "Run workflow" on this page runs it at once.
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["index.html"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: translate-languages
+  cancel-in-progress: false
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      FIREBASE_RULES_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Are the keys there?
+        id: key
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$FIREBASE_RULES_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY or FIREBASE_RULES_KEY is not set — the new phrases were NOT translated. Add them under Settings → Secrets and variables → Actions (or run 🔄 Update all supported languages in the family app)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install a browser for the app
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund playwright@1.56.1 google-auth-library@9 >/dev/null
+          npx playwright install --with-deps chromium
+
+      - name: Translate what is new, and add it to the shared translations
+        if: steps.key.outputs.ok == 'true'
+        run: node tools/translate-new.mjs
+
+      # The job's own token cannot start other workflows by pushing, so it asks directly.
+      - name: Publish them
+        if: steps.key.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish-languages.yml --ref main -f force=false

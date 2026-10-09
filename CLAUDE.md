@@ -834,6 +834,27 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
+  - **v38.14 — new phrases are translated by GitHub after each release (no more "please run Update all
+    supported languages").** Tony: "Is there a way you could run Update all supported languages in the
+    family app once it is updated instead of every time asking me to do it?"
+    - `.github/workflows/translate-languages.yml` (push to main touching index.html; or by hand) runs
+      `tools/translate-new.mjs`: a hidden Chromium opens the checkout's index.html; the APP collects
+      (i18nHarvest — both passes and the source scrape: 1,783 phrases signed out), finds each language's
+      gaps (i18nGapList against the CENTRAL doc read by REST) and translates them with its own
+      i18nTranslateAll — only `window.aiCall` is replaced, answered from Node straight from Anthropic
+      (ANTHROPIC_API_KEY, the app's AI_MODEL). The new phrases are ADDED (never replacing) to the
+      family project's i18n/<lang> with a `currentDocument.updateTime` precondition (changed meanwhile
+      → read again and merge), updateMask strings/count/updatedAt/by ("GitHub, after vX"), and
+      i18n/_index langs.<lang> {at,count}; then it dispatches publish-languages (force=false).
+      More than 600 gaps in one language = something is wrong: it stops.
+    - Needs: secret ANTHROPIC_API_KEY, and the FIREBASE_RULES_KEY service account given
+      "Cloud Datastore User" on recipes-f379d (Tony). Without them: a warning, nothing done.
+    - Checked against a stand-in Firestore + Anthropic (scratch fake-store-ai.mjs): plain, and an admin
+      edit made between read and write — kept ("שלי"), the job re-read and merged.
+    - The probe found phrases no harvest could ever see (written by code): the answers window, Edge's
+      and Opera's hints, the grip's titles, the answer pop-up's text (as a {1}/{2} pattern). Added to
+      I18N_EXTRA — the manual Update now translates them too.
   - **The name after "by" on AMO (9 Oct 2026).** Tony: the page said "… by Tony". It is the AMO
     ACCOUNT's display name (Edit My Profile → Display Name) — Tony changed it himself. The job only
     reports it ("shown as: by …"); it never changes it. The profile's e-mail is never printed.
