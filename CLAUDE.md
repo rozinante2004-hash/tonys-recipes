@@ -834,6 +834,11 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.13 — Edge goes to the Chrome Web Store (Tony's yes).** extStoreUrl('edge') = st.edge || st.chrome;
+    extStoreHint(): under the button, Edge's one extra step ("asks to allow extensions from other stores —
+    press Allow, then Add to Chrome: it installs in Edge"), Opera's ("Install Chrome Extensions" once);
+    extStoreName() for the "move from a folder to the store" words. Checked with the real config as Edge,
+    Opera and Chrome. Chrome published 1.7.2 (9 Oct, Tony's e-mail). Test: the extension offer test.
   - **Released to the family app and the beta: v38.12 (9 Oct 2026, Tony's yes, CI green on 18f4bd3; Pages: success).**
     The extension job run by hand: AMO says the add-on is "nominated" (waiting for Mozilla's review);
     versions: 1.7.2 unreviewed, 1.7.1 disabled (replaced in the queue by 1.7.2). Tony waits for Mozilla.

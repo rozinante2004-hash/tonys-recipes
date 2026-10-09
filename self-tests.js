@@ -1180,6 +1180,13 @@ window.SELF_TESTS = [
         // Edge: its own page in the steps.
         setUA(EDGE); openExtensionOffer();
         if(!/edge:\/\/extensions/.test(dlg().textContent)) throw new Error('Edge is told the Chrome page');
+        // v38.13 — Tony: Edge goes to the Chrome Web Store (until it has its own listing), told about Edge's one extra step.
+        window._extStoresOverride={ chrome:'https://chrome.google.com/webstore/detail/x' }; openExtensionOffer();
+        var es=dlg().querySelector('#extStoreLink');
+        if(!es || es.getAttribute('href')!=='https://chrome.google.com/webstore/detail/x' || !/Add to Edge/.test(es.textContent) || !/Allow/.test(dlg().textContent) || dlg().querySelector('a[download],#extFolderBtn')) throw new Error('Edge is not sent to the Chrome Web Store: '+dlg().textContent.slice(0,200));
+        setUA('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36 OPR/124.0'); openExtensionOffer();
+        if(!/Install Chrome Extensions/.test(dlg().textContent) || !dlg().querySelector('#extStoreLink')) throw new Error('Opera is not told its one extra step');
+        setUA(EDGE);
         // Listed in the store: ONE button, no steps.
         window._extStoresOverride={ edge:'https://microsoftedge.microsoft.com/addons/detail/x' }; openExtensionOffer();
         var st=dlg().querySelector('#extStoreLink');

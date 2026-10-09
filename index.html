@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.12 -->
+<!-- Tony's Recipes Collection v38.13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6690,7 +6690,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.12';
+var APP_VERSION = 'v38.13';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9470,7 +9470,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.12</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.13</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10181,7 +10181,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.12</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.13</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -30588,8 +30588,21 @@ function extInstalledFrom() {
 }
 function extStoreUrl(b) {
   var st = window._extStoresOverride || APP_CONFIG.extensionStores || {};
-  var u = b === 'edge' ? st.edge : b === 'firefox' ? st.firefox : /^(chrome|brave|vivaldi|opera)$/.test(b) ? st.chrome : '';
+  // v38.13 — Tony: "point Edge to the Chrome Web Store" — Edge installs from it (after a one-time
+  // "Allow extensions from other stores"), until Edge has a listing of its own.
+  var u = b === 'edge' ? (st.edge || st.chrome) : b === 'firefox' ? st.firefox : /^(chrome|brave|vivaldi|opera)$/.test(b) ? st.chrome : '';
   return /^https:\/\//.test(u || '') ? u : '';
+}
+// The one extra step a browser takes in another browser's store, said where the button is.
+function extStoreHint(b, name) {
+  var st = window._extStoresOverride || APP_CONFIG.extensionStores || {};
+  if (b === 'edge' && !st.edge) return 'The Chrome Web Store opens. Edge first asks to allow extensions from other stores \u2014 press Allow, then Add to Chrome: it installs in Edge.';
+  if (b === 'opera') return 'The Chrome Web Store opens. Opera first offers \u201CInstall Chrome Extensions\u201D \u2014 add it once, then Add to Opera.';
+  return name + ' asks you to confirm \u2014 that is all.';
+}
+function extStoreName(b, name) {
+  var st = window._extStoresOverride || APP_CONFIG.extensionStores || {};
+  return (b === 'edge' && !st.edge) || b === 'opera' || b === 'brave' || b === 'vivaldi' ? 'Chrome Web Store' : name + ' store';
 }
 function extDownloadUrl() { return 'downloads/my-kitchen-notes-extension' + (extTag() === 'live' ? '' : '-' + extTag().toUpperCase()) + '.zip'; }
 function openExtensionOffer() {
@@ -30606,7 +30619,7 @@ function openExtensionOffer() {
   var latest = _extLatest, older = !!(have && latest && verCmp(latest, have) > 0) && extInstalledFrom() !== 'store';
   // From a folder, and now in this browser's store: move to the store copy, which updates itself.
   if (have && store && extInstalledFrom() !== 'store') {
-    body = '<div style="font-size:13.5px;line-height:1.6;">It is now in the ' + escH(name) + ' store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on <b dir="ltr">' + escH(b) + '://extensions</b>, press <b>Remove</b> on the old My Kitchen Notes).</div>'
+    body = '<div style="font-size:13.5px;line-height:1.6;">It is now in the ' + escH(extStoreName(b, name)) + ', where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on <b dir="ltr">' + escH(b) + '://extensions</b>, press <b>Remove</b> on the old My Kitchen Notes).</div>'
       + '<div style="margin-top:10px;"><a id="extStoreLink" href="' + escA(store) + '" target="_blank" rel="noopener noreferrer" style="' + primary + '">\u2795 Add to ' + escH(name) + '</a></div>';
     older = false; have = '';
   }
@@ -30630,7 +30643,7 @@ function openExtensionOffer() {
   else if (have) body = '<div style="font-size:14px;font-weight:600;color:var(--ok-text,#2e7d32);">✅ It is already installed in ' + escH(name) + ' (version ' + escH(have) + ').</div>'
       + '<div style="font-size:13px;line-height:1.6;margin-top:6px;">On a Facebook, Instagram or TikTok post, press <b>\u{1F4D8} Save recipe</b> under it. On any other recipe site, press the toolbar button, or Alt+Shift+S.</div>';
   else if (store) body = '<a id="extStoreLink" href="' + escA(store) + '" target="_blank" rel="noopener noreferrer" style="' + primary + '">➕ Add to ' + escH(name) + '</a>'
-      + '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' + escH(name) + ' asks you to confirm — that is all.</div>';
+      + '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' + escH(extStoreHint(b, name)) + '</div>';
   else if (chromium) {
     var page = b + '://extensions';
     var saved = window._extFolder || null;
@@ -30750,7 +30763,7 @@ function maybeOfferExtensionUpdate(tries) {
 setTimeout(function(){ extLoadLatest().then(function(){ try { maybeOfferExtensionUpdate(0); } catch(e) {} }); }, 8000);
 window.verCmp = verCmp; window.extInstalledFrom = extInstalledFrom; window.extLoadLatest = extLoadLatest; window.maybeOfferExtensionUpdate = maybeOfferExtensionUpdate;
 window.openExtensionOffer = openExtensionOffer; window.extBrowser = extBrowser; window.extIsComputer = extIsComputer;
-window.extInstalledVersion = extInstalledVersion; window.extStoreUrl = extStoreUrl;
+window.extInstalledVersion = extInstalledVersion; window.extStoreUrl = extStoreUrl; window.extStoreHint = extStoreHint;
 
 
 // ─── SHORTCUTS AND EXTENSIONS (v37.47) ───────────────────────────────────────
