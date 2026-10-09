@@ -834,6 +834,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Released to the family app and the beta: v38.02–v38.05 + the Firefox job (9 Oct 2026, Tony's yes for v38.04 and v38.05, CI green on 0010010 and 1dccd77; Pages: success). "Submit the extension to the stores" ran: Chrome — 1.7.1 already there; Firefox — skipped, no AMO keys yet.**
   - **Firefox extension, ready to submit (9 Oct 2026; no app change).** Tony: "Can we create the same
     for Firefox as for chrome?" The Firefox package was built since 1.4 but never listed (Firefox
     keeps only Mozilla-signed extensions). build-extension.mjs: gecko `strict_min_version` 140.0 and
