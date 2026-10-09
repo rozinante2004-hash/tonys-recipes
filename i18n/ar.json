@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1791506457735,
- "count": 2059,
+ "updatedAt": 1791572039770,
+ "count": 2061,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -763,6 +763,7 @@
   "Restored {1} hidden item{2}": "تم استعادة {1} عنصر{2} مخفي",
   "Revoke access": "إلغاء الوصول",
   "Rosie the rabbit": "روزي الأرنبة",
+  "Running {1}/{2}…": "جارٍ التشغيل {1}/{2}…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT: لم تنتهِ {1} السحابية خلال {2} ثانية. كل شيء محفوظ على هذا الجهاز ولا شيء ضائع. غالبًا يكون السبب اتصالًا بطيئًا أو محجوبًا، أو رفعًا كبيرًا بشكل غير معتاد — فاستعادة الصور قد تصل لميغابايت أو اثنين. جرّب ⚙️ الإعدادات ← مزامنة الآن عندما يتحسن الاتصال.",
   "Salad": "سلطة",
   "Save": "حفظ",
@@ -1506,6 +1507,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ تسجيل الدخول تلقائيًا خلال {1} ثانية…",
   "⏳ Unzipping the extension…": "⏳ جارٍ فك ضغط الإضافة…",
   "⏳ waiting for them": "⏳ في انتظارهم",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ متوقف مؤقتًا عند {1}/{2} — يقلّل المتصفح من نشاط التبويب غير الظاهر. سيكمل العمل عند العودة لهذا التبويب.",
   "▦ Grid": "▦ شبكة",
   "▶ Execute Selected": "▶ تنفيذ المحدد",
   "▶ Run Again": "▶ تشغيل مرة أخرى",

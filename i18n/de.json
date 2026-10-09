@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1791506456604,
- "count": 2056,
+ "updatedAt": 1791572038798,
+ "count": 2058,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -762,6 +762,7 @@
   "Restored {1} hidden item{2}": "{1} verstecktes Element{2} wiederhergestellt",
   "Revoke access": "Zugriff widerrufen",
   "Rosie the rabbit": "Rosie, das Kaninchen",
+  "Running {1}/{2}…": "Läuft {1}/{2}…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT: {1} in der Cloud wurde nicht innerhalb von {2} Sekunden abgeschlossen. Alles ist auf diesem Gerät gespeichert, nichts geht verloren. Meist liegt es an einer langsamen oder blockierten Verbindung oder einem ungewöhnlich großen Upload — Fotos wiederherstellen kann ein, zwei Megabyte ausmachen. Versuch's über ⚙️ Einstellungen → Jetzt synchronisieren, wenn die Verbindung besser ist.",
   "Salad": "Salat",
   "Save": "Speichern",
@@ -1505,6 +1506,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Automatische Anmeldung in {1} Sekunden…",
   "⏳ Unzipping the extension…": "⏳ Erweiterung wird entpackt…",
   "⏳ waiting for them": "⏳ wartet auf sie",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ Pausiert bei {1}/{2} — der Browser bremst Tabs, die nicht im Vordergrund sind. Es geht weiter, sobald dieser Tab wieder aktiv ist.",
   "▦ Grid": "▦ Raster",
   "▶ Execute Selected": "▶ Auswahl ausführen",
   "▶ Run Again": "▶ Erneut ausführen",

@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791506590740,
- "count": 2595,
+ "updatedAt": 1791572041836,
+ "count": 2597,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1009,6 +1009,7 @@
   "Rosie the rabbit": "רוזי, הארנבת",
   "Rows are numbered, and dismissing does not reshuffle them ({1}f.{2})": "השורות ממוספרות, וסגירה לא מערבבת אותן ({1}f.{2})",
   "Run applyAriaLabels() after render/init so icon-only buttons get accessible names, keep aria-label on #searchInput and aria-live on #toast, and keep the Escape handler (closeTopModal).": "הרץ את applyAriaLabels() אחרי render/init כדי שכפתורים עם אייקון בלבד יקבלו שמות נגישים, שמור על aria-label ב-#searchInput ועל aria-live ב-#toast, ושמור על ה-handler של Escape (closeTopModal).",
+  "Running {1}/{2}…": "רץ {1}/{2}…",
   "Running {1}…": "מריץ {1}…",
   "Russian": "רוסית",
   "SPEND_CAP: this Worker's own daily ceiling for AI calls has been reached ({1}).": "SPEND_CAP: תקרת הקריאות היומית של ה-Worker הזה לבינה מלאכותית הגיעה לסיום ({1}).",
@@ -2020,6 +2021,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ מתחברים אוטומטית בעוד {1} שניות…",
   "⏳ Unzipping the extension…": "⏳ מחלץ את התוסף…",
   "⏳ waiting for them": "⏳ ממתין להם",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ מושהה ב-{1}/{2} — הדפדפן מאט כרטיסייה שאינה בחזית. הפעולה תימשך כשהכרטיסייה תחזור להיות בחזית.",
   "▦ Grid": "▦ רשת",
   "▶ Execute Selected": "▶ הפעל נבחרים",
   "▶ Run Again": "▶ הפעל שוב",

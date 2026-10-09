@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1791506464743,
- "count": 2058,
+ "updatedAt": 1791572037775,
+ "count": 2060,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -762,6 +762,7 @@
   "Restored {1} hidden item{2}": "{1} élément{2} masqué{2} restauré{2}",
   "Revoke access": "Révoquer l'accès",
   "Rosie the rabbit": "Rosie la lapine",
+  "Running {1}/{2}…": "Exécution {1}/{2}…",
   "SYNC_TIMEOUT: the cloud {1} did not finish within {2} seconds. Everything is saved on this device and nothing is lost. This is usually a slow or blocked connection, or an unusually large upload — restoring photos can be a megabyte or two. Try ⚙️ Settings → Sync now when the connection is better.": "SYNC_TIMEOUT : la {1} cloud n'a pas terminé en {2} secondes. Tout est enregistré sur cet appareil, rien n'est perdu. C'est souvent une connexion lente ou bloquée, ou un envoi inhabituellement volumineux — restaurer des photos peut peser un mégaoctet ou deux. Essayez ⚙️ Réglages → Synchroniser maintenant quand la connexion sera meilleure.",
   "Salad": "Salade",
   "Save": "Enregistrer",
@@ -1505,6 +1506,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Connexion automatique dans {1} secondes…",
   "⏳ Unzipping the extension…": "⏳ Décompression de l'extension…",
   "⏳ waiting for them": "⏳ en attente de leur réponse",
+  "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ En pause à {1}/{2} — le navigateur ralentit les onglets qui ne sont pas au premier plan. Ça reprend dès que cet onglet repasse au premier plan.",
   "▦ Grid": "▦ Grille",
   "▶ Execute Selected": "▶ Exécuter la sélection",
   "▶ Run Again": "▶ Relancer",
