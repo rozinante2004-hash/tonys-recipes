@@ -263,7 +263,8 @@ window.SELF_TESTS = [
         signal:AbortSignal.timeout(10000)});
       if(!resp.ok) throw new Error('photo-search returned '+resp.status);
       const data=await resp.json();
-      if(!data.images||!data.images.length) throw new Error('No photos returned');
+      // v38.02 — the test copy said only "No photos returned": the server's own word with it.
+      if(!data.images||!data.images.length) throw new Error('No photos returned'+(data.error ? ' — the server said: '+String(data.error).slice(0,200) : (data.notConfigured ? ' — Pixabay has no key on the Worker' : '')));
     }
   },
   { id:'net_instagram',  group:'Network', name:'Instagram fetch (test post)',
@@ -1098,7 +1099,14 @@ window.SELF_TESTS = [
       var kept=null; try{ kept=localStorage.getItem(DEVICE_OFFER_KEY); }catch(e){}
       var realEv=window._pwaInstallEvent, realAsk=window.askChoice, realOpen=window.open, opened=null;
       var dlg=function(){ return document.getElementById('deviceOfferOverlay'); };
+      // v38.02 — Tony's beta: "an iPhone is not offered the shortcut". His account remembers the
+      // shortcut is offered or in use on his iPhone, and the test read that (signed in, a run could also
+      // write "offered" marks to the account). Now it runs as a new person on a new device: no account,
+      // nothing remembered, nothing written.
+      var realCloud=_offersCloud, realUser=window._fbUser, realAuth=window._fbAuth, usedKept=null;
+      try{ usedKept=localStorage.getItem(IOS_SHORTCUT_USED_KEY); }catch(e){}
       try{
+        _offersCloud={}; window._fbUser=null; window._fbAuth={ currentUser:null }; localStorage.removeItem(IOS_SHORTCUT_USED_KEY);
         // The section shows only what fits this device.
         setUA(CHROME); refreshShortcutsSection();
         if(!vis('shortcutsSection') || !vis('extensionItem') || vis('iosShortcutItem') || vis('androidShareItem')) throw new Error('a computer\'s section is wrong');
@@ -1140,6 +1148,8 @@ window.SELF_TESTS = [
       } finally {
         delete window._deviceOfferForce; delete window._iosShortcutOverride; _pwaInstallEvent=realEv; window.askChoice=realAsk; window.open=realOpen;
         try{ if(kept===null) localStorage.removeItem(DEVICE_OFFER_KEY); else localStorage.setItem(DEVICE_OFFER_KEY, kept); }catch(e){}
+        _offersCloud=realCloud; window._fbUser=realUser; window._fbAuth=realAuth;
+        try{ if(usedKept===null) localStorage.removeItem(IOS_SHORTCUT_USED_KEY); else localStorage.setItem(IOS_SHORTCUT_USED_KEY, usedKept); }catch(e){}
         try{ delete navigator.userAgent; }catch(e){}
         var o=dlg(); if(o) o.remove(); refreshShortcutsSection();
       }
@@ -1599,6 +1609,7 @@ window.SELF_TESTS = [
         window.isAppOwner=function(){ return true; }; _workerHealth=null;
         window.fetch=async function(){ return new Response('{"error":"METER: not set up"}', { status:503 }); };
         var dot=document.getElementById('feedbackDot');
+        pathDots({ links:0, replies:0 });    // v38.02 — only the notes' own dot is measured here (restored after)
         if(!feedbackInboxHere()){
           await openManagement();
           if(/Feedback/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the notes are shown in the '+APP_CONFIG.environment+' copy (only the family app reads them)');
@@ -1655,6 +1666,7 @@ window.SELF_TESTS = [
         var o=document.getElementById('feedbackOverlay'); if(o) o.remove();
         if(window.mknManage) mknManage.close();
         renderFeedbackButton();
+        try{ linkDotRefresh(); fbRepliesDot(); }catch(e){}
       }
     } },
 
@@ -1811,6 +1823,34 @@ window.SELF_TESTS = [
         var o2=document.getElementById('feedbackOverlay'); if(o2) o2.remove();
         var o3=document.getElementById('fbRepliesOverlay'); if(o3) o3.remove();
         renderFeedbackButton(); fbRepliesDot();
+      }
+    } },
+
+  { id:'selftest_waits_in_front', group:'UI', name:'🧪 The Self Test waits while its tab is behind another (the browser holds such a tab back) and carries on in front; the report says so (v38.02)',
+    test: async()=>{
+      var was=Object.assign({}, _selfTestPaused, { retried:_selfTestPaused.retried.slice() });
+      var prog=document.getElementById('selfTestProgress'), progWas=prog ? prog.textContent : '';
+      var done=false, p;
+      try{
+        Object.defineProperty(document, 'hidden', { value:true, configurable:true });
+        Object.defineProperty(navigator, 'webdriver', { value:false, configurable:true });
+        p=selfTestWaitVisible(4, 10).then(function(){ done=true; });
+        await new Promise(function(r){ setTimeout(r, 150); });
+        if(done) throw new Error('it ran on in a tab that is not in front');
+        if(prog && !/Paused at 5\/10/.test(prog.textContent)) throw new Error('it does not say it is waiting: '+prog.textContent);
+        Object.defineProperty(document, 'hidden', { value:false, configurable:true });
+        document.dispatchEvent(new Event('visibilitychange'));
+        await p;
+        if(!done || _selfTestPaused.times!==was.times+1) throw new Error('it did not carry on in front');
+        _selfTestPaused.retried.push('farm_visitors');
+        var rep=selfTestReportText();
+        if(!/paused:\s+\d+ times? while this tab was not in front .*run again in front: .*farm_visitors/.test(rep)) throw new Error('the report does not say it waited: '+(rep.match(/paused:.*/)||['(no line)'])[0]);
+      } finally {
+        try{ delete document.hidden; }catch(e){}
+        try{ delete navigator.webdriver; }catch(e){}
+        if(!done){ try{ document.dispatchEvent(new Event('visibilitychange')); }catch(e){} }
+        _selfTestPaused=was;
+        if(prog) prog.textContent=progWas;
       }
     } },
 
@@ -6341,7 +6381,12 @@ window.SELF_TESTS = [
         batch:function(){ var ops=[]; return { delete:function(r){ ops.push(r.path); }, set:function(){}, commit:async function(){ batchDeletes.push(ops); } }; } };
       var real={ db:window._fbDb, user:window._fbUser, hh:window._household, ask:window.askConfirm, load:window.hhLoadLinks, toast:window.toast, home:window.hhSetHome };
       var asked=[];
+      // v38.02 — Tony's family app: "opening the page did not clear the dots". The ⚙️ dot is EVERY
+      // red dot (his new notes, an answer to his own note); this test is about link requests alone,
+      // so the others are set aside here and put back after.
+      var dotsWere=Object.assign({}, _pathDots);
       try{
+        pathDots({ feedback:0, replies:0 });
         window._fbDb=fake; window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true }; window.toast=function(){};
         window._household={ hid:'hA', role:'owner', name:'My Kitchen', code:'MKN-AAAA-2222', appRequests:true,
           links:[{ hid:'hL', name:'Linked Kitchen', code:'MKN-LLLL-3333', at:now-864e5 }], asking:[{ id:'hA_hS', label:'MKN-SSSS-7777' }] };
@@ -6389,7 +6434,7 @@ window.SELF_TESTS = [
         window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.hhLoadLinks=real.load; window.toast=real.toast; window.hhSetHome=real.home;
         try{ localStorage.removeItem(LINK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
         var o=document.getElementById('linkReqOverlay'); if(o) o.remove();
-        _linkState={ pending:[], declined:[], log:{}, loadedFor:'' }; pathDots({ links:0 });
+        _linkState={ pending:[], declined:[], log:{}, loadedFor:'' }; pathDots(dotsWere);
       }
     } },
 

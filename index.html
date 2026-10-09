@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.01 -->
+<!-- Tony's Recipes Collection v38.02 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2423,6 +2423,27 @@ function _selfTestCloseDialogs(ids) {
 }
 window._selfTestPark = _selfTestPark; window._selfTestUnpark = _selfTestUnpark;
 
+// v38.02 — Tony ran the Self Test in three tabs at once: "the tests run only when the
+// page is active. If I switch to a different tab in the browser, they stop." Right: a
+// browser all but stops a tab that is not in front — no animation frames, its timers
+// once a second and after five minutes once a minute — so a test that watches an
+// animal walk fails there through no fault of the app. The run waits between tests
+// while its tab is hidden, says so, and the report says how long it waited.
+var _selfTestPaused = { times: 0, ms: 0, retried: [] };
+async function selfTestWaitVisible(i, n) {
+  if (!document.hidden || navigator.webdriver) return 0;
+  var t0 = Date.now(), prog = document.getElementById('selfTestProgress');
+  _selfTestPaused.times++;
+  if (prog) prog.textContent = '⏸ Paused at ' + (i + 1) + '/' + n + ' — the browser holds back a tab that is not in front. It carries on when this tab is in front again.';
+  await new Promise(function(res){
+    function on() { if (!document.hidden) { document.removeEventListener('visibilitychange', on); res(); } }
+    document.addEventListener('visibilitychange', on);
+  });
+  if (prog) prog.textContent = 'Running ' + (i + 1) + '/' + n + '…';
+  await wait(400);                                  // the page catches up
+  _selfTestPaused.ms += Date.now() - t0;
+  return Date.now() - t0;
+}
 async function runSelfTests() {
   if(_selfTestRunning) return;
   _selfTestRunning = true;
@@ -2439,10 +2460,16 @@ async function runSelfTests() {
 
   // Everything the suite puts aside — see _selfTestPark.
   var _parked = await _selfTestPark();
+  _selfTestPaused = { times: 0, ms: 0, retried: [] };
+  var _hiddenSince = false;
+  var _onHide = function(){ if (document.hidden) _hiddenSince = true; };
+  document.addEventListener('visibilitychange', _onHide);
   try {
 
   for(let i=0; i<toRun.length; i++) {
     const t = toRun[i];
+    await selfTestWaitVisible(i, toRun.length);
+    _hiddenSince = false;
     const statusEl  = document.getElementById('ststat_'+t.id);
     const detailBtn = document.getElementById('stdetail_'+t.id);
     const row       = document.getElementById('strow_'+t.id);
@@ -2460,7 +2487,17 @@ async function runSelfTests() {
     // happens to close it ("Unsaved changes" on Tony's phone for a minute).
     var _openBefore = _selfTestOpenDialogs();
     try {
-      await t.test();
+      // v38.02 — a test the browser held back (its tab went behind another) and that
+      // failed is run once more, in front: animals do not walk in a tab nobody sees.
+      try { await t.test(); }
+      catch (e0) {
+        if (!_hiddenSince && !document.hidden) throw e0;
+        try { _selfTestCloseDialogs(_selfTestOpenDialogs().filter(function(id){ return _openBefore.indexOf(id) === -1; })); } catch(e) {}
+        await selfTestWaitVisible(i, toRun.length);
+        _selfTestPaused.retried.push(t.id);
+        _hiddenSince = false;
+        await t.test();
+      }
       var _stranded = _selfTestOpenDialogs().filter(function(id){ return _openBefore.indexOf(id) === -1; });
       if (_stranded.length) {
         _selfTestCloseDialogs(_stranded);
@@ -2484,6 +2521,7 @@ async function runSelfTests() {
   }
 
   } finally {
+    document.removeEventListener('visibilitychange', _onHide);
     _selfTestUnpark(_parked);    // language, units, sync state, backup record, cloud
   }
 
@@ -2559,6 +2597,10 @@ function selfTestReportText() {
   L.push('run at:        ' + (_selfTestStartedAt ? _selfTestStartedAt.toISOString() : new Date().toISOString()));
   L.push('result:        ' + passing.length + ' passed, ' + failing.length + ' failed, '
          + _selfTestNotRun.length + ' not run (' + SELF_TESTS.length + ' in suite)');
+  // v38.02 — how long it waited while its tab was behind another, and what it ran again in front.
+  if (_selfTestPaused.times || _selfTestPaused.retried.length)
+    L.push('paused:        ' + _selfTestPaused.times + ' time' + (_selfTestPaused.times === 1 ? '' : 's') + ' while this tab was not in front ('
+           + Math.round(_selfTestPaused.ms / 1000) + ' s)' + (_selfTestPaused.retried.length ? '; run again in front: ' + _selfTestPaused.retried.join(', ') : ''));
   L.push('');
 
   // ── Environment. Half of what I ask for after a bug report is here. ────────
@@ -6642,7 +6684,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.01';
+var APP_VERSION = 'v38.02';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9402,7 +9444,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.01</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.02</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10113,7 +10155,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.01</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.02</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

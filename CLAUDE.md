@@ -834,6 +834,22 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.02 — Self Test: waits while its tab is behind another; two tests no longer read Tony's own state.**
+    - Tony ran the Self Test in three tabs at once: "the tests run only when the page is active."
+      Right — a hidden tab gets no animation frames, timers once a second (once a minute after
+      5 min). runSelfTests now waits BETWEEN tests while `document.hidden` (selfTestWaitVisible,
+      "⏸ Paused at n/N…"; not under webdriver), and a test that failed after its tab was hidden
+      runs once more in front. The report: `paused: N times … (s); run again in front: ids`.
+      Test: selftest_waits_in_front. For parallel runs: separate WINDOWS, side by side.
+    - link_requests_page failed in the family app: "opening the page did not clear the dots" — the
+      ⚙️ dot is every source (Tony's new notes, answers); the test now sets the others aside and
+      puts every count back (`pathDots(dotsWere)`, was `pathDots({links:0})`). feedback_notes too.
+    - shortcuts_and_extensions failed in the beta: "an iPhone is not offered the shortcut" — his
+      account remembers the iPhone (`_offersCloud`). The test now runs signed out with
+      `_offersCloud={}` and no IOS_SHORTCUT_USED_KEY, restored after — and so can no longer write
+      offered_* marks to the real account. Both reproduced under his conditions, then fixed.
+    - net_photo on the test copy: "No photos returned" with no reason (family and beta passed at
+      the same moment). It now adds the server's own error (or "no key").
   - **Released to the family app and the beta: v38.00 + v38.01 (8 Oct 2026, Tony's yes, CI green on 633acef; Pages: success). Worker v68 published itself (Deploy the Worker 37853407026: checks, publish, live health says v68 — success). No rules or extension change.**
   - **v38.01 — the farm window stays open after saving; a deeper male voice.**
     - Tony: "Please do not close the 🐄 The farm visitors modal after clicking save for
