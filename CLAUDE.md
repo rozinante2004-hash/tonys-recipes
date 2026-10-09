@@ -834,6 +834,22 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **TONY'S LIST (9 Oct 2026) — to do after the Firefox extension, in this order unless he says otherwise:**
+    1. **Farm animals can be grabbed and moved** with the mouse or a finger, anywhere on the screen;
+       they carry on from there and finish their walk across, even if the way is longer. Grabbing
+       is silent — a click or tap still makes them speak.
+    2. **Multiplying a recipe scales the method too:** "add 2 spoons of milk" says 4 when the
+       ingredients are doubled.
+    3. **The recipe page can be enlarged on a computer** — by dragging a corner, or by clicking it
+       (on a phone it is full size already).
+    4. **A source with words and a link:** a duplicated recipe's source "Loosely based on
+       https://food.walla.co.il/item/3333782?r=1" opened the app itself when clicked. Link the
+       address inside the text (and keep the words).
+    - And: once Mozilla lists the Firefox add-on, put https://addons.mozilla.org/firefox/addon/my-kitchen-notes/
+      in `extensionStores.firefox` (index.html, and the beta's in tools/environments.json).
+  - **Firefox add-on created (9 Oct 2026, 16:37 UTC):** the job, run by hand after Tony added
+    AMO_JWT_ISSUER / AMO_JWT_SECRET — lint 0/0/0, Mozilla's check passed, "submitted: a new add-on",
+    slug `my-kitchen-notes` → https://addons.mozilla.org/firefox/addon/my-kitchen-notes/.
   - **Released to the family app and the beta: v38.02–v38.05 + the Firefox job (9 Oct 2026, Tony's yes for v38.04 and v38.05, CI green on 0010010 and 1dccd77; Pages: success). "Submit the extension to the stores" ran: Chrome — 1.7.1 already there; Firefox — skipped, no AMO keys yet.**
   - **Firefox extension, ready to submit (9 Oct 2026; no app change).** Tony: "Can we create the same
     for Firefox as for chrome?" The Firefox package was built since 1.4 but never listed (Firefox
