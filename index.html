@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.08 -->
+<!-- Tony's Recipes Collection v38.09 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6690,7 +6690,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.08';
+var APP_VERSION = 'v38.09';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7688,6 +7688,14 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
    A finger on an animal moves the animal, not the page; held, it is lifted off the ground. */
 .farm-visitor { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .farm-visitor * { -webkit-user-drag: none; }
+/* v38.09 — the recipe window's corner grip (computers): drag to resize, click for full size. */
+.view-grip { position: fixed; z-index: 2; width: 26px; height: 26px; padding: 4px; border: none; border-radius: 6px 0 14px 0;
+  background: transparent; color: var(--muted); cursor: nwse-resize; opacity: .8; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.view-grip:hover { opacity: 1; color: var(--terracotta); background: rgba(193,68,14,.10); }
+.view-grip:focus-visible { outline: 2px solid var(--terracotta); outline-offset: 1px; opacity: 1; }
+.view-grip[hidden] { display: none; }
+#viewModal.view-sized { animation: none; }
+@media print { .view-grip { display: none !important; } }
 /* v38.08 — an amount in the method, multiplied with the recipe: marked, the original on hover. */
 .step-scaled { font-weight: 700; color: var(--terracotta, #C1440E); border-bottom: 1px dotted currentColor; cursor: help; }
 .farm-visitor.fv-held { cursor: grabbing; filter: drop-shadow(0 14px 10px rgba(0,0,0,.28)); }
@@ -9462,7 +9470,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.08</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.09</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10173,7 +10181,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.08</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.09</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15936,7 +15944,97 @@ function openView(id){
   loadLineMark(id);   // "never lose the line I'm on" — restored per recipe
   drawView();
   trapFocus('viewOverlay');   // 5c.1b — the dialog takes focus, and gives it back on close
+  viewSizeApply();            // v38.09 — the size chosen on this computer
 }
+
+// ─── THE RECIPE WINDOW'S SIZE (v38.09) ───────────────────────────────────────
+// Tony: "Allow expansion of the recipe page (more relevant for PC, as it already
+// expand to its maximum on a mobile) by dragging one corner or clicking it." On a
+// computer a grip sits in the window's bottom-right corner: drag it and the window
+// grows or shrinks (it stays centred, so it grows on both sides while the corner
+// follows the pointer); click it for full size, and again for the usual size. The
+// size is kept on this device, for every recipe. Phones: no grip — full size already.
+var VIEW_SIZE_KEY = 'tonys_view_size', _viewDrag = null, _viewResizedAt = 0;
+function viewSizeOn() {
+  if (window._viewSizeForce !== undefined) return !!window._viewSizeForce;      // the Self Test
+  try { return matchMedia('(pointer: fine)').matches && window.innerWidth >= 700; } catch(e) { return false; }
+}
+function viewSizeSaved() {
+  try { var v = JSON.parse(localStorage.getItem(VIEW_SIZE_KEY) || 'null'); return v && (v.max || (v.w > 0 && v.h > 0)) ? v : null; } catch(e) { return null; }
+}
+function viewSizeSet(v, keep) {
+  var m = document.getElementById('viewModal'); if (!m) return;
+  if (!v) {
+    m.style.width = m.style.maxWidth = m.style.height = m.style.maxHeight = '';
+    m.classList.remove('view-sized', 'view-max');
+  } else {
+    var W = window.innerWidth - 16, H = window.innerHeight - 16;
+    var w = v.max ? W : Math.max(Math.min(480, W), Math.min(W, v.w)), h = v.max ? H : Math.max(Math.min(360, H), Math.min(H, v.h));
+    m.style.maxWidth = 'none'; m.style.maxHeight = 'none'; m.style.width = Math.round(w) + 'px'; m.style.height = Math.round(h) + 'px';
+    m.classList.add('view-sized'); m.classList.toggle('view-max', !!v.max);
+  }
+  if (keep) { try { if (v) localStorage.setItem(VIEW_SIZE_KEY, JSON.stringify(v)); else localStorage.removeItem(VIEW_SIZE_KEY); } catch(e) {} }
+  viewGripPlace();
+}
+function viewGripPlace() {
+  var g = document.getElementById('viewGrip'), m = document.getElementById('viewModal'), ov = document.getElementById('viewOverlay');
+  if (!g || !m || !ov) return;
+  if (!viewSizeOn() || !ov.classList.contains('open')) { g.hidden = true; return; }
+  var r = m.getBoundingClientRect(), max = m.classList.contains('view-max');
+  g.hidden = false;
+  g.style.left = Math.round(r.right - 28) + 'px'; g.style.top = Math.round(r.bottom - 28) + 'px';
+  g.title = max ? 'Drag to resize — click for the usual size' : 'Drag to make the recipe bigger or smaller — click for full size';
+  g.setAttribute('aria-label', max ? 'Usual size' : 'Full size');
+}
+function viewGripEnsure() {
+  var ov = document.getElementById('viewOverlay');
+  if (!ov || document.getElementById('viewGrip')) return;
+  var g = document.createElement('button');
+  g.type = 'button'; g.id = 'viewGrip'; g.className = 'view-grip'; g.hidden = true;
+  g.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M15 5 5 15M15 10 10 15M15 0.5 0.5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>';
+  g.addEventListener('click', function(e) { e.stopPropagation(); });       // never the backdrop's close
+  g.addEventListener('pointerdown', viewGripDown);
+  ov.appendChild(g);
+  try { new ResizeObserver(function(){ viewGripPlace(); }).observe(document.getElementById('viewModal')); } catch(e) {}
+  window.addEventListener('resize', function() {
+    var o = document.getElementById('viewOverlay');
+    if (o && o.classList.contains('open')) viewSizeSet(viewSizeOn() ? viewSizeSaved() : null, false);
+  });
+}
+function viewGripDown(e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  var r = document.getElementById('viewModal').getBoundingClientRect();
+  _viewDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, w: r.width, h: r.height, moved: false };
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch(err) {}
+  window.addEventListener('pointermove', viewGripMove, true);
+  window.addEventListener('pointerup', viewGripUp, true);
+  window.addEventListener('pointercancel', viewGripUp, true);
+}
+function viewGripMove(e) {
+  var d = _viewDrag; if (!d || e.pointerId !== d.id) return;
+  var dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+  if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+  d.moved = true;
+  viewSizeSet({ w: d.w + 2 * dx, h: d.h + 2 * dy }, false);     // centred: both sides move, the corner follows
+}
+function viewGripUp(e) {
+  var d = _viewDrag; if (!d || e.pointerId !== d.id) return;
+  window.removeEventListener('pointermove', viewGripMove, true);
+  window.removeEventListener('pointerup', viewGripUp, true);
+  window.removeEventListener('pointercancel', viewGripUp, true);
+  _viewDrag = null; _viewResizedAt = Date.now();
+  var m = document.getElementById('viewModal');
+  if (d.moved) { var r = m.getBoundingClientRect(); viewSizeSet({ w: Math.round(r.width), h: Math.round(r.height) }, true); }
+  else viewSizeSet(m.classList.contains('view-max') ? null : { max: true }, true);   // a click: full size, or back
+}
+function viewSizeApply() {
+  viewGripEnsure();
+  viewSizeSet(viewSizeOn() ? viewSizeSaved() : null, false);
+  requestAnimationFrame(viewGripPlace);
+  setTimeout(viewGripPlace, 320);          // after the window's opening slide
+}
+window.viewSizeApply = viewSizeApply; window.viewSizeSet = viewSizeSet; window.viewGripPlace = viewGripPlace;
 
 // Which way round does this recipe read? Used for LAYOUT only — which side the
 // ingredients column sits on. Text alignment stays with dir="auto" per element,
@@ -19460,7 +19558,10 @@ window.showUnsavedChanges = showUnsavedChanges;
 window.unsavedSave = unsavedSave;
 window.unsavedDiscard = unsavedDiscard;
 window.unsavedKeepEditing = unsavedKeepEditing;
-function bgClose(e,id){if(e.target===document.getElementById(id))closeM(id);}
+function bgClose(e,id){
+  if (id === 'viewOverlay' && Date.now() - _viewResizedAt < 500) return;   // v38.09 — the end of a resize is not a click outside
+  if(e.target===document.getElementById(id))closeM(id);
+}
 function openExploreModal(){
   ingTags=[];renderIngTags();
   document.getElementById('exploreResult').innerHTML='';

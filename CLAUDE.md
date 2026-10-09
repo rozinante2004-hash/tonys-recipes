@@ -834,6 +834,15 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.09 — the recipe window can be enlarged on a computer (Tony's list, item 3).** A grip
+    (`#viewGrip`, a button in #viewOverlay, placed by viewGripPlace at the modal's bottom-right;
+    ResizeObserver + window resize + after the opening slide) on computers only (viewSizeOn:
+    pointer fine and ≥ 700 px; `_viewSizeForce` for the test). Drag: width/height = start + 2×delta
+    (the window is centred, so the corner follows the pointer), between 480×360 and the screen
+    less 16 px. A click (moved < 4 px): full size (`view-max`), again: the usual size (inline styles
+    cleared). Kept per device: `tonys_view_size` ({w,h} or {max:true}); applied by openView
+    (viewSizeApply). bgClose ignores the 500 ms after a resize (the end of a drag is not a click
+    outside). Test: recipe_window_resize; a real mouse drag checked (900→1100 wide, still open).
   - **v38.08 — multiplying a recipe multiplies the method's amounts (Tony's list, item 2).**
     `scaleStepHtml(txt, viewMult, stepIngWords(ings))` in stepLinesHtml (the recipe view and each
     part of a collection; shown only — the recipe is not changed; edit/translate/share keep the
@@ -879,8 +888,7 @@ found only because a test was written first and disagreed with the code.
   - **TONY'S LIST (9 Oct 2026) — to do after the Firefox extension, in this order unless he says otherwise:**
     1. ~~Farm animals can be grabbed and moved~~ — done in v38.07.
     2. ~~Multiplying a recipe scales the method too~~ — done in v38.08.
-    3. **The recipe page can be enlarged on a computer** — by dragging a corner, or by clicking it
-       (on a phone it is full size already).
+    3. ~~The recipe page can be enlarged on a computer~~ — done in v38.09.
     4. ~~A source with words and a link~~ — done in v38.06.
     - ~~Firefox store link in the app~~ — done in v38.06.
   - **Firefox add-on created (9 Oct 2026, 16:37 UTC):** the job, run by hand after Tony added

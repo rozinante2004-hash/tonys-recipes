@@ -671,6 +671,51 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'recipe_window_resize', group:'UI', name:'↘️ On a computer the recipe window grows from its corner — drag it bigger or smaller, click for full size and back; kept on the device; no grip on a phone (v38.09)',
+    test: async()=>{
+      if(!recipes.length) throw new Error('No recipes to view');
+      var kept=null; try{ kept=localStorage.getItem(VIEW_SIZE_KEY); }catch(e){}
+      var forceWas=window._viewSizeForce;
+      function pe(target, type, x, y){ target.dispatchEvent(new PointerEvent(type, { pointerId:9, pointerType:'mouse', isPrimary:true, button:0, buttons:type==='pointerup'?0:1, clientX:x, clientY:y, bubbles:true, cancelable:true })); }
+      var m=document.getElementById('viewModal');
+      try{
+        window._viewSizeForce=true; localStorage.removeItem(VIEW_SIZE_KEY);
+        openView(recipes[0].id); await wait(400);
+        var g=document.getElementById('viewGrip'), r0=m.getBoundingClientRect(), gr=g && g.getBoundingClientRect();
+        if(!g || g.hidden) throw new Error('no grip on a computer');
+        if(Math.abs(gr.right-r0.right)>6 || Math.abs(gr.bottom-r0.bottom)>6) throw new Error('the grip is not in the window’s corner');
+        // Drag the corner out by 60 × 40: the window grows by twice that (it stays centred), and the corner follows.
+        var W=window.innerWidth, H=window.innerHeight;
+        var want={ w:Math.min(W-16, r0.width+120), h:Math.min(H-16, r0.height+80) };
+        pe(g, 'pointerdown', gr.left+10, gr.top+10); pe(document.body, 'pointermove', gr.left+40, gr.top+30); pe(document.body, 'pointermove', gr.left+70, gr.top+50);
+        pe(document.body, 'pointerup', gr.left+70, gr.top+50);
+        var r1=m.getBoundingClientRect();
+        if(Math.abs(r1.width-want.w)>3 || Math.abs(r1.height-want.h)>3) throw new Error('dragged, the window is '+[Math.round(r1.width),Math.round(r1.height)]+', not '+[Math.round(want.w),Math.round(want.h)]);
+        if(!document.getElementById('viewOverlay').classList.contains('open')) throw new Error('resizing closed the recipe');
+        var sv=JSON.parse(localStorage.getItem(VIEW_SIZE_KEY)||'null');
+        if(!sv || Math.abs(sv.w-r1.width)>2) throw new Error('the size is not kept: '+localStorage.getItem(VIEW_SIZE_KEY));
+        // Reopened: the same size.
+        closeM('viewOverlay'); openView(recipes[0].id); await wait(400);
+        var r2=m.getBoundingClientRect();
+        if(Math.abs(r2.width-r1.width)>3 || Math.abs(r2.height-r1.height)>3) throw new Error('reopened, the size was not kept');
+        // A click on the corner: full size; again: the usual size.
+        gr=g.getBoundingClientRect(); pe(g, 'pointerdown', gr.left+8, gr.top+8); pe(document.body, 'pointerup', gr.left+8, gr.top+8);
+        var r3=m.getBoundingClientRect();
+        if(Math.abs(r3.width-(W-16))>3 || Math.abs(r3.height-(H-16))>3 || !m.classList.contains('view-max')) throw new Error('a click did not make it full size: '+[Math.round(r3.width),Math.round(r3.height)]);
+        gr=g.getBoundingClientRect(); pe(g, 'pointerdown', gr.left+8, gr.top+8); pe(document.body, 'pointerup', gr.left+8, gr.top+8);
+        if(m.style.width || m.classList.contains('view-sized') || localStorage.getItem(VIEW_SIZE_KEY)) throw new Error('a second click did not bring the usual size back');
+        // A phone: no grip, and never a set size.
+        closeM('viewOverlay'); localStorage.setItem(VIEW_SIZE_KEY, JSON.stringify({ w:500, h:400 }));
+        window._viewSizeForce=false; openView(recipes[0].id); await wait(300);
+        if(!g.hidden || m.style.width) throw new Error('a phone got the grip or a set size');
+      } finally {
+        closeM('viewOverlay');
+        if(forceWas===undefined) delete window._viewSizeForce; else window._viewSizeForce=forceWas;
+        try{ if(kept===null) localStorage.removeItem(VIEW_SIZE_KEY); else localStorage.setItem(VIEW_SIZE_KEY, kept); }catch(e){}
+        viewSizeSet(null, false);
+      }
+    } },
+
   { id:'method_scales_with_recipe', group:'UI', name:'✖️ Multiplying a recipe multiplies the amounts in its method too — "2 spoons of milk" says 4 at ×2; times, heat and tin sizes stay (v38.08)',
     test: async()=>{
       var real={ recipes:recipes.slice(), mult:viewMult };
