@@ -834,6 +834,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.10 — a dropped read of the notes changes nothing.** CI on v38.09 failed feedback_notes
+    ("an inbox that did not answer hid the dot"): v38.04 dropped a late loadNotes, but api.open's
+    `.then(render; syncDot)` still ran and re-counted the ⚙️ dot from notes since marked done
+    (feedbackKnown(0)). Now `.then(fresh => fresh === false ? nothing : …)` (open and tabTo).
+    Checked in feedback_reply_in_app (a held read released after reopening must leave
+    `_fbLastNew` as it was) — fails on the old manage.js ("re-counted the red dot: 2").
   - **v38.09 — the recipe window can be enlarged on a computer (Tony's list, item 3).** A grip
     (`#viewGrip`, a button in #viewOverlay, placed by viewGripPlace at the modal's bottom-right;
     ResizeObserver + window resize + after the opening slide) on computers only (viewSizeOn:

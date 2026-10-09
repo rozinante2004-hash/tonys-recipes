@@ -523,10 +523,12 @@
         document.body.appendChild(ov);
         ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') api.close(); });
       }
-      if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadNotes().then(function () { render(); syncDot(); });
+      // v38.10 — a read overtaken by a newer one changes nothing at all: not the page, not the dot
+      // (CI: a late one re-counted the ⚙️ dot from notes since marked done, and hid it).
+      if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadNotes().then(function (fresh) { if (fresh === false) return; render(); syncDot(); });
       return api.reload();
     },
-    tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(render); },
+    tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(function (fresh) { if (fresh !== false) render(); }); },
     noteFilter: function (f) { S.noteFilter = f; render(); },
     mark: async function (key, status) {
       var n = noteBy(key); if (!n) return false;

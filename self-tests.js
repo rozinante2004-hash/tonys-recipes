@@ -1806,7 +1806,8 @@ window.SELF_TESTS = [
   { id:'feedback_reply_in_app', group:'Sharing', name:'📲 Reply in app: Tony answers a note from the Feedback tab, the answer goes to the writer’s own app; the tab’s buttons press like the app’s own (v38.00)',
     test: async()=>{
       if(!feedbackInboxHere()) return;          // the notes are read in the family app only
-      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth };
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, last:_fbLastNew };
+      var keptNew=null; try{ keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
       var sent=[], shown='', toasts=[];
       try{
         window.toast=function(m){ toasts.push(String(m)); }; window.showServiceError=function(m){ shown=String(m); };
@@ -1834,8 +1835,11 @@ window.SELF_TESTS = [
         var release; hold={ p:new Promise(function(r){ release=r; }) };
         await openManagement(); mknManage.close();
         await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
+        // v38.10 — …nor re-counts the ⚙️ dot (CI: a late read counted notes since marked done, and hid it).
+        feedbackKnown(5);
         release(); await new Promise(function(r){ setTimeout(r, 80); });
         if(/A stale read/.test(document.getElementById('manageOverlay').textContent) || mknManage._state.notes.some(function(n){ return n.id===99; })) throw new Error('a stale read replaced the notes on show');
+        if(_fbLastNew!==5) throw new Error('a stale read re-counted the red dot: '+_fbLastNew);
         var card=document.getElementById('mgNote-s5');
         if(!card) throw new Error('the note is not in the Feedback tab');
         var btn=Array.prototype.filter.call(card.querySelectorAll('button'), function(x){ return /Reply in app/.test(x.textContent); })[0];
@@ -1870,6 +1874,7 @@ window.SELF_TESTS = [
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
         if(window.mknManage) mknManage.close();
+        _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
         feedbackKnown(null);
       }
     } },
