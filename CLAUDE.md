@@ -835,6 +835,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
+  - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony adds ANTHROPIC_API_KEY and the Cloud Datastore User role on 10 Oct — then run the job by hand (Actions → Translate new phrases → Run workflow) for the ~21 phrases waiting.**
   - **v38.14 — new phrases are translated by GitHub after each release (no more "please run Update all
     supported languages").** Tony: "Is there a way you could run Update all supported languages in the
     family app once it is updated instead of every time asking me to do it?"
