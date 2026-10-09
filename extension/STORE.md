@@ -66,6 +66,14 @@ of the existing item; in **Privacy practices → Permission justification** add 
   manifest lists the background scripts (Firefox has no extension service worker) and names the add-on
   (`my-kitchen-notes@rozinante2004-hash.github.io`). Mozilla signs it; an unsigned Firefox extension cannot
   stay installed, so there is no download route for Firefox — only the store.
+  **9 Oct 2026 — submitted by GitHub** (deploy-extension.yml, job `firefox`; tools/publish-extension-firefox.mjs,
+  AMO API v5 with the secrets AMO_JWT_ISSUER / AMO_JWT_SECRET): the first run creates the listed add-on
+  (slug `my-kitchen-notes`, category Bookmarks, licence All rights reserved, the summary and description
+  above), later runs add versions. Firefox 140+ (128 and older cannot read the data declaration);
+  `data_collection_permissions: required ["websiteContent"]` — as the Chrome form's "website content".
+  `web-ext lint`: no errors, no warnings. After the first run, in the AMO dashboard: the privacy policy
+  URL above, the screenshots, and "Firefox for Android: no" if it asks. Once listed, put the page in
+  `APP_CONFIG.extensionStores.firefox` (index.html) and the beta's in tools/environments.json.
 - **Safari:** needs converting with Xcode on a Mac (`xcrun safari-web-extension-converter`) and the Apple
   Developer Program (US$99/year); it ships as a Mac app. Not built yet.
 - **When a store lists it:** put its page address in `APP_CONFIG.extensionStores` (index.html; the test copy's in

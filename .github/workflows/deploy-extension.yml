@@ -1,7 +1,8 @@
-name: Submit the extension to the Chrome Web Store
+name: Submit the extension to the stores
 
 # The store copy of the extension uploads itself and is submitted for Google's
 # review when a release that changes it reaches `main` — only on Tony's yes.
+# 9 Oct 2026 — and the Firefox copy to addons.mozilla.org (job `firefox`, below).
 # Google still reviews every version. Needs the repository secret CWS_KEY (the
 # JSON key of store-publisher@recipes-f379d.iam.gserviceaccount.com, linked in
 # the store dashboard's Settings); without it the job says so and does nothing.
@@ -54,3 +55,40 @@ jobs:
         run: |
           npm install --no-audit --no-fund --no-save google-auth-library@9 >/dev/null
           node tools/publish-extension.mjs
+
+  # 9 Oct 2026 — Tony: "Can we create the same for Firefox as for chrome?" The Firefox
+  # copy (same files; Firefox's own manifest) to addons.mozilla.org: the first time
+  # as a new listed add-on, after that as a new version. Mozilla checks and signs it.
+  # Needs the repository secrets AMO_JWT_ISSUER and AMO_JWT_SECRET (addons.mozilla.org
+  # → Tools → Manage API Keys); without them the job says so and does nothing.
+  firefox:
+    runs-on: ubuntu-latest
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Are the keys there?
+        id: key
+        run: |
+          if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
+            echo "::warning::AMO_JWT_ISSUER / AMO_JWT_SECRET are not set — the Firefox copy was NOT sent to addons.mozilla.org. Add them under Settings → Secrets and variables → Actions."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the Firefox copy, and check it as Mozilla will
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          node tools/build-extension.mjs live
+          npx --yes web-ext@10.7.0 lint --source-dir dist-extension/live-firefox --no-config-discovery
+
+      - name: Upload and submit
+        if: steps.key.outputs.ok == 'true'
+        run: node tools/publish-extension-firefox.mjs

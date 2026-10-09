@@ -834,6 +834,16 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **Firefox extension, ready to submit (9 Oct 2026; no app change).** Tony: "Can we create the same
+    for Firefox as for chrome?" The Firefox package was built since 1.4 but never listed (Firefox
+    keeps only Mozilla-signed extensions). build-extension.mjs: gecko `strict_min_version` 140.0 and
+    `data_collection_permissions.required ["websiteContent"]` (AMO requires it of new add-ons),
+    gecko_android 142.0 — `web-ext lint` 0/0/0. tools/publish-extension-firefox.mjs (AMO API v5,
+    HS256 JWT per request; AMO_API overrides the address — checked against a stand-in server: new
+    add-on, new version, version already there, refused package, wrong keys, old category format,
+    no keys) and deploy-extension.yml job `firefox` (lint, then submit). Waiting for Tony: an AMO
+    account and its API keys as AMO_JWT_ISSUER / AMO_JWT_SECRET; then run the job by hand
+    (the workflow file must be on `main`). Then: extensionStores.firefox in index.html and the beta.
   - **v38.05 — the Self Test can no longer leave the page (Firefox).** Tony: "during the test,
     Firefox crashed … Server Not Found — Firefox can't connect to the server at x.example. Twice."
     share_updates_the_app_first waited 0.5 s for newestAppThen, whose service-worker update is

@@ -98,7 +98,12 @@ fs.cpSync(out, ffOut, { recursive: true });
   const mp = path.join(ffOut, 'manifest.json');
   const m = JSON.parse(fs.readFileSync(mp, 'utf8'));
   m.background = { scripts: ['config.js', 'shared.js', 'background.js'] };
-  m.browser_specific_settings = { gecko: { id: 'my-kitchen-notes' + (which === 'live' ? '' : '-' + which) + '@rozinante2004-hash.github.io', strict_min_version: '121.0' } };
+  // 9 Oct 2026 — addons.mozilla.org: a new add-on must say what data it handles (Firefox 140+ shows
+  // it at install). The same answer as the Chrome Web Store's form: website content — the text
+  // of the post or page the user chooses, at their click, handed to their own collection.
+  m.browser_specific_settings = { gecko: { id: 'my-kitchen-notes' + (which === 'live' ? '' : '-' + which) + '@rozinante2004-hash.github.io',
+    strict_min_version: '140.0', data_collection_permissions: { required: ['websiteContent'] } },
+    gecko_android: { strict_min_version: '142.0' } };   // the version on Android that knows that declaration
   if (m.options_page) { m.options_ui = { page: m.options_page, open_in_tab: true }; delete m.options_page; }
   fs.writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
 }
