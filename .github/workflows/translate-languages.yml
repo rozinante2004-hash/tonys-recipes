@@ -16,11 +16,14 @@ name: Translate new phrases
 # the rules), whose service account also needs "Cloud Datastore User" on
 # recipes-f379d. Without them the job says so and does nothing.
 
+# Only PUSHES to main run it: the federation rule allows "Only push" (Tony's pick in
+# the Console), so a hand-started run would be refused. A run that failed (keys not
+# there yet, Anthropic busy) is retried with "Re-run jobs", which keeps its event.
+# The job's own files are in `paths` so that a change to the job runs it as well.
 on:
   push:
     branches: ["main"]
-    paths: ["index.html"]
-  workflow_dispatch:
+    paths: ["index.html", "tools/translate-new.mjs", ".github/workflows/translate-languages.yml"]
 
 permissions:
   contents: read

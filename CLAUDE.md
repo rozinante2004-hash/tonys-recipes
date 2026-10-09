@@ -835,7 +835,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
-  - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then run the job by hand (Actions → Translate new phrases → Run workflow) for the ~21 phrases waiting.**
+  - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
   - **v38.14 — new phrases are translated by GitHub after each release (no more "please run Update all
     supported languages").** Tony: "Is there a way you could run Update all supported languages in the
     family app once it is updated instead of every time asking me to do it?"
@@ -862,6 +862,12 @@ found only because a test was written first and disagreed with the code.
       subject `repo:rozinante2004-hash/tonys-recipes:ref:refs/heads/main`, audience
       https://api.anthropic.com, Default workspace. Refused → 401 "Authentication failed"; the reason
       is on the Console's History tab. ANTHROPIC_API_KEY still works as the fallback.
+    - **The rule as Tony set it (9 Oct):** organization `rozinante2004-hash` with its numeric ID
+      284034856 (a user account; the `repository_owner_id` claim — survives a rename), repository
+      rozinante2004-hash/tonys-recipes, branch main, Allowed events **Only push**, workspace Default,
+      scope workspace:developer, 10 minutes. Because of "Only push" the workflow has NO
+      workflow_dispatch: it runs on pushes to main touching index.html or the job's own two files;
+      a failed run is retried with Re-run (a re-run keeps the event, push).
     - A run in which every AI call failed now FAILS with the reason (the app's own code swallowed the
       errors and the job used to end "the new phrases are in the shared translations"). Stand-in:
       federation (1 identity, 1 exchange, Bearer on every call), refused federation (exit 1 with the
