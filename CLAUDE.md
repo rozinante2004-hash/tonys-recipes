@@ -834,11 +834,9 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
-  - **The name after "by" on AMO (with v38.13).** Tony: the page says "… by Tony" — change it to
-    My Kitchen Notes. It is the AMO ACCOUNT's display name: listing() reads accounts/profile/ and, if
-    different, PATCHes accounts/account/<id>/ {display_name} (AMO_AUTHOR_NAME, default "My Kitchen
-    Notes"), reads it back; else a warning with the manual way (Edit My Profile → Display Name).
-    Checked against the stand-in AMO (changed; refused). The profile's e-mail is never printed.
+  - **The name after "by" on AMO (9 Oct 2026).** Tony: the page said "… by Tony". It is the AMO
+    ACCOUNT's display name (Edit My Profile → Display Name) — Tony changed it himself. The job only
+    reports it ("shown as: by …"); it never changes it. The profile's e-mail is never printed.
   - **v38.13 — Edge goes to the Chrome Web Store (Tony's yes).** extStoreUrl('edge') = st.edge || st.chrome;
     extStoreHint(): under the button, Edge's one extra step ("asks to allow extensions from other stores —
     press Allow, then Add to Chrome: it installs in Edge"), Opera's ("Install Chrome Extensions" once);
