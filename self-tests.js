@@ -2012,7 +2012,7 @@ window.SELF_TESTS = [
     test: async()=>{
       var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)';
       var real={ cloud:_offersCloud, db:window._fbDb, user:window._fbUser, force:window._deviceOfferForce, ov:window._iosShortcutOverride };
-      var kept={}; [DEVICE_OFFER_KEY, IOS_SHORTCUT_USED_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      var kept={}; [DEVICE_OFFER_KEY, DEVICE_OFFER_KEY+'_firefox', DEVICE_OFFER_KEY+'_safari', IOS_SHORTCUT_USED_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
       var written=[];
       try{
         Object.defineProperty(navigator, 'userAgent', { value:IPHONE, configurable:true });
@@ -2037,15 +2037,16 @@ window.SELF_TESTS = [
         window._extStoresOverride={ firefox:'https://addons.mozilla.org/firefox/addon/my-kitchen-notes/' };
         Object.defineProperty(navigator, 'userAgent', { value:FFUA, configurable:true });
         document.documentElement.removeAttribute('data-mkn-extension-'+extTag());
-        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={ offered_computer: 5 }; written=[];
+        // v38.12 — and this browser's mark, copied from the account's Chrome memory before v38.11, no longer counts.
+        localStorage.setItem(DEVICE_OFFER_KEY, '5'); localStorage.removeItem(DEVICE_OFFER_KEY+'_firefox'); _offersCloud={ offered_computer: 5 }; written=[];
         if(maybeOfferDeviceShortcut(9)!=='computer') throw new Error('offered in Chrome, the account stopped Firefox being offered its own');
         dlg=document.getElementById('deviceOfferOverlay'); if(dlg) dlg.remove();
         if(!written.some(function(w){ return w.offered_computer_firefox; }) || written.some(function(w){ return w.offered_computer; })) throw new Error('Firefox’s offer is not remembered under Firefox: '+JSON.stringify(written));
-        localStorage.removeItem(DEVICE_OFFER_KEY);
         if(maybeOfferDeviceShortcut(9)!==false) throw new Error('Firefox was offered twice');
         // …and no offer where it cannot be added (Safari; Firefox with no store page).
-        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={}; window._extStoresOverride={};
+        localStorage.removeItem(DEVICE_OFFER_KEY+'_firefox'); _offersCloud={}; window._extStoresOverride={};
         if(maybeOfferDeviceShortcut(9)!==false) throw new Error('Firefox with no store page was offered the extension');
+        localStorage.removeItem(DEVICE_OFFER_KEY+'_safari');
         Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', configurable:true });
         if(maybeOfferDeviceShortcut(9)!==false) throw new Error('Safari was offered an extension it cannot have');
         window._extStoresOverride=storesWas; Object.defineProperty(navigator, 'userAgent', { value:IPHONE, configurable:true });

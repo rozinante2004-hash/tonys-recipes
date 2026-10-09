@@ -834,6 +834,16 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.12 — Firefox: the offer, and Mozilla's review status.** Tony: "Firefox did not offer to install
+    the extension. After requesting it via settings, the Add to Firefox appeared. Upon clicking …
+    Download failed … This is not a public listing. You are only seeing it because of elevated
+    permissions." The AMO listing is NOT public yet: Mozilla has not approved it; its page shows to
+    its owner only and the file cannot be downloaded (the "Add to Firefox" Tony saw on 9 Oct was the
+    owner's preview). The offer: before v38.11 the account's `offered_computer` was copied into this
+    browser's `mkn_device_offer_shown`; deviceOfferLocalKey() — computers in non-Chrome browsers use
+    `mkn_device_offer_shown_<browser>`, so the old copy no longer counts (test: shortcut_not_offered_twice
+    sets the old key in Firefox and expects the offer). publish-extension-firefox.mjs now logs
+    `the add-on is "<status>"; versions: 1.7.1 <file status>, …` and a notice while it is not public.
   - **Released to the family app and the beta: v38.11 + extension 1.7.2 (9 Oct 2026, Tony's yes, CI green on 6a37e2f; Pages: success). The extension job: Firefox — 1.7.2 submitted to AMO; Chrome — 1.7.2 uploaded and PENDING_REVIEW (so 1.7.1 had been approved).**
   - **v38.11 + extension 1.7.2 — Firefox: offered, and allowed on Facebook.** Tony (Firefox, family app
     v38.10): "it did not offer to install the extension … when I've opened a Facebook recipe in

@@ -99,6 +99,12 @@ const isNew = addon.status === 404;
 if (!isNew && addon.status !== 200) { console.log('::error::could not ask addons.mozilla.org about the add-on (' + addon.status + '): ' + say(addon)); process.exit(1); }
 if (!isNew) {
   const vs = await amo('addons/addon/' + encodeURIComponent(guid) + '/versions/?filter=all_with_unlisted&page_size=50');
+  // v38.12 — Tony: "This is not a public listing … Download failed". Say where Mozilla's review stands.
+  const st = addon.d.status, vlist = (vs.d && vs.d.results) || [];
+  console.log('on addons.mozilla.org: the add-on is "' + st + '"' + (addon.d.is_disabled ? ' (disabled by its owner)' : '') + '; versions: '
+    + (vlist.map((v) => v.version + ' ' + ((v.file && v.file.status) || '?') + (v.channel && v.channel !== 'listed' ? ' (' + v.channel + ')' : '')).join(', ') || 'none'));
+  if (st !== 'public' && st !== 'approved')
+    console.log('::notice::Firefox: the listing is not public yet ("' + st + '") — Mozilla still has to approve it. Until then its page is visible to its owner only, and "Add to Firefox" cannot download it.');
   if ((vs.d && vs.d.results || []).some((v) => v.version === version)) {
     console.log('version ' + version + ' is already on addons.mozilla.org — nothing to upload');
     await listing();

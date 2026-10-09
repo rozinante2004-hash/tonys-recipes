@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.11 -->
+<!-- Tony's Recipes Collection v38.12 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6690,7 +6690,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.11';
+var APP_VERSION = 'v38.12';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9470,7 +9470,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.11</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.12</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10181,7 +10181,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.11</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.12</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -30821,6 +30821,13 @@ function deviceOfferDialog(kind, first) {
 }
 // The first visit on this device: the one offer that fits it, once.
 var DEVICE_OFFER_KEY = 'mkn_device_offer_shown';
+// v38.12 — Tony's Firefox was still not offered the extension: before v38.11 the account's
+// Chrome memory was copied into THIS browser's mark. A computer's mark in Firefox (and the
+// other non-Chrome browsers) now has its own name, so that old copy no longer counts.
+function deviceOfferLocalKey() {
+  var b = extBrowser();
+  return deviceKind() === 'computer' && !/^(chrome|brave|opera|vivaldi|edge)$/.test(b) ? DEVICE_OFFER_KEY + '_' + b : DEVICE_OFFER_KEY;
+}
 // v37.69 — Tony was offered the iPhone shortcut again, though he has it. A
 // page cannot see which shortcuts a phone has, and the "already offered" mark
 // lived only in this browser's storage — which Safari erases after about a
@@ -30879,7 +30886,7 @@ function deviceOfferWanted() {
 }
 function maybeOfferDeviceShortcut(tries) {
   tries = tries || 0;
-  try { if (localStorage.getItem(DEVICE_OFFER_KEY)) return false; } catch(e) { return false; }
+  try { if (localStorage.getItem(deviceOfferLocalKey())) return false; } catch(e) { return false; }
   if (navigator.webdriver && !window._deviceOfferForce) return false;   // the automated checks run without it
   // Never on top of something else: the welcome, the language offer, an import from a shared link.
   if (!window._deviceOfferForce && document.querySelector('#askOverlay, .modal-overlay.open, #deviceOfferOverlay, #tourOverlay')) {
@@ -30899,10 +30906,10 @@ function maybeOfferDeviceShortcut(tries) {
   }
   var okey = deviceOfferKey(kind);
   if (_offersCloud && _offersCloud[okey]) {   // this offer was made before, on this account (in this browser)
-    try { localStorage.setItem(DEVICE_OFFER_KEY, String(_offersCloud[okey])); } catch(e) {}
+    try { localStorage.setItem(deviceOfferLocalKey(), String(_offersCloud[okey])); } catch(e) {}
     return false;
   }
-  try { localStorage.setItem(DEVICE_OFFER_KEY, String(Date.now())); } catch(e) {}
+  try { localStorage.setItem(deviceOfferLocalKey(), String(Date.now())); } catch(e) {}
   var mark = {}; mark[okey] = Date.now(); deviceOffersCloudNote(mark);
   deviceOfferDialog(kind, true);
   return kind;
