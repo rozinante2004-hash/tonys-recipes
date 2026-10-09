@@ -834,6 +834,22 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app: v37.47 (3 Oct 2026) — CI green on 4ca8581.**
   - **Released to the family app: v37.50 and v37.51 (3 Oct 2026, Tony's yes, CI green).**
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
+  - **v38.11 + extension 1.7.2 — Firefox: offered, and allowed on Facebook.** Tony (Firefox, family app
+    v38.10): "it did not offer to install the extension … when I've opened a Facebook recipe in
+    firefox, no App dot appeared at the bottom." Tony's Self Test in Firefox: all passed (the v38.05 fix).
+    - The first-visit offer was once per ACCOUNT per kind: his account had `offered_computer` (Chrome).
+      deviceOfferKey(): a computer's offer per browser — Chrome/Brave/Opera/Vivaldi/Edge keep
+      `offered_computer`, others `offered_computer_<browser>`. extOfferable(): no offer where it
+      cannot be added (Safari; Firefox without a store page, i.e. the test copy). Test:
+      shortcut_not_offered_twice (Chrome-offered account, then Firefox → offered once; Safari never).
+    - Firefox MV3 may hold back a content script's sites until allowed. The Firefox manifest now lists
+      them as `host_permissions` (all content_scripts matches: the three social sites and the app pages
+      — appmark needs the app's), which Firefox asks for when the add-on is added; the Chrome manifest
+      is unchanged (no new store warnings). If they are still not allowed, background.js opens the
+      options page once per version (`mknAskedSites`), whose "Allow" button calls permissions.request.
+      Only the Firefox build has host_permissions, so in Chrome nothing opens (checked in
+      tests/extension.mjs, with the Firefox manifest's list). web-ext lint 0/0/0.
+    - The release sends 1.7.2 to both stores (deploy-extension: Chrome waits if 1.7.1 is still in review).
   - **Released to the family app and the beta: v38.07–v38.10 (9 Oct 2026, Tony's yes, CI green on 8eb1549; Pages: success). Tony's list (9 Oct) is done.** ("pages build and deployment" (event dynamic) is GitHub's own last step of every Pages deploy — normal.)
   - **v38.10 — a dropped read of the notes changes nothing.** CI on v38.09 failed feedback_notes
     ("an inbox that did not answer hid the dot"): v38.04 dropped a late loadNotes, but api.open's

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.10 -->
+<!-- Tony's Recipes Collection v38.11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6690,7 +6690,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.10';
+var APP_VERSION = 'v38.11';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9470,7 +9470,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.10</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.11</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10181,7 +10181,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.10</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.11</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -30859,9 +30859,20 @@ function iosShortcutNoteUsed() {
   deviceOffersCloudNote({ iosUsed: Date.now() });
 }
 window.iosShortcutUsed = iosShortcutUsed; window.iosShortcutNoteUsed = iosShortcutNoteUsed; window.deviceOffersCloud = deviceOffersCloud;
+// v38.11 — Tony opened the family app in Firefox and was not offered the extension: the
+// account remembered "offered on a computer" (in Chrome). Each browser has its own extension,
+// so a computer's offer is remembered per browser — Chrome and its kin keep the old name
+// (they were the ones offered it before Firefox had one). And none where there is no way to
+// add it (Safari; Firefox in the test copy, which has no store page).
+function deviceOfferKey(kind) {
+  if (kind !== 'computer') return 'offered_' + kind;
+  var b = extBrowser();
+  return /^(chrome|brave|opera|vivaldi|edge)$/.test(b) ? 'offered_computer' : 'offered_computer_' + b;
+}
+function extOfferable() { var b = extBrowser(); return !!extStoreUrl(b) || /^(chrome|edge|brave|opera|vivaldi)$/.test(b); }
 function deviceOfferWanted() {
   var k = deviceKind();
-  if (k === 'computer') return extInstalledVersion() ? '' : 'computer';
+  if (k === 'computer') return (extInstalledVersion() || !extOfferable()) ? '' : 'computer';
   if (k === 'ios') return (iosShortcutUrl() && !iosShortcutUsed()) ? 'ios' : '';
   if (k === 'android') return (!appInstalled() && _pwaInstallEvent) ? 'android' : '';
   return '';
@@ -30886,18 +30897,20 @@ function maybeOfferDeviceShortcut(tries) {
     if (deviceKind() === 'android' && tries < 2) setTimeout(function(){ maybeOfferDeviceShortcut(tries + 1); }, 8000);
     return false;
   }
-  if (_offersCloud && _offersCloud['offered_' + kind]) {   // this offer was made before, on this account
-    try { localStorage.setItem(DEVICE_OFFER_KEY, String(_offersCloud['offered_' + kind])); } catch(e) {}
+  var okey = deviceOfferKey(kind);
+  if (_offersCloud && _offersCloud[okey]) {   // this offer was made before, on this account (in this browser)
+    try { localStorage.setItem(DEVICE_OFFER_KEY, String(_offersCloud[okey])); } catch(e) {}
     return false;
   }
   try { localStorage.setItem(DEVICE_OFFER_KEY, String(Date.now())); } catch(e) {}
-  var mark = {}; mark['offered_' + kind] = Date.now(); deviceOffersCloudNote(mark);
+  var mark = {}; mark[okey] = Date.now(); deviceOffersCloudNote(mark);
   deviceOfferDialog(kind, true);
   return kind;
 }
 setTimeout(function(){ try { maybeOfferDeviceShortcut(0); } catch(e) {} }, 6000);
 window.deviceKind = deviceKind; window.refreshShortcutsSection = refreshShortcutsSection; window.openDeviceOffer = openDeviceOffer;
 window.deviceOfferDialog = deviceOfferDialog; window.maybeOfferDeviceShortcut = maybeOfferDeviceShortcut; window.deviceOfferWanted = deviceOfferWanted;
+window.deviceOfferKey = deviceOfferKey; window.extOfferable = extOfferable;
 
 function facebookBookmarkletCode() {
   var app = String(APP_CONFIG.siteOrigin || '') + String(APP_CONFIG.sitePath || '/');

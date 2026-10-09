@@ -239,6 +239,15 @@ try {
   await opFam2.close();
   await page.goto('https://recipes.example/lemon-drizzle', { waitUntil: 'load' });
   ok('…and nothing on any other site', !(await page.evaluate(() => [...document.documentElement.attributes].some(a => /^data-mkn-extension/.test(a.name)))));
+  // 1.7.2 — Tony: no button on Facebook in Firefox. Firefox's package names every site its
+  // scripts run on (Firefox asks for them when it is added); Chrome's is unchanged, and in
+  // Chrome the options page never opens by itself (its sites are granted already).
+  const ffm = JSON.parse(fs.readFileSync(path.join(repo, 'dist-extension', 'live-firefox', 'manifest.json'), 'utf8'));
+  const want = [...new Set(ffm.content_scripts.flatMap(cs => cs.matches))];
+  ok('1.7.2: the Firefox package asks for every site its scripts run on', Array.isArray(ffm.host_permissions) && want.every(m => ffm.host_permissions.includes(m)) && ffm.host_permissions.some(h => /facebook/.test(h)) && ffm.host_permissions.some(h => h.startsWith(APP_FAMILY)), JSON.stringify(ffm.host_permissions));
+  const crm = JSON.parse(fs.readFileSync(path.join(repo, 'dist-extension', 'live', 'manifest.json'), 'utf8'));
+  ok('…the Chrome package asks for nothing new', crm.host_permissions === undefined);
+  ok('…and in Chrome its options page did not open by itself', !ctx.pages().some(pg => /options\.html/.test(pg.url())), ctx.pages().map(pg => pg.url()).join(' '));
 } finally {
   await ctx.close();
   fs.rmSync(profile, { recursive: true, force: true });

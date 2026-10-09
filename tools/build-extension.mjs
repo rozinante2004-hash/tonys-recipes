@@ -105,6 +105,10 @@ fs.cpSync(out, ffOut, { recursive: true });
     strict_min_version: '140.0', data_collection_permissions: { required: ['websiteContent'] } },
     gecko_android: { strict_min_version: '142.0' } };   // the version on Android that knows that declaration
   if (m.options_page) { m.options_ui = { page: m.options_page, open_in_tab: true }; delete m.options_page; }
+  // 1.7.2 — Tony: on Facebook in Firefox, no button. Firefox (Manifest V3) lets an extension's
+  // scripts run on a site only with that site's permission; named here, Firefox asks for them
+  // when it is added. (Chrome grants a content script's sites by themselves: its manifest is unchanged.)
+  m.host_permissions = Array.from(new Set([].concat.apply([], m.content_scripts.map(cs => cs.matches))));
   fs.writeFileSync(mp, JSON.stringify(m, null, 2) + '\n');
 }
 const ffZip = path.join(repo, 'dist-extension', 'my-kitchen-notes-extension-firefox' + tag + '.zip');

@@ -2032,6 +2032,23 @@ window.SELF_TESTS = [
         if(maybeOfferDeviceShortcut(9)!=='ios') throw new Error('a new iPhone is not offered it');
         var dlg=document.getElementById('deviceOfferOverlay'); if(dlg) dlg.remove();
         if(!written.some(function(w){ return w.offered_ios; })) throw new Error('the account was not told it was offered');
+        // v38.11 — Tony: offered in Chrome, then opened in Firefox — not offered there. Each browser its own.
+        var FFUA='Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0', storesWas=window._extStoresOverride;
+        window._extStoresOverride={ firefox:'https://addons.mozilla.org/firefox/addon/my-kitchen-notes/' };
+        Object.defineProperty(navigator, 'userAgent', { value:FFUA, configurable:true });
+        document.documentElement.removeAttribute('data-mkn-extension-'+extTag());
+        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={ offered_computer: 5 }; written=[];
+        if(maybeOfferDeviceShortcut(9)!=='computer') throw new Error('offered in Chrome, the account stopped Firefox being offered its own');
+        dlg=document.getElementById('deviceOfferOverlay'); if(dlg) dlg.remove();
+        if(!written.some(function(w){ return w.offered_computer_firefox; }) || written.some(function(w){ return w.offered_computer; })) throw new Error('Firefox’s offer is not remembered under Firefox: '+JSON.stringify(written));
+        localStorage.removeItem(DEVICE_OFFER_KEY);
+        if(maybeOfferDeviceShortcut(9)!==false) throw new Error('Firefox was offered twice');
+        // …and no offer where it cannot be added (Safari; Firefox with no store page).
+        localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={}; window._extStoresOverride={};
+        if(maybeOfferDeviceShortcut(9)!==false) throw new Error('Firefox with no store page was offered the extension');
+        Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', configurable:true });
+        if(maybeOfferDeviceShortcut(9)!==false) throw new Error('Safari was offered an extension it cannot have');
+        window._extStoresOverride=storesWas; Object.defineProperty(navigator, 'userAgent', { value:IPHONE, configurable:true });
         // Offered the EXTENSION on this account (a computer) says nothing about the iPhone.
         localStorage.removeItem(DEVICE_OFFER_KEY); _offersCloud={ offered_computer: 5 };
         if(maybeOfferDeviceShortcut(9)!=='ios') throw new Error('an offer on the computer stopped the iPhone one');

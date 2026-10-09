@@ -41,6 +41,25 @@ chrome.runtime.onInstalled.addListener(function (details) {
     chrome.contextMenus.create({ id: 'mkn-link', title: '📘 Import this link into ' + MKN_APP_NAME, contexts: ['link'] });
   });
 });
+// 1.7.2 — Firefox: if its sites are not allowed yet (Firefox may hold them back),
+// the options page opens once for this version, with its "Allow" button.
+function mknAskForSites() {
+  try {
+    var origins = chrome.runtime.getManifest().host_permissions || [];
+    if (!origins.length || !chrome.permissions) return;
+    chrome.permissions.contains({ origins: origins }, function (ok) {
+      if (ok) return;
+      var v = chrome.runtime.getManifest().version;
+      chrome.storage.local.get('mknAskedSites', function (o) {
+        if (o && o.mknAskedSites === v) return;
+        chrome.storage.local.set({ mknAskedSites: v });
+        chrome.runtime.openOptionsPage();
+      });
+    });
+  } catch (e) {}
+}
+chrome.runtime.onInstalled.addListener(mknAskForSites);
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(mknAskForSites);
 chrome.contextMenus.onClicked.addListener(async function (info, tab) {
   if (info.menuItemId === 'mkn-link' && info.linkUrl) {
     chrome.tabs.create({ url: (await mknSendToNow()).replace(/#.*$/, '') + '?url=' + encodeURIComponent(info.linkUrl) });
