@@ -1147,6 +1147,56 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'mark-deleted', project: 'recipes-f379d', hid: 'hNever', name: 'Old one', code: 'MKN-OOOO-7777', idToken: famOwner }, ORIGIN);
     const nv = JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hNever'").get().summary);
     expect('…even one that never reported (named from the page)', nv.name === 'Old one' && nv.deletedAt > 0, JSON.stringify(nv));
+    // v69 — what the testers' apps report: errors, and how often each feature was used.
+    const hh3 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
+    expect('v69: health says the apps may report (so they send)', hh3.signals === true && hh3.version === 'v69', JSON.stringify(hh3));
+    const err1 = { kind: 'error', message: 'Cannot read properties of null (reading \'x\')', where: 'index.html:120', screen: 'viewOverlay', version: 'v38.15', env: 'test', device: 'UA', lang: 'he', at: Date.now() - 5000, n: 2 };
+    f = await fb({ action: 'app-signals', idToken: tA, hid: 'hA', errors: [err1, { kind: 'error', message: '   ' }, 'nonsense'] });
+    expect('v69: a signed-in tester\'s app reports an error (empty ones dropped)', f.status === 200 && f.d.errors === 1, JSON.stringify(f));
+    f = await fb({ action: 'app-signals', idToken: tA, errors: [Object.assign({}, err1, { n: 1, screen: 'main', at: Date.now() })] });
+    let er = db.raw.prepare('SELECT * FROM app_errors').all();
+    expect('v69: …the same error again is one line, counted (2 + 1), with the latest screen', er.length === 1 && er[0].n === 3 && er[0].screen === 'main' && er[0].email === 'a@example.com'
+      && er[0].project === 'tonys-recipes-test' && er[0].status === 'new' && er[0].last_at > er[0].first_at, JSON.stringify(er));
+    f = await fb({ action: 'app-signals', idToken: tA, errors: [Object.assign({}, err1, { version: 'v38.16' })] });
+    expect('v69: …a new version is a new line', db.raw.prepare('SELECT COUNT(*) AS n FROM app_errors').get().n === 2, JSON.stringify(f));
+    f = await fb({ action: 'app-signals', idToken: tA.slice(0, -4) + 'AAAA', errors: [err1] });
+    expect('v69: a forged sign-in reports nothing', f.status === 401, JSON.stringify(f));
+    const nowMonth = new Date().toISOString().slice(0, 7);
+    f = await fb({ action: 'app-signals', idToken: tA, hid: 'hA', usage: { month: nowMonth, counts: { 'added.link': 3, 'scale': 1, 'Bad Key!': 4, 'cook': -2, 'print': 1.5, 'open': 5000 } } });
+    let uc = db.raw.prepare("SELECT k, n FROM usage_counts WHERE project = 'tonys-recipes-test' AND hid = 'hA' ORDER BY k").all();
+    expect('v69: a member adds to their household\'s feature counts — names and numbers only, each at most 1000 a call',
+      f.status === 200 && JSON.stringify(uc) === JSON.stringify([{ k: 'added.link', n: 3 }, { k: 'open', n: 1000 }, { k: 'scale', n: 1 }]), JSON.stringify(uc));
+    await fb({ action: 'app-signals', idToken: tA, hid: 'hA', usage: { month: '1999-01', counts: { 'added.link': 2 } } });
+    expect('v69: …which add up, under this month (not a month long gone)', db.raw.prepare("SELECT n FROM usage_counts WHERE hid = 'hA' AND k = 'added.link' AND month = ?").get(nowMonth).n === 5);
+    f = await fb({ action: 'app-signals', idToken: tB, hid: 'hA', usage: { counts: { 'added.link': 50 } } });
+    expect('v69: someone not in the household cannot add to its counts', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'app-signals', idToken: tA, usage: { counts: { 'scale': 1 } } });
+    expect('v69: …nor counts with no household', f.status === 400, JSON.stringify(f));
+    const tZ = await token({ sub: 'uZ' });
+    const ins = db.raw.prepare("INSERT INTO app_errors (project, uid, version, kind, message, place, first_at, last_at, n, status) VALUES ('tonys-recipes-test', 'uZ', 'v1', 'error', ?, '', ?, ?, 1, 'new')");
+    for (let i = 0; i < 199; i++) ins.run('loop ' + i, Date.now(), Date.now());
+    f = await fb({ action: 'app-signals', idToken: tZ, errors: [{ message: 'one more' }, { message: 'and another' }] });
+    expect('v69: an app in a loop cannot fill the table (200 new lines a person a day)', f.status === 200 && f.d.errors === 1 && f.d.dropped === 1, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'errors', idToken: tA });
+    expect('v69: only the owner reads the errors', f.status === 403, JSON.stringify(f));
+    db.raw.prepare("UPDATE app_errors SET last_at = ? WHERE message = 'loop 0'").run(Date.now() - 200 * 864e5);
+    f = await fb({ action: 'meter-admin', op: 'errors', idToken: famOwner }, ORIGIN);
+    const mine = (f.d.errors || []).filter(x => x.uid === 'uA');
+    expect('v69: the owner reads every copy\'s errors, newest first, with who and where', f.status === 200 && mine.length === 2 && mine[0].version === 'v38.15'
+      && mine[0].n === 3 && mine[0].lang === 'he' && mine[0].last_at >= mine[1].last_at, JSON.stringify(mine));
+    expect('v69: …and a report without a household keeps the one already known', mine[0].hid === 'hA', JSON.stringify(mine[0]));
+    expect('v69: …and errors older than 120 days are gone', !db.raw.prepare("SELECT 1 FROM app_errors WHERE message = 'loop 0'").get());
+    f = await fb({ action: 'meter-admin', op: 'errors-new', idToken: famOwner }, ORIGIN);
+    const nNew = f.d.new;
+    f = await fb({ action: 'meter-admin', op: 'error-status', id: mine[1].id, status: 'done', idToken: famOwner }, ORIGIN);
+    expect('v69: the owner marks one done', f.status === 200 && db.raw.prepare('SELECT status FROM app_errors WHERE id = ?').get(mine[1].id).status === 'done', JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'errors-new', idToken: famOwner }, ORIGIN);
+    expect('v69: …and the count of new ones goes down', f.d.new === nNew - 1, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'error-delete', id: mine[0].id, idToken: famOwner }, ORIGIN);
+    expect('v69: …and removes one', f.status === 200 && !db.raw.prepare('SELECT 1 FROM app_errors WHERE id = ?').get(mine[0].id), JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: famOwner }, ORIGIN);
+    const hAu = ((f.d.households || []).filter(x => x.project === 'tonys-recipes-test' && x.hid === 'hA')[0] || {}).usage;
+    expect('v69: the Households list carries each household\'s feature counts by month', hAu && hAu[nowMonth] && hAu[nowMonth]['added.link'] === 5 && hAu[nowMonth].scale === 1, JSON.stringify(hAu));
   } finally { globalThis.fetch = realFetch; }
 }
 

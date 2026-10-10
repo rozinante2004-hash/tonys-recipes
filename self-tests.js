@@ -1810,6 +1810,229 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'tester_errors_reported', group:'Sharing', name:'⚠️ The beta reports its own errors to the app’s server — the site, never the page’s address or an e-mail; the same error once, counted; kept on the device until the server has it; never in the family app (v38.15)',
+    test: async()=>{
+      var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride) };
+      var kept={}; [INS_ERR_KEY, INS_USE_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      var sent=[], down=false;
+      try{
+        // The family app never sends any of it.
+        if(APP_CONFIG.environment==='live' && APP_CONFIG.features.insights!==false) throw new Error('the family app reports by itself');
+        if(APP_CONFIG.environment==='beta' && APP_CONFIG.features.insights!==true) throw new Error('the beta does not report');
+        window._featureOverride.insights=false; window._insUnderTest=true;
+        localStorage.removeItem(INS_ERR_KEY);
+        if(insightError('error','boom','x') !== false || localStorage.getItem(INS_ERR_KEY)) throw new Error('reported with the feature off');
+        // While the Self Test runs, the app's own staged failures are not reported.
+        window._featureOverride.insights=true; window._insUnderTest=false;
+        if(insightError('error','boom','x') !== false) throw new Error('a failure the Self Test staged was reported');
+        window._insUnderTest=true; localStorage.removeItem(INS_USE_KEY);
+        // An error: the site stays, the page and the e-mail go; the same one twice is one line, counted.
+        recordError('import', 'Could not read https://www.example.com/recipes/42?id=7 for me@example.com', 'runUrlImport');
+        recordError('import', 'Could not read https://www.example.com/recipes/42?id=7 for me@example.com', 'runUrlImport');
+        var q=JSON.parse(localStorage.getItem(INS_ERR_KEY)||'[]');
+        if(q.length!==1 || q[0].n!==2) throw new Error('the same error is not one line, counted: '+JSON.stringify(q));
+        if(/recipes\/42|id=7|me@example/.test(q[0].message) || q[0].message.indexOf('https://www.example.com/')===-1 || q[0].message.indexOf('[e-mail]')===-1)
+          throw new Error('what would be sent: '+q[0].message);
+        if(q[0].version!==APP_VERSION || q[0].kind!=='import' || !q[0].screen) throw new Error('without its version, kind or screen: '+JSON.stringify(q[0]));
+        // A fault the app notes in its log, and the error windows, are reported too.
+        syncLog('error', 'Could not give the household its identifier', 'permission-denied');
+        showServiceError('Your note could not be sent: offline'); var so=document.getElementById('serviceErrorOverlay'); if(so) so.remove();
+        q=JSON.parse(localStorage.getItem(INS_ERR_KEY)||'[]');
+        if(!q.some(function(e){ return e.kind==='logged' && /identifier/.test(e.message); }) || !q.some(function(e){ return e.kind==='service'; })) throw new Error('the log and the error window are not reported: '+JSON.stringify(q));
+        // Sent once signed in and the server takes them; taken off the device only then.
+        window._fbUser={ uid:'uT', email:'t@example.com', getIdToken:async function(){ return 'tokT'; } };
+        window._household={ hid:'hT', name:'Test kitchen' };
+        _workerHealth={ ok:true, signals:false };
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          sent.push(b);
+          if(down) return new Response('{"error":"down"}', { status:502 });
+          return new Response(JSON.stringify({ ok:true, errors:(b.errors||[]).length }), { status:200 });
+        };
+        if(await insightsSend()!==false || sent.length) throw new Error('sent to a server that does not take them (before Worker v69)');
+        _workerHealth={ ok:true, signals:true };
+        down=true;
+        if(await insightsSend()!==false || JSON.parse(localStorage.getItem(INS_ERR_KEY)||'[]').length!==3) throw new Error('lost while the server was away');
+        down=false; sent=[];
+        if(await insightsSend()!==true) throw new Error('not sent');
+        var b=sent[0];
+        if(!b || b.action!=='app-signals' || b.idToken!=='tokT' || b.hid!=='hT' || !b.errors || b.errors.length!==3) throw new Error('what was sent: '+JSON.stringify(b));
+        var e0=b.errors.filter(function(e){ return e.kind==='import'; })[0];
+        if(!e0 || e0.n!==2 || !e0.env || !e0.device || !e0.lang || e0.version!==APP_VERSION) throw new Error('an error without its count, copy, device or language: '+JSON.stringify(e0));
+        if(JSON.stringify(b).indexOf('me@example.com')!==-1) throw new Error('an e-mail address was sent');
+        if(JSON.parse(localStorage.getItem(INS_ERR_KEY)||'[]').length) throw new Error('still waiting on the device after the server had it');
+      } finally {
+        window.fetch=real.fetch; _workerHealth=real.h; window._fbUser=real.user; window._household=real.hh; window._insUnderTest=false;
+        window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
+        Object.keys(kept).forEach(function(k){ try{ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); }catch(e){} });
+      }
+    } },
+  { id:'tester_feature_counts', group:'Sharing', name:'📈 The beta counts how recipes arrive and which features are used — names and numbers per household, nothing else; a tap repeated is one use; sent and taken off the device (v38.15)',
+    test: async()=>{
+      var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride), once:_insOnce, via:_insVia };
+      var kept={}; [INS_USE_KEY, INS_ERR_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      var sent=[], status=200;
+      function counts(){ var u=JSON.parse(localStorage.getItem(INS_USE_KEY)||'{"list":[]}'); var b=u.list.filter(function(x){ return x.hid==='hC'; })[0]; return (b && b.counts) || {}; }
+      try{
+        window._featureOverride.insights=true; window._insUnderTest=true; _insOnce={}; _insVia=null;
+        window._household={ hid:'hC', name:'Counted' };
+        localStorage.removeItem(INS_USE_KEY); localStorage.removeItem(INS_ERR_KEY);
+        if(insightCount('Bad key!')!==false) throw new Error('a name that is not a plain word was counted');
+        // A feature: the real entry points count. Search typed ten times in one opening is one use.
+        onSearchInput(); onSearchInput();
+        insightCount('view'); insightCount('view');
+        if(counts().search!==1 || counts().view!==2) throw new Error('the counts: '+JSON.stringify(counts()));
+        // How a recipe came: the extension said first, so the link import that follows does not change it.
+        insightVia('extension'); insightVia('link', true);
+        insightAdded({ source:'https://www.facebook.com/groups/x/posts/1' });
+        insightAdded({ source:'' });
+        insightAdded({ source:'https://cooking.example.com/soup' }, '', 'import');
+        insightAdded({}, 'linked');
+        var c=counts();
+        if(c['added.extension']!==1 || c['from.facebook']!==1 || c['added.typed']!==1 || c['added.import']!==1 || c['from.web']!==1 || c['added.linked']!==1)
+          throw new Error('how the recipes came: '+JSON.stringify(c));
+        if(JSON.stringify(c).indexOf('facebook.com')!==-1 || JSON.stringify(c).indexOf('soup')!==-1) throw new Error('an address went into the counts');
+        // Nothing counted while the Self Test runs on its own.
+        window._insUnderTest=false;
+        if(insightCount('view')!==false) throw new Error('counted during the Self Test');
+        window._insUnderTest=true;
+        // Sent for the household, then taken off the device.
+        window._fbUser={ uid:'uC', email:'c@example.com', getIdToken:async function(){ return 'tokC'; } };
+        _workerHealth={ ok:true, signals:true };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push(b);
+          return new Response(JSON.stringify(status===200 ? { ok:true } : { error:'no' }), { status:status }); };
+        if(await insightsSend()!==true) throw new Error('not sent');
+        var b=sent[0];
+        if(!b || b.action!=='app-signals' || b.hid!=='hC' || !b.usage || b.usage.counts.view!==2 || b.usage.month!==new Date().toISOString().slice(0,7)) throw new Error('what was sent: '+JSON.stringify(b));
+        if(Object.keys(counts()).length) throw new Error('still on the device after the server had it');
+        // A household they are no longer in: the counts are dropped, not resent for ever.
+        insightCount('print'); status=403; sent=[];
+        await insightsSend();
+        if(sent.length!==1 || Object.keys(counts()).length) throw new Error('kept counts for a household they left');
+        // And the switch is off in the family app.
+        if(APP_CONFIG.environment==='live' && APP_CONFIG.features.insights) throw new Error('the family app counts');
+      } finally {
+        window.fetch=real.fetch; _workerHealth=real.h; window._fbUser=real.user; window._household=real.hh; window._insUnderTest=false; _insOnce=real.once; _insVia=real.via;
+        window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
+        Object.keys(kept).forEach(function(k){ try{ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); }catch(e){} });
+      }
+    } },
+  { id:'tester_welcome', group:'Sharing', name:'👋 A new tester is welcomed once — what to try, the 💬 button, what the beta sends, recipes stay theirs; it offers the tour instead of a second window; nobody named; translated (v38.15)',
+    test: async()=>{
+      var real={ user:window._fbUser, ov:Object.assign({}, window._featureOverride), tour:window.startTour, ask:window.askConfirm, just:_hhJustFounded };
+      var kept=null, keptTour=null; try{ kept=localStorage.getItem(TESTER_WELCOME_KEY); keptTour=localStorage.getItem(TOUR_DONE_KEY); }catch(e){}
+      var toured=0, asked=0;
+      try{
+        window._insUnderTest=true;
+        window._featureOverride.testerWelcome=false; applyFeatureFlags();
+        localStorage.removeItem(TESTER_WELCOME_KEY);
+        window._fbUser={ uid:'uW', email:'w@example.com', metadata:{ creationTime:new Date().toUTCString() } };
+        if(await testerWelcomeMaybe({ noWait:true })!==false || document.getElementById('testerWelcomeOverlay')) throw new Error('shown where the feature is off');
+        var item=document.querySelector('[data-feature="testerWelcome"]');
+        if(!item || !document.querySelector('.set-group[data-group="help"]').contains(item)) throw new Error('no 👋 Welcome in ⚙️ → 💬 Help and feedback');
+        if(getComputedStyle(item).display!=='none') throw new Error('the menu item shows where the feature is off');
+        window._featureOverride.testerWelcome=true; applyFeatureFlags();
+        if(getComputedStyle(item).display==='none') throw new Error('the menu item is hidden where the feature is on');
+        // A new account: shown once.
+        if(await testerWelcomeMaybe({ noWait:true })!==true) throw new Error('a new tester was not welcomed');
+        var ov=document.getElementById('testerWelcomeOverlay'), t=ov ? ov.textContent : '';
+        if(!/Welcome to the My Kitchen Notes beta/.test(t) || TESTER_WELCOME_TRY.some(function(x){ return t.indexOf(x)===-1; })) throw new Error('the welcome: '+t.slice(0,200));
+        if(!/button in the corner/.test(t) || !/never your recipes/.test(t) || !/Backups/.test(t)) throw new Error('it does not say where to write, what it sends, or that the recipes stay theirs');
+        if(/Tony/.test(t)) throw new Error('names Tony');
+        // Its words are in the list the translation uses.
+        ['Welcome to the My Kitchen Notes beta', 'A few things worth trying:', 'Let’s start', '\u{1F9ED} Take the tour'].concat(TESTER_WELCOME_TRY).forEach(function(x){
+          if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
+        window.startTour=function(){ toured++; };
+        document.getElementById('twTour').click();
+        if(toured!==1 || document.getElementById('testerWelcomeOverlay')) throw new Error('🧭 Take the tour');
+        if(await testerWelcomeMaybe({ noWait:true })!==false) throw new Error('welcomed twice on one device');
+        // An account a month old (a second device) is not greeted again.
+        localStorage.removeItem(TESTER_WELCOME_KEY);
+        window._fbUser={ uid:'uO', email:'o@example.com', metadata:{ creationTime:new Date(Date.now()-40*864e5).toUTCString() } };
+        if(await testerWelcomeMaybe({ noWait:true })!==false) throw new Error('an old account was welcomed');
+        // The tour is not offered in a second window where testers are welcomed.
+        window.askConfirm=async function(){ asked++; return false; };
+        localStorage.removeItem(TOUR_DONE_KEY);
+        _hhJustFounded=true;
+        var wasRunning=_selfTestRunning; _selfTestRunning=false;
+        try{ firstRunAfterFounding(); } finally { _selfTestRunning=wasRunning; }
+        if(asked) throw new Error('the tour question came as well as the welcome');
+        var menuOv=testerWelcome(); if(!menuOv || !document.getElementById('testerWelcomeOverlay')) throw new Error('the menu item does not open it');
+        document.getElementById('twOk').click();
+        if(document.getElementById('testerWelcomeOverlay')) throw new Error('Let’s start did not close it');
+      } finally {
+        var o=document.getElementById('testerWelcomeOverlay'); if(o) o.remove();
+        window._fbUser=real.user; window.startTour=real.tour; window.askConfirm=real.ask; _hhJustFounded=real.just; window._insUnderTest=false;
+        window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
+        try{ if(kept===null) localStorage.removeItem(TESTER_WELCOME_KEY); else localStorage.setItem(TESTER_WELCOME_KEY, kept); }catch(e){}
+        try{ if(keptTour===null) localStorage.removeItem(TOUR_DONE_KEY); else localStorage.setItem(TOUR_DONE_KEY, keptTour); }catch(e){}
+      }
+    } },
+  { id:'manage_errors_and_use', group:'Sharing', name:'📊 Households: ⚠️ Errors from the testers’ apps (done, removed, copied as text) and 📈 Use — each copy added up, each household’s own counts in its details (v38.15)',
+    test: async()=>{
+      if(!feedbackInboxHere()) return;          // read in the family app only
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, ask:window.askConfirm, copy:window.fbProbeCopy };
+      var sent=[], copied='', month=new Date().toISOString().slice(0,7);
+      var errors=[ { id:7, project:'my-kitchen-notes-beta', uid:'uB', email:'beta@example.com', hid:'hB', kind:'error', message:'Cannot read properties of null', place:'index.html:12',
+                     screen:'viewOverlay', version:'v38.15', env:'beta', device:'UA', lang:'he', first_at:Date.now()-864e5, last_at:Date.now(), n:4, status:'new' },
+                   { id:8, project:'tonys-recipes-test', uid:'uT', email:'test@example.com', hid:'', kind:'service', message:'Old one', place:'', screen:'main', version:'v38.14',
+                     env:'test', device:'UA', lang:'en', first_at:Date.now()-2*864e5, last_at:Date.now()-864e5, n:1, status:'done' } ];
+      try{
+        window.toast=function(){}; window.showServiceError=function(){}; window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window.askConfirm=async function(){ return true; }; window.fbProbeCopy=function(t){ copied=String(t); };
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          sent.push(b);
+          if(b.op==='errors') return new Response(JSON.stringify({ errors:errors.map(function(x){ return Object.assign({}, x); }) }), { status:200 });
+          if(b.op==='error-status' || b.op==='error-delete') return new Response('{"ok":true}', { status:200 });
+          if(b.op==='notes') return new Response('{"notes":[],"replies":[]}', { status:200 });
+          if(b.op==='list') return new Response(JSON.stringify({ project:'recipes-f379d', capped:false, month:month, months:[month], projects:['my-kitchen-notes-beta'],
+              defaults:{ cap:2, firstMonth:4, byProject:{} },
+              households:[
+                { project:'my-kitchen-notes-beta', hid:'hB', name:'Beta Kitchen', code:'MKN-B', capped:true, capNow:2, months:[{ month:month, usd:0.5, calls:3 }],
+                  report:{ name:'Beta Kitchen', members:[{ email:'beta@example.com', role:'owner' }], links:[] },
+                  usage:(function(){ var o={}; o[month]={ 'added.link':3, 'added.extension':2, 'from.facebook':1, 'scale':4, 'open':9 }; return o; })() },
+                { project:'my-kitchen-notes-beta', hid:'hB2', name:'Second Kitchen', code:'MKN-C', capped:true, capNow:2, months:[{ month:month, usd:0, calls:0 }],
+                  report:{ name:'Second Kitchen', members:[{ email:'two@example.com', role:'owner' }], links:[] },
+                  usage:(function(){ var o={}; o[month]={ 'added.link':1, 'print':2 }; return o; })() } ] }), { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 });
+        };
+        window._allCopiesOverride=true;
+        await openManagement(); await mknManage._errors();
+        mknManage.tabTo('errors');
+        var tabs=document.querySelector('#manageOverlay .mg-tabs');
+        if(!tabs || !/Errors/.test(tabs.textContent) || !/Use/.test(tabs.textContent)) throw new Error('no ⚠️ Errors and 📈 Use tabs');
+        var body=document.querySelector('#manageOverlay .mg-body').textContent;
+        if(body.indexOf('Cannot read properties of null')===-1 || !/4 times/.test(body) || body.indexOf('Beta Kitchen')===-1 || body.indexOf('viewOverlay')===-1) throw new Error('the error card: '+body.slice(0,300));
+        if(body.indexOf('Old one')!==-1) throw new Error('a done error shows under Not done yet');
+        mknManage.errCopyAll();
+        if(copied.indexOf('[beta v38.15] error: Cannot read properties of null')===-1 || copied.indexOf('index.html:12')===-1) throw new Error('copied as: '+copied);
+        if(await mknManage.errMark('7','done')!==true || !sent.some(function(b){ return b.op==='error-status' && b.id===7 && b.status==='done'; })) throw new Error('✅ Done');
+        mknManage.errFilter('all');
+        if(await mknManage.errDel('8')!==true || !sent.some(function(b){ return b.op==='error-delete' && b.id===8; })) throw new Error('🗑');
+        // 📈 Use: the beta's households added up.
+        mknManage.tabTo('use');
+        body=document.querySelector('#manageOverlay .mg-body').textContent;
+        if(!/6 recipes added/.test(body) || !/4 from a link/.test(body) || !/2 from the browser extension/.test(body) || !/2 households counted/.test(body) || !/4 Changed the servings/.test(body))
+          throw new Error('the Use tab: '+body.slice(0,400));
+        // Each household's own counts, in its details.
+        mknManage.tabTo('households');
+        var row=mknManage._state.rows.filter(function(r){ return r.hid==='hB'; })[0];
+        if(!row) throw new Error('the household is not listed');
+        mknManage.show(row.key);
+        var panel=document.querySelector('#manageOverlay .mg-panel');
+        if(!panel || !/What they use/.test(panel.textContent) || !/5 recipes added/.test(panel.textContent) || !/1 Facebook/.test(panel.textContent)) throw new Error('the household’s counts: '+(panel ? panel.textContent.slice(0,300) : 'no panel'));
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        window.askConfirm=real.ask; window.fbProbeCopy=real.copy; delete window._allCopiesOverride;
+        if(window.mknManage) mknManage.close();
+      }
+    } },
   { id:'feedback_reply_in_app', group:'Sharing', name:'📲 Reply in app: Tony answers a note from the Feedback tab, the answer goes to the writer’s own app; the tab’s buttons press like the app’s own (v38.00)',
     test: async()=>{
       if(!feedbackInboxHere()) return;          // the notes are read in the family app only
@@ -11288,7 +11511,8 @@ window.SELF_TESTS = [
         if(!ov || !ov.classList.contains('open')) throw new Error('the panel did not open');
         var txt=document.getElementById('privacyBody').textContent;
         if(txt.indexOf('Anthropic')===-1) throw new Error('the panel rendered without its content');
-        if(!/no analytics/i.test(txt)) throw new Error('it does not say whether anything is tracked');
+        // v38.15 — the testers' copies count their own use: "no outside analytics" there.
+        if(!/no (outside )?analytics/i.test(txt)) throw new Error('it does not say whether anything is tracked');
         // It is linked from the LOGIN screen, whose z-index is 9999 — a panel
         // at the default 200 would open behind the screen that linked to it.
         if(parseInt(getComputedStyle(ov).zIndex,10) <= 9999)

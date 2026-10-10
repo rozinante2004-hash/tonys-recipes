@@ -1,4 +1,15 @@
-// Tony's Recipes — Cloudflare Worker v68
+// Tony's Recipes — Cloudflare Worker v69
+// v69: WHAT THE TESTERS' APPS REPORT. Tony, before the beta: "let the beta's
+//      run for a while and then see what we can learn". The beta and the test
+//      copy send, now and then, one `app-signals` call (proved as for AI):
+//      `errors` — the app's own error messages, with the screen, version,
+//      device and language; kept once per person, version and wording, with a
+//      count (table `app_errors`, at most 200 new ones a person a day, gone
+//      after 120 days) — and `usage` — for the person's household, how many
+//      times each feature was used this month: names and numbers only (table
+//      `usage_counts`; membership checked). The owner's `meter-admin`: `errors`,
+//      `errors-new`, `error-status`, `error-delete`; `list` gives each
+//      household's `usage` for the three months it shows. Health: `signals`.
 // v68: AN ANSWER TO A NOTE, IN THE SENDER'S OWN APP. Tony: "Reply in App. This
 //      will send a note directly to the sender's app and will be received
 //      exactly as a join request, with the red dot and all." The owner's
@@ -276,7 +287,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v68';
+const WORKER_VERSION = 'v69';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -653,6 +664,7 @@ async function handleRequest(request, env) {
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
+        signals: !!env.METER_DB,      // v69 — the testers' apps report errors and feature counts
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1112,6 +1124,7 @@ async function handleRequest(request, env) {
     if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
     if (body.action === 'feedback-replies') return await feedbackReplies(request, env, body);   // v68
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
+    if (body.action === 'app-signals') return await appSignals(request, env, body);   // v69
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
@@ -1448,6 +1461,7 @@ async function meterAction(request, env, body) {
     return jsonResp({ ok: true, hid, cap });
   }
   if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body, claims); if (fr) return fr; }
+  if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
   if (body.op === 'set-note') {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
@@ -1460,6 +1474,7 @@ async function meterAction(request, env, body) {
   const months = [0, 1, 2].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return utcMonthKey(d.getTime()); });
   const want = body.all ? projects : [claims.aud];
   await reportsTable(db);
+  await signalsTable(db);   // v69 — each household's feature counts
   const out = [];
   for (const p of want) {
     const pCapped = isCapped(p, env);
@@ -1478,8 +1493,14 @@ async function meterAction(request, env, body) {
       if (sum) { if (!h.name) h.name = sum.name || null; if (!h.code) h.code = sum.code || null; if (!h.created_at) h.created_at = sum.createdAt || null; }
       byHid.set(r.hid, h);
     });
+    const use = (await db.prepare('SELECT hid, month, k, n FROM usage_counts WHERE project = ?1 AND month >= ?2')
+      .bind(p, months[2]).all()).results || [];
     byHid.forEach(h => {
       const mine = sp.filter(s => s.hid === h.hid);
+      // v69 — what it used, by month: { 'YYYY-MM': { feature: times } }
+      const u = {};
+      use.filter(x => x.hid === h.hid).forEach(x => { (u[x.month] = u[x.month] || {})[x.k] = x.n; });
+      if (Object.keys(u).length) h.usage = u;
       out.push(Object.assign(h, {
         project: p, capped: pCapped,
         capNow: pCapped ? capFor(h, month, env, p) : null,
@@ -1704,6 +1725,110 @@ async function feedbackReplies(request, env, body) {
   const rows = (await db.prepare('SELECT id, note_id, text, note_text, note_at, at, read_at FROM feedback_replies '
     + 'WHERE project = ?1 AND uid = ?2 ORDER BY at DESC LIMIT 50').bind(claims.aud, claims.sub).all()).results || [];
   return jsonResp({ replies: rows });
+}
+
+// ─── WHAT THE TESTERS' APPS REPORT (v69) ─────────────────────────────────────
+// Tony, before the beta: "let the beta's run for a while and then see what we
+// can learn". The copies whose `insights` feature is on (the beta and the test
+// copy) send, now and then, one call carrying both:
+//   errors — the app's own error messages (what its log would say: a recipe's
+//     NAME at most, never its contents), the screen, version, device and
+//     language. One row per person, version, kind, wording and place, with a
+//     count, so an error that repeats is one line that says how often.
+//   usage  — for the person's household, how many times each feature was used
+//     this month (or the month before, if it was counted then): a name and a
+//     number. Only a member of the household may add to its counts.
+// The owner reads them in 📊 Households: ⚠️ Errors, and each household's
+// "What they use".
+let _signalsReady = false;
+async function signalsTable(db) {
+  if (!_signalsReady) {
+    await db.prepare('CREATE TABLE IF NOT EXISTS app_errors (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, hid TEXT, '
+      + 'kind TEXT, message TEXT, place TEXT, screen TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, first_at INTEGER, last_at INTEGER, '
+      + 'n INTEGER, status TEXT)').run();
+    await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS app_errors_one ON app_errors (project, uid, version, kind, message, place)').run();
+    await db.prepare('CREATE TABLE IF NOT EXISTS usage_counts (project TEXT NOT NULL, hid TEXT NOT NULL, month TEXT NOT NULL, k TEXT NOT NULL, '
+      + 'n INTEGER, PRIMARY KEY (project, hid, month, k))').run();
+    _signalsReady = true;
+  }
+}
+const SIGNAL_KEY = /^[a-z][a-z0-9_.-]{0,39}$/;
+const ERRORS_PER_DAY = 200;       // new error lines a person may add in a day: a loop cannot fill the table
+const ERRORS_KEPT_DAYS = 120;
+async function appSignals(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'SIGNALS: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'SIGNALS: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  const now = Date.now();
+  const hid = /^[A-Za-z0-9]{1,64}$/.test(String(body.hid || '')) ? String(body.hid) : '';
+  const errors = (Array.isArray(body.errors) ? body.errors : []).filter(e => e && typeof e === 'object' && String(e.message || '').trim()).slice(0, 30);
+  const usage = body.usage && typeof body.usage === 'object' ? body.usage : null;
+  const counts = (usage && usage.counts && typeof usage.counts === 'object' && !Array.isArray(usage.counts) ? Object.entries(usage.counts) : [])
+    .filter(([k, n]) => SIGNAL_KEY.test(k) && Number.isInteger(n) && n > 0).slice(0, 80).map(([k, n]) => [k, Math.min(n, 1000)]);
+  // this month, or the one before (counted on the last day, sent on the first)
+  const prev = (() => { const d = new Date(now); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return utcMonthKey(d.getTime()); })();
+  const month = usage && (usage.month === prev) ? prev : utcMonthKey(now);
+  if (counts.length) {
+    if (!hid) return jsonResp({ error: 'SIGNALS: which household?' }, 400);
+    let hh;
+    try { hh = await meterMembership(claims, hid, body.idToken, env); } catch (e) { return jsonResp({ error: 'SIGNALS: ' + e.message }, 502); }
+    if (!hh.member) return jsonResp({ error: 'SIGNALS: you are not in that household.' }, 403);
+  }
+  const db = await meterDb(env);
+  await signalsTable(db);
+  const stmts = [];
+  let keptErrors = 0;
+  if (errors.length) {
+    const today = await db.prepare('SELECT COUNT(*) AS n FROM app_errors WHERE project = ?1 AND uid = ?2 AND first_at > ?3')
+      .bind(claims.aud, claims.sub, now - 864e5).first();
+    const room = Math.max(0, ERRORS_PER_DAY - ((today && today.n) || 0));
+    errors.slice(0, room).forEach(e => {
+      const at = Number(e.at) > 0 && Number(e.at) <= now + 60000 ? Math.floor(Number(e.at)) : now;
+      const n = Number.isInteger(e.n) && e.n > 0 ? Math.min(e.n, 1000) : 1;
+      stmts.push(db.prepare('INSERT INTO app_errors (project, uid, email, hid, kind, message, place, screen, version, env, device, lang, first_at, last_at, n, status) '
+        + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13, ?14, \'new\') '
+        + 'ON CONFLICT (project, uid, version, kind, message, place) DO UPDATE SET n = n + excluded.n, last_at = MAX(last_at, excluded.last_at), '
+        + 'screen = excluded.screen, device = excluded.device, lang = excluded.lang, hid = CASE WHEN excluded.hid = \'\' THEN hid ELSE excluded.hid END')
+        .bind(claims.aud, claims.sub, str(claims.email, 200), hid, str(e.kind, 30), str(e.message, 500).trim(), str(e.where, 200), str(e.screen, 80),
+              str(e.version, 20), str(e.env, 20), str(e.device, 300), str(e.lang, 10), at, n));
+      keptErrors++;
+    });
+  }
+  counts.forEach(([k, n]) => {
+    stmts.push(db.prepare('INSERT INTO usage_counts (project, hid, month, k, n) VALUES (?1, ?2, ?3, ?4, ?5) '
+      + 'ON CONFLICT (project, hid, month, k) DO UPDATE SET n = n + excluded.n').bind(claims.aud, hid, month, k, n));
+  });
+  if (stmts.length) await db.batch(stmts);
+  return jsonResp({ ok: true, errors: keptErrors, dropped: errors.length - keptErrors, counts: counts.length, month });
+}
+// The owner's side, through meter-admin: errors (newest 300, every copy),
+// errors-new (how many are new), error-status (new | done), error-delete.
+async function signalsAdmin(env, db, body) {
+  await signalsTable(db);
+  if (body.op === 'errors') {
+    await db.prepare('DELETE FROM app_errors WHERE last_at < ?1').bind(Date.now() - ERRORS_KEPT_DAYS * 864e5).run();
+    const rows = (await db.prepare('SELECT id, project, uid, email, hid, kind, message, place, screen, version, env, device, lang, first_at, last_at, n, status '
+      + 'FROM app_errors ORDER BY last_at DESC LIMIT 300').all()).results || [];
+    return jsonResp({ errors: rows });
+  }
+  if (body.op === 'errors-new') {
+    const r = await db.prepare("SELECT COUNT(*) AS n FROM app_errors WHERE status = 'new'").first();
+    return jsonResp({ new: (r && r.n) || 0 });
+  }
+  const id = parseInt(body.id, 10);
+  if (!(id > 0)) return jsonResp({ error: 'SIGNALS: which error?' }, 400);
+  if (body.op === 'error-status') {
+    if (['new', 'done'].indexOf(body.status) === -1) return jsonResp({ error: 'SIGNALS: new or done.' }, 400);
+    await db.prepare('UPDATE app_errors SET status = ?1 WHERE id = ?2').bind(body.status, id).run();
+    return jsonResp({ ok: true });
+  }
+  if (body.op === 'error-delete') {
+    await db.prepare('DELETE FROM app_errors WHERE id = ?1').bind(id).run();
+    return jsonResp({ ok: true });
+  }
+  return null;
 }
 
 // ─── VIDEO RECIPES (v43, v44) ────────────────────────────────────────────────
@@ -2200,4 +2325,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v68 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v69 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

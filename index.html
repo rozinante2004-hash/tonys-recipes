@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.14 -->
+<!-- Tony's Recipes Collection v38.15 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -178,7 +178,9 @@
       bringDirect: false, // v37.95 — retired (Tony: "the official sending to Bring works great"); Worker v66 refuses it
       gmail:    true,     // Send a recipe by e-mail through your Gmail
       feedbackButton: false,  // v37.64 — the floating 💬 note to Tony (the beta and the test copy)
-      selfTestForAll: false   // v37.75 — 🧪 Self Test for everyone (the beta and the test copy); the owner always
+      selfTestForAll: false,  // v37.75 — 🧪 Self Test for everyone (the beta and the test copy); the owner always
+      insights: false,        // v38.15 — errors and feature counts reported to the app's own server (the beta and the test copy)
+      testerWelcome: false    // v38.15 — a short welcome for testers at their first sign-in (the beta and the test copy)
     }),
     // v37.03 — the ways to sign in on THIS copy. Each needs switching on in the
     // Firebase console (Authentication → Sign-in method) as well, and Apple and
@@ -336,6 +338,7 @@
   html[data-feature-off-bring]    [data-feature="bring"],
   html[data-feature-off-bringDirect] [data-feature="bringDirect"],
   html[data-feature-off-feedbackButton] [data-feature="feedbackButton"],
+  html[data-feature-off-testerWelcome] [data-feature="testerWelcome"],
   html[data-feature-off-gmail]    [data-feature="gmail"] { display: none !important; }
 </style>
 <script src="https://accounts.google.com/gsi/client" async></script>
@@ -708,6 +711,11 @@ function pruneSyncLog(now) {
 // The recorder. Newest first, so the viewer and the cap agree on which end is
 // old without re-sorting.
 function syncLog(kind, message, data) {
+  // v38.15 — a fault the app notes is reported where `insights` is on (the beta,
+  // the test copy), whether or not the log is kept on this device.
+  if (kind === 'error' && !window._insFromRecord && typeof insightError === 'function') {
+    try { insightError('logged', String(message == null ? '' : message) + (typeof data === 'string' && data ? ' — ' + data : ''), ''); } catch(e) {}
+  }
   if (!logEnabled()) return false;
   try {
     var entry = {
@@ -1720,6 +1728,7 @@ function handleShareTarget() {
   }
 
   if (!sharedUrl && !sharedText && !sharedTitle) return;
+  if (typeof insightVia === 'function') insightVia(fromBrowser ? 'extension' : 'shared');   // v38.15
   // v37.69 — a link shared into the app on an iPhone came through the shortcut:
   // it is installed, so it is never offered again.
   if (!fromBrowser && sharedUrl && !window._selfTestRunning && typeof isIPhoneLike === 'function' && isIPhoneLike() && typeof iosShortcutNoteUsed === 'function') {
@@ -2993,6 +3002,7 @@ document.addEventListener('visibilitychange', function() {
 var _cookLogId = null, _cookLogRating = 0;
 
 function markCooked(id) {
+  if (typeof insightCount === 'function') insightCount('cooked');
   var r = recipes.find(function(x){ return x.id===id; });
   if (!r) return;
   _cookLogId = id; _cookLogRating = 0;
@@ -4360,6 +4370,7 @@ function hhLinkTarget(text) {
   return null;
 }
 async function hhSendLinkRequest(text, note) {
+  if (typeof insightCount === 'function') insightCount('link-request');
   var tg = hhLinkTarget(text), me = _household, db = hhDb();
   if (!tg) return { ok: false, msg: 'That is neither an identifier (MKN-…) nor an e-mail address.' };
   var base = { from: me.hid, fromName: me.name || '', fromCode: me.code || '', by: _fbUser.uid, at: Date.now() };
@@ -5067,6 +5078,7 @@ function saveLinkedCopy() {
   if (Array.isArray(c.parts)) c.parts.forEach(function(p){ p.uid = newUid(); p.fav = false; delete p.cookCount; delete p.lastCooked; });
   var made = normalizeRecipe(c);
   recipes.unshift(made);
+  if (typeof insightAdded === 'function') insightAdded(made, 'linked');
   saveData(); renderGrid();
   closeM('linkedViewOverlay');
   syncLog('save', 'Saved a copy of a linked household’s recipe', { name: made.name, id: made.id });
@@ -5174,6 +5186,8 @@ async function householdUse(hid, role) {
   hhNoteSeen();                                                  // v37.58
   legalNoteOnMembership().catch(function(){});                   // v37.83
   if (!_selfTestRunning) setTimeout(function(){ hhReport().catch(function(){}); }, 6000);   // v37.71
+  if (!_selfTestRunning && typeof insightsStart === 'function') setTimeout(insightsStart, 3000);   // v38.15
+  if (!_selfTestRunning && typeof testerWelcomeMaybe === 'function') setTimeout(function(){ testerWelcomeMaybe().catch(function(){}); }, 4000);   // v38.15
   if (_openManageOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) { _openManageOnSignIn = false; setTimeout(function(){ openManagement(); }, 800); }
   if (typeof deviceOffersCloud === 'function' && !_selfTestRunning) deviceOffersCloud().catch(function(){});   // v37.69
   if (typeof feedbackTellOwner === 'function') setTimeout(function(){ feedbackTellOwner().catch(function(){}); }, 5000);   // v37.64
@@ -5939,6 +5953,8 @@ function firstRunAfterFounding() {
   if (!_hhJustFounded || window._selfTestRunning) return;
   _hhJustFounded = false;
   try { if (localStorage.getItem(TOUR_DONE_KEY)) return; } catch(e) {}
+  // v38.15 — where testers are greeted, the welcome offers the tour: one window, not two.
+  if (typeof featureOn === 'function' && featureOn('testerWelcome')) return;
   askConfirm({ icon: '\u{1F9ED}', title: 'Your collection is ready',
     message: 'A 30-second tour of where everything is?', okLabel: 'Show me', cancelLabel: 'Not now' })
     .then(function(ok){ if (ok === true) startTour(); else { try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch(e) {} } });
@@ -6308,6 +6324,232 @@ window.openFeedbackForm = openFeedbackForm; window.sendFeedbackNote = sendFeedba
 window.feedbackTellOwner = feedbackTellOwner; window.fbSignedInUser = fbSignedInUser;
 window.feedbackInboxHere = feedbackInboxHere; window.feedbackMoveToInbox = feedbackMoveToInbox;
 document.addEventListener('DOMContentLoaded', function(){ try { renderFeedbackButton(); } catch(e) {} });
+// ─── WHAT THE TESTERS' APPS REPORT (v38.15, Worker v69) ──────────────────────
+// Tony, before the beta: "let the beta's run for a while and then see what we
+// can learn". Testers rarely press "Transmit report to admin", so where the
+// `insights` feature is on (the beta and the test copy):
+//  • every error the app notes is also sent to the app's own server — its
+//    wording (addresses shortened to the site, e-mail addresses removed), where
+//    in the code, the screen in front, the version, the device and language:
+//    what the log would say, never a recipe's contents;
+//  • each use of a feature is counted for the household (insightCount), and
+//    the counts — names and numbers only — are sent.
+// Both wait on the device until the person is signed in and the server takes
+// them (health `signals`), then go a little after something happens, every ten
+// minutes, when the app is put away, and when it opens. Nothing is counted or
+// sent while the Self Test runs. Tony reads them in the family app:
+// 📊 Households → ⚠️ Errors, and each household's "What they use".
+var INS_ERR_KEY = 'mkn_ins_err', INS_USE_KEY = 'mkn_ins_use', INS_DAY_KEY = 'mkn_ins_day';
+function insightsOn() { return typeof featureOn === 'function' && featureOn('insights'); }
+// (window._insUnderTest: the Self Test's own checks of this, which nothing else in a run reaches)
+function insQuiet() { return !insightsOn() || (typeof _selfTestRunning !== 'undefined' && !!_selfTestRunning && !window._insUnderTest); }
+function insRead(k, dflt) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? dflt : v; } catch(e) { return dflt; } }
+function insWrite(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+function insMonth(t) { return new Date(t || Date.now()).toISOString().slice(0, 7); }
+// The window in front (its id), or the main page.
+function insScreen() {
+  var open = document.querySelectorAll('.modal-overlay.open, [id$="Overlay"].open, #serviceErrorOverlay, #importErrorModal');
+  var top = open.length ? open[open.length - 1] : null;
+  return top ? String(top.id || top.className.split(' ')[0] || 'window').slice(0, 80) : 'main';
+}
+// An address says which site, not which page; an e-mail address says nothing.
+function insClean(s, max) {
+  return String(s == null ? '' : s)
+    .replace(/https?:\/\/([^\/\s?#"'<>]+)[^\s"'<>]*/gi, 'https://$1/…')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[e-mail]')
+    .slice(0, max);
+}
+function insightError(kind, message, where) {
+  if (insQuiet()) return false;
+  var msg = insClean(message, 500).trim();
+  if (!msg) return false;
+  var k = String(kind || 'error').slice(0, 30), w = insClean(where, 200);
+  var q = insRead(INS_ERR_KEY, []);
+  if (!Array.isArray(q)) q = [];
+  var same = q.filter(function(e){ return e.kind === k && e.message === msg && e.where === w && e.version === APP_VERSION; })[0];
+  if (same) { same.n = Math.min(1000, (same.n || 1) + 1); same.at = Date.now(); same.screen = insScreen(); }
+  else { q.push({ kind: k, message: msg, where: w, screen: insScreen(), version: APP_VERSION, at: Date.now(), n: 1 }); if (q.length > 30) q.shift(); }
+  insWrite(INS_ERR_KEY, q);
+  insSoon(20000);
+  return true;
+}
+// One more use of a feature by this household. `once`: counted once while the
+// app stays open (a recipe scaled ten times in a row is one use).
+var _insOnce = {};
+function insightCount(key, once, n) {
+  if (insQuiet() || !/^[a-z][a-z0-9_.-]{0,39}$/.test(String(key))) return false;
+  if (once) { if (_insOnce[once]) return false; _insOnce[once] = 1; }
+  var hid = (typeof _household !== 'undefined' && _household && _household.hid) || '';
+  var u = insRead(INS_USE_KEY, null), m = insMonth();
+  if (!u || !Array.isArray(u.list)) u = { list: [] };
+  var b = u.list.filter(function(x){ return x.hid === hid && x.month === m; })[0];
+  if (!b) { b = { hid: hid, month: m, counts: {} }; u.list.push(b); if (u.list.length > 12) u.list.shift(); }
+  b.counts[key] = Math.min(100000, (b.counts[key] || 0) + (n > 0 ? Math.floor(n) : 1));
+  insWrite(INS_USE_KEY, u);
+  insSoon(120000);
+  return true;
+}
+// How a new recipe came: the path that is filling the editor or importing says
+// so first (insightVia), and the moment the recipe is kept counts it.
+var _insVia = null;
+function insightVia(via, weak) {
+  if (insQuiet()) return;
+  if (weak && _insVia && Date.now() - _insVia.at < 120000) return;   // the extension or a share said first
+  _insVia = { via: String(via), at: Date.now() };
+}
+function insightAdded(recipe, via, fallback) {
+  var how = via || (_insVia && Date.now() - _insVia.at < 30 * 60e3 ? _insVia.via : (fallback || 'typed'));
+  _insVia = null;
+  insightCount('added.' + how);
+  var src = String((recipe && recipe.source) || '');
+  if (/^https?:\/\//i.test(src)) {
+    var site = /facebook\.com|fb\.watch|fb\.com/i.test(src) ? 'facebook' : /instagram\.com/i.test(src) ? 'instagram'
+      : /tiktok\.com/i.test(src) ? 'tiktok' : /youtube\.com|youtu\.be/i.test(src) ? 'youtube' : 'web';
+    insightCount('from.' + site);
+  }
+}
+var _insTimer = null, _insSending = false;
+function insSoon(ms) {
+  if (_insTimer || insQuiet()) return;
+  _insTimer = setTimeout(function(){ _insTimer = null; insightsSend().catch(function(){}); }, ms || 20000);
+}
+// Sends what is waiting. What was sent is taken off the device only once the
+// server has it; anything added meanwhile stays for the next time.
+async function insightsSend(opts) {
+  opts = opts || {};
+  if (insQuiet() || _insSending) return false;
+  var u = typeof fbSignedInUser === 'function' ? fbSignedInUser() : null;
+  if (!u || !u.getIdToken) return false;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function' && !opts.keepalive) { try { await checkWorkerHealth(); } catch(e) {} }
+  if (!(_workerHealth && _workerHealth.signals)) return false;
+  var errs = insRead(INS_ERR_KEY, []); if (!Array.isArray(errs)) errs = [];
+  var use = insRead(INS_USE_KEY, { list: [] }); if (!use || !Array.isArray(use.list)) use = { list: [] };
+  var hidNow = (typeof _household !== 'undefined' && _household && _household.hid) || '';
+  var batches = use.list.filter(function(b){ return Object.keys(b.counts || {}).length && (b.hid || hidNow); });
+  if (!errs.length && !batches.length) return true;
+  _insSending = true;
+  try {
+    var token = await u.getIdToken();
+    var common = { env: String(APP_CONFIG.environment || 'live'), device: String(navigator.userAgent || '').slice(0, 300),
+                   lang: (typeof _i18nLang === 'string' ? _i18nLang : 'en') };
+    var post = async function (body) {
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), keepalive: !!opts.keepalive,
+        body: workerBody(Object.assign({ action: 'app-signals', idToken: token }, body)), signal: AbortSignal.timeout(15000) });
+      var d = {}; try { d = await r.json(); } catch(e) {}
+      return { status: r.status, ok: r.ok && !!d.ok };
+    };
+    var sentErrs = errs.map(function(e){ return Object.assign({}, e, common); }), errsDone = !sentErrs.length, done = [], drop = [];
+    for (var i = 0; i < batches.length || !errsDone; i++) {
+      var b = batches[i];
+      var body = { hid: b ? (b.hid || hidNow) : hidNow };
+      if (b) body.usage = { month: b.month, counts: b.counts };
+      if (!errsDone) body.errors = sentErrs;
+      var res = await post(body);
+      if (res.ok) { if (!errsDone) errsDone = 'sent'; if (b) done.push(b); }
+      else if (res.status === 400 || res.status === 403) { if (b) drop.push(b); else errsDone = true; }   // a household they are no longer in
+      else break;                                                                                        // the server is away: later
+      if (!b && errsDone) break;
+    }
+    // Take off what went: errors by their count, counts by the numbers sent.
+    var nowErr = insRead(INS_ERR_KEY, []); if (!Array.isArray(nowErr)) nowErr = [];
+    if (errsDone === 'sent') {
+      nowErr = nowErr.map(function(e){
+        var s = errs.filter(function(x){ return x.kind === e.kind && x.message === e.message && x.where === e.where && x.version === e.version; })[0];
+        if (!s) return e;
+        var left = (e.n || 1) - (s.n || 1);
+        return left > 0 ? Object.assign({}, e, { n: left }) : null;
+      }).filter(Boolean);
+      insWrite(INS_ERR_KEY, nowErr);
+    }
+    if (done.length || drop.length) {
+      var nowUse = insRead(INS_USE_KEY, { list: [] }); if (!nowUse || !Array.isArray(nowUse.list)) nowUse = { list: [] };
+      nowUse.list = nowUse.list.map(function(x){
+        var gone = drop.filter(function(b){ return b.hid === x.hid && b.month === x.month; })[0];
+        if (gone) return null;
+        var s = done.filter(function(b){ return b.hid === x.hid && b.month === x.month; })[0];
+        if (!s) return x;
+        var c = {};
+        Object.keys(x.counts || {}).forEach(function(k){ var left = x.counts[k] - ((s.counts || {})[k] || 0); if (left > 0) c[k] = left; });
+        return Object.keys(c).length ? { hid: x.hid, month: x.month, counts: c } : null;
+      }).filter(Boolean);
+      insWrite(INS_USE_KEY, nowUse);
+    }
+    return errsDone === 'sent' || done.length > 0;
+  } catch(e) { return false; }
+  finally { _insSending = false; }
+}
+// The household is open: one "opened the app" a day, and what waited goes.
+function insightsStart() {
+  if (insQuiet()) return false;
+  var today = new Date().toISOString().slice(0, 10);
+  if (insRead(INS_DAY_KEY, '') !== today) { insWrite(INS_DAY_KEY, today); insightCount('open'); }
+  insSoon(8000);
+  return true;
+}
+setInterval(function(){ if (!insQuiet()) insightsSend().catch(function(){}); }, 10 * 60e3);
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'hidden' && !insQuiet()) insightsSend({ keepalive: true }).catch(function(){});
+});
+window.insightsOn = insightsOn; window.insightError = insightError; window.insightCount = insightCount;
+window.insightVia = insightVia; window.insightAdded = insightAdded; window.insightsSend = insightsSend;
+window.insightsStart = insightsStart; window.insScreen = insScreen; window.insClean = insClean;
+// ─── A WELCOME FOR TESTERS (v38.15) ───────────────────────────────────────────
+// Tony, before recruiting testers: at a tester's first sign-in, a short welcome
+// — thank you, a few things worth trying, where the 💬 button is, what the beta
+// sends by itself, and that their recipes stay theirs. Once per device, and only
+// for an account made in the last three weeks (a tester on a second device a
+// month later is not greeted again). Always at hand in ⚙️ → 💬 Help and
+// feedback → 👋 Welcome to the beta. Where `testerWelcome` is on (the beta, the
+// test copy). Every line is in I18N_EXTRA, so it is translated like the rest.
+var TESTER_WELCOME_KEY = 'mkn_tester_welcome';
+var TESTER_WELCOME_TRY = [
+  '📥 + Add Recipe: from a website link, a photo of a cookbook page, or a screenshot.',
+  '🧩 Save a recipe straight from any site: the browser extension on a computer, or the shortcut on a phone — the app offers them.',
+  '🍽 Open a recipe and change the servings: the amounts follow, even in the method.',
+  '👥 Share one cookbook with your family: ⚙️ → 🏠 My household → 👥 Family Access.'
+];
+function testerWelcome() {
+  var prev = document.getElementById('testerWelcomeOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'testerWelcomeOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="twTitle" style="max-width:520px;text-align:start;">'
+    + '<div class="ask-icon" aria-hidden="true">\u{1F44B}</div>'
+    + '<div class="ask-title" id="twTitle">Welcome to the My Kitchen Notes beta</div>'
+    + '<div class="ask-body" style="text-align:start;">Thank you for trying the app before everyone else — what you tell us shapes what it becomes.</div>'
+    + '<div class="tw-h">A few things worth trying:</div>'
+    + '<ul class="tw-list">' + TESTER_WELCOME_TRY.map(function(t){ return '<li>' + escH(t) + '</li>'; }).join('') + '</ul>'
+    + '<div class="ask-body" style="text-align:start;">\u{1F4AC} The button in the corner sends us a note — what works, what doesn’t, what you wish it did — with a screenshot if you like.</div>'
+    + '<div class="ask-body tw-small" style="text-align:start;">While the app is being tested, it also sends us its own error messages and counts which features are used — never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.</div>'
+    + '<div class="ask-actions"><button type="button" class="ask-btn" id="twOk">Let’s start</button>'
+    + '<button type="button" class="ask-btn ghost" id="twTour">\u{1F9ED} Take the tour</button></div></div>';
+  var close = function(){ ov.remove(); };
+  ov.onclick = function(e){ if (e.target === ov) close(); };
+  ov.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  document.body.appendChild(ov);
+  ov.querySelector('#twOk').onclick = close;
+  ov.querySelector('#twTour').onclick = function(){ close(); if (typeof startTour === 'function') startTour(); };
+  setTimeout(function(){ var b = ov.querySelector('#twOk'); if (b) b.focus(); }, 60);
+  return ov;
+}
+// After the household opens: a new tester, on a device that has not seen it,
+// once nothing else is on the screen (the terms, an update, a link request).
+async function testerWelcomeMaybe(opts) {
+  opts = opts || {};
+  var testing = _selfTestRunning && !window._insUnderTest;
+  if (typeof featureOn !== 'function' || !featureOn('testerWelcome') || testing) return false;
+  try { if (localStorage.getItem(TESTER_WELCOME_KEY)) return false; } catch(e) { return false; }
+  var u = typeof fbSignedInUser === 'function' ? fbSignedInUser() : null;
+  if (!u) return false;
+  var made = Date.parse((u.metadata && u.metadata.creationTime) || '') || 0;
+  if (!made || Date.now() - made > 21 * 864e5) { try { localStorage.setItem(TESTER_WELCOME_KEY, 'not new'); } catch(e) {} return false; }
+  for (var i = 0; !opts.noWait && i < 40 && document.querySelector('.modal-overlay.open, #askOverlay, #serviceErrorOverlay, #importErrorModal'); i++)
+    await new Promise(function(r){ setTimeout(r, 3000); });
+  if ((_selfTestRunning && !window._insUnderTest) || (!opts.noWait && document.querySelector('.modal-overlay.open, #askOverlay'))) return false;
+  try { localStorage.setItem(TESTER_WELCOME_KEY, String(Date.now())); } catch(e) {}
+  testerWelcome();
+  return true;
+}
+window.testerWelcome = testerWelcome; window.testerWelcomeMaybe = testerWelcomeMaybe; window.TESTER_WELCOME_TRY = TESTER_WELCOME_TRY;
 
 // ─── ANSWERS TO NOTES (v38.00, Worker v68) ──────────────────────────────────
 // Tony: "Reply in App. This will send a note directly to the sender's app and
@@ -6690,7 +6932,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.14';
+var APP_VERSION = 'v38.15';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7210,11 +7452,18 @@ function recordError(kind, message, where) {
   // in the report, and kept OUT of the persistent log — where every run used
   // to leave a handful of "errors" for the log nudge to count.
   var duringTest = (typeof _selfTestRunning !== 'undefined') && !!_selfTestRunning;
+  // v38.15 — and to the app's own server, where `insights` is on (the beta, the test copy)
+  if ((!duringTest || window._insUnderTest) && typeof insightError === 'function') { try { insightError(kind, message, where); } catch(e) {} }
   _recentErrors.push({ at: new Date().toISOString(), kind: kind,
                        message: String(message || '(no message)'), where: where || '', duringTest: duringTest });
   // The in-memory buffer dies with the tab; the log survives it, so an error
   // that only happens once a week is still there when someone comes looking.
-  if (!duringTest) { try { syncLog('error', String(message || '(no message)'), where || undefined); } catch(e) {} }
+  if (!duringTest) {
+    // v38.15 — and to the app's own server, where the `insights` feature is on (the beta, the test copy)
+    window._insFromRecord = true;
+    try { syncLog('error', String(message || '(no message)'), where || undefined); } catch(e) {}
+    window._insFromRecord = false;
+  }
   if (_recentErrors.length > 20) _recentErrors.shift();   // ring buffer, newest kept
 }
 window.recentErrors = function(){ return _recentErrors.slice(); };
@@ -7994,6 +8243,11 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 :root[data-theme="dark"] .ask-quote { background: rgba(212,168,67,0.12); border-color: rgba(232,120,74,0.45); border-inline-start-color: var(--terracotta); }
 .ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
 .ask-actions { display: flex; flex-direction: column; gap: 8px; }
+/* v38.15 — the testers' welcome */
+.tw-h { font-size: 13px; font-weight: 700; color: var(--heading); margin: 2px 0 6px; }
+.tw-list { margin: 0 0 14px; padding-inline-start: 4px; list-style: none; font-size: 13px; line-height: 1.6; color: var(--ink); }
+.tw-list li { margin: 0 0 6px; }
+.tw-small { font-size: 12px; }
 .ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta-fill); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
 .ask-btn.danger { background: #C62828; }
 .ask-check { display:flex; align-items:center; gap:9px; margin:2px 0 12px; cursor:pointer;
@@ -9470,7 +9724,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.14</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.15</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9548,6 +9802,7 @@ body.banner-shown .header {
           <div class="set-group" data-group="help">
             <button type="button" class="drop-item set-head" aria-expanded="false" title="The tour, and writing to us." onclick="settingsGroup('help')">💬 Help and feedback</button>
             <div class="set-body">
+              <button class="drop-item" data-feature="testerWelcome" title="What the beta is, what to try, and what it sends." onclick="closeDrop('settingsDrop');testerWelcome()">👋 Welcome to the beta</button>
               <button class="drop-item" title="A short tour of where things are. Changes nothing." onclick="closeDrop('settingsDrop');startTour()">🧭 Take the tour</button>
               <button class="drop-item" title="Write to us by e-mail, with the app's version filled in." onclick="closeDrop('settingsDrop');sendFeedback()">✉️ Send feedback</button>
               <!-- v38.00 — answers to the notes this person sent (shown once there is one) -->
@@ -10181,7 +10436,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.14</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.15</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11125,6 +11380,7 @@ function clearCookTimers() {
   _cookTimers = {};
 }
 function startCookTimer(key, secs) {
+  if (typeof insightCount === 'function') insightCount('timer', 'timer:' + key);
   var btn = document.getElementById('cookTimer-' + key);
   if (!btn) return;
   var t = _cookTimers[key];
@@ -11473,6 +11729,7 @@ window.invalidateFilterCounts = invalidateFilterCounts; window.filterCountKey = 
 
 // ─── PANTRY UI (3.2) ──────────────────────────────────────────────────────────
 function openPantry() {
+  if (typeof insightCount === 'function') insightCount('pantry');
   document.getElementById('pantryInput').value = getPantry().join('\n');
   document.getElementById('pantryOverlay').classList.add('open');
 }
@@ -11621,6 +11878,7 @@ function handleVoiceCommand(text) {
 function toggleVoice() {
   if (!voiceSupported()) { toast('Voice control is not available in this browser'); return; }
   if (_voiceOn) { stopVoice(); return; }
+  if (typeof insightCount === 'function') insightCount('voice');
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   _voiceRec = new SR();
   _voiceRec.continuous = true;
@@ -12829,7 +13087,23 @@ var I18N_EXTRA = [
   'The Chrome Web Store opens. Edge first asks to allow extensions from other stores \u2014 press Allow, then Add to Chrome: it installs in Edge.',
   'The Chrome Web Store opens. Opera first offers \u201CInstall Chrome Extensions\u201D \u2014 add it once, then Add to Opera.',
   // …and the recipe window's corner (v38.09).
-  'Drag to make the recipe bigger or smaller — click for full size', 'Drag to resize — click for the usual size', 'Full size', 'Usual size', 'Not specified'
+  'Drag to make the recipe bigger or smaller — click for full size', 'Drag to resize — click for the usual size', 'Full size', 'Usual size', 'Not specified',
+  // v38.15 — the testers' welcome (built by code).
+  'Welcome to the My Kitchen Notes beta', 'Thank you for trying the app before everyone else \u2014 what you tell us shapes what it becomes.',
+  'A few things worth trying:',
+  '📥 + Add Recipe: from a website link, a photo of a cookbook page, or a screenshot.',
+  '🧩 Save a recipe straight from any site: the browser extension on a computer, or the shortcut on a phone \u2014 the app offers them.',
+  '🍽 Open a recipe and change the servings: the amounts follow, even in the method.',
+  '👥 Share one cookbook with your family: ⚙️ → 🏠 My household → 👥 Family Access.',
+  '\u{1F4AC} The button in the corner sends us a note \u2014 what works, what doesn\u2019t, what you wish it did \u2014 with a screenshot if you like.',
+  'While the app is being tested, it also sends us its own error messages and counts which features are used \u2014 never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.',
+  'Let\u2019s start', '\u{1F9ED} Take the tour',
+  // …and what the privacy panel says in the testers' copies (the family app never shows it).
+  'when you import, search for a photo, use the AI, or send a note \u2014 and, in this test copy, now and then by itself',
+  'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.'
+    + ' In this test copy it also sends, by itself, the app\u2019s own error messages and how many times each feature was used \u2014 names and numbers, never your recipes.',
+  ', and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts which features are used, to the app\u2019s own server. '
+    + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
 ];
 function i18nRegisterExtra() {
   I18N_EXTRA.forEach(function(str) {
@@ -14076,6 +14350,7 @@ function renderUnitsMenuItem() {
   if (el) el.textContent = '📏 Units: ' + unitPref();
 }
 function toggleUnitPref() {
+  if (typeof insightCount === 'function') insightCount('units');
   var next = unitPref() === 'imperial' ? 'metric' : 'imperial';
   try { localStorage.setItem(VIEW_UNIT_KEY, next); } catch(e) {}
   renderUnitsMenuItem();
@@ -15556,6 +15831,7 @@ function prunePhotoUrlCache() {
 // so we render once the user pauses instead of once per character.
 var _searchTimer = null;
 function onSearchInput() {
+  if (typeof insightCount === 'function') insightCount('search', 'search');
   syncSearchClear();
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(function(){ renderGrid(); }, 180);
@@ -15935,6 +16211,7 @@ function toggleFav(e,id){
 // VIEW MODAL
 // ═══════════════════════════════════
 function openView(id){
+  if (typeof insightCount === 'function') insightCount('view');   // v38.15 — what the testers use
   viewId=id;
   // Restore saved scaling for this recipe
   try { viewMult = parseFloat(localStorage.getItem('scale_'+id)||'1')||1; } catch(e){ viewMult=1; }
@@ -16937,6 +17214,7 @@ function currentServings(r){
   return base === null ? null : base * viewMult;
 }
 function setServings(target){
+  if (typeof insightCount === 'function') insightCount('scale', 'scale:' + viewId);
   var r = recipes.find(function(x){ return x.id===viewId; });
   if (!r) return;
   var base = parseServings(r.servings);
@@ -16961,11 +17239,13 @@ window.nudgeServings = nudgeServings; window.servingsInputChanged = servingsInpu
 window.currentServings = currentServings;
 var VIEW_UNIT_KEY = 'tonys_view_unit';
 function setUnit(u){
+  if (typeof insightCount === 'function') insightCount('units', 'units:' + viewId);
   viewUnit = (u==='imperial') ? 'imperial' : 'metric';
   try { localStorage.setItem(VIEW_UNIT_KEY, viewUnit); } catch(e){}
   drawView();
 }
 function toggleShare(id){
+  if (typeof insightCount === 'function') insightCount('share');
   var r=findRecipeRef(id);
   if(!r) return;
   document.getElementById('shareModalTitle').textContent = r.name;
@@ -17470,6 +17750,7 @@ function safeFilename(name) {
 // ─── EXCEL STYLING ────────────────────────────────────────────────────────────
 
 function exportRecipesToWord(list, filename){
+  if (typeof insightCount === 'function') insightCount('word');
   if(!list || !list.length){toast('No recipes to export');return;}
   var date = new Date().toISOString().slice(0,10);
   downloadBlob(makeDocxBlob(list), filename || ('Tonys_Recipes_' + date + '.docx'));
@@ -18103,6 +18384,7 @@ window.importFromFile = importFromFile;
 // salvage: any text we did manage to extract before failing, so the user can
 // carry on from it instead of starting over.
 function showImportError(msg, salvage) {
+  if (typeof insightError === 'function') { try { insightError('import', msg, ''); } catch(e) {} }   // v38.15
   var existing = document.getElementById('importErrorModal');
   if(existing) existing.remove();
   salvage = (typeof salvage === 'string' && salvage.trim()) ? salvage : '';
@@ -18439,6 +18721,7 @@ async function saveRecipe(){
     toast('\u2705 Recipe updated!');
   } else {
     recipes.unshift({id: nextId++, uid: newUid(),bg:rndBg(),...data});
+    if (typeof insightAdded === 'function') insightAdded(recipes[0]);   // v38.15 — how recipes arrive
     toast('\u2705 Recipe saved!');
   }
   _editFormSnapshot = null; // saved — nothing left to warn about
@@ -18622,6 +18905,7 @@ function addSuggestion(idx, containerId) {
     steps: Array.isArray(s.steps) && s.steps.length ? s.steps : ['See full recipe online'],
     updatedAt: Date.now()
   }));
+  if (typeof insightAdded === 'function') insightAdded(recipes[0], 'suggestion');
   const btn = document.getElementById(`sugadd-${containerId}-${idx}`);
   if (btn) { btn.textContent = '✓ Added!'; btn.classList.add('added'); btn.disabled = true; }
   renderGrid();
@@ -18654,6 +18938,7 @@ function openSuggestModal() {
   document.getElementById("suggestOverlay").classList.add("open");
 }
 async function runSuggest() {
+  if (typeof insightCount === 'function') insightCount('suggest');
   var res = document.getElementById("suggestResult");
   var keywords = document.getElementById("sug-keywords").value.trim();
   var filters = [
@@ -19210,6 +19495,7 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
 // It exists because a message that says "reload the whole app" is not a way out
 // — see refreshRecipeFromCloud and the EDITED_ELSEWHERE case below.
 function showServiceError(message, actions) {
+  if (typeof insightError === 'function') { try { insightError('service', message, ''); } catch(e) {} }   // v38.15
   // Parse multi-line messages with URLs into clickable links
   var lines = message.split('\n').filter(function(l){ return l.trim(); });
   var html = '';
@@ -19692,6 +19978,7 @@ function openTranslate(id) {
 // exist, so calling it threw. The translate modal now uses the from/to dropdowns.)
 
 async function runTranslate() {
+  if (typeof insightCount === 'function') insightCount('translate');
   const r = findRecipeRef(translateId);
   if (!r) return;
   const res = document.getElementById('translateResult');
@@ -19785,6 +20072,7 @@ function saveTranslation(parsed) {
     ingredients: parsed.ingredients || [],
     steps: parsed.steps || []
   });
+  if (typeof insightAdded === 'function') insightAdded(recipes[0], 'translation');
   closeM('translateOverlay');
   activeCat = 'All'; renderFilters(); renderGrid();
   saveData();
@@ -19894,6 +20182,7 @@ window.applyParsedToFormPreview = applyParsedToFormPreview;
 
 var _freehandSourceUrl = '';     // set when free-hand is reached from a failed URL import
 async function runFreehandImport() {
+  if (typeof insightVia === 'function') insightVia('text', true);
   const text = document.getElementById('freehandText').value.trim();
   if (!text) { toast('Please paste a recipe first'); return; }
   const res = document.getElementById('freehandResult');
@@ -20183,6 +20472,7 @@ function waFreehandFromFailedUrl(url){
 window.waFreehandFromFailedUrl = waFreehandFromFailedUrl;
 
 async function runUrlImport() {
+  if (typeof insightVia === 'function') insightVia('link', true);   // v38.15 — how recipes arrive
   const url = document.getElementById('urlImportInput').value.trim();
   if (!url) { toast('Please enter a URL'); return; }
   if (!url.startsWith('http')) { toast('Please enter a valid URL starting with http'); return; }
@@ -21192,6 +21482,7 @@ function importParsedNow(parsed, overlayId) {
   activeCat = 'All'; renderFilters(); renderGrid();
   saveData();
   var made = recipes[0];
+  if (typeof insightAdded === 'function') insightAdded(made, '', 'import');
   var n = recipeParts(made).length;
   toast(n ? ('📚 Collection imported — ' + n + ' recipes in “' + made.name + '”') : 'Recipe imported!',
         n ? 5000 : 3000);
@@ -24637,6 +24928,7 @@ function farmSay(text, pitch, voice) {
 // while the app is in front of you.
 function farmEnabled() { try { return localStorage.getItem(FARM_ON_KEY) !== '0'; } catch(e) { return true; } }
 function farmSetEnabled(on) {
+  if (!on && typeof insightCount === 'function') insightCount('farm-off');
   try { localStorage.setItem(FARM_ON_KEY, on ? '1' : '0'); } catch(e) {}
   if (!on) farmClear();
   farmSchedule(); farmRefreshSettings();
@@ -24829,6 +25121,7 @@ function farmWalk(el, a, style, opts) {
   requestAnimationFrame(frame);
 }
 function farmOuch(el, a) {
+  if (typeof insightCount === 'function') insightCount('farm', 'farm');
   var art = el.querySelector('.fv-art'), bubble = el.querySelector('.fv-bubble');
   var said = farmPickSaying();
   bubble.textContent = said;
@@ -25458,6 +25751,7 @@ function appShareUrl() {
 }
 window.appShareUrl = appShareUrl;
 function openShareAppModal() {
+  if (typeof insightCount === 'function') insightCount('share-app');
   const url = appShareUrl();
   document.getElementById('shareAppUrl').textContent = url;
   document.getElementById('shareAppOverlay').classList.add('open');
@@ -25482,6 +25776,7 @@ async function processCameraImage(event) {
   var many = Array.prototype.slice.call((event.target && event.target.files) || []);
   // v37.22 — screenshots (several, or one picked through 📷 Import screenshots)
   // go through the same recipe reader as pasted text.
+  if (typeof insightVia === 'function') insightVia(many.length > 1 || _shotMode ? 'screenshots' : 'photo');
   if (many.length > 1 || (many.length && _shotMode)) { event.target.value = ''; return processScreenshots(many); }
   const file = event.target.files[0];
   if (!file) return;
@@ -25714,6 +26009,7 @@ function buildPrintHtml(list) {
 }
 
 function printRecipes(list) {
+  if (typeof insightCount === 'function') insightCount('print');
   if (!list || !list.length) { toast('Nothing to print'); return; }
   var pw = window.open('', '_blank', 'width=800,height=600');
   if (!pw || !pw.document) {
@@ -26077,6 +26373,7 @@ var PHOTO_SOURCES_NEEDING_CREDIT = ['openverse'];
 var _photoSrcIdx = 0, _photoPage = 1, _photoQuery = '', _photoOriginal = '';
 
 function openPhotoSearch(recipeName) {
+  if (typeof insightCount === 'function') insightCount('photo-search');
   _photoSearchSelected = null; _photoSearchResults = [];
   _photoSrcIdx = 0; _photoPage = 1; _photoQuery = ''; _photoOriginal = '';
   document.getElementById('photoSearchGrid').innerHTML = '';
@@ -26489,6 +26786,7 @@ function openHelp() {
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 
 async function askHelp() {
+  if (typeof insightCount === 'function') insightCount('help');
   var q=document.getElementById('helpInput').value.trim(); if(!q) return;
   _lastHelpQuestion=q;
   var answerEl=document.getElementById('helpAnswer'); var loadingEl=document.getElementById('helpLoading');
@@ -28357,12 +28655,14 @@ function waRaiseOverImportPanel(id){
   ov.style.zIndex = (panel && panel.classList.contains('open')) ? WA_IMPORT_Z : '';
 }
 function waImportOne(sel){
+  if (typeof insightVia === 'function') insightVia('whatsapp');
   _waLastImportAttempt = sel;      // marked 'imported' if a recipe actually lands
   if (sel.kind === 'link') { openUrlImportModal(sel.url); waRaiseOverImportPanel('urlImportOverlay'); }
   else { openFreehandModal(sel.text); waRaiseOverImportPanel('freehandOverlay'); }
 }
 window.waRaiseOverImportPanel = waRaiseOverImportPanel;
 function waImportLink(i){
+  if (typeof insightVia === 'function') insightVia('whatsapp');
   var l = _waHarvest.links[i];
   if (!l) return;
   waImportOne({ kind: 'link', url: l.url });
@@ -28383,6 +28683,7 @@ var _waQueue = { items: [], total: 0, done: 0, skipped: 0, active: false, import
 var _waLastImportAttempt = null;
 
 function waImportSelected(){
+  if (typeof insightVia === 'function') insightVia('whatsapp');
   var keys = Object.keys(_waHarvest.selected);
   if (!keys.length) { toast('Nothing selected'); return; }
   _waQueue.items = keys.map(function(k){ return _waHarvest.selected[k]; });
@@ -28792,6 +29093,7 @@ window.renderWaHarvest = renderWaHarvest;
 // Hand the full message text to the existing free-hand parser — the same path as
 // "✍️ Paste free-hand text", so there is one parser, not two.
 function waImportTextRecipe(i){
+  if (typeof insightVia === 'function') insightVia('whatsapp');
   var c = _waHarvest.texts[i];
   if (!c) return;
   waImportOne({ kind: 'text', text: c.text });
@@ -29277,8 +29579,11 @@ function privacyEntries() {
     { who: 'Anthropic (Claude, the AI)', when: 'only when you use an AI feature', on: true,
       sends: 'The text of what you asked about \u2014 a recipe to translate, a page to import, a question to the help assistant. '
            + 'Not your photos.' },
-    { who: 'The app\u2019s own server', when: 'when you import, search for a photo, use the AI, or send a note', on: true,
-      sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.' },
+    { who: 'The app\u2019s own server', when: 'when you import, search for a photo, use the AI, or send a note'
+        + (insightsOn() ? ' \u2014 and, in this test copy, now and then by itself' : ''), on: true,
+      sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.'
+        // v38.15 — the beta and the test copy report by themselves (Worker v69).
+        + (insightsOn() ? ' In this test copy it also sends, by itself, the app\u2019s own error messages and how many times each feature was used \u2014 names and numbers, never your recipes.' : '') },
     { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Openverse)', when: 'only when you search for a photo', on: true,
       sends: 'The search words. Not your recipes, and not who you are.' },
     { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,
@@ -29311,8 +29616,13 @@ function renderPrivacyPanel() {
          + '</div>';
     });
     h += '<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:12px;">'
-       + '<strong>Nothing is sold, shared or used for advertising</strong>, and no analytics of any kind '
-       + 'are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, '
+       + (insightsOn()
+          // v38.15 — true in the testers' copies too: their own counts, no outside analytics.
+          ? '<strong>Nothing is sold, shared or used for advertising</strong>, and no outside analytics or trackers are used. '
+            + 'While the app is being tested, this copy reports its own errors and counts which features are used, to the app\u2019s own server. '
+          : '<strong>Nothing is sold, shared or used for advertising</strong>, and no analytics of any kind '
+            + 'are collected. ')
+       + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, '
        + 'is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.</div>';
     host.innerHTML = h;
   }
@@ -30029,6 +30339,7 @@ window.doCalcReverse = doCalcReverse;
 var _bringScaledAmounts = []; // amounts actually sent — matches the recipe view's current scale/unit
 
 function openBringModal(recipeId) {
+  if (typeof insightCount === 'function') insightCount('bring');
   if (!featureOn('bring')) return featureOffNotice('bring');   // v36.70
   _bringRecipeId = recipeId;
   var r = findRecipeRef(recipeId);
@@ -30501,6 +30812,7 @@ function pickRecipeVideo(sourceUrl) {
 }
 window.pickRecipeVideo = pickRecipeVideo;
 async function importRecipeVideo(event) {
+  if (typeof insightVia === 'function') insightVia('video-file');
   var file = event && event.target && event.target.files && event.target.files[0];
   if (!file) return false;
   var overlay = document.getElementById('urlImportOverlay');
@@ -31043,6 +31355,7 @@ function saveAsVideoBookmark(btn) {
     updatedAt: Date.now()
   };
   recipes.unshift(r);
+  if (typeof insightAdded === 'function') insightAdded(recipes[0], 'video-bookmark');
   saveData();
   renderGrid();
   closeM('urlImportOverlay');

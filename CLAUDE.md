@@ -836,6 +836,53 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.15 + Worker v69 — before the beta (on `test`, waiting for Tony's yes).** Tony (10 Oct): "Do you
+    believe the app is ready for starting the Beta testing? What else would you add/change?" — ready for a
+    small invited beta; he chose all three additions ("Yes, please go ahead with 1–3"):
+    - **1. Errors report themselves** (feature `insights`: beta + test ON, family OFF). `insightError(kind,
+      message, where)` — fed by recordError, syncLog('error'), showServiceError, showImportError — keeps
+      them on the device (`mkn_ins_err`: one line per kind+wording+place+version, with a count; at most
+      30), addresses cut to the site (`https://site/…`), e-mail addresses → `[e-mail]`; plus the screen
+      (`insScreen`: the top open window's id, or "main"), version, copy, device, language. Sent by
+      `insightsSend()` — only signed in, only to a Worker whose health says `signals` — 20 s after an
+      error, every 10 min, when the app is put away (keepalive), and 3 s after the household opens
+      (`insightsStart`). Taken off the device only once the server has them (by count, so one added
+      during the send stays).
+    - **2. Feature counts per household** (same switch): `insightCount(key, once)` → `mkn_ins_use`
+      {list:[{hid, month, counts}]}. Counted: open (once a day), view, search (once per opening), scale
+      and units (once per recipe), cooked, timer, voice, pantry, suggest, translate, print, word, share,
+      bring, help, photo-search, farm (once), farm-off, share-app, link-request; and how recipes ARRIVE:
+      `insightVia(via, weak)` said by the path (extension / shared from handleShareTarget; link and text
+      weakly — they never overwrite the extension; photo / screenshots; video-file; whatsapp), counted at
+      the moment a recipe is kept (`insightAdded`: saveRecipe new → `added.<via>` or typed; importParsedNow
+      → or import; linked, suggestion, translation, video-bookmark), plus `from.<facebook|instagram|tiktok|
+      youtube|web>` from its source. Names and numbers only. A household they left (403) → dropped.
+    - Nothing is counted or sent while the Self Test runs (`insQuiet`); the tests switch it on with
+      `window._insUnderTest`.
+    - **Worker v69:** `app-signals` (proved as for AI; usage needs membership): tables `app_errors`
+      (unique per project+uid+version+kind+message+place; n added; a later report without a household
+      keeps the known one; ≤200 new lines a person a day; deleted 120 days after last seen) and
+      `usage_counts` (project, hid, month, k) — month = this one or the previous one only. Owner ops:
+      `errors`, `errors-new`, `error-status` (new|done), `error-delete`; `list` gives each household's
+      `usage` for its three months. Health `signals`. Deploys itself when it reaches main.
+    - **📊 Households (family app):** ⚠️ Errors tab (Not done yet / All, ✅ Done, ↩, 🗑, 📋 Copy and
+      📋 Copy these — text to paste to Claude), 📈 Use tab (per copy, every household added up by month),
+      "What they use" in each household's details, and the CSV's last column.
+    - **3. The testers' welcome** (feature `testerWelcome`: beta + test): `testerWelcomeMaybe` 4 s after
+      the household opens — once per device (`mkn_tester_welcome`), only for an account made in the last
+      21 days, after any other window closes. Thank-you, four things to try (TESTER_WELCOME_TRY), the 💬
+      button, what the beta sends, ⚙️ → 💾 Backups; "Let's start" / "🧭 Take the tour". Where it is on,
+      firstRunAfterFounding no longer asks about the tour (one window, not two). ⚙️ → 💬 Help and
+      feedback → 👋 Welcome to the beta opens it any time. Every line is in I18N_EXTRA.
+    - **Privacy statement 1.2 (10 Oct 2026), all 11 languages** (tools/legal-keys.py re-keyed): a new row
+      (error reports and feature counts, test and beta only), the "In short" box (no OUTSIDE analytics;
+      the testers' copies report and count), technical data, Cloudflare's row, what the Team sees, and
+      retention (120 days). TERMS_VERSION unchanged (1.2) — nobody is asked to agree again; the change
+      covers the testers' copies, where no tester has joined yet. The in-app panel says it too, only where
+      `insights` is on ("no outside analytics" there; self-test privacy_note accepts both).
+    - Tests: worker-cors (v69, 19 checks), Self Tests tester_errors_reported, tester_feature_counts,
+      tester_welcome, manage_errors_and_use — 355 pass on the family and the test builds, and in Hebrew
+      dark imperial; each of the three new behaviours broken on purpose was caught.
   - **Released to the family app and the beta: the translation job by Workload Identity Federation (10 Oct 2026, Tony's yes, CI green on cac8020; Pages: success).** Tony did the Google step (Cloud Datastore User) and the Console rule. The move itself started "Translate new phrases" (push): Anthropic by federation, claude-sonnet-5, 9 calls (9,690 tokens in, 17,908 out); ar/de/es/fr/ru/zh +22, he +20, it +26, ja +20 — then "Publish languages" committed b3e24a1 and the family app redeployed. Self Tests on main: success. No ANTHROPIC_API_KEY exists or is needed.
   - **v38.14 — new phrases are translated by GitHub after each release (no more "please run Update all
     supported languages").** Tony: "Is there a way you could run Update all supported languages in the

@@ -10,7 +10,8 @@
   'use strict';
   var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false,
             tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null,
-            replies: {}, replying: null, replyDraft: '', replySending: false };
+            replies: {}, replying: null, replyDraft: '', replySending: false,
+            errors: null, errorsError: '', errFilter: 'open', useCopy: '' };   // v38.15
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
@@ -150,6 +151,7 @@
       r.cap = m ? m.capNow : (r.capped ? defCap(r.project || thisProject()) : null);
       r.capSet = m && typeof m.cap === 'number';
       r.note = (m && m.note) || '';
+      r.usage = (m && m.usage) || null;           // v38.15 — { 'YYYY-MM': { feature: times } } (Worker v69)
       if (m && m.last_seen > r.lastSeen) r.lastSeen = m.last_seen;
       return r;
     });
@@ -250,6 +252,128 @@
       + '<button type="button" class="mg-btn" onclick="mknManage.replyCancel()">Cancel</button></div></div>';
   }
 
+  // ─── v38.15: WHAT THE TESTERS' APPS REPORT (Worker v69) ─────────────────────
+  // Errors the apps noted by themselves (the beta and the test copy), and how
+  // often each household used each feature — names and numbers only.
+  var _errGen = 0;
+  async function loadErrors() {
+    var gen = ++_errGen, rows = null, err = '';
+    try {
+      var t = await window._fbUser.getIdToken();
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'meter-admin', op: 'errors', idToken: t }), signal: AbortSignal.timeout(20000) });
+      var d = {}; try { d = await r.json(); } catch (e) {}
+      if (!r.ok || !Array.isArray(d.errors)) throw new Error((d && d.error) || ('the server answered ' + r.status + (r.ok ? ' — it needs Worker v69 or newer' : '')));
+      rows = d.errors.map(function (x) { return Object.assign({}, x, { copy: COPY_NAME[x.project] || x.env || x.project }); });
+    } catch (e) { err = String((e && e.message) || e); }
+    if (gen !== _errGen) return false;
+    S.errors = rows; S.errorsError = err;
+    return true;
+  }
+  function errNew() { return (S.errors || []).filter(function (x) { return x.status === 'new'; }).length; }
+  function errBy(id) { return (S.errors || []).filter(function (x) { return String(x.id) === String(id); })[0]; }
+  function householdName(project, hid) {
+    var r = S.rows.filter(function (x) { return x.hid === hid && (x.project || thisProject()) === project; })[0];
+    return r ? (r.name || r.code || hid) : (hid || '');
+  }
+  function errText(x) {   // the words to paste to whoever fixes it
+    return '[' + x.copy + ' ' + x.version + '] ' + x.kind + ': ' + x.message + (x.place ? '\n  at ' + x.place : '') + '\n  screen: ' + (x.screen || '—')
+      + ' · ' + x.n + ' time' + (x.n === 1 ? '' : 's') + ', ' + new Date(x.first_at || 0).toISOString().slice(0, 16).replace('T', ' ') + ' → '
+      + new Date(x.last_at || 0).toISOString().slice(0, 16).replace('T', ' ') + ' UTC · ' + (x.lang || '') + '\n  ' + (x.device || '');
+  }
+  function errorsHtml() {
+    if (S.errorsError) return '<div class="mg-note">The error reports could not be read: ' + esc(S.errorsError) + '</div>';
+    if (!S.errors) return '<div class="mg-empty">⏳ Reading the error reports…</div>';
+    var list = S.errors.filter(function (x) { return S.errFilter === 'all' || x.status !== 'done'; });
+    var tools = '<div class="mg-muted" style="margin-bottom:8px;">Sent by the testers’ apps by themselves (the beta and the test copy): the error’s wording, where, the screen, the version and the device — never a recipe’s contents. The same error is one line with a count.</div>'
+      + '<div class="mg-tools" style="margin-bottom:10px;">'
+      + '<button type="button" class="mg-btn' + (S.errFilter === 'open' ? ' mg-primary' : '') + '" onclick="mknManage.errFilter(\'open\')">Not done yet</button>'
+      + '<button type="button" class="mg-btn' + (S.errFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.errFilter(\'all\')">All (' + S.errors.length + ')</button>'
+      + (list.length ? '<button type="button" class="mg-btn" onclick="mknManage.errCopyAll()" title="Copies these reports as text, to paste where they will be fixed">📋 Copy these</button>' : '')
+      + '<button type="button" class="mg-btn" onclick="mknManage.errReload()">↻</button></div>';
+    if (!list.length) return tools + '<div class="mg-empty">' + (S.errors.length ? 'Every error is done. 🎉' : 'No errors reported. 🎉') + '</div>';
+    return tools + list.map(function (x) {
+      var id = jsA(String(x.id));
+      return '<div class="mg-card' + (x.status === 'new' ? ' mg-new' : '') + '">'
+        + '<div class="mg-ptop"><div><b class="mg-email">' + esc(x.email || x.uid || '') + '</b> <span class="mg-muted">' + esc(householdName(x.project, x.hid)) + '</span>'
+        + ' <span class="mg-copy">' + esc(x.copy) + '</span>'
+        + '<div class="mg-muted">' + esc(x.version) + ' · ' + esc(x.kind) + ' · ' + esc(x.lang || '') + ' · last ' + new Date(x.last_at || 0).toLocaleString()
+        + (x.n > 1 ? ' · <b>' + x.n + ' times</b> since ' + new Date(x.first_at || 0).toLocaleDateString() : '') + '</div></div>'
+        + '<span class="mg-muted">' + (x.status === 'done' ? '✅ done' : '🆕 new') + '</span></div>'
+        + '<pre class="mg-log mg-err">' + esc(x.message) + '</pre>'
+        + '<div class="mg-muted">Screen: ' + esc(x.screen || '—') + (x.place ? ' · at ' + esc(x.place) : '') + '</div>'
+        + '<div class="mg-device mg-muted">' + esc(x.device || '') + '</div>'
+        + '<div class="mg-tools" style="margin-top:8px;">'
+        + '<button type="button" class="mg-btn" onclick="mknManage.errCopy(' + id + ')">📋 Copy</button>'
+        + (x.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.errMark(' + id + ',\'done\')">✅ Done</button>'
+                               : '<button type="button" class="mg-btn" onclick="mknManage.errMark(' + id + ',\'new\')">↩ Not done</button>')
+        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.errDel(' + id + ')">🗑</button></div></div>';
+    }).join('');
+  }
+  // Each counted feature in words. An unknown one is shown as it is.
+  var USE_WORDS = {
+    'open': 'Opened the app (days, per device)', 'view': 'Opened a recipe', 'search': 'Searched (times the app was open)',
+    'scale': 'Changed the servings', 'units': 'Switched units', 'cooked': 'Marked as cooked', 'timer': 'Started a timer',
+    'voice': 'Voice control', 'pantry': 'Opened the pantry', 'suggest': 'Asked for suggestions', 'translate': 'Translated a recipe',
+    'print': 'Printed', 'word': 'Exported to Word', 'share': 'Shared a recipe', 'bring': 'Sent to Bring!', 'help': 'Asked the help assistant',
+    'photo-search': 'Searched for a photo', 'farm': 'Tapped a farm visitor', 'farm-off': 'Turned the farm off', 'share-app': 'Shared the app',
+    'link-request': 'Asked to link with a household',
+    'added.typed': 'typed in', 'added.link': 'from a link', 'added.extension': 'from the browser extension', 'added.shared': 'shared to the app (phone)',
+    'added.photo': 'from a photo', 'added.screenshots': 'from screenshots', 'added.text': 'from pasted text', 'added.video-file': 'from a video file',
+    'added.whatsapp': 'from WhatsApp', 'added.linked': 'copied from a linked household', 'added.suggestion': 'an AI suggestion',
+    'added.translation': 'a translated copy', 'added.video-bookmark': 'a video bookmark', 'added.import': 'imported',
+    'from.web': 'a website', 'from.facebook': 'Facebook', 'from.instagram': 'Instagram', 'from.tiktok': 'TikTok', 'from.youtube': 'YouTube'
+  };
+  function useWord(k) { return USE_WORDS[k] || k; }
+  // { feature: times } for one month → three short lists, biggest first.
+  function useGroups(c) {
+    var g = { added: [], from: [], other: [] };
+    Object.keys(c || {}).forEach(function (k) {
+      var n = c[k], grp = /^added\./.test(k) ? 'added' : /^from\./.test(k) ? 'from' : 'other';
+      g[grp].push([k, n]);
+    });
+    Object.keys(g).forEach(function (k) { g[k].sort(function (a, b) { return b[1] - a[1]; }); });
+    return g;
+  }
+  function useListHtml(c) {
+    var g = useGroups(c), total = g.added.reduce(function (t, x) { return t + x[1]; }, 0);
+    var li = function (x) { return '<span class="mg-use"><b>' + x[1] + '</b> ' + esc(useWord(x[0])) + '</span>'; };
+    return (total ? '<div><b>' + total + ' recipe' + (total === 1 ? '' : 's') + ' added</b>: ' + g.added.map(li).join('') + '</div>' : '<div class="mg-muted">No recipes added.</div>')
+      + (g.from.length ? '<div class="mg-muted" style="margin-top:2px;">Their sources: ' + g.from.map(li).join('') + '</div>' : '')
+      + (g.other.length ? '<div style="margin-top:4px;">' + g.other.map(li).join('') + '</div>' : '');
+  }
+  function usePanelHtml(r) {
+    var months = Object.keys(r.usage || {}).sort().reverse();
+    if (!months.length) return r.remote || r.copy !== 'family' ? '<div class="mg-h">What they use</div><div class="mg-muted">Nothing counted yet'
+      + ' (counted in the beta and the test copy only).</div>' : '';
+    return '<div class="mg-h">What they use</div>' + months.map(function (m) {
+      return '<div class="mg-usemonth"><div class="mg-muted">' + mon(m) + ' ' + m.slice(0, 4) + '</div>' + useListHtml(r.usage[m]) + '</div>';
+    }).join('');
+  }
+  // Every household of a copy, added up, month by month.
+  function useHtml() {
+    var copies = {};
+    S.rows.forEach(function (r) { if (r.usage) (copies[r.copy] = copies[r.copy] || []).push(r); });
+    var names = Object.keys(copies).sort(function (a, b) { return a === 'beta' ? -1 : b === 'beta' ? 1 : a < b ? -1 : 1; });
+    var intro = '<div class="mg-muted" style="margin-bottom:10px;">How the testers’ households use the app, added up — counted by their apps (the beta and the test copy), names and numbers only. Each household’s own counts are in its details (🏠 Households → a row).</div>';
+    if (!names.length) return intro + '<div class="mg-empty">Nothing counted yet.</div>';
+    if (names.indexOf(S.useCopy) === -1) S.useCopy = names[0];
+    var pick = '<div class="mg-tools" style="margin-bottom:10px;">' + names.map(function (c) {
+      return '<button type="button" class="mg-btn' + (S.useCopy === c ? ' mg-primary' : '') + '" onclick="mknManage.useCopy(' + jsA(c) + ')">' + esc(c) + ' (' + copies[c].length + ')</button>'; }).join('') + '</div>';
+    var sum = {}, active = {};
+    copies[S.useCopy].forEach(function (r) {
+      Object.keys(r.usage).forEach(function (m) {
+        var c = sum[m] = sum[m] || {};
+        active[m] = (active[m] || 0) + 1;
+        Object.keys(r.usage[m]).forEach(function (k) { c[k] = (c[k] || 0) + r.usage[m][k]; });
+      });
+    });
+    return intro + pick + Object.keys(sum).sort().reverse().map(function (m) {
+      return '<div class="mg-card"><div class="mg-ptop"><b>' + mon(m) + ' ' + m.slice(0, 4) + '</b><span class="mg-muted">' + active[m] + ' household' + (active[m] === 1 ? '' : 's') + ' counted</span></div>'
+        + useListHtml(sum[m]) + '</div>';
+    }).join('');
+  }
+
   function sorted() {
     var q = S.q.trim().toLowerCase();
     var list = S.rows.filter(function (r) {
@@ -313,8 +437,13 @@
     if (!inbox) S.tab = 'households';
     var tabs = !inbox ? '' : '<div class="mg-tabs" role="tablist">'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'households') + '" class="mg-tab' + (S.tab === 'households' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'households\')">🏠 Households</button>'
-      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'feedback') + '" class="mg-tab' + (S.tab === 'feedback' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'feedback\')">💬 Feedback' + (nc ? ' <span class="mg-badge">' + nc + '</span>' : '') + '</button></div>';
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'feedback') + '" class="mg-tab' + (S.tab === 'feedback' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'feedback\')">💬 Feedback' + (nc ? ' <span class="mg-badge">' + nc + '</span>' : '') + '</button>'
+      // v38.15 — what the testers' apps report by themselves (Worker v69).
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'errors') + '" class="mg-tab' + (S.tab === 'errors' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'errors\')">⚠️ Errors' + (errNew() ? ' <span class="mg-badge">' + errNew() + '</span>' : '') + '</button>'
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'use') + '" class="mg-tab' + (S.tab === 'use' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'use\')">📈 Use</button></div>';
     if (S.tab === 'feedback') { body.innerHTML = tabs + notesHtml(); return; }
+    if (S.tab === 'errors') { body.innerHTML = tabs + errorsHtml(); return; }
+    if (S.tab === 'use') { body.innerHTML = tabs + (S.loading ? '<div class="mg-empty">⏳ Reading every household…</div>' : useHtml()); return; }
     head = tabs + head;
     if (S.loading) { body.innerHTML = head + '<div class="mg-empty">⏳ Reading every household…</div>'; return; }
     var list = sorted();
@@ -386,6 +515,7 @@
       + ((r.asked.length || r.asking.length) ? '<div class="mg-h">Requests waiting</div>'
           + r.asked.map(function (a) { return '<div class="mg-li">from ' + esc(a.from) + ' <span class="mg-muted">' + esc(a.code) + '</span></div>'; }).join('')
           + r.asking.map(function (a) { return '<div class="mg-li">to ' + esc(a.to) + '</div>'; }).join('') : '')
+      + usePanelHtml(r)
       + '<div class="mg-h">Shared the app</div><div>' + (r.referred ? r.referred + ' new household' + (r.referred === 1 ? '' : 's') + ' came through its ✉️ share link' : '<span class="mg-muted">No new households through its link yet.</span>') + '</div>'
       + '<div class="mg-h">Your notes</div><textarea id="mgNote" rows="3" dir="auto" placeholder="Only you see these.">' + esc(r.note) + '</textarea>'
       + '<div><button type="button" class="mg-btn" onclick="mknManage.saveNote()">Save the note</button></div>'
@@ -462,6 +592,9 @@
     + '.mg-shot.mg-big{max-height:none;cursor:zoom-out;}'
     + '.mg-log{max-height:260px;overflow:auto;font-size:11px;background:var(--note-bg);padding:8px;border-radius:6px;white-space:pre-wrap;}'
     + '.mg-device{font-size:11px;word-break:break-all;margin-top:4px;}'
+    + '.mg-err{max-height:160px;font-size:12px;margin:8px 0 4px;}'
+    + '.mg-use{display:inline-block;margin:2px 10px 2px 0;}.mg-use b{color:var(--heading);}'
+    + '.mg-usemonth{margin:6px 0 10px;}'
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';
 
@@ -526,9 +659,35 @@
       // v38.10 — a read overtaken by a newer one changes nothing at all: not the page, not the dot
       // (CI: a late one re-counted the ⚙️ dot from notes since marked done, and hid it).
       if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadNotes().then(function (fresh) { if (fresh === false) return; render(); syncDot(); });
+      if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadErrors().then(function (fresh) { if (fresh !== false) render(); });   // v38.15 — the ⚠️ count
       return api.reload();
     },
-    tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(function (fresh) { if (fresh !== false) render(); }); },
+    tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(function (fresh) { if (fresh !== false) render(); });
+      if (t === 'errors' && !S.errors) loadErrors().then(function (fresh) { if (fresh !== false) render(); }); },
+    // v38.15 — the testers' apps' own reports (Worker v69).
+    errFilter: function (f) { S.errFilter = f; render(); },
+    errReload: function () { S.errors = null; render(); return loadErrors().then(function (fresh) { if (fresh !== false) render(); }); },
+    errMark: async function (id, status) {
+      var x = errBy(id); if (!x) return false;
+      try { await meterSet('error-status', '', { id: x.id, status: status }); }
+      catch (e) { showServiceError('Could not mark the error: ' + e.message); return false; }
+      x.status = status; render(); return true;
+    },
+    errDel: async function (id) {
+      var x = errBy(id); if (!x) return false;
+      if (await askConfirm({ icon: '🗑', title: 'Remove this error report?', message: 'If it happens again, it comes back.', okLabel: 'Remove', danger: true }) !== true) return false;
+      try { await meterSet('error-delete', '', { id: x.id }); }
+      catch (e) { showServiceError('Could not remove it: ' + e.message); return false; }
+      S.errors = (S.errors || []).filter(function (y) { return y !== x; }); render(); return true;
+    },
+    errCopy: function (id) { var x = errBy(id); if (x && typeof fbProbeCopy === 'function') fbProbeCopy(errText(x), 'The error report'); },
+    errCopyAll: function () {
+      var list = (S.errors || []).filter(function (x) { return S.errFilter === 'all' || x.status !== 'done'; });
+      if (list.length && typeof fbProbeCopy === 'function') fbProbeCopy(list.map(errText).join('\n\n'), list.length + ' error report' + (list.length === 1 ? '' : 's'));
+      return list.length;
+    },
+    useCopy: function (c) { S.useCopy = c; render(); },
+    _errors: loadErrors,
     noteFilter: function (f) { S.noteFilter = f; render(); },
     mark: async function (key, status) {
       var n = noteBy(key); if (!n) return false;
@@ -582,7 +741,7 @@
       return true;
     },
     _notes: loadNotes,
-    close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; _notesGen++; },
+    close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; _notesGen++; _errGen++; },
     reload: async function () {
       S.loading = true; render();
       try { await load(); }
@@ -646,14 +805,15 @@
     csv: function () {
       var months = (S.meter && S.meter.months) || [];
       var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails (terms agreed)'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
-        .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes', 'Deleted', 'Left']);
+        .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes', 'Deleted', 'Left', 'Feature counts (by month)']);
       var lines = [head].concat(sorted().map(function (r) {
         return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return m.email + ' (' + m.role + (m.termsAt ? ', terms v' + (m.termsVersion || '?') + ' ' + new Date(m.termsAt).toISOString().slice(0, 10) : ', terms not agreed') + ')'; }).join('; ')]
           .concat(months.map(function (m) { var x = r.months.filter(function (y) { return y.month === m; })[0]; return x ? x.usd.toFixed(4) : '0'; }))
           .concat([r.cap == null ? '' : r.cap, r.links.map(function (l) { return l.name; }).join('; '), r.referred,
                    r.lastSeen ? new Date(r.lastSeen).toISOString().slice(0, 10) : '', r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : '',
                    r.referredBy, r.note, r.deleted ? deletedText(r.deleted) : '',
-                   (r.left || []).map(function (x) { return x.email + ' ' + new Date(x.at || 0).toISOString().slice(0, 10); }).join('; ')]);
+                   (r.left || []).map(function (x) { return x.email + ' ' + new Date(x.at || 0).toISOString().slice(0, 10); }).join('; '),
+                   Object.keys(r.usage || {}).sort().map(function (m) { return m + ': ' + Object.keys(r.usage[m]).sort().map(function (k) { return k + '=' + r.usage[m][k]; }).join(' '); }).join('; ')]);
       })).map(function (row) { return row.map(function (c) { c = String(c == null ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(','); });
       var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
