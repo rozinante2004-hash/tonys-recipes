@@ -7034,6 +7034,138 @@ window.SELF_TESTS = [
         try{ Object.defineProperty(navigator, 'clipboard', { configurable:true, value:real.clip }); }catch(e){}
       }
     } },
+  { id:'key_check', group:'Security', name:'🔑 Check the app’s key: each Firebase service the app needs is asked with the key from this page — refused by its API list or its website list is told apart from a normal refusal (v38.18)',
+    test: async()=>{
+      // How a refusal reads (the bodies Google sends).
+      var blockedApi=keyAnswer(403, '{"error":{"code":403,"message":"Requests to this API securetoken.googleapis.com method google.identity.securetoken.v1.SecureToken.GrantToken are blocked.","status":"PERMISSION_DENIED","details":[{"reason":"API_KEY_SERVICE_BLOCKED"}]}}');
+      var blockedSite=keyAnswer(403, '{"error":{"code":403,"message":"Requests from referer https://evil.example/ are blocked.","details":[{"reason":"API_KEY_HTTP_REFERRER_BLOCKED"}]}}');
+      var rules=keyAnswer(403, '{"error":{"code":403,"message":"Missing or insufficient permissions.","status":"PERMISSION_DENIED"}}');
+      var badToken=keyAnswer(400, '{"error":{"code":400,"message":"INVALID_REFRESH_TOKEN","status":"INVALID_ARGUMENT"}}');
+      if(blockedApi.ok!==false || !/list of APIs/.test(blockedApi.why)) throw new Error('a service off the key’s list: '+JSON.stringify(blockedApi));
+      if(blockedSite.ok!==false || !/website/.test(blockedSite.why)) throw new Error('a website off the key’s list: '+JSON.stringify(blockedSite));
+      if(rules.ok!==true || badToken.ok!==true) throw new Error('a normal refusal (the rules, a made-up token) taken for a blocked key');
+      if(KEY_SERVICES.map(function(s){ return s.api; }).join()!=='Identity Toolkit API,Token Service API,Cloud Firestore API') throw new Error('the services checked: '+KEY_SERVICES.map(function(s){ return s.api; }));
+      // The window: all clear, then one refused.
+      var real={ fetch:window.fetch, user:window._fbUser }, asked=[], blockFirestore=false;
+      try{
+        window._fbUser=null;
+        window.fetch=async function(u, init){ asked.push(String(u));
+          if(blockFirestore && /firestore\.googleapis/.test(u)) return new Response('{"error":{"code":403,"message":"Requests to this API firestore.googleapis.com are blocked.","details":[{"reason":"API_KEY_SERVICE_BLOCKED"}]}}', { status:403 });
+          return new Response('{"error":{"code":400,"message":"nope"}}', { status:400 }); };
+        await openKeyCheck();
+        var t=document.getElementById('keyCheckOverlay').textContent;
+        if(!/All clear/.test(t) || (t.match(/✅/g)||[]).length!==3) throw new Error('all clear: '+t);
+        if(asked.length!==3 || !asked.every(function(u){ return u.indexOf('key='+encodeURIComponent(APP_CONFIG.firebase.apiKey))!==-1; })) throw new Error('not every service was asked with this page’s key: '+asked.join(' '));
+        if(!asked.some(function(u){ return u.indexOf('/projects/'+APP_CONFIG.firebase.projectId+'/')!==-1; })) throw new Error('the database of another project was asked');
+        blockFirestore=true; await openKeyCheck();
+        t=document.getElementById('keyCheckOverlay').textContent;
+        if(!/Cloud Firestore API[^✅]*not on the key/.test(t) || !/Undo the last change/.test(t)) throw new Error('a refused service: '+t);
+        var item=document.querySelector('[onclick*="openKeyCheck"]');
+        if(!item || !item.closest('.set-group[data-group="owner"]')) throw new Error('🔑 is not under 👑 App owner');
+      } finally { window.fetch=real.fetch; window._fbUser=real.user; var o=document.getElementById('keyCheckOverlay'); if(o) o.remove(); }
+    } },
+  { id:'tester_survey', group:'Sharing', name:'📝 The end-of-beta question: asked only once it is sent, once per tester, after other windows, “Later” waits a day; the answers go to the server; translated; never in the family app (v38.18)',
+    test: async()=>{
+      var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride), toast:window.toast };
+      var later=SURVEY_LATER_KEY+'end-of-beta-1', kept=null; try{ kept=localStorage.getItem(later); }catch(e){}
+      var server={ survey:null, answered:false }, sent=[], toasts=[];
+      function gone(){ var o=document.getElementById('surveyOverlay'); if(o) o.remove(); }
+      try{
+        if(APP_CONFIG.environment==='live' && APP_CONFIG.features.testerSurvey) throw new Error('the family app would ask it');
+        window._insUnderTest=true; window.toast=function(m){ toasts.push(String(m)); };
+        window._fbUser={ uid:'uS', email:'s@example.com', getIdToken:async function(){ return 'tokS'; } };
+        window._household={ hid:'hS', name:'Survey Kitchen' };
+        _workerHealth={ ok:true, survey:true };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push(b);
+          if(b.action==='survey-status') return new Response(JSON.stringify({ survey:server.survey, answered:server.answered }), { status:200 });
+          if(b.action==='survey-answer') return new Response('{"ok":true}', { status:200 });
+          return new Response('{}', { status:404 }); };
+        window._featureOverride.testerSurvey=false;
+        if(await surveyMaybe({ noWait:true })!==false) throw new Error('asked where the feature is off');
+        window._featureOverride.testerSurvey=true; localStorage.removeItem(later);
+        if(await surveyMaybe({ noWait:true })!==false || document.getElementById('surveyOverlay')) throw new Error('asked before it was sent');
+        server.survey={ id:'end-of-beta-1', openedAt:Date.now() };
+        if(await surveyMaybe({ noWait:true })!=='end-of-beta-1') throw new Error('not asked once sent');
+        var ov=document.getElementById('surveyOverlay'), t=ov.textContent, q=surveyQuestions();
+        [q.keepQ, q.changeQ, q.priceQ, q.otherQ, 'Yes, definitely', 'Up to $1'].forEach(function(x){ if(t.indexOf(x)===-1) throw new Error('the window lacks: '+x); });
+        if(/Tony/.test(t)) throw new Error('names Tony');
+        surveyPhrases().forEach(function(x){ if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
+        // Later: not again for a day.
+        document.getElementById('svLater').click(); gone();
+        if(await surveyMaybe({ noWait:true })!==false) throw new Error('asked again right after Later');
+        localStorage.setItem(later, String(Date.now()-2*864e5));
+        await surveyMaybe({ noWait:true });
+        ov=document.getElementById('surveyOverlay');
+        // Empty: refused here; answered: sent with who and where.
+        sent=[]; await ov.querySelector('#svSend').onclick();
+        if(sent.some(function(b){ return b.action==='survey-answer'; }) || !toasts.some(function(m){ return m===q.empty; })) throw new Error('an empty answer was sent');
+        ov.querySelector('input[name="svKeep"][value="probably"]').checked=true;
+        ov.querySelector('input[name="svPrice"][value="1-3"]').checked=true;
+        ov.querySelector('#svChange').value='Faster imports';
+        var got=await ov.querySelector('#svSend').onclick();
+        var b=sent.filter(function(x){ return x.action==='survey-answer'; })[0];
+        if(!b || b.idToken!=='tokS' || b.survey!=='end-of-beta-1' || b.answers.keep!=='probably' || b.answers.price!=='1-3' || b.answers.change!=='Faster imports' || b.hid!=='hS' || b.version!==APP_VERSION) throw new Error('what was sent: '+JSON.stringify(b));
+        if(document.getElementById('surveyOverlay') || !toasts.some(function(m){ return m===q.thanks; })) throw new Error('no thank-you');
+        server.answered=true;
+        if(await surveyMaybe({ noWait:true })!==false) throw new Error('asked again after answering');
+        // The preview sends nothing.
+        sent=[]; var pv=openSurveyWindow({ preview:true });
+        if(!/nothing is sent/.test(pv.textContent)) throw new Error('the preview does not say so');
+        pv.querySelector('input[name="svKeep"][value="yes"]').checked=true;
+        await pv.querySelector('#svSend').onclick();
+        if(sent.length) throw new Error('the preview sent something');
+      } finally {
+        gone(); window.fetch=real.fetch; _workerHealth=real.h; window._fbUser=real.user; window._household=real.hh; window.toast=real.toast; window._insUnderTest=false;
+        window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
+        try{ if(kept===null) localStorage.removeItem(later); else localStorage.setItem(later, kept); }catch(e){}
+      }
+    } },
+  { id:'manage_survey', group:'Sharing', name:'📊 Households → 📝 Beta question: not sent until you send it (per copy, asked first), Preview, Stop asking, the answers counted and in their words, 📋 Copy (v38.18)',
+    test: async()=>{
+      if(!feedbackInboxHere()) return;
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, ask:window.askConfirm, copy:window.fbProbeCopy };
+      var sent=[], copied='', confirmAnswer=false, opened=false;
+      var answers=[ { id:1, project:'my-kitchen-notes-beta', survey:'end-of-beta-1', uid:'u1', email:'one@example.com', household:'One', keep:'yes', price:'1-3', change:'Faster imports', other:'', lang:'he', at:Date.now() },
+                    { id:2, project:'my-kitchen-notes-beta', survey:'end-of-beta-1', uid:'u2', email:'two@example.com', household:'Two', keep:'probably', price:'free', change:'', other:'Love the farm', lang:'en', at:Date.now() } ];
+      try{
+        window.toast=function(){}; window.showServiceError=function(){}; window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window.askConfirm=async function(){ return confirmAnswer; }; window.fbProbeCopy=function(t){ copied=String(t); };
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push(b);
+          if(b.op==='survey-list') return new Response(JSON.stringify({ surveys: opened ? [{ project:'my-kitchen-notes-beta', survey:'end-of-beta-1', opened_at:Date.now(), closed_at:null }] : [],
+            answers: opened ? answers : [], choices:{} }), { status:200 });
+          if(b.op==='survey-open'){ opened=true; return new Response('{"ok":true}', { status:200 }); }
+          if(b.op==='survey-close') return new Response('{"ok":true}', { status:200 });
+          if(b.op==='notes') return new Response('{"notes":[],"replies":[]}', { status:200 });
+          if(b.op==='errors') return new Response('{"errors":[]}', { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 }); };
+        await openManagement(); await mknManage._survey(); mknManage.tabTo('survey'); await new Promise(function(r){ setTimeout(r, 30); });
+        var body=document.querySelector('#manageOverlay .mg-body').textContent;
+        if(!/beta not sent/.test(body.replace(/\s+/g,' ')) || !/No answers yet/.test(body)) throw new Error('before sending: '+body.slice(0,300));
+        // Preview: the testers' window, nothing sent.
+        var pv=mknManage.surveyPreview(); if(!pv || !/nothing is sent/.test(pv.textContent)) throw new Error('👁 Preview'); pv.remove();
+        // Send: asked first — "Not yet" sends nothing.
+        confirmAnswer=false;
+        if(await mknManage.surveySend('my-kitchen-notes-beta')!==false || sent.some(function(b){ return b.op==='survey-open'; })) throw new Error('sent without asking first');
+        confirmAnswer=true;
+        if(await mknManage.surveySend('my-kitchen-notes-beta')!==true) throw new Error('not sent');
+        var o=sent.filter(function(b){ return b.op==='survey-open'; })[0];
+        if(!o || o.project!=='my-kitchen-notes-beta' || o.survey!=='end-of-beta-1') throw new Error('what was sent: '+JSON.stringify(o));
+        body=document.querySelector('#manageOverlay .mg-body').textContent.replace(/\s+/g,' ');
+        if(!/being asked/.test(body) || !/Stop asking/.test(body) || !/Faster imports/.test(body) || !/Love the farm/.test(body)) throw new Error('after sending: '+body.slice(0,400));
+        mknManage.surveyCopy();
+        if(copied.indexOf('2 answers')===-1 || copied.indexOf('one@example.com')===-1 || copied.indexOf('Would pay a month: $1–$3')===-1 || copied.indexOf('Keep using: Probably')===-1) throw new Error('copied: '+copied.slice(0,300));
+        if(await mknManage.surveyClose('my-kitchen-notes-beta')!==true || !sent.some(function(b){ return b.op==='survey-close'; })) throw new Error('■ Stop asking');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        window.askConfirm=real.ask; window.fbProbeCopy=real.copy; var p=document.getElementById('surveyOverlay'); if(p) p.remove();
+        if(window.mknManage) mknManage.close();
+      }
+    } },
   { id:'about_and_legal', group:'UI', name:'ℹ️ About under ?: the version and whether to update (with Update now), what leaves this device, the privacy statement and the terms — agreed to at sign-in (v37.82)',
     test: async()=>{
       var realF=window.fetch, realUp=window.swUpdateNow, updated=0;
@@ -11260,8 +11392,14 @@ window.SELF_TESTS = [
       // Raised to 1900 in v37.91, the same way: the farm visitors gained two
       // more looks for every animal (3D cartoon drawings, ~45 KB, and pixel
       // art made from the storybook ones) and the page reached 1808 KB.
+      // Raised to 2000 in v38.18, the same way: v37.92–v38.18 added ~95 KB of
+      // real features (answers to notes in the app, the extension offered per
+      // browser, moving the farm animals, scaling the method, the resizable
+      // recipe, the beta's error reports, feature counts and welcome, What can
+      // this app do and Contact us, the end-of-beta question, the key check)
+      // and the page reached 1902 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 1900) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 2000) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

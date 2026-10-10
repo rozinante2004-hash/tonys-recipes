@@ -1,0 +1,69 @@
+name: Back up the beta's database
+
+# v38.18 — Tony: "daily backups of the beta's database". Every night the whole
+# Firestore database of the beta (my-kitchen-notes-beta) is copied by
+# tools/backup-firestore.mjs, ENCRYPTED with BACKUP_PASSPHRASE, and kept as this
+# run's file for 30 days (Actions → this workflow → a run → Artifacts). The
+# repository is public, and so are its run files to anyone signed in to GitHub —
+# hence the encryption: without the passphrase a file is unreadable.
+#
+# Needs (Tony, once):
+#   • the secret BACKUP_PASSPHRASE — a long passphrase he also keeps somewhere
+#     safe (without it no backup can ever be read);
+#   • "Cloud Datastore Viewer" for rules-publisher@recipes-f379d.iam.gserviceaccount.com
+#     (FIREBASE_RULES_KEY's service account) on my-kitchen-notes-beta — read only.
+# Without them the job says so and does nothing. Read back with
+# tools/restore-firestore.mjs (see its header).
+
+on:
+  schedule:
+    - cron: "17 2 * * *"      # 02:17 UTC every day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-beta
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Are the keys there?
+        id: key
+        run: |
+          if [ -z "$FIREBASE_KEY" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning::BACKUP_PASSPHRASE or FIREBASE_RULES_KEY is missing — the beta's database was NOT backed up."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Copy and encrypt the database
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund google-auth-library@9 >/dev/null
+          node tools/backup-firestore.mjs --project my-kitchen-notes-beta --out backup
+
+      - name: Keep it for 30 days
+        if: steps.key.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta-database-${{ github.run_number }}
+          path: backup/*.mknb
+          retention-days: 30
+          if-no-files-found: error

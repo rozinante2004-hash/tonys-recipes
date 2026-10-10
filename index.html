@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.17 -->
+<!-- Tony's Recipes Collection v38.18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -184,7 +184,8 @@
       feedbackButton: false,  // v37.64 — the floating 💬 note to Tony (the beta and the test copy)
       selfTestForAll: false,  // v37.75 — 🧪 Self Test for everyone (the beta and the test copy); the owner always
       insights: false,        // v38.15 — errors and feature counts reported to the app's own server (the beta and the test copy)
-      testerWelcome: false    // v38.15 — a short welcome for testers at their first sign-in (the beta and the test copy)
+      testerWelcome: false,   // v38.15 — a short welcome for testers at their first sign-in (the beta and the test copy)
+      testerSurvey: false     // v38.18 — the end-of-beta question, asked only once Tony opens it (the beta and the test copy)
     }),
     // v37.03 — the ways to sign in on THIS copy. Each needs switching on in the
     // Firebase console (Authentication → Sign-in method) as well, and Apple and
@@ -5208,6 +5209,7 @@ async function householdUse(hid, role) {
   if (!_selfTestRunning) setTimeout(function(){ hhReport().catch(function(){}); }, 6000);   // v37.71
   if (!_selfTestRunning && typeof insightsStart === 'function') setTimeout(insightsStart, 3000);   // v38.15
   if (!_selfTestRunning && typeof testerWelcomeMaybe === 'function') setTimeout(function(){ testerWelcomeMaybe().catch(function(){}); }, 4000);   // v38.15
+  if (!_selfTestRunning && typeof surveyMaybe === 'function') setTimeout(function(){ surveyMaybe().catch(function(){}); }, 9000);   // v38.18 — only once Tony opens it
   if (_openManageOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) { _openManageOnSignIn = false; setTimeout(function(){ openManagement(); }, 800); }
   if (typeof deviceOffersCloud === 'function' && !_selfTestRunning) deviceOffersCloud().catch(function(){});   // v37.69
   if (typeof feedbackTellOwner === 'function') setTimeout(function(){ feedbackTellOwner().catch(function(){}); }, 5000);   // v37.64
@@ -6570,6 +6572,106 @@ async function testerWelcomeMaybe(opts) {
   return true;
 }
 window.testerWelcome = testerWelcome; window.testerWelcomeMaybe = testerWelcomeMaybe; window.TESTER_WELCOME_TRY = TESTER_WELCOME_TRY;
+// ─── THE END-OF-BETA QUESTION (v38.18, Worker v71) ───────────────────────────
+// Tony: "The end-of-beta question, but naturally, do not send it." Prepared: three
+// questions and room for anything else, for the testers' copies (feature
+// `testerSurvey`: the beta, the test copy) — asked ONLY once Tony opens it in
+// 📊 Households → 📝 Beta question (Worker `survey-open`). Then each tester is
+// asked once, after any other window; "Later" waits a day. Answers go to the
+// Worker, read only by Tony. "👁 Preview" there shows it without sending anything.
+// Every line is in I18N_EXTRA (surveyPhrases, a function: the list is built above).
+var SURVEY_ID_DEFAULT = 'end-of-beta-1', SURVEY_LATER_KEY = 'mkn_survey_later_';
+function surveyQuestions() {
+  return {
+    title: '\u{1F4DD} A few questions about the beta',
+    intro: 'The beta is coming to an end. Three quick questions — your answers decide what comes next.',
+    keepQ: 'Would you keep using My Kitchen Notes after the beta?',
+    keep: [['yes', 'Yes, definitely'], ['probably', 'Probably'], ['unsure', 'Not sure yet'], ['probably-not', 'Probably not'], ['no', 'No']],
+    changeQ: 'What is the one thing you would change or add?',
+    priceQ: 'Some features cost us money every time they are used: reading recipes from photos and posts, translating, suggestions. If they were part of a paid plan for your household, what would you pay each month?',
+    price: [['free', 'Nothing — I would use the free part'], ['up-to-1', 'Up to $1'], ['1-3', '$1–$3'], ['3-5', '$3–$5'], ['more-5', 'More than $5']],
+    otherQ: 'Anything else you would like to tell us? (optional)',
+    send: 'Send', later: 'Later', preview: 'Preview — nothing is sent.',
+    empty: 'Choose an answer, or write a few words.', thanks: '\u{1F49C} Thank you — your answers were sent.', failed: 'Your answers could not be sent:'
+  };
+}
+function surveyPhrases() {
+  var q = surveyQuestions(), out = [q.title, q.intro, q.keepQ, q.changeQ, q.priceQ, q.otherQ, q.send, q.later, q.preview, q.empty, q.thanks, q.failed];
+  q.keep.concat(q.price).forEach(function (c) { out.push(c[1]); });
+  return out;
+}
+function openSurveyWindow(opts) {
+  opts = opts || {};
+  var q = surveyQuestions(), id = opts.id || SURVEY_ID_DEFAULT;
+  var prev = document.getElementById('surveyOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'surveyOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '1280';
+  var radios = function (name, list) {
+    return '<div class="sv-choices" role="radiogroup">' + list.map(function (c) {
+      return '<label class="sv-choice"><input type="radio" name="' + name + '" value="' + c[0] + '"><span>' + escH(c[1]) + '</span></label>'; }).join('') + '</div>';
+  };
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="svTitle" style="max-width:520px;text-align:start;max-height:88vh;overflow:auto;">'
+    + '<div class="ask-title" id="svTitle">' + escH(q.title) + '</div>'
+    + (opts.preview ? '<div class="sv-preview">' + escH(q.preview) + '</div>' : '')
+    + '<div class="ask-body" style="text-align:start;">' + escH(q.intro) + '</div>'
+    + '<div class="sv-q">1. ' + escH(q.keepQ) + '</div>' + radios('svKeep', q.keep)
+    + '<div class="sv-q">2. ' + escH(q.changeQ) + '</div><textarea id="svChange" class="sv-text" rows="3" maxlength="2000" dir="auto"></textarea>'
+    + '<div class="sv-q">3. ' + escH(q.priceQ) + '</div>' + radios('svPrice', q.price)
+    + '<div class="sv-q">' + escH(q.otherQ) + '</div><textarea id="svOther" class="sv-text" rows="2" maxlength="2000" dir="auto"></textarea>'
+    + '<div class="ask-actions"><button type="button" class="ask-btn" id="svSend">' + escH(q.send) + '</button>'
+    + '<button type="button" class="ask-btn ghost" id="svLater">' + escH(q.later) + '</button></div></div>';
+  document.body.appendChild(ov);
+  var picked = function (name) { var x = ov.querySelector('input[name="' + name + '"]:checked'); return x ? x.value : ''; };
+  ov.querySelector('#svLater').onclick = function () {
+    if (!opts.preview) { try { localStorage.setItem(SURVEY_LATER_KEY + id, String(Date.now())); } catch (e) {} }
+    ov.remove();
+  };
+  ov.querySelector('#svSend').onclick = async function () {
+    var answers = { keep: picked('svKeep'), price: picked('svPrice'),
+      change: (ov.querySelector('#svChange').value || '').trim(), other: (ov.querySelector('#svOther').value || '').trim() };
+    if (!answers.keep && !answers.price && !answers.change && !answers.other) { toast(q.empty); return false; }
+    if (opts.preview) { ov.remove(); toast(q.preview); return answers; }
+    var btn = ov.querySelector('#svSend'); btn.disabled = true;
+    try {
+      var u = fbSignedInUser();
+      if (!u || !u.getIdToken) throw new Error('sign in first');
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(20000),
+        body: workerBody({ action: 'survey-answer', idToken: await u.getIdToken(), survey: id, answers: answers,
+          hid: (_household && _household.hid) || '', household: (_household && _household.name) || '',
+          lang: (typeof _i18nLang === 'string' ? _i18nLang : 'en'), version: APP_VERSION }) });
+      var d = {}; try { d = await r.json(); } catch (e2) {}
+      if (!r.ok || !d.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
+    } catch (e) { btn.disabled = false; showServiceError(q.failed + ' ' + ((e && e.message) || e)); return false; }
+    ov.remove(); toast(q.thanks, 6000);
+    return answers;
+  };
+  return ov;
+}
+// After the household opens, in the testers' copies: is a question open, and not answered yet?
+async function surveyMaybe(opts) {
+  opts = opts || {};
+  var testing = _selfTestRunning && !window._insUnderTest;
+  if (typeof featureOn !== 'function' || !featureOn('testerSurvey') || testing) return false;
+  var u = typeof fbSignedInUser === 'function' ? fbSignedInUser() : null;
+  if (!u || !u.getIdToken) return false;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch (e) {} }
+  if (!(_workerHealth && _workerHealth.survey)) return false;
+  var d = {};
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(15000),
+      body: workerBody({ action: 'survey-status', idToken: await u.getIdToken() }) });
+    d = await r.json();
+  } catch (e) { return false; }
+  if (!d || !d.survey || d.answered) return false;
+  var later = 0; try { later = +localStorage.getItem(SURVEY_LATER_KEY + d.survey.id) || 0; } catch (e) {}
+  if (later && Date.now() - later < 864e5) return false;
+  for (var i = 0; !opts.noWait && i < 40 && document.querySelector('.modal-overlay.open, #askOverlay, #serviceErrorOverlay'); i++)
+    await new Promise(function (res) { setTimeout(res, 3000); });
+  if (!opts.noWait && document.querySelector('.modal-overlay.open, #askOverlay')) return false;
+  openSurveyWindow({ id: d.survey.id });
+  return d.survey.id;
+}
+window.openSurveyWindow = openSurveyWindow; window.surveyMaybe = surveyMaybe; window.surveyQuestions = surveyQuestions; window.surveyPhrases = surveyPhrases;
 
 // ─── ANSWERS TO NOTES (v38.00, Worker v68) ──────────────────────────────────
 // Tony: "Reply in App. This will send a note directly to the sender's app and
@@ -6952,7 +7054,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.17';
+var APP_VERSION = 'v38.18';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8268,6 +8370,13 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .tw-list { margin: 0 0 14px; padding-inline-start: 4px; list-style: none; font-size: 13px; line-height: 1.6; color: var(--ink); }
 .tw-list li { margin: 0 0 6px; }
 .tw-small { font-size: 12px; }
+/* v38.18 — the end-of-beta question */
+.sv-q { font-size: 14px; font-weight: 700; color: var(--heading); margin: 14px 0 6px; }
+.sv-choices { display: flex; flex-direction: column; gap: 4px; }
+.sv-choice { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; padding: 4px 2px; }
+.sv-choice input { width: 18px; height: 18px; accent-color: var(--terracotta-fill); }
+.sv-text { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 14px; }
+.sv-preview { font-size: 12px; font-weight: 700; color: var(--terracotta); margin-bottom: 6px; }
 /* v38.17 — ✨ What can this app do */
 .af-sec { margin: 10px 0 4px; }
 .af-h { font-size: 14px; font-weight: 700; color: var(--heading); margin-bottom: 4px; }
@@ -9749,7 +9858,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.17</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.18</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -9851,6 +9960,7 @@ body.banner-shown .header {
               <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
               <button class="drop-item" title="Where each copy of the app runs, with links (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
+              <button class="drop-item" data-owner-only title="Checks that the key in this copy's page still works for every Firebase service the app uses — before and after you restrict it in Google Cloud (the app's owner only)." onclick="closeDrop('settingsDrop');openKeyCheck()">🔑 Check the app's key</button>
               <button class="drop-item" data-owner-only title="The Google Cloud client ID that lets the app send recipes through Gmail (the app&#39;s owner only)." data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
               <button class="drop-item" data-owner-only title="The connection that sends ingredients straight to the household's Bring! list." data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
             </div>
@@ -10461,7 +10571,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.17</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.18</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13129,7 +13239,7 @@ var I18N_EXTRA = [
     + ' In this test copy it also sends, by itself, the app\u2019s own error messages and how many times each feature was used \u2014 names and numbers, never your recipes.',
   ', and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts which features are used, to the app\u2019s own server. '
     + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
-].concat(appFeaturePhrases(), contactPhrases());   // v38.17 — ✨ What can this app do, ✉️ Contact us
+].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases());   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
   I18N_EXTRA.forEach(function(str) {
     _i18nHarvested[str] = 1;
@@ -24314,6 +24424,76 @@ async function probeApiKey() {
   }
 }
 
+// ─── 🔑 CHECK THE APP'S KEY (v38.18) ─────────────────────────────────────────
+// Tony: "restricting the beta's API key to the Firebase services only, with a
+// safe way to check nothing breaks". The web key in this page is used for three
+// services, and only by the page itself (the Worker never sends it): Identity
+// Toolkit (signing in), Token Service (staying signed in) and Cloud Firestore
+// (the database). Each is asked directly with the key FROM THIS PAGE — so the
+// key's website list is tested as well as its API list — and, when signed in,
+// used for real: a fresh sign-in token and a read of the household from the
+// server. Run it before changing the key, after each change (they take up to 5
+// minutes), and undo the change if anything turns ❌.
+var KEY_SERVICES = [
+  { id: 'identitytoolkit', api: 'Identity Toolkit API', what: 'signing in' },
+  { id: 'securetoken', api: 'Token Service API', what: 'staying signed in' },
+  { id: 'firestore', api: 'Cloud Firestore API', what: 'the database' }
+];
+function keyAnswer(status, body) {
+  body = String(body || '');
+  if (/API_KEY_HTTP_REFERRER_BLOCKED|referer[^"]*are blocked/i.test(body)) return { ok: false, why: 'blocked for this website — the key’s website list does not include ' + location.origin + '/*' };
+  if (/API_KEY_SERVICE_BLOCKED|are blocked/i.test(body)) return { ok: false, why: 'not on the key’s list of APIs' };
+  if (/API_KEY_INVALID|API key not valid/i.test(body)) return { ok: false, why: 'the key is not valid' };
+  if (/SERVICE_DISABLED|has not been used in project|it is disabled/i.test(body)) return { ok: false, why: 'the service is switched off for this project' };
+  return { ok: true, why: 'the key is accepted (answer ' + status + ')' };
+}
+async function keyProbe(id, key, pid) {
+  var k = encodeURIComponent(key), url, init = {};
+  if (id === 'identitytoolkit') url = 'https://identitytoolkit.googleapis.com/v1/projects?key=' + k;
+  else if (id === 'securetoken') { url = 'https://securetoken.googleapis.com/v1/token?key=' + k;
+    init = { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=key-check' }; }
+  else url = 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(pid) + '/databases/(default)/documents/mkn_key_check/probe?key=' + k;
+  try { var r = await fetch(url, init); return keyAnswer(r.status, await r.text()); }
+  catch (e) { return { ok: null, why: 'could not be reached — ' + ((e && e.message) || 'network error') }; }
+}
+async function checkAppKey() {
+  var key = window._fbConfigApiKey || (APP_CONFIG.firebase && APP_CONFIG.firebase.apiKey) || '';
+  var pid = APP_CONFIG.firebase.projectId, out = [];
+  for (var i = 0; i < KEY_SERVICES.length; i++) {
+    var s = KEY_SERVICES[i], a = key ? await keyProbe(s.id, key, pid) : { ok: null, why: 'the app does not know its key' };
+    out.push({ name: s.api + ' (' + s.what + ')', ok: a.ok, why: a.why });
+  }
+  var u = typeof fbSignedInUser === 'function' ? fbSignedInUser() : null;
+  if (u && u.getIdToken) {
+    try { await u.getIdToken(true); out.push({ name: 'A fresh sign-in token, for real', ok: true, why: 'received' }); }
+    catch (e) { out.push({ name: 'A fresh sign-in token, for real', ok: false, why: (e && (e.code || e.message)) || 'failed' }); }
+  }
+  if (u && typeof _household !== 'undefined' && _household && _household.hid && typeof hhRef === 'function') {
+    try { var d = await hhRef(_household.hid).get({ source: 'server' }); out.push({ name: 'Your household, read from the server', ok: !!(d && d.exists), why: d && d.exists ? 'read' : 'not found' }); }
+    catch (e) { out.push({ name: 'Your household, read from the server', ok: false, why: (e && (e.code || e.message)) || 'failed' }); }
+  }
+  return out;
+}
+async function openKeyCheck() {
+  var prev = document.getElementById('keyCheckOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'keyCheckOverlay'; ov.className = 'modal-overlay open'; ov.setAttribute('data-no-i18n', '');
+  ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="kcTitle" style="max-width:520px;text-align:start;">'
+    + '<div class="ask-title" id="kcTitle">\u{1F511} The app’s key</div><div id="kcBody" class="ask-body" style="text-align:start;">⏳ Asking each service…</div>'
+    + '<div class="ask-actions"><button type="button" class="ask-btn" id="kcAgain">Check again</button><button type="button" class="ask-btn ghost" id="kcClose">Close</button></div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#kcClose').onclick = function () { ov.remove(); };
+  ov.querySelector('#kcAgain').onclick = function () { openKeyCheck(); };
+  var res = await checkAppKey(), bad = res.filter(function (r) { return r.ok === false; }).length, unknown = res.filter(function (r) { return r.ok === null; }).length;
+  var body = ov.querySelector('#kcBody'); if (!body) return res;
+  body.innerHTML = '<div style="margin-bottom:8px;">Project <b>' + escH(APP_CONFIG.firebase.projectId) + '</b>, from <b>' + escH(location.origin) + '</b></div>'
+    + res.map(function (r) { return '<div style="margin:5px 0;">' + (r.ok ? '✅' : r.ok === false ? '❌' : '⚠️') + ' <b>' + escH(r.name) + '</b><br><span style="color:var(--muted);font-size:12px;">' + escH(r.why) + '</span></div>'; }).join('')
+    + '<div style="margin-top:10px;">' + (bad ? '<b>Something the app needs is refused.</b> Undo the last change to the key in Google Cloud (it can take up to 5 minutes), then press Check again.'
+      : unknown ? 'Some could not be reached from this network — try again on another connection.' : '<b>All clear.</b> Everything the app needs from the key works.') + '</div>';
+  return res;
+}
+window.checkAppKey = checkAppKey; window.openKeyCheck = openKeyCheck; window.keyAnswer = keyAnswer; window.KEY_SERVICES = KEY_SERVICES;
 async function diagnoseSignIn() {
   var box = document.getElementById('signInDiag');
   if (!box) return;

@@ -836,6 +836,45 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.18 + Worker v71 — prepared for Tony (10 Oct 2026): the end-of-beta question (NOT sent), the key
+    check, daily backups.** Tony: "Please prepare … The end-of-beta question, but naturally, do not send it."
+    - **📝 The end-of-beta question** (feature `testerSurvey`: beta + test ON, family OFF). `surveyQuestions()`:
+      keep using (yes / probably / unsure / probably-not / no), the one thing to change or add, what they would
+      pay a month for the features that cost money (free / up-to-1 / 1-3 / 3-5 / more-5), anything else.
+      `surveyMaybe()` 9 s after the household opens: only if the Worker says a survey is OPEN for this copy and
+      this person has not answered; after other windows; "Later" = a day (`mkn_survey_later_<id>`).
+      `openSurveyWindow({preview})`. Worker v71: `survey-status`, `survey-answer` (one per person per survey,
+      replaced; choices validated), owner `survey-open` / `survey-close` / `survey-list` (tables `surveys`,
+      `survey_answers`). 📊 Households → **📝 Beta question**: per copy "not sent" / "being asked" /
+      "no longer asked", 👁 Preview, 📤 Send to the beta's testers… (asks first), ■ Stop asking, the
+      answers counted (bars) and in their words, 📋 Copy answers. Survey id `end-of-beta-1`. NOT SENT.
+    - **🔑 Check the app's key** (👑 App owner): asks Identity Toolkit, Token Service and Cloud Firestore WITH
+      THIS PAGE'S KEY (so the key's website list is tested too) and tells "not on the key's list of APIs"
+      (API_KEY_SERVICE_BLOCKED) and "blocked for this website" (API_KEY_HTTP_REFERRER_BLOCKED) from a normal
+      refusal; signed in, also a real token refresh and a server read of the household. The beta's key is
+      used ONLY by the page (the Worker never sends it; the SDKs loaded are app, auth, firestore). Plan for
+      Tony, two stages, checking after each: (1) API restrictions = Identity Toolkit API, Token Service API,
+      Cloud Firestore API; (2) website restrictions = https://mykitchennotes.community/* and
+      https://my-kitchen-notes-beta.pages.dev/* (and *.my-kitchen-notes-beta.pages.dev/* for previews).
+      The key's usage list showed Google Maps APIs: scanners trying a public key — stage 1 shuts them out.
+    - **Daily backups of the beta's database:** tools/backup-firestore.mjs (every document of every
+      collection and sub-collection via REST — listCollectionIds + list with showMissing — gzip, then
+      AES-256-GCM with a scrypt key from BACKUP_PASSPHRASE: "MKNB1"|salt|iv|tag|data; prints only counts per
+      collection), tools/restore-firestore.mjs (--list, --json, --restore [--only prefix] [--write]; a dry run
+      without --write), .github/workflows/backup-beta.yml (02:17 UTC daily + by hand; the file kept 30 days as
+      the run's artifact — public repo, so encrypted). Needs (Tony): secret BACKUP_PASSPHRASE (≥16 chars, kept
+      safe — without it no backup can be read) and "Cloud Datastore Viewer" for
+      rules-publisher@recipes-f379d.iam.gserviceaccount.com on my-kitchen-notes-beta. Checked on a stand-in
+      (scratch fake-firestore.mjs): nested collections, a parent that exists only through its children,
+      paging, wrong passphrase refused, dry run and restore. Scheduled jobs run from `main`: it starts with
+      the release.
+    - **Firefox job:** also sets the listing's support e-mail (index.html's supportEmail) and support site
+      (the beta's address) when they differ — checked on the stand-in; runs with the next extension release
+      or by hand.
+    - Size budget of the page raised to 2000 KB (selftests_are_a_separate_download), the same way as before:
+      ~95 KB of real features since v37.91; it reached 1902 KB.
+    - Tests: key_check, tester_survey, manage_survey, worker-cors v71 (14 checks); 361 pass on the family,
+      test and beta builds.
   - **Released to the family app and the beta: v38.17 + Worker v70 + extension 1.7.3 (10 Oct 2026, Tony's yes after his set-up steps 1–4, CI green on fa6b2ed; Pages: success).** Worker "live: v70, published: v70 — database and storage connected". Chrome 1.7.3 PENDING_REVIEW. Firefox 1.7.3 submitted (the add-on still "nominated"); homepage now https://mykitchennotes.community/; the privacy text WAS updated (AMO answered 200) — the job's "could not be set" was its own comparison (AMO stores the text as HTML), fixed: compared as plain words. Translate: +41 phrases in each language; Publish: success. Self Tests on main: success. Tony confirmed (10 Oct): "Signed in on mykitchennotes.community — everything works". Tony's Email Routing: the dashboard path is now Compute → Email Service → Email Routing (https://dash.cloudflare.com/<account>/email-service/routing); "Activate" there turns the domain on (the next page, "No data available", is only the empty activity chart); then Destination Addresses (verify), Routing Rules → Create routing rule. Tony kept the beta's browser API key UNRESTRICTED (my step said: add the address only if it already had a website list) — its usage list showed Google Maps APIs the app never uses: scanners trying a public key; restricting the key to the Firebase APIs is a separate, tested step later.
   - **Released to the family app and the beta: v38.16 (10 Oct 2026, Tony's yes, CI green on 3db2582; Pages: success; Self Tests on main: success).**
   - **v38.17 + Worker v70 + extension 1.7.3 — THE DOMAIN: mykitchennotes.community (10 Oct 2026).**

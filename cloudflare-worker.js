@@ -1,4 +1,11 @@
-// Tony's Recipes — Cloudflare Worker v70
+// Tony's Recipes — Cloudflare Worker v71
+// v71: THE END-OF-BETA QUESTION. Tony: prepare it, "but naturally, do not send
+//      it". The owner opens a survey for a copy (`meter-admin` `survey-open`,
+//      table `surveys`); a signed-in tester's app asks `survey-status` (is one
+//      open in my copy, and have I answered?) and sends `survey-answer` — one
+//      answer per person per survey, a second replaces the first (table
+//      `survey_answers`). `survey-list` gives the owner every survey and its
+//      answers; `survey-close` stops asking. Health: `survey`.
 // v70: THE BETA'S OWN ADDRESS. Tony bought mykitchennotes.community (10 Oct
 //      2026): the beta lives at its root. Its pages are allowed here (and
 //      capped: an AI call from them without a sign-in is refused, as from the
@@ -292,7 +299,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v70';
+const WORKER_VERSION = 'v71';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -672,6 +679,7 @@ async function handleRequest(request, env) {
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
         signals: !!env.METER_DB,      // v69 — the testers' apps report errors and feature counts
+        survey: !!env.METER_DB,       // v71 — the end-of-beta question
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1132,6 +1140,7 @@ async function handleRequest(request, env) {
     if (body.action === 'feedback-replies') return await feedbackReplies(request, env, body);   // v68
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
     if (body.action === 'app-signals') return await appSignals(request, env, body);   // v69
+    if (body.action === 'survey-status' || body.action === 'survey-answer') return await surveyAction(request, env, body);   // v71
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
@@ -1469,6 +1478,7 @@ async function meterAction(request, env, body) {
   }
   if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body, claims); if (fr) return fr; }
   if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
+  if (/^survey-/.test(String(body.op || ''))) { const sv = await surveyAdmin(env, db, body, proj); if (sv) return sv; }   // v71
   if (body.op === 'set-note') {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
@@ -1833,6 +1843,79 @@ async function signalsAdmin(env, db, body) {
   }
   if (body.op === 'error-delete') {
     await db.prepare('DELETE FROM app_errors WHERE id = ?1').bind(id).run();
+    return jsonResp({ ok: true });
+  }
+  return null;
+}
+
+// ─── THE END-OF-BETA QUESTION (v71) ─────────────────────────────────────────
+// A few questions the owner asks the testers of one copy, once he decides to.
+// Nothing is asked until he opens it; the answers are names and words, read
+// only by him (📊 Households → 📝 Beta question).
+let _surveyReady = false;
+async function surveyTables(db) {
+  if (!_surveyReady) {
+    await db.prepare('CREATE TABLE IF NOT EXISTS surveys (project TEXT NOT NULL, survey TEXT NOT NULL, opened_at INTEGER, closed_at INTEGER, '
+      + 'PRIMARY KEY (project, survey))').run();
+    await db.prepare('CREATE TABLE IF NOT EXISTS survey_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, survey TEXT, uid TEXT, email TEXT, '
+      + 'hid TEXT, household TEXT, keep TEXT, change TEXT, price TEXT, other TEXT, lang TEXT, version TEXT, at INTEGER)').run();
+    await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS survey_answers_one ON survey_answers (project, survey, uid)').run();
+    _surveyReady = true;
+  }
+}
+const SURVEY_ID = /^[a-z0-9-]{1,40}$/;
+const SURVEY_KEEP = ['yes', 'probably', 'unsure', 'probably-not', 'no'];
+const SURVEY_PRICE = ['free', 'up-to-1', '1-3', '3-5', 'more-5'];
+async function openSurvey(db, project) {
+  return await db.prepare('SELECT survey, opened_at FROM surveys WHERE project = ?1 AND closed_at IS NULL ORDER BY opened_at DESC LIMIT 1').bind(project).first();
+}
+async function surveyAction(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'SURVEY: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'SURVEY: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  const db = await meterDb(env);
+  await surveyTables(db);
+  const open = await openSurvey(db, claims.aud);
+  if (body.action === 'survey-status') {
+    if (!open) return jsonResp({ survey: null });
+    const mine = await db.prepare('SELECT at FROM survey_answers WHERE project = ?1 AND survey = ?2 AND uid = ?3').bind(claims.aud, open.survey, claims.sub).first();
+    return jsonResp({ survey: { id: open.survey, openedAt: open.opened_at }, answered: !!mine });
+  }
+  // survey-answer
+  const a = body.answers || {}, str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  if (!open || open.survey !== String(body.survey || '')) return jsonResp({ error: 'SURVEY: that question is not open any more.' }, 409);
+  const keep = SURVEY_KEEP.includes(a.keep) ? a.keep : '', price = SURVEY_PRICE.includes(a.price) ? a.price : '';
+  const change = str(a.change, 2000).trim(), other = str(a.other, 2000).trim();
+  if (!keep && !price && !change && !other) return jsonResp({ error: 'SURVEY: nothing was answered.' }, 400);
+  await db.prepare('INSERT INTO survey_answers (project, survey, uid, email, hid, household, keep, change, price, other, lang, version, at) '
+    + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) ON CONFLICT (project, survey, uid) DO UPDATE SET '
+    + 'email = excluded.email, hid = excluded.hid, household = excluded.household, keep = excluded.keep, change = excluded.change, '
+    + 'price = excluded.price, other = excluded.other, lang = excluded.lang, version = excluded.version, at = excluded.at')
+    .bind(claims.aud, open.survey, claims.sub, str(claims.email, 200), /^[A-Za-z0-9]{1,64}$/.test(String(body.hid || '')) ? String(body.hid) : '',
+          str(body.household, 120), keep, change, price, other, str(body.lang, 10), str(body.version, 20), Date.now()).run();
+  return jsonResp({ ok: true });
+}
+// The owner's side, through meter-admin (`project`: which copy; default his own).
+async function surveyAdmin(env, db, body, proj) {
+  await surveyTables(db);
+  if (body.op === 'survey-list') {
+    const surveys = (await db.prepare('SELECT project, survey, opened_at, closed_at FROM surveys ORDER BY opened_at DESC').all()).results || [];
+    const answers = (await db.prepare('SELECT id, project, survey, uid, email, hid, household, keep, change, price, other, lang, version, at '
+      + 'FROM survey_answers ORDER BY at DESC LIMIT 1000').all()).results || [];
+    return jsonResp({ surveys, answers, choices: { keep: SURVEY_KEEP, price: SURVEY_PRICE } });
+  }
+  const id = String(body.survey || '');
+  if (!SURVEY_ID.test(id)) return jsonResp({ error: 'SURVEY: which question?' }, 400);
+  if (body.op === 'survey-open') {
+    const other = await openSurvey(db, proj);
+    if (other && other.survey !== id) await db.prepare('UPDATE surveys SET closed_at = ?1 WHERE project = ?2 AND survey = ?3').bind(Date.now(), proj, other.survey).run();
+    await db.prepare('INSERT INTO surveys (project, survey, opened_at, closed_at) VALUES (?1, ?2, ?3, NULL) '
+      + 'ON CONFLICT (project, survey) DO UPDATE SET closed_at = NULL').bind(proj, id, Date.now()).run();
+    return jsonResp({ ok: true, project: proj, survey: id });
+  }
+  if (body.op === 'survey-close') {
+    await db.prepare('UPDATE surveys SET closed_at = ?1 WHERE project = ?2 AND survey = ?3 AND closed_at IS NULL').bind(Date.now(), proj, id).run();
     return jsonResp({ ok: true });
   }
   return null;
@@ -2332,4 +2415,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v70 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v71 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

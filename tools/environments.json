@@ -24,7 +24,8 @@
       "feedbackButton": true,
       "selfTestForAll": true,
       "insights": true,
-      "testerWelcome": true
+      "testerWelcome": true,
+      "testerSurvey": true
     },
     "_why_insights": "v38.15 — Tony, before the beta: errors and feature counts go to the app's own server (Worker v69), so the testers' use can be learned from; tried here first. The welcome too.",
     "diagnostics": {
@@ -81,7 +82,8 @@
       "feedbackButton": true,
       "selfTestForAll": true,
       "insights": true,
-      "testerWelcome": true
+      "testerWelcome": true,
+      "testerSurvey": true
     },
     "_why_insights": "v38.15 — Tony (10 Oct 2026), before recruiting testers: the beta reports its errors by itself (testers rarely press Transmit report), and counts — names and numbers only — how recipes arrive and which features each household uses; a short welcome at a tester's first sign-in. The privacy statement (1.2) says so.",
     "_why_features": "Testers get nearly everything, so there is feedback on more of it (Tony, 4 Oct 2026). WhatsApp ON (each tester's own exported chats; the family's repository-folder field is hidden in every copy but the family's). Off: sending to a Bring! list (it is the family's list, through the Worker's token) and Gmail (Google reviews that permission before it may be offered to the public). The floating 💬 note to Tony is on (v37.64).",

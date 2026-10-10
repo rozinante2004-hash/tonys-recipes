@@ -1205,6 +1205,40 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: famOwner }, ORIGIN);
     const hAu = ((f.d.households || []).filter(x => x.project === 'tonys-recipes-test' && x.hid === 'hA')[0] || {}).usage;
     expect('v69: the Households list carries each household\'s feature counts by month', hAu && hAu[nowMonth] && hAu[nowMonth]['added.link'] === 5 && hAu[nowMonth].scale === 1, JSON.stringify(hAu));
+    // v71 — the end-of-beta question: asked only once the owner opens it.
+    const hh4 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
+    expect('v71: health says the question can be asked', hh4.survey === true, JSON.stringify(hh4));
+    f = await fb({ action: 'survey-status', idToken: tA });
+    expect('v71: nothing is asked until the owner opens it', f.status === 200 && f.d.survey === null, JSON.stringify(f));
+    f = await fb({ action: 'survey-answer', idToken: tA, survey: 'end-of-beta-1', answers: { keep: 'yes' } });
+    expect('v71: …and nothing can be answered then', f.status === 409, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'survey-open', project: 'tonys-recipes-test', survey: 'end-of-beta-1', idToken: tA });
+    expect('v71: only the owner opens it', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'survey-open', project: 'tonys-recipes-test', survey: 'end-of-beta-1', idToken: famOwner }, ORIGIN);
+    expect('v71: the owner opens it for the test copy from the family app', f.status === 200 && f.d.ok === true, JSON.stringify(f));
+    f = await fb({ action: 'survey-status', idToken: tA });
+    expect('v71: a tester\'s app sees it, unanswered', f.d.survey && f.d.survey.id === 'end-of-beta-1' && f.d.answered === false, JSON.stringify(f));
+    f = await fb({ action: 'survey-status', idToken: fam }, ORIGIN);
+    expect('v71: …and the family app does not (it was opened for the test copy)', f.d.survey === null, JSON.stringify(f));
+    f = await fb({ action: 'survey-answer', idToken: tA, survey: 'end-of-beta-1', hid: 'hA', household: 'Kitchen A', lang: 'he', version: 'v38.18',
+      answers: { keep: 'probably', change: 'Faster imports', price: '1-3', other: '' } });
+    expect('v71: a tester answers', f.status === 200 && f.d.ok === true, JSON.stringify(f));
+    f = await fb({ action: 'survey-answer', idToken: tA, survey: 'end-of-beta-1', answers: { keep: 'yes', change: 'Faster imports, please', price: 'bogus' } });
+    let sa = db.raw.prepare("SELECT * FROM survey_answers WHERE uid = 'uA'").all();
+    expect('v71: …a second answer replaces the first (one per person), and a choice not on the list is not kept',
+      sa.length === 1 && sa[0].keep === 'yes' && sa[0].change === 'Faster imports, please' && sa[0].price === '' && sa[0].email === 'a@example.com', JSON.stringify(sa));
+    f = await fb({ action: 'survey-answer', idToken: tB, survey: 'end-of-beta-1', answers: {} });
+    expect('v71: an empty answer is refused', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'survey-status', idToken: tA });
+    expect('v71: answered, it is not asked again', f.d.answered === true, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'survey-list', idToken: famOwner }, ORIGIN);
+    expect('v71: the owner reads every survey and its answers', f.status === 200 && f.d.surveys.length === 1 && f.d.answers.length === 1 && f.d.answers[0].change === 'Faster imports, please'
+      && f.d.choices.keep.length === 5, JSON.stringify(f.d));
+    f = await fb({ action: 'meter-admin', op: 'survey-close', project: 'tonys-recipes-test', survey: 'end-of-beta-1', idToken: famOwner }, ORIGIN);
+    f = await fb({ action: 'survey-status', idToken: tB });
+    expect('v71: closed, nobody is asked', f.d.survey === null, JSON.stringify(f));
+    f = await fb({ action: 'survey-answer', idToken: tB, survey: 'end-of-beta-1', answers: { keep: 'no' } });
+    expect('v71: …and late answers are refused', f.status === 409, JSON.stringify(f));
   } finally { globalThis.fetch = realFetch; }
 }
 

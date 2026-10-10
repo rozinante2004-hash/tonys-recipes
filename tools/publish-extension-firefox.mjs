@@ -100,6 +100,15 @@ async function listing() {
     const r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: { homepage: { 'en-US': home } } });
     console.log(r.status < 300 ? 'homepage set: ' + home + (homeNow ? ' (was ' + homeNow + ')' : '') : '::warning::homepage not set (' + r.status + '): ' + say(r));
   }
+  // v38.18 — the listing's support e-mail and support site: the app's own (contact@ and the beta's
+  // address), not a person's. The address is the app's supportEmail in index.html.
+  const contact = (/supportEmail:\s*'([^']+)'/.exec(readFileSync(new URL('index.html', root), 'utf8')) || [])[1] || '';
+  const sp = a.d.support_url, supNow = !sp ? '' : typeof sp === 'string' ? sp : tr(sp.url || sp) || '';
+  const mailNow = tr(a.d.support_email) || '';
+  if (contact && (mailNow !== contact || supNow !== home)) {
+    const r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: { support_email: { 'en-US': contact }, support_url: { 'en-US': home } } });
+    console.log(r.status < 300 ? 'support: ' + contact + ', ' + home + (mailNow ? ' (was ' + mailNow + ')' : '') : '::warning::support e-mail and site not set (' + r.status + '): ' + say(r));
+  } else if (contact) console.log('support: ' + contact + ', ' + home);
 }
 
 // 1. Is the add-on there yet, and does it already have this version?

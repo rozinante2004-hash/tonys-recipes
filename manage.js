@@ -12,7 +12,8 @@
             tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null,
             replies: {}, replying: null, replyDraft: '', replySending: false,
             errors: null, errorsError: '', errFilter: 'open', useCopy: '',   // v38.15
-            picked: {} };   // v38.16 — the notes ticked for 📋 Copy reports
+            picked: {},   // v38.16 — the notes ticked for 📋 Copy reports
+            survey: null, surveyError: '' };   // v38.18 — 📝 the end-of-beta question
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
@@ -411,6 +412,75 @@
     }).join('');
   }
 
+  // ─── v38.18: 📝 THE END-OF-BETA QUESTION (Worker v71) ─────────────────────────
+  // Prepared, not sent (Tony). Sent per copy from here; answers read here.
+  var SURVEY_ID = 'end-of-beta-1';
+  var SURVEY_COPIES = [['my-kitchen-notes-beta', 'beta'], ['tonys-recipes-test', 'test']];
+  async function loadSurvey() {
+    try {
+      var t = await window._fbUser.getIdToken();
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'meter-admin', op: 'survey-list', idToken: t }), signal: AbortSignal.timeout(20000) });
+      var d = {}; try { d = await r.json(); } catch (e) {}
+      if (!r.ok || !Array.isArray(d.surveys)) throw new Error((d && d.error) || ('the server answered ' + r.status + (r.ok ? ' — it needs Worker v71 or newer' : '')));
+      S.survey = d; S.surveyError = '';
+    } catch (e) { S.survey = null; S.surveyError = String((e && e.message) || e); }
+    return true;
+  }
+  function surveyWords(list, key) {
+    var q = typeof surveyQuestions === 'function' ? surveyQuestions() : null, m = {};
+    ((q && q[key]) || []).forEach(function (c) { m[c[0]] = c[1]; });
+    return function (v) { return m[v] || v || '—'; };
+  }
+  function surveyAnswers() {
+    return ((S.survey && S.survey.answers) || []).filter(function (a) { return a.survey === SURVEY_ID; })
+      .map(function (a) { return Object.assign({}, a, { copy: COPY_NAME[a.project] || a.project }); });
+  }
+  function surveyText(list) {
+    var keepW = surveyWords(null, 'keep'), priceW = surveyWords(null, 'price');
+    return 'The end-of-beta question — ' + list.length + ' answer' + (list.length === 1 ? '' : 's') + ', copied ' + new Date().toLocaleString() + '\n\n'
+      + list.map(function (a, i) {
+          return '=== ' + (i + 1) + '. ' + (a.email || a.uid) + (a.household ? ' (' + a.household + ')' : '') + ' · ' + a.copy + ' · ' + new Date(a.at || 0).toLocaleString() + ' · ' + (a.lang || '') + ' ===\n'
+            + 'Keep using: ' + keepW(a.keep) + '\nWould pay a month: ' + priceW(a.price) + '\nOne thing to change or add: ' + (a.change || '—') + '\nAnything else: ' + (a.other || '—');
+        }).join('\n\n');
+  }
+  function countsHtml(list, key, words) {
+    var q = typeof surveyQuestions === 'function' ? surveyQuestions() : { keep: [], price: [] };
+    var total = list.filter(function (a) { return a[key]; }).length;
+    return (q[key] || []).map(function (c) {
+      var n = list.filter(function (a) { return a[key] === c[0]; }).length, pct = total ? Math.round(n / total * 100) : 0;
+      return '<div class="mg-svrow"><span class="mg-svlab">' + esc(c[1]) + '</span><span class="mg-bar mg-svbar"><span style="width:' + pct + '%;background:var(--terracotta-fill);display:block;height:100%;"></span></span><b>' + n + '</b></div>';
+    }).join('');
+  }
+  function surveyHtml() {
+    if (S.surveyError) return '<div class="mg-note">The question could not be read: ' + esc(S.surveyError) + '</div>';
+    if (!S.survey) return '<div class="mg-empty">⏳ Reading…</div>';
+    var list = surveyAnswers();
+    var status = SURVEY_COPIES.map(function (c) {
+      var sv = (S.survey.surveys || []).filter(function (x) { return x.project === c[0] && x.survey === SURVEY_ID; })[0];
+      var n = list.filter(function (a) { return a.project === c[0]; }).length;
+      var word = !sv ? '<b>not sent</b>' : sv.closed_at ? 'asked ' + new Date(sv.opened_at).toLocaleDateString() + ' – ' + new Date(sv.closed_at).toLocaleDateString() + ', no longer asked'
+        : '<b>being asked</b> since ' + new Date(sv.opened_at).toLocaleDateString();
+      var btn = sv && !sv.closed_at ? '<button type="button" class="mg-btn" onclick="mknManage.surveyClose(' + jsA(c[0]) + ')">■ Stop asking</button>'
+        : '<button type="button" class="mg-btn mg-primary" onclick="mknManage.surveySend(' + jsA(c[0]) + ')">📤 ' + (sv ? 'Ask again' : 'Send to the ' + c[1] + '’s testers…') + '</button>';
+      return '<div class="mg-svcopy"><span class="mg-copy">' + esc(c[1]) + '</span> ' + word + ' · ' + n + ' answer' + (n === 1 ? '' : 's') + ' ' + btn + '</div>';
+    }).join('');
+    var head = '<div class="mg-muted" style="margin-bottom:8px;">Three questions and room for anything else. Nobody is asked until you send it; each tester is then asked once, the next time they open the app (“Later” waits a day).</div>'
+      + '<div class="mg-tools" style="margin-bottom:10px;"><button type="button" class="mg-btn" onclick="mknManage.surveyPreview()">👁 Preview</button>'
+      + (list.length ? '<button type="button" class="mg-btn" onclick="mknManage.surveyCopy()">📋 Copy answers</button>' : '')
+      + '<button type="button" class="mg-btn" onclick="mknManage.surveyReload()">↻</button></div>' + status;
+    if (!list.length) return head + '<div class="mg-empty">No answers yet.</div>';
+    var written = list.filter(function (a) { return a.change || a.other; });
+    return head
+      + '<div class="mg-card"><div class="mg-h">Would you keep using it?</div>' + countsHtml(list, 'keep') + '</div>'
+      + '<div class="mg-card"><div class="mg-h">What would you pay each month?</div>' + countsHtml(list, 'price') + '</div>'
+      + '<div class="mg-card"><div class="mg-h">In their words (' + written.length + ')</div>' + (written.length ? written.map(function (a) {
+          return '<div class="mg-svword"><div class="mg-muted">' + esc(a.email || '') + ' · ' + esc(a.household || '') + ' · <span class="mg-copy">' + esc(a.copy) + '</span> · ' + new Date(a.at || 0).toLocaleDateString() + '</div>'
+            + (a.change ? '<div class="mg-text" dir="auto"><b>Change or add:</b> ' + esc(a.change) + '</div>' : '')
+            + (a.other ? '<div class="mg-text" dir="auto"><b>Anything else:</b> ' + esc(a.other) + '</div>' : '') + '</div>';
+        }).join('') : '<div class="mg-muted">Nothing written yet.</div>') + '</div>';
+  }
+
   function sorted() {
     var q = S.q.trim().toLowerCase();
     var list = S.rows.filter(function (r) {
@@ -477,10 +547,12 @@
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'feedback') + '" class="mg-tab' + (S.tab === 'feedback' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'feedback\')">💬 Feedback' + (nc ? ' <span class="mg-badge">' + nc + '</span>' : '') + '</button>'
       // v38.15 — what the testers' apps report by themselves (Worker v69).
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'errors') + '" class="mg-tab' + (S.tab === 'errors' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'errors\')">⚠️ Errors' + (errNew() ? ' <span class="mg-badge">' + errNew() + '</span>' : '') + '</button>'
-      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'use') + '" class="mg-tab' + (S.tab === 'use' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'use\')">📈 Use</button></div>';
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'use') + '" class="mg-tab' + (S.tab === 'use' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'use\')">📈 Use</button>'
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'survey') + '" class="mg-tab' + (S.tab === 'survey' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'survey\')">📝 Beta question</button></div>';
     if (S.tab === 'feedback') { body.innerHTML = tabs + notesHtml(); return; }
     if (S.tab === 'errors') { body.innerHTML = tabs + errorsHtml(); return; }
     if (S.tab === 'use') { body.innerHTML = tabs + (S.loading ? '<div class="mg-empty">⏳ Reading every household…</div>' : useHtml()); return; }
+    if (S.tab === 'survey') { body.innerHTML = tabs + surveyHtml(); return; }
     head = tabs + head;
     if (S.loading) { body.innerHTML = head + '<div class="mg-empty">⏳ Reading every household…</div>'; return; }
     var list = sorted();
@@ -634,6 +706,9 @@
     + '.mg-pick input{width:18px;height:18px;accent-color:var(--terracotta-fill);cursor:pointer;}'
     + '.mg-card.mg-picked{outline:2px solid var(--terracotta-fill);outline-offset:-1px;}'
     + '.mg-sep{width:1px;align-self:stretch;background:var(--border);margin:0 4px;}'
+    + '.mg-svcopy{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;font-size:13px;}'
+    + '.mg-svrow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px;}.mg-svlab{flex:0 0 46%;}'
+    + '.mg-svbar{flex:1;min-width:60px;margin-top:0;}.mg-svword{border-top:1px solid var(--border);padding:6px 0;}'
     + '.mg-use{display:inline-block;margin:2px 10px 2px 0;}.mg-use b{color:var(--heading);}'
     + '.mg-usemonth{margin:6px 0 10px;}'
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
@@ -704,7 +779,32 @@
       return api.reload();
     },
     tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(function (fresh) { if (fresh !== false) render(); });
-      if (t === 'errors' && !S.errors) loadErrors().then(function (fresh) { if (fresh !== false) render(); }); },
+      if (t === 'errors' && !S.errors) loadErrors().then(function (fresh) { if (fresh !== false) render(); });
+      if (t === 'survey') loadSurvey().then(render); },
+    // v38.18 — 📝 the end-of-beta question: preview, send (per copy), stop, copy.
+    surveyReload: function () { S.survey = null; render(); return loadSurvey().then(render); },
+    surveyPreview: function () { return typeof openSurveyWindow === 'function' ? openSurveyWindow({ preview: true }) : null; },
+    surveySend: async function (project) {
+      var copy = COPY_NAME[project] || project;
+      if (await askConfirm({ icon: '📤', title: 'Send the end-of-beta question?',
+          message: 'Each of the ' + copy + '’s testers is asked once, the next time they open the app. You can stop asking at any time.',
+          okLabel: 'Send it', cancelLabel: 'Not yet' }) !== true) return false;
+      try { await meterSet('survey-open', '', { project: project, survey: SURVEY_ID }); }
+      catch (e) { showServiceError('Could not send it: ' + e.message); return false; }
+      toast('📤 Sent — the ' + copy + '’s testers are asked the next time they open the app.', 6000);
+      await loadSurvey(); render(); return true;
+    },
+    surveyClose: async function (project) {
+      try { await meterSet('survey-close', '', { project: project, survey: SURVEY_ID }); }
+      catch (e) { showServiceError('Could not stop it: ' + e.message); return false; }
+      toast('■ Nobody more is asked.'); await loadSurvey(); render(); return true;
+    },
+    surveyCopy: function () {
+      var list = surveyAnswers(); if (!list.length) return 0;
+      if (typeof fbProbeCopy === 'function') fbProbeCopy(surveyText(list), list.length + ' answer' + (list.length === 1 ? '' : 's'));
+      return list.length;
+    },
+    _survey: loadSurvey,
     // v38.15 — the testers' apps' own reports (Worker v69).
     errFilter: function (f) { S.errFilter = f; render(); },
     errReload: function () { S.errors = null; render(); return loadErrors().then(function (fresh) { if (fresh !== false) render(); }); },
