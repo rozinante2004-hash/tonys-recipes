@@ -836,6 +836,9 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **Released to the family app and the beta: v38.19 (10 Oct 2026, Tony's yes given in advance — "once cleared" —
+    CI green on d3ce595).** Pages: success; Translate new phrases: success; Publish languages: success; Self Tests on
+    main: success (also on main for v38.18). No Worker or extension change.
   - **v38.19 — a clicked farm animal vanishes in a puff of smoke (10 Oct 2026).** Tony: "When clicked, once the speech
     bubble disappears, the animal should disappear in a puff of smoke instead of walking away." After farmOuch's
     bubble, `farmPoof(el)` (window.farmPoof): 8 soft grey-white puffs (`.fv-smoke i`, each drifting outwards and
