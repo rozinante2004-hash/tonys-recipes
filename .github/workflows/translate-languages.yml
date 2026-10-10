@@ -10,8 +10,10 @@ name: Translate new phrases
 # Anthropic (the translations' AI): by Workload Identity Federation — no key
 # stored; this run's GitHub identity is exchanged for a ten-minute token, allowed
 # by the federation rule in Claude Console for this repository's `main` only. Its
-# four IDs (not secrets) are repository variables: ANTHROPIC_FEDERATION_RULE_ID,
-# ANTHROPIC_ORGANIZATION_ID, ANTHROPIC_SERVICE_ACCOUNT_ID, ANTHROPIC_WORKSPACE_ID.
+# IDs are below: they are not secrets (Anthropic's own example puts them in the
+# workflow) — alone they open nothing; only a run GitHub signs as a push to this
+# repository's `main` gets a token. The rule covers one workspace (Default), so no
+# workspace ID is needed. A repository variable of the same name would win.
 # (Or else a secret ANTHROPIC_API_KEY.) And FIREBASE_RULES_KEY (already there for
 # the rules), whose service account also needs "Cloud Datastore User" on
 # recipes-f379d. Without them the job says so and does nothing.
@@ -39,9 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
-      ANTHROPIC_ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
-      ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
+      ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID || 'fdrl_014jJQzGTM4YjaEhCpgJJudC' }}
+      ANTHROPIC_ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID || 'b3b9258d-27ec-449a-baaa-8001c6338d8f' }}
+      ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID || 'svac_0187fGnuVTN7F6dFXL2zZeMs' }}
       ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
       FIREBASE_RULES_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
     steps:

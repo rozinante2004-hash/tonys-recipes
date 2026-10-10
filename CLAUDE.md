@@ -868,6 +868,16 @@ found only because a test was written first and disagreed with the code.
       scope workspace:developer, 10 minutes. Because of "Only push" the workflow has NO
       workflow_dispatch: it runs on pushes to main touching index.html or the job's own two files;
       a failed run is retried with Re-run (a re-run keeps the event, push).
+    - **Fixed 10 Oct:** the wizard had doubled the owner (Repository field takes the NAME only —
+      `tonys-recipes`; it prefixes the owner) and stored `ref = main` (GitHub sends
+      `refs/heads/main`). Now: subject `repo:rozinante2004-hash/tonys-recipes:ref:refs/heads/main`,
+      repository/ref/repository_owner/repository_owner_id/event_name as GitHub sends them.
+    - **IDs (not secrets; in the workflow's env, since this session cannot set repository
+      variables — a variable of the same name wins):** rule fdrl_014jJQzGTM4YjaEhCpgJJudC, service
+      account svac_0187fGnuVTN7F6dFXL2zZeMs (github-translations), organization
+      b3b9258d-27ec-449a-baaa-8001c6338d8f. No workspace ID (one workspace). Console:
+      https://platform.claude.com/settings/workload-identity-federation (Rules; History =
+      ?tab=history).
     - A run in which every AI call failed now FAILS with the reason (the app's own code swallowed the
       errors and the job used to end "the new phrases are in the shared translations"). Stand-in:
       federation (1 identity, 1 exchange, Bearer on every call), refused federation (exit 1 with the
