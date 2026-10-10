@@ -74,12 +74,16 @@ async function listing() {
   // v38.17 — kept up to date, not only filled in once (the contact address changed).
   const text = readFileSync(new URL('extension/PRIVACY.md', root), 'utf8')
     .replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
-  if (before && String(before).trim() === text) console.log('privacy policy: already on the page, up to date');
+  // AMO keeps it as a web page (a "- " line becomes <ul><li>…): compared as plain words.
+  const plain = (v) => String(v || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/^\s*[-*]\s+/gm, ' ').replace(/\s+/g, ' ').trim();
+  if (before && plain(before) === plain(text)) console.log('privacy policy: already on the page, up to date');
   else {
     const body = { privacy_policy: { 'en-US': text } };
     let r = await amo('addons/addon/' + id + '/eula_policy/', { method: 'PATCH', json: body });
     if (!(await policyNow())) r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: body });
-    console.log((await policyNow()) === text ? 'privacy policy ' + (before ? 'updated' : 'added') + ' (' + text.length + ' characters)'
+    const after = await policyNow();
+    console.log(after && (plain(after) === plain(text) || r.status < 300) ? 'privacy policy ' + (before ? 'updated' : 'added') + ' (' + text.length + ' characters)'
       : '::warning::the privacy policy could not be set through the API (' + r.status + ': ' + say(r) + ') — it can be added by hand on the add-on\'s page in the Developer Hub');
   }
   // v38.13 — the name after "by" on the page is the AMO account's display name (its profile, not the
