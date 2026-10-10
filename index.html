@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.18 -->
+<!-- Tony's Recipes Collection v38.19 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7054,7 +7054,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.18';
+var APP_VERSION = 'v38.19';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8123,6 +8123,17 @@ body { font-family: 'DM Sans', 'Heebo', sans-serif; background: var(--cream); co
 .fv-bubble::after { content: ""; position: absolute; left: 34%; top: 100%; border: 8px solid transparent; border-top-color: #26301f; }
 .farm-visitor.fv-said .fv-bubble { opacity: 1; transform: translate(-50%, -82%) scale(1); }
 @media (prefers-reduced-motion: reduce) { .fv-art.walking *, .fv-look .fv-art * { animation: none !important; } .fv-art.walking .pxB { visibility: hidden; } }
+/* v38.19 — Tony: clicked, it speaks, and "once the speech bubble disappears, the animal should
+   disappear in a puff of smoke instead of walking away". Puffs burst out as it shrinks away. */
+.farm-visitor.fv-poof { pointer-events: none; }
+.farm-visitor.fv-poof .fv-art { animation: fvVanish .45s ease-in forwards; }
+@keyframes fvVanish { 0% { transform: scale(1); opacity: 1; } 30% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(.12); opacity: 0; } }
+.fv-smoke { position: absolute; left: 50%; top: 55%; width: 0; height: 0; pointer-events: none; }
+.fv-smoke i { position: absolute; left: 0; top: 0; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle at 40% 36%, rgba(255,255,255,.92) 0%, rgba(232,230,226,.8) 38%, rgba(170,166,160,.5) 62%, rgba(170,166,160,0) 72%);
+  animation: fvPuff .8s ease-out forwards; animation-delay: var(--d, 0s); }
+@keyframes fvPuff { 0% { opacity: .95; transform: translate(0, 0) scale(.3); } 55% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--x, 0), var(--y, 0)) scale(var(--s, 1.6)); } }
+@media (prefers-reduced-motion: reduce) { .farm-visitor.fv-poof .fv-art { animation: none; opacity: 0; transition: opacity .3s; } .fv-smoke { display: none; } }
 .fv-card { max-width: 600px; text-align: start; max-height: 88vh; overflow-y: auto; }
 .fv-note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 4px; }
 .fv-h { font-size: 13px; font-weight: 700; color: var(--heading); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .4px; }
@@ -9858,7 +9869,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.18</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.19</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10571,7 +10582,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.18</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.19</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -25274,7 +25285,7 @@ function farmWalk(el, a, style, opts) {
     if (!tapped) art.classList.add('walking');
   }
   el.addEventListener('pointerdown', function(e) {
-    if (held || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (held || el.classList.contains('fv-poof') || (e.pointerType === 'mouse' && e.button !== 0)) return;
     justDragged = false;                                     // a new press: only a grab's own click is not a tap
     if (e.pointerType === 'mouse') e.preventDefault();     // no picture-drag ghost, no text selection
     held = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ex: posX, ey: posY, x: posX, y: posY, moving: false };
@@ -25292,9 +25303,10 @@ function farmWalk(el, a, style, opts) {
     // moving." The whole walk stops (not only some parts paused) and starts again after.
     art.classList.remove('walking'); el.classList.remove('fv-look');
     farmOuch(el, a).then(function(){
-      last = performance.now(); tapped = false;
-      if (held && held.moving) return;
-      if (restUntil) el.classList.add('fv-look'); else art.classList.add('walking');
+      // v38.19 — then gone in a puff of smoke, where it stands (not on across the screen) —
+      // unless it was grabbed meanwhile: then it walks on from where it is put, as before.
+      if (held && held.moving) { last = performance.now(); tapped = false; return; }
+      return farmPoof(el);
     });
   });
   function frame(now) {
@@ -25337,6 +25349,24 @@ function farmOuch(el, a) {
       el.classList.remove('fv-said'); art.classList.remove('turned');
       setTimeout(resolve, 260);
     }, 1300 + Math.min(2200, said.length * 60));
+  });
+}
+// v38.19 — Tony: "When clicked, once the speech bubble disappears, the animal should disappear
+// in a puff of smoke instead of walking away." Where it stands: a burst of little clouds as it
+// shrinks to nothing, then it is gone (the next visitor comes as usual).
+function farmPoof(el) {
+  return new Promise(function(resolve) {
+    if (!el || !el.isConnected) return resolve(false);
+    el._farm = el._farm || {}; el._farm.poofed = true;
+    var smoke = document.createElement('div'); smoke.className = 'fv-smoke'; smoke.setAttribute('aria-hidden', 'true');
+    [[-48, -34, 1.7, 0], [42, -38, 1.6, .04], [-56, 12, 1.5, .08], [52, 10, 1.7, .02], [0, -60, 1.8, .06], [-14, 38, 1.5, .1], [20, 40, 1.4, .05], [0, 0, 2.1, .03]].forEach(function(p) {
+      var i = document.createElement('i');
+      i.style.setProperty('--x', p[0] + 'px'); i.style.setProperty('--y', p[1] + 'px'); i.style.setProperty('--s', String(p[2])); i.style.setProperty('--d', p[3] + 's');
+      smoke.appendChild(i);
+    });
+    el.appendChild(smoke);
+    el.classList.add('fv-poof');
+    setTimeout(function() { el.remove(); resolve(true); }, 900);
   });
 }
 function farmClear() { Array.prototype.forEach.call(document.querySelectorAll('.farm-visitor'), function(v){ v.remove(); }); }
@@ -25465,7 +25495,7 @@ window.farmSettingsSave = farmSettingsSave; window.farmAddSaying = farmAddSaying
 window.farmConfig = farmConfig; window.farmUseConfig = farmUseConfig; window.farmPickAnimal = farmPickAnimal; window.farmPickSaying = farmPickSaying;
 window.farmTyping = farmTyping; window.farmWait = farmWait; window.farmTick = farmTick; window.farmClear = farmClear; window.FARM_ANIMALS = FARM_ANIMALS;
 window.farmRefreshSettings = farmRefreshSettings; window.farmThumbs = farmThumbs; window.farmPixel = farmPixel; window.farmToonArt = farmToonArt;
-window.farmArtFor = farmArtFor; window.farmWindowVoice = farmWindowVoice; window.farmVoiceKind = farmVoiceKind; window.farmLoadConfig = farmLoadConfig; window.farmStyle = farmStyle; window.FARM_STYLES = FARM_STYLES; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
+window.farmArtFor = farmArtFor; window.farmWindowVoice = farmWindowVoice; window.farmVoiceKind = farmVoiceKind; window.farmPoof = farmPoof; window.farmLoadConfig = farmLoadConfig; window.farmStyle = farmStyle; window.FARM_STYLES = FARM_STYLES; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
 farmLoadConfig().then(function(){ farmSchedule(); });   // the pace may be Tony's; until it is read, the device's copy of it
 
 // ─── THE KITCHEN RULES: AGREEING TO THE TERMS ON FIRST SIGN-IN (v37.83) ─────

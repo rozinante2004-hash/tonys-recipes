@@ -7376,7 +7376,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a British voice; never while typing; on by default (v37.88)',
+  { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a British voice, then vanishes in a puff of smoke (v38.19); never while typing; on by default (v37.88)',
     test: async()=>{
       var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on') }, spoken=[];
       var inp=null;
@@ -7415,10 +7415,16 @@ window.SELF_TESTS = [
         if(el.querySelector('.fv-art').classList.contains('walking') || (legNow && getComputedStyle(legNow).animationName!=='none')) throw new Error('its legs kept moving while it stood and spoke');
         for(i=0;i<40 && el.isConnected && el.querySelector('.fv-art').classList.contains('turned');i++) await wait(100);
         if(el.querySelector('.fv-art').classList.contains('turned')) throw new Error('it did not turn back');
-        await wait(350);
-        if(el.isConnected && !el.querySelector('.fv-art').classList.contains('walking')) throw new Error('it did not walk on after speaking');
-        for(i=0;i<40 && el.isConnected;i++) await wait(100);
-        if(el.isConnected) throw new Error('it did not leave the screen');
+        // v38.19 — Tony: once the bubble goes, it "disappears in a puff of smoke instead of walking away".
+        for(i=0;i<40 && el.isConnected && !el.classList.contains('fv-poof');i++) await wait(50);
+        if(!el.classList.contains('fv-poof') || el.querySelectorAll('.fv-smoke i').length<5) throw new Error('it did not vanish in a puff of smoke');
+        if(el.classList.contains('fv-said')) throw new Error('the smoke came before the bubble went');
+        if(el.querySelector('.fv-art').classList.contains('walking')) throw new Error('it walked away instead');
+        var poofAt=el.getBoundingClientRect().left; await wait(200);
+        if(el.isConnected && Math.abs(el.getBoundingClientRect().left-poofAt)>1) throw new Error('it kept walking in the smoke');
+        if(el.isConnected && getComputedStyle(el).pointerEvents!=='none') throw new Error('it can still be grabbed while it vanishes');
+        for(i=0;i<20 && el.isConnected;i++) await wait(100);
+        if(el.isConnected) throw new Error('it did not disappear');
         // v37.91 — three looks, one for everyone (3D cartoon to begin with); each can walk and turn.
         if(farmDefaultConfig().style!=='cartoon') throw new Error('3D cartoon is not the look to begin with');
         for(var si=0; si<FARM_STYLES.length; si++){

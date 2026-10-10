@@ -836,6 +836,17 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.19 — a clicked farm animal vanishes in a puff of smoke (10 Oct 2026).** Tony: "When clicked, once the speech
+    bubble disappears, the animal should disappear in a puff of smoke instead of walking away." After farmOuch's
+    bubble, `farmPoof(el)` (window.farmPoof): 8 soft grey-white puffs (`.fv-smoke i`, each drifting outwards and
+    fading, `fvPuff` .8 s) while the animal shrinks and fades (`.fv-poof .fv-art`, `fvVanish` .45 s); removed after
+    900 ms; no clicks or grabs once it is going. If the animal is being held when the bubble ends it stays (as
+    before). Reduced motion: no smoke, a plain fade. Test farm_visitors: fv-poof, ≥5 puffs, not walking, gone
+    within 2 s.
+  - **Released to the family app and the beta: v38.18 + Worker v71 (10 Oct 2026, Tony's yes, CI green on 743a52e).**
+    Pages: success; Worker: published and the live Worker answers v71; Translate new phrases: success (the survey's
+    and key check's phrases); Publish languages: success (fe870c3). Still to do by Tony: secret BACKUP_PASSPHRASE
+    and Cloud Datastore Viewer for the backup — then the first backup by hand (Actions → Back up the beta's database → Run workflow).
   - **v38.18 + Worker v71 — prepared for Tony (10 Oct 2026): the end-of-beta question (NOT sent), the key
     check, daily backups.** Tony: "Please prepare … The end-of-beta question, but naturally, do not send it."
     - **📝 The end-of-beta question** (feature `testerSurvey`: beta + test ON, family OFF). `surveyQuestions()`:
