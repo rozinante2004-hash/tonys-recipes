@@ -1277,14 +1277,14 @@ window.SELF_TESTS = [
         localStorage.removeItem(DEVICE_OFFER_KEY); setUA(ANDROID); _pwaInstallEvent={ prompt:function(){}, userChoice:Promise.resolve({ outcome:'dismissed' }) };
         if(maybeOfferDeviceShortcut(9)!=='android' || !dlg().querySelector('button#deviceOfferGo')) throw new Error('Android is not offered the install');
         dlg().remove();
-        // Send feedback: to Tony's address, through a choice that works without a mail app.
+        // Send feedback: to the app's address (v38.17: contact@, the domain's), through a choice that works without a mail app.
         setUA(CHROME);
-        window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(!/tony\.schvekher@gmail\.com/.test(intro)) throw new Error('feedback does not say where it goes'); return 'gmail'; };
+        window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(!/contact@mykitchennotes\.community/.test(intro)) throw new Error('feedback does not say where it goes'); return 'gmail'; };
         window.open=function(u){ opened=u; return null; };
         // (v37.67 — where the 💬 note is on, Send feedback opens the note form; the e-mail way is the family's)
         var fbWas=_featureOverride.feedbackButton; _featureOverride.feedbackButton=false;
         try{ await sendFeedback(); } finally { if(fbWas===undefined) delete _featureOverride.feedbackButton; else _featureOverride.feedbackButton=fbWas; }
-        if(!opened || opened.indexOf('to='+encodeURIComponent('tony.schvekher@gmail.com'))===-1) throw new Error('feedback does not reach tony.schvekher@gmail.com: '+opened);
+        if(!opened || opened.indexOf('to='+encodeURIComponent('contact@mykitchennotes.community'))===-1) throw new Error('feedback does not reach contact@mykitchennotes.community: '+opened);
       } finally {
         delete window._deviceOfferForce; delete window._iosShortcutOverride; _pwaInstallEvent=realEv; window.askChoice=realAsk; window.open=realOpen;
         try{ if(kept===null) localStorage.removeItem(DEVICE_OFFER_KEY); else localStorage.setItem(DEVICE_OFFER_KEY, kept); }catch(e){}
@@ -6967,6 +6967,73 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
+    test: async()=>{
+      var olds=['https://my-kitchen-notes-beta.pages.dev', 'https://www.mykitchennotes.community'], site='https://mykitchennotes.community';
+      var to=appMovedTo('https://my-kitchen-notes-beta.pages.dev/?url=https%3A%2F%2Fx.example%2Fsoup#share-text=Soup%20for%20two', olds, site);
+      if(to!=='https://mykitchennotes.community/?url=https%3A%2F%2Fx.example%2Fsoup#share-text=Soup%20for%20two') throw new Error('the shared link or the text did not come along: '+to);
+      if(appMovedTo('https://www.mykitchennotes.community/privacy.html', olds, site)!=='https://mykitchennotes.community/privacy.html') throw new Error('www. is not sent on');
+      if(appMovedTo('https://feature-x.my-kitchen-notes-beta.pages.dev/', olds, site)!=='') throw new Error('a branch preview was sent away');
+      if(appMovedTo('https://mykitchennotes.community/', olds.concat([site]), site)!=='') throw new Error('the new address sends itself on (a loop)');
+      if(appMovedTo('https://rozinante2004-hash.github.io/tonys-recipes/', olds, site)!=='') throw new Error('the family app was sent away');
+      if(appMovedTo('not a url', olds, site)!=='') throw new Error('a broken address');
+      if(APP_CONFIG.environment==='live'){
+        if((APP_CONFIG.oldOrigins||[]).length) throw new Error('the family app forwards somewhere');
+        if(APP_CONFIG.betaCopy.siteUrl!=='https://mykitchennotes.community/') throw new Error('the family app links to the beta at '+APP_CONFIG.betaCopy.siteUrl);
+      }
+      if(APP_CONFIG.environment==='beta' && (APP_CONFIG.siteOrigin!==site || APP_CONFIG.firebase.authDomain!=='mykitchennotes.community' || APP_CONFIG.oldOrigins.indexOf('https://my-kitchen-notes-beta.pages.dev')===-1))
+        throw new Error('the beta is not set up for its address');
+      if(window._appMoving) throw new Error('this page is being sent away while it runs its tests');
+      if(APP_CONFIG.supportEmail!=='contact@mykitchennotes.community') throw new Error('the contact address is '+APP_CONFIG.supportEmail);
+    } },
+  { id:'about_features_and_contact', group:'UI', name:'ℹ️ About: ✨ What can this app do (households, inviting, linking, joining, sharing first) and ✉️ Contact us (a note in the app, e-mail, copy the address); “© 2026 My Kitchen Notes”, no personal name (v38.17)',
+    test: async()=>{
+      var real={ form:window.openFeedbackForm, mail:window.sendFeedbackByEmail, replies:window.openFbReplies, toast:window.toast, check:window.aboutCheckUpdate, clip:navigator.clipboard };
+      var calls=[], copied=null;
+      function gone(id){ var e=document.getElementById(id); if(e) e.remove(); }
+      try{
+        window.aboutCheckUpdate=async function(){};
+        window.openFeedbackForm=function(){ calls.push('note'); }; window.sendFeedbackByEmail=function(){ calls.push('mail'); }; window.openFbReplies=function(){ calls.push('replies'); };
+        window.toast=function(){};
+        Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{ writeText:function(t){ copied=String(t); return Promise.resolve(); } } });
+        await openAbout();
+        var about=document.getElementById('aboutOverlay'), t=about.textContent;
+        if(!document.getElementById('aboutFeatures') || !document.getElementById('aboutContact')) throw new Error('About has no ✨ What can this app do or ✉️ Contact us');
+        if(t.indexOf('© 2026 My Kitchen Notes')===-1 || /Tony|Schvekher|gmail/.test(t)) throw new Error('the About line: '+t.slice(-120));
+        if(!about.querySelector('a[href="mailto:contact@mykitchennotes.community"]')) throw new Error('About does not give the contact address');
+        // ✨ What can this app do — the community first.
+        document.getElementById('aboutFeatures').click();
+        var af=document.getElementById('appFeaturesOverlay'), ft=af ? af.textContent : '';
+        if(!af || parseInt(af.style.zIndex,10)<=parseInt(about.style.zIndex,10)) throw new Error('it opens behind About');
+        var first=af.querySelector('.af-sec');
+        if(!first || !/Cook together/.test(first.textContent)) throw new Error('the community is not first');
+        ['invite family and friends', 'Link with other households', 'Ask to join a household', 'block', 'Share a recipe on WhatsApp', 'share the app itself',
+         'browser extension', 'Change the servings', 'Translate a recipe', 'works offline'].forEach(function(x){ if(ft.indexOf(x)===-1) throw new Error('the list lacks: '+x); });
+        appFeaturePhrases().forEach(function(x){ if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
+        var wa=featureOn('whatsapp'); window._featureOverride.whatsapp=!wa;
+        try{ if(appFeatureSections().some(function(s){ return s.items.some(function(i){ return /WhatsApp group/.test(i); }); })===wa) throw new Error('WhatsApp is listed where it is off (or not where it is on)'); }
+        finally{ delete window._featureOverride.whatsapp; }
+        gone('appFeaturesOverlay');
+        // ✉️ Contact us.
+        document.getElementById('aboutContact').click();
+        var cu=document.getElementById('contactOverlay'), ct=cu ? cu.textContent : '';
+        if(!cu || ct.indexOf('contact@mykitchennotes.community')===-1) throw new Error('Contact us does not show the address');
+        contactPhrases().forEach(function(x){ if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
+        var rItem=document.getElementById('fbRepliesItem');
+        if(!!document.getElementById('cuReplies') !== !!(rItem && !rItem.hidden)) throw new Error('📨 Answers to my notes shows without answers (or hides with them)');
+        document.getElementById('cuCopy').click(); await new Promise(function(r){ setTimeout(r, 20); });
+        if(copied!=='contact@mykitchennotes.community') throw new Error('copied: '+copied);
+        document.getElementById('cuNote').click();
+        if(calls[0]!=='note' || document.getElementById('contactOverlay') || document.getElementById('aboutOverlay')) throw new Error('the note form, in front of everything');
+        await openAbout(); document.getElementById('aboutContact').click(); document.getElementById('cuMail').click();
+        if(calls[1]!=='mail' || document.getElementById('aboutOverlay')) throw new Error('E-mail us');
+        if(/Tony|Schvekher/.test(ct+ft)) throw new Error('a personal name');
+      } finally {
+        ['aboutOverlay','appFeaturesOverlay','contactOverlay'].forEach(gone);
+        window.openFeedbackForm=real.form; window.sendFeedbackByEmail=real.mail; window.openFbReplies=real.replies; window.toast=real.toast; window.aboutCheckUpdate=real.check;
+        try{ Object.defineProperty(navigator, 'clipboard', { configurable:true, value:real.clip }); }catch(e){}
+      }
+    } },
   { id:'about_and_legal', group:'UI', name:'ℹ️ About under ?: the version and whether to update (with Update now), what leaves this device, the privacy statement and the terms — agreed to at sign-in (v37.82)',
     test: async()=>{
       var realF=window.fetch, realUp=window.swUpdateNow, updated=0;
@@ -6994,7 +7061,7 @@ window.SELF_TESTS = [
         // What the documents say, and that the privacy statement names every service the app sends to.
         window.fetch=realF;
         var priv=await (await fetch('privacy.html?t='+Date.now(), { cache:'no-store' })).text(), terms=await (await fetch('terms.html?t='+Date.now(), { cache:'no-store' })).text();
-        ['Tony Schvekher','tony.schvekher@gmail.com','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
+        ['Tony Schvekher','contact@mykitchennotes.community','mykitchennotes.community/','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
           if(priv.indexOf(w)===-1) throw new Error('the privacy statement does not mention '+w); });
         // v37.90 — the agreement is with the My Kitchen Notes Team; the privacy statement still names who answers for the data.
         if(terms.indexOf('Tony Schvekher')!==-1 || priv.indexOf('acts for the Team')===-1) throw new Error('the terms still name a person, or the privacy statement no longer names who answers for the data');
@@ -7095,7 +7162,7 @@ window.SELF_TESTS = [
             if(!d.querySelector('a[href="'+doc+'.html"][lang="en"]')) throw new Error(f+' does not point to the English text, which prevails');
             if(d.body.textContent.indexOf(doc==='terms' ? 'My Kitchen Notes Team' : 'Tony Schvekher')===-1) throw new Error(f+' does not name '+(doc==='terms' ? 'the Team it is an agreement with' : 'who answers for the data'));
             d.querySelectorAll('a[href^="privacy"]:not([lang="en"])').forEach(function(a){ if(a.getAttribute('href')!=='privacy.'+l+'.html') throw new Error(f+' links to '+a.getAttribute('href')+' instead of the same language'); });
-            if(doc==='privacy') ['tony.schvekher@gmail.com','Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
+            if(doc==='privacy') ['contact@mykitchennotes.community','Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
             // v37.85 — every passage is tied to its English twin (tools/legal-keys.py), or the editor cannot offer it.
             var sel='h1,h2,h3,p,li,th,td,div.box,div.meta', words=function(el){ return el.textContent.replace(/\s+/g,' ').trim(); };
             var enB=Array.prototype.filter.call(en[doc].querySelectorAll(sel), function(el){ return !el.closest('[data-no-k]'); });

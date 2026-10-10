@@ -836,6 +836,46 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.17 + Worker v70 + extension 1.7.3 — THE DOMAIN: mykitchennotes.community (10 Oct 2026).**
+    Tony bought it (Cloudflare Registrar) and chose: **the beta at the root** (family stays on GitHub
+    Pages, test on pages.dev — "if there is no problem for the Family app with sharing recipes and
+    joining households where it is" — there is none: linking/joining are within one copy whatever the
+    address; a recipe file opens in any copy), **contact@** as the contact address, and About saying
+    **"© 2026 My Kitchen Notes"** (his name only where the law wants it: the privacy statement).
+    - **Addresses:** beta https://mykitchennotes.community (siteOrigin AND authDomain — sign-in is
+      served from it; build.js still fetches the helpers from my-kitchen-notes-beta.firebaseapp.com).
+      `APP_CONFIG.oldOrigins` (beta: the old pages.dev address and www.) → `appMovedTo(href, olds, site)`
+      in the head sends a visit on with its path, ?url= and #share-text (exact origins only: a branch
+      preview <x>.my-kitchen-notes-beta.pages.dev stays). The family's `betaCopy.siteUrl` → the new one.
+    - **Tony's set-up (only he can):** (1) Pages project my-kitchen-notes-beta → Custom domains: the
+      apex and www.; (2) Firebase (my-kitchen-notes-beta) → Authentication → Settings → Authorized
+      domains: mykitchennotes.community; (3) Google Cloud (my-kitchen-notes-beta) → the OAuth "Web client
+      (auto created by Google Service)": origin https://mykitchennotes.community and redirect
+      https://mykitchennotes.community/__/auth/handler; the browser key's website list if it has one;
+      (4) Cloudflare Email Routing on the domain: contact@ → his Gmail (+ optional catch-all). The release
+      waits for these — without 1–3 sign-in on the new address fails.
+    - **Contact:** `APP_CONFIG.supportEmail` = contact@mykitchennotes.community (Send feedback, About,
+      ✉️ Contact us); the privacy statement in all 11 languages (every address; plus "Website:
+      mykitchennotes.community" after the first; tools/legal-keys.py re-keyed), privacy-extension.html,
+      extension/PRIVACY.md (the Firefox job now UPDATES the policy text and the homepage on AMO when they
+      differ, not only when empty; the homepage comes from environments.json's beta).
+    - **Worker v70:** the new origin allowed and capped (CAPPED_ORIGINS_DEFAULT); the old one kept.
+    - **Extension 1.7.3:** MKN_APP → the new address (content script matches it: Chrome shows a new-site
+      permission on update — fine, no testers yet). Old 1.7.2 keeps working: its page forwards.
+    - **About → ✨ What can this app do** (`openAppFeatures`; `appFeatureSections(all)`: Cook together —
+      household, roles, invites, linking + talking, keeping a linked recipe, join/link requests by e-mail
+      or MKN- identifier with accept/decline/block, sharing a recipe or the app — then saving from
+      anywhere, cooking, smart help, keeping tidy, everywhere; WhatsApp and Bring! lines only where on)
+      and **✉️ Contact us** (`openContactUs`: 💬 a note in the app → openFeedbackForm; 📨 answers if any;
+      ✉️ e-mail → sendFeedbackByEmail; 📋 copy the address). Both over About (z 1270); an action closes
+      them first so its own window is in front. All lines in I18N_EXTRA via appFeaturePhrases() and
+      contactPhrases() — FUNCTIONS, because I18N_EXTRA is built far above (a var would still be unset).
+    - Guard `cfg_identifiers_in_one_place` (beta build): the domain may appear only in APP_CONFIG — even
+      comments outside it must not name it.
+    - Tests: beta_moved_to_its_domain, about_features_and_contact, worker-cors v70; 358 pass on the
+      family, test and BETA builds.
+    - Optional for Tony later: the beta iPhone shortcut's address (works meanwhile via the forward);
+      the Chrome Web Store listing's homepage; Gmail "Send mail as" contact@.
   - **v38.16 — 📋 Copy reports (Feedback tab).** Tony: "select several feedback reports and in one click
     on a "Copy Reports" button, will copy all relevant information, so I could paste it here, for you to
     analyse, in one go". A tick box on each note (☑ Select all shown — only what the filter shows;
@@ -1823,7 +1863,7 @@ found only because a test was written first and disagreed with the code.
   - **v37.59 — the BETA copy, prepared (design step 5).** tools/
     environments.json `beta`: environment 'beta', households, logging on,
     password + e-mail-link sign-in, features whatsapp/bringDirect/gmail OFF,
-    site https://my-kitchen-notes-beta.pages.dev/ (Cloudflare Pages project
+    site https://my-kitchen-notes-beta.pages.dev/ (since v38.17: https://mykitchennotes.community/, the old address forwards) (Cloudflare Pages project
     `my-kitchen-notes-beta`, production branch `beta`, build `node
     tools/build.js beta`), manifest "My Kitchen Notes (beta)", violet icons
     with a BETA band (icons/beta, `node tools/make-test-icons.mjs beta`), and

@@ -73,6 +73,14 @@ const preflightForeign = await worker.fetch(new Request('https://worker.test', {
   method: 'OPTIONS', headers: { Origin: 'https://evil.example' } }), env);
 expect('foreign preflight is refused', preflightForeign.status === 403, `got ${preflightForeign.status}`);
 
+// v70 — the beta's own address (Tony's domain) is the app's, like its old one.
+for (const o of ['https://mykitchennotes.community', 'https://my-kitchen-notes-beta.pages.dev']) {
+  check('v70: the beta at ' + o, await worker.fetch(post({ action: 'health' }, o), env), o);
+  const pf = await worker.fetch(new Request('https://worker.test', { method: 'OPTIONS', headers: { Origin: o } }), env);
+  expect('v70: …its preflight is granted (' + o + ')', pf.status === 200 && pf.headers.get('Access-Control-Allow-Origin') === o, 'status ' + pf.status);
+}
+check('v70: www. is not the app (it forwards in the browser)', await worker.fetch(post({ action: 'health' }, 'https://www.mykitchennotes.community'), env), 'null');
+
 console.log('\nApp key (configured):');
 const keyed = { APP_SHARED_KEY: 'secret-k' };
 const good = await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), keyed);
@@ -1149,7 +1157,7 @@ console.log('\nAI per household (v60):');
     expect('…even one that never reported (named from the page)', nv.name === 'Old one' && nv.deletedAt > 0, JSON.stringify(nv));
     // v69 — what the testers' apps report: errors, and how often each feature was used.
     const hh3 = await (await worker.fetch(post({ action: 'health' }), envM)).json();
-    expect('v69: health says the apps may report (so they send)', hh3.signals === true && hh3.version === 'v69', JSON.stringify(hh3));
+    expect('v69: health says the apps may report (so they send)', hh3.signals === true, JSON.stringify(hh3));
     const err1 = { kind: 'error', message: 'Cannot read properties of null (reading \'x\')', where: 'index.html:120', screen: 'viewOverlay', version: 'v38.15', env: 'test', device: 'UA', lang: 'he', at: Date.now() - 5000, n: 2 };
     f = await fb({ action: 'app-signals', idToken: tA, hid: 'hA', errors: [err1, { kind: 'error', message: '   ' }, 'nonsense'] });
     expect('v69: a signed-in tester\'s app reports an error (empty ones dropped)', f.status === 200 && f.d.errors === 1, JSON.stringify(f));

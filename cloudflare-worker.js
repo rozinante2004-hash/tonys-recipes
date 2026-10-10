@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v69
+// Tony's Recipes — Cloudflare Worker v70
+// v70: THE BETA'S OWN ADDRESS. Tony bought mykitchennotes.community (10 Oct
+//      2026): the beta lives at its root. Its pages are allowed here (and
+//      capped: an AI call from them without a sign-in is refused, as from the
+//      old pages.dev address, which stays allowed while browsers still have it
+//      open — it forwards to the new one).
 // v69: WHAT THE TESTERS' APPS REPORT. Tony, before the beta: "let the beta's
 //      run for a while and then see what we can learn". The beta and the test
 //      copy send, now and then, one `app-signals` call (proved as for AI):
@@ -287,7 +292,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v69';
+const WORKER_VERSION = 'v70';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -325,6 +330,8 @@ const DEFAULT_ORIGINS = [
   'http://127.0.0.1:8137',
   // v60 — the beta copy (design step 5); the test copy comes in ALLOWED_ORIGINS.
   'https://my-kitchen-notes-beta.pages.dev',
+  // v70 — the beta's own address (its old one above forwards there).
+  'https://mykitchennotes.community',
 ];
 function allowedOrigins(env) {
   const extra = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
@@ -1200,7 +1207,7 @@ async function handleRequest(request, env) {
 //                    (`meter-admin`, the management app)
 const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test,my-kitchen-notes-beta';
 const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test,my-kitchen-notes-beta';
-const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev,https://my-kitchen-notes-beta.pages.dev';
+const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev,https://my-kitchen-notes-beta.pages.dev,https://mykitchennotes.community';   // v70
 const OWNER_EMAILS_DEFAULT = 'rozinante2004@gmail.com';
 const AI_CAP_BY_PROJECT_DEFAULT = { 'recipes-f379d': 10 };      // v67 — the family's, per household per month
 function projectCap(project, env) {
@@ -2325,4 +2332,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v69 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v70 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

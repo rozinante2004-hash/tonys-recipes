@@ -58,14 +58,16 @@
     "_why": "v37.59 — the BETA copy (design step 5): the testers' own app, with its own Firebase project and site, built from the `beta` branch, which moves forward only when Tony says (like the family's). Tony, 3 Oct 2026: a beta copy and a per-household AI cap.",
     "firebase": {
       "apiKey": "AIzaSyD0UKy9SkhiHV3UwJ_KgkXFJSGN_6uMTPQ",
-      "authDomain": "my-kitchen-notes-beta.pages.dev",
+      "authDomain": "mykitchennotes.community",
       "projectId": "my-kitchen-notes-beta",
       "storageBucket": "my-kitchen-notes-beta.firebasestorage.app",
       "messagingSenderId": "557995593102",
       "appId": "1:557995593102:web:048cf4d1b54156b6ff68df"
     },
     "_why_firebase": "Tony's beta Firebase project (4 Oct 2026). authDomain is the copy's OWN address, not my-kitchen-notes-beta.firebaseapp.com: sign-in is served from it (tools/build.js fetches Firebase's sign-in files into dist/__/), as for the test copy — on an iPhone the firebaseapp.com address fails with 'missing initial state'.",
-    "siteOrigin": "https://my-kitchen-notes-beta.pages.dev",
+    "siteOrigin": "https://mykitchennotes.community",
+    "oldOrigins": ["https://my-kitchen-notes-beta.pages.dev", "https://www.mykitchennotes.community"],
+    "_why_siteOrigin": "v38.17 — Tony bought mykitchennotes.community (10 Oct 2026; Cloudflare): the beta — the testers', later the public app — lives at its root; the family app stays on GitHub Pages, the test copy on pages.dev. Sign-in is served from this address too (authDomain). Its old address and www. send visitors on (oldOrigins). Tony's set-up: the Pages project's custom domains (both), Firebase → Authorized domains, the Google OAuth web client's origin and /__/auth/handler, the browser key's website list if it has one.",
     "sitePath": "/",
     "iosShortcutUrl": "https://www.icloud.com/shortcuts/d207d5c07d9049bfb311aa13cccef43e",
     "_why_iosShortcutUrl": "v37.72 — Tony's beta shortcut (5 Oct 2026): a copy of his, pointed at this address.",

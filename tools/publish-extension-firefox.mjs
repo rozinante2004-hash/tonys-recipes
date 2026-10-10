@@ -71,25 +71,30 @@ async function listing() {
   // The privacy policy: AMO keeps the text itself — extension/PRIVACY.md, as plain text.
   const policyNow = async () => { const p = await amo('addons/addon/' + id + '/eula_policy/'); return p.status === 200 ? tr(p.d.privacy_policy) : null; };
   const before = await policyNow();
-  if (before) console.log('privacy policy: already on the page');
+  // v38.17 — kept up to date, not only filled in once (the contact address changed).
+  const text = readFileSync(new URL('extension/PRIVACY.md', root), 'utf8')
+    .replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  if (before && String(before).trim() === text) console.log('privacy policy: already on the page, up to date');
   else {
-    const text = readFileSync(new URL('extension/PRIVACY.md', root), 'utf8')
-      .replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
     const body = { privacy_policy: { 'en-US': text } };
     let r = await amo('addons/addon/' + id + '/eula_policy/', { method: 'PATCH', json: body });
     if (!(await policyNow())) r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: body });
-    console.log((await policyNow()) ? 'privacy policy added (' + text.length + ' characters)'
+    console.log((await policyNow()) === text ? 'privacy policy ' + (before ? 'updated' : 'added') + ' (' + text.length + ' characters)'
       : '::warning::the privacy policy could not be set through the API (' + r.status + ': ' + say(r) + ') — it can be added by hand on the add-on\'s page in the Developer Hub');
   }
   // v38.13 — the name after "by" on the page is the AMO account's display name (its profile, not the
   // add-on). Tony set it himself (Edit My Profile → Display Name); the job only says what it is.
   const me = await amo('accounts/profile/');
   if (me.status === 200 && me.d && me.d.display_name) console.log('shown as: by ' + me.d.display_name);
-  // Its homepage: My Kitchen Notes, where the store copy sends recipes.
-  if (!a.d.homepage) {
-    const home = 'https://my-kitchen-notes-beta.pages.dev/';
+  // Its homepage: My Kitchen Notes, where the store copy sends recipes — the beta's address in
+  // tools/environments.json (v38.17: https://mykitchennotes.community/), kept up to date.
+  const beta = JSON.parse(readFileSync(new URL('tools/environments.json', root), 'utf8')).beta || {};
+  const home = String(beta.siteOrigin || '').replace(/\/$/, '') + (beta.sitePath || '/');
+  const hp = a.d.homepage, homeNow = !hp ? '' : typeof hp === 'string' ? hp : tr(hp.url || hp) || '';
+  if (homeNow === home) console.log('homepage: ' + home);
+  else {
     const r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: { homepage: { 'en-US': home } } });
-    console.log(r.status < 300 ? 'homepage set: ' + home : '::warning::homepage not set (' + r.status + '): ' + say(r));
+    console.log(r.status < 300 ? 'homepage set: ' + home + (homeNow ? ' (was ' + homeNow + ')' : '') : '::warning::homepage not set (' + r.status + '): ' + say(r));
   }
 }
 

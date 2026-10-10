@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.16 -->
+<!-- Tony's Recipes Collection v38.17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,7 +118,7 @@
     cloudflareAccountId: '4dbc420100c13bf94fda83047ce0a7ac',
     ownerEmail:          'rozinante2004@gmail.com',
     // v37.00 — where ✉️ Send feedback writes to; empty = the owner's address.
-    supportEmail:        'tony.schvekher@gmail.com',   // v37.47 — Tony's contact until there is a domain
+    supportEmail:        'contact@mykitchennotes.community',   // v38.17 — the app's own address (Cloudflare Email Routing → Tony's Gmail); was his Gmail
     // v37.28 — the iCloud link of the "Save to My Kitchen Notes" shortcut for
     // THIS copy (Tony builds it once and shares it); empty = no offer shown.
     iosShortcutUrl:      'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6',   // v37.40 — Tony's family shortcut (2 Oct 2026)
@@ -137,8 +137,12 @@
     liveSiteUrl:         'https://rozinante2004-hash.github.io/tonys-recipes/',
     // v37.70 — the beta, by name, for the management page's links to it.
     betaCopy: Object.freeze({
-      siteUrl:           'https://my-kitchen-notes-beta.pages.dev/'
+      siteUrl:           'https://mykitchennotes.community/'   // v38.17 — its own address (Tony's domain, 10 Oct 2026)
     }),
+    // v38.17 — addresses THIS copy used to live at (or also answers on): a visit
+    // there is sent on to siteOrigin, keeping the path, ?url= and #share-text.
+    // The beta's are in tools/environments.json; the family's copy has none.
+    oldOrigins:          Object.freeze([]),
     testCopy: Object.freeze({
       siteUrl:           'https://tonys-recipes-test.pages.dev/',
       pagesProject:      'tonys-recipes-test',
@@ -226,6 +230,22 @@
     });
   };
   window.applyFeatureFlags();
+  // v38.17 — the beta moved to its own domain (Tony's, 10 Oct 2026). Its old address
+  // (my-kitchen-notes-beta.pages.dev) and www. send the visitor on, at once and
+  // with everything they brought: a shared link (?url=), the extension's text
+  // (#share-text), the path. Only the exact old addresses — a pages.dev preview
+  // of a branch (<branch>.my-kitchen-notes-beta.pages.dev) stays where it is.
+  window.appMovedTo = function (href, olds, site) {
+    try {
+      var u = new URL(href);
+      if (!site || (olds || []).indexOf(u.origin) === -1 || u.origin === site) return '';
+      return String(site).replace(/\/$/, '') + u.pathname + u.search + u.hash;
+    } catch (e) { return ''; }
+  };
+  (function () {
+    var to = window.appMovedTo(location.href, window.APP_CONFIG.oldOrigins, window.APP_CONFIG.siteOrigin);
+    if (to) { window._appMoving = true; location.replace(to); }
+  })();
   // What a tap on a switched-off feature says — once, plainly, and nothing else.
   window.featureOffNotice = function (name) {
     var what = { whatsapp: 'WhatsApp groups', bring: 'Bring!', gmail: 'Sending through Gmail',
@@ -6932,7 +6952,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.16';
+var APP_VERSION = 'v38.17';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8248,6 +8268,11 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .tw-list { margin: 0 0 14px; padding-inline-start: 4px; list-style: none; font-size: 13px; line-height: 1.6; color: var(--ink); }
 .tw-list li { margin: 0 0 6px; }
 .tw-small { font-size: 12px; }
+/* v38.17 — ✨ What can this app do */
+.af-sec { margin: 10px 0 4px; }
+.af-h { font-size: 14px; font-weight: 700; color: var(--heading); margin-bottom: 4px; }
+.af-list { margin: 0; padding-inline-start: 20px; font-size: 13px; line-height: 1.55; color: var(--ink); }
+.af-list li { margin: 0 0 4px; }
 .ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta-fill); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
 .ask-btn.danger { background: #C62828; }
 .ask-check { display:flex; align-items:center; gap:9px; margin:2px 0 12px; cursor:pointer;
@@ -9724,7 +9749,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.16</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.17</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10436,7 +10461,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.16</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.17</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13104,7 +13129,7 @@ var I18N_EXTRA = [
     + ' In this test copy it also sends, by itself, the app\u2019s own error messages and how many times each feature was used \u2014 names and numbers, never your recipes.',
   ', and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts which features are used, to the app\u2019s own server. '
     + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
-];
+].concat(appFeaturePhrases(), contactPhrases());   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
   I18N_EXTRA.forEach(function(str) {
     _i18nHarvested[str] = 1;
@@ -25589,6 +25614,112 @@ if ('serviceWorker' in navigator) {
 // handler, which serves the CACHED document and merely refreshes the cache for
 // next time — so the button visibly did nothing and the user had to reload twice
 // without being told. Dropping the caches first makes the reload hit the network.
+// ─── WHAT CAN THIS APP DO · CONTACT US (v38.17) ─────────────────────────────
+// Tony, with the domain (".community"): in ℹ️ About, "What can this
+// app do" — "a list of the main features … do not forget to include the sharing
+// and joining options, as we are shooting for the Community angle" — and
+// "Contact us", "with several options including email and the Notes mechanism".
+// Every line is translated: appFeatureSections(true) and contactPhrases() go into
+// I18N_EXTRA (function declarations, so the list, built far above, can use them).
+function appFeatureSections(all) {
+  var on = function (f) { return all || typeof featureOn !== 'function' || featureOn(f); };
+  return [
+    { icon: '\u{1F91D}', title: 'Cook together', items: [
+      'One cookbook for your household: invite family and friends by e-mail, and everyone sees and adds the same recipes.',
+      'Choose who may change things: owners, admins, editors and viewers.',
+      'Link with other households you know: each sees the other’s recipes, and you can write to each other in the app.',
+      'Keep your own copy of a recipe from a linked household.',
+      'Ask to join a household, or to link with one, by e-mail or by its identifier (MKN-…) — and accept, decline or block the requests you get.',
+      'Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere — or share the app itself.' ] },
+    { icon: '\u{1F4E5}', title: 'Save recipes from anywhere', items: [
+      'From a website link, a photo of a cookbook page, screenshots, pasted text or a video.',
+      'From Facebook, Instagram and TikTok posts.',
+      'Straight from the page you are reading: the browser extension on a computer, the Share button on a phone.' ]
+      .concat(on('whatsapp') ? ['Find the recipes hiding in your WhatsApp group chats.'] : []) },
+    { icon: '\u{1F373}', title: 'Cook', items: [
+      'Change the servings: the amounts follow, even in the method — in metric or imperial.',
+      'Timers in the steps, voice control for messy hands, and a screen that stays on.',
+      'Mark a dish as cooked, rate it, and keep notes for next time.' ] },
+    { icon: '✨', title: 'Smart help', items: [
+      'Translate a recipe into another language.',
+      'What can I make? Ideas from what is in your pantry.',
+      'Find a photo for a recipe.',
+      'Ask the help assistant how to do anything in the app.' ] },
+    { icon: '\u{1F5C2}', title: 'Keep it tidy', items: [
+      'Categories, diets, favourites, collections and a quick search.',
+      'Every change is kept: go back to an earlier version of a recipe.' ]
+      .concat(on('bring') ? ['Send the ingredients to your Bring! shopping list.'] : [])
+      .concat(['Print a recipe, or export recipes to Word.']) },
+    { icon: '\u{1F30D}', title: 'Everywhere', items: [
+      'On a phone, a tablet or a computer: it installs like an app and works offline.',
+      'In many languages, in light or dark.',
+      'Back up all your recipes to your device at any time.',
+      'And now and then, a visitor from the farm drops by. \u{1F404}' ] }
+  ];
+}
+function appFeaturePhrases() {
+  var out = ['✨ What can this app do', 'Your recipes in one place — shared with the people you cook with.'];
+  appFeatureSections(true).forEach(function (s) { out.push(s.title); out = out.concat(s.items); });
+  return out;
+}
+function aboutSubOverlay(id) {      // over ℹ️ About; closing it goes back there
+  var prev = document.getElementById(id); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = id; ov.className = 'modal-overlay open'; ov.style.zIndex = '1270';
+  ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+  ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') ov.remove(); });
+  return ov;
+}
+function aboutCloseButton(id) {
+  return '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'' + id + '\').remove()">✕</button>';
+}
+function openAppFeatures() {
+  var ov = aboutSubOverlay('appFeaturesOverlay');
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="afTitle" style="max-width:520px;text-align:start;max-height:86vh;overflow:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="afTitle">✨ What can this app do</div>' + aboutCloseButton('appFeaturesOverlay') + '</div>'
+    + '<div class="ask-body" style="text-align:start;margin-bottom:6px;">Your recipes in one place — shared with the people you cook with.</div>'
+    + appFeatureSections().map(function (s) {
+        return '<div class="af-sec"><div class="af-h"><span aria-hidden="true">' + s.icon + '</span> <span>' + escH(s.title) + '</span></div><ul class="af-list">'
+          + s.items.map(function (t) { return '<li>' + escH(t) + '</li>'; }).join('') + '</ul></div>';
+      }).join('')
+    + '</div>';
+  document.body.appendChild(ov);
+  return ov;
+}
+// (a function, not a var: I18N_EXTRA, far above, is built before a var here would be set)
+function contactPhrases() {
+  return ['✉️ Contact us', 'Questions, ideas, something that does not work — we read every message.',
+    '\u{1F4AC} Write us a note in the app', 'Add a screenshot if you like. The answer comes back here, in the app.',
+    '\u{1F4E8} Answers to my notes', '✉️ E-mail us', '\u{1F4CB} Copy our e-mail address', 'The address is copied.'];
+}
+function openContactUs() {
+  var to = String(APP_CONFIG.supportEmail || APP_CONFIG.ownerEmail || '');
+  var ov = aboutSubOverlay('contactOverlay');
+  var row = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:start;padding:11px 12px;margin-top:8px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--heading);font:inherit;font-size:14px;font-weight:600;cursor:pointer;';
+  var sub = 'font-size:12px;font-weight:400;color:var(--muted);';
+  var replies = document.getElementById('fbRepliesItem');
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="cuTitle" style="max-width:440px;text-align:start;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="cuTitle">✉️ Contact us</div>' + aboutCloseButton('contactOverlay') + '</div>'
+    + '<div class="ask-body" style="text-align:start;">Questions, ideas, something that does not work — we read every message.</div>'
+    + '<button type="button" id="cuNote" style="' + row + '"><span>\u{1F4AC} Write us a note in the app</span><span style="' + sub + '">Add a screenshot if you like. The answer comes back here, in the app.</span></button>'
+    + (replies && !replies.hidden ? '<button type="button" id="cuReplies" style="' + row + '"><span>\u{1F4E8} Answers to my notes</span></button>' : '')
+    + '<button type="button" id="cuMail" style="' + row + '"><span>✉️ E-mail us</span><span style="' + sub + '" data-no-i18n>' + escH(to) + '</span></button>'
+    + '<button type="button" id="cuCopy" style="' + row + '"><span>\u{1F4CB} Copy our e-mail address</span></button>'
+    + '</div>';
+  document.body.appendChild(ov);
+  // Each opens its own window: About and this one step aside first, so it is never behind them.
+  var go = function (fn) { return function () { ov.remove(); var a = document.getElementById('aboutOverlay'); if (a) a.remove(); fn(); }; };
+  ov.querySelector('#cuNote').onclick = go(function () { openFeedbackForm(); });
+  if (ov.querySelector('#cuReplies')) ov.querySelector('#cuReplies').onclick = go(function () { openFbReplies(); });
+  ov.querySelector('#cuMail').onclick = go(function () { sendFeedbackByEmail(); });
+  ov.querySelector('#cuCopy').onclick = function () {
+    try { navigator.clipboard.writeText(to).then(function () { toast('\u{1F4CB} The address is copied.'); }, function () { showServiceError(to); }); }
+    catch (e) { showServiceError(to); }
+  };
+  return ov;
+}
+window.appFeatureSections = appFeatureSections; window.appFeaturePhrases = appFeaturePhrases; window.openAppFeatures = openAppFeatures;
+window.openContactUs = openContactUs; window.contactPhrases = contactPhrases;
 // ─── ABOUT (v37.82) ──────────────────────────────────────────────────────────
 // Tony: under ?, an About: the version, "an indication whether it should be
 // upgraded to a higher version (and if possible an Update now button)", what
@@ -25606,10 +25737,14 @@ async function openAbout() {
     + (function(){ var e = String(APP_CONFIG.environment || 'live'); return e === 'live' ? '' : '<div style="font-size:13px;color:var(--muted);">' + (e === 'beta' ? 'Beta' : 'Test copy') + '</div>'; })()
     + '<div style="margin-top:10px;font-size:14px;">Version <b id="aboutVersion" data-no-i18n>' + escH(APP_VERSION) + '</b></div>'
     + '<div id="aboutUpdate" style="font-size:13px;color:var(--muted);margin-top:4px;">⏳ Checking for a newer version…</div>'
+    // v38.17 — Tony: "What can this app do" and "Contact us".
+    + '<button type="button" id="aboutFeatures" style="' + row + '" onclick="openAppFeatures()">\u2728 What can this app do</button>'
+    + '<button type="button" id="aboutContact" style="' + row + '" onclick="openContactUs()">\u2709\ufe0f Contact us</button>'
     + '<button type="button" id="aboutPrivacyPanel" style="' + row + '" onclick="showPrivacyPanel()">\u{1F512} What leaves this device</button>'
     + '<button type="button" id="aboutPrivacyDoc" style="' + row + '" onclick="openLegalDoc(\'privacy\')">\u{1F4DC} Privacy statement</button>'
     + '<button type="button" id="aboutTermsDoc" style="' + row + '" onclick="openLegalDoc(\'terms\')">⚖️ Terms of use and disclaimer</button>'
-    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;" data-no-i18n>© 2026 Tony Schvekher · <a href="mailto:tony.schvekher@gmail.com" style="color:var(--terracotta);">tony.schvekher@gmail.com</a></div>'
+    // v38.17 — Tony: "change the About to © 2026 My Kitchen Notes" (his name stays only where the law wants it: the privacy statement).
+    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;" data-no-i18n>© 2026 My Kitchen Notes · <a href="mailto:' + escA(String(APP_CONFIG.supportEmail || '')) + '" style="color:var(--terracotta);">' + escH(String(APP_CONFIG.supportEmail || '')) + '</a></div>'
     + '</div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
