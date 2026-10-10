@@ -11,7 +11,8 @@
   var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false,
             tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null,
             replies: {}, replying: null, replyDraft: '', replySending: false,
-            errors: null, errorsError: '', errFilter: 'open', useCopy: '' };   // v38.15
+            errors: null, errorsError: '', errFilter: 'open', useCopy: '',   // v38.15
+            picked: {} };   // v38.16 — the notes ticked for 📋 Copy reports
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
@@ -188,6 +189,31 @@
     S.notes = out; S.replies = replies; S.notesError = (!out.length && errs.length) ? errs.join('; ') : ''; S.notesPartial = errs.length > 0;
     return true;
   }
+  // v38.16 — the notes ticked, in the order shown (newest first), and all of each as text.
+  function pickedNotes() { return (S.notes || []).filter(function (n) { return S.picked[n.key]; }); }
+  function shownNotes() { return (S.notes || []).filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; }); }
+  function when(t) { var d = new Date(t || 0); return d.toLocaleString() + ' (UTC ' + d.toISOString().slice(0, 16).replace('T', ' ') + ')'; }
+  function reportText(n, i, total) {
+    var L = [];
+    L.push('=== Report ' + (i + 1) + ' of ' + total + ' — ' + (n.src === 'server' ? 'note #' + n.id : 'kept in this copy’s database') + ' (' + (n.copy || n.env || '?') + ') ===');
+    L.push('From: ' + (n.email || n.uid || 'unknown') + (n.name ? ' (' + n.name + ')' : '') + (n.household ? ' · Household: ' + n.household : '') + (n.hid ? ' [' + n.hid + ']' : ''));
+    L.push('When: ' + when(n.at) + ' · App ' + (n.version || '?') + ' · Copy: ' + (n.copy || n.env || '?') + ' · Language: ' + (n.lang || '?') + ' · Status: ' + (n.status || '?'));
+    if (n.where) L.push('Where in the app: ' + n.where);
+    L.push('Device: ' + (n.device || '?'));
+    if (n.shot) L.push('Screenshot: yes — attached to the note in the app (pictures are not copied as text)');
+    L.push('--- Note ---', String(n.text || '').trim() || '(empty)');
+    var reps = n.src === 'server' ? (S.replies[n.id] || []) : [];
+    if (reps.length) {
+      L.push('--- Answers sent to their app ---');
+      reps.forEach(function (x) { L.push('[' + when(x.at) + '] ' + String(x.text || '').trim() + (x.read_at ? '  (read ' + when(x.read_at) + ')' : '  (not read yet)')); });
+    }
+    L.push(n.log ? '--- What the app was doing (log, ' + Math.round(n.log.length / 1024) + ' KB) ---\n' + String(n.log).trim() : '--- No log was sent with this note ---');
+    return L.join('\n');
+  }
+  function reportsText(list) {
+    return 'Notes about My Kitchen Notes — ' + list.length + ' report' + (list.length === 1 ? '' : 's') + ', copied ' + when(Date.now()) + '\n\n'
+      + list.map(function (n, i) { return reportText(n, i, list.length); }).join('\n\n');
+  }
   function noteBy(key) { return (S.notes || []).filter(function (n) { return n.key === key; })[0]; }
   function newCount() { return (S.notes || []).filter(function (n) { return n.status === 'new'; }).length; }
   // v37.68 — the ⚙️ dot follows what is marked here.
@@ -198,9 +224,18 @@
       + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 🏠 My household → 👥 Family Access → Show rules).' : '') + '</div>';
     if (!S.notes) return '<div class="mg-empty">⏳ Reading the notes…</div>';
     var list = S.notes.filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; });
+    // v38.16 — Tony: "select several feedback reports and in one click on a "Copy Reports" button,
+    // will copy all relevant information, so I could paste it here … in one go".
+    var nPicked = pickedNotes().length;
     var filt = '<div class="mg-tools" style="margin-bottom:10px;">'
       + '<button type="button" class="mg-btn' + (S.noteFilter === 'open' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'open\')">Not done yet</button>'
-      + '<button type="button" class="mg-btn' + (S.noteFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'all\')">All (' + S.notes.length + ')</button></div>';
+      + '<button type="button" class="mg-btn' + (S.noteFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'all\')">All (' + S.notes.length + ')</button>'
+      + (list.length ? '<span class="mg-sep"></span>'
+        + '<button type="button" class="mg-btn" id="mgPickAll" onclick="mknManage.pickAll(true)">☑ Select all shown</button>'
+        + (nPicked ? '<button type="button" class="mg-btn" id="mgPickNone" onclick="mknManage.pickAll(false)">☐ Clear</button>' : '')
+        + '<button type="button" class="mg-btn mg-primary" id="mgCopyReports"' + (nPicked ? '' : ' disabled title="Tick the notes to copy first"')
+        + ' onclick="mknManage.copyReports()">📋 Copy reports' + (nPicked ? ' (' + nPicked + ')' : '') + '</button>' : '')
+      + '</div>';
     if (!list.length) return filt + '<div class="mg-empty">' + (S.notes.length ? 'Every note is done. 🎉' : 'No notes yet.') + '</div>';
     var tag = { new: '🆕 new', seen: '👀 seen', done: '✅ done' };
     return filt + list.map(function (n) {
@@ -209,7 +244,9 @@
       // v37.95 — the key carries a document's id (anyone signed in may choose one): as an
       // attribute it is escA'd, as a handler's argument a JS string (jsA).
       var k = escA(n.key), kj = jsA(n.key);
-      return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + '" id="mgNote-' + k + '">'
+      return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + (S.picked[n.key] ? ' mg-picked' : '') + '" id="mgNote-' + k + '">'
+        + '<label class="mg-pick"><input type="checkbox"' + (S.picked[n.key] ? ' checked' : '') + ' onchange="mknManage.pick(' + kj + ', this.checked)"'
+        + ' aria-label="Select this note for 📋 Copy reports"> Select</label>'
         + '<div class="mg-ptop"><div><b class="mg-email">' + esc(n.email || n.uid) + '</b> <span class="mg-muted">' + esc(n.household || '') + '</span>'
         + (n.copy ? ' <span class="mg-copy">' + esc(n.copy) + '</span>' : '')
         + '<div class="mg-muted">' + new Date(n.at || 0).toLocaleString() + ' · ' + esc(n.version || '') + ' · ' + esc(n.env || '') + ' · ' + esc(n.lang || '') + '</div></div>'
@@ -593,6 +630,10 @@
     + '.mg-log{max-height:260px;overflow:auto;font-size:11px;background:var(--note-bg);padding:8px;border-radius:6px;white-space:pre-wrap;}'
     + '.mg-device{font-size:11px;word-break:break-all;margin-top:4px;}'
     + '.mg-err{max-height:160px;font-size:12px;margin:8px 0 4px;}'
+    + '.mg-pick{float:inline-end;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;margin-inline-start:10px;user-select:none;}'
+    + '.mg-pick input{width:18px;height:18px;accent-color:var(--terracotta-fill);cursor:pointer;}'
+    + '.mg-card.mg-picked{outline:2px solid var(--terracotta-fill);outline-offset:-1px;}'
+    + '.mg-sep{width:1px;align-self:stretch;background:var(--border);margin:0 4px;}'
     + '.mg-use{display:inline-block;margin:2px 10px 2px 0;}.mg-use b{color:var(--heading);}'
     + '.mg-usemonth{margin:6px 0 10px;}'
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
@@ -689,6 +730,19 @@
     useCopy: function (c) { S.useCopy = c; render(); },
     _errors: loadErrors,
     noteFilter: function (f) { S.noteFilter = f; render(); },
+    // v38.16 — tick notes, then 📋 Copy reports: everything about each, as one text.
+    pick: function (key, on) { if (on) S.picked[key] = true; else delete S.picked[key]; render(); return pickedNotes().length; },
+    pickAll: function (on) { S.picked = {}; if (on) shownNotes().forEach(function (n) { S.picked[n.key] = true; }); render(); return pickedNotes().length; },
+    copyReports: function () {
+      var list = pickedNotes();
+      if (!list.length) { toast('Tick the notes to copy first.'); return 0; }
+      var text = reportsText(list), kb = Math.round(text.length / 1024);
+      var done = function () { toast('\u{1F4CB} ' + list.length + ' report' + (list.length === 1 ? '' : 's') + ' copied (' + kb + ' KB) \u2014 paste them into the chat', 7000); };
+      try { navigator.clipboard.writeText(text).then(done, function () { showServiceError('The reports could not be copied by themselves \u2014 select this text and copy it:\n\n' + text); }); }
+      catch (e) { showServiceError('The reports could not be copied by themselves \u2014 select this text and copy it:\n\n' + text); }
+      return list.length;
+    },
+    _reportsText: function (keys) { return reportsText((S.notes || []).filter(function (n) { return keys.indexOf(n.key) !== -1; })); },
     mark: async function (key, status) {
       var n = noteBy(key); if (!n) return false;
       try {

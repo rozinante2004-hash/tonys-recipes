@@ -836,7 +836,15 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
-  - **v38.15 + Worker v69 — before the beta (on `test`, waiting for Tony's yes).** Tony (10 Oct): "Do you
+  - **v38.16 — 📋 Copy reports (Feedback tab).** Tony: "select several feedback reports and in one click
+    on a "Copy Reports" button, will copy all relevant information, so I could paste it here, for you to
+    analyse, in one go". A tick box on each note (☑ Select all shown — only what the filter shows;
+    ☐ Clear); 📋 Copy reports (N) copies one text: per note — who (e-mail, name, household and its id),
+    when (local and UTC), app version, copy, language, status, where in the app, device, whether a
+    screenshot is attached (pictures are not copied), the note, the answers sent (and whether read), and
+    the WHOLE log. Toast says how many and how big. Test: feedback_copy_reports.
+  - **Released to the family app and the beta: v38.15 + Worker v69 (10 Oct 2026, Tony's yes, CI green on dc3147e; Pages: success).** Deploy the Worker: "live: v69, published: v69 — database and storage connected". Translate new phrases (push, by federation): 18 calls, +15 phrases in each of the 9 languages; Publish languages: success.
+  - **v38.15 + Worker v69 — before the beta.** Tony (10 Oct): "Do you
     believe the app is ready for starting the Beta testing? What else would you add/change?" — ready for a
     small invited beta; he chose all three additions ("Yes, please go ahead with 1–3"):
     - **1. Errors report themselves** (feature `insights`: beta + test ON, family OFF). `insightError(kind,

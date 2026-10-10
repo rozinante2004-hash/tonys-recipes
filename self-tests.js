@@ -2033,6 +2033,64 @@ window.SELF_TESTS = [
         if(window.mknManage) mknManage.close();
       }
     } },
+  { id:'feedback_copy_reports', group:'Sharing', name:'📋 Feedback: tick several notes, and 📋 Copy reports copies everything about each — who, when, version, device, the note, the answers and the whole log — as one text to paste (v38.16)',
+    test: async()=>{
+      if(!feedbackInboxHere()) return;          // the notes are read in the family app only
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, last:_fbLastNew, clip:navigator.clipboard };
+      var keptNew=null; try{ keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
+      var copied=null, toasts=[], at=Date.now()-3600e3;
+      try{
+        window.toast=function(m){ toasts.push(String(m)); }; window.showServiceError=function(m){ copied='ERROR '+m; };
+        window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{ writeText:function(t){ copied=String(t); return Promise.resolve(); } } });
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.op==='notes') return new Response(JSON.stringify({ notes:[
+              { id:5, project:'my-kitchen-notes-beta', uid:'uT', email:'tester@example.com', household:'Tess’s Kitchen', hid:'hT', text:'The import is slow', at:at, status:'new', env:'beta',
+                version:'v38.15', lang:'he', device:'Mozilla/5.0 (iPhone)', log:'10:01 save  Imported “Soup”\n10:02 error Could not read the page', shot:'data:image/png;base64,AAAA', where:'/#view' },
+              { id:6, project:'tonys-recipes-test', uid:'uU', email:'other@example.com', text:'Second note', at:at-1, status:'seen', env:'test', version:'v38.14', lang:'en', device:'Firefox' },
+              { id:7, project:'my-kitchen-notes-beta', uid:'uV', email:'done@example.com', text:'An old one', at:at-2, status:'done', env:'beta' } ],
+            replies:[ { id:1, note_id:5, text:'Looking at it', at:at+60e3, read_at:at+120e3 } ] }), { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 });
+        };
+        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback'); mknManage.noteFilter('open'); mknManage.pickAll(false);
+        var btn=document.getElementById('mgCopyReports');
+        if(!btn || !btn.disabled) throw new Error('📋 Copy reports is missing, or works with nothing ticked');
+        var boxes=document.querySelectorAll('#manageOverlay .mg-pick input');
+        if(boxes.length!==2) throw new Error('a tick box on each note shown (the done one is hidden): '+boxes.length);
+        // Tick two, by hand.
+        boxes[0].click(); document.querySelectorAll('#manageOverlay .mg-pick input')[1].click();
+        btn=document.getElementById('mgCopyReports');
+        if(btn.disabled || !/\(2\)/.test(btn.textContent)) throw new Error('the button does not count the ticked notes: '+btn.textContent);
+        if(!document.getElementById('mgNote-s5').classList.contains('mg-picked')) throw new Error('a ticked note does not look ticked');
+        btn.click(); await new Promise(function(r){ setTimeout(r, 30); });
+        var t=copied||'';
+        ['2 reports', 'Report 1 of 2', 'Report 2 of 2', 'tester@example.com', 'Tess’s Kitchen', 'v38.15', 'beta', 'he', 'Mozilla/5.0 (iPhone)', '/#view',
+         'The import is slow', 'Looking at it', 'read ', 'Could not read the page', 'Imported “Soup”', 'Screenshot: yes', 'other@example.com', 'Second note', 'No log was sent'].forEach(function(x){
+          if(t.indexOf(x)===-1) throw new Error('the copy lacks "'+x+'": '+t.slice(0,300)); });
+        if(t.indexOf('An old one')!==-1) throw new Error('copied a note that was not ticked');
+        if(t.indexOf('base64')!==-1) throw new Error('the screenshot was pasted as text');
+        if(!toasts.some(function(m){ return /2 reports copied/.test(m); })) throw new Error('no word that it was copied');
+        // Select all shown: only what the list shows; Clear empties it.
+        mknManage.noteFilter('all'); mknManage.pickAll(true);
+        if(!/\(3\)/.test(document.getElementById('mgCopyReports').textContent)) throw new Error('Select all shown, with All: '+document.getElementById('mgCopyReports').textContent);
+        mknManage.noteFilter('open'); mknManage.pickAll(true);
+        if(!/\(2\)/.test(document.getElementById('mgCopyReports').textContent)) throw new Error('Select all shown took a hidden note');
+        mknManage.pickAll(false);
+        if(!document.getElementById('mgCopyReports').disabled) throw new Error('☐ Clear');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        try{ Object.defineProperty(navigator, 'clipboard', { configurable:true, value:real.clip }); }catch(e){}
+        if(window.mknManage) { mknManage.pickAll(false); mknManage.close(); }
+        _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
+        feedbackKnown(null);
+      }
+    } },
   { id:'feedback_reply_in_app', group:'Sharing', name:'📲 Reply in app: Tony answers a note from the Feedback tab, the answer goes to the writer’s own app; the tab’s buttons press like the app’s own (v38.00)',
     test: async()=>{
       if(!feedbackInboxHere()) return;          // the notes are read in the family app only
