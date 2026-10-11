@@ -144,7 +144,16 @@ service cloud.firestore {
       return request.resource.data.get('code', null) == resource.data.get('code', null)
         || (resource.data.get('code', null) == null && codeFor(hid, request.resource.data.get('code', null)));
     }
-    function hhKeys() { return ['name', 'ownerUid', 'createdAt', 'code', 'appRequests', 'referredBy']; }
+    function hhKeys() { return ['name', 'ownerUid', 'createdAt', 'code', 'appRequests', 'referredBy', 'features']; }
+    // v38.22 — extras the app's owner switches on for ONE household where the copy
+    // has them off for everyone (the family's Gmail and WhatsApp in the community
+    // copy): `features` = { gmail?, whatsapp? }, true or false. Only he writes it.
+    function okFeatures() {
+      return request.resource.data.features is map
+        && request.resource.data.features.keys().hasOnly(['gmail', 'whatsapp'])
+        && request.resource.data.features.get('gmail', false) is bool
+        && request.resource.data.features.get('whatsapp', false) is bool;
+    }
     // v37.58 — the app's owner (the management app) reads the list of
     // households, their members, links and requests — never their recipes,
     // photos or chats. The APP_ADMINS placeholder, as for translations.
@@ -192,6 +201,7 @@ service cloud.firestore {
         && (foundingOpen() || appAdmin())                      // v37.96 — by invitation only, when closed
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly(hhKeys())
+        && !('features' in request.resource.data)               // v38.22 — never set by whoever founds it
         && (request.resource.data.get('code', null) == null || codeFor(hid, request.resource.data.code))
         && okAppRequests() && okReferredBy()
         && getAfter(memberPath(hid, request.auth.uid)).data.role == 'owner';
@@ -202,6 +212,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && codeKept(hid) && okAppRequests()
         && request.resource.data.get('referredBy', null) == resource.data.get('referredBy', null)
+        && request.resource.data.get('features', null) == resource.data.get('features', null)   // v38.22
         && ( (atLeast(hid, 'admin') && request.resource.data.ownerUid == resource.data.ownerUid)
           || (resource.data.ownerUid == request.auth.uid
               && getAfter(memberPath(hid, request.resource.data.ownerUid)).data.role == 'owner') );
@@ -210,6 +221,9 @@ service cloud.firestore {
       allow update: if appAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleting'])
         && request.resource.data.deleting == true;
+      allow update: if appAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features'])
+        && okFeatures();
 
       match /members/{uid} {
         allow read: if isMember(hid) || appAdmin();

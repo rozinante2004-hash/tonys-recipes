@@ -1,0 +1,112 @@
+name: Move the family into the community copy
+
+# v38.22 — Tony, 11 Oct 2026 (option B): the family app's households move into
+# the community copy (mykitchennotes.community), with their accounts, so testers
+# can join his live recipes. tools/move-family.mjs does the work; this job only
+# runs it, by hand:
+#
+#   survey  — reads both databases and says what a copy would do (counts only).
+#   copy    — into the TEST copy first (a rehearsal), then into the community
+#             copy; "mark" also marks the family households as moved, so the
+#             family app stops and points to the new address.
+#   remove  — takes a rehearsal out of the test copy again.
+#
+# Copying into the community copy needs the words "move the family" in
+# `confirm`; removing needs "remove". The log shows counts only (the repository
+# is public).
+#
+# Needs (Tony, once): for rules-publisher@recipes-f379d.iam.gserviceaccount.com
+# (FIREBASE_RULES_KEY) — on recipes-f379d "Cloud Datastore User" (it writes the
+# moved mark) and "Firebase Authentication Viewer"; on the target
+# "Cloud Datastore User" and "Firebase Authentication Admin".
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "survey, copy or remove"
+        required: true
+        default: survey
+        type: choice
+        options: [survey, copy, remove]
+      target:
+        description: "where to"
+        required: true
+        default: tonys-recipes-test
+        type: choice
+        options: [tonys-recipes-test, my-kitchen-notes-beta]
+      mark:
+        description: "copy: also mark the family's households as moved (move day only)"
+        required: false
+        default: false
+        type: boolean
+      i18n:
+        description: "copy: also the shared translations"
+        required: false
+        default: false
+        type: boolean
+      resume:
+        description: "copy: the same copy a second time (overwrites what the first one wrote)"
+        required: false
+        default: false
+        type: boolean
+      confirm:
+        description: "copy into my-kitchen-notes-beta: type  move the family   ·   remove: type  remove"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: move-family
+  cancel-in-progress: false
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Allowed?
+        env:
+          MODE: ${{ inputs.mode }}
+          TARGET: ${{ inputs.target }}
+          CONFIRM: ${{ inputs.confirm }}
+          MARK: ${{ inputs.mark }}
+        run: |
+          if [ -z "$FIREBASE_KEY" ]; then echo "::error::FIREBASE_RULES_KEY is missing"; exit 1; fi
+          if [ "$MODE" = "copy" ] && [ "$TARGET" = "my-kitchen-notes-beta" ] && [ "$CONFIRM" != "move the family" ]; then
+            echo "::error::copying into the community copy needs  move the family  in confirm"; exit 1; fi
+          if [ "$MODE" = "remove" ] && [ "$CONFIRM" != "remove" ]; then
+            echo "::error::removing needs  remove  in confirm"; exit 1; fi
+          if [ "$MARK" = "true" ] && [ "$TARGET" != "my-kitchen-notes-beta" ]; then
+            echo "::error::the family is marked as moved only when it moves into the community copy"; exit 1; fi
+
+      - name: Run
+        env:
+          MODE: ${{ inputs.mode }}
+          TARGET: ${{ inputs.target }}
+          MARK: ${{ inputs.mark }}
+          I18N: ${{ inputs.i18n }}
+          RESUME: ${{ inputs.resume }}
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund google-auth-library@9 >/dev/null
+          OWNER_EMAIL=$(node -e "const s=require('fs').readFileSync('index.html','utf8');const m=/ownerEmail:\s*'([^']+)'/.exec(s);process.stdout.write(m?m[1]:'')")
+          export OWNER_EMAIL
+          SITE=$(node -e "const e=require('./tools/environments.json');process.stdout.write(e.beta.siteOrigin+'/')")
+          ARGS="--from recipes-f379d --to $TARGET --mode $MODE"
+          [ "$MARK" = "true" ] && ARGS="$ARGS --mark-moved $SITE"
+          [ "$I18N" = "true" ] && ARGS="$ARGS --i18n"
+          [ "$RESUME" = "true" ] && ARGS="$ARGS --resume"
+          [ "$MODE" = "remove" ] && ARGS="$ARGS --confirm remove"
+          node tools/move-family.mjs $ARGS

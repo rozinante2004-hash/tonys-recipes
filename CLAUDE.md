@@ -836,6 +836,43 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.22 + Worker v72 — everything the family's move needs, ready but not yet run (11 Oct 2026).**
+    - **tools/move-family.mjs** (`--from recipes-f379d --to <project> --mode survey|copy|remove`): copies the
+      accounts with the SAME user ids (Identity Toolkit accounts:batchGet → accounts:batchCreate, Google identity
+      kept: providerId google.com + rawId, so a Google sign-in in the target finds the same user) and every
+      document of households/ (all of them, recursively), codes/, homes/, linkRequests/, linkTalk/, pending/,
+      pendingNotice/, invites/, users/<uid>/prefs/ (+ i18n/ with --i18n); NOT shared/, feedback/, config/. Then
+      batchGet reads every one back and compares field by field. Someone who already has an account in the target
+      under the same address keeps it: their places (ids in paths, in values, as map keys) go to that account, and
+      their own homes/ and prefs/ there win. Refuses an id taken by someone else, and households/identifiers
+      already there (unless --resume). `--mark-moved <url>` marks every family household `movedTo` FIRST and takes
+      the mark off if anything fails. `remove` (--confirm remove) takes a rehearsal away again (never i18n, never
+      an account that was there before). Prints counts only (public logs). Paths with ':' (pending/<hid>:<email>)
+      are encoded and never listed under (the emulator — and the API — read ':' as the method) — the same fix in
+      tools/backup-firestore.mjs. Rehearsed on the Firestore + Auth emulators: tests/move-family.test.mjs (35
+      checks; CI step "Family move (emulator)").
+    - **.github/workflows/move-family.yml** (by hand, from main): survey / copy / remove, target tonys-recipes-test
+      or my-kitchen-notes-beta; copying into the community copy needs `confirm` = "move the family"; mark only
+      with that target. Needs for rules-publisher@recipes-f379d: on recipes-f379d "Cloud Datastore User" (the mark)
+      + "Firebase Authentication Viewer"; on the target "Cloud Datastore User" + "Firebase Authentication Admin".
+    - **App:** a household with `movedTo` shows "Your kitchen has moved" over everything (`householdMovedNotice`;
+      nothing more happens in that copy). `APP_CONFIG.movedTo` ('' everywhere now): set in the FAMILY copy on move
+      day, every visit is forwarded (`appCopyMovedTo`: the path past sitePath, ?url=, #share-text kept). One
+      household's extras: `households/<hid>.features` {gmail?, whatsapp?} — only the app's owner writes it (rules
+      `okFeatures`, never at founding, members' updates keep it; 8 rules checks) — `featureOn` honours it for gmail
+      and whatsapp only; 📊 Households → details → "Extras for this household". The owner's 💬 Feedback inbox and
+      the all-copies list now in the community copy too (`feedbackInboxHere`, manage.js `allCopiesHere`: live or
+      beta). 📊 Households in the beta: "📦 Bring the family app's allowances and AI history here" → Worker v72
+      `meter-admin` `copy-from` {from}: ai_households (a household without its own allowance gets the old copy's —
+      the family's $10), ai_spend, hh_reports, usage_counts; INSERT OR IGNORE (twice is harmless; old rows stay).
+      Test `family_move`; Worker checks 7 more.
+    - **Move day (planned, with Tony):** (1) Tony deletes his beta account in the beta (⚙️ → 🗑 Delete my
+      account… — his test household goes with it); (2) survey, then a rehearsal copy into tonys-recipes-test,
+      check, remove; (3) copy into my-kitchen-notes-beta with mark + i18n; (4) a release that sets the family
+      copy's `movedTo` to https://mykitchennotes.community/ and `languageSource` to my-kitchen-notes-beta (the
+      translate job's service account needs "Cloud Datastore User" there); (5) in the community copy: 📦 Bring the
+      allowances, Extras → Gmail (and Gmail's OAuth client gets the new origin; the client ID is per device —
+      ⚙️ → 👑 → 📧 again); (6) family members sign in once there and re-add the icon / Share-menu shortcut.
   - **v38.21 — the community copy installs as the app itself (11 Oct 2026).** Tony: "1 yes" (a solid status bar;
     "My Kitchen Notes" with the normal icon), "2 delete it" (his beta test household, on move day), "3 yes" (the
     family moves BEFORE the testers are invited, next week), "4 yes" (build admin protections 4–7; his second

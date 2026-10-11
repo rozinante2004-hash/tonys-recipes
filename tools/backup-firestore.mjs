@@ -55,11 +55,14 @@ async function call(url, init) {
     throw new Error(url.replace(BASE, '') + ': HTTP ' + r.status + ' ' + t.slice(0, 200));
   }
 }
+// v38.22 — each part of a path encoded in the address: a kept place's id
+// (pending/<hid>:<email>) holds ':' and '@', and ':' there reads as a method.
+const enc = rel => rel.split('/').map(encodeURIComponent).join('/');
 // The collections under the root ('' ) or under one document.
 async function collectionIds(docPath) {
   const ids = []; let pageToken;
   do {
-    const d = await call(BASE + (docPath ? '/' + docPath : '') + ':listCollectionIds', { method: 'POST', body: JSON.stringify({ pageSize: 300, pageToken }) });
+    const d = await call(BASE + (docPath ? '/' + enc(docPath) : '') + ':listCollectionIds', { method: 'POST', body: JSON.stringify({ pageSize: 300, pageToken }) });
     (d.collectionIds || []).forEach(x => ids.push(x)); pageToken = d.nextPageToken;
   } while (pageToken);
   return ids;
@@ -71,11 +74,14 @@ async function walk(colPath) {
   let pageToken;
   do {
     const q = '?pageSize=300&showMissing=true' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
-    const d = await call(BASE + '/' + colPath + q);
+    const d = await call(BASE + '/' + enc(colPath) + q);
     for (const doc of d.documents || []) {
       const rel = doc.name.slice(doc.name.indexOf('/documents/') + '/documents/'.length);
       if (doc.fields || doc.createTime) docs.push({ path: rel, fields: doc.fields || {}, createTime: doc.createTime, updateTime: doc.updateTime });
-      for (const sub of await collectionIds(rel)) await walk(rel + '/' + sub);
+      // (an id with ':' — a place kept or a request by e-mail — never has sub-collections, and
+      // listing under it is refused: the ':' reads as the method's own)
+      if (rel.split('/').pop().indexOf(':') === -1)
+        for (const sub of await collectionIds(rel)) await walk(rel + '/' + sub);
     }
     pageToken = d.nextPageToken;
   } while (pageToken);

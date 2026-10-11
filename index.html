@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.21 -->
+<!-- Tony's Recipes Collection v38.22 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,6 +143,9 @@
     // there is sent on to siteOrigin, keeping the path, ?url= and #share-text.
     // The beta's are in tools/environments.json; the family's copy has none.
     oldOrigins:          Object.freeze([]),
+    // v38.22 — this whole copy moved (Tony, 11 Oct 2026: the family into the
+    // community copy). Empty until move day; then every visit is sent there.
+    movedTo:             '',
     testCopy: Object.freeze({
       siteUrl:           'https://tonys-recipes-test.pages.dev/',
       pagesProject:      'tonys-recipes-test',
@@ -214,6 +217,11 @@
   window.featureOn = function (name) {
     var o = window._featureOverride;
     if (o && Object.prototype.hasOwnProperty.call(o, name)) return !!o[name];
+    // v38.22 — the app's owner may switch one on for ONE household (📊 Households →
+    // Extras), where the copy has it off for everyone else: the family's Gmail
+    // and WhatsApp, once the family lives in the community copy.
+    var hf = window._hhFeatures;
+    if (hf && (name === 'gmail' || name === 'whatsapp') && hf[name] === true) return true;
     return !!(window.APP_CONFIG.features && window.APP_CONFIG.features[name] === true);
   };
   // v36.73 — which copy this is, in words, for the top of every report, so a
@@ -243,8 +251,22 @@
       return String(site).replace(/\/$/, '') + u.pathname + u.search + u.hash;
     } catch (e) { return ''; }
   };
+  // v38.22 — the WHOLE copy moved (the family app into the community copy, Tony's
+  // option B): `movedTo` = the new address. Everything that comes here is sent on —
+  // the path past this copy's own (sitePath), a shared link (?url=), #share-text.
+  window.appCopyMovedTo = function (href, movedTo, sitePath) {
+    try {
+      if (!movedTo || !/^https:\/\/[a-z0-9.-]+\//i.test(movedTo)) return '';
+      var u = new URL(href), base = String(sitePath || '/');
+      if (u.origin === new URL(movedTo).origin) return '';
+      var rest = u.pathname.indexOf(base) === 0 ? u.pathname.slice(base.length) : u.pathname.replace(/^\//, '');
+      if (/^(index\.html)?$/.test(rest)) rest = '';
+      return movedTo.replace(/\/?$/, '/') + rest + u.search + u.hash;
+    } catch (e) { return ''; }
+  };
   (function () {
-    var to = window.appMovedTo(location.href, window.APP_CONFIG.oldOrigins, window.APP_CONFIG.siteOrigin);
+    var to = window.appMovedTo(location.href, window.APP_CONFIG.oldOrigins, window.APP_CONFIG.siteOrigin)
+          || window.appCopyMovedTo(location.href, window.APP_CONFIG.movedTo, window.APP_CONFIG.sitePath);
     if (to) { window._appMoving = true; location.replace(to); }
   })();
   // What a tap on a switched-off feature says — once, plainly, and nothing else.
@@ -5214,11 +5236,39 @@ async function householdEnter(user) {
     return false;
   }
 }
+// v38.22 — "your kitchen has moved": the whole screen, no way round it (anything
+// saved here now would stay behind), one button to the new address.
+function householdMovedNotice(to) {
+  var url = /^https:\/\/[a-z0-9.-]+\//i.test(to) ? to : '';
+  if (document.getElementById('movedOverlay')) return;
+  var ov = document.createElement('div');
+  ov.id = 'movedOverlay'; ov.setAttribute('role', 'alertdialog'); ov.setAttribute('aria-modal', 'true');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:var(--cream,#FAF7F2);display:flex;align-items:center;justify-content:center;'
+    + 'padding:24px;padding-top:max(24px, var(--top-safe, 0px));text-align:center;font-family:\'DM Sans\',\'Heebo\',sans-serif;';
+  var host = url ? new URL(url).host : '';
+  ov.innerHTML = '<div style="max-width:420px;">'
+    + '<div style="font-size:56px;line-height:1;">\u{1F3E0}</div>'
+    + '<h2 style="font-family:\'Playfair Display\',\'Frank Ruhl Libre\',serif;color:var(--heading,#5C3D2E);margin:14px 0 10px;">Your kitchen has moved</h2>'
+    + '<p style="color:var(--ink,#1C1A18);line-height:1.55;margin:0 0 8px;">Your household\u2019s recipes, photos and everyone in it now live at <b dir="ltr">' + escH(host || 'the new address') + '</b>.</p>'
+    + '<p style="color:var(--muted,#6F6A60);line-height:1.55;margin:0 0 20px;">Open it there and sign in with the same Google account \u2014 everything is waiting for you. '
+    + 'Then add it to your home screen again, and remove this one.</p>'
+    + (url ? '<a id="movedGo" href="' + escA(url) + '" style="display:inline-block;background:var(--terracotta-fill,#C1440E);color:#fff;text-decoration:none;'
+      + 'padding:14px 22px;border-radius:12px;font-weight:600;font-size:16px;">Open My Kitchen Notes</a>' : '')
+    + '</div>';
+  document.body.appendChild(ov);
+  syncLog('system', 'This household has moved to another copy of the app', host);
+}
+window.householdMovedNotice = householdMovedNotice;
 async function householdUse(hid, role) {
   _cloudHid = hid;
   try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
   var snap = await hhRef(hid).get();
   var h = snap.exists ? (snap.data() || {}) : {};
+  // v38.22 — the family moved into the community copy: this household was copied
+  // there and marked here. Nothing more happens in this copy; the person is sent on.
+  if (h.movedTo && typeof householdMovedNotice === 'function') { householdMovedNotice(String(h.movedTo)); return; }
+  window._hhFeatures = (h.features && typeof h.features === 'object') ? h.features : null;   // v38.22
+  if (typeof applyFeatureFlags === 'function') applyFeatureFlags();
   _household = { hid: hid, role: role, name: h.name || '', ownerUid: h.ownerUid || '',
                  code: h.code || '', appRequests: h.appRequests !== false,   // v37.49
                  createdAt: h.createdAt || 0, referredBy: h.referredBy || '' };   // v37.71
@@ -6294,7 +6344,9 @@ var _fbNewTold = false;
 // should never go". The inbox is read in the FAMILY app only: its 💬 Feedback
 // tab, its dot and its "new notes" word. Every copy (the owner's app) moves
 // notes left in its own database into the inbox (`feedbackMoveToInbox`).
-function feedbackInboxHere() { return String((window.APP_CONFIG && APP_CONFIG.environment) || 'live') === 'live'; }
+// v38.22 — …and in the community copy, where the family (and its owner) is moving:
+// the inbox is the Worker's, the same from either. Never in the test copy.
+function feedbackInboxHere() { var e = String((window.APP_CONFIG && APP_CONFIG.environment) || 'live'); return e === 'live' || e === 'beta'; }
 async function feedbackTellOwner() {
   if (_fbNewTold || _selfTestRunning || typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return 0;
   _fbNewTold = true;
@@ -7085,7 +7137,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.21';
+var APP_VERSION = 'v38.22';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9922,7 +9974,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.21</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.22</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10635,7 +10687,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.21</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.22</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

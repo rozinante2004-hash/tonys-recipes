@@ -1,0 +1,319 @@
+/**
+ * v38.22 — THE FAMILY MOVES INTO THE COMMUNITY COPY. Tony, 11 Oct 2026, option B:
+ * "testers should be able to join my live and synced set of recipes" — so the
+ * family app's households (recipes-f379d) are copied into the community copy's
+ * database (my-kitchen-notes-beta, mykitchennotes.community), with the accounts
+ * of the people in them, so each person signs in there with the same Google
+ * account and lands in the same household, with the same identifier.
+ *
+ *     FIREBASE_KEY='<service account JSON>' node tools/move-family.mjs \
+ *       --from recipes-f379d --to my-kitchen-notes-beta --mode survey|copy|remove [options]
+ *
+ *   survey  reads both projects and says what a copy would do. Changes nothing.
+ *   copy    copies the accounts (same user ids, so Google sign-in finds them)
+ *           and every document that belongs to the households, then reads each
+ *           one back and compares it field by field. --mark-moved <address> also
+ *           marks every family household `movedTo` FIRST (the family app then
+ *           stops and sends people to the new address) — and takes the mark off
+ *           again if anything fails.
+ *   remove  takes a copy away again (a rehearsal in the test copy): the copied
+ *           documents and the accounts it created. Needs --confirm remove.
+ *
+ * What moves: households (and everything under them), their identifiers
+ * (codes/), homes/, linkRequests/, linkTalk/, places kept (pending/,
+ * pendingNotice/), invitation links (invites/) and each person's own settings
+ * (users/<uid>/prefs/). With --i18n also the shared translations (i18n/).
+ * Not: the old pre-household collection (shared/), notes (feedback/ — the
+ * Worker's inbox has them) or the family copy's own settings (config/).
+ *
+ * The FAMILY's database is never changed (beyond the movedTo mark). Someone
+ * who already has an account in the target under the same e-mail keeps it:
+ * their places in the copied documents are given to that account instead.
+ *
+ * The repository is public and so are its job logs: this prints counts only —
+ * never a name, an address, an id or a recipe.
+ *
+ * The service account needs: on the source "Cloud Datastore Viewer" and
+ * "Firebase Authentication Viewer"; on the target "Cloud Datastore User" and
+ * "Firebase Authentication Admin". Checked against the Firebase emulators
+ * (FIRESTORE_BASE / IDENTITY_BASE, FIREBASE_KEY=stand-in).
+ */
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+
+const arg = (name, dflt) => { const i = process.argv.indexOf('--' + name); return i > -1 ? process.argv[i + 1] : dflt; };
+const has = name => process.argv.indexOf('--' + name) > -1;
+const FROM = arg('from', ''), TO = arg('to', ''), MODE = arg('mode', 'survey');
+const MARK = arg('mark-moved', ''), WITH_I18N = has('i18n'), RESUME = has('resume');
+const OWNER = String(process.env.OWNER_EMAIL || '').toLowerCase();
+if (!/^[a-z0-9-]{4,40}$/.test(FROM) || !/^[a-z0-9-]{4,40}$/.test(TO) || FROM === TO) { console.error('usage: --from <project> --to <project> --mode survey|copy|remove'); process.exit(2); }
+if (['survey', 'copy', 'remove'].indexOf(MODE) === -1) { console.error('--mode survey, copy or remove'); process.exit(2); }
+if (MODE === 'remove' && arg('confirm', '') !== 'remove') { console.error('remove takes documents and accounts away from ' + TO + ': add --confirm remove'); process.exit(2); }
+if (MARK && !/^https:\/\/[a-z0-9.-]+\/[^\s"']*$/.test(MARK)) { console.error('--mark-moved wants the new address, https://…/'); process.exit(2); }
+
+const FS = p => (process.env.FIRESTORE_BASE || 'https://firestore.googleapis.com/v1/') + 'projects/' + p + '/databases/(default)/documents';
+const IT = p => (process.env.IDENTITY_BASE || 'https://identitytoolkit.googleapis.com/') + 'v1/projects/' + p;
+const docName = (p, rel) => 'projects/' + p + '/databases/(default)/documents/' + rel;
+// In an address each part of a path is encoded: a kept place's id holds ':' and '@'.
+const enc = rel => rel.split('/').map(encodeURIComponent).join('/');
+
+let H = null, calls = 0;
+async function headers() {
+  const key = process.env.FIREBASE_KEY || '';
+  if ((process.env.FIRESTORE_BASE || process.env.IDENTITY_BASE) && key === 'stand-in') return { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
+  let credentials = null; try { credentials = JSON.parse(key.trim()); } catch (e) {}
+  if (!credentials || credentials.type !== 'service_account') throw new Error('FIREBASE_KEY is not a service account key');
+  const { GoogleAuth } = require('google-auth-library');
+  const client = await new GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getClient();
+  const t = await client.getAccessToken();
+  return { Authorization: 'Bearer ' + (t.token || t), 'Content-Type': 'application/json' };
+}
+const ROLE_HINT = {
+  read: 'needs "Cloud Datastore Viewer" (or User) and "Firebase Authentication Viewer" there',
+  write: 'needs "Cloud Datastore User" and "Firebase Authentication Admin" there'
+};
+async function call(url, init, project, need) {
+  for (let attempt = 1; ; attempt++) {
+    calls++;
+    const r = await fetch(url, Object.assign({ headers: H }, init || {}));
+    if (r.ok) { const t = await r.text(); return t ? JSON.parse(t) : {}; }
+    const t = await r.text();
+    if ((r.status === 429 || r.status >= 500) && attempt < 6) { await new Promise(s => setTimeout(s, 1500 * attempt)); continue; }
+    if (r.status === 403) throw new Error('the service account was refused by ' + project + ' (403) — it ' + ROLE_HINT[need || 'read']);
+    if (r.status === 404 && init && init.allow404) return null;
+    // (the answer's words only — never a document's path or an address)
+    let why = ''; try { why = String(JSON.parse(t).error.message || ''); } catch (e) { why = t; }
+    const what = (/:(listCollectionIds|commit|batchGet|batchCreate|batchDelete)\b/.exec(url) || [, (init && init.method) || 'GET'])[1];
+    throw new Error(project + ': HTTP ' + r.status + ' (' + what + ') — ' + why.replace(/\S*@\S*/g, '…').replace(/projects\/\S+/g, '…').slice(0, 200));
+  }
+}
+
+// ── Documents ────────────────────────────────────────────────────────────────
+async function collectionIds(p, docPath) {
+  const ids = []; let pageToken;
+  do {
+    const d = await call(FS(p) + (docPath ? '/' + enc(docPath) : '') + ':listCollectionIds', { method: 'POST', body: JSON.stringify({ pageSize: 300, pageToken }) }, p);
+    (d.collectionIds || []).forEach(x => ids.push(x)); pageToken = d.nextPageToken;
+  } while (pageToken);
+  return ids;
+}
+// Every document under one collection (sub-collections included).
+async function walk(p, colPath, out, keep) {
+  let pageToken;
+  do {
+    const q = '?pageSize=300&showMissing=true' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const d = await call(FS(p) + '/' + enc(colPath) + q, null, p);
+    for (const doc of d.documents || []) {
+      const rel = doc.name.slice(doc.name.indexOf('/documents/') + '/documents/'.length);
+      if ((doc.fields || doc.createTime) && (!keep || keep(rel))) out.push({ path: rel, fields: doc.fields || {} });
+      // (an id with ':' — a place kept or a request by e-mail — never has sub-collections, and
+      // listing under it is refused: the ':' reads as the method's own)
+      if (rel.split('/').pop().indexOf(':') === -1)
+        for (const sub of await collectionIds(p, rel)) await walk(p, rel + '/' + sub, out, keep);
+    }
+    pageToken = d.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+const MOVED = ['households', 'codes', 'homes', 'linkRequests', 'linkTalk', 'pending', 'pendingNotice', 'invites', 'users'];
+async function sourceDocs() {
+  const all = [];
+  const top = await collectionIds(FROM, '');
+  for (const c of MOVED.concat(WITH_I18N ? ['i18n'] : [])) {
+    if (top.indexOf(c) === -1) continue;
+    // users/<uid>/… — only the person's own settings (prefs/), never older leftovers.
+    await walk(FROM, c, all, c === 'users' ? rel => /^users\/[^/]+\/prefs\/[^/]+$/.test(rel) : null);
+  }
+  return { docs: all, top };
+}
+
+// ── Accounts ─────────────────────────────────────────────────────────────────
+async function accounts(p) {
+  const out = []; let nextPageToken;
+  do {
+    const d = await call(IT(p) + '/accounts:batchGet?maxResults=1000' + (nextPageToken ? '&nextPageToken=' + encodeURIComponent(nextPageToken) : ''), null, p);
+    (d.users || []).forEach(u => out.push(u)); nextPageToken = d.nextPageToken;
+  } while (nextPageToken);
+  return out;
+}
+function importRecord(u) {
+  const r = { localId: u.localId };
+  ['email', 'emailVerified', 'displayName', 'photoUrl', 'disabled', 'createdAt', 'lastLoginAt', 'customAttributes'].forEach(k => { if (u[k] !== undefined) r[k] = u[k]; });
+  r.providerUserInfo = (u.providerUserInfo || []).filter(x => x.providerId && x.providerId !== 'password')
+    .map(x => { const o = { providerId: x.providerId, rawId: x.rawId || x.federatedId }; ['email', 'displayName', 'photoUrl'].forEach(k => { if (x[k]) o[k] = x[k]; }); return o; });
+  return r;
+}
+
+// ── Someone already in the target under the same address keeps that account ──
+let uidMap = {};
+function mapUid(s) { return Object.prototype.hasOwnProperty.call(uidMap, s) ? uidMap[s] : s; }
+function mapPath(rel) { return rel.split('/').map(mapUid).join('/'); }
+function mapValue(v) {
+  if (!v || typeof v !== 'object') return v;
+  if ('stringValue' in v) return { stringValue: mapUid(v.stringValue) };
+  if ('arrayValue' in v) return { arrayValue: { values: (v.arrayValue.values || []).map(mapValue) } };
+  if ('mapValue' in v) return { mapValue: { fields: mapFields(v.mapValue.fields || {}) } };
+  return v;
+}
+function mapFields(f) { const o = {}; Object.keys(f).forEach(k => { o[mapUid(k)] = mapValue(f[k]); }); return o; }
+function strip(rel, fields) {
+  if (!/^households\/[^/]+$/.test(rel)) return fields;
+  const o = Object.assign({}, fields); delete o.movedTo; delete o.movedAt; return o;   // the mark stays behind
+}
+const same = (a, b) => JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
+function sortKeys(v) {
+  if (Array.isArray(v)) return v.map(sortKeys);
+  if (v && typeof v === 'object') { const o = {}; Object.keys(v).sort().forEach(k => { o[k] = sortKeys(v[k]); }); return o; }
+  return v;
+}
+
+// ── Writing ──────────────────────────────────────────────────────────────────
+async function commit(p, writes) {
+  let batch = [], size = 0;
+  async function flush() {
+    if (!batch.length) return;
+    await call(FS(p) + ':commit', { method: 'POST', body: JSON.stringify({ writes: batch }) }, p, 'write');
+    batch = []; size = 0;
+  }
+  for (const w of writes) {
+    const s = JSON.stringify(w).length;
+    if (batch.length && (batch.length >= 400 || size + s > 8 * 1024 * 1024)) await flush();
+    batch.push(w); size += s;
+  }
+  await flush();
+}
+async function batchGet(p, rels) {
+  const found = {};
+  for (let i = 0; i < rels.length; i += 100) {
+    const d = await call(FS(p) + ':batchGet', { method: 'POST', body: JSON.stringify({ documents: rels.slice(i, i + 100).map(r => docName(p, r)) }) }, p);
+    (Array.isArray(d) ? d : [d]).forEach(x => {
+      if (x && x.found) found[x.found.name.slice(x.found.name.indexOf('/documents/') + '/documents/'.length)] = x.found.fields || {};
+    });
+  }
+  return found;
+}
+// The documents of one collection only (no sub-collections).
+async function shallow(p, colPath) {
+  const out = []; let pageToken;
+  do {
+    const d = await call(FS(p) + '/' + enc(colPath) + '?pageSize=300' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''), null, p);
+    (d.documents || []).forEach(doc => out.push({ path: doc.name.slice(doc.name.indexOf('/documents/') + '/documents/'.length), fields: doc.fields || {} }));
+    pageToken = d.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+async function mark(on) {
+  const hh = await shallow(FROM, 'households');
+  for (const h of hh) {
+    const mask = '?updateMask.fieldPaths=movedTo&updateMask.fieldPaths=movedAt';
+    const fields = on ? { movedTo: { stringValue: MARK }, movedAt: { integerValue: String(Date.now()) } } : {};
+    await call(FS(FROM) + '/' + enc(h.path) + mask, { method: 'PATCH', body: JSON.stringify({ fields }) }, FROM, 'write');
+  }
+  return hh.length;
+}
+const count = list => { const per = {}; list.forEach(d => { const t = d.path.split('/')[0]; per[t] = (per[t] || 0) + 1; }); return per; };
+const table = per => Object.keys(per).sort().map(k => k + ' ' + per[k]).join(', ') || 'nothing';
+
+async function main() {
+  H = await headers();
+  const started = Date.now();
+  console.log('== ' + MODE + ': ' + FROM + ' → ' + TO);
+
+  // Accounts on both sides.
+  const fromUsers = await accounts(FROM), toUsers = await accounts(TO);
+  const toById = {}, toByEmail = {};
+  toUsers.forEach(u => { toById[u.localId] = u; if (u.email) toByEmail[u.email.toLowerCase()] = u; });
+  uidMap = {};
+  const create = [], kept = [], clash = [];
+  let password = 0, ownerKept = false;
+  for (const u of fromUsers) {
+    const em = String(u.email || '').toLowerCase();
+    const there = em && toByEmail[em];
+    if (there && there.localId !== u.localId) { uidMap[u.localId] = there.localId; kept.push(u); if (em === OWNER) ownerKept = true; continue; }
+    if (toById[u.localId]) {
+      if (String(toById[u.localId].email || '').toLowerCase() === em) { kept.push(u); continue; }   // already copied (a second run)
+      clash.push(u); continue;                                                                       // the same id, someone else
+    }
+    if (u.passwordHash) password++;
+    create.push(u);
+  }
+  console.log('accounts: ' + fromUsers.length + ' in ' + FROM + ', ' + toUsers.length + ' in ' + TO
+    + ' — ' + create.length + ' to create (same ids), ' + kept.length + ' already there'
+    + (Object.keys(uidMap).length ? ' (' + Object.keys(uidMap).length + ' under another id: their places go to that account'
+      + (OWNER ? '; the owner\'s address ' + (ownerKept ? 'IS one of them' : 'is not') : '') + ')' : '')
+    + (clash.length ? ', ' + clash.length + ' CLASH (an id taken by someone else)' : '')
+    + (password ? ', ' + password + ' sign in with a password (they will need "Forgot password" once)' : ''));
+
+  // Documents.
+  const src = await sourceDocs();
+  const docs = src.docs.map(d => ({ path: mapPath(d.path), fields: strip(d.path, mapFields(d.fields)) }));
+  const hids = docs.filter(d => /^households\/[^/]+$/.test(d.path)).map(d => d.path.split('/')[1]);
+  const codes = docs.filter(d => /^codes\/[^/]+$/.test(d.path)).map(d => d.path);
+  console.log('documents in ' + FROM + ': ' + docs.length + ' (' + table(count(docs)) + '); households ' + hids.length
+    + '; not moved: ' + (src.top.filter(c => MOVED.indexOf(c) === -1 && !(WITH_I18N && c === 'i18n')).join(', ') || 'nothing'));
+
+  // In the way? A household or an identifier already there (a second run says --resume).
+  const there = await batchGet(TO, hids.map(h => 'households/' + h).concat(codes));
+  const inTheWay = Object.keys(there).length;
+  // Per-person documents of someone who already has an account there: theirs win.
+  const personal = docs.filter(d => /^(homes|users)\//.test(d.path) && Object.values(uidMap).indexOf(d.path.split('/')[1]) > -1).map(d => d.path);
+  const personalThere = personal.length ? Object.keys(await batchGet(TO, personal)) : [];
+  console.log('already in ' + TO + ': ' + inTheWay + ' of the households and identifiers'
+    + (personalThere.length ? '; ' + personalThere.length + ' personal settings of people already there (kept as they are)' : ''));
+
+  if (MODE === 'survey') { console.log('survey only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
+
+  if (MODE === 'remove') {
+    // Everything the copy wrote — the shared translations never; and of the
+    // personal settings of someone who already had an account there, only
+    // those that are still exactly what the copy put there.
+    const now = personal.length ? await batchGet(TO, personal) : {};
+    const own = docs.filter(d => !/^i18n\//.test(d.path)
+      && (personal.indexOf(d.path) === -1 || (now[d.path] && same(now[d.path], d.fields))));
+    await commit(TO, own.map(d => ({ delete: docName(TO, d.path) })));
+    // Accounts this tool made: the same ids, created by the copy (never someone who had one before).
+    const made = fromUsers.filter(u => toById[u.localId] && String(toById[u.localId].email || '').toLowerCase() === String(u.email || '').toLowerCase()).map(u => u.localId);
+    for (let i = 0; i < made.length; i += 1000)
+      await call(IT(TO) + '/accounts:batchDelete', { method: 'POST', body: JSON.stringify({ localIds: made.slice(i, i + 1000), force: true }) }, TO, 'write');
+    const left = await batchGet(TO, own.map(d => d.path));
+    console.log('removed from ' + TO + ': ' + own.length + ' documents, ' + made.length + ' accounts'
+      + ' — ' + Object.keys(left).length + ' still there');
+    if (Object.keys(left).length) throw new Error(Object.keys(left).length + ' documents could not be removed');
+    return;
+  }
+
+  // copy
+  const writing = docs.filter(d => personalThere.indexOf(d.path) === -1);
+  if (clash.length) throw new Error(clash.length + ' account id(s) in ' + TO + ' belong to someone else — nothing was copied');
+  if (inTheWay && !RESUME) throw new Error(inTheWay + ' of the households or identifiers are already in ' + TO + ' — nothing was copied (a second run of the same copy: --resume)');
+  let marked = 0;
+  try {
+    if (MARK) { marked = await mark(true); console.log('marked ' + marked + ' family household(s) as moved — the family app stops and points to the new address'); }
+    if (process.env.MOVE_TEST_FAIL === 'after-mark') throw new Error('a failure on purpose (the tests)');
+    // Accounts first: a document naming someone who cannot sign in is no use.
+    for (let i = 0; i < create.length; i += 500) {
+      const users = create.slice(i, i + 500).map(importRecord);
+      const r = await call(IT(TO) + '/accounts:batchCreate', { method: 'POST', body: JSON.stringify({ users }) }, TO, 'write');
+      const errs = (r && r.error) || [];
+      if (errs.length) throw new Error(errs.length + ' account(s) could not be created: ' + errs.slice(0, 3).map(e => String(e.message).replace(/\S+@\S+/g, '…')).join('; '));
+    }
+    const afterUsers = await accounts(TO), afterIds = {};
+    afterUsers.forEach(u => { afterIds[u.localId] = true; });
+    const missingUsers = create.filter(u => !afterIds[u.localId]).length;
+    if (missingUsers) throw new Error(missingUsers + ' account(s) are not in ' + TO + ' after the copy');
+    console.log('accounts created: ' + create.length);
+
+    await commit(TO, writing.map(d => ({ update: { name: docName(TO, d.path), fields: d.fields } })));
+    // Read every one back and compare.
+    const back = await batchGet(TO, writing.map(d => d.path));
+    const wrong = writing.filter(d => !back[d.path] || !same(back[d.path], d.fields));
+    console.log('documents copied: ' + writing.length + ' (' + table(count(writing)) + ') — read back: ' + Object.keys(back).length + ', different: ' + wrong.length);
+    if (wrong.length) throw new Error(wrong.length + ' document(s) did not read back the same (' + table(count(wrong)) + ')');
+  } catch (e) {
+    if (marked) { try { await mark(false); console.log('the moved mark was taken off again — the family app works as before'); } catch (e2) { console.log('::error::could not take the moved mark off: ' + e2.message); } }
+    throw e;
+  }
+  console.log('done in ' + Math.round((Date.now() - started) / 1000) + ' s, ' + calls + ' requests');
+}
+
+main().catch(e => { console.log('::error::' + ((e && e.message) || e)); process.exit(1); });

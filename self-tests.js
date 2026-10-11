@@ -1973,7 +1973,10 @@ window.SELF_TESTS = [
       if(!feedbackInboxHere()) return;          // read in the family app only
       var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, ask:window.askConfirm, copy:window.fbProbeCopy };
       var sent=[], copied='', month=new Date().toISOString().slice(0,7);
-      var errors=[ { id:7, project:'my-kitchen-notes-beta', uid:'uB', email:'beta@example.com', hid:'hB', kind:'error', message:'Cannot read properties of null', place:'index.html:12',
+      // v38.22 — the households shown come from ANOTHER copy (this page reads its own copy's from the database):
+      // the beta's in the family app, the test copy's in the community copy, which has the owner's page too now.
+      var OTHER=APP_CONFIG.firebase.projectId==='my-kitchen-notes-beta' ? 'tonys-recipes-test' : 'my-kitchen-notes-beta';
+      var errors=[ { id:7, project:OTHER, uid:'uB', email:'beta@example.com', hid:'hB', kind:'error', message:'Cannot read properties of null', place:'index.html:12',
                      screen:'viewOverlay', version:'v38.15', env:'beta', device:'UA', lang:'he', first_at:Date.now()-864e5, last_at:Date.now(), n:4, status:'new' },
                    { id:8, project:'tonys-recipes-test', uid:'uT', email:'test@example.com', hid:'', kind:'service', message:'Old one', place:'', screen:'main', version:'v38.14',
                      env:'test', device:'UA', lang:'en', first_at:Date.now()-2*864e5, last_at:Date.now()-864e5, n:1, status:'done' } ];
@@ -1991,13 +1994,13 @@ window.SELF_TESTS = [
           if(b.op==='errors') return new Response(JSON.stringify({ errors:errors.map(function(x){ return Object.assign({}, x); }) }), { status:200 });
           if(b.op==='error-status' || b.op==='error-delete') return new Response('{"ok":true}', { status:200 });
           if(b.op==='notes') return new Response('{"notes":[],"replies":[]}', { status:200 });
-          if(b.op==='list') return new Response(JSON.stringify({ project:'recipes-f379d', capped:false, month:month, months:[month], projects:['my-kitchen-notes-beta'],
+          if(b.op==='list') return new Response(JSON.stringify({ project:'recipes-f379d', capped:false, month:month, months:[month], projects:[OTHER],
               defaults:{ cap:2, firstMonth:4, byProject:{} },
               households:[
-                { project:'my-kitchen-notes-beta', hid:'hB', name:'Beta Kitchen', code:'MKN-B', capped:true, capNow:2, months:[{ month:month, usd:0.5, calls:3 }],
+                { project:OTHER, hid:'hB', name:'Beta Kitchen', code:'MKN-B', capped:true, capNow:2, months:[{ month:month, usd:0.5, calls:3 }],
                   report:{ name:'Beta Kitchen', members:[{ email:'beta@example.com', role:'owner' }], links:[] },
                   usage:(function(){ var o={}; o[month]={ 'added.link':3, 'added.extension':2, 'from.facebook':1, 'scale':4, 'open':9 }; return o; })() },
-                { project:'my-kitchen-notes-beta', hid:'hB2', name:'Second Kitchen', code:'MKN-C', capped:true, capNow:2, months:[{ month:month, usd:0, calls:0 }],
+                { project:OTHER, hid:'hB2', name:'Second Kitchen', code:'MKN-C', capped:true, capNow:2, months:[{ month:month, usd:0, calls:0 }],
                   report:{ name:'Second Kitchen', members:[{ email:'two@example.com', role:'owner' }], links:[] },
                   usage:(function(){ var o={}; o[month]={ 'added.link':1, 'print':2 }; return o; })() } ] }), { status:200 });
           return new Response('{"error":"METER: not set up"}', { status:503 });
@@ -2011,7 +2014,7 @@ window.SELF_TESTS = [
         if(body.indexOf('Cannot read properties of null')===-1 || !/4 times/.test(body) || body.indexOf('Beta Kitchen')===-1 || body.indexOf('viewOverlay')===-1) throw new Error('the error card: '+body.slice(0,300));
         if(body.indexOf('Old one')!==-1) throw new Error('a done error shows under Not done yet');
         mknManage.errCopyAll();
-        if(copied.indexOf('[beta v38.15] error: Cannot read properties of null')===-1 || copied.indexOf('index.html:12')===-1) throw new Error('copied as: '+copied);
+        if(copied.indexOf('['+(OTHER==='tonys-recipes-test' ? 'test' : 'beta')+' v38.15] error: Cannot read properties of null')===-1 || copied.indexOf('index.html:12')===-1) throw new Error('copied as: '+copied);
         if(await mknManage.errMark('7','done')!==true || !sent.some(function(b){ return b.op==='error-status' && b.id===7 && b.status==='done'; })) throw new Error('✅ Done');
         mknManage.errFilter('all');
         if(await mknManage.errDel('8')!==true || !sent.some(function(b){ return b.op==='error-delete' && b.id===8; })) throw new Error('🗑');
@@ -7376,6 +7379,45 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'family_move', group:'Sharing', name:'🏠 The family’s move into the community copy: no copy forwards until move day; then every visit goes to the new address with its path, shared link and text; a moved household says so and stops; one household’s own Gmail/WhatsApp; the owner’s inbox in the community copy too (v38.22)',
+    test: async()=>{
+      // Nothing forwards today (move day sets the family copy's movedTo).
+      if(APP_CONFIG.movedTo!=='') throw new Error('movedTo is set in the '+APP_CONFIG.environment+' copy: '+APP_CONFIG.movedTo);
+      var M='https://new.example/';
+      var cases=[
+        ['https://old.example/tonys-recipes/?url=https%3A%2F%2Fa.b%2Fr#share-text=hi', M+'?url=https%3A%2F%2Fa.b%2Fr#share-text=hi'],
+        ['https://old.example/tonys-recipes/index.html?manage', M+'?manage'],
+        ['https://old.example/tonys-recipes/privacy.html', M+'privacy.html'],
+        ['https://new.example/?url=x', ''] ];
+      cases.forEach(function(c){ var got=appCopyMovedTo(c[0], M, '/tonys-recipes/'); if(got!==c[1]) throw new Error(c[0]+' → '+got+' (expected '+c[1]+')'); });
+      if(appCopyMovedTo('https://old.example/tonys-recipes/', '', '/tonys-recipes/')!=='') throw new Error('an empty movedTo forwards');
+      if(appCopyMovedTo('https://old.example/tonys-recipes/', 'javascript:alert(1)//', '/tonys-recipes/')!=='') throw new Error('a movedTo that is not an https address forwards');
+      // A household marked as moved: the whole screen says so, with the way there.
+      var old=document.getElementById('movedOverlay'); if(old) old.remove();
+      householdMovedNotice('https://new.example/');
+      var ov=document.getElementById('movedOverlay');
+      try{
+        if(!ov) throw new Error('no notice for a moved household');
+        var go=document.getElementById('movedGo');
+        if(!go || go.getAttribute('href')!=='https://new.example/' || !/moved/i.test(ov.textContent) || !/same Google account/.test(ov.textContent)) throw new Error('the notice: '+ov.textContent.slice(0,200));
+        if(parseInt(getComputedStyle(ov).zIndex,10) < 100000) throw new Error('the notice can be covered by other windows');
+      } finally { if(ov) ov.remove(); }
+      // One household's extras.
+      var realHF=window._hhFeatures, realFO=window._featureOverride;
+      try{
+        delete window._featureOverride;
+        window._hhFeatures={ gmail:true };
+        if(!featureOn('gmail')) throw new Error('a household’s own Gmail is not on');
+        if(featureOn('bringDirect')!==!!(APP_CONFIG.features&&APP_CONFIG.features.bringDirect)) throw new Error('a household cannot switch on anything else');
+        window._hhFeatures={ bringDirect:true };
+        if(featureOn('bringDirect')!==!!(APP_CONFIG.features&&APP_CONFIG.features.bringDirect)) throw new Error('bringDirect switched on by a household');
+        window._hhFeatures=null;
+        if(featureOn('gmail')!==!!(APP_CONFIG.features&&APP_CONFIG.features.gmail)) throw new Error('without a household’s extras, Gmail is the copy’s');
+      } finally { window._hhFeatures=realHF; if(realFO!==undefined) window._featureOverride=realFO; applyFeatureFlags(); }
+      // The owner's inbox: the family app and the community copy, never the test copy.
+      var want={ live:true, beta:true, test:false }[APP_CONFIG.environment];
+      if(want!==undefined && feedbackInboxHere()!==want) throw new Error('the owner’s inbox in the '+APP_CONFIG.environment+' copy: '+feedbackInboxHere());
+    }},
   { id:'link_code_other_copy', group:'Sharing', name:'🤝 An identifier not in this copy: the owner is told that each copy (family, beta, test) keeps its own households and links only within itself; others get the plain message (v38.20)',
     test: async()=>{
       var real=window.isAppOwner;

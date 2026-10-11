@@ -875,7 +875,7 @@ console.log('\nAI per household (v60):');
       bind: (...a) => stmt(sql, a),
       first: async () => raw.prepare(sql).get(...(args || [])) || null,
       all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
-      run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid) } }; },
+      run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
       _run() { raw.prepare(sql).run(...(args || [])); }
     });
     return { raw, prepare: (sql) => stmt(sql, []), batch: async (list) => { raw.exec('BEGIN'); try { list.forEach(s => s._run()); raw.exec('COMMIT'); } catch (e) { raw.exec('ROLLBACK'); throw e; } return []; } };
@@ -1239,6 +1239,26 @@ console.log('\nAI per household (v60):');
     expect('v71: closed, nobody is asked', f.d.survey === null, JSON.stringify(f));
     f = await fb({ action: 'survey-answer', idToken: tB, survey: 'end-of-beta-1', answers: { keep: 'no' } });
     expect('v71: …and late answers are refused', f.status === 409, JSON.stringify(f));
+    // v72 — the family moves into the community copy: its allowances and history come too.
+    db.raw.prepare("INSERT INTO ai_households (project, hid, name, code, created_at, first_seen, last_seen, cap, note) VALUES ('recipes-f379d', 'hFam', 'Fam', 'MKN-FFFF-FFFF', 1, 1, 2, NULL, 'the family')").run();
+    db.raw.prepare("INSERT INTO ai_households (project, hid, name, code, created_at, first_seen, last_seen, cap, note) VALUES ('recipes-f379d', 'hFam2', 'Fam2', 'MKN-GGGG-GGGG', 1, 1, 2, 4.5, NULL)").run();
+    db.raw.prepare("INSERT INTO ai_spend (project, hid, month, usd, calls) VALUES ('recipes-f379d', 'hFam', '2026-09', 3.25, 40)").run();
+    db.raw.prepare("INSERT INTO hh_reports (project, hid, summary, at) VALUES ('recipes-f379d', 'hFam', '{\"name\":\"Fam\"}', 5)").run();
+    const comOwner = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com' });
+    f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'recipes-f379d', idToken: tA });
+    expect('v72: only the owner brings another copy\'s households over', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'tonys-recipes-test', idToken: comOwner });
+    expect('v72: …from another copy, not its own', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'recipes-f379d', idToken: comOwner });
+    const famRow = db.raw.prepare("SELECT * FROM ai_households WHERE project = 'tonys-recipes-test' AND hid = 'hFam'").get();
+    const famRow2 = db.raw.prepare("SELECT cap FROM ai_households WHERE project = 'tonys-recipes-test' AND hid = 'hFam2'").get();
+    expect('v72: the family\'s households, their spending and reports come over', f.status === 200 && f.d.copied.households >= 2 && f.d.copied.households === f.d.of && f.d.copied.months >= 1 && f.d.copied.reports >= 1
+      && famRow && famRow.note === 'the family' && famRow.code === 'MKN-FFFF-FFFF'
+      && db.raw.prepare("SELECT usd FROM ai_spend WHERE project = 'tonys-recipes-test' AND hid = 'hFam' AND month = '2026-09'").get().usd === 3.25, JSON.stringify(f));
+    expect('v72: …a household with no allowance of its own keeps the family\'s $10; one with its own keeps that', famRow.cap === 10 && famRow2.cap === 4.5, JSON.stringify([famRow, famRow2]));
+    f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'recipes-f379d', idToken: comOwner });
+    expect('v72: …a second time nothing is copied again (and nothing overwritten)', f.status === 200 && f.d.copied.households === 0 && f.d.copied.months === 0, JSON.stringify(f));
+    expect('v72: …and the family\'s own rows stay', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE project = 'recipes-f379d' AND hid = 'hFam'").get());
   } finally { globalThis.fetch = realFetch; }
 }
 

@@ -1,4 +1,11 @@
-// Tony's Recipes — Cloudflare Worker v71
+// Tony's Recipes — Cloudflare Worker v72
+// v72: THE FAMILY MOVES INTO THE COMMUNITY COPY (Tony, 11 Oct 2026, option B).
+//      `meter-admin` `copy-from` {from}: the owner's page in the community copy
+//      brings another copy's households' allowances, notes, spending, reports
+//      and feature counts over to its own project — same household ids (the
+//      move keeps them). A household with no allowance of its own gets the one
+//      its old copy gave it (the family's $10), so nothing changes for it. Rows
+//      already there are kept, so it can run twice. The old rows stay.
 // v71: THE END-OF-BETA QUESTION. Tony: prepare it, "but naturally, do not send
 //      it". The owner opens a survey for a copy (`meter-admin` `survey-open`,
 //      table `surveys`); a signed-in tester's app asks `survey-status` (is one
@@ -299,7 +306,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v71';
+const WORKER_VERSION = 'v72';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1479,6 +1486,27 @@ async function meterAction(request, env, body) {
   if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body, claims); if (fr) return fr; }
   if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
   if (/^survey-/.test(String(body.op || ''))) { const sv = await surveyAdmin(env, db, body, proj); if (sv) return sv; }   // v71
+  // v72 — the family moved here: its households' allowances and history come too.
+  if (body.op === 'copy-from') {
+    const from = String(body.from || '');
+    if (!projects.includes(from) || from === proj) return jsonResp({ error: 'METER: copy from which other copy?' }, 400);
+    await reportsTable(db); await signalsTable(db);
+    const fromCap = projectCap(from, env);
+    const hs = (await db.prepare('SELECT hid, name, code, created_at, first_seen, last_seen, cap, note FROM ai_households WHERE project = ?1').bind(from).all()).results || [];
+    const n = { households: 0, months: 0, reports: 0, counts: 0 };
+    for (const h of hs) {
+      const r = await db.prepare('INSERT OR IGNORE INTO ai_households (project, hid, name, code, created_at, first_seen, last_seen, cap, note) '
+        + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)')
+        .bind(proj, h.hid, h.name, h.code, h.created_at, h.first_seen, h.last_seen,
+              typeof h.cap === 'number' ? h.cap : fromCap, h.note).run();
+      n.households += (r.meta && r.meta.changes) || 0;
+    }
+    const r1 = await db.prepare('INSERT OR IGNORE INTO ai_spend (project, hid, month, usd, calls) SELECT ?1, hid, month, usd, calls FROM ai_spend WHERE project = ?2').bind(proj, from).run();
+    const r2 = await db.prepare('INSERT OR IGNORE INTO hh_reports (project, hid, summary, at) SELECT ?1, hid, summary, at FROM hh_reports WHERE project = ?2').bind(proj, from).run();
+    const r3 = await db.prepare('INSERT OR IGNORE INTO usage_counts (project, hid, month, k, n) SELECT ?1, hid, month, k, n FROM usage_counts WHERE project = ?2').bind(proj, from).run();
+    n.months = (r1.meta && r1.meta.changes) || 0; n.reports = (r2.meta && r2.meta.changes) || 0; n.counts = (r3.meta && r3.meta.changes) || 0;
+    return jsonResp({ ok: true, copied: n, of: hs.length });
+  }
   if (body.op === 'set-note') {
     const hid = String(body.hid || '');
     if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'METER: which household?' }, 400);
@@ -2415,4 +2443,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v71 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v72 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

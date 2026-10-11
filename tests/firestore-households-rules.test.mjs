@@ -374,6 +374,18 @@ await check('a household founded through a share link says whose', (() => { cons
 await check('…and that never changes',                          updateDoc(doc(frank, 'households/R1'), { referredBy: 'MKN-KKKK-4444' }), false);
 await check('…while renaming still works',                      updateDoc(doc(frank, 'households/R1'), { name: 'Frank\'s' }), true);
 
+console.log('Extras for one household, switched on by the app\'s owner (v38.22)');
+await check('the app\'s owner switches Gmail on for one household', updateDoc(doc(alice, 'households/L1'), { features: { gmail: true } }), true);
+await check('…and WhatsApp, and off again',                     updateDoc(doc(alice, 'households/L1'), { features: { gmail: false, whatsapp: true } }), true);
+await check('…only the extras that exist',                       updateDoc(doc(alice, 'households/L1'), { features: { gmail: true, bank: true } }), false);
+await check('…true or false only',                               updateDoc(doc(alice, 'households/L1'), { features: { gmail: 'yes' } }), false);
+await check('…and nothing else with them',                       updateDoc(doc(alice, 'households/L1'), { features: { gmail: true }, name: 'X' }), false);
+await check('its own owner may not switch them',                 updateDoc(doc(gina, 'households/L1'), { features: { gmail: true, whatsapp: true } }), false);
+await check('…but still renames it (the extras stay as they are)', updateDoc(doc(gina, 'households/L1'), { name: 'Gina and Hank' }), true);
+await check('nobody founds a household with extras',             (() => { const b = writeBatch(frank);
+  b.set(doc(frank, 'households/X9'), { name: 'Extras', ownerUid: 'frank', createdAt: 1, features: { gmail: true } });
+  b.set(doc(frank, 'households/X9/members/frank'), { uid: 'frank', role: 'owner', email: 'frank@example.com', joinedAt: 1 }); return b.commit(); })(), false);
+
 console.log('The owner deletes a household from the management app (v37.61)');
 await check('the app\'s owner cannot read a household\'s recipes before marking it', getDocs(collection(alice, 'households/L2/recipes')), false);
 await check('nobody else may mark a household for deletion', updateDoc(doc(carol, 'households/L2'), { deleting: true }), false);

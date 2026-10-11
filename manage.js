@@ -33,7 +33,9 @@
   // details". Every copy's households are listed in the FAMILY app only.
   function allCopiesHere() {
     if (window._allCopiesOverride !== undefined) return !!window._allCopiesOverride;   // the tests
-    return String((window.APP_CONFIG && APP_CONFIG.environment) || 'live') === 'live';
+    // v38.22 — and in the community copy, where the family (and its owner) is moving.
+    var e = String((window.APP_CONFIG && APP_CONFIG.environment) || 'live');
+    return e === 'live' || e === 'beta';
   }
   async function meterList() {
     if (!window._fbUser) throw new Error('Sign in first.');
@@ -91,7 +93,8 @@
     hs.forEach(function (d) {
       var h = d.data() || {};
       rows[d.id] = { key: d.id, hid: d.id, name: h.name || '', code: h.code || '', ownerUid: h.ownerUid || '', createdAt: h.createdAt || 0,
-                     referredBy: h.referredBy || '', members: [], links: [], asking: [], asked: [], referred: 0, lastSeen: 0 };
+                     referredBy: h.referredBy || '', members: [], links: [], asking: [], asked: [], referred: 0, lastSeen: 0,
+                     features: (h.features && typeof h.features === 'object') ? h.features : {} };   // v38.22
       if (h.code) byCode[h.code] = d.id;
     });
     (await db.collectionGroup('members').get()).forEach(function (d) {
@@ -531,6 +534,10 @@
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
     if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
       + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 🏠 My household → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
+    // v38.22 — once the family has moved here: its allowances and history come too.
+    if (env === 'beta') head += '<div class="mg-muted" id="mgFamilyMove" style="margin:6px 0 2px;">After the family\u2019s move: '
+      + '<button type="button" class="mg-btn" id="mgCopyFrom" style="min-height:28px;padding:3px 10px;" onclick="mknManage.copyFromFamily()">'
+      + '📦 Bring the family app\u2019s allowances and AI history here</button> <span>(safe to press twice)</span></div>';
     // v37.96 — Tony (security audit, "b"): newcomers by invitation only, per copy.
     if (S.founding !== null) head += '<div class="mg-muted" id="mgFounding" style="margin:6px 0 2px;">New households in this copy: <b>'
       + (S.founding ? 'anyone who signs in may start one' : 'by invitation only') + '</b> '
@@ -596,6 +603,21 @@
     return Object.keys(n).sort().map(function (c) { return n[c] + ' ' + c; }).join(', ');
   }
   function openRow() { return S.rows.filter(function (x) { return x.key === S.open; })[0]; }
+  // v38.22 — Tony's household keeps what the family app had once it lives in the
+  // community copy, where these are off for everyone else: switched on for ONE
+  // household by the owner (rules: only the app's owner writes `features`).
+  var EXTRAS = [['gmail', '📧 Send recipes through Gmail'], ['whatsapp', '💬 WhatsApp groups (search the household’s chats)']];
+  function extrasHtml(r) {
+    if (r.remote || r.deleted) return '';
+    var f = r.features || {};
+    return '<div class="mg-h">Extras for this household</div><div class="mg-muted">On here even where this copy has them off for everyone.</div>'
+      + EXTRAS.map(function (x) {
+          var copyOn = window.APP_CONFIG && APP_CONFIG.features && APP_CONFIG.features[x[0]] === true;
+          return '<label class="mg-li" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" data-extra="' + x[0] + '"'
+            + (f[x[0]] === true || copyOn ? ' checked' : '') + (copyOn ? ' disabled title="On for everyone in this copy"' : '')
+            + ' onchange="mknManage.setExtra(\'' + x[0] + '\', this.checked)"> ' + esc(x[1]) + (copyOn ? ' <span class="mg-muted">(on for everyone here)</span>' : '') + '</label>';
+        }).join('');
+  }
   function panelHtml() {
     var r = openRow();
     if (!r) return '';
@@ -620,6 +642,7 @@
             + ' · ' + (m.termsAt ? '\u{1F4DD} agreed to the terms' + (m.termsVersion ? ' (v' + esc(m.termsVersion) + ')' : '') + ' ' + new Date(m.termsAt).toLocaleDateString() : '<span class="mg-noterms">not yet agreed to the terms</span>')
             + '</span></div>'; }).join('')
       + leftHtml(r)
+      + extrasHtml(r)
       + '<div class="mg-h">Linked with</div>' + (r.links.length ? r.links.map(function (l) { return '<div class="mg-li">' + esc(l.name) + ' <span class="mg-muted">' + esc(l.code) + '</span></div>'; }).join('') : '<div class="mg-muted">Nobody yet.</div>')
       + ((r.asked.length || r.asking.length) ? '<div class="mg-h">Requests waiting</div>'
           + r.asked.map(function (a) { return '<div class="mg-li">from ' + esc(a.from) + ' <span class="mg-muted">' + esc(a.code) + '</span></div>'; }).join('')
@@ -908,6 +931,31 @@
     sortBy: function (k) { if (S.sort === k) S.dir = -S.dir; else { S.sort = k; S.dir = (k === 'name' || k === 'owner') ? 1 : -1; } render(); },
     show: function (hid) { S.open = (hid && S.open !== hid) ? hid : null; render();
       if (S.open) { var p = document.querySelector('#manageOverlay .mg-panel'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+    copyFromFamily: async function () {
+      var ok = await askConfirm({ icon: '\u{1F4E6}', title: 'Bring the family\u2019s allowances here?',
+        message: 'Each household that moved from the family app gets its AI allowance (the family\u2019s $10 a month unless it had its own), '
+          + 'your notes about it and its spending so far, here in this copy. Anything already here is kept. The family app\u2019s own figures are not touched.',
+        okLabel: 'Bring them' });
+      if (ok !== true) return false;
+      var d;
+      try { d = await meterSet('copy-from', '', { from: 'recipes-f379d' }); }
+      catch (e) { showServiceError('Could not bring them: ' + e.message); return false; }
+      toast('\u2705 ' + d.copied.households + ' of ' + d.of + ' households brought over (' + d.copied.months + ' months of spending)', 7000);
+      await api.reload();
+      return d;
+    },
+    setExtra: async function (name, on) {
+      var r = openRow();
+      if (!r || r.remote || EXTRAS.map(function (x) { return x[0]; }).indexOf(name) === -1) return false;
+      var f = Object.assign({}, r.features || {});
+      if (on) f[name] = true; else delete f[name];
+      try { await window._fbDb.collection('households').doc(r.hid).update({ features: f }); }
+      catch (e) { showServiceError('Could not change it: ' + ((e && e.message) || e)); render(); return false; }
+      r.features = f;
+      toast(on ? '✅ On for ' + (r.name || 'this household') : 'Off for ' + (r.name || 'this household'));
+      render();
+      return true;
+    },
     saveCap: async function (v) {
       var r = openRow();
       if (!r) return false;
