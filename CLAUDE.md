@@ -836,6 +836,20 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **Released to the family app and the beta: v38.20 (11 Oct 2026, Tony's yes, CI green on 09cbc42).** Pages: success;
+    Translate new phrases: success; Publish languages: success. No Worker, rules or extension change.
+  - **Tony's decision (11 Oct 2026): OPTION B — the family moves into the community copy (mykitchennotes.community,
+    project my-kitchen-notes-beta).** "As I am the one acting as the main 'seller' of the application, testers
+    should be able to join my live and synced set of recipes." Conditions: every capability and privilege he has
+    as admin in the family app is kept. He asked for B's risks against A and how to protect the admin identity
+    (today: the verified e-mail rozinante2004@gmail.com in three places — ownerEmail in the app, {{APP_ADMINS}}
+    in the rules, the Worker's owner checks). The beta has NOT been given to testers yet (planned next week);
+    Tony is the only one who would reinstall — so install-time things (status-bar style, home-screen name and
+    icon) can change now. Family-only today (must move to the community copy for the owner): the 💬 Feedback
+    tab (`feedbackInboxHere`, inbox itself is in the Worker's D1), all copies in 📊 Households
+    (manage.js `allCopiesHere`), writing the shared translations (`languageSource` = recipes-f379d i18n/),
+    features whatsapp/bringDirect/gmail (per copy today → per household), the family's AI allowance
+    (AI_CAP_BY_PROJECT recipes-f379d = $10, counted never capped → a per-household cap).
   - **v38.20 — the iPhone's top edge (iOS 26/27 "Liquid Glass"); a link to another copy's identifier (11 Oct 2026).**
     - Tony (iOS 27.0.1): "the header of the application is somewhat obscured by Apple's liquid glass". Since iOS 26
       an installed web app that runs under the status bar (`black-translucent` + `viewport-fit=cover`, ours) gets the
