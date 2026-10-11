@@ -637,10 +637,10 @@
   }
 
   var CSS = '#manageOverlay{position:fixed;inset:0;z-index:1250;background:var(--cream);color:var(--ink);overflow:auto;font-family:"DM Sans","Heebo",sans-serif;}'
-    + '#manageOverlay .mg-wrap{max-width:1280px;margin:0 auto;padding:16px;padding-top:calc(12px + env(safe-area-inset-top));'
+    + '#manageOverlay .mg-wrap{max-width:1280px;margin:0 auto;padding:16px;padding-top:calc(12px + var(--top-safe, env(safe-area-inset-top)));'
     + 'padding-left:calc(16px + env(safe-area-inset-left));padding-right:calc(16px + env(safe-area-inset-right));}'
     // v37.68 — the Close button was under the iPhone's clock and battery: below them, and it stays in reach when scrolling.
-    + '#manageOverlay .mg-bar0{display:flex;justify-content:flex-end;position:sticky;top:0;z-index:5;padding-top:env(safe-area-inset-top);margin-top:calc(-1 * env(safe-area-inset-top));background:var(--cream);}'
+    + '#manageOverlay .mg-bar0{display:flex;justify-content:flex-end;position:sticky;top:0;z-index:5;padding-top:var(--top-safe, env(safe-area-inset-top));margin-top:calc(-1 * var(--top-safe, env(safe-area-inset-top)));background:var(--cream);}'
     + '.mg-top{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between;margin-bottom:12px;}'
     + '.mg-title{font:700 20px/1.2 "Playfair Display","Frank Ruhl Libre",serif;color:var(--heading);}'
     + '.mg-muted{color:var(--muted);font-size:12px;}.mg-code{font-family:ui-monospace,Menlo,Consolas,monospace;}'

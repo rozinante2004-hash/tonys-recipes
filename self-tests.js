@@ -7376,6 +7376,66 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'link_code_other_copy', group:'Sharing', name:'🤝 An identifier not in this copy: the owner is told that each copy (family, beta, test) keeps its own households and links only within itself; others get the plain message (v38.20)',
+    test: async()=>{
+      var real=window.isAppOwner;
+      try{
+        window.isAppOwner=function(){ return true; };
+        var own=hhCodeNotHereMsg('MKN-J5DM-F9BX');
+        if(!/MKN-J5DM-F9BX/.test(own) || !/keeps its own households/.test(own) || !/same copy/.test(own)) throw new Error('the owner’s message: '+own);
+        var here={ live:'the family app', beta:'the beta', test:'the test copy' }[APP_CONFIG.environment];
+        if(here && own.indexOf('No household in '+here)!==0) throw new Error('the owner is not told which copy was searched: '+own);
+        window.isAppOwner=function(){ return false; };
+        var other=hhCodeNotHereMsg('MKN-J5DM-F9BX');
+        if(other!=='No household has the identifier MKN-J5DM-F9BX — check it and try again.') throw new Error('a tester’s message: '+other);
+      } finally { window.isAppOwner=real; }
+    }},
+  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 40 px on iOS) (v38.20)',
+    test: async()=>{
+      var css=(document.getElementById('topSafeCss')||{}).textContent||'';
+      if(!/--top-safe:\s*env\(safe-area-inset-top/.test(css)) throw new Error('--top-safe is not the safe-area inset by default');
+      if(!/@supports\s*\(-webkit-touch-callout:\s*none\)[\s\S]*min\(env\(safe-area-inset-top, 0px\) \* 100, env\(safe-area-inset-top, 0px\) \+ 40px\)/.test(css))
+        throw new Error('on iOS the glass band (40 px below a non-zero inset) is not added');
+      var root=document.documentElement, prev=root.style.getPropertyValue('--top-safe'), BAND=99;
+      var header=document.querySelector('.header'), made=[];
+      root.style.setProperty('--top-safe', BAND+'px');
+      try{
+        if(Math.abs(safeAreaTopPx()-BAND)>1) throw new Error('safeAreaTopPx() says '+safeAreaTopPx()+', not the band — the slid header would leave its rows in the blur');
+        // The header: its first row (or the copy's ribbon text) starts below the band.
+        var rib=document.querySelector('#envRibbon span'), first=rib || header.querySelector('.header-top');
+        var gap=first.getBoundingClientRect().top - header.getBoundingClientRect().top;
+        if(gap < BAND-1) throw new Error('the header’s first row starts '+Math.round(gap)+'px into the header — under the clock and the glass');
+        // A window taller than the screen: starts below the band, ends on the screen.
+        var ov=document.createElement('div'); ov.className='modal-overlay open'; ov.style.zIndex='-1'; ov.style.visibility='hidden';
+        ov.innerHTML='<div class="modal" style="animation:none"><div style="height:3000px"></div></div>'; document.body.appendChild(ov); made.push(ov);
+        var r=ov.firstChild.getBoundingClientRect();   // (no slide-in: it would move the box while measured)
+        if(r.top < BAND-1) throw new Error('a tall window starts at '+Math.round(r.top)+'px — under the glass');
+        if(r.bottom > window.innerHeight+1) throw new Error('a tall window runs off the bottom ('+Math.round(r.bottom)+' > '+window.innerHeight+')');
+        // The same for a window made on the fly (the Self Test's own detail box).
+        var ad=document.createElement('div'); ad.id='stDetailOverlay'; ad.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;visibility:hidden;z-index:-1';
+        ad.innerHTML='<div style="max-height:90vh;overflow:auto"><div style="height:3000px"></div></div>';
+        var old=document.getElementById('stDetailOverlay'); if(old) throw new Error('a Self Test detail box is open — close it first');
+        document.body.appendChild(ad); made.push(ad);
+        var ar=ad.firstChild.getBoundingClientRect();
+        if(ar.top < BAND-1 || ar.bottom > window.innerHeight+1) throw new Error('a window made on the fly spans '+Math.round(ar.top)+'–'+Math.round(ar.bottom)+'px');
+        // Banners at the top keep their words below the band.
+        ['refreshBanner','offlineBanner'].forEach(function(id){
+          var el=document.getElementById(id); if(!el) return;
+          var pt=parseFloat(getComputedStyle(el).paddingTop);
+          if(pt < BAND) throw new Error('#'+id+' keeps only '+pt+'px at its top');
+        });
+        // A menu taller than the screen starts below the band.
+        // (its button scrolled away, so neither below nor above it is the answer)
+        var off={ top:-150, bottom:-122, right:380 };
+        var m=dropPlacement(off, 230, 5000, 393, 852, safeAreaTopPx());
+        if(m.top!==BAND || m.maxHeight!==852-BAND-8) throw new Error('a long menu is placed at '+m.top+'px, '+m.maxHeight+'px tall');
+        var d=dropPlacement(off, 230, 5000, 393, 852);
+        if(d.top!==8) throw new Error('without a band a long menu should still start 8px from the top, not '+d.top);
+      } finally {
+        made.forEach(function(e){ e.remove(); });
+        if(prev) root.style.setProperty('--top-safe', prev); else root.style.removeProperty('--top-safe');
+      }
+    }},
   { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a British voice, then vanishes in a puff of smoke (v38.19); never while typing; on by default (v37.88)',
     test: async()=>{
       var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on') }, spoken=[];

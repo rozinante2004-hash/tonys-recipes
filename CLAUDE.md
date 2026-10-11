@@ -836,6 +836,32 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.20 — the iPhone's top edge (iOS 26/27 "Liquid Glass"); a link to another copy's identifier (11 Oct 2026).**
+    - Tony (iOS 27.0.1): "the header of the application is somewhat obscured by Apple's liquid glass". Since iOS 26
+      an installed web app that runs under the status bar (`black-translucent` + `viewport-fit=cover`, ours) gets the
+      system "scroll edge effect": a blur over the clock's strip AND ~40 pt below it. No meta tag or CSS turns it
+      off; env(safe-area-inset-top) does not include it (developer reports, Oct 2026; one confirmed on an iOS 27
+      device: keep content out of the band). Also found: the header had NO top inset at all — on a notched iPhone
+      its first row (name + version) has always sat under the clock. Now `--top-safe` (style#topSafeCss) =
+      env(safe-area-inset-top), and on iOS (`@supports (-webkit-touch-callout: none)`) `min(inset*100, inset+40px)`
+      (0 stays 0). Used by: `.header` padding-top (in test/beta the ribbon carries it; the beta's band is the
+      header's brown, the violet strip is the mark), safeAreaTopPx() (so the slid header leaves the whole band),
+      every full-screen window (.modal-overlay, .calc/.prog overlays, #loginScreen, #termsGate, the Self Test /
+      e-mail / help / import-error / service-error boxes), #refreshBanner, #offlineBanner, the pull hint,
+      dropPlacement(…, topMin) (a menu taller than the screen starts below the band), manage.js. A card in a
+      window is capped `min(<its own limit>, 100%)` — centred and taller than its overlay it would overflow at both
+      ends, back under the glass; a computer keeps each window's own limit (.view-sized excluded). The recipe
+      window's ✕ row is now simply 60px from the window's top (the window itself starts below the band). NOT
+      switched to the `default` status-bar style: iOS reads it only when the icon is added, so every installed
+      copy would have to be removed and added again. Test `ios_glass_edge` (simulates a 99px band).
+    - Tony tried 🤝 Connect from his BETA household with the FAMILY app's identifier → "No household has the
+      identifier MKN-J5DM-F9BX". Expected: each copy is its own Firebase project; codes/, linkRequests and links
+      live inside one copy (said to Tony on 10 Oct). The owner is now told so (`hhCodeNotHereMsg`: "No household in
+      the beta has … Each copy … keeps its own households, and a household links only with another in the same
+      copy"); others get the plain message. Test `link_code_other_copy`. Linking between two BETA households is
+      what testers use: the beta has the link rules (rules published to all three projects, 8 Oct). Cross-copy
+      communities: options put to Tony (a Worker bridge with a read key to both databases / the family moves into
+      the community copy / for now his recipes imported into his beta household).
   - **Released to the family app and the beta: v38.19 (10 Oct 2026, Tony's yes given in advance — "once cleared" —
     CI green on d3ce595).** Pages: success; Translate new phrases: success; Publish languages: success; Self Tests on
     main: success (also on main for v38.18). No Worker or extension change.
