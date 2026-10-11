@@ -157,7 +157,24 @@ service cloud.firestore {
     // v37.58 — the app's owner (the management app) reads the list of
     // households, their members, links and requests — never their recipes,
     // photos or chats. The APP_ADMINS placeholder, as for translations.
-    function appAdmin() { return signedIn() && verified() && myEmail() in [{{APP_ADMINS}}]; }
+    // v38.23 — Tony: "the only thing that keeps me Admin is my email address … I need to
+    // protect myself". His powers now need (1) a sign-in WITH GOOGLE — not an e-mail
+    // link or a password, which someone who only got into his mailbox could use — and
+    // (2) once he has switched it on (config/security.ownerTwoStep, after setting up an
+    // authenticator app), the authenticator's code in that sign-in. The address is
+    // checked first, so nobody else's request ever reads config/security.
+    function appAdmin() {
+      return signedIn() && verified() && myEmail() in [{{APP_ADMINS}}]
+        && request.auth.token.firebase.sign_in_provider == 'google.com' && ownerTwoStepOk();
+    }
+    function secPath() { return /databases/$(database)/documents/config/security; }
+    function ownerTwoStepOk() {
+      return !exists(secPath()) || get(secPath()).data.get('ownerTwoStep', false) != true
+        || request.auth.token.firebase.get('sign_in_second_factor', '') == 'totp';
+    }
+    // …and what cannot be undone (deleting a household, its extras, who may found
+    // one, the switch above) only within 15 minutes of signing in.
+    function recentSignIn() { return request.time.toMillis() < request.auth.token.auth_time * 1000 + 900000; }
     // v37.61 — the app's owner deleting a household from the management app:
     // first marked `deleting: true` (only by him, and only that), and ONLY
     // then may he read and remove what is inside it. He never reads the
@@ -218,10 +235,10 @@ service cloud.firestore {
               && getAfter(memberPath(hid, request.resource.data.ownerUid)).data.role == 'owner') );
       allow delete: if resource.data.ownerUid == request.auth.uid
         || (appAdmin() && resource.data.get('deleting', false) == true);
-      allow update: if appAdmin()
+      allow update: if appAdmin() && recentSignIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleting'])
         && request.resource.data.deleting == true;
-      allow update: if appAdmin()
+      allow update: if appAdmin() && recentSignIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features'])
         && okFeatures();
 
@@ -556,9 +573,16 @@ service cloud.firestore {
     // says "by invitation only" before trying); only the owner writes.
     match /config/{doc} {
       allow read: if signedIn();
-      allow write: if appAdmin() && doc == 'founding'
+      allow write: if appAdmin() && recentSignIn() && doc == 'founding'
         && request.resource.data.keys().hasOnly(['open', 'by', 'at'])
         && request.resource.data.open is bool;
+      // v38.23 — the owner's two-step switch: turned ON only from a sign-in that used
+      // the authenticator (so it can never lock him out), and off only by him with it.
+      allow write: if appAdmin() && recentSignIn() && doc == 'security'
+        && request.resource.data.keys().hasOnly(['ownerTwoStep', 'by', 'at'])
+        && request.resource.data.ownerTwoStep is bool
+        && (request.resource.data.ownerTwoStep == false
+            || request.auth.token.firebase.get('sign_in_second_factor', '') == 'totp');
     }
 
     // Interface translations: one copy for everyone, so no household pays to
@@ -567,7 +591,7 @@ service cloud.firestore {
     match /i18n/{lang} {
       allow get: if true;            // public, as in `shared` (v36.88)
       allow list: if signedIn();
-      allow write: if signedIn() && verified() && myEmail() in [{{APP_ADMINS}}];
+      allow write: if appAdmin();   // v38.23 — the same protected check as everywhere
     }
 
 

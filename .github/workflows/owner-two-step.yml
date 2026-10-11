@@ -1,0 +1,41 @@
+name: Switch on the owner's authenticator sign-in
+
+# v38.23 — Tony: protect the owner's powers beyond his e-mail address. Firebase
+# has to allow sign-in with an authenticator app (TOTP) in the project before he
+# can set one up in the app (⚙️ → 👑 App owner → 🔐 Two-step sign-in for the
+# owner). Run once, by hand, AFTER the project was upgraded to "Firebase
+# Authentication with Identity Platform" (a console click) and the service
+# account of FIREBASE_RULES_KEY has "Firebase Authentication Admin" there.
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "which copy"
+        required: true
+        default: my-kitchen-notes-beta
+        type: choice
+        options: [my-kitchen-notes-beta, tonys-recipes-test]
+
+permissions:
+  contents: read
+
+jobs:
+  totp:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Switch it on
+        env:
+          PROJECT: ${{ inputs.project }}
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund google-auth-library@9 >/dev/null
+          node tools/enable-totp.mjs --project "$PROJECT"

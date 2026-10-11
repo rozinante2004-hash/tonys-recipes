@@ -50,6 +50,18 @@ jobs:
         if: steps.token.outputs.ok == 'true'
         run: npx --yes wrangler@4 deploy --config worker/wrangler.jsonc
 
+      # v73 — where the owner's alerts go (Tony's second address, verified in
+      # Cloudflare Email Routing): the GitHub secret ALERT_EMAIL becomes the
+      # Worker's secret ALERT_TO. Never printed; without it, no alerts.
+      - name: The owner's alert address
+        if: steps.token.outputs.ok == 'true'
+        env:
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          if [ -z "$ALERT_EMAIL" ]; then echo "::notice::ALERT_EMAIL is not set — the owner's alerts stay off."; exit 0; fi
+          printf '%s' "$ALERT_EMAIL" | npx --yes wrangler@4 secret put ALERT_TO --config worker/wrangler.jsonc >/dev/null
+          echo "the alert address is set"
+
       # The Worker says which version it is; it must be the one just published —
       # with its database (METER_DB) and its storage (BRING_KV) still connected.
       - name: Check the live Worker answers with this version

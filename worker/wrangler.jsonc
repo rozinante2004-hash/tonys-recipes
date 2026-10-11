@@ -26,5 +26,13 @@
   "kv_namespaces": [
     { "binding": "BRING_KV", "id": "8c950e5009b34afca800fea2ce69eb1b" }
   ],
+  // v73 — the owner's alerts (a new device using his tools, actions that cannot be
+  // undone), sent from alerts@ the app's domain through Cloudflare Email Routing to
+  // a VERIFIED destination address. No address here (the repository is public): the
+  // Worker's secret ALERT_TO names it, set from the GitHub secret ALERT_EMAIL by
+  // the deploy job.
+  "send_email": [
+    { "name": "ALERTS" }
+  ],
   "observability": { "enabled": true }
 }

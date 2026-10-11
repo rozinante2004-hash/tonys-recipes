@@ -887,7 +887,8 @@ console.log('\nAI per household (v60):');
   async function token(claims, key = kp.privateKey, kid = 'k1') {
     const now = Math.floor(Date.now() / 1000);
     const c = Object.assign({ iss: 'https://securetoken.google.com/' + (claims.aud || 'tonys-recipes-test'), aud: 'tonys-recipes-test',
-      sub: 'uA', email: 'a@example.com', email_verified: true, iat: now - 10, exp: now + 3600 }, claims);
+      sub: 'uA', email: 'a@example.com', email_verified: true, iat: now - 10, exp: now + 3600,
+      auth_time: now - 10, firebase: { sign_in_provider: 'google.com' } }, claims);   // v73 — signed in with Google, just now
     if (claims.aud && !claims.iss) c.iss = 'https://securetoken.google.com/' + claims.aud;
     const head = b64u({ alg: 'RS256', kid }), body = b64u(c);
     const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(head + '.' + body));
@@ -899,12 +900,19 @@ console.log('\nAI per household (v60):');
                  ALLOWED_ORIGINS: TEST_ORIGIN, __firestoreBase: 'https://fs.test' };
   // Firestore: uA is in hA (created long ago); uB is in nothing.
   const members = { 'hA/uA': true, 'hF/uF': true };
+  const security = {};   // v73 — config/security per project: true / false / 'fail'
   let anthropicCalls = 0, sent = null, firestoreAsks = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     url = String(url);
     if (url.startsWith('https://fs.test/')) {
       firestoreAsks.push({ url, auth: init && init.headers && init.headers.Authorization });
+      if (/\/config\/security$/.test(url)) {
+        const sp = security[/projects\/([^/]+)/.exec(url)[1]];
+        if (sp === undefined) return new Response('{}', { status: 404 });
+        if (sp === 'fail') return new Response('oops', { status: 500 });
+        return new Response(JSON.stringify({ fields: { ownerTwoStep: { booleanValue: sp } } }), { status: 200 });
+      }
       const m = /households\/([^/]+)(?:\/members\/([^/?]+))?$/.exec(url);
       const mem = members[m[1] + '/' + m[2]];
       if (m[2]) return new Response(mem ? JSON.stringify({ fields: { role: { stringValue: typeof mem === 'string' ? mem : 'owner' } } }) : '{}', { status: mem ? 200 : 403 });
@@ -1259,6 +1267,49 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'recipes-f379d', idToken: comOwner });
     expect('v72: …a second time nothing is copied again (and nothing overwritten)', f.status === 200 && f.d.copied.households === 0 && f.d.copied.months === 0, JSON.stringify(f));
     expect('v72: …and the family\'s own rows stay', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE project = 'recipes-f379d' AND hid = 'hFam'").get());
+    // v73 — the owner's powers, protected.
+    const nowS = Math.floor(Date.now() / 1000);
+    const ownerLink = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', firebase: { sign_in_provider: 'emailLink' } });
+    const ownerPw = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', firebase: { sign_in_provider: 'password' } });
+    const ownerOld = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', auth_time: nowS - 3600 });
+    const owner2f = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', firebase: { sign_in_provider: 'google.com', sign_in_second_factor: 'totp' } });
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: ownerLink });
+    expect('v73: signed in by an e-mail link, the owner\'s address opens none of his tools', f.status === 403 && f.d.needGoogle === true, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: ownerPw });
+    expect('v73: …nor with a password', f.status === 403 && f.d.needGoogle === true, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+    expect('v73: with Google they open', f.status === 200, JSON.stringify(f).slice(0, 200));
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: ownerOld });
+    expect('v73: an hour after signing in he still reads', f.status === 200, JSON.stringify(f).slice(0, 200));
+    f = await fb({ action: 'meter-admin', op: 'set-cap', hid: 'hA', cap: 3, idToken: ownerOld });
+    expect('v73: …but what cannot be undone asks him to sign in again', f.status === 401 && f.d.reauth === true, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'set-cap', hid: 'hA', cap: 3, idToken: comOwner });
+    expect('v73: …and just signed in, it is done', f.status === 200, JSON.stringify(f));
+    security['tonys-recipes-test'] = true;
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+    expect('v73: once he switched the authenticator on, Google alone is not enough', f.status === 403 && f.d.needTwoStep === true, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: owner2f });
+    expect('v73: …Google with the authenticator is', f.status === 200, JSON.stringify(f).slice(0, 200));
+    security['tonys-recipes-test'] = 'fail';
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: owner2f });
+    expect('v73: if the switch cannot be read, the tools stay shut (never "off" by mistake)', f.status === 502, JSON.stringify(f));
+    delete security['tonys-recipes-test'];
+    // …and he hears about it.
+    const mails = [];
+    class FakeEmail { constructor(from, to, raw) { this.from = from; this.to = to; this.raw = raw; } }
+    const envAlert = Object.assign({}, envM, { ALERTS: { send: async m => { mails.push(m); } }, ALERT_TO: 'second@example.com', __EmailMessage: FakeEmail });
+    const fa = async (body) => { const rr = await worker.fetch(post(body, TEST_ORIGIN), envAlert); let dd = null; try { dd = await rr.json(); } catch (e) {} return { status: rr.status, d: dd }; };
+    const hh5 = await (await worker.fetch(post({ action: 'health' }), envAlert)).json();
+    expect('v73: health says the alerts are set up', hh5.alerts === true && (await (await worker.fetch(post({ action: 'health' }), envM)).json()).alerts === false, JSON.stringify(hh5));
+    f = await fa({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-AAAA1111' });
+    expect('v73: the owner\'s tools on a new device: an e-mail to his second address', f.status === 200 && mails.length === 1 && mails[0].to === 'second@example.com'
+      && /new device/.test(mails[0].raw) && /^From: My Kitchen Notes <alerts@mykitchennotes\.community>/m.test(mails[0].raw) && /Copy: tonys-recipes-test/.test(mails[0].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 300))));
+    f = await fa({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-AAAA1111' });
+    expect('v73: …the same device again: nothing', mails.length === 1, String(mails.length));
+    f = await fa({ action: 'meter-admin', op: 'set-cap', hid: 'hA', cap: 2, idToken: comOwner, device: 'dev-AAAA1111' });
+    expect('v73: …and every action that cannot be undone is told', f.status === 200 && mails.length === 2 && /owner action "set-cap"/.test(mails[1].raw) && /household hA/.test(mails[1].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 200))));
+    f = await fa({ action: 'meter-admin', op: 'list', idToken: tA, device: 'dev-BBBB2222' });
+    expect('v73: …someone who is not the owner: refused, and no e-mail', f.status === 403 && mails.length === 2, String(mails.length));
   } finally { globalThis.fetch = realFetch; }
 }
 

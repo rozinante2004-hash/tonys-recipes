@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.22 -->
+<!-- Tony's Recipes Collection v38.23 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2082,6 +2082,8 @@ function workerBody(payload) {
   var o = {};
   Object.keys(payload || {}).forEach(function(k){ o[k] = payload[k]; });
   o.appKey = WORKER_APP_KEY;
+  // v38.23 — the owner's tools say which device asks (a random id kept on it), so a new one is told to him.
+  if (o.action === 'meter-admin' && !o.device && typeof ownerDeviceId === 'function') o.device = ownerDeviceId();
   // v37.57 — AI per household: an AI call (and meter-*) carries the sign-in
   // and the household, ONLY to a Worker that says it strips them (health
   // `metering`, v60+). An older Worker would pass them on to Anthropic, which
@@ -5860,7 +5862,8 @@ async function accountReauthenticate(user, before) {
   if (how === 'google.com' || how === 'microsoft.com' || how === 'apple.com') {
     if (await askConfirm({ icon: '\u{1F510}', title: 'Sign in once more', message: intro, okLabel: 'Sign in and finish' }) !== true) return false;
     var p = how === 'google.com' ? (window._fbProvider || new firebase.auth.GoogleAuthProvider()) : new firebase.auth.OAuthProvider(how);
-    await user.reauthenticateWithPopup(p);
+    try { await user.reauthenticateWithPopup(p); }
+    catch (e0) { if (e0 && e0.code === 'auth/multi-factor-auth-required') await mfaResolve(e0); else throw e0; }   // v38.23
     return true;
   }
   // Signed in with an e-mailed link: a fresh sign-in is the confirmation.
@@ -7137,7 +7140,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.22';
+var APP_VERSION = 'v38.23';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9974,7 +9977,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.22</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.23</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10077,6 +10080,8 @@ body.banner-shown .header {
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
               <button class="drop-item" title="Where each copy of the app runs, with links (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
               <button class="drop-item" data-owner-only title="Checks that the key in this copy's page still works for every Firebase service the app uses — before and after you restrict it in Google Cloud (the app's owner only)." onclick="closeDrop('settingsDrop');openKeyCheck()">🔑 Check the app's key</button>
+              <!-- v38.23 — Tony: protect the owner's powers beyond his e-mail address. -->
+              <button class="drop-item" data-owner-only title="An authenticator app's code on top of your Google sign-in for the owner's tools — so even someone in your mailbox cannot use them (the app's owner only)." onclick="closeDrop('settingsDrop');openOwnerTwoStep()">🔐 Two-step sign-in for the owner</button>
               <button class="drop-item" data-owner-only title="The Google Cloud client ID that lets the app send recipes through Gmail (the app&#39;s owner only)." data-feature="gmail" onclick="closeDrop('settingsDrop');openGmailSetup()">📧 Gmail Setup</button>
               <button class="drop-item" data-owner-only title="The connection that sends ingredients straight to the household's Bring! list." data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
             </div>
@@ -10687,7 +10692,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.22</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.23</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14586,6 +14591,156 @@ async function copyWorkerCode() {
 }
 window.copyWorkerCode = copyWorkerCode; window.workerCodeCheck = workerCodeCheck;
 
+// ─── THE OWNER'S PROTECTIONS (v38.23) ────────────────────────────────────────
+// Tony: "the only thing that keeps me Admin is my email address … I need to protect
+// myself against identity theft". The rules and the Worker (v73) now give his powers
+// only to a sign-in WITH GOOGLE, ask for a fresh one (15 minutes) for what cannot be
+// undone, and — once he switches it on here — the code from an authenticator app.
+// The Worker e-mails his second address when the owner's tools are used on a new
+// device, and for every action that cannot be undone.
+var OWNER_DEVICE_KEY = 'mkn_owner_device';
+function ownerDeviceId() {
+  try {
+    var d = localStorage.getItem(OWNER_DEVICE_KEY);
+    if (d && /^[A-Za-z0-9-]{8,64}$/.test(d)) return d;
+    d = 'dev-' + ((window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36)));
+    localStorage.setItem(OWNER_DEVICE_KEY, d);
+    return d;
+  } catch(e) { return 'unknown'; }
+}
+window.ownerDeviceId = ownerDeviceId;
+function totpApi() { return window._totpApiOverride || (window.firebase && firebase.auth && firebase.auth.TotpMultiFactorGenerator) || null; }
+// Firebase asks for the second step: the 6-digit code from the authenticator app.
+async function mfaResolve(err) {
+  var resolver = err && err.resolver;
+  var hint = resolver && (resolver.hints || []).filter(function(h){ return h.factorId === 'totp'; })[0];
+  if (!hint || !totpApi()) throw err;
+  for (var tries = 0; tries < 3; tries++) {
+    var code = await askConfirm({ icon: '\u{1F510}', title: 'The code from your authenticator',
+      message: 'Open your authenticator app (or the iPhone\u2019s Passwords) and type the 6-digit code for My Kitchen Notes.',
+      input: '', placeholder: '123 456', okLabel: 'Continue' });
+    if (typeof code !== 'string') { var c = new Error('The sign-in was not finished.'); c.code = 'auth/popup-closed-by-user'; throw c; }
+    try { return await resolver.resolveSignIn(totpApi().assertionForSignIn(hint.uid, code.replace(/\D+/g, ''))); }
+    catch (e) {
+      if (e && /invalid-verification-code|missing-code/.test(e.code || '') && tries < 2) { toast('That code did not match \u2014 try the newest one.', 5000); continue; }
+      throw e;
+    }
+  }
+}
+window.mfaResolve = mfaResolve;
+// For what cannot be undone: a sign-in with Google in the last few minutes, or one now.
+async function ownerFresh(why) {
+  // (a Self Test run stubs the account: only the test about this asks it for real)
+  if (window._selfTestRunning && !window._ownerFreshUnderTest) return true;
+  var u = window._fbUser;
+  if (!u) return false;
+  try {
+    var t = await u.getIdTokenResult();
+    if (t.signInProvider === 'google.com' && Date.now() - Date.parse(t.authTime) < 13 * 60e3) return true;
+  } catch(e) {}
+  if (await askConfirm({ icon: '\u{1F510}', title: 'Confirm it\u2019s you',
+      message: (why ? why + '\n\n' : '') + 'Changes that cannot be undone need the owner to sign in with Google again'
+        + ' (and the authenticator\u2019s code, once that is switched on).', okLabel: 'Sign in with Google' }) !== true) return false;
+  try {
+    try { await u.reauthenticateWithPopup(window._fbProvider || new firebase.auth.GoogleAuthProvider()); }
+    catch (e0) { if (e0 && e0.code === 'auth/multi-factor-auth-required') await mfaResolve(e0); else throw e0; }
+    await u.getIdToken(true);
+    return true;
+  } catch (e) {
+    if (e && e.code !== 'auth/popup-closed-by-user') showServiceError('Could not confirm it is you: ' + ((e && e.message) || e));
+    return false;
+  }
+}
+window.ownerFresh = ownerFresh;
+async function ownerTwoStepState() {
+  var on = false;
+  try { var d = await hhDb().collection('config').doc('security').get(); on = !!(d.exists && d.data().ownerTwoStep === true); } catch(e) {}
+  var u = window._fbUser, factors = (u && u.multiFactor && u.multiFactor.enrolledFactors) || [];
+  return { on: on, enrolled: factors.filter(function(f){ return f.factorId === 'totp'; }) };
+}
+// ⚙️ → 👑 App owner → 🔐 Two-step sign-in for the owner.
+async function openOwnerTwoStep() {
+  if (!window._fbUser || !isAppOwner()) return null;
+  if (!totpApi()) { showServiceError('This browser\u2019s sign-in library has no authenticator support. Reload the app and try again.'); return null; }
+  var st = await ownerTwoStepState();
+  var head = 'An authenticator app (Google Authenticator, Microsoft Authenticator, or the iPhone\u2019s own Passwords) gives a new 6-digit code every 30 seconds. '
+    + 'Once it is required, your owner\u2019s tools need that code as well as your Google sign-in \u2014 so someone who gets into your mailbox, or even your Google account, still cannot use them.';
+  var opts = [];
+  if (!st.enrolled.length) opts.push({ value: 'setup', label: '\u{1F4F2} Set up an authenticator app' });
+  if (st.enrolled.length && !st.on) opts.push({ value: 'on', label: '\u2705 Require it for the owner\u2019s tools' });
+  if (st.on) opts.push({ value: 'off', label: 'Stop requiring it' });
+  if (st.enrolled.length && !st.on) opts.push({ value: 'remove', label: 'Remove the authenticator' });
+  var pick = await askChoice('\u{1F510} Two-step sign-in for the owner \u2014 ' + (st.on ? 'REQUIRED' : st.enrolled.length ? 'set up, not yet required' : 'not set up') + '\n\n' + head, opts);
+  if (pick === 'setup') return ownerTotpSetup();
+  if (pick === 'on' || pick === 'off') return ownerTwoStepSwitch(pick === 'on');
+  if (pick === 'remove') {
+    if (!(await ownerFresh())) return false;
+    try { await window._fbUser.multiFactor.unenroll(st.enrolled[0]); toast('The authenticator was removed.'); return true; }
+    catch (e) { showServiceError('Could not remove it: ' + ((e && e.message) || e)); return false; }
+  }
+  return null;
+}
+window.openOwnerTwoStep = openOwnerTwoStep;
+async function ownerTotpSetup() {
+  var u = window._fbUser;
+  if (!(await ownerFresh('Setting up the authenticator needs a fresh sign-in.'))) return false;
+  var secret;
+  try { secret = await totpApi().generateSecret(await u.multiFactor.getSession()); }
+  catch (e) {
+    showServiceError(/operation-not-allowed|admin-restricted|not.?enabled|unsupported/i.test(((e && e.code) || '') + ' ' + ((e && e.message) || ''))
+      ? 'The authenticator is not switched on for this copy\u2019s sign-in yet (one setting in Firebase \u2014 the owner\u2019s step in the instructions). Nothing changed.'
+      : 'Could not start it: ' + ((e && e.message) || e));
+    return false;
+  }
+  var key = String(secret.secretKey || ''), url = secret.generateQrCodeUrl(u.email, 'My Kitchen Notes');
+  var ov = document.createElement('div');
+  ov.id = 'totpOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '1310';
+  ov.innerHTML = '<div class="modal" style="max-width:460px;padding:20px;" role="dialog" aria-label="Set up the authenticator">'
+    + '<h3 style="margin:0 0 8px;">\u{1F4F2} Add My Kitchen Notes to your authenticator</h3>'
+    + '<p style="margin:0 0 10px;line-height:1.5;">On this iPhone: <a id="totpLink" href="' + escA(url) + '">tap here to add it to Passwords</a> (or your authenticator app).</p>'
+    + '<p style="margin:0 0 6px;line-height:1.5;">Anywhere else: in the authenticator, choose \u201cEnter a setup key\u201d and type</p>'
+    + '<div id="totpKey" dir="ltr" style="font:600 16px/1.6 ui-monospace,Menlo,monospace;letter-spacing:2px;word-break:break-all;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;">'
+    + escH(key.replace(/(.{4})/g, '$1 ').trim()) + '</div>'
+    + '<p style="margin:10px 0 6px;">Then type the 6-digit code it shows:</p>'
+    + '<input id="totpCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" style="width:100%;font-size:18px;padding:10px;border-radius:8px;border:1px solid var(--border);">'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;"><button class="btn btn-secondary" id="totpCancel" style="color:var(--ink);">Cancel</button>'
+    + '<button class="btn btn-primary" id="totpOk">Finish</button></div></div>';
+  document.body.appendChild(ov);
+  return new Promise(function(resolve) {
+    function done(v) { ov.remove(); resolve(v); }
+    document.getElementById('totpCancel').onclick = function(){ done(false); };
+    document.getElementById('totpOk').onclick = async function() {
+      var code = String(document.getElementById('totpCode').value || '').replace(/\D+/g, '');
+      if (code.length !== 6) { toast('The 6 digits from the authenticator, please.'); return; }
+      try {
+        await u.multiFactor.enroll(totpApi().assertionForEnrollment(secret, code), 'Authenticator app');
+      } catch (e) { toast(/invalid-verification-code/.test((e && e.code) || '') ? 'That code did not match \u2014 try the newest one.' : 'Could not finish: ' + ((e && e.message) || e), 6000); return; }
+      syncLog('auth', 'The owner set up an authenticator app', '');
+      done(true);
+      if (await askConfirm({ icon: '\u2705', title: 'The authenticator is set up',
+          message: 'Require it now for your owner\u2019s tools? You will sign in once more, with Google and its code.', okLabel: 'Require it' }) === true)
+        ownerTwoStepSwitch(true);
+    };
+  });
+}
+async function ownerTwoStepSwitch(on) {
+  var u = window._fbUser;
+  // Turning it on needs a sign-in WITH the code (the rules check it), so it can never lock him out.
+  try {
+    var t = await u.getIdTokenResult();
+    var fresh = t.signInProvider === 'google.com' && Date.now() - Date.parse(t.authTime) < 13 * 60e3 && t.signInSecondFactor === 'totp';
+    if (!fresh) {
+      if (await askConfirm({ icon: '\u{1F510}', title: 'Sign in with Google and the code', message: 'This change needs a sign-in that used the authenticator\u2019s code.', okLabel: 'Sign in' }) !== true) return false;
+      try { await u.reauthenticateWithPopup(window._fbProvider || new firebase.auth.GoogleAuthProvider()); }
+      catch (e0) { if (e0 && e0.code === 'auth/multi-factor-auth-required') await mfaResolve(e0); else throw e0; }
+      await u.getIdToken(true);
+    }
+    await hhDb().collection('config').doc('security').set({ ownerTwoStep: !!on, by: u.email, at: Date.now() });
+  } catch (e) { if (!e || e.code !== 'auth/popup-closed-by-user') showServiceError('Could not change it: ' + ((e && e.message) || e)); return false; }
+  toast(on ? '\u{1F510} Your owner\u2019s tools now need the authenticator\u2019s code.' : 'The authenticator is no longer required.', 7000);
+  return true;
+}
+window.ownerTwoStepSwitch = ownerTwoStepSwitch;
 function isAppOwner() {
   // v37.03 — and CONFIRMED: an account made with the owner's address and a
   // password proves nothing until the mailbox has confirmed it.
@@ -24059,7 +24214,8 @@ async function startGoogleSignIn() {
   window._justSignedIn = true;
   if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
   try {
-    await _fbAuth.signInWithPopup(_fbProvider);
+    try { await _fbAuth.signInWithPopup(_fbProvider); }
+    catch (e0) { if (e0 && e0.code === 'auth/multi-factor-auth-required') await mfaResolve(e0); else throw e0; }   // v38.23
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
   } catch(err) {
     window._justSignedIn = false;
@@ -24203,7 +24359,8 @@ async function startProviderSignIn(kind) {
     p.addScope('email'); p.addScope('name');
   } else return null;
   window._justSignedIn = true;
-  try { return await _fbAuth.signInWithPopup(p); }
+  try { try { return await _fbAuth.signInWithPopup(p); }
+        catch (e0) { if (e0 && e0.code === 'auth/multi-factor-auth-required') return await mfaResolve(e0); throw e0; } }   // v38.23
   catch(e) { authFailed(e, 'Sign-in with ' + kind); return null; }
 }
 function emailFormValues() {

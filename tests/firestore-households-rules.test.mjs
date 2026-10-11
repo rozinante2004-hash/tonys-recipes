@@ -17,7 +17,9 @@ const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8
   .replaceAll('{{READ}}', "'nobody@example.com'").replaceAll('{{WRITE}}', "'nobody@example.com'")
   .replaceAll('{{ADMIN}}', "'nobody@example.com'").replaceAll('{{APP_ADMINS}}', "'alice@example.com'");
 const env = await initializeTestEnvironment({ projectId: 'demo-households', firestore: { rules } });
-const person = (uid, extra) => env.authenticatedContext(uid, Object.assign({ email: uid + '@example.com', email_verified: true }, extra || {})).firestore();
+// v38.23 — signed in with Google, just now (the app's owner's powers need both).
+const person = (uid, extra) => env.authenticatedContext(uid, Object.assign({ email: uid + '@example.com', email_verified: true,
+  firebase: { sign_in_provider: 'google.com' }, auth_time: Math.floor(Date.now() / 1000) }, extra || {})).firestore();
 const alice = person('alice'), bob = person('bob'), carol = person('carol'), dave = person('dave'),
       erin = person('erin'), michal = person('michal'), frank = person('frank'),
       unverified = person('michal2', { email: 'michal@example.com', email_verified: false }),
@@ -385,6 +387,27 @@ await check('…but still renames it (the extras stay as they are)', updateDoc(d
 await check('nobody founds a household with extras',             (() => { const b = writeBatch(frank);
   b.set(doc(frank, 'households/X9'), { name: 'Extras', ownerUid: 'frank', createdAt: 1, features: { gmail: true } });
   b.set(doc(frank, 'households/X9/members/frank'), { uid: 'frank', role: 'owner', email: 'frank@example.com', joinedAt: 1 }); return b.commit(); })(), false);
+
+console.log('The owner\'s powers are protected (v38.23)');
+const aliceLink = person('alice', { firebase: { sign_in_provider: 'emailLink' } });
+const alicePw = person('alice', { firebase: { sign_in_provider: 'password' } });
+const aliceOld = person('alice', { auth_time: Math.floor(Date.now() / 1000) - 3600 });
+const alice2f = person('alice', { firebase: { sign_in_provider: 'google.com', sign_in_second_factor: 'totp' } });
+await check('signed in by an e-mail link, the owner\'s address is not enough', getDocs(collection(aliceLink, 'households')), false);
+await check('…nor with a password',                                 getDocs(collection(alicePw, 'households')), false);
+await check('with Google it is',                                    getDocs(collection(alice, 'households')), true);
+await check('an hour after signing in, he cannot switch a household\'s extras', updateDoc(doc(aliceOld, 'households/L1'), { features: { gmail: true } }), false);
+await check('…nor change who may found a household',                setDoc(doc(aliceOld, 'config/founding'), { open: true, by: 'alice', at: 1 }), false);
+await check('…but still reads the list',                            getDocs(collection(aliceOld, 'households')), true);
+await check('the two-step switch is turned on only from a sign-in with the authenticator', setDoc(doc(alice, 'config/security'), { ownerTwoStep: true, by: 'alice', at: 1 }), false);
+await check('…and from one, it is',                                 setDoc(doc(alice2f, 'config/security'), { ownerTwoStep: true, by: 'alice', at: 1 }), true);
+await check('then Google alone is not enough',                      getDocs(collection(alice, 'households')), false);
+await check('…Google with the authenticator is',                    getDocs(collection(alice2f, 'households')), true);
+await check('…nobody else may turn it off',                         setDoc(doc(carol, 'config/security'), { ownerTwoStep: false, by: 'carol', at: 1 }), false);
+await check('…nor he without the authenticator',                    setDoc(doc(alice, 'config/security'), { ownerTwoStep: false, by: 'alice', at: 1 }), false);
+await check('…he turns it off with it',                             setDoc(doc(alice2f, 'config/security'), { ownerTwoStep: false, by: 'alice', at: 1 }), true);
+await check('…and Google alone works again',                        getDocs(collection(alice, 'households')), true);
+await check('anyone signed in reads whether it is on',              getDoc(doc(carol, 'config/security')), true);
 
 console.log('The owner deletes a household from the management app (v37.61)');
 await check('the app\'s owner cannot read a household\'s recipes before marking it', getDocs(collection(alice, 'households/L2/recipes')), false);

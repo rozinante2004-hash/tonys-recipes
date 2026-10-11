@@ -47,13 +47,22 @@
     return d;
   }
   async function meterSet(op, hid, extra) {
-    var t = await _fbUser.getIdToken();
-    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-      body: workerBody(Object.assign({ action: 'meter-admin', op: op, hid: hid, idToken: t }, extra || {})), signal: AbortSignal.timeout(15000) });
-    var d = {}; try { d = await r.json(); } catch (e) {}
-    if (!r.ok) throw new Error((d && d.error) || ('the server answered ' + r.status));
-    return d;
+    for (var attempt = 0; ; attempt++) {
+      var t = await _fbUser.getIdToken();
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody(Object.assign({ action: 'meter-admin', op: op, hid: hid, idToken: t }, extra || {})), signal: AbortSignal.timeout(15000) });
+      var d = {}; try { d = await r.json(); } catch (e) {}
+      // v38.23 — what cannot be undone needs a fresh sign-in (Worker v73): once, then the same again.
+      if (r.status === 401 && d && d.reauth && attempt === 0 && typeof ownerFresh === 'function') {
+        if (await ownerFresh()) continue;
+        throw new Error('it was not confirmed, so nothing was changed');
+      }
+      if (!r.ok) throw new Error(String((d && d.error) || ('the server answered ' + r.status)).replace(/^(METER|REAUTH): /, ''));
+      return d;
+    }
   }
+  // v38.23 — the database asks for the same before a change that cannot be undone.
+  async function fresh(why) { return typeof ownerFresh !== 'function' || await ownerFresh(why); }
 
   // Everything about every household, gathered in five reads.
   // v37.60 — the database and the server are read independently: either can
@@ -781,6 +790,7 @@
   var api = window.mknManage = {
     // v37.96 — newcomers by invitation only (or not), in this copy.
     setFounding: async function (open) {
+      if (!(await fresh())) return false;   // v38.23
       try { await hhSetFoundingOpen(!!open); S.founding = !!open; render(); toast(open ? 'Anyone who signs in may start a household here.' : 'New households here: by invitation only.'); return true; }
       catch (e) { toast('Could not change it: ' + ((e && e.message) || e) + (/permission/i.test(String(e && e.message)) ? ' — publish this copy\u2019s database rules first.' : ''), 8000); return false; }
     },
@@ -949,6 +959,7 @@
       if (!r || r.remote || EXTRAS.map(function (x) { return x[0]; }).indexOf(name) === -1) return false;
       var f = Object.assign({}, r.features || {});
       if (on) f[name] = true; else delete f[name];
+      if (!(await fresh())) { render(); return false; }   // v38.23
       try { await window._fbDb.collection('households').doc(r.hid).update({ features: f }); }
       catch (e) { showServiceError('Could not change it: ' + ((e && e.message) || e)); render(); return false; }
       r.features = f;
@@ -978,6 +989,7 @@
         input: '', placeholder: r.name || '', okLabel: 'Delete it', danger: true });
       if (typeof typed !== 'string') return false;
       if (!sameTypedName(typed, r.name || r.code)) { toast('The name did not match \u2014 nothing was deleted.', 6000); return false; }
+      if (!(await fresh())) return false;   // v38.23 — deleting needs a fresh sign-in (rules)
       var n;
       try { n = await deleteHousehold(r, function (msg) { toast('\u23f3 ' + msg, 4000); }); }
       catch (e) { showServiceError('The household could not be fully deleted: ' + (e && e.message)

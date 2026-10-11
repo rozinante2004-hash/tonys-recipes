@@ -7379,6 +7379,53 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'owner_protections', group:'Security', name:'🔐 The owner’s powers: every owner request says which device; what cannot be undone asks for a fresh Google sign-in; the authenticator’s code at sign-in; ⚙️ → 👑 → 🔐 Two-step sign-in (v38.23)',
+    test: async()=>{
+      // The device: a random id kept on this device, sent with the owner's requests only.
+      function wb(x){ var v=workerBody(x); return typeof v==='string' ? JSON.parse(v) : v; }   // (what is sent: JSON text)
+      var b1=wb({ action:'meter-admin', op:'list' }), b2=wb({ action:'meter-admin', op:'notes' }), b3=wb({ action:'ai' });
+      if(!/^[A-Za-z0-9-]{8,64}$/.test(b1.device||'') || b1.device!==b2.device) throw new Error('the owner’s requests carry no steady device id: '+b1.device+' / '+b2.device);
+      if('device' in b3) throw new Error('an ordinary request carries the device id');
+      var item=document.querySelector('#settingsDrop [onclick*="openOwnerTwoStep"]');
+      if(!item || !item.hasAttribute('data-owner-only')) throw new Error('no owner-only 🔐 Two-step sign-in item in ⚙️');
+      var real={ user:window._fbUser, ask:window.askConfirm, err:window.showServiceError, toast:window.toast, prov:window._fbProvider };
+      var asked=[], refreshed=0, reauthed=0;
+      window._ownerFreshUnderTest=true;
+      try{
+        window.showServiceError=function(){}; window.toast=function(){};
+        function user(provider, minutesAgo, reauth){
+          return { email:'owner@example.com', getIdTokenResult:async function(){ return { signInProvider:provider, authTime:new Date(Date.now()-minutesAgo*60e3).toUTCString() }; },
+                   getIdToken:async function(force){ if(force) refreshed++; return 'tok'; }, reauthenticateWithPopup:reauth || async function(){ reauthed++; return {}; } };
+        }
+        window._fbProvider={};
+        window.askConfirm=async function(o){ asked.push(o.title); return false; };
+        window._fbUser=user('google.com', 2);
+        if(await ownerFresh()!==true || asked.length) throw new Error('a Google sign-in two minutes ago is fresh enough, without asking');
+        window._fbUser=user('google.com', 60);
+        if(await ownerFresh()!==false || asked.length!==1) throw new Error('an hour-old sign-in: asked, and refused when not confirmed');
+        window._fbUser=user('emailLink', 1);
+        if(await ownerFresh()!==false || asked.length!==2) throw new Error('an e-mail-link sign-in is never enough');
+        window.askConfirm=async function(o){ asked.push(o.title); return true; };
+        window._fbUser=user('google.com', 60);
+        if(await ownerFresh()!==true || reauthed!==1 || refreshed!==1) throw new Error('confirmed: signs in with Google again and refreshes the token ('+reauthed+', '+refreshed+')');
+        // The authenticator's code, when Firebase asks for it.
+        var used=null;
+        window._totpApiOverride={ assertionForSignIn:function(uid, code){ return { uid:uid, code:code }; } };
+        var err={ code:'auth/multi-factor-auth-required', resolver:{ hints:[{ factorId:'totp', uid:'h1' }], resolveSignIn:async function(a){ used=a; return { user:{} }; } } };
+        window.askConfirm=async function(o){ asked.push(o.title); return o.input!==undefined ? ' 123 456 ' : true; };   // the code box gets the code, a question a yes
+        await mfaResolve(err);
+        if(!used || used.uid!=='h1' || used.code!=='123456') throw new Error('the code is not handed to Firebase as six digits: '+JSON.stringify(used));
+        window._fbUser=user('google.com', 60, async function(){ throw err; });
+        used=null;
+        if(await ownerFresh()!==true || !used) throw new Error('a re-sign-in that asks for the code is finished with it');
+        var other={ code:'auth/multi-factor-auth-required', resolver:{ hints:[{ factorId:'phone', uid:'p1' }] } };
+        var threw=false; try{ await mfaResolve(other); }catch(e){ threw=(e===other); }
+        if(!threw) throw new Error('a second step the app does not know is passed on, not guessed');
+      } finally {
+        delete window._ownerFreshUnderTest; delete window._totpApiOverride;
+        window._fbUser=real.user; window.askConfirm=real.ask; window.showServiceError=real.err; window.toast=real.toast; window._fbProvider=real.prov;
+      }
+    }},
   { id:'family_move', group:'Sharing', name:'🏠 The family’s move into the community copy: no copy forwards until move day; then every visit goes to the new address with its path, shared link and text; a moved household says so and stops; one household’s own Gmail/WhatsApp; the owner’s inbox in the community copy too (v38.22)',
     test: async()=>{
       // Nothing forwards today (move day sets the family copy's movedTo).

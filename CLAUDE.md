@@ -836,6 +836,30 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.23 + Worker v73 — the owner's powers, protected (11 Oct 2026, Tony's "4 yes"; alerts to his second
+    address, kept in the GitHub secret ALERT_EMAIL — never in the repository).** Three layers, in the rules AND the
+    Worker: (1) `appAdmin()` needs `request.auth.token.firebase.sign_in_provider == 'google.com'` (an e-mail link or
+    a password — which mere mailbox access could give — opens nothing); (2) `ownerTwoStepOk()`: once
+    `config/security.ownerTwoStep` is true, the sign-in must carry `sign_in_second_factor == 'totp'`; the switch is
+    turned ON only from such a sign-in (so it can never lock him out) and off only by him with it; (3)
+    `recentSignIn()` (auth_time ≤ 15 min) for the deletion mark, a household's extras, config/founding and
+    config/security. The address is checked first, so nobody else's request reads config/security. The i18n write
+    now uses appAdmin() too. Worker v73: the same in `meter-admin` (needGoogle 403, needTwoStep 403, reading the
+    switch with his own token — failing CLOSED, 502; OWNER_DESTRUCTIVE ops → 401 `reauth`), and `ownerWatch`:
+    table owner_devices (email, device from the app's random `mkn_owner_device`, ua) — the first use of the owner's
+    tools on a device and every destructive op are e-mailed (`ownerAlert`, send_email binding ALERTS in
+    worker/wrangler.jsonc, no address there; secret ALERT_TO set by deploy-worker.yml from GitHub secret
+    ALERT_EMAIL; from alerts@mykitchennotes.community; health `alerts`). App: `workerBody` adds `device` to every
+    meter-admin request; `mfaResolve` (the authenticator's 6 digits when Firebase says
+    auth/multi-factor-auth-required — Google sign-in, both popup paths, re-sign-in); `ownerFresh` (a Google
+    sign-in under 13 minutes old, or a re-sign-in now — skipped in Self Test runs unless `_ownerFreshUnderTest`);
+    manage.js `meterSet` retries once after a `reauth`, and asks `fresh()` before deleting a household, the
+    extras and founding; ⚙️ → 👑 → 🔐 Two-step sign-in for the owner (`openOwnerTwoStep`: set up —
+    `TotpMultiFactorGenerator.generateSecret`, an otpauth:// link for the iPhone's Passwords and the setup key
+    for any authenticator — require / stop requiring / remove). Needs (Tony) for the authenticator: the
+    community project upgraded to Identity Platform with TOTP switched on; for alerts: tony.schvekher@gmail.com
+    verified as a destination address in Cloudflare Email Routing + GitHub secret ALERT_EMAIL. Tests: 15 rules
+    checks, 16 Worker checks, self-test `owner_protections`.
   - **v38.22 + Worker v72 — everything the family's move needs, ready but not yet run (11 Oct 2026).**
     - **tools/move-family.mjs** (`--from recipes-f379d --to <project> --mode survey|copy|remove`): copies the
       accounts with the SAME user ids (Identity Toolkit accounts:batchGet → accounts:batchCreate, Google identity
@@ -873,6 +897,8 @@ found only because a test was written first and disagreed with the code.
       translate job's service account needs "Cloud Datastore User" there); (5) in the community copy: 📦 Bring the
       allowances, Extras → Gmail (and Gmail's OAuth client gets the new origin; the client ID is per device —
       ⚙️ → 👑 → 📧 again); (6) family members sign in once there and re-add the icon / Share-menu shortcut.
+  - **Released to the family app and the beta: v38.21 (11 Oct 2026, Tony's "1 yes", CI green on 86179f6).** Pages,
+    Translate, Publish languages, Self Tests on main: success. Tony reinstalls the beta's icon once.
   - **v38.21 — the community copy installs as the app itself (11 Oct 2026).** Tony: "1 yes" (a solid status bar;
     "My Kitchen Notes" with the normal icon), "2 delete it" (his beta test household, on move day), "3 yes" (the
     family moves BEFORE the testers are invited, next week), "4 yes" (build admin protections 4–7; his second

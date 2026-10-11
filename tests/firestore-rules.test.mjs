@@ -24,7 +24,7 @@ const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8
   .replaceAll('{{APP_ADMINS}}', q([OWNER]));
 
 const env = await initializeTestEnvironment({ projectId: 'demo-rules', firestore: { rules } });
-const as = email => env.authenticatedContext(email.split('@')[0], { email, email_verified: true }).firestore();
+const as = email => env.authenticatedContext(email.split('@')[0], { email, email_verified: true, firebase: { sign_in_provider: 'google.com' } }).firestore();   // v38.23 — with Google
 // v37.03 — someone who made an account with a member's address and a password,
 // without confirming it (they do not own the mailbox).
 const unconfirmed = email => env.authenticatedContext('pw-' + email.split('@')[0], { email, email_verified: false }).firestore();

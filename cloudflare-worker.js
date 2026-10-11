@@ -1,4 +1,18 @@
-// Tony's Recipes — Cloudflare Worker v72
+// Tony's Recipes — Cloudflare Worker v73
+// v73: THE OWNER'S POWERS, PROTECTED. Tony: "the only thing that keeps me Admin is
+//      my email address … I need to protect myself". `meter-admin` (every owner
+//      tool) now needs (1) a sign-in WITH GOOGLE (claims.firebase.sign_in_provider)
+//      — an e-mail link or a password, which mere access to his mailbox could give,
+//      is refused; (2) once he has switched it on in his copy (Firestore
+//      config/security.ownerTwoStep, read with his own token), the authenticator's
+//      code in that sign-in (sign_in_second_factor 'totp'); (3) for what cannot be
+//      undone (OWNER_DESTRUCTIVE) a sign-in within the last 15 minutes — else 401
+//      `reauth`, and the app asks him to sign in again. And he HEARS about it: the
+//      first use of the owner's tools from a device (the app sends a random id kept
+//      on it; table owner_devices) and every destructive action are e-mailed to
+//      ALERT_TO (a Cloudflare secret, from the GitHub secret ALERT_EMAIL) through
+//      the send_email binding ALERTS, from alerts@ the app's domain. Health:
+//      `alerts`.
 // v72: THE FAMILY MOVES INTO THE COMMUNITY COPY (Tony, 11 Oct 2026, option B).
 //      `meter-admin` `copy-from` {from}: the owner's page in the community copy
 //      brings another copy's households' allowances, notes, spending, reports
@@ -306,7 +320,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v72';
+const WORKER_VERSION = 'v73';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -682,6 +696,7 @@ async function handleRequest(request, env) {
         // Anthropic refuses unknown fields — the v37 lesson).
         metering: { version: 1, db: !!env.METER_DB },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
+        alerts: !!(env.ALERTS && env.ALERT_TO),   // v73 — the owner hears about a new device and destructive actions
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
@@ -1318,6 +1333,52 @@ function fsValue(f) {
   if ('booleanValue' in f) return f.booleanValue;
   return null;
 }
+// v73 — the owner's protections (see the top of the file).
+const OWNER_DESTRUCTIVE = new Set(['forget', 'mark-deleted', 'set-cap', 'survey-open', 'survey-close', 'note-delete', 'error-delete', 'copy-from']);
+const _ownerSec = new Map();
+async function ownerTwoStepOn(project, token, env) {
+  const c = env.__firestoreBase ? null : _ownerSec.get(project);   // (the tests change it between calls)
+  if (c && Date.now() - c.at < 60e3) return c.on;
+  const url = (env.__firestoreBase || 'https://firestore.googleapis.com') + '/v1/projects/' + encodeURIComponent(project)
+    + '/databases/(default)/documents/config/security';
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(8000) });
+  let on = false;
+  if (r.ok) { try { on = fsValue((((await r.json()) || {}).fields || {}).ownerTwoStep) === true; } catch (e) { on = false; } }
+  else if (r.status !== 404) throw new Error('the database answered ' + r.status);   // never "off" by mistake
+  _ownerSec.set(project, { on, at: Date.now() });
+  return on;
+}
+async function ownerWatch(env, db, claims, body, request) {
+  await db.prepare('CREATE TABLE IF NOT EXISTS owner_devices (email TEXT NOT NULL, device TEXT NOT NULL, first_at INTEGER, last_at INTEGER, '
+    + 'ua TEXT, PRIMARY KEY (email, device))').run();
+  const email = String(claims.email || '').toLowerCase(), now = Date.now(), op = String(body.op || 'list');
+  const dev = /^[A-Za-z0-9-]{8,64}$/.test(String(body.device || '')) ? String(body.device) : 'unknown';
+  const ua = String(request.headers.get('User-Agent') || '').slice(0, 200);
+  const known = await db.prepare('SELECT 1 AS k FROM owner_devices WHERE email = ?1 AND device = ?2').bind(email, dev).first();
+  await db.prepare('INSERT INTO owner_devices (email, device, first_at, last_at, ua) VALUES (?1, ?2, ?3, ?3, ?4) '
+    + 'ON CONFLICT (email, device) DO UPDATE SET last_at = excluded.last_at, ua = excluded.ua').bind(email, dev, now, ua).run();
+  const cf = request.cf || {};
+  const where = [cf.city, cf.country || request.headers.get('CF-IPCountry')].filter(Boolean).join(', ') || 'unknown place';
+  const lines = ['Account: ' + email, 'Copy: ' + claims.aud, 'Device: ' + ua, 'From: ' + where, 'When: ' + new Date(now).toUTCString()];
+  if (!known) await ownerAlert(env, 'My Kitchen Notes: the owner\'s tools were opened on a new device',
+    ['Someone signed in as the app\'s owner opened the owner\'s tools on a device not seen before.'].concat(lines,
+      ['', 'If this was you, there is nothing to do. If not: change your Google password, sign out of all devices at',
+       'https://myaccount.google.com/device-activity and switch on the authenticator step in the app.']).join('\n'));
+  if (OWNER_DESTRUCTIVE.has(op)) await ownerAlert(env, 'My Kitchen Notes: owner action "' + op + '"',
+    ['The app\'s owner did "' + op + '"' + (body.hid ? ' on household ' + String(body.hid).slice(0, 64) : '') + (body.project ? ' in ' + String(body.project).slice(0, 40) : '') + '.']
+      .concat(lines).join('\n'));
+}
+async function ownerAlert(env, subject, text) {
+  const to = String(env.ALERT_TO || '').trim();
+  if (!env.ALERTS || !/^[^\s@<>]+@[^\s@<>]+$/.test(to)) return false;
+  const from = String(env.ALERT_FROM || 'alerts@mykitchennotes.community');
+  const raw = ['From: My Kitchen Notes <' + from + '>', 'To: <' + to + '>', 'Subject: ' + subject.replace(/[^\x20-\x7E]/g, ''),
+    'Date: ' + new Date().toUTCString(), 'Message-ID: <' + crypto.randomUUID() + '@' + from.split('@')[1] + '>',
+    'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '', text].join('\r\n');
+  const EmailMessage = env.__EmailMessage || (await import('cloudflare:email')).EmailMessage;
+  await env.ALERTS.send(new EmailMessage(from, to, raw));
+  return true;
+}
 async function meterMembership(claims, hid, token, env) {
   const k = claims.aud + '/' + hid + '/' + claims.sub, c = _meterMembers.get(k);
   if (c && Date.now() - c.at < 600e3) return c;
@@ -1460,6 +1521,18 @@ async function meterAction(request, env, body) {
   const owners = csvList(env.OWNER_EMAILS, OWNER_EMAILS_DEFAULT).map(s => s.toLowerCase());
   if (!claims.email_verified || !owners.includes(String(claims.email || '').toLowerCase()))
     return jsonResp({ error: 'METER: only the app\'s owner may see this.' }, 403);
+  // v73 — with Google; with the authenticator once he switched it on; recently, for what cannot be undone.
+  const fb = claims.firebase || {};
+  if (fb.sign_in_provider !== 'google.com')
+    return jsonResp({ error: 'METER: the owner\'s tools need a sign-in with Google (not an e-mail link or a password).', needGoogle: true }, 403);
+  let twoStep;
+  try { twoStep = await ownerTwoStepOn(claims.aud, body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'METER: could not check the owner\'s two-step setting (' + e.message + ') — try again.' }, 502); }
+  if (twoStep && fb.sign_in_second_factor !== 'totp')
+    return jsonResp({ error: 'METER: the owner\'s tools need a sign-in with the code from your authenticator app.', needTwoStep: true }, 403);
+  if (OWNER_DESTRUCTIVE.has(String(body.op || '')) && !(Number(claims.auth_time) > Date.now() / 1000 - 900))
+    return jsonResp({ error: 'REAUTH: confirm it is you — sign in again, then do it once more.', reauth: true }, 401);
+  try { await ownerWatch(env, db, claims, body, request); } catch (e) {}
   // v62 — the owner's page in one copy manages another copy's households.
   const projects = csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT);
   const proj = body.project == null || body.project === '' ? claims.aud : String(body.project);
@@ -2443,4 +2516,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v72 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v73 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
