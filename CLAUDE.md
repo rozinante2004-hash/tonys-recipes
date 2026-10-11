@@ -836,8 +836,20 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.21 — the community copy installs as the app itself (11 Oct 2026).** Tony: "1 yes" (a solid status bar;
+    "My Kitchen Notes" with the normal icon), "2 delete it" (his beta test household, on move day), "3 yes" (the
+    family moves BEFORE the testers are invited, next week), "4 yes" (build admin protections 4–7; his second
+    address for alerts: tony.schvekher@gmail.com). tools/environments.json beta: manifest name "My Kitchen Notes",
+    short_name "Kitchen Notes"; NEW `homeScreen` {title "Kitchen Notes", statusBar "default"} — tools/build.js
+    rewrites `apple-mobile-web-app-title` and `-status-bar-style` (refuses a value it does not know, and a page
+    without the tags); `brand` dropped (no violet tab icon, no icons/beta — deleted). An iPhone keeps label, icon
+    and status-bar style from the moment the icon is added, hence now. NOTE: until v38.21 the beta's iPhone label
+    was the family's "Tony's Recipes" (the meta tag was never overridden). With the solid bar the page starts
+    below it: inset 0 → --top-safe 0, no band. The in-app "β BETA" strip stays. Test: ios_glass_edge checks the
+    two tags in the beta build. Live and test unchanged.
   - **Released to the family app and the beta: v38.20 (11 Oct 2026, Tony's yes, CI green on 09cbc42).** Pages: success;
-    Translate new phrases: success; Publish languages: success. No Worker, rules or extension change.
+    Translate new phrases: success; Publish languages: success; Self Tests on main: success. No Worker, rules or
+    extension change.
   - **Tony's decision (11 Oct 2026): OPTION B — the family moves into the community copy (mykitchennotes.community,
     project my-kitchen-notes-beta).** "As I am the one acting as the main 'seller' of the application, testers
     should be able to join my live and synced set of recipes." Conditions: every capability and privilege he has

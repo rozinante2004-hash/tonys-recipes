@@ -97,16 +97,13 @@
       "emailLink": true
     },
     "manifest": {
-      "name": "My Kitchen Notes (beta)",
-      "short_name": "Kitchen Notes β"
+      "name": "My Kitchen Notes",
+      "short_name": "Kitchen Notes"
     },
-    "brand": {
-      "iconFrom": "#5C3D2E",
-      "color": "#4B3F72",
-      "band": "#7A5AC8",
-      "icons": "icons/beta",
-      "label": "BETA"
+    "homeScreen": {
+      "title": "Kitchen Notes",
+      "statusBar": "default"
     },
-    "_why_brand": "Its own violet icons with a BETA band (tools/make-test-icons.mjs beta) and a small 'Beta' mark instead of the test copy's warning stripes: testers are real users of their own recipes."
+    "_why_homeScreen": "v38.21 — Tony, 11 Oct 2026: this copy becomes THE app (the family moves into it), so it installs as the app itself: its name, the normal icon (no violet BETA icons any more), and an iPhone home-screen label short enough not to be cut ('Kitchen Notes'). An iPhone keeps the name, the icon and the status-bar style it saw when the icon was added, so this had to be settled before the testers install. statusBar 'default' = a solid status bar: the page starts below it, so iOS 26/27's glass blur has nothing of ours to cover (reported sharp on an iOS 27 iPhone) and the 40px band of v38.20 is not needed. The small 'β BETA' strip inside the app stays; it can go later without anyone reinstalling."
   }
 }

@@ -69,7 +69,7 @@ const live = vm.runInNewContext('(' + literal + ')', { Object });
 function merge(base, over) {
   const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
   Object.keys(over).forEach(k => {
-    if (k.charAt(0) === '_' || k === 'manifest' || k === 'brand') return;   // notes, and what is not app config
+    if (k.charAt(0) === '_' || k === 'manifest' || k === 'brand' || k === 'homeScreen') return;   // notes, and what is not app config
     const v = over[k];
     out[k] = (v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object')
       ? merge(base[k], v) : v;
@@ -154,6 +154,23 @@ if (envName === 'live' && fs.readFileSync(path.join(outDir, 'index.html'), 'utf8
   if (csp[1].indexOf(new URL(cfg.workerUrl).host) === -1) fail('the Content-Security-Policy does not allow ' + cfg.workerUrl + ' — every AI call would be blocked');
 }
 
+// v38.21 — what an iPhone keeps from the moment the icon is added: its label and
+// the status bar's style (see environments.json, _why_homeScreen).
+if (overrides.homeScreen) {
+  const hs = overrides.homeScreen;
+  if (hs.title) {
+    const t = /<meta name="apple-mobile-web-app-title" content="[^"]*">/;
+    if (!t.test(page)) fail('could not find the home-screen title to replace');
+    page = page.replace(t, '<meta name="apple-mobile-web-app-title" content="' + hs.title.replace(/"/g, '&quot;') + '">');
+  }
+  if (hs.statusBar) {
+    if (['default', 'black', 'black-translucent'].indexOf(hs.statusBar) === -1) fail('homeScreen.statusBar must be default, black or black-translucent');
+    const b = /<meta name="apple-mobile-web-app-status-bar-style" content="[^"]*">/;
+    if (!b.test(page)) fail('could not find the status-bar style to replace');
+    page = page.replace(b, '<meta name="apple-mobile-web-app-status-bar-style" content="' + hs.statusBar + '">');
+  }
+  fs.writeFileSync(path.join(outDir, 'index.html'), page);
+}
 // The installable app's name, so a test copy on a home screen cannot pass for the real one.
 if (overrides.manifest) {
   const mf = JSON.parse(fs.readFileSync(path.join(repo, 'manifest.json'), 'utf8'));

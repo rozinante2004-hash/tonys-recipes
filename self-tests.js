@@ -7390,12 +7390,18 @@ window.SELF_TESTS = [
         if(other!=='No household has the identifier MKN-J5DM-F9BX — check it and try again.') throw new Error('a tester’s message: '+other);
       } finally { window.isAppOwner=real; }
     }},
-  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 40 px on iOS) (v38.20)',
+  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 40 px on iOS) (v38.20); the community copy installs with a solid status bar as “Kitchen Notes” (v38.21)',
     test: async()=>{
       var css=(document.getElementById('topSafeCss')||{}).textContent||'';
       if(!/--top-safe:\s*env\(safe-area-inset-top/.test(css)) throw new Error('--top-safe is not the safe-area inset by default');
       if(!/@supports\s*\(-webkit-touch-callout:\s*none\)[\s\S]*min\(env\(safe-area-inset-top, 0px\) \* 100, env\(safe-area-inset-top, 0px\) \+ 40px\)/.test(css))
         throw new Error('on iOS the glass band (40 px below a non-zero inset) is not added');
+      // v38.21 — the community copy installs with a solid status bar and its own name (an iPhone keeps both from the day the icon is added).
+      if(APP_CONFIG.environment==='beta'){
+        var sb=(document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')||{}).content, tt=(document.querySelector('meta[name="apple-mobile-web-app-title"]')||{}).content;
+        if(sb!=='default') throw new Error('the community copy’s status bar is “'+sb+'”, not the solid one');
+        if(tt!=='Kitchen Notes') throw new Error('the community copy installs as “'+tt+'”');
+      }
       var root=document.documentElement, prev=root.style.getPropertyValue('--top-safe'), BAND=99;
       var header=document.querySelector('.header'), made=[];
       root.style.setProperty('--top-safe', BAND+'px');
