@@ -68,9 +68,8 @@ jobs:
     env:
       FIREBASE_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
     steps:
+      # (the branch it was started from: main, or the test branch for a tool fixed there)
       - uses: actions/checkout@v5
-        with:
-          ref: main
 
       - uses: actions/setup-node@v5
         with:

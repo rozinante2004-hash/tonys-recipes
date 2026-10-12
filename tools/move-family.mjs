@@ -51,6 +51,9 @@ if (['survey', 'copy', 'remove'].indexOf(MODE) === -1) { console.error('--mode s
 if (MODE === 'remove' && arg('confirm', '') !== 'remove') { console.error('remove takes documents and accounts away from ' + TO + ': add --confirm remove'); process.exit(2); }
 if (MARK && !/^https:\/\/[a-z0-9.-]+\/[^\s"']*$/.test(MARK)) { console.error('--mark-moved wants the new address, https://…/'); process.exit(2); }
 
+// The job's log cannot be read from outside GitHub — its summary lines are also
+// posted as notices, which can (counts only, as everything here).
+const say = line => console.log((process.env.GITHUB_ACTIONS === 'true' ? '::notice::' : '') + line);
 const FS = p => (process.env.FIRESTORE_BASE || 'https://firestore.googleapis.com/v1/') + 'projects/' + p + '/databases/(default)/documents';
 const IT = p => (process.env.IDENTITY_BASE || 'https://identitytoolkit.googleapis.com/') + 'v1/projects/' + p;
 const docName = (p, rel) => 'projects/' + p + '/databases/(default)/documents/' + rel;
@@ -217,7 +220,7 @@ const table = per => Object.keys(per).sort().map(k => k + ' ' + per[k]).join(', 
 async function main() {
   H = await headers();
   const started = Date.now();
-  console.log('== ' + MODE + ': ' + FROM + ' → ' + TO);
+  say('== ' + MODE + ': ' + FROM + ' → ' + TO);
 
   // Accounts on both sides.
   const fromUsers = await accounts(FROM), toUsers = await accounts(TO);
@@ -237,7 +240,7 @@ async function main() {
     if (u.passwordHash) password++;
     create.push(u);
   }
-  console.log('accounts: ' + fromUsers.length + ' in ' + FROM + ', ' + toUsers.length + ' in ' + TO
+  say('accounts: ' + fromUsers.length + ' in ' + FROM + ', ' + toUsers.length + ' in ' + TO
     + ' — ' + create.length + ' to create (same ids), ' + kept.length + ' already there'
     + (Object.keys(uidMap).length ? ' (' + Object.keys(uidMap).length + ' under another id: their places go to that account'
       + (OWNER ? '; the owner\'s address ' + (ownerKept ? 'IS one of them' : 'is not') : '') + ')' : '')
@@ -249,7 +252,7 @@ async function main() {
   const docs = src.docs.map(d => ({ path: mapPath(d.path), fields: strip(d.path, mapFields(d.fields)) }));
   const hids = docs.filter(d => /^households\/[^/]+$/.test(d.path)).map(d => d.path.split('/')[1]);
   const codes = docs.filter(d => /^codes\/[^/]+$/.test(d.path)).map(d => d.path);
-  console.log('documents in ' + FROM + ': ' + docs.length + ' (' + table(count(docs)) + '); households ' + hids.length
+  say('documents in ' + FROM + ': ' + docs.length + ' (' + table(count(docs)) + '); households ' + hids.length
     + '; not moved: ' + (src.top.filter(c => MOVED.indexOf(c) === -1 && !(WITH_I18N && c === 'i18n')).join(', ') || 'nothing'));
 
   // In the way? A household or an identifier already there (a second run says --resume).
@@ -258,10 +261,10 @@ async function main() {
   // Per-person documents of someone who already has an account there: theirs win.
   const personal = docs.filter(d => /^(homes|users)\//.test(d.path) && Object.values(uidMap).indexOf(d.path.split('/')[1]) > -1).map(d => d.path);
   const personalThere = personal.length ? Object.keys(await batchGet(TO, personal)) : [];
-  console.log('already in ' + TO + ': ' + inTheWay + ' of the households and identifiers'
+  say('already in ' + TO + ': ' + inTheWay + ' of the households and identifiers'
     + (personalThere.length ? '; ' + personalThere.length + ' personal settings of people already there (kept as they are)' : ''));
 
-  if (MODE === 'survey') { console.log('survey only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
+  if (MODE === 'survey') { say('survey only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
 
   if (MODE === 'remove') {
     // Everything the copy wrote — the shared translations never; and of the
@@ -276,7 +279,7 @@ async function main() {
     for (let i = 0; i < made.length; i += 1000)
       await call(IT(TO) + '/accounts:batchDelete', { method: 'POST', body: JSON.stringify({ localIds: made.slice(i, i + 1000), force: true }) }, TO, 'write');
     const left = await batchGet(TO, own.map(d => d.path));
-    console.log('removed from ' + TO + ': ' + own.length + ' documents, ' + made.length + ' accounts'
+    say('removed from ' + TO + ': ' + own.length + ' documents, ' + made.length + ' accounts'
       + ' — ' + Object.keys(left).length + ' still there');
     if (Object.keys(left).length) throw new Error(Object.keys(left).length + ' documents could not be removed');
     return;
@@ -288,7 +291,7 @@ async function main() {
   if (inTheWay && !RESUME) throw new Error(inTheWay + ' of the households or identifiers are already in ' + TO + ' — nothing was copied (a second run of the same copy: --resume)');
   let marked = 0;
   try {
-    if (MARK) { marked = await mark(true); console.log('marked ' + marked + ' family household(s) as moved — the family app stops and points to the new address'); }
+    if (MARK) { marked = await mark(true); say('marked ' + marked + ' family household(s) as moved — the family app stops and points to the new address'); }
     if (process.env.MOVE_TEST_FAIL === 'after-mark') throw new Error('a failure on purpose (the tests)');
     // Accounts first: a document naming someone who cannot sign in is no use.
     for (let i = 0; i < create.length; i += 500) {
@@ -301,19 +304,19 @@ async function main() {
     afterUsers.forEach(u => { afterIds[u.localId] = true; });
     const missingUsers = create.filter(u => !afterIds[u.localId]).length;
     if (missingUsers) throw new Error(missingUsers + ' account(s) are not in ' + TO + ' after the copy');
-    console.log('accounts created: ' + create.length);
+    say('accounts created: ' + create.length);
 
     await commit(TO, writing.map(d => ({ update: { name: docName(TO, d.path), fields: d.fields } })));
     // Read every one back and compare.
     const back = await batchGet(TO, writing.map(d => d.path));
     const wrong = writing.filter(d => !back[d.path] || !same(back[d.path], d.fields));
-    console.log('documents copied: ' + writing.length + ' (' + table(count(writing)) + ') — read back: ' + Object.keys(back).length + ', different: ' + wrong.length);
+    say('documents copied: ' + writing.length + ' (' + table(count(writing)) + ') — read back: ' + Object.keys(back).length + ', different: ' + wrong.length);
     if (wrong.length) throw new Error(wrong.length + ' document(s) did not read back the same (' + table(count(wrong)) + ')');
   } catch (e) {
-    if (marked) { try { await mark(false); console.log('the moved mark was taken off again — the family app works as before'); } catch (e2) { console.log('::error::could not take the moved mark off: ' + e2.message); } }
+    if (marked) { try { await mark(false); say('the moved mark was taken off again — the family app works as before'); } catch (e2) { console.log('::error::could not take the moved mark off: ' + e2.message); } }
     throw e;
   }
-  console.log('done in ' + Math.round((Date.now() - started) / 1000) + ' s, ' + calls + ' requests');
+  say('done in ' + Math.round((Date.now() - started) / 1000) + ' s, ' + calls + ' requests');
 }
 
 main().catch(e => { console.log('::error::' + ((e && e.message) || e)); process.exit(1); });

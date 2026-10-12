@@ -24,7 +24,9 @@ try {
   const { GoogleAuth } = require('google-auth-library');
   const client = await new GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getClient();
   const t = await client.getAccessToken();
-  const H = { Authorization: 'Bearer ' + (t.token || t), 'Content-Type': 'application/json', 'X-Goog-User-Project': project };
+  // (no X-Goog-User-Project: naming the project as the one billed asks for "Service Usage Consumer" there —
+  // refused on 12 Oct 2026; the move job's own Identity Toolkit calls, without it, were answered)
+  const H = { Authorization: 'Bearer ' + (t.token || t), 'Content-Type': 'application/json' };
   const r = await fetch(base + '?updateMask=mfa', { method: 'PATCH', headers: H,
     body: JSON.stringify({ mfa: { providerConfigs: [{ state: 'ENABLED', totpProviderConfig: { adjacentIntervals: 5 } }] } }) });
   const txt = await r.text();
@@ -36,7 +38,7 @@ try {
   }
   const back = JSON.parse(txt || '{}');
   const on = ((back.mfa || {}).providerConfigs || []).some(c => c.state === 'ENABLED' && c.totpProviderConfig);
-  console.log(on ? 'authenticator sign-in (TOTP) is ON for ' + project : '::warning::the answer does not show TOTP as on for ' + project);
+  console.log(on ? '::notice::authenticator sign-in (TOTP) is ON for ' + project : '::warning::the answer does not show TOTP as on for ' + project);
   if (!on) process.exit(1);
 } catch (e) {
   console.log('::error::' + ((e && e.message) || e));
