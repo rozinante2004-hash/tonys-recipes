@@ -90,6 +90,11 @@ const h1f = await get(F, 'households/H1'), h2f = await get(F, 'households/H2');
 ok(h1f.fields.movedTo.stringValue === 'https://new.example/' && h2f.fields.movedTo, 'every family household is marked as moved');
 ok((await get(F, 'households/H1/recipes/r0')).fields.uid.stringValue === 'uOWNERfam', "the family's own documents are unchanged");
 
+r = run(['--from', F, '--to', T, '--mode', 'unmark']);
+ok(r.code === 2, 'unmark needs --confirm unmark');
+r = run(['--from', F, '--to', T, '--mode', 'unmark', '--confirm', 'unmark']);
+const h1u = await get(F, 'households/H1');
+ok(r.code === 0 && !h1u.fields.movedTo && !h1u.fields.movedAt && h1u.fields.name.stringValue === "Family's Recipes", 'unmark takes the mark off (the way back), and nothing else');
 r = run(['--from', F, '--to', T, '--mode', 'copy']);
 ok(r.code === 1 && /already in demo-community — nothing was copied/.test(r.out), 'a second copy refuses without --resume');
 r = run(['--from', F, '--to', T, '--mode', 'copy', '--resume', '--i18n']);

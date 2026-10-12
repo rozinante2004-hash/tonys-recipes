@@ -845,6 +845,19 @@ found only because a test was written first and disagreed with the code.
     ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
+  - **12 Oct 2026, after Tony's steps:** Deploy the Worker re-run (ALERT_TO set from ALERT_EMAIL: success). "Switch on
+    the owner's authenticator sign-in": first refused (403, "Service Usage Consumer" — tools/enable-totp.mjs sent
+    X-Goog-User-Project; removed) → re-run from test: "authenticator sign-in (TOTP) is ON for my-kitchen-notes-beta".
+    The move and authenticator jobs now check out the branch they are started from (a fixed tool runs from test
+    before a release) and the move tool posts its summary as ::notice:: (job logs cannot be read from here;
+    annotations can). Backup job: "BACKUP_PASSPHRASE is missing or shorter than 16 characters" — asked Tony to check.
+    **Survey recipes-f379d → my-kitchen-notes-beta:** 3 accounts in the family (2 to create, 1 — the owner's address —
+    already in the beta under his beta id), 2 accounts in the beta; 143 documents (codes 1, households 137 — ONE
+    household —, pending 2, users 3); nothing in the way. NEW mode `unmark` (--confirm unmark): takes the movedTo
+    mark off again — the way back on move day. **Move day, revised:** no rehearsal in the test copy (its project
+    has none of the roles; the emulator rehearsal + survey + read-back cover it). (1) Tony deletes his beta account;
+    (2) copy WITHOUT the mark; (3) Tony checks the household in the community app; (4) copy --resume --mark --i18n
+    (catches anything changed meanwhile); (5) release: family copy's movedTo + languageSource → the beta project.
   - **Released to the family app and the beta: v38.22 + v38.23 + v38.24, Worker v73 (12 Oct 2026, Tony's yes, CI green
     on 52baeed).** Pages, Translate, Publish languages, Self Tests on main: success. Publish the database rules: success
     (all three projects — the owner's powers now need a Google sign-in). Deploy the Worker: success, live v73 with its

@@ -18,6 +18,8 @@
  *           again if anything fails.
  *   remove  takes a copy away again (a rehearsal in the test copy): the copied
  *           documents and the accounts it created. Needs --confirm remove.
+ *   unmark  takes the movedTo mark off the family households again — the family
+ *           app works as before (the way back on move day). --confirm unmark.
  *
  * What moves: households (and everything under them), their identifiers
  * (codes/), homes/, linkRequests/, linkTalk/, places kept (pending/,
@@ -47,7 +49,8 @@ const FROM = arg('from', ''), TO = arg('to', ''), MODE = arg('mode', 'survey');
 const MARK = arg('mark-moved', ''), WITH_I18N = has('i18n'), RESUME = has('resume');
 const OWNER = String(process.env.OWNER_EMAIL || '').toLowerCase();
 if (!/^[a-z0-9-]{4,40}$/.test(FROM) || !/^[a-z0-9-]{4,40}$/.test(TO) || FROM === TO) { console.error('usage: --from <project> --to <project> --mode survey|copy|remove'); process.exit(2); }
-if (['survey', 'copy', 'remove'].indexOf(MODE) === -1) { console.error('--mode survey, copy or remove'); process.exit(2); }
+if (['survey', 'copy', 'remove', 'unmark'].indexOf(MODE) === -1) { console.error('--mode survey, copy, remove or unmark'); process.exit(2); }
+if (MODE === 'unmark' && arg('confirm', '') !== 'unmark') { console.error('unmark lets the family app work again: add --confirm unmark'); process.exit(2); }
 if (MODE === 'remove' && arg('confirm', '') !== 'remove') { console.error('remove takes documents and accounts away from ' + TO + ': add --confirm remove'); process.exit(2); }
 if (MARK && !/^https:\/\/[a-z0-9.-]+\/[^\s"']*$/.test(MARK)) { console.error('--mark-moved wants the new address, https://…/'); process.exit(2); }
 
@@ -221,6 +224,7 @@ async function main() {
   H = await headers();
   const started = Date.now();
   say('== ' + MODE + ': ' + FROM + ' → ' + TO);
+  if (MODE === 'unmark') { const n = await mark(false); say('took the moved mark off ' + n + ' family household(s) — the family app works as before'); return; }
 
   // Accounts on both sides.
   const fromUsers = await accounts(FROM), toUsers = await accounts(TO);

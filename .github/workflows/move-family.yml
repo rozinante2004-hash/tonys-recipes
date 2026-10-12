@@ -24,11 +24,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "survey, copy or remove"
+        description: "survey, copy, remove — or unmark (the way back: the family app works again)"
         required: true
         default: survey
         type: choice
-        options: [survey, copy, remove]
+        options: [survey, copy, remove, unmark]
       target:
         description: "where to"
         required: true
@@ -51,7 +51,7 @@ on:
         default: false
         type: boolean
       confirm:
-        description: "copy into my-kitchen-notes-beta: type  move the family   ·   remove: type  remove"
+        description: "copy into my-kitchen-notes-beta: type  move the family   ·   remove: type  remove   ·   unmark: type  unmark"
         required: false
         default: ""
 
@@ -87,6 +87,8 @@ jobs:
             echo "::error::copying into the community copy needs  move the family  in confirm"; exit 1; fi
           if [ "$MODE" = "remove" ] && [ "$CONFIRM" != "remove" ]; then
             echo "::error::removing needs  remove  in confirm"; exit 1; fi
+          if [ "$MODE" = "unmark" ] && [ "$CONFIRM" != "unmark" ]; then
+            echo "::error::unmarking needs  unmark  in confirm"; exit 1; fi
           if [ "$MARK" = "true" ] && [ "$TARGET" != "my-kitchen-notes-beta" ]; then
             echo "::error::the family is marked as moved only when it moves into the community copy"; exit 1; fi
 
@@ -108,4 +110,5 @@ jobs:
           [ "$I18N" = "true" ] && ARGS="$ARGS --i18n"
           [ "$RESUME" = "true" ] && ARGS="$ARGS --resume"
           [ "$MODE" = "remove" ] && ARGS="$ARGS --confirm remove"
+          [ "$MODE" = "unmark" ] && ARGS="$ARGS --confirm unmark"
           node tools/move-family.mjs $ARGS
