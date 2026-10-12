@@ -836,6 +836,16 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.24 — the reinstalled beta (12 Oct 2026).** Tony's screenshot after reinstalling v38.21 (solid status bar):
+    a GREY status bar, and the glass blur still over the first ~27 pt below it (the "β BETA" strip blurred). So
+    (1) the community copy's `homeScreen.statusBar` is back to "black-translucent" (brown under the clock, the
+    v38.20 band) — Tony reinstalls once more; (2) an INSTALLED iPhone app (`navigator.standalone` → html class
+    `ios-standalone`, set before the first paint) keeps the 40px band even with an inset of 0 (portrait) — so the
+    one solid-bar install is covered too. And "it was stuck like this for a very long time … only pulling the
+    screen down resolved it": an EMPTY household — setSyncing(true) drew placeholder cards and a load redraws the
+    list only when it brought recipes. Now setSyncing(false) redraws when placeholders are left, and the
+    first-paint placeholders give way after 6 s if no sync took them over. Tests: ui_sync_indicator (empty
+    household), ios_glass_edge (the standalone band, the beta's status-bar style).
   - **v38.23 + Worker v73 — the owner's powers, protected (11 Oct 2026, Tony's "4 yes"; alerts to his second
     address, kept in the GitHub secret ALERT_EMAIL — never in the repository).** Three layers, in the rules AND the
     Worker: (1) `appAdmin()` needs `request.auth.token.firebase.sign_in_provider == 'google.com'` (an e-mail link or

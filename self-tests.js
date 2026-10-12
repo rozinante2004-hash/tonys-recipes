@@ -7479,16 +7479,18 @@ window.SELF_TESTS = [
         if(other!=='No household has the identifier MKN-J5DM-F9BX — check it and try again.') throw new Error('a tester’s message: '+other);
       } finally { window.isAppOwner=real; }
     }},
-  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 40 px on iOS) (v38.20); the community copy installs with a solid status bar as “Kitchen Notes” (v38.21)',
+  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 40 px on iOS) (v38.20); the community copy installs as “Kitchen Notes” (v38.21), brown under the clock; an installed app always keeps the band (v38.24)',
     test: async()=>{
       var css=(document.getElementById('topSafeCss')||{}).textContent||'';
       if(!/--top-safe:\s*env\(safe-area-inset-top/.test(css)) throw new Error('--top-safe is not the safe-area inset by default');
       if(!/@supports\s*\(-webkit-touch-callout:\s*none\)[\s\S]*min\(env\(safe-area-inset-top, 0px\) \* 100, env\(safe-area-inset-top, 0px\) \+ 40px\)/.test(css))
         throw new Error('on iOS the glass band (40 px below a non-zero inset) is not added');
+      if(!/html\.ios-standalone\s*\{\s*--top-safe:\s*calc\(env\(safe-area-inset-top, 0px\) \+ 40px\)/.test(css))
+        throw new Error('an installed app below a solid status bar gets no band (v38.24)');
       // v38.21 — the community copy installs with a solid status bar and its own name (an iPhone keeps both from the day the icon is added).
       if(APP_CONFIG.environment==='beta'){
         var sb=(document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')||{}).content, tt=(document.querySelector('meta[name="apple-mobile-web-app-title"]')||{}).content;
-        if(sb!=='default') throw new Error('the community copy’s status bar is “'+sb+'”, not the solid one');
+        if(sb!=='black-translucent') throw new Error('the community copy’s status bar is “'+sb+'” — v38.24: brown under the clock, like the family app');
         if(tt!=='Kitchen Notes') throw new Error('the community copy installs as “'+tt+'”');
       }
       var root=document.documentElement, prev=root.style.getPropertyValue('--top-safe'), BAND=99;
@@ -16058,7 +16060,7 @@ window.SELF_TESTS = [
       if(evil.indexOf('<img')!==-1) throw new Error('hlMatch let raw HTML through — XSS via a recipe name');
       if(evil.indexOf('<mark>pepper</mark>')===-1) throw new Error('hlMatch did not highlight after escaping');
     } },
-  { id:'ui_sync_indicator', group:'UI', name:'Cloud sync is visible while it runs',
+  { id:'ui_sync_indicator', group:'UI', name:'Cloud sync is visible while it runs; an empty household is not left on placeholders (v38.24)',
     test: async()=>{
       if(typeof setSyncing!=='function') throw new Error('setSyncing not defined');
       var lbl=document.getElementById('sectionLabel');
@@ -16072,6 +16074,15 @@ window.SELF_TESTS = [
         if(lbl.classList.contains('syncing')) throw new Error('the indicator was not cleared when syncing finished');
         setSyncing(false);
         if(_syncDepth<0) throw new Error('the sync counter went negative');
+        // v38.24 — an empty household: the placeholders while it loads, and the list (empty) once it is done.
+        var keep=recipes, grid=document.getElementById('recipeGrid');
+        try{
+          recipes=[];
+          setSyncing(true);
+          if(!grid.querySelector('.skeleton-card')) throw new Error('an empty grid shows no placeholders while syncing');
+          setSyncing(false);
+          if(grid.querySelector('.skeleton-card')) throw new Error('the placeholders stay after the sync ended (an empty household looked stuck)');
+        } finally { recipes=keep; renderGrid(); }
       } finally { _syncDepth=0; lbl.classList.remove('syncing'); }
     } },
   { id:'ui_two_col', group:'UI', name:'Desktop recipe view splits ingredients and method',
