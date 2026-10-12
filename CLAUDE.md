@@ -845,6 +845,8 @@ found only because a test was written first and disagreed with the code.
     ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
+  - **Released to the family app and the beta: v38.25 (12 Oct 2026, Tony's yes "when we're in the green", CI green on
+    fef572c).** Pages, Translate, Publish languages, Self Tests on main: success.
   - **v38.25 — the band 24px, not 40 (12 Oct 2026).** Tony: "a lot of wasted space at the top". He scrolled the
     reinstalled beta until the blur began: the "β BETA" strip sharp with its top 88 pt from the screen's top
     (iPhone 15, inset 59, iOS 27.0.1), blurred above. --top-safe = inset + 24px on iOS (both rules) → the first row
