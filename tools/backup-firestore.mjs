@@ -106,7 +106,8 @@ try {
   const file = path.join(outDir, 'backup-' + project + '-' + at.slice(0, 19).replace(/[:T]/g, '-') + '.mknb');
   fs.writeFileSync(file, seal(json));
   const per = {}; docs.forEach(d => { const t = d.path.split('/')[0]; per[t] = (per[t] || 0) + 1; });
-  console.log('backed up ' + project + ': ' + docs.length + ' documents (' + Object.keys(per).sort().map(k => k + ' ' + per[k]).join(', ') + ')'
+  // (also as a notice: a job's log cannot be read from outside GitHub, its notices can — counts only)
+  console.log((process.env.GITHUB_ACTIONS === 'true' ? '::notice::' : '') + 'backed up ' + project + ': ' + docs.length + ' documents (' + Object.keys(per).sort().map(k => k + ' ' + per[k]).join(', ') + ')'
     + ' in ' + Math.round((Date.now() - started) / 1000) + ' s, ' + calls + ' requests → ' + file + ' (' + Math.round(fs.statSync(file).size / 1024) + ' KB, encrypted)');
 } catch (e) {
   console.log('::error::the backup failed: ' + ((e && e.message) || e));

@@ -845,6 +845,9 @@ found only because a test was written first and disagreed with the code.
     ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
+  - **First backup of the beta's database: 12 Oct 2026, run 38316719256, success** — artifact beta-database-4 (4 KB,
+    encrypted; kept to 11 Nov). Tony's first BACKUP_PASSPHRASE had 13 characters (the tool wants ≥16); he set a
+    longer one. The tool now also posts its count line as a ::notice:: (from the next release; the job runs main).
   - **12 Oct 2026, after Tony's steps:** Deploy the Worker re-run (ALERT_TO set from ALERT_EMAIL: success). "Switch on
     the owner's authenticator sign-in": first refused (403, "Service Usage Consumer" — tools/enable-totp.mjs sent
     X-Goog-User-Project; removed) → re-run from test: "authenticator sign-in (TOTP) is ON for my-kitchen-notes-beta".
