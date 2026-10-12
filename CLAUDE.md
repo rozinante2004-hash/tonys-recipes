@@ -836,6 +836,15 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **TO DO after the family's move (Tony, 12 Oct 2026):** "When an extension is updated, a pop up window appears
+    suggesting to update to the newer version. Once it is installed, can we close the pop up automatically? Otherwise,
+    when I get back to the App tab, the popup is still open, which might confuse the user." → while the offer is
+    open, watch the extension's own mark (appmark.js `data-mkn-extension-<tag>-version`, and visibilitychange when
+    he comes back to the tab) and close it with a ✅ once the newer version is there.
+  - **Tony's set-up steps done (12 Oct 2026):** BACKUP_PASSPHRASE; the roles for rules-publisher@ (move + backups);
+    ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
+    upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
+    already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
   - **Released to the family app and the beta: v38.22 + v38.23 + v38.24, Worker v73 (12 Oct 2026, Tony's yes, CI green
     on 52baeed).** Pages, Translate, Publish languages, Self Tests on main: success. Publish the database rules: success
     (all three projects — the owner's powers now need a Google sign-in). Deploy the Worker: success, live v73 with its
