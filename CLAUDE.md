@@ -845,6 +845,9 @@ found only because a test was written first and disagreed with the code.
     ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
+  - **v38.24 confirmed on Tony's iPhone (12 Oct 2026, reinstalled, iOS 27.0.1, dark theme):** the header's colour
+    under the clock and through the 40px band, the "β BETA" strip and every row below it sharp — no blur on
+    anything that must be read. The empty test household showed the app's sample recipes.
   - **MOVE DAY CHECKLIST (agreed with Tony, 12 Oct 2026 — the one to follow).**
     1. Tony: in the beta (mykitchennotes.community) ⚙️ → 🗑 Delete my account… (his test household goes too).
     2. Me: survey again (expect 3 accounts to create, none "already there"); then copy WITHOUT the mark.
