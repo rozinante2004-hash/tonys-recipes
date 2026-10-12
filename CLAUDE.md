@@ -845,6 +845,25 @@ found only because a test was written first and disagreed with the code.
     ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
+  - **MOVE DAY CHECKLIST (agreed with Tony, 12 Oct 2026 — the one to follow).**
+    1. Tony: in the beta (mykitchennotes.community) ⚙️ → 🗑 Delete my account… (his test household goes too).
+    2. Me: survey again (expect 3 accounts to create, none "already there"); then copy WITHOUT the mark.
+    3. Tony: open mykitchennotes.community, sign in with Google — the family household, its recipes and photos.
+    4. Me: copy --resume --mark --i18n (catches changes meanwhile; the family app now says "moved"); release: the
+       family copy's `movedTo` = https://mykitchennotes.community/ and `languageSource` → my-kitchen-notes-beta.
+       If anything is wrong: the move job's `unmark` (family app works again; its data was never touched).
+    5. Tony, in the community app: 📊 Households → 📦 Bring the family app's allowances; the family household →
+       Extras → Gmail on; ⚙️ → 👑 → 📧 the Gmail client ID again (per device); ⚙️ → 👑 → 🔐 set up the
+       authenticator (keep the setup key somewhere safe) and require it.
+    6. Tony, the iPhone shortcut (ONE "Save to My Kitchen Notes" from now on): Shortcuts → long-press the family
+       "Save to My Kitchen Notes" → Edit → in the Text step replace `https://rozinante2004-hash.github.io/tonys-recipes/`
+       with `https://mykitchennotes.community/` (keep `?url=` and the blue URL Encoded Text bubble) → ‹ to save;
+       delete "Save to My Kitchen Notes (Beta)"; test from Safari → Share; long-press → Share → Copy iCloud Link
+       → send it. Me: that link becomes `iosShortcutUrl` in the beta's settings (and the family copy's), released.
+       The family's own shortcuts keep working through the forward (?url= is kept).
+    7. Tony: the family signs in once at the new address with the same Google account, adds the new home-screen
+       icon, removes the old one. Nobody uses the app during the ~10 minutes of steps 2–4.
+    8. Me: record it; next backup includes the family; then the extension pop-up that closes itself (task).
   - **First backup of the beta's database: 12 Oct 2026, run 38316719256, success** — artifact beta-database-4 (4 KB,
     encrypted; kept to 11 Nov). Tony's first BACKUP_PASSPHRASE had 13 characters (the tool wants ≥16); he set a
     longer one. The tool now also posts its count line as a ::notice:: (from the next release; the job runs main).
