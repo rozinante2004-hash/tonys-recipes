@@ -845,6 +845,11 @@ found only because a test was written first and disagreed with the code.
     ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
+  - **v38.25 — the band 24px, not 40 (12 Oct 2026).** Tony: "a lot of wasted space at the top". He scrolled the
+    reinstalled beta until the blur began: the "β BETA" strip sharp with its top 88 pt from the screen's top
+    (iPhone 15, inset 59, iOS 27.0.1), blurred above. --top-safe = inset + 24px on iOS (both rules) → the first row
+    at 8 + 59 + 24 = 91 pt; 16px given back on every screen, also while scrolling (the slid header leaves --top-safe).
+    The ramp is ~29 pt below the inset on his phone (v38.20 guessed 40 from developers' reports).
   - **v38.24 confirmed on Tony's iPhone (12 Oct 2026, reinstalled, iOS 27.0.1, dark theme):** the header's colour
     under the clock and through the 40px band, the "β BETA" strip and every row below it sharp — no blur on
     anything that must be read. The empty test household showed the app's sample recipes.

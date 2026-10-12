@@ -7479,13 +7479,13 @@ window.SELF_TESTS = [
         if(other!=='No household has the identifier MKN-J5DM-F9BX — check it and try again.') throw new Error('a tester’s message: '+other);
       } finally { window.isAppOwner=real; }
     }},
-  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 40 px on iOS) (v38.20); the community copy installs as “Kitchen Notes” (v38.21), brown under the clock; an installed app always keeps the band (v38.24)',
+  { id:'ios_glass_edge', group:'UI', name:'📱 iPhone top edge: the header, every window, banner and long menu start below the clock AND iOS 26/27’s glass blur (--top-safe = the inset + 24 px on iOS, v38.25) (v38.20); the community copy installs as “Kitchen Notes” (v38.21), brown under the clock; an installed app always keeps the band (v38.24)',
     test: async()=>{
       var css=(document.getElementById('topSafeCss')||{}).textContent||'';
       if(!/--top-safe:\s*env\(safe-area-inset-top/.test(css)) throw new Error('--top-safe is not the safe-area inset by default');
-      if(!/@supports\s*\(-webkit-touch-callout:\s*none\)[\s\S]*min\(env\(safe-area-inset-top, 0px\) \* 100, env\(safe-area-inset-top, 0px\) \+ 40px\)/.test(css))
-        throw new Error('on iOS the glass band (40 px below a non-zero inset) is not added');
-      if(!/html\.ios-standalone\s*\{\s*--top-safe:\s*calc\(env\(safe-area-inset-top, 0px\) \+ 40px\)/.test(css))
+      if(!/@supports\s*\(-webkit-touch-callout:\s*none\)[\s\S]*min\(env\(safe-area-inset-top, 0px\) \* 100, env\(safe-area-inset-top, 0px\) \+ 24px\)/.test(css))
+        throw new Error('on iOS the glass band (24 px below a non-zero inset — Tony\u2019s measure, v38.25) is not added');
+      if(!/html\.ios-standalone\s*\{\s*--top-safe:\s*calc\(env\(safe-area-inset-top, 0px\) \+ 24px\)/.test(css))
         throw new Error('an installed app below a solid status bar gets no band (v38.24)');
       // v38.21 — the community copy installs with a solid status bar and its own name (an iPhone keeps both from the day the icon is added).
       if(APP_CONFIG.environment==='beta'){

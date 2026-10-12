@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.24 -->
+<!-- Tony's Recipes Collection v38.25 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -303,21 +303,24 @@
   /* v38.20 — Tony, after iOS 27.0.1: the top of the header is "obscured by Apple's
      liquid glass". Since iOS 26 an iPhone draws a soft blur over the top edge of an
      installed web app that runs under the status bar (black-translucent): the clock's
-     own strip AND about 40 pt below it (the "scroll edge effect"). No meta tag or CSS
+     own strip AND some way below it (the "scroll edge effect"). No meta tag or CSS
      turns it off, and env(safe-area-inset-top) does not include it. So nothing that
      must be read goes there: --top-safe is where content may start — the notch's
-     inset, plus 40 px on iOS whenever there is an inset (0 stays 0: landscape, an
+     inset, plus 24 px on iOS whenever there is an inset (0 stays 0: landscape, an
      older iPhone without a notch, a desktop). `-webkit-touch-callout` exists only in
      iOS's WebKit (every browser on an iPhone or iPad), never on Android or a desktop.
      Not "black-translucent → default": iOS reads that only when the icon is added,
      so every installed copy would have to be removed and added again. */
   :root { --top-safe: env(safe-area-inset-top, 0px); }
   @supports (-webkit-touch-callout: none) {
-    :root { --top-safe: min(env(safe-area-inset-top, 0px) * 100, env(safe-area-inset-top, 0px) + 40px); }
+    /* v38.25 — 24px, not 40: Tony scrolled the reinstalled beta on his iPhone 15 (iOS 27.0.1) until the blur
+       began — sharp with the "β BETA" strip's top 88 pt from the screen's top, blurred above. 8 (body margin)
+       + 59 (inset) + 24 = 91 pt: just below that, and 16 px less of an empty band than v38.20's guess. */
+    :root { --top-safe: min(env(safe-area-inset-top, 0px) * 100, env(safe-area-inset-top, 0px) + 24px); }
     /* v38.24 — an INSTALLED app blurs its top edge even below a solid status bar
        (the inset is then 0): Tony's beta, reinstalled with one, showed the blur over
        the first ~27 pt. Installed and upright: always the band. */
-    @media (orientation: portrait) { html.ios-standalone { --top-safe: calc(env(safe-area-inset-top, 0px) + 40px); } }
+    @media (orientation: portrait) { html.ios-standalone { --top-safe: calc(env(safe-area-inset-top, 0px) + 24px); } }
   }
 </style>
 <script>try { if (navigator.standalone === true) document.documentElement.classList.add('ios-standalone'); } catch (e) {}</script>
@@ -7145,7 +7148,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.24';
+var APP_VERSION = 'v38.25';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9982,7 +9985,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.24</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.25</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10697,7 +10700,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.24</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.25</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
