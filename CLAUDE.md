@@ -836,6 +836,12 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **Released to the family app and the beta: v38.22 + v38.23 + v38.24, Worker v73 (12 Oct 2026, Tony's yes, CI green
+    on 52baeed).** Pages, Translate, Publish languages, Self Tests on main: success. Publish the database rules: success
+    (all three projects — the owner's powers now need a Google sign-in). Deploy the Worker: success, live v73 with its
+    database and storage; the send_email binding ALERTS deployed fine; "ALERT_EMAIL is not set — the owner's alerts
+    stay off" (once Tony adds the secret: run Deploy the Worker by hand so the job sets ALERT_TO). The move job and
+    the authenticator job are on main now (by hand).
   - **v38.24 — the reinstalled beta (12 Oct 2026).** Tony's screenshot after reinstalling v38.21 (solid status bar):
     a GREY status bar, and the glass blur still over the first ~27 pt below it (the "β BETA" strip blurred). So
     (1) the community copy's `homeScreen.statusBar` is back to "black-translucent" (brown under the clock, the
