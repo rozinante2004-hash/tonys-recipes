@@ -171,6 +171,12 @@
       if (m && m.last_seen > r.lastSeen) r.lastSeen = m.last_seen;
       return r;
     });
+    // v38.31 — move day: the family's households were copied, with the same ids, into the
+    // community copy; the originals stay in the family database until it is cleared. One that
+    // has its twin in the community copy is that old copy, not a second household.
+    var moved = {};
+    S.rows.forEach(function (r) { if (r.copy === 'beta') moved[r.hid] = 1; });
+    S.rows.forEach(function (r) { r.movedOld = r.copy === 'family' && !!moved[r.hid]; });
   }
 
   // v37.64 — notes from the floating 💬 button (feedback/<id>), newest first.
@@ -678,11 +684,12 @@
     // v37.70 — each copy has its own households: one tap opens another copy's list.
     var multi = S.rows.some(function (r) { return r.remote; });
     var nDel = S.rows.filter(function (r) { return r.deleted; }).length;
+    var nOld = S.rows.filter(function (r) { return r.movedOld && !r.deleted; }).length;   // v38.31 — the family's old copies
     var others = copies.length ? '<div class="mg-muted" style="margin-top:4px;">' + (multi ? 'Their own pages: ' : 'Other copies: ') + copies.map(function (c) {
         return '<a class="mg-link" href="' + escA(c[2] + '?manage') + '" target="_blank" rel="noopener">' + esc(c[1]) + ' \u2197</a>'; }).join(' · ') + '</div>' : '';
     var head = '<div class="mg-top"><div><div class="mg-title">📊 Households</div><div class="mg-muted">'
-      + (multi ? 'every copy' : esc(env === 'live' ? 'the family’s copy' : env + ' copy')) + ' · ' + (S.rows.length - nDel) + ' household' + (S.rows.length - nDel === 1 ? '' : 's')
-      + (multi ? ' (' + copyCounts() + ')' : '') + (nDel ? ' \u00b7 ' + nDel + ' deleted' : '')
+      + (multi ? 'every copy' : esc(env === 'live' ? 'the family’s copy' : env + ' copy')) + ' · ' + (S.rows.length - nDel - nOld) + ' household' + (S.rows.length - nDel - nOld === 1 ? '' : 's')
+      + (multi ? ' (' + copyCounts() + ')' : '') + (nDel ? ' \u00b7 ' + nDel + ' deleted' : '') + (nOld ? ' \u00b7 ' + nOld + ' moved (old copy)' : '')
       + (!S.meter ? '' : multi ? ' · AI allowance $' + S.meter.defaults.cap + '/month ($' + S.meter.defaults.firstMonth + ' the first) on the test copy and the beta; '
             + (famCap() != null ? 'the family’s $' + famCap() + '/month' : 'the family’s is counted, not capped')
           : ' · AI ' + (S.meter.capped ? 'allowance ' + capWords(thisProject()) : 'counted, not capped')) + '</div>' + others + '</div>'
@@ -726,9 +733,10 @@
       + th('cap', 'Cap') + '<th>' + (months.length ? months.slice(1).map(mon).reverse().join(' · ') : 'Before') + '</th>'
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
       + (list.length ? list.map(function (r) {
-          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + '" onclick="mknManage.show(' + jsA(r.key) + ')">'
+          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + (r.movedOld ? ' mg-movedold' : '') + '" onclick="mknManage.show(' + jsA(r.key) + ')">'
             + '<td><div class="mg-name" dir="auto">' + esc(r.name || (r.anonymised ? '(name removed after six months)' : '(no name)')) + '</div><div class="mg-muted mg-code">' + esc(r.code || '—') + '</div>'
             + (r.deleted ? '<div class="mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '</div>' : '')
+            + (r.movedOld ? '<div class="mg-muted">\u{1F4E6} Moved to the beta \u2014 the old copy, kept until it is cleared</div>' : '')
             + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '') + '</td>'
             + (multi ? '<td><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
             + '<td class="mg-email">' + esc(r.owner || '—') + '</td>'
@@ -756,7 +764,7 @@
   }
   function copyCounts() {
     var n = {};
-    S.rows.forEach(function (r) { if (!r.deleted) n[r.copy] = (n[r.copy] || 0) + 1; });
+    S.rows.forEach(function (r) { if (!r.deleted && !r.movedOld) n[r.copy] = (n[r.copy] || 0) + 1; });
     return Object.keys(n).sort().map(function (c) { return n[c] + ' ' + c; }).join(', ');
   }
   function openRow() { return S.rows.filter(function (x) { return x.key === S.open; })[0]; }
@@ -871,7 +879,7 @@
     + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
     + '.mg-sort:hover{background:var(--note-bg);}.mg-sort:active{background:var(--border);}'
     + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
-    + '.mg-deleted{opacity:.62;}.mg-deleted .mg-name{text-decoration:line-through;}.mg-gone{color:var(--danger);font-size:12px;margin-top:2px;}'
+    + '.mg-movedold{opacity:.55;}.mg-deleted{opacity:.62;}.mg-deleted .mg-name{text-decoration:line-through;}.mg-gone{color:var(--danger);font-size:12px;margin-top:2px;}'
     + '.mg-link{color:var(--terracotta);font-weight:600;text-decoration:none;}'
     + '.mg-copy{display:inline-block;padding:1px 7px;border-radius:9px;border:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}'
     + '.mg-card{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:12px 14px;margin-bottom:10px;}'

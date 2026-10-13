@@ -74,8 +74,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   --resume --mark --i18n (153 documents incl. 12 translation files, 0 different; the family household marked
   moved). `test` has **v38.31** — the family copy's `movedTo` = https://mykitchennotes.community/ and
   `languageSource` → my-kitchen-notes-beta; the forward never runs on 127.0.0.1/localhost (the suites).
-  NOTHING in recipes-f379d was deleted; `unmark` is the way back. Next: release v38.31 (Tony's yes), then
-  Tony's steps 5–7 of the MOVE DAY CHECKLIST, and the clearing a week later (step 9, with his OK).
+  NOTHING in recipes-f379d was deleted; `unmark` is the way back. Tony's step 5a (📦 Bring the family app's
+  allowances) done: first "stuck" — it was the "Confirm it's you" box (copy-from needs a sign-in under 15 min);
+  after a hard reload it worked (cap $10, spend carried). The 📊 page then showed every family household twice
+  (FAMILY = the original, BETA = the moved one): v38.31 also greys a family row whose household id is in the
+  beta ("📦 Moved to the beta — the old copy, kept until it is cleared") and leaves it out of the counts.
+  Next: release v38.31 (Tony was unsure — ask), then Tony's steps 5–7 of the MOVE DAY CHECKLIST, and the
+  clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
+  when it first signed in (and his old beta test household is still there) — his to keep or delete.
 - Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
   the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
   used — Tony to say what it is for). v38.26 brought:
