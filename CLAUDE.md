@@ -53,6 +53,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
     owner's powers, a way back in if the first is lost. Its fingerprint is the second entry of
     `APP_CONFIG.ownerKeys`; the Self Tests job checks the two match.
 - "I do not like my name appearing much": app texts name nobody.
+  Tony, 13 Oct 2026: no need to take his name out of the WhatsApp share text, the shared recipe list's
+  title or the Word export — leave those as they are.
 - **Times in Tony's local time** (13 Oct 2026: "Could you please use local time instead"): Israel — UTC+3 in
   summer time (until the last Sunday of October), UTC+2 in winter. Never quote UTC to him.
 - After each release:
@@ -88,7 +90,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.36** (on `test`): **a shared link survives the iPhone tab.** Tony, move day, the iPhone shortcut with an
+- **Released: v38.36 (14 Oct 2026, 01:04 Israel time, Tony's "Yes, please release it", CI green on 3cedfae).**
+  All jobs success (Pages, Translate new phrases, Publish languages, Cloudflare Pages beta + test, Self Tests on
+  main at 01:15).
+- **v38.36**: **a shared link survives the iPhone tab.** Tony, move day, the iPhone shortcut with an
   Instagram reel (from 22:45 Israel time): "it did not do anything. It did not create a recipe, it did not even
   try". His log (v38.34, Safari tab): signed in, caption read, "Extracting 1363 chars in one call", the AI asked —
   then nothing; the report was taken 8 s after the AI call started, from the 🪵 log pop-up that came up 4 s
@@ -106,6 +111,13 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   window was open", "Back in the app — …", "Picking up the shared link again …", "The shared recipe was added" /
   "…closed without adding…". The report's copy label for the beta: "BETA COPY — the community app, the family's
   household included" (it said "separate data, not the family's"). Self-test `shared_link_survives_reload`.
+  **The shortcut itself was also wrong** (Tony's screenshot, 00:12): its Text action read
+  "https://rozinante2004-hash.github.io/tonys-recipes/ to https://mykitchennotes.community/?url=" + the encoded
+  link — the move-day instruction ("change X to Y") typed in as it stood. Open URLs finds TWO addresses in that
+  text and opens two Safari tabs: the old address (forwarded to the app, nothing shared) and the one with ?url=.
+  That fits the log (two "Signed in" 56 ms apart, two "Read 62 recipes") and "it did not even try": the import ran
+  in the tab he was not looking at. Fix on his side: the Text must be exactly `https://mykitchennotes.community/?url=`
+  + the URL Encoded Text bubble. Two tabs per use also feed the b815 IndexedDB fault (v38.34).
 - **Released: v38.35 (13 Oct 2026, Tony's "Please do", CI green on f7d04c4).** All jobs success (Pages, Translate
   new phrases, Publish languages, Cloudflare Pages beta + test, Self Tests on main at 22:59 Israel time).
 - **v38.35**: **the owner's authenticator could never start.** Tony, with the spare account: "This
