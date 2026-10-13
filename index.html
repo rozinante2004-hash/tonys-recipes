@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.35 -->
+<!-- Tony's Recipes Collection v38.36 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -241,7 +241,9 @@
   // report pasted into a chat can never be mistaken for the other copy's.
   window.appCopyLabel = function () {
     var c = window.APP_CONFIG, env = String(c.environment || 'live');
-    return (env === 'live' ? 'LIVE — the family’s copy' : env.toUpperCase() + ' COPY — separate data, not the family’s')
+    // v38.36 — since move day (13 Oct 2026) the beta holds the family's household too.
+    return (env === 'live' ? 'LIVE — the family’s old copy' : env === 'beta' ? 'BETA COPY — the community app, the family’s household included'
+      : env.toUpperCase() + ' COPY — separate data, not the family’s')
       + ' — ' + c.siteOrigin + c.sitePath + ' — Firebase ' + c.firebase.projectId;
   };
   // Everything marked data-feature="x" is hidden by ONE rule while x is off —
@@ -1081,6 +1083,13 @@ function maybeNudgeAboutLog(opts) {
   if (!logNudgeEnabled())            return 'nudge-off';
   if (!logEnabled())                 return 'logging-off';
   if (_logNudgeShownThisSession && !opts.force) return 'already-shown-this-session';
+  // v38.36 — never over a recipe being imported. Tony's shared reel: the nudge came up
+  // four seconds in, over the import window, and the report it led to was all he saw.
+  // It waits until the window is closed (asked again every 15 seconds).
+  if (!opts.force && typeof importWindowOpen === 'function' && importWindowOpen()) {
+    if (!opts.noRetry) setTimeout(function(){ if (!window._selfTestRunning) { try { maybeNudgeAboutLog(); } catch(e) {} } }, 15000);
+    return 'import-open';
+  }
   var findings = analyseSyncLog(readSyncLog());
   var bad = findings.filter(function(f){ return f.level === 'bad'; });
   if (!bad.length)                   return 'nothing-wrong';
@@ -1789,6 +1798,54 @@ function extractSharedUrl(sharedUrl, sharedText, sharedTitle, rawSearch) {
 }
 window.extractSharedUrl = extractSharedUrl;
 
+// v38.36 — Tony, move day, the iPhone shortcut with an Instagram reel: "it did not do
+// anything. It did not create a recipe, it did not even try". His log: the caption was
+// read and the AI asked — and then nothing, because the page did not live to show the
+// answer (an iPhone puts a Safari tab away, and often reloads it, the moment you switch
+// app). The shared link was already gone from the address (it is removed at once, so a
+// reload never imports it twice). So the link is now KEPT, in this tab only, until its
+// import window is closed — added or given up — and a reload picks the import up again,
+// once, within 20 minutes.
+var SHARE_PENDING_KEY = 'mkn_share_pending';
+var SHARE_PENDING_MS = 20 * 60 * 1000;
+function sharePendingRead() {
+  try { var v = JSON.parse(sessionStorage.getItem(SHARE_PENDING_KEY) || 'null'); return (v && v.href) ? v : null; } catch(e) { return null; }
+}
+function sharePendingSave(href, now) {
+  if (window._selfTestRunning && !window._sharePendingTest) return;   // a test's shared link is never resumed for real
+  var was = sharePendingRead();
+  var keep = !!(was && was.href === href);
+  try { sessionStorage.setItem(SHARE_PENDING_KEY, JSON.stringify({ href: href, at: keep ? was.at : (now || Date.now()), resumed: keep ? (was.resumed || 0) : 0 })); } catch(e) {}
+}
+function sharePendingClear() { try { sessionStorage.removeItem(SHARE_PENDING_KEY); } catch(e) {} }
+// The link to pick up again after a reload, or '' — and the pick-up is counted, so a
+// page that dies on the import itself is not sent round for ever.
+function sharePendingResume(now) {
+  var p = sharePendingRead();
+  if (!p) return '';
+  now = now || Date.now();
+  if ((p.resumed || 0) >= 1 || !(now - p.at < SHARE_PENDING_MS) || p.at > now + 60000) { sharePendingClear(); return ''; }
+  p.resumed = (p.resumed || 0) + 1;
+  try { sessionStorage.setItem(SHARE_PENDING_KEY, JSON.stringify(p)); } catch(e) {}
+  return p.href;
+}
+function importWindowOpen() {
+  return ['urlImportOverlay', 'freehandOverlay'].some(function(id) {
+    var el = document.getElementById(id); return !!(el && el.classList.contains('open'));
+  });
+}
+window.sharePendingRead = sharePendingRead; window.sharePendingSave = sharePendingSave;
+window.sharePendingClear = sharePendingClear; window.sharePendingResume = sharePendingResume;
+window.importWindowOpen = importWindowOpen;
+// What the log says about the page being put away while a recipe is read — the one
+// thing the report from Tony's phone could not tell.
+document.addEventListener('visibilitychange', function() {
+  if (window._selfTestRunning || !(importWindowOpen() || sharePendingRead())) return;
+  syncLog('import', document.visibilityState === 'hidden'
+    ? 'The app was put away while the import window was open'
+    : 'Back in the app — the import window is ' + (importWindowOpen() ? 'still open' : 'closed'));
+});
+
 // v37.34 — opened by a shared link while a newer version is on the server:
 // update first (once), and come back to the same shared link in the new app.
 // Offline, unreadable, or already tried for this link → carry on as is.
@@ -1840,14 +1897,31 @@ function handleShareTarget() {
     sharedUrl  = sharedUrl || hp.get('share-url') || '';
   }
 
-  if (!sharedUrl && !sharedText && !sharedTitle) return;
-  if (typeof insightVia === 'function') insightVia(fromBrowser ? 'extension' : 'shared');   // v38.15
+  if (!sharedUrl && !sharedText && !sharedTitle) {
+    // v38.36 — nothing in the address, but this tab was given a link whose import
+    // window never closed (the page was reloaded under it): pick it up again, once.
+    var back = sharePendingResume();
+    if (!back) return;
+    syncLog('import', 'Picking up the shared link again — the page was reloaded before its import window closed');
+    try { window.history.replaceState({}, '', back); } catch(e) { sharePendingClear(); return; }
+    window._shareResumed = true;
+    return handleShareTarget();      // the link is in the address again; a second pass cannot resume twice
+  }
+  var resumed = !!window._shareResumed; window._shareResumed = false;
+  if (typeof insightVia === 'function' && !resumed) insightVia(fromBrowser ? 'extension' : 'shared');   // v38.15
   // v37.69 — a link shared into the app on an iPhone came through the shortcut:
   // it is installed, so it is never offered again.
   if (!fromBrowser && sharedUrl && !window._selfTestRunning && typeof isIPhoneLike === 'function' && isIPhoneLike() && typeof iosShortcutNoteUsed === 'function') {
     try { iosShortcutNoteUsed(); } catch(e) {}
   }
   var sharedHref = window.location.href;   // v37.34 — to come back to, in a newer app
+  // v38.36 — kept until the import window closes, and said in the log (the site only).
+  sharePendingSave(sharedHref);
+  if (!resumed) {
+    var _shHost = (/^\s*https?:\/\/(?:www\.)?([^\/?#\s]+)/i.exec(sharedUrl || '') || [])[1] || '';
+    syncLog('import', 'Opened with ' + (fromBrowser ? 'a page’s text' : sharedUrl ? 'a shared link' : 'shared text')
+      + (_shHost ? ' from ' + _shHost : ''), { textChars: (sharedText || '').length || undefined });
+  }
 
   // Remove query params from browser URL without reloading
   try { window.history.replaceState({}, '', window.location.pathname); } catch(e) {}
@@ -3034,7 +3108,7 @@ window.addEventListener('appinstalled', function() {
   if (banner) banner.style.display = 'none';
   _pwaInstallEvent = null;
   var sb = document.getElementById('androidShareOffer'); if (sb) sb.style.display = 'none';
-  toast('✅ Tony\'s Recipes installed as an app!');
+  toast('✅ Installed as an app!');   // v38.36 — no name: every copy says it
 });
 
 function pwaInstall() {
@@ -3044,7 +3118,7 @@ function pwaInstall() {
     _pwaInstallEvent.prompt();
     _pwaInstallEvent.userChoice.then(function(result) {
       if (result.outcome === 'accepted') {
-        toast('✅ Installing Tony\'s Recipes...');
+        toast('✅ Installing the app…');
       } else {
         localStorage.setItem(PWA_DISMISSED_KEY, '1');
       }
@@ -7375,7 +7449,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.35';
+var APP_VERSION = 'v38.36';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8811,6 +8885,9 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 #helpDetailOverlay > * { max-height: min(85vh, 100%) !important; }
 #termsGate > * { max-height: min(94vh, 100%) !important; }
 .modal-overlay.open { display: flex; }
+/* v38.36 — the install hint never sits on an open window: on an iPhone it covered
+   "✓ Add to My Collection" in the import window. */
+body:has(.modal-overlay.open) #pwaIosBanner, body:has(.modal-overlay.open) #pwaInstallBanner { display: none !important; }
 .modal { background: var(--cream); border-radius: 16px; width: calc(100vw - 16px); max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .modal::-webkit-scrollbar { width: 6px; }
 .modal::-webkit-scrollbar-track { background: transparent; }
@@ -10275,7 +10352,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.35</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.36</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10990,7 +11067,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.35</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.36</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -20580,6 +20657,11 @@ function closeM(id){
   if (id === 'urlImportOverlay' || id === 'freehandOverlay') {
     var saved = (typeof _waQueue === 'object') && _waQueue.imported;
     if (typeof _waQueue === 'object') _waQueue.imported = false;
+    // v38.36 — the shared link's import is over, whichever way: not picked up again.
+    if (typeof sharePendingRead === 'function' && sharePendingRead() && !importWindowOpen()) {
+      sharePendingClear();
+      syncLog('import', saved ? 'The shared recipe was added' : 'The import window was closed without adding the shared recipe');
+    }
     if (typeof _waQueue === 'object' && _waQueue.active) {
       waQueueAdvance(saved);
     } else if (saved && typeof _waLastImportAttempt !== 'undefined' && _waLastImportAttempt) {
@@ -32827,7 +32909,7 @@ window.onHeaderScroll = onHeaderScroll;
   max-width:420px;width:calc(100vw - 32px);font-family:'DM Sans','Heebo',sans-serif;">
   <div style="font-size:36px;flex-shrink:0;">📲</div>
   <div style="flex:1;">
-    <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:2px;">Install Tony's Recipes</div>
+    <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:2px;">Install the app</div>
     <div style="font-size:12px;color:var(--muted);">Add to your home screen for quick access — works offline too.</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
@@ -32844,7 +32926,7 @@ window.onHeaderScroll = onHeaderScroll;
   max-width:380px;width:calc(100vw - 32px);font-family:'DM Sans','Heebo',sans-serif;">
   <div style="font-size:30px;flex-shrink:0;">📲</div>
   <div style="flex:1;">
-    <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:4px;">Install Tony's Recipes</div>
+    <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:4px;">Install the app</div>
     <div style="font-size:12px;color:var(--muted);line-height:1.5;">Tap <strong>Share</strong> <span style="font-size:14px;">⎙</span> then <strong>"Add to Home Screen"</strong> to install as an app.</div>
   </div>
   <button onclick="pwaIosDismiss()" style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);cursor:pointer;font-size:14px;color:var(--muted);">✕</button>

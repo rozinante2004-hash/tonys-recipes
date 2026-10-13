@@ -678,6 +678,57 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'shared_link_survives_reload', group:'Import/Export', name:'📲 A shared link is kept until its import window closes: a reload picks it up again (once, within 20 minutes); the log pop-up and the install hint keep off the import (v38.36)',
+    test: async()=>{
+      var real={ run:window.runUrlImport, toast:window.toast, href:location.href, nudgeOn:window.logNudgeEnabled, logOn:window.logEnabled,
+                 shown:window._logNudgeShownThisSession, ios:document.getElementById('pwaIosBanner').style.display };
+      var ran=0, ov=document.getElementById('urlImportOverlay');
+      var link=location.origin+location.pathname+'?url='+encodeURIComponent('https://www.instagram.com/reel/SELFTEST1/');
+      try{
+        window._sharePendingTest=true; window.toast=function(){};
+        window.runUrlImport=async function(){ ran++; };
+        // 1. Kept, picked up once, and not after 20 minutes.
+        var t=Date.now();
+        sharePendingClear(); sharePendingSave(link, t);
+        if(sharePendingResume(t+1000)!==link) throw new Error('a kept link was not given back');
+        if(sharePendingResume(t+2000)!=='') throw new Error('a link was picked up twice');
+        if(sharePendingRead()) throw new Error('a used-up link was kept');
+        sharePendingSave(link, t); sharePendingResume(t+1000); sharePendingSave(link, t+5000);
+        if((sharePendingRead()||{}).resumed!==1) throw new Error('saving the same link again forgot it was picked up');
+        sharePendingClear(); sharePendingSave(link, t);
+        if(sharePendingResume(t+21*60*1000)!=='') throw new Error('a link from 21 minutes ago was picked up');
+        // 2. The page reloaded with nothing in its address: the import starts again.
+        sharePendingClear(); sharePendingSave(link, Date.now());
+        history.replaceState(null, '', location.pathname);
+        handleShareTarget();
+        for(var i=0; i<60 && !ran; i++) await wait(100);
+        if(ran!==1 || !ov.classList.contains('open')) throw new Error('the kept link was not imported after a reload: '+ran);
+        if(document.getElementById('urlImportInput').value!=='https://www.instagram.com/reel/SELFTEST1/') throw new Error('a different link was imported: '+document.getElementById('urlImportInput').value);
+        if(/[?&]url=/.test(location.href)) throw new Error('the link stays in the address bar');
+        if(!sharePendingRead()) throw new Error('the link was let go while its window is still open');
+        // 3. While the import window is open, the log pop-up waits.
+        window.logNudgeEnabled=function(){ return true; }; window.logEnabled=function(){ return true; }; window._logNudgeShownThisSession=false;
+        var why=maybeNudgeAboutLog({ noRetry:true });
+        if(why!=='import-open') throw new Error('the log pop-up did not wait for the import: '+why);
+        if(document.getElementById('logNudge')) throw new Error('the log pop-up came up over the import');
+        // 4. …and the install hint is not over the window's buttons.
+        var ios=document.getElementById('pwaIosBanner'); ios.style.display='flex';
+        if(getComputedStyle(ios).display!=='none') throw new Error('the install hint shows over the import window');
+        // 5. Closed (added or given up): the link is let go, and nothing is picked up again.
+        closeM('urlImportOverlay');
+        if(!document.querySelector('.modal-overlay.open') && getComputedStyle(ios).display==='none') throw new Error('the install hint stays hidden with no window open');
+        if(sharePendingRead()) throw new Error('the link was kept after its window closed');
+        ran=0; handleShareTarget(); await wait(900);
+        if(ran) throw new Error('a closed import came back');
+      } finally {
+        window.runUrlImport=real.run; window.toast=real.toast; window.logNudgeEnabled=real.nudgeOn; window.logEnabled=real.logOn;
+        window._logNudgeShownThisSession=real.shown; document.getElementById('pwaIosBanner').style.display=real.ios;
+        sharePendingClear(); delete window._sharePendingTest;
+        if(ov.classList.contains('open')) closeM('urlImportOverlay');
+        try{ history.replaceState(null, '', real.href); }catch(e){}
+      }
+    } },
+
   { id:'recipe_window_resize', group:'UI', name:'↘️ On a computer the recipe window grows from its corner — drag it bigger or smaller, click for full size and back; kept on the device; no grip on a phone (v38.09)',
     test: async()=>{
       if(!recipes.length) throw new Error('No recipes to view');
@@ -12693,9 +12744,12 @@ window.SELF_TESTS = [
           + JSON.stringify(after.filter(function(k){ return /Click \{1\} below/.test(k); })));
 
       // …and the real file's proof: two toasts that sit behind both hazards.
-      if(after.indexOf('✅ Installing Tony’s Recipes...')===-1
-         && after.indexOf('✅ Installing Tony\'s Recipes...')===-1)
+      // (v38.36 — the install toast names no one now: "Installing the app…".)
+      if(after.indexOf('✅ Installing the app…')===-1)
         throw new Error('the PWA install toast is still not in the catalogue');
+      if(after.indexOf('📸 Using the caption you shared — Instagram won\'t give it to us any other way')===-1
+         && after.indexOf('📸 Using the caption you shared — Instagram won’t give it to us any other way')===-1)
+        throw new Error('a toast with an escaped quote is not in the catalogue');
 
       // A placeholder is chrome even on a field marked dir="auto" — that
       // marking is about the recipe text typed INTO it. The whole ingredient

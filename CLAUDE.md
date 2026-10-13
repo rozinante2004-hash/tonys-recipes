@@ -53,6 +53,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
     owner's powers, a way back in if the first is lost. Its fingerprint is the second entry of
     `APP_CONFIG.ownerKeys`; the Self Tests job checks the two match.
 - "I do not like my name appearing much": app texts name nobody.
+- **Times in Tony's local time** (13 Oct 2026: "Could you please use local time instead"): Israel — UTC+3 in
+  summer time (until the last Sunday of October), UTC+2 in winter. Never quote UTC to him.
 - After each release:
   - Check every job that ran: Deploy to GitHub Pages, Deploy the Worker, Publish the database rules,
     Translate new phrases, Publish languages, Self Tests on main.
@@ -86,7 +88,27 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.35** (on `test`): **the owner's authenticator could never start.** Tony, with the spare account: "This
+- **v38.36** (on `test`): **a shared link survives the iPhone tab.** Tony, move day, the iPhone shortcut with an
+  Instagram reel (from 22:45 Israel time): "it did not do anything. It did not create a recipe, it did not even
+  try". His log (v38.34, Safari tab): signed in, caption read, "Extracting 1363 chars in one call", the AI asked —
+  then nothing; the report was taken 8 s after the AI call started, from the 🪵 log pop-up that came up 4 s
+  after opening (old b815 errors) over the import window. The page did not live to show the answer: an iPhone
+  puts a Safari tab away when you switch app (to paste the report) and often reloads it, and the shared link
+  was already gone from the address (removed at once). Reproduced in a signed-in iPhone-sized run against the
+  emulator: the import itself works (preview, Add) — the loss is the reload. Now: `sharePendingSave` keeps the
+  link (sessionStorage `mkn_share_pending`: href, at, resumed) from `handleShareTarget` until the import window
+  closes (`closeM` of urlImportOverlay/freehandOverlay — added or given up); a page opened with nothing in its
+  address picks it up again (`sharePendingResume`: once, within 20 minutes; self-test runs never keep one).
+  `maybeNudgeAboutLog` waits while an import window is open ('import-open', asked again every 15 s). The
+  install hints (#pwaIosBanner/#pwaInstallBanner) are hidden while any window is open (`body:has(.modal-overlay
+  .open)` — on an iPhone the hint covered "✓ Add to My Collection") and say "Install the app" (no name). The log
+  now says each step: "Opened with a shared link from instagram.com", "The app was put away while the import
+  window was open", "Back in the app — …", "Picking up the shared link again …", "The shared recipe was added" /
+  "…closed without adding…". The report's copy label for the beta: "BETA COPY — the community app, the family's
+  household included" (it said "separate data, not the family's"). Self-test `shared_link_survives_reload`.
+- **Released: v38.35 (13 Oct 2026, Tony's "Please do", CI green on f7d04c4).** All jobs success (Pages, Translate
+  new phrases, Publish languages, Cloudflare Pages beta + test, Self Tests on main at 22:59 Israel time).
+- **v38.35**: **the owner's authenticator could never start.** Tony, with the spare account: "This
   browser's sign-in library has no authenticator support." The app loads Firebase's COMPAT library, and
   @firebase/auth-compat 0.6.11 registers only PhoneMultiFactorGenerator — never TotpMultiFactorGenerator — so
   `totpApi()` was always null outside the Self Test's stand-in (v38.23's two-step never worked for real; not a
