@@ -7677,6 +7677,21 @@ window.SELF_TESTS = [
         window.askConfirm=async function(o){ asked.push(o.title); return o.input!==undefined ? ' 123 456 ' : true; };   // the code box gets the code, a question a yes
         await mfaResolve(err);
         if(!used || used.uid!=='h1' || used.code!=='123456') throw new Error('the code is not handed to Firebase as six digits: '+JSON.stringify(used));
+        // v38.38 — the code box is ABOVE the sign-in screen (Tony: "stuck on Signing in…" — it opened behind it),
+        // and a wrong code is said in the box (a toast is under the sign-in screen too).
+        var boxes=[], fails=1;
+        window.askConfirm=async function(o){ boxes.push(o); return o.input!==undefined ? '111111' : true; };
+        err.resolver.resolveSignIn=async function(a){ if(fails-->0){ var x=new Error('bad'); x.code='auth/invalid-verification-code'; throw x; } used=a; return { user:{} }; };
+        await mfaResolve(err);
+        var lz=+getComputedStyle(document.getElementById('loginScreen')).zIndex||9999;
+        if(boxes.length!==2 || !boxes.every(function(o){ return +o.z>lz; })) throw new Error('the code box is not above the sign-in screen ('+lz+'): '+JSON.stringify(boxes.map(function(o){ return o.z; })));
+        if(!/did not match/.test(boxes[1].message)) throw new Error('a wrong code is not said in the box: '+boxes[1].message);
+        window.askConfirm=real.ask;
+        var shown=askConfirm({ title:'z', z:10070 });
+        var ao=document.getElementById('askOverlay');
+        if(!ao || +getComputedStyle(ao).zIndex!==10070) throw new Error('askConfirm does not take its z: '+(ao && ao.style.zIndex));
+        document.getElementById('askCancel').click(); await shown;
+        window.askConfirm=async function(o){ asked.push(o.title); return o.input!==undefined ? ' 123 456 ' : true; };   // the stand-in again, for what follows
         window._fbUser=user('google.com', 60, async function(){ throw err; });
         used=null;
         if(await ownerFresh()!==true || !used) throw new Error('a re-sign-in that asks for the code is finished with it');

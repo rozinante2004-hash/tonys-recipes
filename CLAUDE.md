@@ -90,6 +90,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
+- **v38.38** (on `test`): **the authenticator's code box was behind the sign-in screen.** Tony set up the
+  spare's authenticator (PC, Chrome Incognito; Passwords on the iPhone) — the ENROLMENT half of v38.35's
+  TOTP_REST works against Google. Then signing the spare in again: Google's own SMS check (its account, not
+  ours), then "stuck on Signing in…". `mfaResolve`'s askConfirm opened at z-index 1300, under #loginScreen
+  (9999), and waited unseen. Now askConfirm takes `opts.z` and the code box uses 10070 (above the sign-in
+  screen, the terms gate 10050 and the legal page 10060); a wrong code is said in the box (toasts are z 999,
+  under the sign-in screen too); the log says "Google sign-in done — asking for the authenticator's code",
+  accepted / not accepted. Self-test `owner_protections` checks the layer and the retry text.
 - **Released: v38.37 (14 Oct 2026, 01:37 Israel time, Tony's "Sure. Please go ahead", CI green on 46bad8d).**
   All jobs success (Pages, Translate new phrases, Publish languages, Cloudflare Pages beta + test, Self Tests on
   main at 01:48). Then the authenticator, spare first: iPhone Safari says "Private Browsing unavailable" (iOS

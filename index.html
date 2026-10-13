@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.37 -->
+<!-- Tony's Recipes Collection v38.38 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7450,7 +7450,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.37';
+var APP_VERSION = 'v38.38';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10353,7 +10353,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.37</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.38</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11068,7 +11068,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.37</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.38</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15112,14 +15112,23 @@ async function mfaResolve(err) {
   var resolver = err && err.resolver;
   var hint = resolver && (resolver.hints || []).filter(function(h){ return h.factorId === 'totp'; })[0];
   if (!hint || !totpApi()) throw err;
+  syncLog('auth', 'Google sign-in done \u2014 asking for the authenticator\u2019s code');
+  var again = '';
   for (var tries = 0; tries < 3; tries++) {
-    var code = await askConfirm({ icon: '\u{1F510}', title: 'The code from your authenticator',
-      message: 'Open your authenticator app (or the iPhone\u2019s Passwords) and type the 6-digit code for My Kitchen Notes.',
+    // v38.38 — Tony, signing the spare owner in from the sign-in screen: "stuck on Signing in…". This box
+    // opened at z-index 1300, BEHIND the sign-in screen (9999), and waited there unseen. Now above it; and a
+    // wrong code is said in the box itself (a toast is under the sign-in screen too).
+    var code = await askConfirm({ icon: '\u{1F510}', title: 'The code from your authenticator', z: 10070,
+      message: again + 'Open your authenticator app (or the iPhone\u2019s Passwords) and type the 6-digit code for My Kitchen Notes.',
       input: '', placeholder: '123 456', okLabel: 'Continue' });
     if (typeof code !== 'string') { var c = new Error('The sign-in was not finished.'); c.code = 'auth/popup-closed-by-user'; throw c; }
-    try { return await resolver.resolveSignIn(totpApi().assertionForSignIn(hint.uid, code.replace(/\D+/g, ''))); }
-    catch (e) {
-      if (e && /invalid-verification-code|missing-code/.test(e.code || '') && tries < 2) { toast('That code did not match \u2014 try the newest one.', 5000); continue; }
+    try {
+      var done = await resolver.resolveSignIn(totpApi().assertionForSignIn(hint.uid, code.replace(/\D+/g, '')));
+      syncLog('auth', 'The authenticator\u2019s code was accepted');
+      return done;
+    } catch (e) {
+      syncLog('auth', 'The authenticator\u2019s code was not accepted', String((e && (e.code || e.message)) || e).slice(0, 120));
+      if (e && /invalid-verification-code|missing-code/.test(e.code || '') && tries < 2) { again = 'That code did not match \u2014 type the newest one.\n\n'; continue; }
       throw e;
     }
   }
@@ -20690,7 +20699,7 @@ function askConfirm(opts) {
     var ov = document.createElement('div');
     ov.id = 'askOverlay';
     ov.className = 'modal-overlay';
-    ov.style.cssText = 'display:flex;z-index:1300;';
+    ov.style.cssText = 'display:flex;z-index:' + (+opts.z || 1300) + ';';   // v38.38 — opts.z: above the sign-in screen (9999)
     var danger = !!opts.danger;
     ov.innerHTML =
       '<div class="ask-card">'
