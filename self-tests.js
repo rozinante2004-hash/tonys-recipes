@@ -708,9 +708,11 @@ window.SELF_TESTS = [
         if(!sharePendingRead()) throw new Error('the link was let go while its window is still open');
         // 3. While the import window is open, the log pop-up waits.
         window.logNudgeEnabled=function(){ return true; }; window.logEnabled=function(){ return true; }; window._logNudgeShownThisSession=false;
+        var before=document.getElementById('logNudge');   // one may be up already from the page's start (Tony's PC set-up)
         var why=maybeNudgeAboutLog({ noRetry:true });
         if(why!=='import-open') throw new Error('the log pop-up did not wait for the import: '+why);
-        if(document.getElementById('logNudge')) throw new Error('the log pop-up came up over the import');
+        var nudge=document.getElementById('logNudge');
+        if(nudge && nudge!==before) throw new Error('the log pop-up came up over the import');
         // 4. …and the install hint is not over the window's buttons.
         var ios=document.getElementById('pwaIosBanner'); ios.style.display='flex';
         if(getComputedStyle(ios).display!=='none') throw new Error('the install hint shows over the import window');
