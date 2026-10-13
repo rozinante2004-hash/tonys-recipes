@@ -3,7 +3,8 @@
 // version.json is never cached, and the in-app update banner is what tells the
 // user a newer version has landed — see the note on the fetch handler below.
 
-const CACHE_NAME = 'tonys-recipes-v9';   // v9 (app v37.33): drops v8's copies filed under ?url=… addresses
+const CACHE_NAME = 'tonys-recipes-v10';  // v10 (app v38.29): also the app's own fonts and code libraries (fonts/, vendor/)
+// v9 (app v37.33): dropped v8's copies filed under ?url=… addresses
 // v5 (app v36.72) — WHERE the app lives is no longer written in: it is the
 // folder this worker was registered for. The live site is served from
 // /tonys-recipes/ (so nothing changes there); the test copy from the root of its
@@ -40,6 +41,19 @@ function isAppDocument(url) {
 }
 function isPrecachedAsset(url) {
   return URLS_TO_CACHE.indexOf(swPath(url)) !== -1;
+}
+// v38.29 — the fonts and code libraries the app now serves itself instead of Google Fonts, gstatic and
+// cdnjs. Their file names carry their version (vendor/firebase-12.19.0/…, fonts/<family>-v39-….woff2), so a
+// stored copy can never be out of date: kept on first use and served from here after — which is what the
+// long browser caching of those services used to give, and what lets the app start offline. The two font
+// style sheets have plain names, so they go to the network first and fall back to the stored copy.
+function isVersionedAsset(url) {
+  var p = swPath(url);
+  return p.indexOf(BASE + 'vendor/') === 0 || (p.indexOf(BASE + 'fonts/') === 0 && /\.woff2$/.test(p));
+}
+function isFontSheet(url) {
+  var p = swPath(url);
+  return p.indexOf(BASE + 'fonts/') === 0 && /\.css$/.test(p);
 }
 
 // Install: pre-cache core files
@@ -133,6 +147,25 @@ self.addEventListener('fetch', function(event) {
         return cached || network;
       })
     );
+    return;
+  }
+
+  if (isVersionedAsset(event.request.url)) {
+    event.respondWith(caches.open(CACHE_NAME).then(function(cache) {
+      return cache.match(event.request).then(function(cached) {
+        return cached || fetch(event.request).then(function(response) {
+          if (response && response.ok) cache.put(event.request, response.clone());
+          return response;
+        });
+      });
+    }));
+    return;
+  }
+  if (isFontSheet(event.request.url)) {
+    event.respondWith(fetch(event.request).then(function(response) {
+      if (response && response.ok) { var c = response.clone(); caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, c); }); }
+      return response;
+    }).catch(function() { return caches.match(event.request); }));
     return;
   }
 

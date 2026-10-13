@@ -1321,7 +1321,70 @@ console.log('\nAI per household (v60):');
     expect('v73: …and every action that cannot be undone is told', f.status === 200 && mails.length === 2 && /owner action "set-cap"/.test(mails[1].raw) && /household hA/.test(mails[1].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 200))));
     f = await fa({ action: 'meter-admin', op: 'list', idToken: tA, device: 'dev-BBBB2222' });
     expect('v73: …someone who is not the owner: refused, and no e-mail', f.status === 403 && mails.length === 2, String(mails.length));
+    // v75 — a spare owner key: two owner addresses; the alerts go to every alert address, and one refused
+    // address does not stop the others.
+    const spare = await token({ sub: 'uSpare', email: 'spare@worker-test.example' });
+    const env2 = Object.assign({}, envAlert, { OWNER_EMAIL: TEST_OWNER + ', spare@worker-test.example', ALERT_TO: 'second@example.com, bad@example.com,owner@worker-test.example',
+      ALERTS: { send: async m => { if (m.to === 'bad@example.com') throw new Error('destination address not verified'); mails.push(m); } } });
+    const mailsBefore = mails.length;
+    const rs = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: spare, device: 'dev-CCCC3333' }, TEST_ORIGIN), env2);
+    const toNow = mails.slice(mailsBefore).map(m => m.to).sort().join(',');
+    expect('v75: the spare owner account is an owner too', rs.status === 200, 'status ' + rs.status);
+    expect('v75: …and its first use is told to every alert address (a refused one does not stop the rest)',
+      toNow === 'owner@worker-test.example,second@example.com' && /Account: spare@worker-test\.example/.test(mails[mails.length - 1].raw), toNow);
   } finally { globalThis.fetch = realFetch; }
+}
+
+// v75 — nothing kept longer than six months: the daily sweep.
+{
+  console.log('Six months, then gone (v75)');
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(':memory:');
+  const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a),
+    all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+    run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { changes: Number(x.changes) } }; } });
+  const d1 = { prepare: (sql) => stmt(sql, []) };
+  const now = Date.UTC(2026, 9, 13, 12), old = now - 200 * 864e5, recent = now - 10 * 864e5;
+  const mOld = new Date(old).toISOString().slice(0, 7), mNew = new Date(recent).toISOString().slice(0, 7);
+  raw.exec(`CREATE TABLE feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, text TEXT, at INTEGER);
+    CREATE TABLE feedback_replies (id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER, text TEXT, at INTEGER);
+    CREATE TABLE survey_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, at INTEGER);
+    CREATE TABLE ai_spend (project TEXT, hid TEXT, month TEXT, usd REAL);
+    CREATE TABLE usage_counts (project TEXT, hid TEXT, month TEXT, k TEXT, n INTEGER);
+    CREATE TABLE ai_households (project TEXT, hid TEXT, name TEXT);
+    CREATE TABLE hh_reports (project TEXT, hid TEXT, summary TEXT, at INTEGER);`);
+  raw.prepare('INSERT INTO feedback (id, email, text, at) VALUES (1, ?, ?, ?), (2, ?, ?, ?)').run('a@example.com', 'old note', old, 'b@example.com', 'new note', recent);
+  raw.prepare('INSERT INTO feedback_replies (note_id, text, at) VALUES (1, ?, ?), (2, ?, ?)').run('answer to the old note', recent, 'answer to the new', recent);
+  raw.prepare('INSERT INTO survey_answers (email, at) VALUES (?, ?), (?, ?)').run('a@example.com', old, 'b@example.com', recent);
+  raw.prepare('INSERT INTO ai_spend VALUES (?, ?, ?, 1), (?, ?, ?, 1)').run('p', 'live', mOld, 'p', 'live', mNew);
+  raw.prepare('INSERT INTO usage_counts VALUES (?, ?, ?, ?, 1), (?, ?, ?, ?, 1)').run('p', 'live', mOld, 'open', 'p', 'live', mNew, 'open');
+  raw.prepare('INSERT INTO ai_households VALUES (?, ?, ?), (?, ?, ?)').run('p', 'gone', 'Gone Kitchen', 'p', 'live', 'Live Kitchen');
+  raw.prepare('INSERT INTO ai_spend VALUES (?, ?, ?, 1)').run('p', 'gone', mNew);
+  raw.prepare('INSERT INTO hh_reports VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)').run(
+    'p', 'gone', JSON.stringify({ name: 'Gone Kitchen', deletedAt: old }), old,
+    'p', 'justgone', JSON.stringify({ name: 'Just Gone', deletedAt: recent }), recent,
+    'p', 'stale', JSON.stringify({ name: 'Quiet Kitchen' }), old,
+    'p', 'live', JSON.stringify({ name: 'Live Kitchen', left: [{ email: 'x@example.com', at: old }, { email: 'y@example.com', at: recent }] }), recent);
+  const waits = [];
+  await worker.scheduled({ cron: '23 3 * * *', scheduledTime: now }, { METER_DB: d1 }, { waitUntil: p => waits.push(p) });
+  await Promise.all(waits);
+  const q = (sql) => raw.prepare(sql).all();
+  expect('v75: notes older than six months go, newer ones stay', q('SELECT text FROM feedback').map(r => r.text).join() === 'new note');
+  expect('v75: …and the answers to a note that is gone', q('SELECT text FROM feedback_replies').map(r => r.text).join() === 'answer to the new');
+  expect('v75: survey answers likewise', q('SELECT email FROM survey_answers').map(r => r.email).join() === 'b@example.com');
+  expect('v75: spend and feature counts: only the last six months', q("SELECT month FROM ai_spend WHERE hid = 'live'").map(r => r.month).join() === mNew
+    && q('SELECT month FROM usage_counts').map(r => r.month).join() === mNew);
+  expect('v75: a household deleted over six months ago: its summary, allowance and counts go', !q("SELECT 1 FROM hh_reports WHERE hid = 'gone'").length
+    && !q("SELECT 1 FROM ai_households WHERE hid = 'gone'").length && !q("SELECT 1 FROM ai_spend WHERE hid = 'gone'").length);
+  expect('v75: …one deleted recently stays (for now), and so does a live one', q('SELECT hid FROM hh_reports ORDER BY hid').map(r => r.hid).join() === 'justgone,live'
+    && q("SELECT 1 FROM ai_households WHERE hid = 'live'").length === 1);
+  expect('v75: a summary not refreshed for six months goes', !q("SELECT 1 FROM hh_reports WHERE hid = 'stale'").length);
+  const liveSum = JSON.parse(q("SELECT summary FROM hh_reports WHERE hid = 'live'")[0].summary);
+  expect('v75: members who left more than six months ago are no longer listed', liveSum.left.map(x => x.email).join() === 'y@example.com', JSON.stringify(liveSum.left));
+  const again = await (async () => { const w = []; await worker.scheduled({}, { METER_DB: d1 }, { waitUntil: p => w.push(p) }); await Promise.all(w); return q('SELECT COUNT(*) AS n FROM feedback')[0].n; })();
+  expect('v75: running it again changes nothing, and tables that do not exist are skipped', again === 1);
+  const h = await (await worker.fetch(post({ action: 'health' }), { METER_DB: d1 })).json();
+  expect('v75: health says the sweep is there', h.retention && h.retention.days === 183 && h.retention.db === true, JSON.stringify(h.retention));
 }
 
 // v41 — the file said "Worker v40" on line 1 and 'v41' in WORKER_VERSION; Tony

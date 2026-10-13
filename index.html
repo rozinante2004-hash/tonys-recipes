@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.28 -->
+<!-- Tony's Recipes Collection v38.29 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +53,7 @@
      If photo selection ever starts failing with a CSP error in the console, the
      Worker is the thing to check first: ⚙️ → 📡 Sync Health reports its live
      version. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com https://cdnjs.cloudflare.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -64,7 +64,8 @@
      title in Playfair. CSS resolves font-family per GLYPH, so listing the Hebrew
      face after the Latin one renders each script in its own typeface — including
      inside a single mixed string. -->
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&family=Frank+Ruhl+Libre:wght@400;700&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+<!-- v38.29 — served from the app's own site (fonts/), not Google Fonts: opening the app contacts nobody else. -->
+<link href="fonts/fonts.css" rel="stylesheet">
 <!-- 5.11 — xlsx and mammoth are deliberately NOT loaded here. They are the two
      heaviest dependencies and only matter when someone imports a spreadsheet or
      a Word file, which almost no session does; loadScriptOnce() fetches them on
@@ -119,8 +120,11 @@
     // v38.27 — the owner, by a salted fingerprint of the address (ownerKeyOf), never the
     // address itself: the repository is public and its text is harvested for e-mail
     // addresses. The rules, the Worker and the jobs take the address from the GitHub
-    // secret OWNER_EMAIL instead.
-    ownerKey:            'sha256:2e0ef39cecbb6add9582629771d8af25479278319d52f0e3841062e5207eb814',
+    // secret OWNER_EMAIL instead. v38.29 — a list: the owner, then the spare owner key
+    // (GitHub secret OWNER_SECONDARY_EMAIL; Tony: "another way of getting in"). CI checks
+    // each fingerprint against its secret (self-tests.yml → "The owner fingerprints").
+    ownerKeys:           Object.freeze(['sha256:2e0ef39cecbb6add9582629771d8af25479278319d52f0e3841062e5207eb814',
+                                        'sha256:ccc8328897d80c71e83eef912c442b83219b9bcf8f3153bc90295b34fa58abac']),
     // v37.00 — where ✉️ Send feedback writes to (v38.17: the app's own address, Cloudflare
     // Email Routing). v38.27 — kept as its two halves, joined only on the screen
     // (appSupportEmail), so no address is written out in the page or the repository.
@@ -422,11 +426,11 @@
   html[data-feature-off-testerWelcome] [data-feature="testerWelcome"],
   html[data-feature-off-gmail]    [data-feature="gmail"] { display: none !important; }
 </style>
-<script src="https://accounts.google.com/gsi/client" async></script>
+<!-- v38.29 — Google Identity Services (Gmail sending) is loaded only when a recipe is sent by Gmail (getGmailToken). -->
 <!-- Firebase Compat SDK — single combined file for faster loading -->
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js" crossorigin="anonymous" onerror="console.error('Failed to load Firebase app SDK')"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js" crossorigin="anonymous" onerror="console.error('Failed to load Firebase auth SDK')"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js" crossorigin="anonymous" onerror="console.error('Failed to load Firebase firestore SDK')"></script>
+<script src="vendor/firebase-12.19.0/firebase-app-compat.js" crossorigin="anonymous" onerror="console.error('Failed to load Firebase app SDK')"></script>
+<script src="vendor/firebase-12.19.0/firebase-auth-compat.js" crossorigin="anonymous" onerror="console.error('Failed to load Firebase auth SDK')"></script>
+<script src="vendor/firebase-12.19.0/firebase-firestore-compat.js" crossorigin="anonymous" onerror="console.error('Failed to load Firebase firestore SDK')"></script>
 <script>
   var _fbAuth, _fbDb, _fbProvider, _autoLoginTimer;
   // A Firestore call carries no timeout of its own. On a wedged connection it
@@ -7175,7 +7179,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.28';
+var APP_VERSION = 'v38.29';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7594,6 +7598,9 @@ window.openGmailSetup = openGmailSetup;
 // ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
 async function getGmailToken() {
   if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
+  // v38.29 — Google's script is fetched only now, when a recipe is sent by Gmail (it used to load
+  // with every opening of the app). A failure falls through to the message below.
+  try { await loadScriptOnce(GSI_CLIENT_URL, 'google'); } catch (e) {}
   return new Promise(function(resolve, reject) {
     if(!window.google || !window.google.accounts) {
       reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
@@ -10012,7 +10019,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.28</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.29</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10727,7 +10734,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.28</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.29</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14583,17 +14590,18 @@ window.renderLangMenu = renderLangMenu;
 // translation editor is the owner's and admins'. WP-A moves the address itself
 // into configuration.
 // v38.27 — by a salted fingerprint of the address, never the address (see #appConfig).
-var APP_OWNER_KEY = APP_CONFIG.ownerKey || '';
+// v38.29 — a list (the owner and the spare owner key).
+var APP_OWNER_KEYS = (APP_CONFIG.ownerKeys || []).slice();
 var OWNER_KEY_SALT = 'mkn-owner|';
 function ownerKeyOf(email) {
   return 'sha256:' + mknSha256Hex(OWNER_KEY_SALT + String(email == null ? '' : email).trim().toLowerCase());
 }
-var _ownerKeyMemo = Object.create(null);     // address → its key (not → yes/no: a test may swap APP_OWNER_KEY)
+var _ownerKeyMemo = Object.create(null);     // address → its key (not → yes/no: a test may swap APP_OWNER_KEYS)
 function isOwnerAddress(email) {
   var e = String(email == null ? '' : email).trim().toLowerCase();
-  if (!e || !APP_OWNER_KEY) return false;
+  if (!e || !APP_OWNER_KEYS || !APP_OWNER_KEYS.length) return false;
   if (!(e in _ownerKeyMemo)) _ownerKeyMemo[e] = ownerKeyOf(e);
-  return _ownerKeyMemo[e] === APP_OWNER_KEY;
+  return APP_OWNER_KEYS.indexOf(_ownerKeyMemo[e]) !== -1;
 }
 // SHA-256 of a text (UTF-8), as lower-case hex — synchronously, because isAppOwner is
 // asked from synchronous code all over the app and crypto.subtle only answers later.
@@ -19531,9 +19539,11 @@ function loadScriptOnce(url, globalName) {
   return _scriptPromises[url];
 }
 window.loadScriptOnce = loadScriptOnce;
-var CDN_XLSX    = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-var CDN_MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
-var CDN_JSZIP   = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';   // v37.50 — unzipping the extension into a folder
+// v38.29 — served from the app's own site (vendor/libs/, the same versions cdnjs had), not cdnjs.
+var CDN_XLSX    = 'vendor/libs/xlsx-0.18.5.full.min.js';
+var CDN_MAMMOTH = 'vendor/libs/mammoth-1.6.0.browser.min.js';
+var CDN_JSZIP   = 'vendor/libs/jszip-3.10.1.min.js';
+var GSI_CLIENT_URL = 'https://accounts.google.com/gsi/client';   // v38.29 — Google's own; it cannot be served from here   // v37.50 — unzipping the extension into a folder
 
 // Single source of truth for the AI model. Several call sites (PDF import, the self
 // test) previously hard-coded a different id than aiCall used, so they could fail
@@ -24772,7 +24782,7 @@ function signInDiagLines() {
   L.push(['Page', location.origin + location.pathname]);
   L.push(['Network', navigator.onLine ? 'online' : 'OFFLINE — the browser says there is no connection']);
   L.push(['Firebase SDK', (typeof firebase === 'undefined')
-    ? 'NOT LOADED — the scripts from www.gstatic.com did not arrive'
+    ? 'NOT LOADED — the Firebase scripts (vendor/firebase-…) did not arrive'
     : 'loaded (' + (firebase.SDK_VERSION || '?') + ')']);
   L.push(['Auth object', window._fbAuth ? 'ready' : 'NOT CREATED — initFirebase() did not run']);
   L.push(['Signed in as', (window._fbUser && window._fbUser.email) || 'nobody']);
@@ -25910,7 +25920,7 @@ function legalFonts() {
   // (the page fell back to print): Hebrew cursive for the headings and buttons, and a
   // rounded print (Varela Round) for the long text, which in cursive was hard going.
   // Each is fetched only for letters actually shown (unicode-range).
-  l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&family=Playpen+Sans+Hebrew:wght@400;600&family=Playpen+Sans+Arabic:wght@400;600&family=Varela+Round&display=swap';
+  l.href = 'fonts/legal-fonts.css';   // v38.29 — the app's own copy (fonts/), not Google Fonts
   document.head.appendChild(l);
 }
 function legalShowGate(user) {
@@ -30319,10 +30329,8 @@ function privacyEntries() {
       sends: 'The text of what you asked about \u2014 a recipe to translate, a page to import, a question to the help assistant'
            + (featureOn('whatsapp') ? ', the parts of your WhatsApp chats that answer a question you asked them' : '')
            + '. Not your photos \u2014 only a picture of a recipe you ask it to read.' },
-    // v38.28 — the privacy audit: these were missing. Loading the app at all asks Google and
-    // Cloudflare for its fonts and code libraries; a video import goes to Google's Gemini.
-    { who: 'Google and Cloudflare (the app\u2019s fonts and code libraries)', when: 'every time the app opens', on: true,
-      sends: 'Nothing of yours \u2014 like any website you visit, they see your device\u2019s internet address when the app loads its fonts and code from them.' },
+    // v38.28 — the privacy audit: a video import goes to Google's Gemini. (v38.29 — the fonts and
+    // code libraries are the app's own files now, so opening the app asks no one else for them.)
     { who: 'Google Gemini and YouTube', when: 'only when you import a recipe from a video', on: true,
       sends: 'The video\u2019s address, or the video you chose. Google may use what it is sent under its own terms.' },
     { who: 'The app\u2019s own server', when: 'when you import, search for a photo, use the AI, or send a note'

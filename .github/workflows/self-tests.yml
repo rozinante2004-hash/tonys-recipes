@@ -151,6 +151,32 @@ jobs:
             console.log('version strings agree: ' + declared);
           "
 
+      # v38.29 — the app knows its owners only by salted fingerprints (APP_CONFIG.ownerKeys); the
+      # addresses are the GitHub secrets OWNER_EMAIL and OWNER_SECONDARY_EMAIL. A fingerprint that does
+      # not match its secret would show the owner's tools to nobody (the rules and the Worker would still
+      # work). Never prints an address — only whether each matches, and the fingerprint to use if not.
+      # Without the secrets (a fork) it says so and passes.
+      - name: The owner fingerprints
+        env:
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          OWNER_SECONDARY_EMAIL: ${{ secrets.OWNER_SECONDARY_EMAIL }}
+        run: |
+          node -e "
+            const fs = require('fs'), crypto = require('crypto');
+            const html = fs.readFileSync('index.html', 'utf8');
+            const m = /ownerKeys:\s*Object\.freeze\(\[([^\]]*)\]\)/.exec(html);
+            const keys = m ? (m[1].match(/sha256:[0-9a-f]{64}/g) || []) : [];
+            const key = a => 'sha256:' + crypto.createHash('sha256').update('mkn-owner|' + a.trim().toLowerCase()).digest('hex');
+            let bad = 0;
+            for (const [name, v] of [['OWNER_EMAIL', process.env.OWNER_EMAIL], ['OWNER_SECONDARY_EMAIL', process.env.OWNER_SECONDARY_EMAIL]]) {
+              if (!v) { console.log('::notice::' + name + ' is not available here — not checked'); continue; }
+              if (keys.includes(key(v))) console.log(name + ': its fingerprint is in the app');
+              else { bad++; console.log('::error::' + name + ': its fingerprint is not in APP_CONFIG.ownerKeys — use ' + key(v)); }
+            }
+            if (!keys.length) { console.log('::error::no APP_CONFIG.ownerKeys in index.html'); bad++; }
+            process.exit(bad ? 1 : 0);
+          "
+
       # The Worker had no tests until v36, and a CORS regression in it took every
       # server-side feature down for three releases without the suite noticing —
       # that suite only ever loaded index.html. This drives the Worker directly.

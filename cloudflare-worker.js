@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v74
+// Tony's Recipes — Cloudflare Worker v75
+// v75: NOTHING KEPT LONGER THAN SIX MONTHS, AND A SPARE OWNER KEY (Tony, 13 Oct 2026: "limit them to 6
+// months. I do not see much point in keeping them longer"; "I wanted to give us another way of getting in").
+// A daily sweep (`scheduled`, cron in worker/wrangler.jsonc; `retentionSweep`) deletes notes and their
+// answers, survey answers, the owner's device records and usage/spend months older than 183 days; a deleted
+// household's summary, allowance and counts 183 days after its deletion; a summary not refreshed for 183
+// days; members who left, from a summary, after 183 days. Error reports keep their own 120 days. health:
+// `retention`. The owner's address list (secret OWNER_EMAIL) may now hold a second, spare owner account,
+// and the alerts go to every address in ALERT_TO (comma-separated), so neither owner acts unseen.
 // v74: NO E-MAIL ADDRESS IN THE CODE. The repository is public and its text is harvested
 // for addresses, so the owner's address is no longer written here as a default: it comes
 // from the secret OWNER_EMAIL (set by .github/workflows/deploy-worker.yml from the GitHub
@@ -325,7 +333,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v74';
+const WORKER_VERSION = 'v75';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -703,6 +711,7 @@ async function handleRequest(request, env) {
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         alerts: !!(env.ALERTS && env.ALERT_TO),   // v73 — the owner hears about a new device and destructive actions
         owner: ownerEmails(env).length > 0,       // v74 — the owner's address is set (it is no longer in the code)
+        retention: { days: KEEP_DAYS, db: !!env.METER_DB },   // v75 — the daily six-month sweep
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
@@ -1377,15 +1386,20 @@ async function ownerWatch(env, db, claims, body, request) {
       .concat(lines).join('\n'));
 }
 async function ownerAlert(env, subject, text) {
-  const to = String(env.ALERT_TO || '').trim();
-  if (!env.ALERTS || !/^[^\s@<>]+@[^\s@<>]+$/.test(to)) return false;
+  // v75 — every address in ALERT_TO (comma-separated): with a spare owner key, each owner hears what the
+  // other did, so whoever controls one mailbox cannot hide the other account's actions.
+  const tos = Array.from(new Set(String(env.ALERT_TO || '').split(',').map(x => x.trim()).filter(x => /^[^\s@<>]+@[^\s@<>]+$/.test(x))));
+  if (!env.ALERTS || !tos.length) return false;
   const from = String(env.ALERT_FROM || ['alerts', 'mykitchennotes.community'].join('@'));   // v74 — not written out (harvested)
-  const raw = ['From: My Kitchen Notes <' + from + '>', 'To: <' + to + '>', 'Subject: ' + subject.replace(/[^\x20-\x7E]/g, ''),
-    'Date: ' + new Date().toUTCString(), 'Message-ID: <' + crypto.randomUUID() + '@' + from.split('@')[1] + '>',
-    'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '', text].join('\r\n');
   const EmailMessage = env.__EmailMessage || (await import('cloudflare:email')).EmailMessage;
-  await env.ALERTS.send(new EmailMessage(from, to, raw));
-  return true;
+  let sent = 0;
+  for (const to of tos) {
+    const raw = ['From: My Kitchen Notes <' + from + '>', 'To: <' + to + '>', 'Subject: ' + subject.replace(/[^\x20-\x7E]/g, ''),
+      'Date: ' + new Date().toUTCString(), 'Message-ID: <' + crypto.randomUUID() + '@' + from.split('@')[1] + '>',
+      'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '', text].join('\r\n');
+    try { await env.ALERTS.send(new EmailMessage(from, to, raw)); sent++; } catch (e) {}   // one refused address must not stop the others
+  }
+  return sent > 0;
 }
 async function meterMembership(claims, hid, token, env) {
   const k = claims.aud + '/' + hid + '/' + claims.sub, c = _meterMembers.get(k);
@@ -2507,7 +2521,57 @@ async function fbProbe(env, url) {
   return { url: clean, preview, rows };
 }
 
+// ─── NOTHING KEPT LONGER THAN SIX MONTHS (v75) ──────────────────────────────
+// Tony, 13 Oct 2026: notes, answers and the records about households "limit them to 6 months". Run daily
+// by `scheduled` (worker/wrangler.jsonc → triggers.crons). Each step on its own: a table that does not exist
+// yet (nothing was ever stored there) is skipped, never an error. Returns what it removed (counts only).
+const KEEP_DAYS = 183;
+async function retentionSweep(env, now) {
+  const db = env.METER_DB;
+  if (!db) return null;
+  now = now || Date.now();
+  const cut = now - KEEP_DAYS * 864e5, cutMonth = new Date(cut).toISOString().slice(0, 7);   // 'YYYY-MM': older months go
+  const done = {};
+  const run = async (name, sql, ...args) => {
+    try { const r = await db.prepare(sql).bind(...args).run(); done[name] = (done[name] || 0) + ((r && r.meta && r.meta.changes) || 0); }
+    catch (e) { if (!(name in done)) done[name] = 0; }
+  };
+  await run('notes', 'DELETE FROM feedback WHERE at < ?1', cut);
+  await run('answersToNotes', 'DELETE FROM feedback_replies WHERE at < ?1 OR note_id NOT IN (SELECT id FROM feedback)', cut);
+  await run('surveyAnswers', 'DELETE FROM survey_answers WHERE at < ?1', cut);
+  await run('errors', 'DELETE FROM app_errors WHERE last_at < ?1', now - ERRORS_KEPT_DAYS * 864e5);
+  await run('ownerDevices', 'DELETE FROM owner_devices WHERE last_at < ?1', cut);
+  await run('spendMonths', 'DELETE FROM ai_spend WHERE month < ?1', cutMonth);
+  await run('usageMonths', 'DELETE FROM usage_counts WHERE month < ?1', cutMonth);
+  // Household summaries: a deleted household's (with its allowance and counts) six months after the
+  // deletion; one not refreshed for six months; and, in the rest, members who left more than six months ago.
+  let rows = [];
+  try { rows = (await db.prepare('SELECT project, hid, summary, at FROM hh_reports').all()).results || []; } catch (e) {}
+  for (const r of rows) {
+    let sum = {};
+    try { sum = JSON.parse(r.summary || '{}') || {}; } catch (e) {}
+    if ((sum.deletedAt && sum.deletedAt < cut) || (!sum.deletedAt && (r.at || 0) < cut)) {
+      await run('households', 'DELETE FROM hh_reports WHERE project = ?1 AND hid = ?2', r.project, r.hid);
+      if (sum.deletedAt) for (const t of ['ai_households', 'ai_spend', 'usage_counts'])
+        await run('householdRows', 'DELETE FROM ' + t + ' WHERE project = ?1 AND hid = ?2', r.project, r.hid);
+      continue;
+    }
+    const left = Array.isArray(sum.left) ? sum.left : [];
+    const keep = left.filter(x => x && Number(x.at) >= cut);
+    if (keep.length !== left.length) {
+      sum.left = keep;
+      await run('leftTrimmed', 'UPDATE hh_reports SET summary = ?3 WHERE project = ?1 AND hid = ?2', r.project, r.hid, JSON.stringify(sum));
+    }
+  }
+  return done;
+}
+
 export default {
+  // v75 — the daily sweep (cron in worker/wrangler.jsonc).
+  async scheduled(event, env, ctx) {
+    const p = retentionSweep(env, Date.now());
+    if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
+  },
   async fetch(request, env) {
     const cors = corsFor(request, env);
     let resp;
@@ -2524,4 +2588,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v74 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v75 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

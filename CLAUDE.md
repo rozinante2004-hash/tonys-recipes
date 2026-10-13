@@ -49,6 +49,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - Secrets:
   - They live only in GitHub. Never print one, and never ask him to paste one into the chat.
   - His second address exists only in the secret `ALERT_EMAIL`, never in the repository.
+  - `OWNER_SECONDARY_EMAIL` (v38.29) is the spare owner key: a second Google account with the
+    owner's powers, a way back in if the first is lost. Its fingerprint is the second entry of
+    `APP_CONFIG.ownerKeys`; the Self Tests job checks the two match.
 - "I do not like my name appearing much": app texts name nobody.
 - After each release:
   - Check every job that ran: Deploy to GitHub Pages, Deploy the Worker, Publish the database rules,
@@ -60,6 +63,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 **Where things are now**
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
   **v38.28** (released 13 Oct, with Worker v74).
+- `test` is at **v38.29 + Worker v75** (Tony's answers to the audit's open points, 13 Oct: "Please
+  proceed"), waiting for CI and then the release. See the v38.29 note below: the spare owner key,
+  six-month retention, the fonts and libraries served by the app itself, privacy statement 1.4.
 - Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
   the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
   used — Tony to say what it is for). v38.26 brought:
@@ -77,6 +83,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   - TOTP is enabled, but Tony has NOT yet set up his authenticator (move-day step 5);
   - alerts to his second address are on;
   - the encrypted backup runs daily (first one on 12 Oct).
+  - (v38.29) the spare owner account must sign in to the community app once and set up its own
+    authenticator BEFORE Tony switches "require" on — otherwise it is locked out of the owner's tools.
 - Extension: 1.7.3.
 
 **Done since 10 Oct (details in the release notes below)**
@@ -112,8 +120,11 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - Skipped by Tony: a hardware security key.
 
 **What is left, in order**
-1. **The open points of AUDIT-2026-10-privacy.md**, for Tony to decide (git history, self-hosted fonts and
-   libraries, a fixed retention, clearing the old family data after the move, OWNER_SECONDARY_EMAIL).
+1. **Release v38.29 + Worker v75** when CI is green (the audit's open points, decided by Tony on 13 Oct:
+   git history left as it is; fonts and libraries self-hosted; six months' retention; the old family data
+   cleared one week after the move; OWNER_SECONDARY_EMAIL = the spare owner key). After it: "Deploy the
+   Worker" must report v75 with the owner set and the cron trigger; "Publish the database rules" must say
+   "with the spare owner key".
 2. **Move day**, when Tony says ("I'll let you know"). Follow "MOVE DAY CHECKLIST" below, step by
    step. My steps, from this environment:
    - Survey:
@@ -131,12 +142,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
    - Then Tony's steps 5–7 (allowances, Gmail, authenticator, the ONE iPhone shortcut, the family
      re-signing in). His shortcut's iCloud link becomes `iosShortcutUrl` for the beta (and the
      family copy) in the next release.
+   - **ONE WEEK after the move** (Tony, 13 Oct: "do the clearing a week after we move … in case
+     something is missing"): clear the old family data in `recipes-f379d` — checklist step 9.
 3. **After the move** (task, Tony 12 Oct): the "new version of the extension" pop-up should close
    itself, with a ✅, once the newer version is installed. Watch appmark.js's
    `data-mkn-extension-<tag>` version and `visibilitychange`.
 4. **The addresses in the git history** — earlier versions of `i18n/*.json` hold family members'
-   addresses. Only a rewrite of the public repository's history removes them, and copies may already
-   exist. It is Tony's call; ask him once, and do not do it unasked.
+   addresses. Tony, 13 Oct: "I accept your judgement" — LEFT AS IT IS (a rewrite would not reach the
+   copies already made, and breaks every clone). Do not raise it again.
 5. **Testers** are invited by Tony next week, after the move. The end-of-beta question is prepared
    and NOT sent.
 6. **Tony's own account security** (suggested; his to do):
@@ -243,9 +256,13 @@ is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
 - **`index.html` is the whole app** — inline `<style>`, inline JS, ~24 750 lines,
-  no build step. CDN scripts in `<head>`: Firebase compat 12.19.0 (v36.74; was 10.12.0), GSI. **xlsx and
-  mammoth load on demand** via `loadScriptOnce()` (5.11) — don't put them back in
-  `<head>`; there is a test. qrcodejs and the Excel export were removed in v28.5.
+  no build step. Scripts in `<head>`: Firebase compat 12.19.0 (v36.74; was 10.12.0) — since v38.29 the
+  app's own copy in `vendor/firebase-12.19.0/` (from the npm package), not gstatic. **xlsx, mammoth, jszip
+  (`vendor/libs/`) and Google's GSI (Gmail sending) load on demand** via `loadScriptOnce()` (5.11) — don't
+  put them back in `<head>`; there is a test. The fonts are `fonts/` (`fonts.css`, `legal-fonts.css`, the
+  woff2 files, OFL in `fonts/LICENSE.txt`), not Google Fonts; the CSP allows only `'self'` for fonts and
+  styles. A library upgrade = a new versioned folder/file name (the service worker keeps them cache-first)
+  plus the e2e test's `wantSdk`. qrcodejs and the Excel export were removed in v28.5.
 - `cloudflare-worker.js` — the Worker (Anthropic, photo search, YouTube,
   Instagram, Bring!'s import, metering). **Since 8 Oct 2026 it publishes itself**:
   `.github/workflows/deploy-worker.yml` runs when a push to `main` changes it (or
@@ -389,8 +406,8 @@ found only because a test was written first and disagreed with the code.
 ## Traps this codebase has already sprung
 
 - **NO E-MAIL ADDRESS IS WRITTEN IN THE REPOSITORY (v38.27).** It is public and harvested for addresses — and so
-  are its Actions logs. The owner is `APP_CONFIG.ownerKey` (a salted fingerprint) and the GitHub secret
-  `OWNER_EMAIL`; the contact address is `supportMailbox` (two halves) and `.mkn-mail` links on the legal pages.
+  are its Actions logs. The owner is `APP_CONFIG.ownerKeys` (salted fingerprints: the owner, then the spare
+  owner key) and the GitHub secrets `OWNER_EMAIL` and `OWNER_SECONDARY_EMAIL`; the contact address is `supportMailbox` (two halves) and `.mkn-mail` links on the legal pages.
   A test that needs the owner uses `stAsOwner()` and `ST_OWNER`, never a real address; sample data uses
   example domains. `owner_by_fingerprint` and the Worker test scan for slips.
 - **AN E-MAIL ADDRESS IS NEVER A PHRASE (v38.26).** The translations are published as files in a PUBLIC
@@ -994,6 +1011,33 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.29 + Worker v75 — the audit's open points, as Tony decided them (13 Oct 2026, "Please proceed").**
+    (1) git history: left as it is ("I accept your judgement"). (2) **The fonts and code libraries are the app's
+    own files**: `fonts/` (56 woff2 from Google Fonts' css2 — the same families and subsets — `fonts.css` for the
+    app, `legal-fonts.css` for the legal pages, OFL in `fonts/LICENSE.txt`), `vendor/firebase-12.19.0/` (the three
+    compat files from the npm package, Apache-2.0) and `vendor/libs/` (xlsx 0.18.5, mammoth 1.6.0, jszip 3.10.1 from
+    npm — cdnjs is blocked from this environment; the same versions). Google's GSI script is no longer in `<head>`:
+    `getGmailToken()` loads it (`GSI_CLIENT_URL`) when a recipe is sent by Gmail. CSP: `style-src 'self'
+    'unsafe-inline'`, `font-src 'self' data:`, `script-src` keeps only accounts.google.com and apis.google.com
+    besides 'self'. sw.js v10: `vendor/` and `fonts/*.woff2` cache-first (versioned names), `fonts/*.css`
+    network-first. Opening the app now contacts Google only for sign-in and the database. (3) **Six months, then
+    gone** — Worker v75 `retentionSweep`, a daily cron `23 3 * * *` (worker/wrangler.jsonc `triggers`), KEEP_DAYS
+    183: notes (and replies, also orphaned ones), survey answers, owner_devices, monthly ai_spend/usage_counts rows,
+    household summaries not refreshed for six months or deleted six months ago (with their allowance rows), and
+    the departed-member entries; error reports stay at 120 days after the last occurrence. Health: `retention`.
+    (4) the old family data: cleared one week after the move — MOVE DAY CHECKLIST step 9 (a tool mode to write
+    then). (5) **OWNER_SECONDARY_EMAIL = the spare owner key**: `APP_CONFIG.ownerKeys` (a list; `ownerKey` is gone;
+    `APP_OWNER_KEYS`), the Worker's secret OWNER_EMAIL is set to both (comma-separated), publish-rules.mjs puts
+    both in `{{APP_ADMINS}}` ("with the spare owner key"), alerts go to ALERT_EMAIL + both owners, each sent on
+    its own (an unverified destination does not stop the others). Self Tests job step "The owner fingerprints"
+    checks both secrets against `ownerKeys` and prints only "match" or the fingerprint to use — the spare's was
+    computed from the second address Tony gave on 13 Oct; if the step says otherwise, put in what it prints.
+    Privacy statement 1.4 (11 languages): no fonts/code from Google or Cloudflare; household summaries and notes
+    six months; the in-app panel lost its "fonts and code libraries" row. Tests: worker-cors (spare owner,
+    several recipients, "Six months, then gone" on a node:sqlite D1), self-tests `owner_by_fingerprint` (lists,
+    a second owner), `css_hebrew_font` (fonts/fonts.css, no Google Fonts), the CSP test (no Google Fonts/gstatic/
+    cdnjs, libraries same-origin, no eager GSI), the service-worker test (vendor, woff2, fonts.css); e2e reads the
+    SDK version from the vendor path.
   - **Released to the family app and the beta: v38.26 + v38.27 + v38.28, Worker v74 (13 Oct 2026, Tony's yes "once
     done and fixed … once possible", CI green on 561c31c).** All success: Pages (and 8c7b7fa, the languages it
     published), Cloudflare Pages beta, Deploy the Worker (secret OWNER_EMAIL set first; live v74 with `"owner":true`),
@@ -1115,6 +1159,18 @@ found only because a test was written first and disagreed with the code.
     7. Tony: the family signs in once at the new address with the same Google account, adds the new home-screen
        icon, removes the old one. Nobody uses the app during the ~10 minutes of steps 2–4.
     8. Me: record it; next backup includes the family; then the extension pop-up that closes itself (task).
+    9. **One week after step 4** (Tony, 13 Oct 2026: "do the clearing a week after we move (make a note) in case
+       something is missing"), once Tony confirms nothing is missing: delete the old family data in recipes-f379d —
+       the first-layout `shared/` collection and the moved households. NO tool does this yet (`--mode remove` takes
+       a copy away from the TARGET): add a mode to tools/move-family.mjs that deletes in the SOURCE only documents
+       the target holds identically (compared field by field, as the copy's read-back does), with a dry run that
+       counts them first. Keep `config/` and `i18n/` there until the family copy is retired.
+       Record it here and in AUDIT-2026-10-privacy.md (open item 4).
+    - Also from v38.29: (a) the spare owner account (OWNER_SECONDARY_EMAIL) signs in once to the community app
+      and sets up its own authenticator BEFORE step 5's "require" — or it is locked out of the owner's tools;
+      (b) the owner's Gmail address must be a verified destination in Cloudflare Email Routing for the alerts to
+      reach it (ALERT_TO now also lists OWNER_EMAIL and OWNER_SECONDARY_EMAIL; an unverified one is skipped,
+      the others still get the alert).
   - **First backup of the beta's database: 12 Oct 2026, run 38316719256, success** — artifact beta-database-4 (4 KB,
     encrypted; kept to 11 Nov). Tony's first BACKUP_PASSPHRASE had 13 characters (the tool wants ≥16); he set a
     longer one. The tool now also posts its count line as a ::notice:: (from the next release; the job runs main).

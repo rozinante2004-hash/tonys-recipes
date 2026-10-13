@@ -83,7 +83,8 @@ const sdkDir = path.dirname(resolveDep('firebase/package.json'));
 const sdkVersion = JSON.parse(readFileSync(path.join(sdkDir, 'package.json'), 'utf8')).version;
 
 const html = readFileSync(path.join(repo, 'index.html'), 'utf8');
-const wantSdk = (html.match(/gstatic\.com\/firebasejs\/([\d.]+)\/firebase-app-compat\.js/) || [])[1];
+// v38.29 — the app serves the SDK itself (vendor/firebase-<version>/), no longer from www.gstatic.com.
+const wantSdk = (html.match(/vendor\/firebase-([\d.]+)\/firebase-app-compat\.js/) || [])[1];
 if (wantSdk !== sdkVersion) {
   console.error(`the app loads Firebase ${wantSdk}, but ${sdkVersion} is installed here — install firebase@${wantSdk}`);
   process.exit(2);
@@ -92,7 +93,8 @@ if (wantSdk !== sdkVersion) {
 // in index.html), so the run uses a stand-in owner and serves the page with its fingerprint.
 const OWNER  = 'owner@e2e.example';
 const OWNER_KEY = 'sha256:' + createHash('sha256').update('mkn-owner|' + OWNER).digest('hex');
-if (!/ownerKey:\s*'sha256:[0-9a-f]{64}'/.test(html)) throw new Error('could not find the page\'s owner fingerprint');
+const OWNER_KEYS_RE = /ownerKeys:(\s*)Object\.freeze\(\[[^\]]*\]\)/;   // v38.29 — a list of fingerprints
+if (!OWNER_KEYS_RE.test(html)) throw new Error('could not find the page\'s owner fingerprints');
 const WRITER = 'writer@example.com';
 const READER = 'reader@example.com';
 
@@ -193,7 +195,7 @@ const server = http.createServer((req, res) => {
     // either way (the move test still starts in the first layout).
     if (!/dataLayout:\s*'(shared|households)'/.test(body)) throw new Error('could not find the page\'s data layout');
     body = body.replace(/dataLayout:(\s*)'(shared|households)'/, "dataLayout:$1'" + (SERVE_HH ? 'households' : 'shared') + "'");
-    body = body.replace(/ownerKey:(\s*)'sha256:[0-9a-f]{64}'/, "ownerKey:$1'" + OWNER_KEY + "'");
+    body = body.replace(OWNER_KEYS_RE, "ownerKeys:$1Object.freeze(['" + OWNER_KEY + "'])");
     if (SERVE_HH) {
       // v37.03 — and any address may sign in: a password, or a link by e-mail.
       const b2 = body;

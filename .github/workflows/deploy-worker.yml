@@ -49,14 +49,17 @@ jobs:
       # v74 — the owner's address is no longer in the code (the repository is public): it is
       # the Worker's secret OWNER_EMAIL, set here from the GitHub secret of the same name,
       # BEFORE publishing — so a Worker without it is never published (v73 stays live).
+      # v75 — and the spare owner key (OWNER_SECONDARY_EMAIL, when set): both addresses go in, comma-separated.
       - name: The owner's address
         if: steps.token.outputs.ok == 'true'
         env:
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          OWNER_SECONDARY_EMAIL: ${{ secrets.OWNER_SECONDARY_EMAIL }}
         run: |
           if [ -z "$OWNER_EMAIL" ]; then echo "::error::OWNER_EMAIL is not set (Settings → Secrets and variables → Actions) — the Worker was NOT published: without it nobody could use the owner's tools."; exit 1; fi
-          printf '%s' "$OWNER_EMAIL" | npx --yes wrangler@4 secret put OWNER_EMAIL --config worker/wrangler.jsonc >/dev/null
-          echo "the owner's address is set"
+          owners="$OWNER_EMAIL"; [ -n "$OWNER_SECONDARY_EMAIL" ] && owners="$owners,$OWNER_SECONDARY_EMAIL"
+          printf '%s' "$owners" | npx --yes wrangler@4 secret put OWNER_EMAIL --config worker/wrangler.jsonc >/dev/null
+          if [ -n "$OWNER_SECONDARY_EMAIL" ]; then echo "the owner's address and the spare owner's are set"; else echo "the owner's address is set"; fi
 
       - name: Publish
         if: steps.token.outputs.ok == 'true'
@@ -65,14 +68,19 @@ jobs:
       # v73 — where the owner's alerts go (Tony's second address, verified in
       # Cloudflare Email Routing): the GitHub secret ALERT_EMAIL becomes the
       # Worker's secret ALERT_TO. Never printed; without it, no alerts.
-      - name: The owner's alert address
+      # v75 — the alerts go to the alert address AND to each owner account, so neither owner acts unseen.
+      # (Each must be a verified destination in Cloudflare Email Routing; one that is not is skipped.)
+      - name: The owner's alert addresses
         if: steps.token.outputs.ok == 'true'
         env:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          OWNER_SECONDARY_EMAIL: ${{ secrets.OWNER_SECONDARY_EMAIL }}
         run: |
           if [ -z "$ALERT_EMAIL" ]; then echo "::notice::ALERT_EMAIL is not set — the owner's alerts stay off."; exit 0; fi
-          printf '%s' "$ALERT_EMAIL" | npx --yes wrangler@4 secret put ALERT_TO --config worker/wrangler.jsonc >/dev/null
-          echo "the alert address is set"
+          to=$(printf '%s\n%s\n%s\n' "$ALERT_EMAIL" "$OWNER_EMAIL" "$OWNER_SECONDARY_EMAIL" | tr 'A-Z' 'a-z' | sed 's/^ *//; s/ *$//' | grep -v '^$' | awk '!seen[$0]++' | paste -sd, -)
+          printf '%s' "$to" | npx --yes wrangler@4 secret put ALERT_TO --config worker/wrangler.jsonc >/dev/null
+          echo "the alert addresses are set ($(printf '%s' "$to" | tr ',' '\n' | grep -c .) of them)"
 
       # The Worker says which version it is; it must be the one just published —
       # with its database (METER_DB) and its storage (BRING_KV) still connected.

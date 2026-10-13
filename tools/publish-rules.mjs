@@ -26,14 +26,18 @@ const projects = [live, envs.test && envs.test.firebase && envs.test.firebase.pr
 if (!owner || !version || projects.length !== 3) throw new Error('could not read the owner, the version or the three projects: ' + JSON.stringify({ owner, version, projects }));
 
 const q = '"' + owner + '"';
+// v38.29 — the spare owner key (GitHub secret OWNER_SECONDARY_EMAIL, when set) is an app admin too;
+// the old first-layout lists keep the owner alone.
+const spare = String(process.env.OWNER_SECONDARY_EMAIL || '').trim().toLowerCase();
+const admins = [owner].concat(spare && spare !== owner ? [spare] : []).map(a => '"' + a + '"').join(', ');
 const stamp = "// These rules come from Tony's Recipes " + version + ', published by GitHub on '
   + new Date().toISOString().slice(0, 10) + ". (The line above is Firebase's rules-language edition — always '2'.)";
 let rules = readFileSync(new URL('firestore.rules', root), 'utf8')
-  .replace(/\{\{READ\}\}/g, q).replace(/\{\{WRITE\}\}/g, q).replace(/\{\{ADMIN\}\}/g, q).replace(/\{\{APP_ADMINS\}\}/g, q);
+  .replace(/\{\{READ\}\}/g, q).replace(/\{\{WRITE\}\}/g, q).replace(/\{\{ADMIN\}\}/g, q).replace(/\{\{APP_ADMINS\}\}/g, admins);
 rules = /^rules_version = '2';/m.test(rules) ? rules.replace(/^(rules_version = '2';)/m, '$1\n' + stamp) : stamp + '\n' + rules;
 if (/\{\{[A-Z_]+\}\}/.test(rules)) throw new Error('a placeholder is left: ' + rules.match(/\{\{[A-Z_]+\}\}/)[0]);
 
-console.log('rules from ' + version + ' for ' + projects.join(', ') + ' (' + rules.length + ' characters)');   // never the address: the log is public
+console.log('rules from ' + version + ' for ' + projects.join(', ') + ' (' + rules.length + ' characters' + (spare ? ', with the spare owner key' : '') + ')');   // never the address: the log is public
 if (DRY) process.exit(0);
 
 const key = process.env.FIREBASE_RULES_KEY;

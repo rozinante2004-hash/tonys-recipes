@@ -65,6 +65,7 @@ jobs:
         if: steps.key.outputs.ok == 'true'
         env:
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — the owner's address, no longer in index.html
+          OWNER_SECONDARY_EMAIL: ${{ secrets.OWNER_SECONDARY_EMAIL }}     # v38.29 — the spare owner key
         run: |
           npm install --no-audit --no-fund --no-save google-auth-library@9 >/dev/null
           node tools/publish-rules.mjs

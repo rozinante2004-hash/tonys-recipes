@@ -1,7 +1,8 @@
 # Privacy audit — October 2026
 
 Done on 13 October 2026 at the owner's request, after e-mail addresses were found in the published
-translations. Released as v38.26 – v38.28 (Worker v74). The repository is public, so this report names
+translations. Released as v38.26 – v38.28 (Worker v74); the owner's decisions on the open points as v38.29
+(Worker v75). The repository is public, so this report names
 kinds of data, never the data itself.
 
 The audit covered:
@@ -47,12 +48,26 @@ The audit covered:
 - **Store screenshots and the architecture diagram** use made-up data.
 - **The site-root repository** holds no personal data.
 
-## Left for the owner to decide
+## Left for the owner to decide — decided on 13 October 2026
 
-1. **The git history.** Earlier versions of files in both repositories still contain what was removed above. Only rewriting the public history removes it, and copies may already exist elsewhere. Not recommended unless wanted; if it is, it needs a plan (every clone and branch is affected).
-2. **Self-hosting the fonts and code libraries.** The app would then contact Google and Cloudflare only for sign-in and the database, not on every open. The statement is accurate as it stands, so this is an improvement rather than a fix. About a day of work, plus about 1–2 MB of font files in the repository.
-3. **Retention of notes, error reports and household summaries.** The statement says notes are kept "until we delete them". A fixed period (for example a year) would be stronger; the Worker could delete them by itself.
-4. **After the family's move:** once the move has been checked, the old copies of the family's data in the family project (the old first-layout `shared/` collection and the moved households) could be deleted.
-5. **`OWNER_SECONDARY_EMAIL`** (a GitHub secret added on 13 Oct) is not used by anything yet. If it is meant as a second owner, that is possible (the Worker and rules accept a list), but a second account with the owner's powers is a second account to protect. If it is meant for alerts, `ALERT_EMAIL` already does that.
+1. **The git history.** Earlier versions of files in both repositories still contain what was removed above.
+   Only rewriting the public history removes it, and copies may already exist elsewhere.
+   **Decision: left as it is** (a rewrite would not reach the copies already made, and affects every clone).
+2. **Self-hosting the fonts and code libraries.** **Done in v38.29.** The fonts (`fonts/`, SIL Open Font
+   License), Firebase's compat SDK (`vendor/firebase-12.19.0/`) and the import libraries (`vendor/libs/`) are
+   served by the app itself; Google's sign-in script for Gmail loads only when a recipe is sent by Gmail. Opening
+   the app contacts Google only for sign-in and the database. Statement 1.4 and the in-app panel say so.
+3. **Retention of notes, error reports and household summaries.** **Done in Worker v75: six months.** A daily
+   job deletes notes and their replies, survey answers, the owner's device records, monthly allowance and usage
+   rows, and household summaries (not refreshed, or deleted, six months ago); error reports go 120 days after
+   they last happened. Statement 1.4 says so.
+4. **After the family's move:** the old copies of the family's data in the family project (the old first-layout
+   `shared/` collection and the moved households) **will be deleted one week after the move**, once nothing is
+   found missing (CLAUDE.md, MOVE DAY CHECKLIST step 9). Open until then.
+5. **`OWNER_SECONDARY_EMAIL`** — **a spare owner key (v38.29, Worker v75)**: a second Google account with the
+   owner's powers, so that losing the first account does not lock the owner out. The app knows it by its
+   fingerprint, the Worker and the rules by the secret; it also receives the alerts. It has the same
+   protections as the first (Google sign-in only, the authenticator once required, a recent sign-in for
+   destructive actions), and must set up its own authenticator before that is required.
 
 Not legal advice. The earlier recommendation stands: have an Israeli lawyer review the statement and the terms before the app opens to the public.

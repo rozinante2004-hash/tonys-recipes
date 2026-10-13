@@ -11,7 +11,9 @@
 > app. The family's copy IS `index.html`, served as committed; a small plain-Node build
 > (`tools/build.js`) exists only to make the **test and community copies** from the same file (§1a, §1b).
 > Plain ES5‑flavoured vanilla JavaScript (mostly `var`/`function`, some template literals and
-> `async/await`), inline `<style>`, and CDN `<script>` tags. Keep it that way.
+> `async/await`), inline `<style>`, and plain `<script>` tags. Since v38.29 the fonts (`fonts/`) and the
+> code libraries (`vendor/`) are copies served from the app's own site, not from Google or cdnjs — the
+> app asks Google only for sign-in, the database and (on demand) Gmail sending. Keep it that way.
 
 ---
 
@@ -38,8 +40,8 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
-(`APP_CONFIG.ownerKey`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.28` — app. **Worker: v74**, deployed separately and versioned separately
+(`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
+**Current version:** `v38.29` — app. **Worker: v75**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -288,13 +290,19 @@ hidden / refuses / silent / privacy text.
      every destructive operation. The Worker reads `config/security` with the owner's own token and
      fails CLOSED (502).
   5. **No e-mail address is written out anywhere public (v38.27, Worker v74).** The repository is public
-     and harvested for addresses. The app holds `ownerKey` = `'sha256:' + SHA-256('mkn-owner|' +
-     lower-cased address)`; `isOwnerAddress()` compares a sign-in's address to it (`mknSha256Hex` — a
+     and harvested for addresses. The app holds `ownerKeys`, a list of `'sha256:' + SHA-256('mkn-owner|' +
+     lower-cased address)`; `isOwnerAddress()` compares a sign-in's address to them (`mknSha256Hex` — a
      synchronous SHA-256 in the page, checked against the browser's and Node's). The Worker reads the
-     owner from its secret `OWNER_EMAIL` (or the variable `OWNER_EMAILS`) — none set means NOBODY is the
-     owner; `deploy-worker.yml` sets it from the GitHub secret before publishing and refuses to publish
-     without it. `tools/publish-rules.mjs` fills `{{APP_ADMINS}}` from the same secret (and never prints
-     it). The contact address is `APP_CONFIG.supportMailbox` (two halves, `appSupportEmail()` joins them
+     owners from its secret `OWNER_EMAIL` (a comma-separated list; or the variable `OWNER_EMAILS`) — none
+     set means NOBODY is the owner; `deploy-worker.yml` sets it from the GitHub secrets `OWNER_EMAIL` and
+     `OWNER_SECONDARY_EMAIL` before publishing and refuses to publish without the first.
+     `tools/publish-rules.mjs` fills `{{APP_ADMINS}}` from the same secrets (and never prints them).
+     **The spare owner key (v38.29, Worker v75):** `OWNER_SECONDARY_EMAIL` is a second Google account
+     with the owner's powers — a way back in if the first is lost. It is the second fingerprint in
+     `ownerKeys`, the second address in the Worker's `OWNER_EMAIL` and in the rules' admin list, and it
+     also receives the alerts (`ALERT_TO` = `ALERT_EMAIL`, `OWNER_EMAIL`, `OWNER_SECONDARY_EMAIL`, each
+     sent separately). The Self Tests workflow compares both secrets' fingerprints with `ownerKeys`
+     ("The owner fingerprints") and prints only match / the fingerprint to use. The contact address is `APP_CONFIG.supportMailbox` (two halves, `appSupportEmail()` joins them
      on screen); the legal pages carry `<a class="mkn-mail" data-u data-d>contact [at] …</a>`, which
      `legal-i18n.js` turns into a real mailto: link. Self-tests fake the owner with a stand-in address
      and its fingerprint (`stAsOwner()`), never the real one; `owner_by_fingerprint` scans the page.
@@ -396,8 +404,14 @@ under its plain path only (a `?url=` request goes network-first).
 - **Privacy by default (v38.26–v38.28; AUDIT-2026-10-privacy.md):** no e-mail address is written in any public
   file or job log (§1b.5); the device log shortens every address (`logMaskAddresses`); deleting an account also
   deletes `homes/<uid>` and `users/<uid>/prefs/*`; test data is made up, never copied from real chats or
-  accounts; the privacy statement (1.3, 11 languages) and the in-app panel name every service that receives
-  anything, including what loads on every open (fonts and code from Google and Cloudflare).
+  accounts; the privacy statement (1.4, 11 languages) and the in-app panel name every service that receives
+  anything. v38.29: the fonts and code libraries are served by the app itself (nothing loads from Google
+  Fonts, gstatic or cdnjs; the CSP allows only `'self'` for them), and Google's Gmail script loads only when
+  a recipe is sent by Gmail. **Six months, then gone (Worker v75):** a daily cron (`23 3 * * *`,
+  `retentionSweep`, `KEEP_DAYS` = 183) deletes notes and their replies, survey answers, the owner's device
+  records, monthly allowance/spend/usage rows older than six months, household summaries not refreshed
+  for six months (and a deleted household's summary and allowance rows six months after deletion), and
+  the departed-member entries in a summary; error reports go 120 days after they last happened.
 - **Sign-in options per copy** (`APP_CONFIG.signIn`): Google (all), password + e-mail link
   (community, test); Microsoft and Apple built but off. Sign-in runs on each copy's own address
   (`authDomain` = the site; Firebase's helper files served at `/__/auth/`).
@@ -1473,8 +1487,10 @@ Rules that follow from that:
 
 ## 6. Firebase auth & sync behaviour (subtle — match carefully)
 
-- Firebase **compat** SDK v12.19.0 (v36.74) loaded from `gstatic.com` (app + auth + firestore), plus
-  Google Identity Services (`accounts.google.com/gsi/client`). Init on `DOMContentLoaded` with a
+- Firebase **compat** SDK v12.19.0 (v36.74) — since v38.29 a copy served by the app itself
+  (`vendor/firebase-12.19.0/firebase-{app,auth,firestore}-compat.js`, from the npm package; the e2e
+  test reads the version from that path) — app + auth + firestore. Google Identity Services
+  (`accounts.google.com/gsi/client`) is loaded only by `getGmailToken()`, via `loadScriptOnce()`. Init on `DOMContentLoaded` with a
   retry loop (up to 30×500ms) in case the SDK is slow/offline; a `loadFirebaseDynamically()`
   path re‑loads it on demand at sign‑in.
 - Auth persistence = `LOCAL`; Firestore `enablePersistence({synchronizeTabs:true})`.
@@ -1713,7 +1729,7 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   logged **nothing** before v36.1, so turning logging on during the hang showed an empty
   panel.
 - **Word** (`.docx`): **built by hand** as an OOXML zip — `makeDocxBlob` + a tiny `buildZip`
-  (store‑only, CRC32) — no library for export. Import `.docx` via **mammoth** 1.6.0 CDN
+  (store‑only, CRC32) — no library for export. Import `.docx` via **mammoth** 1.6.0 (`vendor/libs/`)
   (`parseWordText`). Three things here are load‑bearing and were all wrong before **v35.1**:
   - **Photos are embedded for real**, not noted. `dataUrlToBytes` decodes the data URL and
     `imagePixelSize` reads the intrinsic size straight out of the JPEG SOF marker or PNG IHDR —
@@ -2259,9 +2275,13 @@ CSS variables on `:root`:
 
 `<head>` essentials: viewport with `viewport-fit=cover`; `mobile-web-app-capable` +
 `apple-mobile-web-app-*` metas; `theme-color #5C3D2E`; manifest link; apple‑touch‑icon; an inline
-SVG favicon (the fork/flame mark); Google Fonts; and CDN scripts for **Google GSI and Firebase
-compat (app/auth/firestore)**. **xlsx and mammoth are NOT in `<head>`** — they load on first
-use via `loadScriptOnce()` (5.11). qrcodejs and the Excel export were removed in v28.5.
+SVG favicon (the fork/flame mark); the fonts' stylesheet `fonts/fonts.css` (woff2 files beside it, OFL
+licence in `fonts/LICENSE.txt`; the legal pages use `fonts/legal-fonts.css`); and the app's own copies
+of **Firebase compat (app/auth/firestore)** from `vendor/`. **xlsx, mammoth, jszip and Google GSI are
+NOT in `<head>`** — they load on first use via `loadScriptOnce()` (5.11); the three libraries from
+`vendor/libs/`, GSI from Google. The service worker keeps `vendor/` and the woff2 files cache-first
+(their names carry the version) and `fonts/*.css` network-first. qrcodejs and the Excel export were
+removed in v28.5.
 
 ---
 
@@ -2354,7 +2374,7 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
 
 ## 17. Rebuild order (suggested)
 
-1. Scaffold `index.html` skeleton: `<head>` (metas, fonts, CDN scripts, CSS variables + full
+1. Scaffold `index.html` skeleton: `<head>` (metas, fonts, vendored scripts, CSS variables + full
    stylesheet), header, filter bars, grid, and empty modal shells.
 2. DATA section (constants, seed recipes, state vars) + `localStorage` load/save/migrate.
 3. `renderFilters` + `renderGrid` + search/sort/filter/select‑mode.
@@ -2377,7 +2397,7 @@ Firebase auth state then updates everything asynchronously. Register `sw.js` for
     walk the acceptance checklist in §16 — including the security, honesty, Worker, rules, photo
     and accessibility rows, which are the ones a rebuild is most likely to miss.
 
-> Keep everything in one `index.html` with inline CSS/JS and CDN dependencies. Prefer clarity and
+> Keep everything in one `index.html` with inline CSS/JS and its few vendored libraries. Prefer clarity and
 > parity with this spec over modernization. When in doubt, match the observable behaviour above.
 
 ---

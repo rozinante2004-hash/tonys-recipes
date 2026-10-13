@@ -59,7 +59,9 @@ async function claims(url, destination) {
   install('caches', {
     match: function(k) { keys.push(String(k && k.url || k)); return Promise.resolve(cachedHit); },
     open: function() { return Promise.resolve({ put: function(k) { keys.push(String(k && k.url || k)); return Promise.resolve(); },
-                                                addAll: function() { return Promise.resolve(); } }); },
+                                                addAll: function() { return Promise.resolve(); },
+                                                // v38.29 — the fonts and libraries are looked up in the opened cache
+                                                match: function(k) { keys.push(String(k && k.url || k)); return Promise.resolve(cachedHit); } }); },
     keys: function() { return Promise.resolve([]); },
     delete: function() { return Promise.resolve(true); }
   });

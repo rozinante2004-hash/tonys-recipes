@@ -34,5 +34,7 @@
   "send_email": [
     { "name": "ALERTS" }
   ],
+  // v75 — the daily six-month sweep (retentionSweep): 03:23 UTC.
+  "triggers": { "crons": ["23 3 * * *"] },
   "observability": { "enabled": true }
 }

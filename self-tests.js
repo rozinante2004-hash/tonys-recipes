@@ -31,12 +31,12 @@ async function _inFirstLayout(fn){
   try{ return await fn(); } finally{ _cloudLayout=was; }
 }
 
-// v38.27 — the app knows its owner only by a fingerprint of the address (APP_OWNER_KEY),
+// v38.27 — the app knows its owner only by a fingerprint of the address (APP_OWNER_KEYS),
 // and its contact address only as two halves. A test that plays the owner swaps in the
 // fingerprint of a stand-in address, and puts the real one back after.
 var ST_OWNER = 'owner@self-test.example';
 var ST_CONTACT = ['contact', 'mykitchennotes.community'].join('@');
-function stAsOwner(){ var was=APP_OWNER_KEY; APP_OWNER_KEY=ownerKeyOf(ST_OWNER); return function(){ APP_OWNER_KEY=was; }; }
+function stAsOwner(){ var was=APP_OWNER_KEYS; APP_OWNER_KEYS=[ownerKeyOf(ST_OWNER)]; return function(){ APP_OWNER_KEYS=was; }; }
 
 window.SELF_TESTS = [
   // ── UI ELEMENTS ────────────────────────────────────────────────────────────
@@ -3654,8 +3654,9 @@ window.SELF_TESTS = [
         var hex=Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
         if(mknSha256Hex(t)!==hex) throw new Error('SHA-256 disagrees with the browser for '+JSON.stringify(t.slice(0,20)));
       }
-      if(!/^sha256:[0-9a-f]{64}$/.test(APP_CONFIG.ownerKey||'') || APP_OWNER_KEY!==APP_CONFIG.ownerKey) throw new Error('the owner is not configured as a fingerprint');
-      if('ownerEmail' in APP_CONFIG || 'supportEmail' in APP_CONFIG) throw new Error('an address is still configured as text');
+      if(!APP_CONFIG.ownerKeys || !APP_CONFIG.ownerKeys.length || APP_CONFIG.ownerKeys.some(function(k){ return !/^sha256:[0-9a-f]{64}$/.test(k); })
+         || APP_OWNER_KEYS.join()!==APP_CONFIG.ownerKeys.join()) throw new Error('the owner is not configured as fingerprints');
+      if('ownerEmail' in APP_CONFIG || 'supportEmail' in APP_CONFIG || 'ownerKey' in APP_CONFIG) throw new Error('an address is still configured as text (or the single owner key is back)');
       // The owner check goes by the fingerprint: any case, spaces around, only that address.
       var real={ user:window._fbUser }, undo=stAsOwner();
       try{
@@ -3663,8 +3664,11 @@ window.SELF_TESTS = [
         if(!isAppOwner()) throw new Error('the owner (in capitals, with spaces) is not recognised');
         window._fbUser={ uid:'o', email:'other@self-test.example', emailVerified:true };
         if(isAppOwner()) throw new Error('someone else counts as the owner');
-        window._fbUser={ uid:'o', email:ST_OWNER, emailVerified:true }; var was=APP_OWNER_KEY; APP_OWNER_KEY='';
-        try{ if(isAppOwner()) throw new Error('with no owner configured, someone counts as the owner'); } finally { APP_OWNER_KEY=was; }
+        window._fbUser={ uid:'o', email:ST_OWNER, emailVerified:true }; var was=APP_OWNER_KEYS; APP_OWNER_KEYS=[];
+        try{ if(isAppOwner()) throw new Error('with no owner configured, someone counts as the owner'); } finally { APP_OWNER_KEYS=was; }
+        // v38.29 — the spare owner key: a second fingerprint in the list is an owner too.
+        APP_OWNER_KEYS=[ownerKeyOf('first@self-test.example'), ownerKeyOf(ST_OWNER)];
+        try{ if(!isAppOwner()) throw new Error('the second owner in the list is not an owner'); } finally { APP_OWNER_KEYS=was; }
       } finally { window._fbUser=real.user; undo(); }
       if(appSupportEmail()!==APP_CONFIG.supportMailbox[0]+'@'+APP_CONFIG.supportMailbox[1] || !/@/.test(appSupportEmail())) throw new Error('the contact address does not join: '+appSupportEmail());
       // The page and the owner's page write out no address but the examples in input boxes.
@@ -3682,10 +3686,10 @@ window.SELF_TESTS = [
         throw new Error('APP_CONFIG is missing or can be changed at run time');
       ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'].forEach(function(k){
         if(!APP_CONFIG.firebase[k]) throw new Error('APP_CONFIG.firebase.'+k+' is empty'); });
-      ['workerUrl','workerAppKey','workerName','cloudflareAccountId','ownerKey','githubRepo','siteOrigin','sitePath'].forEach(function(k){
+      ['workerUrl','workerAppKey','workerName','cloudflareAccountId','ownerKeys','githubRepo','siteOrigin','sitePath'].forEach(function(k){
         if(!APP_CONFIG[k]) throw new Error('APP_CONFIG.'+k+' is empty'); });
       // The code reads it — not a copy typed out somewhere else.
-      if(WORKER_ENDPOINT!==APP_CONFIG.workerUrl || APP_OWNER_KEY!==APP_CONFIG.ownerKey)
+      if(WORKER_ENDPOINT!==APP_CONFIG.workerUrl || APP_OWNER_KEYS.join()!==APP_CONFIG.ownerKeys.join())
         throw new Error('a constant does not come from APP_CONFIG');
       // Outside #appConfig and the CSP <meta> (which no script can reach), the
       // file names none of them. The Firebase settings were typed out twice,
@@ -3695,7 +3699,7 @@ window.SELF_TESTS = [
       if(a===-1) throw new Error('no #appConfig block in the page');
       var rest=(src.slice(0,a)+src.slice(z)).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/,'');
       var ids=[APP_CONFIG.firebase.apiKey, APP_CONFIG.firebase.projectId, APP_CONFIG.firebase.messagingSenderId,
-               APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerKey, APP_CONFIG.githubRepo,
+               APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerKeys[0], APP_CONFIG.githubRepo,
                APP_CONFIG.siteOrigin.replace(/^https:\/\//,'')+APP_CONFIG.sitePath.replace(/\/$/,'')];
       var hits=ids.filter(function(v){ return rest.indexOf(v)!==-1; });
       if(hits.length) throw new Error('hard-wired outside APP_CONFIG: '+hits.join(', '));
@@ -4805,10 +4809,15 @@ window.SELF_TESTS = [
       // face in the stack every Hebrew title renders in whatever generic serif
       // the OS picks, beside an English title in Playfair — the grid reads as
       // two different apps. This is a bilingual collection; it matters.
-      var link=Array.prototype.slice.call(document.querySelectorAll('link[href*="fonts.googleapis.com"]'))
-        .map(function(l){ return l.getAttribute('href')||''; }).join(' ');
-      if(!/Frank\+Ruhl\+Libre/.test(link)) throw new Error('Frank Ruhl Libre is not being requested — Hebrew titles have no serif face');
-      if(!/Heebo/.test(link)) throw new Error('Heebo is not being requested — Hebrew body text has no sans face');
+      // v38.29 — the faces come from the app's own fonts/fonts.css (no longer Google Fonts).
+      var fl=document.querySelector('link[rel="stylesheet"][href$="fonts/fonts.css"]');
+      if(!fl) throw new Error('the app\u2019s own font style sheet (fonts/fonts.css) is not linked');
+      if(document.querySelector('link[href*="fonts.googleapis.com"]')) throw new Error('Google Fonts is linked again — opening the app would contact Google');
+      var css=await (await fetch(fl.href, { cache:'no-store' })).text();
+      if(!/font-family:\s*'Frank Ruhl Libre'/.test(css)) throw new Error('Frank Ruhl Libre is not defined — Hebrew titles have no serif face');
+      if(!/font-family:\s*'Heebo'/.test(css)) throw new Error('Heebo is not defined — Hebrew body text has no sans face');
+      var w=/url\(([^)]+\.woff2)\)/.exec(css);
+      if(!w || !(await fetch(new URL(w[1], fl.href).href, { cache:'no-store' })).ok) throw new Error('a font file the style sheet names is not there: '+(w ? w[1] : 'none named'));
       // And the stacks must actually name them, after the Latin face so that CSS
       // per-glyph fallback puts each script in its own typeface.
       var t=document.querySelector('.card-title')||document.querySelector('h1,h2');
@@ -10018,10 +10027,15 @@ window.SELF_TESTS = [
         throw new Error('the Firebase auth domain is not allowed, so sign-in would stall');
       // The email preview is a srcdoc iframe (about:srcdoc) and needs frame-src 'self'.
       if(!/frame-src[^;]*'self'/.test(c)) throw new Error("frame-src lacks 'self' — the email preview iframe would be blocked");
-      // Lazily loaded libraries must still be reachable.
-      ['https://cdnjs.cloudflare.com','https://www.gstatic.com'].forEach(function(host){
-        if(c.indexOf(host)===-1) throw new Error('script-src omits '+host+', so a lazily loaded library would silently fail');
+      // v38.29 — the fonts and libraries are the app's own: no Google Fonts, gstatic or cdnjs any more,
+      // and every library the app loads later is on its own site. Google's sign-in script for Gmail is
+      // the one outside script, fetched only when used — so its host must be allowed.
+      ['fonts.googleapis.com','fonts.gstatic.com','cdnjs.cloudflare.com','www.gstatic.com'].forEach(function(host){
+        if(c.indexOf(host)!==-1) throw new Error('the CSP still allows '+host+' — opening the app would contact it');
       });
+      [CDN_XLSX, CDN_MAMMOTH, CDN_JSZIP].forEach(function(u){ if(/^https?:/.test(u)) throw new Error('a library is loaded from another site: '+u); });
+      if(!/script-src[^;]*https:\/\/accounts\.google\.com/.test(c)) throw new Error('script-src omits accounts.google.com, so sending by Gmail would fail');
+      if(document.querySelector('script[src*="accounts.google.com"]:not([data-on-demand])')) throw new Error('Google\u2019s sign-in script loads with every opening again');
     } },
 
   { id:'feat_import_duplicates', group:'Import/Export', name:'Importing the same recipe twice is caught (5f.2)',
@@ -10372,7 +10386,10 @@ window.SELF_TESTS = [
             { url:'https://x/tonys-recipes/icons/icon-192.png',destination:'image'    },
             { url:'https://x/tonys-recipes/filename-test.html',destination:'document' },
             { url:'https://x/tonys-recipes/tests/sw-probe.js', destination:'script'   },
-            { url:'https://x/tonys-recipes/?url=https%3A%2F%2Fwww.facebook.com%2Freel%2F1', destination:'document' }
+            { url:'https://x/tonys-recipes/?url=https%3A%2F%2Fwww.facebook.com%2Freel%2F1', destination:'document' },
+            { url:'https://x/tonys-recipes/vendor/firebase-12.19.0/firebase-app-compat.js', destination:'script' },
+            { url:'https://x/tonys-recipes/fonts/heebo-v28-x.woff2', destination:'font' },
+            { url:'https://x/tonys-recipes/fonts/fonts.css', destination:'style' }
           ]});
         });
         if(reply.loadError) throw new Error('sw.js would not load: ' + reply.loadError);
@@ -10403,6 +10420,12 @@ window.SELF_TESTS = [
         if(!r[5].responded || r[5].served!=='network') throw new Error('a shared link is not opened in the newest app: '+JSON.stringify(r[5]));
         if(!r[5].keys.length || r[5].keys.some(function(k){ return /\?/.test(k); })) throw new Error('the app is filed under a shared link\'s address: '+JSON.stringify(r[5].keys));
         if(r[0].served!=='cached') throw new Error('a plain open no longer paints from the cache first: '+JSON.stringify(r[0]));
+        // v38.29 — the app's own fonts and libraries (they used to come from Google and cdnjs): kept by the
+        // worker, served from its copy (their names carry their version), so the app still starts offline.
+        if(!r[6].responded || r[6].served!=='cached' || r[6].revalidated) throw new Error('a library file is not served from the worker\u2019s copy: '+JSON.stringify(r[6]));
+        if(!r[7].responded || r[7].served!=='cached' || r[7].revalidated) throw new Error('a font file is not served from the worker\u2019s copy: '+JSON.stringify(r[7]));
+        // …but the font style sheets have plain names: the network first.
+        if(!r[8].responded || r[8].served!=='network') throw new Error('a font style sheet is not fetched fresh: '+JSON.stringify(r[8]));
       } finally { probe.terminate(); }
     } },
 
