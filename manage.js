@@ -167,6 +167,7 @@
       r.capSet = m && typeof m.cap === 'number';
       r.note = (m && m.note) || '';
       r.usage = (m && m.usage) || null;           // v38.15 — { 'YYYY-MM': { feature: times } } (Worker v69)
+      r.recipesN = (m && m.report && m.report.recipes) || 0;   // v38.30 — how many recipes (Worker v76)
       if (m && m.last_seen > r.lastSeen) r.lastSeen = m.last_seen;
       return r;
     });
@@ -373,9 +374,41 @@
     'added.photo': 'from a photo', 'added.screenshots': 'from screenshots', 'added.text': 'from pasted text', 'added.video-file': 'from a video file',
     'added.whatsapp': 'from WhatsApp', 'added.linked': 'copied from a linked household', 'added.suggestion': 'an AI suggestion',
     'added.translation': 'a translated copy', 'added.video-bookmark': 'a video bookmark', 'added.import': 'imported',
-    'from.web': 'a website', 'from.facebook': 'Facebook', 'from.instagram': 'Instagram', 'from.tiktok': 'TikTok', 'from.youtube': 'YouTube'
+    'from.web': 'a website', 'from.facebook': 'Facebook', 'from.instagram': 'Instagram', 'from.tiktok': 'TikTok', 'from.youtube': 'YouTube',
+    // v38.30 — more to learn from
+    'session': 'Visits (opened, or back after half an hour)', 'offline': 'Opened without a connection', 'install': 'Installed on a device',
+    'time.morning': 'Morning (5–11)', 'time.midday': 'Midday (11–16)', 'time.evening': 'Evening (16–22)', 'time.night': 'Night (22–5)',
+    'day.sun': 'Sunday', 'day.mon': 'Monday', 'day.tue': 'Tuesday', 'day.wed': 'Wednesday', 'day.thu': 'Thursday', 'day.fri': 'Friday', 'day.sat': 'Saturday',
+    'week.opens-1': 'Once', 'week.opens-2-3': '2–3 times', 'week.opens-4-7': '4–7 times', 'week.opens-8-14': '8–14 times', 'week.opens-15-plus': '15 times or more',
+    'signin.google': 'Google', 'signin.password': 'Password', 'signin.email-link': 'E-mail link', 'signin.microsoft': 'Microsoft', 'signin.apple': 'Apple',
+    'signup.google': 'Google', 'signup.password': 'Password', 'signup.email-link': 'E-mail link', 'signup.microsoft': 'Microsoft', 'signup.apple': 'Apple',
+    'account.google': 'Google', 'account.password': 'Password', 'account.email-link': 'E-mail link', 'account.microsoft': 'Microsoft', 'account.apple': 'Apple', 'account.other': 'Other',
+    'first.invitation': 'An invitation link', 'first.share-link': 'Someone’s “share the app” link', 'first.extension': 'The browser extension',
+    'first.shortcut': 'The iPhone shortcut', 'first.shared': 'Shared to the app (phone)', 'first.direct': 'Typed in, a bookmark or an app link',
+    'first.store-chrome': 'Chrome Web Store', 'first.store-firefox': 'Firefox Add-ons', 'first.store-edge': 'Edge Add-ons',
+    'first.search': 'A search engine', 'first.social': 'A social site', 'first.e-mail': 'Webmail', 'first.old-address': 'The app’s old address',
+    'first.other-site': 'Another website',
+    'joined.founded': 'Started their own', 'joined.founded-referred': 'Started their own, through a share link', 'joined.invitation': 'Joined by invitation',
+    'joined.kept-place': 'Took up a place kept for them',
+    'device.iphone': 'iPhone', 'device.ipad': 'iPad', 'device.android-phone': 'Android phone', 'device.android-tablet': 'Android tablet',
+    'device.mac': 'Mac', 'device.windows': 'Windows', 'device.linux': 'Linux', 'device.chromebook': 'Chromebook', 'device.other': 'Other',
+    'browser.safari': 'Safari', 'browser.chrome': 'Chrome', 'browser.firefox': 'Firefox', 'browser.edge': 'Edge', 'browser.samsung': 'Samsung Internet',
+    'browser.opera': 'Opera', 'browser.other': 'Other', 'installed.yes': 'On the home screen / installed', 'installed.no': 'In a browser tab',
+    'theme.light': 'Light', 'theme.dark': 'Dark', 'extension.yes': 'Has the extension', 'extension.no': 'No extension',
+    'edit': 'Edited a recipe', 'favorite': 'Marked a favourite', 'note': 'Sent a note', 'invite': 'Made an invitation link', 'gmail': 'Sent by Gmail',
+    'backup': 'Saved a backup', 'update': 'Pressed Update now', 'farm-on': 'Turned the farm back on',
+    'farm.visit': 'A visitor came by', 'farm.tap': 'Tapped a visitor', 'farm.grab': 'Picked a visitor up', 'farm.turned-off': 'Farm off (devices)'
   };
-  function useWord(k) { return USE_WORDS[k] || k; }
+  var LANG_NAMES = { en: 'English', he: 'Hebrew', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German', it: 'Italian', pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese' };
+  function useWord(k) {
+    if (USE_WORDS[k]) return USE_WORDS[k];
+    var m;
+    if ((m = /^week\.days-(\d)$/.exec(k))) return m[1] + (m[1] === '1' ? ' day' : ' days');
+    if ((m = /^lang\.([a-z-]+)$/.exec(k))) return LANG_NAMES[m[1]] || m[1];
+    if ((m = /^farm\.tap-([a-z-]+)$/.exec(k))) return 'Tapped the ' + m[1];
+    if ((m = /^farm\.look-([a-z-]+)$/.exec(k))) return 'Look: ' + m[1];
+    return k;
+  }
   // { feature: times } for one month → three short lists, biggest first.
   function useGroups(c) {
     var g = { added: [], from: [], other: [] };
@@ -397,12 +430,126 @@
     var months = Object.keys(r.usage || {}).sort().reverse();
     if (!months.length) return r.remote || r.copy !== 'family' ? '<div class="mg-h">What they use</div><div class="mg-muted">Nothing counted yet'
       + ' (counted in the beta and the test copy only).</div>' : '';
-    return '<div class="mg-h">What they use</div>' + months.map(function (m) {
+    return '<div class="mg-h">What they use</div>' + (r.recipesN ? '<div class="mg-muted">' + r.recipesN + ' recipe' + (r.recipesN === 1 ? '' : 's') + ' in the collection</div>' : '') + months.map(function (m) {
       return '<div class="mg-usemonth"><div class="mg-muted">' + mon(m) + ' ' + m.slice(0, 4) + '</div>' + useListHtml(r.usage[m]) + '</div>';
     }).join('');
   }
+  // ─── v38.30: 📈 TRENDS (Worker v76 `trends`) ──────────────────────────────────
+  // Tony: "I'd like to understand trends and foresee needs before they arise." Every copy's counts,
+  // added up by month (newest first), in sections; a share of its group where that says more than the
+  // number. The tables come from the server's sums (24 months); an older server: the view below.
+  var TREND_SECTIONS = [
+    { title: '🗓 How often', note: 'Visits, and when. “Days a week” and “Times a week”: per device, for each week it was used.', parts: [
+      { label: null, test: /^(session|open|offline)$/ },
+      { label: 'Days a week', test: /^week\.days-/, share: true, order: function (k) { return +k.slice(-1); } },
+      { label: 'Times a week', test: /^week\.opens-/, share: true, order: function (k) { return ['1', '2-3', '4-7', '8-14', '15-plus'].indexOf(k.slice(11)); } },
+      { label: 'Time of day', test: /^time\./, share: true, order: function (k) { return ['morning', 'midday', 'evening', 'night'].indexOf(k.slice(5)); } },
+      { label: 'Day of the week', test: /^day\./, share: true, order: function (k) { return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(k.slice(4)); } } ] },
+    { title: '🔑 Signing in', note: 'Each sign-in; new accounts; and once a month per device, the kind of account in use.', parts: [
+      { label: 'Signed in with', test: /^signin\./, share: true }, { label: 'New accounts', test: /^signup\./, share: true },
+      { label: 'Accounts in use (devices)', test: /^account\./, share: true } ] },
+    { title: '🚪 How they came', note: 'How each new device first reached the app, and how its person came into a household.', parts: [
+      { label: 'First reached the app through', test: /^first\./, share: true }, { label: 'Into a household', test: /^joined\./, share: true },
+      { label: 'Bringing others', test: /^(invite|share-app|link-request|install)$/ } ] },
+    { title: '🍲 Recipes added', note: '', parts: [
+      { label: 'How', test: /^added\./, share: true }, { label: 'From which kind of site', test: /^from\./, share: true } ] },
+    { title: '🐑 The farm', note: '', parts: [
+      { label: null, test: /^(farm|farm\.visit|farm\.tap|farm\.grab|farm-off|farm-on)$/ },
+      { label: 'Which animal was tapped', test: /^farm\.tap-/, share: true },
+      { label: 'Look (devices, monthly)', test: /^farm\.(look-|turned-off)/, share: true } ] },
+    { title: '📱 Devices and settings', note: 'Once a month per device.', parts: [
+      { label: 'Device', test: /^device\./, share: true }, { label: 'Browser', test: /^browser\./, share: true },
+      { label: 'Installed', test: /^installed\./, share: true }, { label: 'Language', test: /^lang\./, share: true },
+      { label: 'Light or dark', test: /^theme\./, share: true }, { label: 'Browser extension (computers)', test: /^extension\./, share: true } ] }
+  ];
+  async function loadTrends() {
+    try {
+      var t = await window._fbUser.getIdToken();
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'meter-admin', op: 'trends', idToken: t }), signal: AbortSignal.timeout(20000) });
+      var d = {}; try { d = await r.json(); } catch (e) {}
+      if (!r.ok || !Array.isArray(d.rows)) throw new Error((d && d.error) || ('the server answered ' + r.status + (r.ok ? ' — it needs Worker v76 or newer' : '')));
+      S.trends = d; S.trendsError = '';
+    } catch (e) { S.trends = null; S.trendsError = String((e && e.message) || e); }
+    return true;
+  }
+  // { copy: { months: [newest…], n: { month: { key: n } }, hh: { month: households } } }
+  function trendsByCopy() {
+    var out = {};
+    ((S.trends && S.trends.rows) || []).forEach(function (x) {
+      var c = out[copyOf(x.project)] = out[copyOf(x.project)] || { n: {}, hh: {} };
+      (c.n[x.month] = c.n[x.month] || {})[x.k] = x.n;
+    });
+    ((S.trends && S.trends.counted) || []).forEach(function (x) { var c = out[copyOf(x.project)]; if (c) c.hh[x.month] = x.households; });
+    Object.keys(out).forEach(function (c) { out[c].months = Object.keys(out[c].n).sort().reverse().slice(0, 12); });
+    return out;
+  }
+  function trendRowsHtml(c, part, used) {
+    var keys = {};
+    c.months.forEach(function (m) { Object.keys(c.n[m]).forEach(function (k) { if (part.test.test(k) && !used[k]) keys[k] = (keys[k] || 0) + c.n[m][k]; }); });
+    var list = Object.keys(keys);
+    if (!list.length) return '';
+    list.forEach(function (k) { used[k] = 1; });
+    list.sort(part.order ? function (a, b) { return part.order(a) - part.order(b); } : function (a, b) { return keys[b] - keys[a]; });
+    var tot = {};
+    if (part.share) c.months.forEach(function (m) { tot[m] = list.reduce(function (t, k) { return t + (c.n[m][k] || 0); }, 0); });
+    return (part.label ? '<tr><td colspan="' + (c.months.length + 1) + '" class="mg-trsub">' + esc(part.label) + '</td></tr>' : '')
+      + list.map(function (k) {
+        return '<tr><td class="mg-trk">' + esc(useWord(k)) + '</td>' + c.months.map(function (m) {
+          var n = c.n[m][k] || 0;
+          return '<td class="mg-c">' + (n ? '<b>' + n + '</b>' + (part.share && tot[m] ? ' <span class="mg-muted">' + Math.round(n / tot[m] * 100) + '%</span>' : '') : '<span class="mg-muted">—</span>') + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+  }
+  function trendsHtml() {
+    var byCopy = trendsByCopy(), names = Object.keys(byCopy).sort(function (a, b) { return a === 'beta' ? -1 : b === 'beta' ? 1 : a < b ? -1 : 1; });
+    var intro = '<div class="mg-muted" style="margin-bottom:10px;">How the households use the app, month by month — counted by their apps (the beta and the test copy), names and numbers only. Each household’s own counts are in its details (🏠 Households → a row).</div>';
+    if (!names.length) return intro + '<div class="mg-empty">Nothing counted yet.</div>';
+    if (names.indexOf(S.useCopy) === -1) S.useCopy = names[0];
+    var c = byCopy[S.useCopy];
+    var pick = '<div class="mg-tools" style="margin-bottom:10px;">' + names.map(function (n) {
+      return '<button type="button" class="mg-btn' + (S.useCopy === n ? ' mg-primary' : '') + '" onclick="mknManage.useCopy(' + jsA(n) + ')">' + esc(n) + '</button>'; }).join('')
+      + '<button type="button" class="mg-btn" onclick="mknManage.trendsCsv()">📋 Copy as a table</button></div>';
+    var head = '<tr><th class="mg-trk">' + '</th>' + c.months.map(function (m) { return '<th class="mg-c">' + esc(mon(m) + ' ' + m.slice(0, 4)) + '</th>'; }).join('') + '</tr>'
+      + '<tr><td class="mg-trk mg-muted">Households counted</td>' + c.months.map(function (m) { return '<td class="mg-c mg-muted">' + (c.hh[m] || 0) + '</td>'; }).join('') + '</tr>';
+    var used = {}, out = TREND_SECTIONS.map(function (sec) {
+      var rows = sec.parts.map(function (p) { return trendRowsHtml(c, p, used); }).join('');
+      return rows ? sectionTable(sec.title, sec.note, head, rows) : '';
+    });
+    var rest = trendRowsHtml(c, { label: null, test: /^(?!added\.|from\.)/ }, used);   // every other feature, most used first
+    if (rest) out.splice(4, 0, sectionTable('✨ Features', 'How many times each was used.', head, rest));
+    return intro + pick + sizesHtml() + out.join('');
+  }
+  function sectionTable(title, note, head, rows) {
+    return '<div class="mg-card"><div class="mg-ptop"><b>' + esc(title) + '</b></div>' + (note ? '<div class="mg-muted" style="margin:2px 0 6px;">' + esc(note) + '</div>' : '')
+      + '<div class="mg-scroll"><table class="mg-table mg-trend">' + head + rows + '</table></div></div>';
+  }
+  // How big the collections are now (each household's last summary, Worker v76).
+  function sizesHtml() {
+    var b = { '1–9': 0, '10–49': 0, '50–199': 0, '200 or more': 0 }, any = 0;
+    S.rows.forEach(function (r) {
+      var n = r.copy === S.useCopy && !r.deleted && r.recipesN;
+      if (!n) return;
+      any++; b[n < 10 ? '1–9' : n < 50 ? '10–49' : n < 200 ? '50–199' : '200 or more']++;
+    });
+    if (!any) return '';
+    return '<div class="mg-card"><div class="mg-ptop"><b>📚 How big the collections are</b><span class="mg-muted">' + any + ' household' + (any === 1 ? '' : 's') + ', now</span></div>'
+      + Object.keys(b).map(function (k) { return '<span class="mg-use">' + esc(k) + ' recipes: <b>' + b[k] + '</b></span>'; }).join('') + '</div>';
+  }
+  function trendsCsvText() {
+    var c = trendsByCopy()[S.useCopy];
+    if (!c) return '';
+    var keys = {};
+    c.months.forEach(function (m) { Object.keys(c.n[m]).forEach(function (k) { keys[k] = 1; }); });
+    var months = c.months.slice().reverse();
+    var lines = [['Copy: ' + S.useCopy, 'Name'].concat(months)].concat([['Households counted', ''].concat(months.map(function (m) { return c.hh[m] || 0; }))])
+      .concat(Object.keys(keys).sort().map(function (k) { return [useWord(k), k].concat(months.map(function (m) { return c.n[m][k] || 0; })); }));
+    return lines.map(function (row) { return row.map(function (x) { x = String(x); return /[\t\n"]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; }).join('\t'); }).join('\n');
+  }
   // Every household of a copy, added up, month by month.
   function useHtml() {
+    if (S.trends) return trendsHtml();
+    if (S.trendsLoading) return '<div class="mg-empty">⏳ Adding up every month…</div>';
     var copies = {};
     S.rows.forEach(function (r) { if (r.usage) (copies[r.copy] = copies[r.copy] || []).push(r); });
     var names = Object.keys(copies).sort(function (a, b) { return a === 'beta' ? -1 : b === 'beta' ? 1 : a < b ? -1 : 1; });
@@ -744,6 +891,8 @@
     + '.mg-svbar{flex:1;min-width:60px;margin-top:0;}.mg-svword{border-top:1px solid var(--border);padding:6px 0;}'
     + '.mg-use{display:inline-block;margin:2px 10px 2px 0;}.mg-use b{color:var(--heading);}'
     + '.mg-usemonth{margin:6px 0 10px;}'
+    + '.mg-trend{min-width:0;}.mg-trend th,.mg-trend td{padding:5px 8px;}.mg-trend th.mg-c{text-align:center;}.mg-trk{min-width:150px;width:40%;}'
+    + '.mg-trsub{font-weight:700;color:var(--heading);padding-top:10px !important;background:var(--note-bg);}'
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';
 
@@ -814,7 +963,14 @@
     },
     tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(function (fresh) { if (fresh !== false) render(); });
       if (t === 'errors' && !S.errors) loadErrors().then(function (fresh) { if (fresh !== false) render(); });
-      if (t === 'survey') loadSurvey().then(render); },
+      if (t === 'survey') loadSurvey().then(render);
+      if (t === 'use' && !S.trends && !S.trendsLoading) { S.trendsLoading = true; render(); loadTrends().then(function () { S.trendsLoading = false; render(); }); } },   // v38.30
+    trendsCsv: async function () {
+      var text = trendsCsvText();
+      if (!text) return false;
+      try { await navigator.clipboard.writeText(text); toast('📋 Copied — paste it into a spreadsheet.', 5000); return true; }
+      catch (e) { showServiceError('Could not copy it: ' + ((e && e.message) || e)); return false; }
+    },
     // v38.18 — 📝 the end-of-beta question: preview, send (per copy), stop, copy.
     surveyReload: function () { S.survey = null; render(); return loadSurvey().then(render); },
     surveyPreview: function () { return typeof openSurveyWindow === 'function' ? openSurveyWindow({ preview: true }) : null; },
@@ -931,10 +1087,11 @@
     _notes: loadNotes,
     close: function () { var ov = document.getElementById('manageOverlay'); if (ov) ov.remove(); S.open = null; _notesGen++; _errGen++; },
     reload: async function () {
-      S.loading = true; render();
+      S.loading = true; S.trends = null; render();
       try { await load(); }
       catch (e) { S.loadError = String((e && e.message) || e); }
       S.loading = false; render();
+      if (S.tab === 'use' && !S.trendsLoading) { S.trendsLoading = true; loadTrends().then(function () { S.trendsLoading = false; render(); }); }   // v38.30
       var s = document.getElementById('mgSearch'); if (s && !S.open) s.focus();
       return S.rows.length;
     },
@@ -1036,7 +1193,7 @@
       document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       return lines.length - 1;
     },
-    _state: S, _load: load, _render: render
+    _state: S, _load: load, _render: render, _trendsText: trendsCsvText
   };
   window._manageLoaded = true;
 })();

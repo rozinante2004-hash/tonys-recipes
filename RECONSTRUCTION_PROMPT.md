@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.29` — app. **Worker: v75**, deployed separately and versioned separately
+**Current version:** `v38.30` — app. **Worker: v76**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -266,8 +266,8 @@ hidden / refuses / silent / privacy text.
   - **💬 Feedback** — every copy's notes (Worker D1): filter, screenshot zoom, the log, 👀 Seen,
     ✅ Done, 🗑, ✉️ Reply in Gmail / 📨 E-mail app / **📲 Reply in app** (arrives in the sender's app
     like a link request, with red dots; "✓ read" shown), ☑ select + 📋 Copy reports.
-  - **⚠️ Errors** (testers' copies report their own errors) and **📈 Use** (feature counts per copy
-    and month), each with 📋 Copy.
+  - **⚠️ Errors** (testers' copies report their own errors) and **📈 Use** (v38.30: the trends — every
+    count per copy, month by month, in sections, with shares and collection sizes), each with 📋 Copy.
   - **📝 Beta question** — the end-of-beta survey (`end-of-beta-1`): Preview, Send to testers, Stop,
     answers counted and in their words. Prepared, never sent yet.
 - 👑 App owner also holds: Gmail setup (OAuth client ID, per device), Bring! connection, 🔑 Check the
@@ -392,8 +392,20 @@ under its plain path only (a `?url=` request goes network-first).
   optional screenshot, the log), sent to the Worker's inbox; "📨 Answers to my notes" shows replies.
   "📤 Transmit report to admin" and a failed Self Test's "Send to admin?" use the same route.
 - **Testers' copies only (`insights`):** errors report themselves (no addresses, e-mails masked) and
-  names-and-numbers feature counts per household (how recipes arrive; which features are used);
-  the privacy statement (1.2) says so. Nothing is counted during a Self Test.
+  names-and-numbers counts per household and month (how recipes arrive; which features are used);
+  nothing is counted during a Self Test. **v38.30 (Worker v76) — "all kinds of stats" (the owner, to
+  foresee needs):** visits (`session`, back after 30 min = a new one) with part of the day and weekday;
+  per device per ISO week, days used and times opened (`week.days-N`, `week.opens-*`); how people sign in
+  (`signin.*`, `signup.*` for an account under 10 minutes old, `account.*` monthly); how a device first came
+  (`first.<via>`, noted at page load before ?join= / ?ref= are removed — a kind of source, never an
+  address; existing devices are 'before', never counted) and how its person came into a household
+  (`joined.*`); monthly per device: device, browser, installed or not, interface language, light/dark,
+  the extension, the farm's look; the farm (`farm.visit`, `farm.tap`, `farm.tap-<animal>`, `farm.grab`);
+  edits, favourites, notes, invitations, Gmail, backups, updates, installs. A month is sent in parts of
+  ≤ 60 names. The household summary carries its number of recipes. The owner's 📈 Use tab reads the
+  Worker's `trends` (sums by copy, month and name for 24 months, with how many households) and shows
+  sections with months as columns, shares in %, collection sizes, and a copy-as-table button. Privacy
+  statement 1.5 lists all of it.
 - **Languages:** the central translations are in ONE project (`APP_CONFIG.languageSource`, today
   `recipes-f379d` `i18n/…`; it becomes `my-kitchen-notes-beta` on the family's move), read by every
   copy and signed-out visitors over plain REST, published as files in the repository, and new

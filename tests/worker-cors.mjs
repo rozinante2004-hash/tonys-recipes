@@ -1128,7 +1128,11 @@ console.log('\nAI per household (v60):');
     const rsum = rrow && JSON.parse(rrow.summary);
     expect('v65 — …with each member\'s agreement to the terms', rsum && rsum.members[0].termsAt === 1759700000000 && rsum.members[0].termsVersion === '1.1', JSON.stringify(rsum && rsum.members));
     expect('…kept under its copy, with only what the page shows', rrow && rrow.project === 'recipes-f379d' && rsum.members.length === 1 && rsum.members[0].extra === undefined
-      && rsum.links.length === 1 && rsum.recipes === undefined && rsum.name === 'Kitchen A', JSON.stringify(rrow));
+      && rsum.links.length === 1 && rsum.recipes === null && !/secret/.test(rrow.summary) && rsum.name === 'Kitchen A', JSON.stringify(rrow));
+    // v76 — how many recipes: a number, never what they are.
+    f = await fb({ action: 'household-report', idToken: fam, hid: 'hF', report: Object.assign({}, report, { recipes: 42 }) }, ORIGIN);
+    expect('v76: …and how many recipes it holds, as a number', f.status === 200
+      && JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hF'").get().summary).recipes === 42);
     f = await fb({ action: 'household-report', idToken: tB, hid: 'hA', report });
     expect('someone not in the household cannot report it', f.status === 403, JSON.stringify(f));
     f = await fb({ action: 'household-report', idToken: tA.slice(0, -4) + 'AAAA', hid: 'hA', report });
@@ -1199,6 +1203,16 @@ console.log('\nAI per household (v60):');
     expect('v69: someone not in the household cannot add to its counts', f.status === 403, JSON.stringify(f));
     f = await fb({ action: 'app-signals', idToken: tA, usage: { counts: { 'scale': 1 } } });
     expect('v69: …nor counts with no household', f.status === 400, JSON.stringify(f));
+    // v76 — the trends: every copy's counts added up by month and name, for the owner only.
+    db.raw.prepare("INSERT INTO usage_counts (project, hid, month, k, n) VALUES ('tonys-recipes-test', 'hT2', ?, 'added.link', 4), ('tonys-recipes-test', 'hOld', '2001-01', 'added.link', 9)").run(nowMonth);
+    f = await fb({ action: 'meter-admin', op: 'trends', idToken: tA });
+    expect('v76: only the owner reads the trends', f.status === 403, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'trends', idToken: famOwner }, ORIGIN);
+    const tl = (f.d.rows || []).filter(x => x.project === 'tonys-recipes-test' && x.month === nowMonth && x.k === 'added.link')[0];
+    const tc = (f.d.counted || []).filter(x => x.project === 'tonys-recipes-test' && x.month === nowMonth)[0];
+    expect('v76: the owner reads the counts added up by month and name, with how many households each came from',
+      f.status === 200 && tl && tl.n === 9 && tl.households === 2 && tc && tc.households === 2, JSON.stringify(f.d));
+    expect('v76: …the last 24 months, nothing older, and no household named', !(f.d.rows || []).some(x => x.month === '2001-01' || 'hid' in x), JSON.stringify(f.d.rows));
     const tZ = await token({ sub: 'uZ' });
     const ins = db.raw.prepare("INSERT INTO app_errors (project, uid, version, kind, message, place, first_at, last_at, n, status) VALUES ('tonys-recipes-test', 'uZ', 'v1', 'error', ?, '', ?, ?, 1, 'new')");
     for (let i = 0; i < 199; i++) ins.run('loop ' + i, Date.now(), Date.now());

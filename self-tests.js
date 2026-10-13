@@ -1541,7 +1541,10 @@ window.SELF_TESTS = [
         _workerHealth={ ok:true, metering:{ version:1, db:true }, reports:true };
         if(await hhReport()!==true) throw new Error('the report was not sent');
         var rep=sent.filter(function(b){ return b.action==='household-report'; })[0];
-        if(!rep || rep.hid!=='hA' || rep.idToken!=='tok' || rep.report.members.length!==2 || rep.report.links[0].hid!=='hB' || rep.report.code!=='MKN-AAAA-2222' || rep.report.recipes!==undefined)
+        if(!rep || rep.hid!=='hA' || rep.idToken!=='tok' || rep.report.members.length!==2 || rep.report.links[0].hid!=='hB' || rep.report.code!=='MKN-AAAA-2222'
+          // v38.30 — how many recipes, as a number; never what they are
+          || (rep.report.recipes!==undefined && rep.report.recipes!==recipes.length)
+          || recipes.some(function(r){ return r && r.name && String(r.name).length>3 && JSON.stringify(rep.report).indexOf(String(r.name))!==-1; }))
           throw new Error('what was reported: '+JSON.stringify(rep));
         if(await hhReport()!==false) throw new Error('reported twice in a day');
         if(await hhReport({ gone:true })!==true || !sent.filter(function(b){ return b.gone===true && b.hid==='hA' && !b.report; }).length) throw new Error('a household being deleted does not say so');
@@ -1924,6 +1927,77 @@ window.SELF_TESTS = [
         Object.keys(kept).forEach(function(k){ try{ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); }catch(e){} });
       }
     } },
+  { id:'more_statistics', group:'Sharing', name:'📊 More to learn from: visits and weeks, how people sign in and first came, the device, the farm — names and numbers only; sent in parts; nothing while the Self Test runs (v38.30)',
+    test: async()=>{
+      var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride), once:_insOnce };
+      var keys=[INS_USE_KEY, INS_ERR_KEY, INS_SESSION_KEY, INS_WEEK_KEY, INS_MONTHLY_KEY, INS_FIRST_KEY, SIGNIN_VIA_KEY, INS_DAY_KEY];
+      var kept={}; keys.forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      function counts(){ var u=JSON.parse(localStorage.getItem(INS_USE_KEY)||'{"list":[]}'); var b=u.list.filter(function(x){ return x.hid==='hS'; })[0]; return (b && b.counts) || {}; }
+      try{
+        window._featureOverride.insights=true; window._insUnderTest=true; _insOnce={};
+        window._household={ hid:'hS', name:'Stats' };
+        keys.forEach(function(k){ localStorage.removeItem(k); });
+        // How a device first came: a kind, never an address.
+        var here='mykitchennotes.community', ua='Mozilla/5.0 (Windows NT 10.0) Chrome/140 Safari/537.36', iph='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1';
+        var cases=[['?join=abcdefghijklmnop','','','invitation'],['?ref=MKN-ABCD-2345','','','share-link'],['','#share-text=soup','','extension'],
+          ['?url=https%3A%2F%2Fa.example','','','shared'],['?url=x','', '', 'shortcut', iph],['','','','direct'],['','','https://mykitchennotes.community/x','direct'],
+          ['','','https://www.google.co.il/','search'],['','','https://chromewebstore.google.com/detail/x','store-chrome'],['','','https://addons.mozilla.org/he/firefox/addon/x/','store-firefox'],
+          ['','','https://m.facebook.com/groups/1','social'],['','','https://mail.google.com/mail/u/0','e-mail'],['','','https://rozinante2004-hash.github.io/tonys-recipes/','old-address'],
+          ['','','https://cooking.example.com/soup','other-site']];
+        cases.forEach(function(c){ var got=insFirstVia(c[0], c[1], c[2], here, c[4]||ua); if(got!==c[3]) throw new Error('first came from '+JSON.stringify(c)+' → '+got); });
+        localStorage.setItem(INS_FIRST_KEY, JSON.stringify({ via:'share-link', at:Date.now() }));
+        if(!insightFirstContact() || counts()['first.share-link']!==1 || insightFirstContact()) throw new Error('first contact counted once: '+JSON.stringify(counts()));
+        localStorage.setItem(INS_FIRST_KEY, JSON.stringify({ via:'before', at:Date.now() }));
+        if(insightFirstContact()) throw new Error('a device that was here before was counted as new');
+        // Visits: one per opening; back within half an hour is the same visit.
+        var t0=new Date(2026, 9, 12, 9, 0);            // a Monday morning
+        if(!insightSession(t0)) throw new Error('the first visit was not counted');
+        if(insightSession(new Date(t0.getTime()+20*60e3))) throw new Error('back after 20 minutes counted as a new visit');
+        if(!insightSession(new Date(t0.getTime()+11*3600e3))) throw new Error('the evening visit was not counted');   // 20:00
+        insightSession(new Date(2026, 9, 14, 13, 0));    // Wednesday midday
+        var c=counts();
+        if(c.session!==3 || c['time.morning']!==1 || c['time.evening']!==1 || c['time.midday']!==1 || c['day.mon']!==2 || c['day.wed']!==1)
+          throw new Error('the visits: '+JSON.stringify(c));
+        // The next week: the week before is counted — on 2 days, 3 times.
+        insightSession(new Date(2026, 9, 19, 23, 30));   // the next Monday, at night
+        c=counts();
+        if(c['week.days-2']!==1 || c['week.opens-2-3']!==1 || c['time.night']!==1) throw new Error('the week: '+JSON.stringify(c));
+        // Signing in: how, and whether the account is new.
+        insightSignedIn('google', { metadata:{ creationTime:new Date().toUTCString() } });
+        insightSignedIn('email-link', { metadata:{ creationTime:new Date(Date.now()-90*864e5).toUTCString() } });
+        c=counts();
+        if(c['signin.google']!==1 || c['signup.google']!==1 || c['signin.email-link']!==1 || c['signup.email-link']) throw new Error('sign-in: '+JSON.stringify(c));
+        // The device, once a month.
+        if(insDeviceKind(iph, 5)!=='iphone' || insDeviceKind('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1', 5)!=='ipad'
+          || insDeviceKind('Mozilla/5.0 (Linux; Android 15; Pixel 9) Mobile Safari/537.36', 5)!=='android-phone' || insDeviceKind(ua, 0)!=='windows')
+          throw new Error('the kind of device');
+        if(insBrowserKind(ua)!=='chrome' || insBrowserKind('Mozilla/5.0 (Windows NT 10.0) Chrome/140 Safari/537.36 Edg/140')!=='edge'
+          || insBrowserKind('Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0')!=='firefox' || insBrowserKind(iph)!=='safari')
+          throw new Error('the kind of browser');
+        window._fbUser={ uid:'uS', email:'s@example.com', providerData:[{ providerId:'google.com' }], getIdToken:async function(){ return 'tokS'; } };
+        if(!insightMonthly() || insightMonthly()) throw new Error('the month’s picture: once a month');
+        c=counts();
+        ['device.','browser.','installed.','lang.','theme.','account.'].forEach(function(p){ if(!Object.keys(c).some(function(k){ return k.indexOf(p)===0; })) throw new Error('no '+p+'* in '+JSON.stringify(c)); });
+        if(JSON.stringify(c).indexOf('@')!==-1 || JSON.stringify(c).indexOf('/')!==-1) throw new Error('an address went into the counts: '+JSON.stringify(c));
+        // Nothing while the Self Test runs on its own.
+        window._insUnderTest=false;
+        if(insightSession(new Date(2026, 9, 25, 9, 0)) || insightSignedIn('google', null)) throw new Error('counted during the Self Test');
+        window._insUnderTest=true;
+        // A month with more names than one request takes: sent in parts, all of it taken off the device.
+        for(var i=0;i<130;i++) insightCount('x.k'+i);
+        var sent=[];
+        _workerHealth={ ok:true, signals:true };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push(b); return new Response(JSON.stringify({ ok:true }), { status:200 }); };
+        if(await insightsSend()!==true) throw new Error('not sent');
+        var most=Math.max.apply(null, sent.map(function(b){ return Object.keys((b.usage && b.usage.counts)||{}).length; }));
+        var total=sent.reduce(function(t, b){ return t+Object.keys((b.usage && b.usage.counts)||{}).length; }, 0);
+        if(most>60 || total<130 || Object.keys(counts()).length) throw new Error('sent in '+sent.length+' parts, the biggest '+most+', '+total+' names; left: '+Object.keys(counts()).length);
+      } finally {
+        window.fetch=real.fetch; _workerHealth=real.h; window._fbUser=real.user; window._household=real.hh; window._insUnderTest=false; _insOnce=real.once;
+        window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
+        Object.keys(kept).forEach(function(k){ try{ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); }catch(e){} });
+      }
+    } },
   { id:'tester_welcome', group:'Sharing', name:'👋 A new tester is welcomed once — what to try, the 💬 button, what the beta sends, recipes stay theirs; it offers the tour instead of a second window; nobody named; translated (v38.15)',
     test: async()=>{
       var real={ user:window._fbUser, ov:Object.assign({}, window._featureOverride), tour:window.startTour, ask:window.askConfirm, just:_hhJustFounded };
@@ -1987,6 +2061,7 @@ window.SELF_TESTS = [
                      screen:'viewOverlay', version:'v38.15', env:'beta', device:'UA', lang:'he', first_at:Date.now()-864e5, last_at:Date.now(), n:4, status:'new' },
                    { id:8, project:'tonys-recipes-test', uid:'uT', email:'test@example.com', hid:'', kind:'service', message:'Old one', place:'', screen:'main', version:'v38.14',
                      env:'test', device:'UA', lang:'en', first_at:Date.now()-2*864e5, last_at:Date.now()-864e5, n:1, status:'done' } ];
+      var trendsDown=false;
       try{
         window.toast=function(){}; window.showServiceError=function(){}; window.isAppOwner=function(){ return true; }; _workerHealth=null;
         window.askConfirm=async function(){ return true; }; window.fbProbeCopy=function(t){ copied=String(t); };
@@ -2001,6 +2076,14 @@ window.SELF_TESTS = [
           if(b.op==='errors') return new Response(JSON.stringify({ errors:errors.map(function(x){ return Object.assign({}, x); }) }), { status:200 });
           if(b.op==='error-status' || b.op==='error-delete') return new Response('{"ok":true}', { status:200 });
           if(b.op==='notes') return new Response('{"notes":[],"replies":[]}', { status:200 });
+          // v38.30 — the server's sums, month by month (Worker v76); an older server has none.
+          if(b.op==='trends') return trendsDown ? new Response('{"error":"METER: not set up"}', { status:503 })
+            : new Response(JSON.stringify({ since:month, counted:[{ project:OTHER, month:month, households:2 }], rows:[
+                { project:OTHER, month:month, k:'added.link', n:4, households:2 }, { project:OTHER, month:month, k:'added.extension', n:2, households:1 },
+                { project:OTHER, month:month, k:'signin.google', n:3, households:2 }, { project:OTHER, month:month, k:'signin.password', n:1, households:1 },
+                { project:OTHER, month:month, k:'first.share-link', n:2, households:2 }, { project:OTHER, month:month, k:'week.days-3', n:5, households:2 },
+                { project:OTHER, month:month, k:'farm.tap-sheep', n:7, households:1 }, { project:OTHER, month:month, k:'print', n:2, households:1 },
+                { project:OTHER, month:month, k:'lang.he', n:2, households:2 } ] }), { status:200 });
           if(b.op==='list') return new Response(JSON.stringify({ project:'recipes-f379d', capped:false, month:month, months:[month], projects:[OTHER],
               defaults:{ cap:2, firstMonth:4, byProject:{} },
               households:[
@@ -2025,9 +2108,18 @@ window.SELF_TESTS = [
         if(await mknManage.errMark('7','done')!==true || !sent.some(function(b){ return b.op==='error-status' && b.id===7 && b.status==='done'; })) throw new Error('✅ Done');
         mknManage.errFilter('all');
         if(await mknManage.errDel('8')!==true || !sent.some(function(b){ return b.op==='error-delete' && b.id===8; })) throw new Error('🗑');
-        // 📈 Use: the beta's households added up.
+        // 📈 Use (v38.30): month by month, in sections, from the server's sums.
+        var useBody=async function(){ for(var w=0; w<100 && /Adding up every month/.test(document.querySelector('#manageOverlay .mg-body').textContent); w++) await new Promise(function(r){ setTimeout(r, 30); });
+          return document.querySelector('#manageOverlay .mg-body').textContent; };
         mknManage.tabTo('use');
-        body=document.querySelector('#manageOverlay .mg-body').textContent;
+        body=await useBody();
+        ['Households counted','Signing in','Signed in with','75%','25%','Someone’s “share the app” link','Days a week','3 days','Tapped the sheep','Hebrew','✨ Features','Printed','from the browser extension']
+          .forEach(function(w){ if(body.indexOf(w)===-1) throw new Error('the trends lack “'+w+'”: '+body.slice(0,600)); });
+        var csv=mknManage._trendsText();
+        if(csv.indexOf('signin.google')===-1 || csv.indexOf(month)===-1 || csv.indexOf('Households counted\t\t2')===-1) throw new Error('the table to copy: '+csv.slice(0,300));
+        // An older server (no sums): the households' own counts, added up, as before.
+        trendsDown=true; await mknManage.reload(); mknManage.tabTo('use');
+        body=await useBody();
         if(!/6 recipes added/.test(body) || !/4 from a link/.test(body) || !/2 from the browser extension/.test(body) || !/2 households counted/.test(body) || !/4 Changed the servings/.test(body))
           throw new Error('the Use tab: '+body.slice(0,400));
         // Each household's own counts, in its details.

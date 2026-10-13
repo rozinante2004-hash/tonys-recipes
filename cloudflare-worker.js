@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v75
+// Tony's Recipes — Cloudflare Worker v76
+// v76: TRENDS (Tony, 13 Oct 2026: "I'd like to understand trends and foresee needs before they arise").
+// meter-admin `trends`: every copy's counts added up by month and name (and in how many households each
+// was counted), for up to 24 months — the owner's 📈 Use tab draws its month-by-month tables from it.
+// A household's summary may now say how many recipes it holds (`recipes`).
 // v75: LOGS GO, CORRESPONDENCE AND STATISTICS STAY, AND A SPARE OWNER KEY (Tony, 13 Oct 2026: notes and
 // replies "stay for ever … as opposed to logs and other maintenance info"; keep "statistics of user
 // activities"; "I wanted to give us another way of getting in"). A daily sweep (`scheduled`, cron in
@@ -334,7 +338,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v75';
+const WORKER_VERSION = 'v76';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1581,6 +1585,17 @@ async function meterAction(request, env, body) {
   }
   if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body, claims); if (fr) return fr; }
   if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
+  // v76 — every copy's counts, added up by month and name, with how many households each came from.
+  if (body.op === 'trends') {
+    await signalsTable(db);
+    const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 23);
+    const since = utcMonthKey(d.getTime());
+    const rows = (await db.prepare('SELECT project, month, k, SUM(n) AS n, COUNT(DISTINCT hid) AS households FROM usage_counts '
+      + 'WHERE month >= ?1 GROUP BY project, month, k ORDER BY project, month, k').bind(since).all()).results || [];
+    const counted = (await db.prepare('SELECT project, month, COUNT(DISTINCT hid) AS households FROM usage_counts '
+      + 'WHERE month >= ?1 GROUP BY project, month').bind(since).all()).results || [];
+    return jsonResp({ since, rows, counted });
+  }
   if (/^survey-/.test(String(body.op || ''))) { const sv = await surveyAdmin(env, db, body, proj); if (sv) return sv; }   // v71
   // v72 — the family moved here: its households' allowances and history come too.
   if (body.op === 'copy-from') {
@@ -1682,7 +1697,8 @@ function reportSummary(r) {
     left: [],
     links: (Array.isArray(r.links) ? r.links : []).slice(0, 100).filter(l => l && okId(l.hid)).map(l => ({
       hid: l.hid, name: str(l.name, 80), code: str(l.code, 20) })),
-    referrals: num(r.referrals) || 0
+    referrals: num(r.referrals) || 0,
+    recipes: num(r.recipes)          // v76 — how big the collection is (a number only)
   };
 }
 async function householdReport(request, env, body) {
@@ -2595,4 +2611,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v75 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v76 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

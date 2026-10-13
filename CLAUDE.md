@@ -62,10 +62,11 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 
 **Where things are now**
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
-  **v38.28** (released 13 Oct, with Worker v74).
-- **v38.29 + Worker v75** (Tony's answers to the audit's open points, 13 Oct) — released on his yes; see the
-  v38.29 note below: the spare owner key, the daily sweep (logs and names go after six months; notes, replies
-  and statistics stay — Tony's correction), the fonts and libraries served by the app itself, statement 1.4.
+  **v38.29** with **Worker v75** (released 13 Oct; see the release note below): the spare owner key, the
+  daily sweep (logs and names go after six months; notes, replies and statistics stay — Tony's correction),
+  the fonts and libraries served by the app itself, privacy statement 1.4.
+- `test` is at **v38.30 + Worker v76** — "all kinds of stats" (Tony, 13 Oct) and the 📈 Use tab's month-by-
+  month Trends; privacy statement 1.5. Waiting for CI, then Tony's yes for the release.
 - Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
   the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
   used — Tony to say what it is for). v38.26 brought:
@@ -77,7 +78,7 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
     After the release, check the "Translate new phrases" run: its annotations should say
     "entries holding an e-mail address taken out — …". Then the "Publish languages" commit should
     show `i18n/*.json` and `i18n/archive/` without them.
-- Worker **v74** is live.
+- Worker **v75** is live (with its daily cron).
 - The rules with the owner protections are published to all three projects.
 - The community project:
   - TOTP is enabled, but Tony has NOT yet set up his authenticator (move-day step 5);
@@ -1011,6 +1012,40 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.30 + Worker v76 — all kinds of statistics, and the trends (13 Oct 2026).** Tony: "please add counting of
+    sign-in methods, also other statistics, like how people usually first connect to the app (invite from friends,
+    website, etc.) I'd like to understand trends and foresee needs before they arise … all kinds of stats … number
+    of times an app is used in a week, how do people add recipes …, are people playing with the animals". Still the
+    testers' copies only (`insights`), names and numbers per household and month, nothing during a Self Test.
+    New counts (index.html, "MORE TO LEARN FROM"): `session` (an opening, or back after 30 min away — the
+    visibilitychange 'hidden' marks the visit's last moment), `time.morning|midday|evening|night`, `day.sun…sat`,
+    `offline`; per device per ISO week (`insWeekOf`), at the first visit of the next week: `week.days-N`,
+    `week.opens-1|2-3|4-7|8-14|15-plus`; `signin.<google|password|email-link|microsoft|apple>` (insightSignedIn,
+    from each sign-in path; remembered in `mkn_signin_via`) and `signup.<how>` when the account is < 10 min old;
+    `first.<via>` — once per DEVICE, noted at page load before ?join=/?ref= are stripped (`noteFirstContact`,
+    `insFirstVia`: invitation, share-link, extension, shortcut, shared, direct, store-chrome|firefox|edge,
+    old-address, e-mail, search, social, other-site — a kind, never the address; a device with the app's data
+    already = 'before', never counted), counted by insightFirstContact once there is a household; `joined.founded`,
+    `joined.founded-referred`, `joined.invitation`, `joined.kept-place`; once a month per device (insightMonthly):
+    `device.*`, `browser.*`, `installed.yes|no`, `lang.*`, `theme.*`, `extension.yes|no` (computers), `account.*`,
+    `farm.look-*|turned-off`; the farm: `farm.visit` (not the settings window's try-out), `farm.tap`,
+    `farm.tap-<animal>`, `farm.grab`, `farm-on`; features `edit`, `favorite`, `note`, `invite`, `gmail`, `backup`,
+    `update`, `install` (appinstalled). insightsSend sends a month in parts of ≤ 60 names (the Worker takes 80 a
+    request). The household summary carries `recipes` (a number; Worker v76 `reportSummary`). Worker v76:
+    meter-admin `trends` — SUM(n) and COUNT(DISTINCT hid) by project, month and name, 24 months, and households
+    counted per month (owner only, no household named). manage.js 📈 Use: sections (How often · Signing in · How
+    they came · Recipes added · Features · The farm · Devices and settings), months as columns (12), shares of a
+    group in %, "How big the collections are", 📋 Copy as a table (tab-separated, for a spreadsheet); an older
+    Worker → the previous view. In-app texts (tester welcome, privacy panel) and privacy statement 1.5 (11
+    languages: section 2's feature-counts row lists the new counts; its purpose adds planning) say so. Tests:
+    `more_statistics`, `manage_errors_and_use` (the trends and the fallback), worker-cors v76 (trends owner-only,
+    sums, 24 months; recipes a number).
+  - **Released to the family app and the beta: v38.29 + Worker v75 (13 Oct 2026, Tony's "Yes, go ahead and release
+    v38.29" — with his change made first: notes, replies and statistics are kept; CI green on eb54cf7).** Pages,
+    Cloudflare Pages (beta and test), Deploy the Worker (owner + spare set, alerts set, live v75 checked), Publish
+    the database rules (all three, with the spare), Translate new phrases, Publish languages, Self Tests on main: success. Tony
+    confirmed OWNER_SECONDARY_EMAIL is his second address (the CI fingerprint step matched both). Mozilla approved
+    extension 1.7.3 on AMO the same day (the app has linked there since v38.06).
   - **v38.29 + Worker v75 — the audit's open points, as Tony decided them (13 Oct 2026, "Please proceed").**
     (1) git history: left as it is ("I accept your judgement"). (2) **The fonts and code libraries are the app's
     own files**: `fonts/` (56 woff2 from Google Fonts' css2 — the same families and subsets — `fonts.css` for the
