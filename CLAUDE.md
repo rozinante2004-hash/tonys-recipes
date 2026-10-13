@@ -90,7 +90,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.38** (on `test`): **the authenticator's code box was behind the sign-in screen.** Tony set up the
+- **Released: v38.38 (14 Oct 2026, 02:27 Israel time, Tony's "Please move it to the Family and beta when green",
+  CI green on 8e35dcf).** All jobs success (beta live 02:29; Self Tests on main 02:38). Next: Tony signs the spare
+  in again (the SIGN-IN half of TOTP_REST, untested against Google until then), then his main account, then Require.
+- **v38.38**: **the authenticator's code box was behind the sign-in screen.** Tony set up the
   spare's authenticator (PC, Chrome Incognito; Passwords on the iPhone) — the ENROLMENT half of v38.35's
   TOTP_REST works against Google. Then signing the spare in again: Google's own SMS check (its account, not
   ours), then "stuck on Signing in…". `mfaResolve`'s askConfirm opened at z-index 1300, under #loginScreen
