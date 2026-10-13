@@ -1,10 +1,11 @@
 // Tony's Recipes — Cloudflare Worker v75
-// v75: NOTHING KEPT LONGER THAN SIX MONTHS, AND A SPARE OWNER KEY (Tony, 13 Oct 2026: "limit them to 6
-// months. I do not see much point in keeping them longer"; "I wanted to give us another way of getting in").
-// A daily sweep (`scheduled`, cron in worker/wrangler.jsonc; `retentionSweep`) deletes notes and their
-// answers, survey answers, the owner's device records and usage/spend months older than 183 days; a deleted
-// household's summary, allowance and counts 183 days after its deletion; a summary not refreshed for 183
-// days; members who left, from a summary, after 183 days. Error reports keep their own 120 days. health:
+// v75: LOGS GO, CORRESPONDENCE AND STATISTICS STAY, AND A SPARE OWNER KEY (Tony, 13 Oct 2026: notes and
+// replies "stay for ever … as opposed to logs and other maintenance info"; keep "statistics of user
+// activities"; "I wanted to give us another way of getting in"). A daily sweep (`scheduled`, cron in
+// worker/wrangler.jsonc; `retentionSweep`): after 183 days a note's attached device log is dropped (the
+// note stays), the owner's device records go, and a deleted household's summary and the members who left
+// a household lose their names and addresses (dates and counts stay). Error reports keep their 120 days.
+// Notes, replies, survey answers, usage counts and spend are never deleted by it. health:
 // `retention`. The owner's address list (secret OWNER_EMAIL) may now hold a second, spare owner account,
 // and the alerts go to every address in ALERT_TO (comma-separated), so neither owner acts unseen.
 // v74: NO E-MAIL ADDRESS IN THE CODE. The repository is public and its text is harvested
@@ -711,7 +712,7 @@ async function handleRequest(request, env) {
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         alerts: !!(env.ALERTS && env.ALERT_TO),   // v73 — the owner hears about a new device and destructive actions
         owner: ownerEmails(env).length > 0,       // v74 — the owner's address is set (it is no longer in the code)
-        retention: { days: KEEP_DAYS, db: !!env.METER_DB },   // v75 — the daily six-month sweep
+        retention: { days: KEEP_DAYS, db: !!env.METER_DB },   // v75 — the daily sweep (logs and names after six months)
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
@@ -2521,47 +2522,53 @@ async function fbProbe(env, url) {
   return { url: clean, preview, rows };
 }
 
-// ─── NOTHING KEPT LONGER THAN SIX MONTHS (v75) ──────────────────────────────
-// Tony, 13 Oct 2026: notes, answers and the records about households "limit them to 6 months". Run daily
-// by `scheduled` (worker/wrangler.jsonc → triggers.crons). Each step on its own: a table that does not exist
-// yet (nothing was ever stored there) is skipped, never an error. Returns what it removed (counts only).
+// ─── LOGS GO, CORRESPONDENCE AND STATISTICS STAY (v75) ──────────────────────
+// Tony, 13 Oct 2026: notes and replies "stay for ever. These could be personal correspondences that people
+// may wish to keep, as opposed to logs and other maintenance info", and keep "statistics of user activities
+// … which may help understand pain points and development directions". Run daily by `scheduled`
+// (worker/wrangler.jsonc → triggers.crons). So, after six months:
+//   • the device log attached to a note is dropped — the note itself, its picture and the replies stay;
+//   • the owner's device records go (a security log);
+//   • a deleted household's summary, and the members who left a household, lose the names and addresses
+//     in them: what remains — dates, roles, counts — is statistics that identify no one;
+// and error reports go 120 days after they last happened. Never touched: notes, replies, survey answers,
+// usage counts, AI spend, allowances, and the summaries of households that exist.
+// Each step on its own: a table that does not exist yet is skipped, never an error. Returns counts only.
 const KEEP_DAYS = 183;
 async function retentionSweep(env, now) {
   const db = env.METER_DB;
   if (!db) return null;
   now = now || Date.now();
-  const cut = now - KEEP_DAYS * 864e5, cutMonth = new Date(cut).toISOString().slice(0, 7);   // 'YYYY-MM': older months go
+  const cut = now - KEEP_DAYS * 864e5;
   const done = {};
   const run = async (name, sql, ...args) => {
     try { const r = await db.prepare(sql).bind(...args).run(); done[name] = (done[name] || 0) + ((r && r.meta && r.meta.changes) || 0); }
     catch (e) { if (!(name in done)) done[name] = 0; }
   };
-  await run('notes', 'DELETE FROM feedback WHERE at < ?1', cut);
-  await run('answersToNotes', 'DELETE FROM feedback_replies WHERE at < ?1 OR note_id NOT IN (SELECT id FROM feedback)', cut);
-  await run('surveyAnswers', 'DELETE FROM survey_answers WHERE at < ?1', cut);
+  await run('noteLogs', 'UPDATE feedback SET log = NULL WHERE at < ?1 AND log IS NOT NULL', cut);
   await run('errors', 'DELETE FROM app_errors WHERE last_at < ?1', now - ERRORS_KEPT_DAYS * 864e5);
   await run('ownerDevices', 'DELETE FROM owner_devices WHERE last_at < ?1', cut);
-  await run('spendMonths', 'DELETE FROM ai_spend WHERE month < ?1', cutMonth);
-  await run('usageMonths', 'DELETE FROM usage_counts WHERE month < ?1', cutMonth);
-  // Household summaries: a deleted household's (with its allowance and counts) six months after the
-  // deletion; one not refreshed for six months; and, in the rest, members who left more than six months ago.
   let rows = [];
-  try { rows = (await db.prepare('SELECT project, hid, summary, at FROM hh_reports').all()).results || []; } catch (e) {}
+  try { rows = (await db.prepare('SELECT project, hid, summary FROM hh_reports').all()).results || []; } catch (e) {}
   for (const r of rows) {
-    let sum = {};
-    try { sum = JSON.parse(r.summary || '{}') || {}; } catch (e) {}
-    if ((sum.deletedAt && sum.deletedAt < cut) || (!sum.deletedAt && (r.at || 0) < cut)) {
-      await run('households', 'DELETE FROM hh_reports WHERE project = ?1 AND hid = ?2', r.project, r.hid);
-      if (sum.deletedAt) for (const t of ['ai_households', 'ai_spend', 'usage_counts'])
-        await run('householdRows', 'DELETE FROM ' + t + ' WHERE project = ?1 AND hid = ?2', r.project, r.hid);
-      continue;
-    }
+    let sum = null;
+    try { sum = JSON.parse(r.summary || 'null'); } catch (e) {}
+    if (!sum || typeof sum !== 'object') continue;
+    let changed = false;
     const left = Array.isArray(sum.left) ? sum.left : [];
-    const keep = left.filter(x => x && Number(x.at) >= cut);
-    if (keep.length !== left.length) {
-      sum.left = keep;
-      await run('leftTrimmed', 'UPDATE hh_reports SET summary = ?3 WHERE project = ?1 AND hid = ?2', r.project, r.hid, JSON.stringify(sum));
+    sum.left = left.map(x => {
+      if (!x || !x.email || !(Number(x.at) < cut)) return x;
+      changed = true; return { at: x.at, how: x.how || '' };
+    });
+    if (sum.deletedAt && sum.deletedAt < cut && !sum.anonymisedAt) {
+      sum = { name: '', code: '', createdAt: sum.createdAt || 0, referredBy: '',
+              members: (Array.isArray(sum.members) ? sum.members : []).map(m => ({ role: (m && m.role) || '', joinedAt: (m && m.joinedAt) || 0, lastSeen: (m && m.lastSeen) || 0 })),
+              links: [], linkCount: Array.isArray(sum.links) ? sum.links.length : 0, left: sum.left,
+              deletedAt: sum.deletedAt, deletedBy: '', deletedHow: sum.deletedHow || '', anonymisedAt: now };
+      changed = true;
+      await run('householdNames', 'UPDATE ai_households SET name = NULL, code = NULL, note = NULL WHERE project = ?1 AND hid = ?2', r.project, r.hid);
     }
+    if (changed) await run('summaries', 'UPDATE hh_reports SET summary = ?3 WHERE project = ?1 AND hid = ?2', r.project, r.hid, JSON.stringify(sum));
   }
   return done;
 }
@@ -2569,7 +2576,7 @@ async function retentionSweep(env, now) {
 export default {
   // v75 — the daily sweep (cron in worker/wrangler.jsonc).
   async scheduled(event, env, ctx) {
-    const p = retentionSweep(env, Date.now());
+    const p = retentionSweep(env, (event && Number(event.scheduledTime)) || Date.now());
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
   },
   async fetch(request, env) {

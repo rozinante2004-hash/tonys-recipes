@@ -63,9 +63,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 **Where things are now**
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
   **v38.28** (released 13 Oct, with Worker v74).
-- `test` is at **v38.29 + Worker v75** (Tony's answers to the audit's open points, 13 Oct: "Please
-  proceed"), waiting for CI and then the release. See the v38.29 note below: the spare owner key,
-  six-month retention, the fonts and libraries served by the app itself, privacy statement 1.4.
+- **v38.29 + Worker v75** (Tony's answers to the audit's open points, 13 Oct) — released on his yes; see the
+  v38.29 note below: the spare owner key, the daily sweep (logs and names go after six months; notes, replies
+  and statistics stay — Tony's correction), the fonts and libraries served by the app itself, statement 1.4.
 - Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
   the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
   used — Tony to say what it is for). v38.26 brought:
@@ -120,11 +120,11 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - Skipped by Tony: a hardware security key.
 
 **What is left, in order**
-1. **Release v38.29 + Worker v75** when CI is green (the audit's open points, decided by Tony on 13 Oct:
-   git history left as it is; fonts and libraries self-hosted; six months' retention; the old family data
-   cleared one week after the move; OWNER_SECONDARY_EMAIL = the spare owner key). After it: "Deploy the
-   Worker" must report v75 with the owner set and the cron trigger; "Publish the database rules" must say
-   "with the spare owner key".
+1. **The authenticator's "require"** — Tony, 13 Oct: "Please provide me with the relevant instructions and
+   URLs once turning on 'require' for the authenticator is relevant." It becomes relevant at MOVE DAY step 5:
+   send him then, step by step with the URLs, (a) the spare owner account signs in at
+   https://mykitchennotes.community with Google, ⚙️ → 👑 → 🔐 sets up its own authenticator; (b) his own
+   account does the same; (c) only then "require". Do not switch it on before both have one.
 2. **Move day**, when Tony says ("I'll let you know"). Follow "MOVE DAY CHECKLIST" below, step by
    step. My steps, from this environment:
    - Survey:
@@ -1020,11 +1020,21 @@ found only because a test was written first and disagreed with the code.
     `getGmailToken()` loads it (`GSI_CLIENT_URL`) when a recipe is sent by Gmail. CSP: `style-src 'self'
     'unsafe-inline'`, `font-src 'self' data:`, `script-src` keeps only accounts.google.com and apis.google.com
     besides 'self'. sw.js v10: `vendor/` and `fonts/*.woff2` cache-first (versioned names), `fonts/*.css`
-    network-first. Opening the app now contacts Google only for sign-in and the database. (3) **Six months, then
-    gone** — Worker v75 `retentionSweep`, a daily cron `23 3 * * *` (worker/wrangler.jsonc `triggers`), KEEP_DAYS
-    183: notes (and replies, also orphaned ones), survey answers, owner_devices, monthly ai_spend/usage_counts rows,
-    household summaries not refreshed for six months or deleted six months ago (with their allowance rows), and
-    the departed-member entries; error reports stay at 120 days after the last occurrence. Health: `retention`.
+    network-first. Opening the app now contacts Google only for sign-in and the database. (3) **Logs go,
+    correspondence and statistics stay** — first built as "six months, then gone"; Tony then (13 Oct, with his
+    yes to the release): notes and replies "stay for ever. These could be personal correspondences that people
+    may wish to keep, as opposed to logs and other maintenance info", and keep "statistics of user activities
+    like connection preferences and other stats which may help understand pain points and development
+    directions". So Worker v75 `retentionSweep` (daily cron `23 3 * * *`, worker/wrangler.jsonc `triggers`;
+    uses the cron's `scheduledTime`; KEEP_DAYS 183) only: drops a note's attached device LOG after six months
+    (the note, its picture and every reply stay — even replies to a note since deleted); deletes owner_devices
+    rows unused for six months; error reports at 120 days (as before); six months after a household's deletion
+    turns its summary into statistics (`anonymisedAt`: no name, identifier, addresses, links' names or
+    deletedBy; members keep role/joinedAt/lastSeen; `linkCount`) and clears ai_households name/code/note (cap
+    and spend stay); a departed member's entry loses its address after six months (at/how stay). NEVER deleted:
+    notes, replies, survey answers, usage_counts, ai_spend, ai_households, summaries of existing households.
+    manage.js shows "(name removed after six months)" and "someone (address removed after six months)".
+    Health: `retention`.
     (4) the old family data: cleared one week after the move — MOVE DAY CHECKLIST step 9 (a tool mode to write
     then). (5) **OWNER_SECONDARY_EMAIL = the spare owner key**: `APP_CONFIG.ownerKeys` (a list; `ownerKey` is gone;
     `APP_OWNER_KEYS`), the Worker's secret OWNER_EMAIL is set to both (comma-separated), publish-rules.mjs puts
@@ -1032,9 +1042,12 @@ found only because a test was written first and disagreed with the code.
     its own (an unverified destination does not stop the others). Self Tests job step "The owner fingerprints"
     checks both secrets against `ownerKeys` and prints only "match" or the fingerprint to use — the spare's was
     computed from the second address Tony gave on 13 Oct; if the step says otherwise, put in what it prints.
-    Privacy statement 1.4 (11 languages): no fonts/code from Google or Cloudflare; household summaries and notes
-    six months; the in-app panel lost its "fonts and code libraries" row. Tests: worker-cors (spare owner,
-    several recipients, "Six months, then gone" on a node:sqlite D1), self-tests `owner_by_fingerprint` (lists,
+    Privacy statement 1.4 (11 languages): no fonts/code from Google or Cloudflare; notes and replies kept as
+    correspondence (the attached device log six months); usage counts kept as statistics; names and addresses
+    removed six months after a deletion or a member leaving; the in-app panel lost its "fonts and code
+    libraries" row. Tony confirmed OWNER_SECONDARY_EMAIL is the second address he gave (13 Oct). Tests:
+    worker-cors (spare owner, several recipients, "Logs go, correspondence and statistics stay" on a
+    node:sqlite D1), self-tests `owner_by_fingerprint` (lists,
     a second owner), `css_hebrew_font` (fonts/fonts.css, no Google Fonts), the CSP test (no Google Fonts/gstatic/
     cdnjs, libraries same-origin, no eager GSI), the service-worker test (vendor, woff2, fonts.css); e2e reads the
     SDK version from the vendor path.

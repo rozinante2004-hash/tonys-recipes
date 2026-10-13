@@ -57,10 +57,13 @@ The audit covered:
    License), Firebase's compat SDK (`vendor/firebase-12.19.0/`) and the import libraries (`vendor/libs/`) are
    served by the app itself; Google's sign-in script for Gmail loads only when a recipe is sent by Gmail. Opening
    the app contacts Google only for sign-in and the database. Statement 1.4 and the in-app panel say so.
-3. **Retention of notes, error reports and household summaries.** **Done in Worker v75: six months.** A daily
-   job deletes notes and their replies, survey answers, the owner's device records, monthly allowance and usage
-   rows, and household summaries (not refreshed, or deleted, six months ago); error reports go 120 days after
-   they last happened. Statement 1.4 says so.
+3. **Retention of notes, error reports and household summaries.** **Done in Worker v75.** The owner's rule:
+   notes and replies are people's correspondence and are kept; statistics (feature counts, AI spend, survey
+   answers) are kept to understand pain points; logs and other maintenance data go. A daily job drops the
+   device log attached to a note after six months, deletes the owner's device records after six months and
+   error reports 120 days after they last happened, and six months after a household is deleted or a member
+   leaves it removes the names and addresses from its summary, leaving dates and numbers that identify no one.
+   Statement 1.4 says so.
 4. **After the family's move:** the old copies of the family's data in the family project (the old first-layout
    `shared/` collection and the moved households) **will be deleted one week after the move**, once nothing is
    found missing (CLAUDE.md, MOVE DAY CHECKLIST step 9). Open until then.

@@ -1335,9 +1335,9 @@ console.log('\nAI per household (v60):');
   } finally { globalThis.fetch = realFetch; }
 }
 
-// v75 — nothing kept longer than six months: the daily sweep.
+// v75 — the daily sweep: logs and names go after six months; notes, replies and statistics stay.
 {
-  console.log('Six months, then gone (v75)');
+  console.log('Logs go, correspondence and statistics stay (v75)');
   const { DatabaseSync } = await import('node:sqlite');
   const raw = new DatabaseSync(':memory:');
   const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a),
@@ -1346,43 +1346,59 @@ console.log('\nAI per household (v60):');
   const d1 = { prepare: (sql) => stmt(sql, []) };
   const now = Date.UTC(2026, 9, 13, 12), old = now - 200 * 864e5, recent = now - 10 * 864e5;
   const mOld = new Date(old).toISOString().slice(0, 7), mNew = new Date(recent).toISOString().slice(0, 7);
-  raw.exec(`CREATE TABLE feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, text TEXT, at INTEGER);
+  raw.exec(`CREATE TABLE feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, text TEXT, log TEXT, at INTEGER);
     CREATE TABLE feedback_replies (id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER, text TEXT, at INTEGER);
     CREATE TABLE survey_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, at INTEGER);
+    CREATE TABLE app_errors (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, last_at INTEGER);
+    CREATE TABLE owner_devices (email TEXT, device TEXT, last_at INTEGER);
     CREATE TABLE ai_spend (project TEXT, hid TEXT, month TEXT, usd REAL);
     CREATE TABLE usage_counts (project TEXT, hid TEXT, month TEXT, k TEXT, n INTEGER);
-    CREATE TABLE ai_households (project TEXT, hid TEXT, name TEXT);
+    CREATE TABLE ai_households (project TEXT, hid TEXT, name TEXT, code TEXT, note TEXT, cap REAL);
     CREATE TABLE hh_reports (project TEXT, hid TEXT, summary TEXT, at INTEGER);`);
-  raw.prepare('INSERT INTO feedback (id, email, text, at) VALUES (1, ?, ?, ?), (2, ?, ?, ?)').run('a@example.com', 'old note', old, 'b@example.com', 'new note', recent);
-  raw.prepare('INSERT INTO feedback_replies (note_id, text, at) VALUES (1, ?, ?), (2, ?, ?)').run('answer to the old note', recent, 'answer to the new', recent);
+  raw.prepare('INSERT INTO feedback (id, email, text, log, at) VALUES (1, ?, ?, ?, ?), (2, ?, ?, ?, ?)').run('a@example.com', 'old note', 'old log', old, 'b@example.com', 'new note', 'new log', recent);
+  raw.prepare('INSERT INTO feedback_replies (note_id, text, at) VALUES (1, ?, ?), (2, ?, ?), (99, ?, ?)').run('answer to the old note', old, 'answer to the new', recent, 'answer to a note since deleted', old);
   raw.prepare('INSERT INTO survey_answers (email, at) VALUES (?, ?), (?, ?)').run('a@example.com', old, 'b@example.com', recent);
-  raw.prepare('INSERT INTO ai_spend VALUES (?, ?, ?, 1), (?, ?, ?, 1)').run('p', 'live', mOld, 'p', 'live', mNew);
-  raw.prepare('INSERT INTO usage_counts VALUES (?, ?, ?, ?, 1), (?, ?, ?, ?, 1)').run('p', 'live', mOld, 'open', 'p', 'live', mNew, 'open');
-  raw.prepare('INSERT INTO ai_households VALUES (?, ?, ?), (?, ?, ?)').run('p', 'gone', 'Gone Kitchen', 'p', 'live', 'Live Kitchen');
-  raw.prepare('INSERT INTO ai_spend VALUES (?, ?, ?, 1)').run('p', 'gone', mNew);
+  raw.prepare('INSERT INTO app_errors (message, last_at) VALUES (?, ?), (?, ?)').run('old error', now - 130 * 864e5, 'new error', recent);
+  raw.prepare('INSERT INTO owner_devices VALUES (?, ?, ?), (?, ?, ?)').run('o@example.com', 'old-device', old, 'o@example.com', 'new-device', recent);
+  raw.prepare('INSERT INTO ai_spend VALUES (?, ?, ?, 1), (?, ?, ?, 1), (?, ?, ?, 1)').run('p', 'live', mOld, 'p', 'live', mNew, 'p', 'gone', mOld);
+  raw.prepare('INSERT INTO usage_counts VALUES (?, ?, ?, ?, 1), (?, ?, ?, ?, 1), (?, ?, ?, ?, 1)').run('p', 'live', mOld, 'open', 'p', 'live', mNew, 'open', 'p', 'gone', mOld, 'open');
+  raw.prepare('INSERT INTO ai_households VALUES (?, ?, ?, ?, ?, 5), (?, ?, ?, ?, ?, 2)').run('p', 'gone', 'Gone Kitchen', 'GONE1', 'the Smiths', 'p', 'live', 'Live Kitchen', 'LIVE1', 'friends');
   raw.prepare('INSERT INTO hh_reports VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)').run(
-    'p', 'gone', JSON.stringify({ name: 'Gone Kitchen', deletedAt: old }), old,
-    'p', 'justgone', JSON.stringify({ name: 'Just Gone', deletedAt: recent }), recent,
-    'p', 'stale', JSON.stringify({ name: 'Quiet Kitchen' }), old,
-    'p', 'live', JSON.stringify({ name: 'Live Kitchen', left: [{ email: 'x@example.com', at: old }, { email: 'y@example.com', at: recent }] }), recent);
+    'p', 'gone', JSON.stringify({ name: 'Gone Kitchen', code: 'GONE1', createdAt: old - 864e5, referredBy: 'LIVE1', deletedAt: old, deletedBy: 'g@example.com', deletedHow: 'household',
+      members: [{ uid: 'u1', email: 'g@example.com', name: 'G', role: 'owner', joinedAt: old - 864e5, lastSeen: old }, { uid: 'u2', email: 'h@example.com', name: 'H', role: 'member', joinedAt: old, lastSeen: old }],
+      links: [{ hid: 'live', name: 'Live Kitchen', code: 'LIVE1' }] }), old,
+    'p', 'justgone', JSON.stringify({ name: 'Just Gone', deletedAt: recent, deletedBy: 'j@example.com', members: [{ email: 'j@example.com', role: 'owner' }] }), recent,
+    'p', 'quiet', JSON.stringify({ name: 'Quiet Kitchen', members: [{ email: 'q@example.com', role: 'owner' }] }), old,
+    'p', 'live', JSON.stringify({ name: 'Live Kitchen', members: [{ email: 'l@example.com', role: 'owner' }], left: [{ email: 'x@example.com', at: old, how: 'account' }, { email: 'y@example.com', at: recent, how: 'account' }] }), recent);
   const waits = [];
   await worker.scheduled({ cron: '23 3 * * *', scheduledTime: now }, { METER_DB: d1 }, { waitUntil: p => waits.push(p) });
   await Promise.all(waits);
   const q = (sql) => raw.prepare(sql).all();
-  expect('v75: notes older than six months go, newer ones stay', q('SELECT text FROM feedback').map(r => r.text).join() === 'new note');
-  expect('v75: …and the answers to a note that is gone', q('SELECT text FROM feedback_replies').map(r => r.text).join() === 'answer to the new');
-  expect('v75: survey answers likewise', q('SELECT email FROM survey_answers').map(r => r.email).join() === 'b@example.com');
-  expect('v75: spend and feature counts: only the last six months', q("SELECT month FROM ai_spend WHERE hid = 'live'").map(r => r.month).join() === mNew
-    && q('SELECT month FROM usage_counts').map(r => r.month).join() === mNew);
-  expect('v75: a household deleted over six months ago: its summary, allowance and counts go', !q("SELECT 1 FROM hh_reports WHERE hid = 'gone'").length
-    && !q("SELECT 1 FROM ai_households WHERE hid = 'gone'").length && !q("SELECT 1 FROM ai_spend WHERE hid = 'gone'").length);
-  expect('v75: …one deleted recently stays (for now), and so does a live one', q('SELECT hid FROM hh_reports ORDER BY hid').map(r => r.hid).join() === 'justgone,live'
-    && q("SELECT 1 FROM ai_households WHERE hid = 'live'").length === 1);
-  expect('v75: a summary not refreshed for six months goes', !q("SELECT 1 FROM hh_reports WHERE hid = 'stale'").length);
+  const dump = JSON.stringify(q('SELECT summary FROM hh_reports')) + JSON.stringify(q('SELECT * FROM ai_households'));
+  expect('v75: every note stays, old ones too (Tony: "stay for ever")', q('SELECT text FROM feedback ORDER BY id').map(r => r.text).join() === 'old note,new note');
+  expect('v75: …but a note\'s attached device log goes after six months', q('SELECT log FROM feedback ORDER BY id').map(r => r.log).join() === ',new log');
+  expect('v75: every reply stays, even to a note since deleted', q('SELECT COUNT(*) AS n FROM feedback_replies')[0].n === 3);
+  expect('v75: survey answers stay', q('SELECT COUNT(*) AS n FROM survey_answers')[0].n === 2);
+  expect('v75: statistics stay — spend and feature counts of every month, a deleted household\'s too',
+    q('SELECT COUNT(*) AS n FROM ai_spend')[0].n === 3 && q('SELECT COUNT(*) AS n FROM usage_counts')[0].n === 3);
+  expect('v75: error reports go 120 days after they last happened', q('SELECT message FROM app_errors').map(r => r.message).join() === 'new error');
+  expect('v75: the owner\'s device records go after six months', q('SELECT device FROM owner_devices').map(r => r.device).join() === 'new-device');
+  const gone = JSON.parse(q("SELECT summary FROM hh_reports WHERE hid = 'gone'")[0].summary);
+  expect('v75: a household deleted over six months ago stays listed, with its dates and counts',
+    gone.deletedAt === old && gone.deletedHow === 'household' && gone.members.length === 2 && gone.members[0].role === 'owner' && gone.linkCount === 1 && gone.anonymisedAt === now, JSON.stringify(gone));
+  expect('v75: …but no name, identifier, address or note is left of it', !/g@example|h@example|Gone Kitchen|GONE1|the Smiths|"name":"[^"]/.test(JSON.stringify(gone))
+    && q("SELECT name, code, note FROM ai_households WHERE hid = 'gone'").every(r => r.name === null && r.code === null && r.note === null), JSON.stringify(gone));
+  expect('v75: …its allowance row stays (a statistic)', q("SELECT cap FROM ai_households WHERE hid = 'gone'")[0].cap === 5);
+  expect('v75: one deleted recently keeps its details (for now), and a quiet household is left alone',
+    /j@example\.com/.test(dump) && /Just Gone/.test(dump) && /Quiet Kitchen/.test(dump) && /q@example\.com/.test(dump) && q('SELECT COUNT(*) AS n FROM hh_reports')[0].n === 4);
   const liveSum = JSON.parse(q("SELECT summary FROM hh_reports WHERE hid = 'live'")[0].summary);
-  expect('v75: members who left more than six months ago are no longer listed', liveSum.left.map(x => x.email).join() === 'y@example.com', JSON.stringify(liveSum.left));
-  const again = await (async () => { const w = []; await worker.scheduled({}, { METER_DB: d1 }, { waitUntil: p => w.push(p) }); await Promise.all(w); return q('SELECT COUNT(*) AS n FROM feedback')[0].n; })();
-  expect('v75: running it again changes nothing, and tables that do not exist are skipped', again === 1);
+  expect('v75: members who left more than six months ago stay counted, without their address',
+    liveSum.left.length === 2 && !liveSum.left[0].email && liveSum.left[0].at === old && liveSum.left[1].email === 'y@example.com' && liveSum.name === 'Live Kitchen', JSON.stringify(liveSum.left));
+  expect('v75: a live household\'s own details are untouched', q("SELECT name FROM ai_households WHERE hid = 'live'")[0].name === 'Live Kitchen');
+  const before = JSON.stringify(q('SELECT * FROM hh_reports'));
+  const w2 = []; await worker.scheduled({}, { METER_DB: d1 }, { waitUntil: p => w2.push(p) }); await Promise.all(w2);
+  expect('v75: running it again changes nothing, and tables that do not exist are skipped',
+    JSON.stringify(q('SELECT * FROM hh_reports')) === before && q('SELECT COUNT(*) AS n FROM feedback')[0].n === 2);
   const h = await (await worker.fetch(post({ action: 'health' }), { METER_DB: d1 })).json();
   expect('v75: health says the sweep is there', h.retention && h.retention.days === 183 && h.retention.db === true, JSON.stringify(h.retention));
 }

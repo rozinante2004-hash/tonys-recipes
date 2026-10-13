@@ -407,11 +407,14 @@ under its plain path only (a `?url=` request goes network-first).
   accounts; the privacy statement (1.4, 11 languages) and the in-app panel name every service that receives
   anything. v38.29: the fonts and code libraries are served by the app itself (nothing loads from Google
   Fonts, gstatic or cdnjs; the CSP allows only `'self'` for them), and Google's Gmail script loads only when
-  a recipe is sent by Gmail. **Six months, then gone (Worker v75):** a daily cron (`23 3 * * *`,
-  `retentionSweep`, `KEEP_DAYS` = 183) deletes notes and their replies, survey answers, the owner's device
-  records, monthly allowance/spend/usage rows older than six months, household summaries not refreshed
-  for six months (and a deleted household's summary and allowance rows six months after deletion), and
-  the departed-member entries in a summary; error reports go 120 days after they last happened.
+  a recipe is sent by Gmail. **Logs go, correspondence and statistics stay (Worker v75):** a daily cron
+  (`23 3 * * *`, `retentionSweep`, `KEEP_DAYS` = 183) drops the device log attached to a note after six
+  months (the note, its picture and its replies are kept for ever — the owner's rule: they are people's
+  correspondence), deletes the owner's device records unused for six months, and, six months after a
+  household's deletion or a member's leaving, removes the names and addresses from its summary (and the
+  allowance row's name, identifier and note) — the dates, roles and counts stay as statistics
+  (`anonymisedAt`). Error reports go 120 days after they last happened. Usage counts, AI spend and survey
+  answers are never deleted: they are the statistics for finding pain points and directions.
 - **Sign-in options per copy** (`APP_CONFIG.signIn`): Google (all), password + e-mail link
   (community, test); Microsoft and Apple built but off. Sign-in runs on each copy's own address
   (`authDomain` = the site; Firebase's helper files served at `/__/auth/`).
