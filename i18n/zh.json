@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1791929107381,
- "count": 2225,
+ "updatedAt": 1791934153684,
+ "count": 2226,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1535,6 +1535,7 @@
   "{1}Enter the shared secret above and press Save — the bookmarklet is built from it, so there is nothing to copy until then. It must match BRING_SETTOKEN_SECRET on the Cloudflare Worker (Settings → Variables & Secrets).": "{1}在上方输入共享密钥并点击保存——书签小工具是根据它生成的，所以在此之前无内容可复制。它必须与 Cloudflare Worker 上的 BRING_SETTOKEN_SECRET（设置 → Variables & Secrets）一致。",
   "{1}Imported {2}; {3} could not be saved to the cloud{4}Imported {5} language{6}": "{1}已导入{2}；{3}无法保存到云端{4}已导入{5}种语言{6}",
   "{1}Let them know": "{1}通知他们",
+  "{1}Open your authenticator app (or the iPhone’s Passwords) and type the 6-digit code for My Kitchen Notes.": "{1}打开你的身份验证器应用（或 iPhone 的“密码”），输入 My Kitchen Notes 的 6 位验证码。",
   "{1}Preview of your email — press Send Email to send it from your Gmail{2}Preview of your email — open it in your mail app, or copy it": "{1}邮件预览——点击“发送邮件”即可通过你的 Gmail 发送{2}邮件预览——在邮件应用中打开，或直接复制",
   "{1}Recipe imported!": "{1}菜谱已导入！",
   "{1}Stopped — {2} still selected{3}Stopped": "{1}已停止 — 仍选中 {2} 个{3}已停止",

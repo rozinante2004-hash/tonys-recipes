@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791929107381,
- "count": 2529,
+ "updatedAt": 1791934153684,
+ "count": 2530,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1826,6 +1826,7 @@
   "{1}Enter the shared secret above and press Save — the bookmarklet is built from it, so there is nothing to copy until then. It must match BRING_SETTOKEN_SECRET on the Cloudflare Worker (Settings → Variables & Secrets).": "{1}Введите общий секрет выше и нажмите «Сохранить» — букмарклет собирается из него, так что копировать пока нечего. Он должен совпадать с BRING_SETTOKEN_SECRET на Cloudflare Worker (Настройки → Variables & Secrets).",
   "{1}Imported {2}; {3} could not be saved to the cloud{4}Imported {5} language{6}": "{1}Импортировано {2}; {3} не удалось сохранить в облако{4}Импортирован язык {5}{6}",
   "{1}Let them know": "{1}Сообщить им",
+  "{1}Open your authenticator app (or the iPhone’s Passwords) and type the 6-digit code for My Kitchen Notes.": "{1}Откройте приложение-аутентификатор (или «Пароли» на iPhone) и введите 6-значный код для My Kitchen Notes.",
   "{1}Preview of your email — press Send Email to send it from your Gmail{2}Preview of your email — open it in your mail app, or copy it": "{1}Предпросмотр письма — нажми «Отправить письмо», чтобы отправить его через Gmail{2}Предпросмотр письма — открой его в почтовом приложении или скопируй",
   "{1}Recipe imported!": "{1}Рецепт импортирован!",
   "{1}Stopped — {2} still selected{3}Stopped": "{1}Остановлено — {2} ещё выбрано{3}Остановлено",

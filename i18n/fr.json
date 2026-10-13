@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1791929107381,
- "count": 2197,
+ "updatedAt": 1791934153684,
+ "count": 2198,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1525,6 +1525,7 @@
   "{1}Enter the shared secret above and press Save — the bookmarklet is built from it, so there is nothing to copy until then. It must match BRING_SETTOKEN_SECRET on the Cloudflare Worker (Settings → Variables & Secrets).": "{1}Saisissez le secret partagé ci-dessus et appuyez sur Enregistrer — le bookmarklet est généré à partir de celui-ci, donc il n'y a rien à copier avant cela. Il doit correspondre à BRING_SETTOKEN_SECRET sur le Cloudflare Worker (Réglages → Variables & Secrets).",
   "{1}Imported {2}; {3} could not be saved to the cloud{4}Imported {5} language{6}": "{1}Importé {2} ; {3} n'a pas pu être enregistré dans le cloud{4}Importé {5} langue{6}",
   "{1}Let them know": "{1}Prévenez-les",
+  "{1}Open your authenticator app (or the iPhone’s Passwords) and type the 6-digit code for My Kitchen Notes.": "{1}Ouvrez votre application d'authentification (ou l'app Mots de passe de l'iPhone) et saisissez le code à 6 chiffres pour My Kitchen Notes.",
   "{1}Preview of your email — press Send Email to send it from your Gmail{2}Preview of your email — open it in your mail app, or copy it": "{1}Aperçu de votre e-mail — appuyez sur Envoyer l'e-mail pour l'envoyer depuis votre Gmail{2}Aperçu de votre e-mail — ouvrez-le dans votre application de messagerie, ou copiez-le",
   "{1}Recipe imported!": "{1}Recette importée !",
   "{1}Stopped — {2} still selected{3}Stopped": "{1}Arrêté — {2} toujours sélectionné{3}Arrêté",

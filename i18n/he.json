@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791929107381,
- "count": 2739,
+ "updatedAt": 1791934153684,
+ "count": 2740,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2006,6 +2006,7 @@
   "{1}Enter the shared secret above and press Save — the bookmarklet is built from it, so there is nothing to copy until then. It must match BRING_SETTOKEN_SECRET on the Cloudflare Worker (Settings → Variables & Secrets).": "{1}הכניסו את הסוד המשותף למעלה ולחצו על שמירה — ה-bookmarklet נבנה ממנו, כך שאין מה להעתיק עד אז. הוא חייב להתאים ל-BRING_SETTOKEN_SECRET ב-Cloudflare Worker (הגדרות → משתנים וסודות).",
   "{1}Imported {2}; {3} could not be saved to the cloud{4}Imported {5} language{6}": "{1}יובאו {2}; {3} לא ניתן היה לשמור לענן{4}יובאה שפה {5}{6}",
   "{1}Let them know": "{1}עדכנו אותם",
+  "{1}Open your authenticator app (or the iPhone’s Passwords) and type the 6-digit code for My Kitchen Notes.": "{1}פתח/י את אפליקציית האימות שלך (או את 'סיסמאות' באייפון) והקלד/י את הקוד בן 6 הספרות של My Kitchen Notes.",
   "{1}Preview of your email — press Send Email to send it from your Gmail{2}Preview of your email — open it in your mail app, or copy it": "{1}תצוגה מקדימה של האימייל שלך — לחץ על שליחת אימייל כדי לשלוח אותו מ-Gmail{2}תצוגה מקדימה של האימייל שלך — פתח אותו באפליקציית המייל שלך, או העתק אותו",
   "{1}Recipe imported!": "{1}המתכון יובא בהצלחה!",
   "{1}Stopped — {2} still selected{3}Stopped": "{1}נעצר — {2} עדיין נבחרים{3}נעצר",

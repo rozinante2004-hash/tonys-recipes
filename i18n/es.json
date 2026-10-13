@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1791929107381,
- "count": 2193,
+ "updatedAt": 1791934153684,
+ "count": 2194,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1524,6 +1524,7 @@
   "{1}Enter the shared secret above and press Save — the bookmarklet is built from it, so there is nothing to copy until then. It must match BRING_SETTOKEN_SECRET on the Cloudflare Worker (Settings → Variables & Secrets).": "{1}Introduce el secreto compartido arriba y pulsa Guardar — el bookmarklet se genera a partir de él, así que no hay nada que copiar hasta entonces. Debe coincidir con BRING_SETTOKEN_SECRET en el Cloudflare Worker (Ajustes → Variables y secretos).",
   "{1}Imported {2}; {3} could not be saved to the cloud{4}Imported {5} language{6}": "{1}Importado {2}; {3} no se pudo guardar en la nube{4}Importado {5} idioma{6}",
   "{1}Let them know": "{1}Avísales",
+  "{1}Open your authenticator app (or the iPhone’s Passwords) and type the 6-digit code for My Kitchen Notes.": "{1}Abre tu app de autenticación (o Contraseñas en el iPhone) y escribe el código de 6 dígitos para My Kitchen Notes.",
   "{1}Preview of your email — press Send Email to send it from your Gmail{2}Preview of your email — open it in your mail app, or copy it": "{1}Vista previa de tu correo — pulsa Enviar correo para enviarlo desde tu Gmail{2}Vista previa de tu correo — ábrelo en tu app de correo, o cópialo",
   "{1}Recipe imported!": "{1}¡Receta importada!",
   "{1}Stopped — {2} still selected{3}Stopped": "{1}Detenido — {2} sigue seleccionado{3}Detenido",
