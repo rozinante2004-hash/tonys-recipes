@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791915327260,
- "count": 2520,
+ "updatedAt": 1791917976071,
+ "count": 2523,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1858,6 +1858,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Слушаю…{2}🎤 Голос",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Режим отладки включён — смотрите консоль браузера{2}Режим отладки выключен",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Скопировать отчёт ({2} с ошибками){3}📋 Скопировать отчёт",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Готово — нажмите, чтобы отправить{2}📧 Отправить письмо",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Показать оригинал{2}📸 Скрыть оригинал",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 Показать оригинал{2}🙈 Скрыть оригинал",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 Теперь для инструментов владельца нужен код аутентификатора.{2}Аутентификатор больше не требуется.",
@@ -1928,6 +1929,7 @@
   "⏳ Applying...": "⏳ Применение...",
   "⏳ Calculating nutrition...": "⏳ Подсчёт КБЖУ...",
   "⏳ Checking for a newer version…": "⏳ Проверка обновлений…",
+  "⏳ Getting ready…": "⏳ Подготовка…",
   "⏳ Getting the newest version of the app first…": "⏳ Получаем последнюю версию приложения…",
   "⏳ One moment…": "⏳ Секунду…",
   "⏳ Opening share…": "⏳ Открываем «Поделиться»…",
@@ -1974,6 +1976,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ Не удалось удалить из облака: {1}",
   "⚠️ Error: {1}": "⚠️ Ошибка: {1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ Браузер считает файл пустым — пробуем прочитать всё равно…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ Не удалось подключиться к Google — проверьте соединение и попробуйте снова.",
   "⚠️ Imported here, but not synced: {1}": "⚠️ Импортировано, но не синхронизировано: {1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ Локальное хранилище заполнено — освобождаем место, перенося фото в базу данных…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ Этот браузер не поддерживает системный выбор файлов. Попробуйте Firefox.",

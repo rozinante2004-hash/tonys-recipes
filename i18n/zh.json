@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1791915327260,
- "count": 2216,
+ "updatedAt": 1791917976071,
+ "count": 2219,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1567,6 +1567,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 正在聆听…{2}🎤 语音",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 调试模式已开启——请查看浏览器控制台{2}调试模式已关闭",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 复制报告（{2} 项失败）{3}📋 复制报告",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 准备就绪 — 点击发送{2}📧 发送邮件",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 显示原图{2}📸 隐藏原图",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 显示原图{2}🙈 隐藏原图",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 你的主人工具现在需要身份验证器验证码。{2}不再需要身份验证器。",
@@ -1622,6 +1623,7 @@
   "⏳ Applying...": "⏳ 应用中…",
   "⏳ Calculating nutrition...": "⏳ 正在计算营养…",
   "⏳ Checking for a newer version…": "⏳ 正在检查新版本…",
+  "⏳ Getting ready…": "⏳ 准备中…",
   "⏳ Getting the newest version of the app first…": "⏳ 正在获取应用的最新版本…",
   "⏳ One moment…": "⏳ 稍等…",
   "⏳ Opening share…": "⏳ 正在打开分享…",
@@ -1665,6 +1667,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ 无法从云端移除：{1}",
   "⚠️ Error: {1}": "⚠️ 错误：{1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ 浏览器认为文件为空 — 仍尝试读取…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ 无法连接到 Google，请检查网络连接后重试。",
   "⚠️ Imported here, but not synced: {1}": "⚠️ 已在本地导入，但未同步：{1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ 本地存储已满 — 正在将照片移至数据库以释放空间…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ 此浏览器不支持原生文件选择器，请改用 Firefox。",

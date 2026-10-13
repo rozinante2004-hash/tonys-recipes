@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1791915327260,
- "count": 2184,
+ "updatedAt": 1791917976071,
+ "count": 2187,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1556,6 +1556,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Escuchando…{2}🎤 Voz",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Modo depuración activado — mira la consola del navegador{2}Modo depuración desactivado",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Copiar informe ({2} fallando){3}📋 Copiar informe",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Listo — pulsa para enviar{2}📧 Enviar correo",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Mostrar original{2}📸 Ocultar original",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 Mostrar original{2}🙈 Ocultar original",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 Las herramientas del propietario ahora necesitan el código del autenticador.{2}Ya no hace falta el autenticador.",
@@ -1606,6 +1607,7 @@
   "⏳ Applying...": "⏳ Aplicando...",
   "⏳ Calculating nutrition...": "⏳ Calculando información nutricional...",
   "⏳ Checking for a newer version…": "⏳ Buscando una versión más reciente…",
+  "⏳ Getting ready…": "⏳ Preparando…",
   "⏳ Getting the newest version of the app first…": "⏳ Obteniendo primero la versión más reciente de la app…",
   "⏳ One moment…": "⏳ Un momento…",
   "⏳ Opening share…": "⏳ Abriendo para compartir…",
@@ -1649,6 +1651,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ No se pudo eliminar de la nube: {1}",
   "⚠️ Error: {1}": "⚠️ Error: {1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ El archivo parece vacío para el navegador — intentando leerlo de todos modos…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ No se pudo conectar con Google — comprueba la conexión e inténtalo de nuevo.",
   "⚠️ Imported here, but not synced: {1}": "⚠️ Importado aquí, pero no sincronizado: {1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ El almacenamiento local está lleno — liberando espacio moviendo fotos a la base de datos…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ El selector de archivos nativo no es compatible con este navegador. Prueba con Firefox.",

@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1791915327260,
- "count": 2189,
+ "updatedAt": 1791917976071,
+ "count": 2192,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1558,6 +1558,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 يستمع…{2}🎤 صوت",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 وضع التصحيح مفعّل — راجع طرفية المتصفح{2}وضع التصحيح متوقف",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 نسخ التقرير ({2} فاشلة){3}📋 نسخ التقرير",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 جاهز — اضغط للإرسال{2}📧 إرسال بريد إلكتروني",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 إظهار الأصل{2}📸 إخفاء الأصل",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 إظهار الأصل{2}🙈 إخفاء الأصل",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 أدوات المالك الآن تحتاج رمز المصادقة.{2}لم تعد المصادقة مطلوبة.",
@@ -1608,6 +1609,7 @@
   "⏳ Applying...": "⏳ جارٍ التطبيق...",
   "⏳ Calculating nutrition...": "⏳ جارٍ حساب القيم الغذائية...",
   "⏳ Checking for a newer version…": "⏳ جارٍ التحقق من وجود إصدار أحدث…",
+  "⏳ Getting ready…": "⏳ جارٍ التجهيز…",
   "⏳ Getting the newest version of the app first…": "⏳ جارٍ جلب أحدث إصدار من التطبيق أولاً…",
   "⏳ One moment…": "⏳ لحظة واحدة…",
   "⏳ Opening share…": "⏳ جارٍ فتح المشاركة…",
@@ -1651,6 +1653,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ تعذّر حذفه من السحابة: {1}",
   "⚠️ Error: {1}": "⚠️ خطأ: {1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ يبدو الملف فارغًا بالنسبة للمتصفح — جارٍ محاولة القراءة على أي حال…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ تعذر الوصول إلى Google — تحقق من الاتصال ثم حاول مرة أخرى.",
   "⚠️ Imported here, but not synced: {1}": "⚠️ تم الاستيراد هنا، لكن لم تتم المزامنة: {1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ التخزين المحلي ممتلئ — جارٍ تحرير مساحة بنقل الصور إلى قاعدة البيانات…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ منتقي الملفات الأصلي غير مدعوم في هذا المتصفح. جرّب Firefox بدلاً منه.",

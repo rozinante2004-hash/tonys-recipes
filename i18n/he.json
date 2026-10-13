@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791915327260,
- "count": 2730,
+ "updatedAt": 1791917976071,
+ "count": 2733,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2038,6 +2038,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 מקשיב…{2}🎤 קול",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 מצב דיבוג פעיל — ראה קונסולת דפדפן{2}מצב דיבוג כבוי",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 העתקת דו״ח ({2} נכשלו){3}📋 העתקת דו״ח",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 מוכן — לחץ לשליחה{2}📧 שליחת אימייל",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 הצגת המקור{2}📸 הסתרת המקור",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 הצגת המקור{2}🙈 הסתרת המקור",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 כלי הבעלים שלך דורשים כעת את הקוד מאפליקציית האימות.{2}אפליקציית האימות כבר לא נדרשת.",
@@ -2127,6 +2128,7 @@
   "⏳ Applying...": "⏳ מחיל...",
   "⏳ Calculating nutrition...": "⏳ מחשב ערכים תזונתיים...",
   "⏳ Checking for a newer version…": "⏳ בודק אם יש גרסה חדשה…",
+  "⏳ Getting ready…": "⏳ מתכונן…",
   "⏳ Getting the newest version of the app first…": "⏳ מביאים קודם את הגרסה החדשה ביותר של האפליקציה…",
   "⏳ One moment…": "⏳ רגע אחד…",
   "⏳ Opening share…": "⏳ פותח שיתוף…",
@@ -2173,6 +2175,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ לא ניתן להסיר מהענן: {1}",
   "⚠️ Error: {1}": "⚠️ שגיאה: {1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ הדפדפן רואה את הקובץ כריק — מנסה לקרוא בכל זאת…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ לא הצלחנו להתחבר ל-Google — בדוק את החיבור ונסה שוב.",
   "⚠️ Imported here, but not synced: {1}": "⚠️ יובא כאן, אך לא סונכרן: {1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ האחסון המקומי מלא — מפנה מקום על ידי העברת תמונות למסד הנתונים…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ בורר הקבצים המובנה אינו נתמך בדפדפן זה. נסה Firefox במקום.",

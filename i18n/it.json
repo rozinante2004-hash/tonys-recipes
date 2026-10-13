@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1791915327260,
- "count": 2068,
+ "updatedAt": 1791917976071,
+ "count": 2071,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -1469,6 +1469,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 In ascolto…{2}🎤 Voce",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Modalità debug attiva — guarda la console del browser{2}Modalità debug disattivata",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Copia report ({2} falliti){3}📋 Copia report",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Pronto — premi per inviare{2}📧 Invia email",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Mostra originale{2}📸 Nascondi originale",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 Mostra originale{2}🙈 Nascondi originale",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 Gli strumenti del proprietario ora richiedono il codice dell'autenticatore.{2}L'autenticatore non è più richiesto.",
@@ -1517,6 +1518,7 @@
   "⏳ Applying...": "⏳ Applicazione in corso...",
   "⏳ Calculating nutrition...": "⏳ Calcolo valori nutrizionali...",
   "⏳ Checking for a newer version…": "⏳ Controllo nuova versione…",
+  "⏳ Getting ready…": "⏳ Preparazione…",
   "⏳ Getting the newest version of the app first…": "⏳ Recupero prima l'ultima versione dell'app…",
   "⏳ One moment…": "⏳ Un momento…",
   "⏳ Opening share…": "⏳ Apertura condivisione…",
@@ -1559,6 +1561,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ Impossibile rimuoverlo dal cloud: {1}",
   "⚠️ Error: {1}": "⚠️ Errore: {1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ Il file sembra vuoto al browser — provo comunque a leggerlo…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ Impossibile raggiungere Google — controlla la connessione e riprova.",
   "⚠️ Imported here, but not synced: {1}": "⚠️ Importato qui, ma non sincronizzato: {1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ Memoria locale piena — libero spazio spostando le foto nel database…",
   "⚠️ No file detected — try again": "⚠️ Nessun file rilevato — riprova",

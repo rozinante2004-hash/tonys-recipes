@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1791915327260,
- "count": 2188,
+ "updatedAt": 1791917976071,
+ "count": 2191,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1557,6 +1557,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Écoute…{2}🎤 Voix",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Mode débogage activé — voir la console du navigateur{2}Mode débogage désactivé",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Copier le rapport ({2} en échec){3}📋 Copier le rapport",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Prêt — appuyez pour envoyer{2}📧 Envoyer l'e-mail",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Afficher l'original{2}📸 Masquer l'original",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 Afficher l'original{2}🙈 Masquer l'original",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 Les outils du propriétaire nécessitent désormais le code de l’authentificateur.{2}L’authentificateur n’est plus requis.",
@@ -1607,6 +1608,7 @@
   "⏳ Applying...": "⏳ Application en cours...",
   "⏳ Calculating nutrition...": "⏳ Calcul des valeurs nutritionnelles...",
   "⏳ Checking for a newer version…": "⏳ Recherche d’une nouvelle version…",
+  "⏳ Getting ready…": "⏳ Préparation…",
   "⏳ Getting the newest version of the app first…": "⏳ Récupération de la dernière version de l'app…",
   "⏳ One moment…": "⏳ Un instant…",
   "⏳ Opening share…": "⏳ Ouverture du partage…",
@@ -1650,6 +1652,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ Impossible de le retirer du cloud : {1}",
   "⚠️ Error: {1}": "⚠️ Erreur : {1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ Le navigateur voit ce fichier comme vide — tentative de lecture quand même…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ Impossible de contacter Google — vérifiez la connexion, puis réessayez.",
   "⚠️ Imported here, but not synced: {1}": "⚠️ Importé ici, mais non synchronisé : {1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ Stockage local plein — déplacement des photos vers la base de données pour libérer de l'espace…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ Sélecteur de fichiers natif non pris en charge par ce navigateur. Essayez Firefox.",

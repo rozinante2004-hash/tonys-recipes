@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1791915327260,
- "count": 2530,
+ "updatedAt": 1791917976071,
+ "count": 2533,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1864,6 +1864,7 @@
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 聞き取り中…{2}🎤 音声",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 デバッグモードON — ブラウザのコンソールを確認{2}デバッグモードOFF",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 レポートをコピー（{2}件失敗）{3}📋 レポートをコピー",
+  "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 準備完了 — 押して送信{2}📧 メールを送信",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 元の画像を表示{2}📸 元の画像を隠す",
   "{1}📸 Show Original{2}🙈 Hide Original": "{1}📸 元の画像を表示{2}🙈 元の画像を隠す",
   "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": "{1}🔐 オーナー向けツールには認証アプリのコードが必要になりました。{2}認証アプリはもう必要ありません。",
@@ -1934,6 +1935,7 @@
   "⏳ Applying...": "⏳ 適用中...",
   "⏳ Calculating nutrition...": "⏳ 栄養価を計算中...",
   "⏳ Checking for a newer version…": "⏳ 新しいバージョンを確認中…",
+  "⏳ Getting ready…": "⏳ 準備中…",
   "⏳ Getting the newest version of the app first…": "⏳ 最新バージョンを取得しています…",
   "⏳ One moment…": "⏳少々お待ちください…",
   "⏳ Opening share…": "⏳ 共有を開いています…",
@@ -1980,6 +1982,7 @@
   "⚠️ Couldn't remove it from the cloud: {1}": "⚠️ クラウドから削除できませんでした：{1}",
   "⚠️ Error: {1}": "⚠️ エラー：{1}",
   "⚠️ File appears empty to browser — attempting to read anyway…": "⚠️ ブラウザにはファイルが空に見えます — 読み込みを試みます…",
+  "⚠️ Google could not be reached — check the connection, then try again.": "⚠️ Googleに接続できませんでした。接続を確認してもう一度お試しください。",
   "⚠️ Imported here, but not synced: {1}": "⚠️ ここに取り込みましたが、同期されていません：{1}",
   "⚠️ Local storage is full — freeing space by moving photos to the database…": "⚠️ ローカルストレージが満杯です — 写真をデータベースに移動して空き容量を確保しています…",
   "⚠️ Native file picker not supported in this browser. Try Firefox instead.": "⚠️ このブラウザはネイティブのファイル選択に対応していません。Firefoxをお試しください。",
