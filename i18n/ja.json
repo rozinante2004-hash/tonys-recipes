@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1791886073452,
- "count": 2526,
+ "updatedAt": 1791906047885,
+ "count": 2529,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -19,6 +19,7 @@
   ", and no analytics of any kind are collected. The sync log in ⚙️ → Logging & debugging stays on this device and is never uploaded, not even into a backup.": "、また分析データも一切収集されません。⚙️ →「ログとデバッグ」の同期ログはこの端末内だけに保存され、バックアップにも含めてアップロードされることはありません。",
   ", and no analytics of any kind are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device and is never uploaded, not even into a backup.": "、また、いかなる種類の解析データも収集されません。⚙️ → 🔧 トラブルシューティング → ログと診断にある同期ログはこの端末内にとどまり、バックアップにも含めて外部にアップロードされることはありません。",
   ", and no analytics of any kind are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "、分析データも一切収集されません。⚙️ →🔧 トラブルシューティング →ログとデバッグにある同期ログは、この端末に保存されたままで、バックアップに含まれることはなく、アプリの管理者に送ると選んだときだけ外に出ます。",
+  ", and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts how it is used (which features, how often, on what kind of device), to the app’s own server. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "また、外部の解析ツールやトラッカーは一切使用していません。アプリのテスト期間中は、このコピーが自身のエラーと使われ方（どの機能を、どのくらいの頻度で、どんな端末で使っているか）をアプリ独自のサーバーに送信します。⚙️ → 🔧 トラブルシューティング → ログと診断 にある同期ログはこの端末に保存されたままで、バックアップに含まれることはなく、あなたがアプリの管理者に送ることを選んだ場合にのみ端末を離れます。",
   ", and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts which features are used, to the app’s own server. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "、外部の解析ツールやトラッカーは一切使用していません。テスト期間中、このバージョンはアプリ自身のエラー内容と各機能の利用回数をアプリ自身のサーバーに送信します。⚙️ → 🔧 トラブルシューティング → ログとデバッグ にある同期ログはこの端末だけに保存され、バックアップには含まれず、あなたがアプリの管理者に送ることを選んだときだけ外部に出ます。",
   ".docx .xlsx .pdf .html": ".docx .xlsx .pdf .html",
   ".txt": ".txt",
@@ -1258,6 +1259,7 @@
   "The address you are importing, the words you search photos for, and the AI request above. It holds the API keys so your browser never has to, and stores nothing except a request count used to cap the bill.": "インポート中のアドレス、写真を検索するときのキーワード、そして上記のAIリクエストです。APIキーはここで保持するので、ブラウザ側で持つ必要はありません。保存するのは料金の上限を管理するためのリクエスト数だけです。",
   "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.": "インポートするアドレス、写真検索に使った言葉、送信中のAIリクエスト、そしてあなたが送信を選んだメモやレポートです。",
   "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send. In this test copy it also sends, by itself, the app’s own error messages and how many times each feature was used — names and numbers, never your recipes.": "インポートしたURL、写真を検索するときのキーワード、送信中のAIリクエスト、そしてあなたが送ることを選んだメモやレポートです。このテスト版では、アプリ自身のエラーメッセージと各機能の利用回数も自動的に送信されます — 名称と数字だけで、あなたのレシピが送られることはありません。",
+  "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send. In this test copy it also sends, by itself, the app’s own error messages and how the app is used — which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.": "インポートしたアドレス、写真を検索した言葉、送信中のAIリクエスト、そしてあなたが送ることを選んだメモやレポート。このテスト版では、それに加えてアプリ自身のエラーメッセージと使われ方（どの機能を、どのくらいの頻度で、いつ、どんな端末で、どうやってサインインし、どうやってこのアプリを知ったか）も自動的に送信されます。名前と数字のみで、あなたのレシピが送られることは決してありません。",
   "The answers could not be read just now. Try again in a moment.": "現在、回答を読み込めませんでした。しばらくしてからもう一度お試しください。",
   "The answers to the notes you sent about the app.": "アプリについて送ったメモへの返事です。",
   "The app can say why sign-in failed (v{1})": "サインインに失敗した理由を表示できる（v{1}）",
@@ -1513,6 +1515,7 @@
   "Where is my data stored?": "データはどこに保存されますか?",
   "Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive.": "他の世帯があなたの識別子を使って、アプリ経由で連携をリクエストできるかどうか。メールでのリクエストは常に届きます。",
   "Whether this device and the cloud agree, with a report to copy and send. Read-only — changes nothing.": "この端末とクラウドが一致しているか。コピーして送れるレポート付き。読み取り専用 — 何も変更されません。",
+  "While the app is being tested, it also sends us its own error messages and counts how it is used — which features, how often, on what kind of device, how you signed in and first found it: numbers only, never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.": "アプリのテスト期間中は、独自のエラーメッセージと使われ方（どの機能を、どのくらいの頻度で、どんな端末で、どうやってサインインし、どうやって見つけたか）も送信します。数字だけで、あなたのレシピが送られることは決してありません。レシピはあなたのものです：⚙️ → 💾 バックアップ でいつでも全件を端末に保存できます。",
   "While the app is being tested, it also sends us its own error messages and counts which features are used — never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.": "テスト期間中は、アプリ自身のエラーメッセージと各機能の利用状況も送信されます — あなたのレシピが送られることはありません。レシピはあなただけのものです。⚙️ → 💾 バックアップ でいつでも端末に全て保存できます。",
   "Who may visit": "訪問できる動物",
   "Who receives what, and when. Read-only — changes nothing.": "誰が何をいつ受け取るか。閲覧のみ — 何も変更されません。",

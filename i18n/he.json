@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791886073452,
- "count": 2726,
+ "updatedAt": 1791906047885,
+ "count": 2729,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -19,6 +19,7 @@
   ", and no analytics of any kind are collected. The sync log in ⚙️ → Logging & debugging stays on this device and is never uploaded, not even into a backup.": ", ולא נאספים נתוני שימוש מכל סוג. יומן הסנכרון ב-⚙️ ← רישום וניפוי באגים נשאר במכשיר הזה ולעולם לא מועלה, גם לא לגיבוי.",
   ", and no analytics of any kind are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device and is never uploaded, not even into a backup.": "ולא נאספים נתוני שימוש מכל סוג. יומן הסנכרון ב-⚙️ ← 🔧 פתרון תקלות ← רישום ואיתור באגים נשאר במכשיר הזה ולעולם לא מועלה, גם לא לגיבוי.",
   ", and no analytics of any kind are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "ולא נאספים נתוני שימוש מכל סוג. יומן הסנכרון ב-⚙️ ← 🔧 פתרון בעיות ← רישום וניפוי שגיאות נשאר במכשיר הזה, לעולם לא נכלל בגיבוי, ויוצא ממנו רק כשאתם בוחרים לשלוח אותו למנהל האפליקציה.",
+  ", and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts how it is used (which features, how often, on what kind of device), to the app’s own server. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "ולא נעשה שימוש בכלי אנליטיקה או מעקב חיצוניים. בזמן שהאפליקציה בבדיקות, העותק הזה מדווח על השגיאות שלו וסופר איך הוא נמצא בשימוש (אילו תכונות, כמה פעמים, באיזה סוג מכשיר), לשרת של האפליקציה עצמה. יומן הסנכרון ב-⚙️ ← 🔧 פתרון בעיות ← רישום וניפוי באגים נשאר במכשיר הזה, לעולם לא נכלל בגיבוי, ועוזב אותו רק כשאתם בוחרים לשלוח אותו למנהל האפליקציה.",
   ", and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts which features are used, to the app’s own server. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "ולא נעשה שימוש בכלי אנליטיקה או מעקב חיצוניים. בזמן בדיקת האפליקציה, הגרסה הזו מדווחת על השגיאות שלה וסופרת אילו תכונות נעשה בהן שימוש, לשרת של האפליקציה עצמה. יומן הסנכרון ב-⚙️ ← 🔧 פתרון תקלות ← רישום וניפוי שגיאות נשאר במכשיר הזה, לעולם לא נכלל בגיבוי, ויוצא ממנו רק כשאתם בוחרים לשלוח אותו למנהל האפליקציה.",
   ".docx .xlsx .pdf .html": ".docx .xlsx .pdf .html",
   ".txt": ".txt",
@@ -1326,6 +1327,7 @@
   "The address you are importing, the words you search photos for, and the AI request above. It holds the API keys so your browser never has to, and stores nothing except a request count used to cap the bill.": "הכתובת שאתה מייבא, המילים שאתה מחפש לפיהן תמונות, ובקשת ה-AI שלמעלה. הוא שומר את מפתחות ה-API כדי שהדפדפן שלך לא יצטרך, ולא שומר כלום מלבד מונה בקשות שמשמש להגבלת העלות.",
   "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.": "הכתובת שאתם מייבאים, המילים שאתם מחפשים בתמונות, בקשת הבינה המלאכותית שלכם בדרך, וההערות והדיווחים שאתם בוחרים לשלוח.",
   "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send. In this test copy it also sends, by itself, the app’s own error messages and how many times each feature was used — names and numbers, never your recipes.": "הכתובת שאתם מייבאים, המילים שבהן אתם מחפשים תמונות, בקשת ה-AI שלכם בדרך, וההערות והדיווחים שאתם בוחרים לשלוח. בגרסת הבדיקה הזו היא גם שולחת מעצמה את הודעות השגיאה של האפליקציה וכמה פעמים נעשה שימוש בכל תכונה — שמות ומספרים, אף פעם לא את המתכונים שלכם.",
+  "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send. In this test copy it also sends, by itself, the app’s own error messages and how the app is used — which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.": "הכתובת שאתם מייבאים, המילים שבהן אתם מחפשים תמונות, בקשת ה-AI שלכם בדרכה, וההערות והדיווחים שאתם בוחרים לשלוח. בעותק הבדיקה הזה היא גם שולחת, מעצמה, את הודעות השגיאה של האפליקציה ואיך היא נמצאת בשימוש — אילו תכונות וכמה פעמים, מתי, באיזה סוג מכשיר, איך נרשמתם ואיך מצאתם את האפליקציה בפעם הראשונה: שמות ומספרים, לעולם לא המתכונים שלכם.",
   "The answers could not be read just now. Try again in a moment.": "לא ניתן היה לקרוא את התשובות כרגע. נסה שוב בעוד רגע.",
   "The answers to the notes you sent about the app.": "התשובות להערות ששלחתם על האפליקציה.",
   "The app can say why sign-in failed (v{1})": "האפליקציה יכולה להגיד למה הכניסה נכשלה (v{1})",
@@ -1593,6 +1595,7 @@
   "Where is my data stored?": "איפה מאוחסן המידע שלי?",
   "Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive.": "האם משקי בית אחרים יכולים לבקש להתחבר לשלך דרך האפליקציה, באמצעות המזהה שלך. בקשות במייל תמיד מגיעות.",
   "Whether this device and the cloud agree, with a report to copy and send. Read-only — changes nothing.": "האם המכשיר הזה והענן תואמים, עם דוח להעתקה ושליחה. לקריאה בלבד — לא משנה כלום.",
+  "While the app is being tested, it also sends us its own error messages and counts how it is used — which features, how often, on what kind of device, how you signed in and first found it: numbers only, never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.": "בזמן שהאפליקציה בבדיקות, היא גם שולחת לנו את הודעות השגיאה שלה וסופרת איך היא נמצאת בשימוש — אילו תכונות, כמה פעמים, באיזה סוג מכשיר, איך נרשמתם ואיך מצאתם אותה: מספרים בלבד, לעולם לא המתכונים שלכם. המתכונים שלכם נשארים שלכם: ⚙️ ← 💾 גיבויים שומר את כולם למכשיר שלכם, בכל רגע.",
   "While the app is being tested, it also sends us its own error messages and counts which features are used — never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.": "בזמן בדיקת האפליקציה, היא גם שולחת לנו את הודעות השגיאה שלה וסופרת אילו תכונות נעשה בהן שימוש — אף פעם לא את המתכונים שלכם. המתכונים שלכם נשארים שלכם: ⚙️ ← 💾 גיבויים שומר את כולם למכשיר שלכם, בכל רגע.",
   "Who may visit": "מי רשאי לבקר",
   "Who receives what, and when. Read-only — changes nothing.": "מי מקבל מה, ומתי. לקריאה בלבד — לא משנה כלום.",

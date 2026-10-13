@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1791886073452,
- "count": 2212,
+ "updatedAt": 1791906047885,
+ "count": 2215,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -18,6 +18,7 @@
   ", and no analytics of any kind are collected. The sync log in ⚙️ → Logging & debugging stays on this device and is never uploaded, not even into a backup.": "，且不会收集任何形式的分析数据。⚙️ → 日志与调试 中的同步日志只保留在本设备上，绝不会上传，即使备份中也不会包含。",
   ", and no analytics of any kind are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device and is never uploaded, not even into a backup.": "，也不会收集任何形式的使用数据。⚙️ → 🔧 故障排查 → 日志与调试中的同步日志只保存在本设备上，不会上传，备份中也不会包含它。",
   ", and no analytics of any kind are collected. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "，也不会收集任何形式的统计数据。⚙️ → 🔧 疑难解答 → 日志与调试 中的同步日志只保存在本设备上，不会被加入备份，只有当你选择发送给应用管理员时才会离开本机。",
+  ", and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts how it is used (which features, how often, on what kind of device), to the app’s own server. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "，且不使用任何外部分析或跟踪工具。在应用测试期间，这份副本会向应用自己的服务器报告自身的错误，并统计使用情况（使用了哪些功能、使用频率、使用的设备类型）。同步日志位于 ⚙️ → 🔧 故障排查 → 日志与调试，只保留在本设备上，绝不会被放入备份，只有在你主动选择发送给应用管理员时才会离开本设备。",
   ", and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts which features are used, to the app’s own server. The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app’s admin.": "，不使用任何外部分析或跟踪工具。在应用测试期间，这份测试版会把自身的错误报告和功能使用次数发送到应用自己的服务器。⚙️ → 🔧 故障排查 → 日志与调试中的同步日志只保存在本设备上，绝不会放入备份，只有在你主动发送给应用管理员时才会离开设备。",
   ".docx .xlsx .pdf .html": ".docx .xlsx .pdf .html",
   ".txt": ".txt",
@@ -1032,6 +1033,7 @@
   "The address you are importing, the words you search photos for, and the AI request above. It holds the API keys so your browser never has to, and stores nothing except a request count used to cap the bill.": "你要导入的地址、搜索图片时用的关键词，以及上面的 AI 请求。它保存着 API 密钥，这样你的浏览器就不必保存；除了用于控制费用的请求计数外，不存储任何其他内容。",
   "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.": "你导入的地址、搜索图片用的关键词、发送中的 AI 请求，以及你选择发送的备注和报告。",
   "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send. In this test copy it also sends, by itself, the app’s own error messages and how many times each feature was used — names and numbers, never your recipes.": "你导入的地址、搜索图片用的关键词、发送中的 AI 请求，以及你主动发送的备注和报告。在这个测试版本中，它还会自动发送应用自身的错误信息和各功能的使用次数——只有名称和数字，绝不包含你的食谱。",
+  "The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send. In this test copy it also sends, by itself, the app’s own error messages and how the app is used — which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.": "你导入的地址、你用来搜索图片的关键词、发送中的 AI 请求，以及你选择发送的笔记和报告。在这份测试版本中，它还会自动发送应用自身的错误信息和使用情况——使用了哪些功能、使用频率、使用时间、使用的设备类型、你的登录方式以及你最初是如何发现这款应用的：都是名称和数字，绝不包含你的食谱。",
   "The answers could not be read just now. Try again in a moment.": "暂时无法读取回答。请稍后重试。",
   "The answers to the notes you sent about the app.": "你发送的关于本应用的留言的回复。",
   "The app could not load {1} as of {2}. Check the connection and try again.": "应用无法加载{1}（截至{2}）。请检查网络连接后重试。",
@@ -1242,6 +1244,7 @@
   "Where is my data stored?": "我的数据存储在哪里？",
   "Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive.": "其他家庭是否可以通过你的标识符请求与你的家庭互联。邮件请求始终会送达。",
   "Whether this device and the cloud agree, with a report to copy and send. Read-only — changes nothing.": "此设备与云端是否一致，并生成可复制发送的报告。只读——不会更改任何内容。",
+  "While the app is being tested, it also sends us its own error messages and counts how it is used — which features, how often, on what kind of device, how you signed in and first found it: numbers only, never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.": "在应用测试期间，它还会向我们发送自身的错误信息，并统计使用情况——使用了哪些功能、使用频率、使用的设备类型、你的登录方式以及你最初是如何发现它的：仅限数字，绝不包含你的食谱。你的食谱始终属于你：⚙️ → 💾 备份 可随时将它们全部保存到你的设备。",
   "While the app is being tested, it also sends us its own error messages and counts which features are used — never your recipes. Your recipes stay yours: ⚙️ → 💾 Backups saves all of them to your device, any time.": "在应用测试期间，它还会发送自身的错误信息，并统计各功能的使用次数——绝不会涉及你的食谱。你的食谱始终属于你：⚙️ → 💾 备份可以随时把它们全部保存到你的设备上。",
   "Who may visit": "谁可以来访",
   "Who receives what, and when. Read-only — changes nothing.": "谁收到什么内容，何时收到。只读——不会更改任何内容。",
