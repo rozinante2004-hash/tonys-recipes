@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1791906047885,
- "count": 2187,
+ "updatedAt": 1791915327260,
+ "count": 2188,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1534,6 +1534,7 @@
   "{1}Updating the shared translations needs full access.": "{1}Mettre à jour les traductions partagées nécessite un accès complet.",
   "{1}What was copied is only a link — copy the TEXT under the post (tap “See more” first), or paste it here.{2}Paste the recipe text into the box (long-press → Paste).": "{1}Ce qui a été copié n'est qu'un lien — copiez le TEXTE sous la publication (appuyez d'abord sur « Voir plus »), ou collez-le ici.{2}Collez le texte de la recette dans la zone (appui long → Coller)",
   "{1}Who shares this recipe collection{2}Manage who can access your recipe collection": "{1}Qui partage cette collection de recettes{2}Gérez qui peut accéder à votre collection de recettes",
+  "{1}admin{2}👑 ADMIN{3}β BETA": "{1}admin{2}👑 ADMIN{3}β BETA",
   "{1}cloud{2}✅ {3} saved and shared with everyone{4}✅ {5} saved on this device — it could not be shared": "{1}cloud{2}✅ {3} enregistré et partagé avec tout le monde{4}✅ {5} enregistré sur cet appareil — impossible de le partager",
   "{1}collapsed{2}🗑 Removed — one recipe was left, so “{3}” is an ordinary recipe now{4}emptied{5}🗑 Removed — “{6}” is empty now{7}🗑 Removed “{8}” — {9} left in the collection": "{1}collapsed{2}🗑 Supprimé — il ne restait qu'une recette, donc « {3} » est maintenant une recette ordinaire{4}emptied{5}🗑 Supprimé — « {6} » est maintenant vide{7}🗑 « {8} » supprimé — {9} restante(s) dans la collection",
   "{1}default{2}⇅ Sort{3}": "{1}default{2}⇅ Trier{3}",

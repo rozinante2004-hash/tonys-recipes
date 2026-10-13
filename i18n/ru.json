@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791906047885,
- "count": 2519,
+ "updatedAt": 1791915327260,
+ "count": 2520,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1835,6 +1835,7 @@
   "{1}Updating the shared translations needs full access.": "{1}Для обновления общих переводов нужен полный доступ.",
   "{1}What was copied is only a link — copy the TEXT under the post (tap “See more” first), or paste it here.{2}Paste the recipe text into the box (long-press → Paste).": "{1}Скопированное — это только ссылка. Скопируйте ТЕКСТ под публикацией (сначала нажмите «Ещё»), или вставьте его сюда.{2}Вставьте текст рецепта в поле (нажмите и удерживайте → Вставить).",
   "{1}Who shares this recipe collection{2}Manage who can access your recipe collection": "{1}Кто имеет доступ к этой коллекции рецептов{2}Управляйте доступом к своей коллекции рецептов",
+  "{1}admin{2}👑 ADMIN{3}β BETA": "{1}admin{2}👑 АДМИН{3}β БЕТА",
   "{1}cloud{2}✅ {3} saved and shared with everyone{4}✅ {5} saved on this device — it could not be shared": "{1}облако{2}✅ {3} сохранено и доступно всем{4}✅ {5} сохранено на этом устройстве — поделиться не удалось",
   "{1}collapsed{2}🗑 Removed — one recipe was left, so “{3}” is an ordinary recipe now{4}emptied{5}🗑 Removed — “{6}” is empty now{7}🗑 Removed “{8}” — {9} left in the collection": "{1}collapsed{2}🗑 Удалено — остался один рецепт, поэтому «{3}» теперь обычный рецепт{4}emptied{5}🗑 Удалено — «{6}» теперь пусто{7}🗑 Удалено «{8}» — осталось {9} в коллекции",
   "{1}default{2}⇅ Sort{3}": "{1}default{2}⇅ Сортировка{3}",

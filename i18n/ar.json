@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1791906047885,
- "count": 2188,
+ "updatedAt": 1791915327260,
+ "count": 2189,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1535,6 +1535,7 @@
   "{1}Updating the shared translations needs full access.": "{1}تحديث الترجمات المشتركة يحتاج إلى صلاحية كاملة.",
   "{1}What was copied is only a link — copy the TEXT under the post (tap “See more” first), or paste it here.{2}Paste the recipe text into the box (long-press → Paste).": "{1}ما تم نسخه هو رابط فقط — انسخ النص الموجود أسفل المنشور (اضغط على \"عرض المزيد\" أولًا)، أو الصقه هنا.{2}الصق نص الوصفة في المربع (اضغط مطولًا ← لصق).",
   "{1}Who shares this recipe collection{2}Manage who can access your recipe collection": "{1}من يشارك مجموعة الوصفات هذه{2}إدارة من يمكنه الوصول إلى مجموعة وصفاتك",
+  "{1}admin{2}👑 ADMIN{3}β BETA": "{1}admin{2}👑 المسؤول{3}β تجريبي",
   "{1}cloud{2}✅ {3} saved and shared with everyone{4}✅ {5} saved on this device — it could not be shared": "{1}cloud{2}✅ {3} تم حفظها ومشاركتها مع الجميع{4}✅ {5} تم حفظها على هذا الجهاز — تعذّرت مشاركتها",
   "{1}collapsed{2}🗑 Removed — one recipe was left, so “{3}” is an ordinary recipe now{4}emptied{5}🗑 Removed — “{6}” is empty now{7}🗑 Removed “{8}” — {9} left in the collection": "{1}collapsed{2}🗑 تم الحذف — تبقّت وصفة واحدة، فأصبحت \"{3}\" وصفة عادية الآن{4}emptied{5}🗑 تم الحذف — أصبحت \"{6}\" فارغة الآن{7}🗑 تم حذف \"{8}\" — تبقّى {9} في المجموعة",
   "{1}default{2}⇅ Sort{3}": "{1}default{2}⇅ فرز{3}",

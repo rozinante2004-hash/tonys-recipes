@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791906047885,
- "count": 2729,
+ "updatedAt": 1791915327260,
+ "count": 2730,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2015,6 +2015,7 @@
   "{1}Updating the shared translations needs full access.": "{1}עדכון התרגומים המשותפים דורש גישה מלאה.",
   "{1}What was copied is only a link — copy the TEXT under the post (tap “See more” first), or paste it here.{2}Paste the recipe text into the box (long-press → Paste).": "{1}מה שהועתק הוא רק קישור — העתיקו את הטקסט מתחת לפוסט (לחצו קודם על \"הצג עוד\"), או הדביקו אותו כאן.{2}הדביקו את טקסט המתכון בתיבה (לחיצה ארוכה ← הדבקה).",
   "{1}Who shares this recipe collection{2}Manage who can access your recipe collection": "{1}מי משתף את אוסף המתכונים הזה{2}נהלו מי יכול לגשת לאוסף המתכונים שלכם",
+  "{1}admin{2}👑 ADMIN{3}β BETA": "{1}מנהל{2}👑 אדמין{3}β בטא",
   "{1}cloud{2}✅ {3} saved and shared with everyone{4}✅ {5} saved on this device — it could not be shared": "{1}ענן{2}✅ {3} נשמר ושותף עם כולם{4}✅ {5} נשמר במכשיר הזה — לא ניתן היה לשתף אותו",
   "{1}collapsed{2}🗑 Removed — one recipe was left, so “{3}” is an ordinary recipe now{4}emptied{5}🗑 Removed — “{6}” is empty now{7}🗑 Removed “{8}” — {9} left in the collection": "{1}collapsed{2}🗑 הוסר — נשארה מתכון אחד, אז “{3}” הפכה למתכון רגיל{4}emptied{5}🗑 הוסר — “{6}” ריקה עכשיו{7}🗑 “{8}” הוסרה — נשארו {9} באוסף",
   "{1}default{2}⇅ Sort{3}": "{1}ברירת מחדל{2}⇅ מיון{3}",
