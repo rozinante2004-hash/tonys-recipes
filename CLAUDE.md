@@ -59,12 +59,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 
 **Where things are now**
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
-  **v38.25**, released 12 Oct.
-- `test` is at **v38.28** = v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md).
-  **Tony said yes to releasing them once CI is green** (13 Oct). He added the secrets `OWNER_EMAIL` and
-  `OWNER_SECONDARY_EMAIL` (the second is not used — ask what it is for). After the release check that "Deploy the
-  Worker" ends "database, storage and the owner's address connected", that "Translate new phrases" took the
-  addresses out, and the Firefox listing job ran. v38.26 brings:
+  **v38.28** (released 13 Oct, with Worker v74).
+- Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
+  the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
+  used — Tony to say what it is for). v38.26 brought:
   - the in-app Help's knowledge brought up to date: link requests, saving from other apps, About and
     contact, the farm visitors, Read-only invitations, Open in Bring!, the Self Test's place;
   - `RECONSTRUCTION_PROMPT.md` §1b;
@@ -73,7 +71,7 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
     After the release, check the "Translate new phrases" run: its annotations should say
     "entries holding an e-mail address taken out — …". Then the "Publish languages" commit should
     show `i18n/*.json` and `i18n/archive/` without them.
-- Worker **v73** is live.
+- Worker **v74** is live.
 - The rules with the owner protections are published to all three projects.
 - The community project:
   - TOTP is enabled, but Tony has NOT yet set up his authenticator (move-day step 5);
@@ -114,8 +112,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - Skipped by Tony: a hardware security key.
 
 **What is left, in order**
-1. **Release v38.26 – v38.28** to `main` and `beta` as soon as CI is green (Tony's yes is given), then check the
-   jobs and record it. Then the open points of AUDIT-2026-10-privacy.md, for Tony to decide.
+1. **The open points of AUDIT-2026-10-privacy.md**, for Tony to decide (git history, self-hosted fonts and
+   libraries, a fixed retention, clearing the old family data after the move, OWNER_SECONDARY_EMAIL).
 2. **Move day**, when Tony says ("I'll let you know"). Follow "MOVE DAY CHECKLIST" below, step by
    step. My steps, from this environment:
    - Survey:
@@ -996,6 +994,14 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **Released to the family app and the beta: v38.26 + v38.27 + v38.28, Worker v74 (13 Oct 2026, Tony's yes "once
+    done and fixed … once possible", CI green on 561c31c).** All success: Pages (and 8c7b7fa, the languages it
+    published), Cloudflare Pages beta, Deploy the Worker (secret OWNER_EMAIL set first; live v74 with `"owner":true`),
+    Publish the database rules (from the secret), Translate new phrases ("entries holding an e-mail address taken
+    out — ar 7, de 7, es 7, fr 7, he 12, it 7, ja 9, ru 9, zh 7"), Publish languages ("taken out of 108 kept
+    versions" — no address left in i18n/ on main), the extension job (Chrome: same version, nothing to upload;
+    Firefox: listing still "nominated"), Self Tests on main. Tony added OWNER_EMAIL and OWNER_SECONDARY_EMAIL (the
+    second unused — asked what it is for).
   - **v38.28 — the privacy audit (13 Oct 2026; report: AUDIT-2026-10-privacy.md).** Tony: "In view of your
     findings, I think we should run a full privacy audit on the applications, workers and everything else. Please
     do it now … once done and fixed, please move these changes to the family and Beta apps once possible" (his yes
