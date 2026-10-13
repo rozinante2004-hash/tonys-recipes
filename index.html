@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.26 -->
+<!-- Tony's Recipes Collection v38.27 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -116,9 +116,15 @@
     workerAppKey:        'tonys-recipes-web-v1',
     workerName:          'lively-bread-273a',
     cloudflareAccountId: '4dbc420100c13bf94fda83047ce0a7ac',
-    ownerEmail:          'rozinante2004@gmail.com',
-    // v37.00 — where ✉️ Send feedback writes to; empty = the owner's address.
-    supportEmail:        'contact@mykitchennotes.community',   // v38.17 — the app's own address (Cloudflare Email Routing → Tony's Gmail); was his Gmail
+    // v38.27 — the owner, by a salted fingerprint of the address (ownerKeyOf), never the
+    // address itself: the repository is public and its text is harvested for e-mail
+    // addresses. The rules, the Worker and the jobs take the address from the GitHub
+    // secret OWNER_EMAIL instead.
+    ownerKey:            'sha256:2e0ef39cecbb6add9582629771d8af25479278319d52f0e3841062e5207eb814',
+    // v37.00 — where ✉️ Send feedback writes to (v38.17: the app's own address, Cloudflare
+    // Email Routing). v38.27 — kept as its two halves, joined only on the screen
+    // (appSupportEmail), so no address is written out in the page or the repository.
+    supportMailbox:      Object.freeze(['contact', 'mykitchennotes.community']),
     // v37.28 — the iCloud link of the "Save to My Kitchen Notes" shortcut for
     // THIS copy (Tony builds it once and shares it); empty = no offer shown.
     iosShortcutUrl:      'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6',   // v37.40 — Tony's family shortcut (2 Oct 2026)
@@ -285,12 +291,17 @@
       projectId: c.firebase.projectId, authDomain: c.firebase.authDomain,
       siteUrl: c.siteOrigin + c.sitePath, siteHost: (c.siteOrigin + c.sitePath).replace(/^https?:\/\//, '').replace(/\/$/, ''),
       workerName: c.workerName, cloudflareAccountId: c.cloudflareAccountId,
-      githubRepo: c.githubRepo, workerUrl: c.workerUrl, ownerEmail: c.ownerEmail,
+      githubRepo: c.githubRepo, workerUrl: c.workerUrl,
       liveSiteUrl: c.liveSiteUrl,
       testSiteUrl: c.testCopy && c.testCopy.siteUrl, testPagesProject: c.testCopy && c.testCopy.pagesProject,
       testProjectId: c.testCopy && c.testCopy.firebaseProjectId
     }[key];
     return v === undefined ? '' : String(v);
+  };
+  // v38.27 — the app's contact address, joined from its two halves only when shown.
+  window.appSupportEmail = function () {
+    var m = window.APP_CONFIG && window.APP_CONFIG.supportMailbox;
+    return (m && m.length === 2 && m[0] && m[1]) ? m[0] + '@' + m[1] : '';
   };
   window.applyAppConfig = function (root) {
     var fill = function (t) { return String(t).replace(/\{([A-Za-z]+)\}/g, function (m, k) { return window.appConfigValue(k) || m; }); };
@@ -6198,7 +6209,7 @@ async function firstRunLanguageOffer() {
   return yes === true ? code : 'en';
 }
 function feedbackMailto() {
-  var to = APP_CONFIG.supportEmail || APP_CONFIG.ownerEmail;
+  var to = appSupportEmail();
   var subject = 'Feedback — ' + (APP_CONFIG.brandName || 'My Kitchen Notes') + ' ' + APP_VERSION;
   var body = '\n\n—\n' + (typeof appCopyLabel === 'function' ? appCopyLabel() + '\n' : '') + APP_VERSION + ' · ' + navigator.userAgent;
   return 'mailto:' + to + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
@@ -6212,7 +6223,7 @@ function sendFeedback() {
   return sendFeedbackByEmail();
 }
 function sendFeedbackByEmail() {
-  var to = APP_CONFIG.supportEmail || APP_CONFIG.ownerEmail;
+  var to = appSupportEmail();
   var body = '\n\n\u2014\n' + (typeof appCopyLabel === 'function' ? appCopyLabel() + '\n' : '') + APP_VERSION + ' \u00b7 ' + navigator.userAgent;
   return shareMessage({ to: to, omit: ['wa'], copyLabel: '\u{1F4CB} Copy the address', copyText: to,
     title: 'Send feedback', intro: 'Your note goes to ' + to + '. Choose how to write it \u2014 it opens ready, and you press Send:',
@@ -7070,7 +7081,8 @@ function updateAccessRules() {
       .replace(/\{\{WRITE\}\}/g, allWrite)
       .replace(/\{\{ADMIN\}\}/g, allAdmin)
       // v36.86 — the household rules' app-wide admins (translations): the owner.
-      .replace(/\{\{APP_ADMINS\}\}/g, '"' + APP_OWNER_EMAIL + '"');
+      // v38.27 — the app no longer holds that address; the owner's own sign-in does.
+      .replace(/\{\{APP_ADMINS\}\}/g, '"' + (isAppOwner() ? String(window._fbUser.email).toLowerCase() : "(the app owner's address)") + '"');
   });
 }
 
@@ -7148,7 +7160,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.26';
+var APP_VERSION = 'v38.27';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9985,7 +9997,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.26</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.27</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10700,7 +10712,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.26</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.27</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14555,7 +14567,65 @@ window.renderLangMenu = renderLangMenu;
 // operator tools — Payments, Deployments — are the owner's alone; the
 // translation editor is the owner's and admins'. WP-A moves the address itself
 // into configuration.
-var APP_OWNER_EMAIL = APP_CONFIG.ownerEmail;      // see #appConfig
+// v38.27 — by a salted fingerprint of the address, never the address (see #appConfig).
+var APP_OWNER_KEY = APP_CONFIG.ownerKey || '';
+var OWNER_KEY_SALT = 'mkn-owner|';
+function ownerKeyOf(email) {
+  return 'sha256:' + mknSha256Hex(OWNER_KEY_SALT + String(email == null ? '' : email).trim().toLowerCase());
+}
+var _ownerKeyMemo = Object.create(null);     // address → its key (not → yes/no: a test may swap APP_OWNER_KEY)
+function isOwnerAddress(email) {
+  var e = String(email == null ? '' : email).trim().toLowerCase();
+  if (!e || !APP_OWNER_KEY) return false;
+  if (!(e in _ownerKeyMemo)) _ownerKeyMemo[e] = ownerKeyOf(e);
+  return _ownerKeyMemo[e] === APP_OWNER_KEY;
+}
+// SHA-256 of a text (UTF-8), as lower-case hex — synchronously, because isAppOwner is
+// asked from synchronous code all over the app and crypto.subtle only answers later.
+// Checked against Node's own SHA-256 (self-test owner_by_fingerprint).
+var _mknShaK = null, _mknShaH0 = null;
+function mknSha256Hex(text) {
+  var s = unescape(encodeURIComponent(String(text == null ? '' : text)));   // UTF-8, one byte per character
+  var i, j;
+  if (!_mknShaK) {
+    // The fractional parts of the cube roots of the first 64 primes, and of the
+    // square roots of the first 8 — SHA-256's constants, computed rather than typed.
+    _mknShaK = []; _mknShaH0 = [];
+    for (var n = 2; _mknShaK.length < 64; n++) {
+      var prime = true;
+      for (var d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+      if (!prime) continue;
+      if (_mknShaH0.length < 8) _mknShaH0.push((Math.pow(n, 1 / 2) * 4294967296) | 0);
+      _mknShaK.push((Math.pow(n, 1 / 3) * 4294967296) | 0);
+    }
+  }
+  var bitLen = s.length * 8, words = [];
+  s += '\x80';
+  while (s.length % 64 !== 56) s += '\x00';
+  for (i = 0; i < s.length; i++) words[i >> 2] |= s.charCodeAt(i) << ((3 - i % 4) * 8);
+  words.push((bitLen / 4294967296) | 0, bitLen | 0);
+  function rotr(x, k) { return (x >>> k) | (x << (32 - k)); }
+  var H = _mknShaH0.slice();
+  for (j = 0; j < words.length; j += 16) {
+    var w = words.slice(j, j + 16);
+    var a = H[0], b = H[1], c = H[2], dd = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (i = 0; i < 64; i++) {
+      if (i >= 16) {
+        var x = w[i - 15], y = w[i - 2];
+        w[i] = (w[i - 16] + (rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3)) + w[i - 7] + (rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10))) | 0;
+      }
+      var t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + _mknShaK[i] + w[i]) | 0;
+      var t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (dd + t1) | 0; dd = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + dd) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  var out = '';
+  for (i = 0; i < 8; i++) out += ('00000000' + (H[i] >>> 0).toString(16)).slice(-8);
+  return out;
+}
+window.ownerKeyOf = ownerKeyOf; window.isOwnerAddress = isOwnerAddress; window.mknSha256Hex = mknSha256Hex;
 // ─── COPY THE WORKER (v36.68) ────────────────────────────────────────────────
 // The Worker is pasted into Cloudflare by hand, and Tony's first paste of v41
 // stopped after 9,159 of 52,896 characters: "Uncaught SyntaxError: Unexpected
@@ -14760,7 +14830,7 @@ function isAppOwner() {
   // v37.03 — and CONFIRMED: an account made with the owner's address and a
   // password proves nothing until the mailbox has confirmed it.
   try { return !!(window._fbUser && window._fbUser.email && window._fbUser.emailVerified !== false
-                  && String(window._fbUser.email).toLowerCase() === APP_OWNER_EMAIL); }
+                  && isOwnerAddress(window._fbUser.email)); }
   catch(e) { return false; }
 }
 function unitPref() {
@@ -26190,7 +26260,7 @@ function contactPhrases() {
     '\u{1F4E8} Answers to my notes', '✉️ E-mail us', '\u{1F4CB} Copy our e-mail address', 'The address is copied.'];
 }
 function openContactUs() {
-  var to = String(APP_CONFIG.supportEmail || APP_CONFIG.ownerEmail || '');
+  var to = appSupportEmail();
   var ov = aboutSubOverlay('contactOverlay');
   var row = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:start;padding:11px 12px;margin-top:8px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--heading);font:inherit;font-size:14px;font-weight:600;cursor:pointer;';
   var sub = 'font-size:12px;font-weight:400;color:var(--muted);';
@@ -26241,7 +26311,7 @@ async function openAbout() {
     + '<button type="button" id="aboutPrivacyDoc" style="' + row + '" onclick="openLegalDoc(\'privacy\')">\u{1F4DC} Privacy statement</button>'
     + '<button type="button" id="aboutTermsDoc" style="' + row + '" onclick="openLegalDoc(\'terms\')">⚖️ Terms of use and disclaimer</button>'
     // v38.17 — Tony: "change the About to © 2026 My Kitchen Notes" (his name stays only where the law wants it: the privacy statement).
-    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;" data-no-i18n>© 2026 My Kitchen Notes · <a href="mailto:' + escA(String(APP_CONFIG.supportEmail || '')) + '" style="color:var(--terracotta);">' + escH(String(APP_CONFIG.supportEmail || '')) + '</a></div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:12px;" data-no-i18n>© 2026 My Kitchen Notes · <a href="mailto:' + escA(appSupportEmail()) + '" style="color:var(--terracotta);">' + escH(appSupportEmail()) + '</a></div>'
     + '</div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);

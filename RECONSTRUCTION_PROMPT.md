@@ -37,8 +37,9 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 `/__/auth/` (the family app's Google sign-in pages) and a `404.html` that forwards to the app (§1a)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
-**Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v38.26` — app. **Worker: v73**, deployed separately and versioned separately
+**Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
+(`APP_CONFIG.ownerKey`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
+**Current version:** `v38.27` — app. **Worker: v74**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -161,7 +162,7 @@ Job summaries are posted as `::notice::` annotations (counts only — the reposi
 `CLOUDFLARE_API_TOKEN`, `FIREBASE_RULES_KEY` (JSON key of `rules-publisher@recipes-f379d`; roles:
 Firebase Rules Admin in each project; Cloud Datastore User on the family and community projects;
 Firebase Authentication Viewer/Admin for the move; Cloud Datastore Viewer on the community project
-for backups), `BACKUP_PASSPHRASE`, `ALERT_EMAIL`, `CWS_KEY` (Chrome store), `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox). The Anthropic
+for backups), `BACKUP_PASSPHRASE`, `ALERT_EMAIL`, `OWNER_EMAIL` (the owner's Google address — v38.27), `CWS_KEY` (Chrome store), `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox). The Anthropic
 federation IDs (rule, organization, service account) are not secrets and sit in the translate
 job's `env`. The Worker's own API keys (Anthropic, Gemini, YouTube, Pexels…) stay in Cloudflare.
 
@@ -282,10 +283,21 @@ hidden / refuses / silent / privacy text.
      (forget, mark-deleted, set-cap, survey-open/close, note-delete, error-delete, copy-from) when the
      sign-in is older than 900 s, and the app re-signs-in (`ownerFresh`) and retries once;
   4. alerts: the Worker e-mails the owner's second address (secret `ALERT_TO`, from GitHub
-     `ALERT_EMAIL`; sender `alerts@mykitchennotes.community`, `send_email` binding `ALERTS`) on the
+     `ALERT_EMAIL`; sender `alerts [at] the community domain`, `send_email` binding `ALERTS`) on the
      first use of the owner's tools on a new device (`mkn_owner_device`, table `owner_devices`) and on
      every destructive operation. The Worker reads `config/security` with the owner's own token and
      fails CLOSED (502).
+  5. **No e-mail address is written out anywhere public (v38.27, Worker v74).** The repository is public
+     and harvested for addresses. The app holds `ownerKey` = `'sha256:' + SHA-256('mkn-owner|' +
+     lower-cased address)`; `isOwnerAddress()` compares a sign-in's address to it (`mknSha256Hex` — a
+     synchronous SHA-256 in the page, checked against the browser's and Node's). The Worker reads the
+     owner from its secret `OWNER_EMAIL` (or the variable `OWNER_EMAILS`) — none set means NOBODY is the
+     owner; `deploy-worker.yml` sets it from the GitHub secret before publishing and refuses to publish
+     without it. `tools/publish-rules.mjs` fills `{{APP_ADMINS}}` from the same secret (and never prints
+     it). The contact address is `APP_CONFIG.supportMailbox` (two halves, `appSupportEmail()` joins them
+     on screen); the legal pages carry `<a class="mkn-mail" data-u data-d>contact [at] …</a>`, which
+     `legal-i18n.js` turns into a real mailto: link. Self-tests fake the owner with a stand-in address
+     and its fingerprint (`stAsOwner()`), never the real one; `owner_by_fingerprint` scans the page.
   App side: `mfaResolve` asks for the authenticator's 6 digits whenever Firebase says
   `auth/multi-factor-auth-required` (every Google sign-in and re-sign-in path); `openOwnerTwoStep` sets
   it up (`TotpMultiFactorGenerator.generateSecret`, an `otpauth://` link for the iPhone's Passwords
@@ -362,7 +374,7 @@ under its plain path only (a `?url=` request goes network-first).
 - **Recipes:** scaling multiplies the method's amounts too; on a computer the recipe window can be
   enlarged (a corner grip); a source with words and a link opens the link.
 - **About** (ℹ️, at the bottom of the ? window): version and update check, ✨ What can this app do
-  (`appFeatureSections`), ✉️ Contact us (`APP_CONFIG.supportEmail` = contact@mykitchennotes.community),
+  (`appFeatureSections`), ✉️ Contact us (`APP_CONFIG.supportMailbox` — contact [at] mykitchennotes.community, joined only on screen),
   🔒 What leaves this device, the **Privacy Statement** and **Terms of Use** — `privacy.html` /
   `terms.html` plus 10 translations each (`privacy.<lang>.html`, `legal-i18n.js`,
   `tools/legal-keys.py`). The Terms are between the user and the "My Kitchen Notes Team"; the privacy

@@ -33,6 +33,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -87,7 +88,11 @@ if (wantSdk !== sdkVersion) {
   console.error(`the app loads Firebase ${wantSdk}, but ${sdkVersion} is installed here — install firebase@${wantSdk}`);
   process.exit(2);
 }
-const OWNER  = (html.match(/ownerEmail:\s*'([^']+)'/) || [])[1];
+// v38.27 — the app knows its owner only by a salted fingerprint of the address (ownerKeyOf
+// in index.html), so the run uses a stand-in owner and serves the page with its fingerprint.
+const OWNER  = 'owner@e2e.example';
+const OWNER_KEY = 'sha256:' + createHash('sha256').update('mkn-owner|' + OWNER).digest('hex');
+if (!/ownerKey:\s*'sha256:[0-9a-f]{64}'/.test(html)) throw new Error('could not find the page\'s owner fingerprint');
 const WRITER = 'writer@example.com';
 const READER = 'reader@example.com';
 
@@ -188,6 +193,7 @@ const server = http.createServer((req, res) => {
     // either way (the move test still starts in the first layout).
     if (!/dataLayout:\s*'(shared|households)'/.test(body)) throw new Error('could not find the page\'s data layout');
     body = body.replace(/dataLayout:(\s*)'(shared|households)'/, "dataLayout:$1'" + (SERVE_HH ? 'households' : 'shared') + "'");
+    body = body.replace(/ownerKey:(\s*)'sha256:[0-9a-f]{64}'/, "ownerKey:$1'" + OWNER_KEY + "'");
     if (SERVE_HH) {
       // v37.03 — and any address may sign in: a password, or a link by e-mail.
       const b2 = body;

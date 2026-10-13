@@ -46,6 +46,18 @@ jobs:
         if: steps.token.outputs.ok == 'true'
         run: node tests/worker-cors.mjs
 
+      # v74 — the owner's address is no longer in the code (the repository is public): it is
+      # the Worker's secret OWNER_EMAIL, set here from the GitHub secret of the same name,
+      # BEFORE publishing — so a Worker without it is never published (v73 stays live).
+      - name: The owner's address
+        if: steps.token.outputs.ok == 'true'
+        env:
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+        run: |
+          if [ -z "$OWNER_EMAIL" ]; then echo "::error::OWNER_EMAIL is not set (Settings → Secrets and variables → Actions) — the Worker was NOT published: without it nobody could use the owner's tools."; exit 1; fi
+          printf '%s' "$OWNER_EMAIL" | npx --yes wrangler@4 secret put OWNER_EMAIL --config worker/wrangler.jsonc >/dev/null
+          echo "the owner's address is set"
+
       - name: Publish
         if: steps.token.outputs.ok == 'true'
         run: npx --yes wrangler@4 deploy --config worker/wrangler.jsonc
@@ -75,7 +87,8 @@ jobs:
             if [ "$got" = "$want" ]; then
               echo "$h" | grep -q '"db":true' || { echo "::error::the Worker lost its database (METER_DB)"; exit 1; }
               echo "$h" | grep -q '"rateLimiting":true' || { echo "::error::the Worker lost its storage (BRING_KV)"; exit 1; }
-              echo "database and storage connected"; exit 0
+              echo "$h" | grep -q '"owner":true' || { echo "::error::the Worker has no owner's address (OWNER_EMAIL)"; exit 1; }
+              echo "database, storage and the owner's address connected"; exit 0
             fi
             sleep 10
           done

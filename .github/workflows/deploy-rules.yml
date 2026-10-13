@@ -63,6 +63,8 @@ jobs:
 
       - name: Publish to the three projects
         if: steps.key.outputs.ok == 'true'
+        env:
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — the owner's address, no longer in index.html
         run: |
           npm install --no-audit --no-fund --no-save google-auth-library@9 >/dev/null
           node tools/publish-rules.mjs

@@ -101,8 +101,11 @@ async function listing() {
     console.log(r.status < 300 ? 'homepage set: ' + home + (homeNow ? ' (was ' + homeNow + ')' : '') : '::warning::homepage not set (' + r.status + '): ' + say(r));
   }
   // v38.18 — the listing's support e-mail and support site: the app's own (contact@ and the beta's
-  // address), not a person's. The address is the app's supportEmail in index.html.
-  const contact = (/supportEmail:\s*'([^']+)'/.exec(readFileSync(new URL('index.html', root), 'utf8')) || [])[1] || '';
+  // address), not a person's. The address is the app's supportMailbox in index.html (v38.27: kept as
+  // its two halves, so it is not written out in the repository — joined here).
+  const mb = /supportMailbox:\s*Object\.freeze\(\[\s*'([^']+)',\s*'([^']+)'\s*\]\)/.exec(readFileSync(new URL('index.html', root), 'utf8'));
+  const contact = mb ? mb[1] + '@' + mb[2] : '';
+  if (!contact) console.log('::warning::could not read the app\'s contact address (supportMailbox in index.html) — the support e-mail was left as it is');
   const sp = a.d.support_url, supNow = !sp ? '' : typeof sp === 'string' ? sp : tr(sp.url || sp) || '';
   const mailNow = tr(a.d.support_email) || '';
   if (contact && (mailNow !== contact || supNow !== home)) {

@@ -895,9 +895,11 @@ console.log('\nAI per household (v60):');
     return head + '.' + body + '.' + Buffer.from(sig).toString('base64url');
   }
   const TEST_ORIGIN = 'https://tonys-recipes-test.pages.dev';
+  const TEST_OWNER = 'owner@worker-test.example';
   const db = fakeD1();
+  // v74 — the owner's address comes from the Worker's settings (the secret OWNER_EMAIL), never from the code.
   const envM = { ANTHROPIC_API_KEY: 'sk-test', METER_DB: db, __testKeys: { k1: Object.assign({ kid: 'k1' }, pub) },
-                 ALLOWED_ORIGINS: TEST_ORIGIN, __firestoreBase: 'https://fs.test' };
+                 ALLOWED_ORIGINS: TEST_ORIGIN, __firestoreBase: 'https://fs.test', OWNER_EMAIL: TEST_OWNER };
   // Firestore: uA is in hA (created long ago); uB is in nothing.
   const members = { 'hA/uA': true, 'hF/uF': true };
   const security = {};   // v73 — config/security per project: true / false / 'fail'
@@ -1009,9 +1011,18 @@ console.log('\nAI per household (v60):');
     expect('meter-me: the household\'s month so far', Math.abs(m.usd - 2.0) < 1e-9 && m.cap === 2 && m.calls === 5, JSON.stringify(m));
     let adm = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tA }, TEST_ORIGIN), envM);
     expect('meter-admin is refused to anyone but the owner', adm.status === 403, 'status ' + adm.status);
-    const tOwner = await token({ sub: 'uT', email: 'rozinante2004@gmail.com' });
+    const tOwner = await token({ sub: 'uT', email: TEST_OWNER });
     adm = await (await worker.fetch(post({ action: 'meter-admin', op: 'set-cap', hid: 'hA', cap: 5, idToken: tOwner }, TEST_ORIGIN), envM)).json();
     expect('the owner raises a household\'s cap', adm.ok === true && adm.cap === 5, JSON.stringify(adm));
+    // v74 — no owner's address in the Worker's settings: nobody is the owner (not everybody).
+    const envNoOwner = Object.assign({}, envM); delete envNoOwner.OWNER_EMAIL;
+    let noOwn = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tOwner }, TEST_ORIGIN), envNoOwner);
+    expect('v74: with no owner set, the owner\'s tools are refused to everyone', noOwn.status === 403, 'status ' + noOwn.status);
+    noOwn = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tOwner }, TEST_ORIGIN), Object.assign({}, envNoOwner, { OWNER_EMAILS: 'someone@else.example, ' + TEST_OWNER.toUpperCase() }));
+    expect('v74: OWNER_EMAILS (a list, any case) still names the owner', noOwn.status === 200, 'status ' + noOwn.status);
+    const hOwn = await (await worker.fetch(post({ action: 'health' }, TEST_ORIGIN), envM)).json(), hNone = await (await worker.fetch(post({ action: 'health' }, TEST_ORIGIN), envNoOwner)).json();
+    expect('v74: health says whether the owner is set', hOwn.owner === true && hNone.owner === false, JSON.stringify([hOwn.owner, hNone.owner]));
+    expect('v74: no e-mail address is written in the Worker', !/[A-Za-z0-9._%+-]+@(?!example\b|system\.gserviceaccount\.com\b)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/.test((await import('node:fs')).readFileSync(new URL('../cloudflare-worker.js', import.meta.url), 'utf8')), 'an address is in the code');
     r = await ai({ idToken: tA, hid: 'hA' });
     expect('…and the household answers again', r.status === 200 && r.d._meter.cap === 5, JSON.stringify(r));
     // v67 — the family's copy: $10 a month per household, paused or changed by the owner.
@@ -1032,7 +1043,7 @@ console.log('\nAI per household (v60):');
     const list = await (await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: tOwner }, TEST_ORIGIN), envM)).json();
     const hA = (list.households || []).filter(h => h.hid === 'hA')[0];
     expect('the owner lists every household with this month and the two before', hA && hA.capNow === 5 && hA.months.length === 3 && Math.abs(hA.months[0].usd - 2.4) < 1e-9 && list.capped === true, JSON.stringify(list).slice(0, 300));
-    const unverified = await token({ sub: 'uT', email: 'rozinante2004@gmail.com', email_verified: false });
+    const unverified = await token({ sub: 'uT', email: TEST_OWNER, email_verified: false });
     adm = await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: unverified }, TEST_ORIGIN), envM);
     expect('…but not with an unconfirmed address', adm.status === 403, 'status ' + adm.status);
     // v61 — notes from every copy, one inbox.
@@ -1068,7 +1079,7 @@ console.log('\nAI per household (v60):');
     const rrow1 = db.raw.prepare('SELECT * FROM feedback_replies WHERE note_id = ?').get(slowId);
     expect('v68: the owner answers from the family app — kept for the writer\'s copy and account, with what they wrote',
       f.status === 200 && f.d.ok && f.d.reply.id > 0 && rrow1 && rrow1.project === 'tonys-recipes-test' && rrow1.uid === 'uA'
-      && rrow1.note_text === 'The import was slow' && rrow1.from_email === 'rozinante2004@gmail.com' && rrow1.read_at === null, JSON.stringify([f, rrow1]));
+      && rrow1.note_text === 'The import was slow' && rrow1.from_email === TEST_OWNER && rrow1.read_at === null, JSON.stringify([f, rrow1]));
     expect('v68: …and the note, new until now, is marked seen', db.raw.prepare('SELECT status FROM feedback WHERE id = ?').get(slowId).status === 'seen');
     f = await fb({ action: 'meter-admin', op: 'notes', idToken: tOwner }, ORIGIN);
     expect('v68: the owner\'s list shows the answers with their notes', f.d.replies && f.d.replies.length === 1 && f.d.replies[0].note_id === slowId && f.d.replies[0].read_at === null, JSON.stringify(f.d.replies));
@@ -1143,7 +1154,7 @@ console.log('\nAI per household (v60):');
     expect('…but its spending stays (no member can reset an allowance that way)', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hG'").get());
     f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: fam }, ORIGIN);
     expect('nobody but the owner lists every copy', f.status === 403, JSON.stringify(f));
-    const famOwner = await token({ sub: 'uO', aud: 'recipes-f379d', email: 'rozinante2004@gmail.com' });
+    const famOwner = await token({ sub: 'uO', aud: 'recipes-f379d', email: TEST_OWNER });
     f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: famOwner }, ORIGIN);
     const rows = (f.d && f.d.households) || [];
     const rowOf = (p, h) => rows.filter(x => x.project === p && x.hid === h)[0];
@@ -1158,7 +1169,7 @@ console.log('\nAI per household (v60):');
     expect('…but not a copy this server does not serve', f.status === 400, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'mark-deleted', project: 'recipes-f379d', hid: 'hF', idToken: famOwner }, ORIGIN);
     const fs2 = JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hF'").get().summary);
-    expect('a household the owner deletes stays listed, marked as his doing', f.status === 200 && fs2.deletedHow === 'admin' && fs2.deletedBy === 'rozinante2004@gmail.com' && fs2.members.length === 1, JSON.stringify(fs2));
+    expect('a household the owner deletes stays listed, marked as his doing', f.status === 200 && fs2.deletedHow === 'admin' && fs2.deletedBy === TEST_OWNER && fs2.members.length === 1, JSON.stringify(fs2));
     expect('…and its spending stays', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE hid = 'hF'").get());
     f = await fb({ action: 'meter-admin', op: 'mark-deleted', project: 'recipes-f379d', hid: 'hNever', name: 'Old one', code: 'MKN-OOOO-7777', idToken: famOwner }, ORIGIN);
     const nv = JSON.parse(db.raw.prepare("SELECT summary FROM hh_reports WHERE hid = 'hNever'").get().summary);
@@ -1252,7 +1263,7 @@ console.log('\nAI per household (v60):');
     db.raw.prepare("INSERT INTO ai_households (project, hid, name, code, created_at, first_seen, last_seen, cap, note) VALUES ('recipes-f379d', 'hFam2', 'Fam2', 'MKN-GGGG-GGGG', 1, 1, 2, 4.5, NULL)").run();
     db.raw.prepare("INSERT INTO ai_spend (project, hid, month, usd, calls) VALUES ('recipes-f379d', 'hFam', '2026-09', 3.25, 40)").run();
     db.raw.prepare("INSERT INTO hh_reports (project, hid, summary, at) VALUES ('recipes-f379d', 'hFam', '{\"name\":\"Fam\"}', 5)").run();
-    const comOwner = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com' });
+    const comOwner = await token({ sub: 'uO2', email: TEST_OWNER });
     f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'recipes-f379d', idToken: tA });
     expect('v72: only the owner brings another copy\'s households over', f.status === 403, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'copy-from', from: 'tonys-recipes-test', idToken: comOwner });
@@ -1269,10 +1280,10 @@ console.log('\nAI per household (v60):');
     expect('v72: …and the family\'s own rows stay', !!db.raw.prepare("SELECT 1 FROM ai_spend WHERE project = 'recipes-f379d' AND hid = 'hFam'").get());
     // v73 — the owner's powers, protected.
     const nowS = Math.floor(Date.now() / 1000);
-    const ownerLink = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', firebase: { sign_in_provider: 'emailLink' } });
-    const ownerPw = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', firebase: { sign_in_provider: 'password' } });
-    const ownerOld = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', auth_time: nowS - 3600 });
-    const owner2f = await token({ sub: 'uO2', email: 'rozinante2004@gmail.com', firebase: { sign_in_provider: 'google.com', sign_in_second_factor: 'totp' } });
+    const ownerLink = await token({ sub: 'uO2', email: TEST_OWNER, firebase: { sign_in_provider: 'emailLink' } });
+    const ownerPw = await token({ sub: 'uO2', email: TEST_OWNER, firebase: { sign_in_provider: 'password' } });
+    const ownerOld = await token({ sub: 'uO2', email: TEST_OWNER, auth_time: nowS - 3600 });
+    const owner2f = await token({ sub: 'uO2', email: TEST_OWNER, firebase: { sign_in_provider: 'google.com', sign_in_second_factor: 'totp' } });
     f = await fb({ action: 'meter-admin', op: 'list', idToken: ownerLink });
     expect('v73: signed in by an e-mail link, the owner\'s address opens none of his tools', f.status === 403 && f.d.needGoogle === true, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'list', idToken: ownerPw });

@@ -31,6 +31,13 @@ async function _inFirstLayout(fn){
   try{ return await fn(); } finally{ _cloudLayout=was; }
 }
 
+// v38.27 — the app knows its owner only by a fingerprint of the address (APP_OWNER_KEY),
+// and its contact address only as two halves. A test that plays the owner swaps in the
+// fingerprint of a stand-in address, and puts the real one back after.
+var ST_OWNER = 'owner@self-test.example';
+var ST_CONTACT = ['contact', 'mykitchennotes.community'].join('@');
+function stAsOwner(){ var was=APP_OWNER_KEY; APP_OWNER_KEY=ownerKeyOf(ST_OWNER); return function(){ APP_OWNER_KEY=was; }; }
+
 window.SELF_TESTS = [
   // ── UI ELEMENTS ────────────────────────────────────────────────────────────
   { id:'ui_header',      group:'UI',      name:'Header renders',
@@ -1279,12 +1286,12 @@ window.SELF_TESTS = [
         dlg().remove();
         // Send feedback: to the app's address (v38.17: contact@, the domain's), through a choice that works without a mail app.
         setUA(CHROME);
-        window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(!/contact@mykitchennotes\.community/.test(intro)) throw new Error('feedback does not say where it goes'); return 'gmail'; };
+        window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(intro.indexOf(ST_CONTACT)===-1) throw new Error('feedback does not say where it goes'); return 'gmail'; };
         window.open=function(u){ opened=u; return null; };
         // (v37.67 — where the 💬 note is on, Send feedback opens the note form; the e-mail way is the family's)
         var fbWas=_featureOverride.feedbackButton; _featureOverride.feedbackButton=false;
         try{ await sendFeedback(); } finally { if(fbWas===undefined) delete _featureOverride.feedbackButton; else _featureOverride.feedbackButton=fbWas; }
-        if(!opened || opened.indexOf('to='+encodeURIComponent('contact@mykitchennotes.community'))===-1) throw new Error('feedback does not reach contact@mykitchennotes.community: '+opened);
+        if(!opened || opened.indexOf('to='+encodeURIComponent(ST_CONTACT))===-1) throw new Error('feedback does not reach the app\u2019s contact address: '+opened);
       } finally {
         delete window._deviceOfferForce; delete window._iosShortcutOverride; _pwaInstallEvent=realEv; window.askChoice=realAsk; window.open=realOpen;
         try{ if(kept===null) localStorage.removeItem(DEVICE_OFFER_KEY); else localStorage.setItem(DEVICE_OFFER_KEY, kept); }catch(e){}
@@ -3615,16 +3622,48 @@ window.SELF_TESTS = [
       if(bad.length) throw new Error(bad.length+' problem(s): '+bad.slice(0,8).join(' · '));
     } },
 
+  { id:'owner_by_fingerprint', group:'Security', name:'No e-mail address is written out in the app: the owner is known by a salted fingerprint, the contact address by its two halves (v38.27)',
+    test: async()=>{
+      // SHA-256, done by the app itself (synchronously), agrees with the browser's own.
+      if(mknSha256Hex('')!=='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' || mknSha256Hex('abc')!=='ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+        throw new Error('SHA-256 of the test vectors is wrong');
+      if(window.crypto && crypto.subtle) for(var t of ['שלום 🍲', 'x'.repeat(55), 'y'.repeat(64), 'mkn-owner|'+ST_OWNER]){
+        var buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+        var hex=Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
+        if(mknSha256Hex(t)!==hex) throw new Error('SHA-256 disagrees with the browser for '+JSON.stringify(t.slice(0,20)));
+      }
+      if(!/^sha256:[0-9a-f]{64}$/.test(APP_CONFIG.ownerKey||'') || APP_OWNER_KEY!==APP_CONFIG.ownerKey) throw new Error('the owner is not configured as a fingerprint');
+      if('ownerEmail' in APP_CONFIG || 'supportEmail' in APP_CONFIG) throw new Error('an address is still configured as text');
+      // The owner check goes by the fingerprint: any case, spaces around, only that address.
+      var real={ user:window._fbUser }, undo=stAsOwner();
+      try{
+        window._fbUser={ uid:'o', email:'  '+ST_OWNER.toUpperCase()+' ', emailVerified:true };
+        if(!isAppOwner()) throw new Error('the owner (in capitals, with spaces) is not recognised');
+        window._fbUser={ uid:'o', email:'other@self-test.example', emailVerified:true };
+        if(isAppOwner()) throw new Error('someone else counts as the owner');
+        window._fbUser={ uid:'o', email:ST_OWNER, emailVerified:true }; var was=APP_OWNER_KEY; APP_OWNER_KEY='';
+        try{ if(isAppOwner()) throw new Error('with no owner configured, someone counts as the owner'); } finally { APP_OWNER_KEY=was; }
+      } finally { window._fbUser=real.user; undo(); }
+      if(appSupportEmail()!==APP_CONFIG.supportMailbox[0]+'@'+APP_CONFIG.supportMailbox[1] || !/@/.test(appSupportEmail())) throw new Error('the contact address does not join: '+appSupportEmail());
+      // The page and the owner's page write out no address but the examples in input boxes.
+      var ok=function(a){ return /@example\.(com|org|net|invalid)$/i.test(a) || ['your@gmail.com','their@gmail.com','recipient@email.com'].indexOf(a.toLowerCase())!==-1; };
+      for(var f of [location.pathname.replace(/[^/]*$/,'')+'index.html', 'manage.js']){
+        var src=await (await fetch(f+'?t='+Date.now(), { cache:'no-store' })).text();
+        var found=(src.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g)||[]).filter(function(a){ return !ok(a); });
+        if(found.length) throw new Error(f+' writes out '+found.length+' e-mail address(es)');
+      }
+    } },
+
   { id:'cfg_identifiers_in_one_place', group:'Security', name:'Every deployment identifier lives in APP_CONFIG (v36.66, WP-A.2)',
     test: async()=>{
       if(!window.APP_CONFIG || !Object.isFrozen(APP_CONFIG) || !Object.isFrozen(APP_CONFIG.firebase))
         throw new Error('APP_CONFIG is missing or can be changed at run time');
       ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'].forEach(function(k){
         if(!APP_CONFIG.firebase[k]) throw new Error('APP_CONFIG.firebase.'+k+' is empty'); });
-      ['workerUrl','workerAppKey','workerName','cloudflareAccountId','ownerEmail','githubRepo','siteOrigin','sitePath'].forEach(function(k){
+      ['workerUrl','workerAppKey','workerName','cloudflareAccountId','ownerKey','githubRepo','siteOrigin','sitePath'].forEach(function(k){
         if(!APP_CONFIG[k]) throw new Error('APP_CONFIG.'+k+' is empty'); });
       // The code reads it — not a copy typed out somewhere else.
-      if(WORKER_ENDPOINT!==APP_CONFIG.workerUrl || APP_OWNER_EMAIL!==APP_CONFIG.ownerEmail)
+      if(WORKER_ENDPOINT!==APP_CONFIG.workerUrl || APP_OWNER_KEY!==APP_CONFIG.ownerKey)
         throw new Error('a constant does not come from APP_CONFIG');
       // Outside #appConfig and the CSP <meta> (which no script can reach), the
       // file names none of them. The Firebase settings were typed out twice,
@@ -3634,7 +3673,7 @@ window.SELF_TESTS = [
       if(a===-1) throw new Error('no #appConfig block in the page');
       var rest=(src.slice(0,a)+src.slice(z)).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/,'');
       var ids=[APP_CONFIG.firebase.apiKey, APP_CONFIG.firebase.projectId, APP_CONFIG.firebase.messagingSenderId,
-               APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerEmail, APP_CONFIG.githubRepo,
+               APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerKey, APP_CONFIG.githubRepo,
                APP_CONFIG.siteOrigin.replace(/^https:\/\//,'')+APP_CONFIG.sitePath.replace(/\/$/,'')];
       var hits=ids.filter(function(v){ return rest.indexOf(v)!==-1; });
       if(hits.length) throw new Error('hard-wired outside APP_CONFIG: '+hits.join(', '));
@@ -3817,7 +3856,7 @@ window.SELF_TESTS = [
         var txt=function(){ return menu ? menu.textContent : ''; };
         if(/Export languages/.test(txt())) throw new Error('the menu still offers Export languages');
         if(/Put back a language/.test(txt())) throw new Error('someone who is not the owner is offered Put back');
-        window._fbUser={ email:APP_OWNER_EMAIL }; renderLangMenu();
+        var undoOwner=stAsOwner(); window._fbUser={ email:ST_OWNER }; renderLangMenu();
         if(menu && !/Put back a language/.test(txt())) throw new Error('the owner is not offered Put back a language');
         // (2) The lists: language first, then the version by date.
         var files={
@@ -3852,6 +3891,7 @@ window.SELF_TESTS = [
         window._fbUser={ email:'someone@example.com' }; asked=[];
         if(await i18nPutBack()!==null || asked.length) throw new Error('someone who is not the owner got the lists');
       } finally {
+        if(typeof undoOwner==='function') undoOwner();
         window._fbUser=real.user; window.askChoice=real.choice; window.askConfirm=real.confirm; window.i18nReadBest=real.best;
         window.i18nApplyLanguages=real.apply; window._i18nArchiveFetch=real.fetch; window.toast=real.toast;
         try{ renderLangMenu(); }catch(e){}
@@ -3913,7 +3953,7 @@ window.SELF_TESTS = [
       if(hhSame({a:1,b:[1,2]},{a:1,b:[2,1]})||hhSame({r:'x'},{r:'y'})) throw new Error('a changed document counted as identical');
       if(hhKind('recipe_4')!=='recipes'||hhKind('photo_4')!=='photos'||hhKind('chatpart_a_1')!=='chats'||hhKind('i18n_he')!=='languages'||hhKind('meta')!=='other')
         throw new Error('the move\u2019s report counts documents under the wrong heading');
-      if(householdDefaultName({ email:'tony.schvekher@amat.com' })!=='Tony\u2019s Kitchen Notes') throw new Error('an address gave the name '+householdDefaultName({ email:'tony.schvekher@amat.com' }));
+      if(householdDefaultName({ email:'tony.smith@work.example' })!=='Tony\u2019s Kitchen Notes') throw new Error('an address gave the name '+householdDefaultName({ email:'tony.smith@work.example' }));
       if(typeof sameTypedName!=='function' || !sameTypedName("tony.schvekher's kitchen  notes ", 'Tony.schvekher\u2019s Kitchen Notes') || sameTypedName('', '') || sameTypedName('Tony', 'Tony\u2019s'))
         throw new Error('a typed name with a straight apostrophe does not match the curly one (or anything matches)');
       if(householdDefaultName({ email:'michal@x.com' })!=='Michal\u2019s Kitchen Notes' || householdDefaultName({})!=='My Kitchen Notes')
@@ -4065,7 +4105,7 @@ window.SELF_TESTS = [
       }
       // Feedback reaches a person, and says which version it is about.
       var m=feedbackMailto();
-      if(m.indexOf('mailto:'+(APP_CONFIG.supportEmail||APP_CONFIG.ownerEmail))!==0 || m.indexOf(encodeURIComponent(APP_VERSION))===-1)
+      if(m.indexOf('mailto:'+appSupportEmail())!==0 || !appSupportEmail() || m.indexOf(encodeURIComponent(APP_VERSION))===-1)
         throw new Error('the feedback link reads '+m.slice(0,120));
       ['startTour','sendFeedback'].forEach(function(f){ if(!document.querySelector('#settingsDrop [onclick*="'+f+'"]')) throw new Error(f+' is not in the ⚙️ menu'); });
     } },
@@ -4119,12 +4159,13 @@ window.SELF_TESTS = [
         E.value='not an address'; calls=[];
         await emailSendLink(); if(calls.length || !/does not look like/.test(err.textContent)) throw new Error('a bad address was sent a link');
         // An address someone merely typed is not the owner's.
-        window._fbUser={ uid:'x', email:APP_OWNER_EMAIL, emailVerified:false };
+        var undoOwner=stAsOwner(); window._fbUser={ uid:'x', email:ST_OWNER, emailVerified:false };
         if(isAppOwner()) throw new Error('an unconfirmed account with the owner’s address counts as the owner');
-        window._fbUser={ uid:'x', email:APP_OWNER_EMAIL, emailVerified:true };
+        window._fbUser={ uid:'x', email:ST_OWNER, emailVerified:true };
         if(!isAppOwner()) throw new Error('the confirmed owner is not the owner');
         if(authErrorText({ code:'auth/operation-not-allowed' }).indexOf('not switched on')===-1) throw new Error('a way not set up yet is not explained');
       } finally {
+        if(typeof undoOwner==='function') undoOwner();
         window._signInOverride=real.over; window._fbAuth=real.auth; window.firebase=real.fb; window._fbUser=real.user; window.toast=real.toast;
         try{ if(mailWas===null) localStorage.removeItem('tonys_signin_email'); else localStorage.setItem('tonys_signin_email', mailWas); }catch(e){}
         var er=document.getElementById('loginError'); if(er){ er.textContent=''; er.style.display='none'; }
@@ -6987,7 +7028,7 @@ window.SELF_TESTS = [
       if(APP_CONFIG.environment==='beta' && (APP_CONFIG.siteOrigin!==site || APP_CONFIG.firebase.authDomain!=='mykitchennotes.community' || APP_CONFIG.oldOrigins.indexOf('https://my-kitchen-notes-beta.pages.dev')===-1))
         throw new Error('the beta is not set up for its address');
       if(window._appMoving) throw new Error('this page is being sent away while it runs its tests');
-      if(APP_CONFIG.supportEmail!=='contact@mykitchennotes.community') throw new Error('the contact address is '+APP_CONFIG.supportEmail);
+      if(appSupportEmail()!==ST_CONTACT) throw new Error('the contact address is '+appSupportEmail());
     } },
   { id:'about_features_and_contact', group:'UI', name:'ℹ️ About: ✨ What can this app do (households, inviting, linking, joining, sharing first) and ✉️ Contact us (a note in the app, e-mail, copy the address); “© 2026 My Kitchen Notes”, no personal name (v38.17)',
     test: async()=>{
@@ -7003,7 +7044,7 @@ window.SELF_TESTS = [
         var about=document.getElementById('aboutOverlay'), t=about.textContent;
         if(!document.getElementById('aboutFeatures') || !document.getElementById('aboutContact')) throw new Error('About has no ✨ What can this app do or ✉️ Contact us');
         if(t.indexOf('© 2026 My Kitchen Notes')===-1 || /Tony|Schvekher|gmail/.test(t)) throw new Error('the About line: '+t.slice(-120));
-        if(!about.querySelector('a[href="mailto:contact@mykitchennotes.community"]')) throw new Error('About does not give the contact address');
+        if(!about.querySelector('a[href="mailto:'+ST_CONTACT+'"]')) throw new Error('About does not give the contact address');
         // ✨ What can this app do — the community first.
         document.getElementById('aboutFeatures').click();
         var af=document.getElementById('appFeaturesOverlay'), ft=af ? af.textContent : '';
@@ -7020,12 +7061,12 @@ window.SELF_TESTS = [
         // ✉️ Contact us.
         document.getElementById('aboutContact').click();
         var cu=document.getElementById('contactOverlay'), ct=cu ? cu.textContent : '';
-        if(!cu || ct.indexOf('contact@mykitchennotes.community')===-1) throw new Error('Contact us does not show the address');
+        if(!cu || ct.indexOf(ST_CONTACT)===-1) throw new Error('Contact us does not show the address');
         contactPhrases().forEach(function(x){ if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
         var rItem=document.getElementById('fbRepliesItem');
         if(!!document.getElementById('cuReplies') !== !!(rItem && !rItem.hidden)) throw new Error('📨 Answers to my notes shows without answers (or hides with them)');
         document.getElementById('cuCopy').click(); await new Promise(function(r){ setTimeout(r, 20); });
-        if(copied!=='contact@mykitchennotes.community') throw new Error('copied: '+copied);
+        if(copied!==ST_CONTACT) throw new Error('copied: '+copied);
         document.getElementById('cuNote').click();
         if(calls[0]!=='note' || document.getElementById('contactOverlay') || document.getElementById('aboutOverlay')) throw new Error('the note form, in front of everything');
         await openAbout(); document.getElementById('aboutContact').click(); document.getElementById('cuMail').click();
@@ -7196,7 +7237,21 @@ window.SELF_TESTS = [
         // What the documents say, and that the privacy statement names every service the app sends to.
         window.fetch=realF;
         var priv=await (await fetch('privacy.html?t='+Date.now(), { cache:'no-store' })).text(), terms=await (await fetch('terms.html?t='+Date.now(), { cache:'no-store' })).text();
-        ['Tony Schvekher','contact@mykitchennotes.community','mykitchennotes.community/','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
+        // v38.27 — the contact address is in it, but never written out: the page is public and
+        // harvested for addresses. Its two halves are joined by legal-i18n.js when it opens.
+        if(/[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/.test(priv)) throw new Error('the privacy statement writes out an e-mail address');
+        var pm=new DOMParser().parseFromString(priv,'text/html').querySelectorAll('a.mkn-mail[data-u][data-d]');
+        if(pm.length<3 || Array.prototype.some.call(pm, function(a){ return a.getAttribute('data-u')+'@'+a.getAttribute('data-d')!==appSupportEmail(); }))
+          throw new Error('the privacy statement does not give the app\u2019s contact address ('+pm.length+' link(s))');
+        var pf=document.createElement('iframe'); pf.style.cssText='position:fixed;left:-9999px;width:400px;height:300px;';
+        pf.src='privacy.html?t='+Date.now(); document.body.appendChild(pf);
+        try{
+          await new Promise(function(res, rej){ pf.onload=res; setTimeout(function(){ rej(new Error('privacy.html did not load')); }, 8000); });
+          var pd=pf.contentDocument, shown=pd && pd.querySelector('a.mkn-mail');
+          if(!shown || shown.getAttribute('href')!=='mailto:'+appSupportEmail() || shown.textContent!==appSupportEmail())
+            throw new Error('opened, the privacy statement does not show the address as a link: '+(shown ? shown.outerHTML.slice(0,160) : 'no link'));
+        } finally { pf.remove(); }
+        ['Tony Schvekher','mykitchennotes.community/','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
           if(priv.indexOf(w)===-1) throw new Error('the privacy statement does not mention '+w); });
         // v37.90 — the agreement is with the My Kitchen Notes Team; the privacy statement still names who answers for the data.
         if(terms.indexOf('Tony Schvekher')!==-1 || priv.indexOf('acts for the Team')===-1) throw new Error('the terms still name a person, or the privacy statement no longer names who answers for the data');
@@ -7297,7 +7352,12 @@ window.SELF_TESTS = [
             if(!d.querySelector('a[href="'+doc+'.html"][lang="en"]')) throw new Error(f+' does not point to the English text, which prevails');
             if(d.body.textContent.indexOf(doc==='terms' ? 'My Kitchen Notes Team' : 'Tony Schvekher')===-1) throw new Error(f+' does not name '+(doc==='terms' ? 'the Team it is an agreement with' : 'who answers for the data'));
             d.querySelectorAll('a[href^="privacy"]:not([lang="en"])').forEach(function(a){ if(a.getAttribute('href')!=='privacy.'+l+'.html') throw new Error(f+' links to '+a.getAttribute('href')+' instead of the same language'); });
-            if(doc==='privacy') ['contact@mykitchennotes.community','Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
+            if(doc==='privacy'){
+              var dm=d.querySelectorAll('a.mkn-mail[data-u][data-d]');
+              if(dm.length<3 || Array.prototype.some.call(dm, function(a){ return a.getAttribute('data-u')+'@'+a.getAttribute('data-d')!==appSupportEmail(); })) throw new Error(f+' does not give the contact address');
+              if(/[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/.test(d.documentElement.outerHTML)) throw new Error(f+' writes out an e-mail address');
+            }
+            if(doc==='privacy') ['Anthropic','Cloudflare','Gemini','allorigins','Bring!'].forEach(function(w){ if(d.body.textContent.indexOf(w)===-1) throw new Error(f+' does not mention '+w); });
             // v37.85 — every passage is tied to its English twin (tools/legal-keys.py), or the editor cannot offer it.
             var sel='h1,h2,h3,p,li,th,td,div.box,div.meta', words=function(el){ return el.textContent.replace(/\s+/g,' ').trim(); };
             var enB=Array.prototype.filter.call(en[doc].querySelectorAll(sel), function(el){ return !el.closest('[data-no-k]'); });
@@ -12356,7 +12416,7 @@ window.SELF_TESTS = [
       (function(){
         var prevDict=i18nCurrentDict(), prevLang=i18nLang(), prevUser=window._fbUser;
         try{
-          window._fbUser={ email:'rozinante2004@gmail.com' };
+          window._fbUser={ email:ST_OWNER }; var undoOwnerU1=stAsOwner();
           var d={ 'Accessibility basics (labels, Escape, focus)':'アクセシビリティ', 'CRUD':'CRUD' };
           i18nInstall('ja', d);
           i18nNoteMissing('Cloud Sync');
@@ -12366,7 +12426,7 @@ window.SELF_TESTS = [
             throw new Error('a translated self-test name is not offered for removal as unusable');
           if(i18nGapList().indexOf('Cloud Sync')!==-1)
             throw new Error('a self-test heading in the missing list would be paid for by the gap-filler');
-        } finally { i18nClearMissing(['Cloud Sync']); i18nInstall(prevLang, prevDict);
+        } finally { if(typeof undoOwnerU1==='function') undoOwnerU1(); i18nClearMissing(['Cloud Sync']); i18nInstall(prevLang, prevDict);
                     window._fbUser=prevUser; _i18nEdDraft=null; i18nEdInvalidate(); }
       })();
       // …and a keycap step from a static panel, which v36.47 had re-keyed to
@@ -12630,7 +12690,7 @@ window.SELF_TESTS = [
       (function(){
         var prevDict2=i18nCurrentDict(), prevLang2=i18nLang(), prevUser=window._fbUser;
         try{
-          window._fbUser={ email:'rozinante2004@gmail.com' };
+          window._fbUser={ email:ST_OWNER }; var undoOwnerU2=stAsOwner();
           var d2={};
           d2['15 errors recorded']='15 שגיאות נרשמו';      // re-key: no live target
           d2['{1} min ago']='לפני {1} דקות';               // already correct: leave alone
@@ -12659,7 +12719,7 @@ window.SELF_TESTS = [
               + 'offered for removal — it can never be re-used and never be cleaned up');
           if(inf.all.filter(inf.junk).indexOf('9/18/2026, 10:57:13 PM · import')===-1)
             throw new Error('a sync-log row was not recognised as removable');
-        } finally { i18nInstall(prevLang2, prevDict2); window._fbUser=prevUser;
+        } finally { if(typeof undoOwnerU2==='function') undoOwnerU2(); i18nInstall(prevLang2, prevDict2); window._fbUser=prevUser;
                    _i18nEdDraft=null; i18nEdInvalidate(); }
       })();
 
@@ -12680,7 +12740,7 @@ window.SELF_TESTS = [
           + '<div id="zw2">Installing this app...</div>';
         document.body.appendChild(host3);
         try{
-          window._fbUser={ email:'rozinante2004@gmail.com' };
+          window._fbUser={ email:ST_OWNER }; var undoOwnerU3=stAsOwner();
           var live3=i18nCatalogue(host3);
           if(live3.indexOf('Widget settings & secrets')===-1)
             throw new Error('the trailing hint is still part of the key: '+JSON.stringify(live3));
@@ -12702,7 +12762,7 @@ window.SELF_TESTS = [
             throw new Error('the LIVE key was classed as an orphan');
           if(inf3.orphan('Installing this app...'))
             throw new Error('the LIVE key was classed as an orphan');
-        } finally { i18nInstall(prevLang3, prevDict3); window._fbUser=prevUser3;
+        } finally { if(typeof undoOwnerU3==='function') undoOwnerU3(); i18nInstall(prevLang3, prevDict3); window._fbUser=prevUser3;
                     _i18nEdDraft=null; i18nEdInvalidate(); host3.remove(); }
       })();
 
@@ -12790,10 +12850,10 @@ window.SELF_TESTS = [
         var res=await i18nWriteCloud('zz',{ lang:'zz', strings:{ a:'b' } });
         if(wrote) throw new Error('a non-admin tried to write a shared translation');
         if(res!=='refused') throw new Error('a non-admin translation write returned '+res);
-        window._fbUser={ email:'rozinante2004@gmail.com' };
+        window._fbUser={ email:ST_OWNER }; var undoOwnerU4=stAsOwner();
         applyOwnerOnlyItems();
         items.forEach(function(el){ if(el.style.display==='none') throw new Error('an owner-only item is hidden from the owner'); });
-      } finally {
+      } finally { if(typeof undoOwnerU4==='function') undoOwnerU4();
         window._fbUser=prevUser; window.toast=realToast; applyOwnerOnlyItems();
         closeM('deploymentsOverlay'); closeM('paymentsOverlay');
         try{ localStorage.removeItem('tonys_i18n_zz'); }catch(e){}
@@ -13271,7 +13331,7 @@ window.SELF_TESTS = [
         var newWords=cat.slice(-5), ruStrings={}, jaStrings={};
         cat.forEach(function(k,i){ jaStrings[k]='ja'+i; if(newWords.indexOf(k)===-1) ruStrings[k]='ru'+i; });
         var db=_fakeFirestore({ i18n_ru:{ strings:ruStrings, updatedAt:1 }, i18n_ja:{ strings:jaStrings, updatedAt:1 } });
-        window._fbDb=db; window._fbUser={ email:APP_OWNER_EMAIL };
+        window._fbDb=db; var undoOwner=stAsOwner(); window._fbUser={ email:ST_OWNER };
         Object.keys(localStorage).forEach(function(k){ if(/^tonys_i18n_/.test(k)) localStorage.removeItem(k); });
         _i18nIndexFetched=false;
         await i18nIndexFetch();
@@ -13316,6 +13376,7 @@ window.SELF_TESTS = [
         await i18nUpdateAll();
         if(prompts.length) throw new Error('a member without full access ran a paid update');
       } finally {
+        if(typeof undoOwner==='function') undoOwner();
         window._fbDb=realDb; window._fbUser=realUser; window.askConfirm=realAsk; window.aiCall=realAI;
         window.i18nHarvest=realHarvest; window.toast=realToast; _i18nIndexFetched=fetchedWas;
         window.i18nFullCatalogue=realCat; window.i18nCentralIndex=realCentral;
@@ -13387,7 +13448,7 @@ window.SELF_TESTS = [
           throw new Error('the editor opened for somebody with no access at all');
         if(!/full access/i.test(said)) throw new Error('it did not say why: "'+said+'"');
 
-        window._fbUser={ email:'rozinante2004@gmail.com' };
+        window._fbUser={ email:ST_OWNER }; var undoOwnerU5=stAsOwner();
         var cat=i18nCatalogue();
         if(cat.indexOf('Clips')===-1) throw new Error('the catalogue has no Clips button to edit');
         var dict={}; cat.forEach(function(s,i){ if(i%3) dict[s]='«'+s+'»'; });
@@ -13541,7 +13602,7 @@ window.SELF_TESTS = [
         if(!live.querySelector('svg')) throw new Error('saving the translation ate the button’s icon');
         if(i18nMissingList().indexOf('Clips')!==-1)
           throw new Error('a string that has just been translated by hand is still counted as missing');
-      } finally {
+      } finally { if(typeof undoOwnerU5==='function') undoOwnerU5();
         window.aiCall=realAI; window.toast=realToast;
         window._fbUser=prevUser; window._fbDb=prevDb;
         try{ document.getElementById('i18nOverlay').classList.remove('open'); }catch(e){}

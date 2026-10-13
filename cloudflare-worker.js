@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v73
+// Tony's Recipes — Cloudflare Worker v74
+// v74: NO E-MAIL ADDRESS IN THE CODE. The repository is public and its text is harvested
+// for addresses, so the owner's address is no longer written here as a default: it comes
+// from the secret OWNER_EMAIL (set by .github/workflows/deploy-worker.yml from the GitHub
+// secret of the same name) or the variable OWNER_EMAILS. With neither, nobody is the
+// owner — the owner's tools are refused, never opened to anyone. health says `owner`.
 // v73: THE OWNER'S POWERS, PROTECTED. Tony: "the only thing that keeps me Admin is
 //      my email address … I need to protect myself". `meter-admin` (every owner
 //      tool) now needs (1) a sign-in WITH GOOGLE (claims.firebase.sign_in_provider)
@@ -320,7 +325,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v73';
+const WORKER_VERSION = 'v74';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -697,6 +702,7 @@ async function handleRequest(request, env) {
         metering: { version: 1, db: !!env.METER_DB },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         alerts: !!(env.ALERTS && env.ALERT_TO),   // v73 — the owner hears about a new device and destructive actions
+        owner: ownerEmails(env).length > 0,       // v74 — the owner's address is set (it is no longer in the code)
         reports: !!env.METER_DB,      // v62 — households report themselves, one Households page
         notesImport: !!env.METER_DB,  // v64 — notes kept in a copy's own database move to the inbox
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
@@ -1235,11 +1241,11 @@ async function handleRequest(request, env) {
 //   AI_CAP_USD       the monthly allowance (2); AI_CAP_FIRST_USD the first
 //                    month's, for a household's big first import (4)
 //   OWNER_EMAILS     who may read every household's spending and set caps
-//                    (`meter-admin`, the management app)
+//                    (`meter-admin`, the management app); else the secret
+//                    OWNER_EMAIL (v74 — no default: none means no owner)
 const METER_PROJECTS_DEFAULT = 'recipes-f379d,tonys-recipes-test,my-kitchen-notes-beta';
 const CAPPED_PROJECTS_DEFAULT = 'tonys-recipes-test,my-kitchen-notes-beta';
 const CAPPED_ORIGINS_DEFAULT = 'https://tonys-recipes-test.pages.dev,https://my-kitchen-notes-beta.pages.dev,https://mykitchennotes.community';   // v70
-const OWNER_EMAILS_DEFAULT = 'rozinante2004@gmail.com';
 const AI_CAP_BY_PROJECT_DEFAULT = { 'recipes-f379d': 10 };      // v67 — the family's, per household per month
 function projectCap(project, env) {
   let m = AI_CAP_BY_PROJECT_DEFAULT;
@@ -1275,6 +1281,8 @@ const AI_PRICES = {
 const AI_PRICE_UNKNOWN = { input: 5, cacheWrite: 6.25, cacheRead: 0.5, output: 25 };
 const AI_WEB_SEARCH_USD = 0.01;
 function csvList(v, dflt) { return String(v || dflt).split(',').map(s => s.trim()).filter(Boolean); }
+// v74 — the owner's address(es), from the Worker's settings only (never written in this file).
+function ownerEmails(env) { return csvList(env.OWNER_EMAILS || env.OWNER_EMAIL, '').map(s => s.toLowerCase()); }
 function aiCostUsd(model, usage) {
   const p = AI_PRICES[model] || AI_PRICE_UNKNOWN, M = 1e6, u = usage || {};
   return (u.input_tokens || 0) * p.input / M + (u.cache_creation_input_tokens || 0) * p.cacheWrite / M
@@ -1371,7 +1379,7 @@ async function ownerWatch(env, db, claims, body, request) {
 async function ownerAlert(env, subject, text) {
   const to = String(env.ALERT_TO || '').trim();
   if (!env.ALERTS || !/^[^\s@<>]+@[^\s@<>]+$/.test(to)) return false;
-  const from = String(env.ALERT_FROM || 'alerts@mykitchennotes.community');
+  const from = String(env.ALERT_FROM || ['alerts', 'mykitchennotes.community'].join('@'));   // v74 — not written out (harvested)
   const raw = ['From: My Kitchen Notes <' + from + '>', 'To: <' + to + '>', 'Subject: ' + subject.replace(/[^\x20-\x7E]/g, ''),
     'Date: ' + new Date().toUTCString(), 'Message-ID: <' + crypto.randomUUID() + '@' + from.split('@')[1] + '>',
     'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '', text].join('\r\n');
@@ -1518,8 +1526,8 @@ async function meterAction(request, env, body) {
     return jsonResp({ month, usd: row.usd || 0, calls: row.calls || 0, cap: capped ? capFor(row, month, env, claims.aud) : null });
   }
   // meter-admin
-  const owners = csvList(env.OWNER_EMAILS, OWNER_EMAILS_DEFAULT).map(s => s.toLowerCase());
-  if (!claims.email_verified || !owners.includes(String(claims.email || '').toLowerCase()))
+  const owners = ownerEmails(env);
+  if (!claims.email_verified || !owners.length || !owners.includes(String(claims.email || '').toLowerCase()))
     return jsonResp({ error: 'METER: only the app\'s owner may see this.' }, 403);
   // v73 — with Google; with the authenticator once he switched it on; recently, for what cannot be undone.
   const fb = claims.firebase || {};
@@ -2516,4 +2524,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v73 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v74 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

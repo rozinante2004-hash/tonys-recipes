@@ -60,7 +60,13 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 **Where things are now**
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
   **v38.25**, released 12 Oct.
-- `test` is at **v38.26**, waiting for CI and then Tony's yes. It brings:
+- `test` is at **v38.27**, waiting for CI and then Tony's yes (v38.26 and v38.27 go together). v38.27 + Worker
+  v74 take every e-mail address out of the public source (see its note below). **Before releasing it, Tony adds
+  the GitHub secret `OWNER_EMAIL`** (his Google address):
+  https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new — without it the Worker job
+  refuses to publish (v73 stays live) and nothing breaks; with it, check that "Deploy the Worker" ends
+  "database, storage and the owner's address connected". His other step: https://github.com/settings/emails
+  (keep his address private). v38.26 brings:
   - the in-app Help's knowledge brought up to date: link requests, saving from other apps, About and
     contact, the farm visitors, Read-only invitations, Open in Bring!, the Self Test's place;
   - `RECONSTRUCTION_PROMPT.md` §1b;
@@ -110,7 +116,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - Skipped by Tony: a hardware security key.
 
 **What is left, in order**
-1. **Release v38.26** to `main` and `beta` when CI is green and Tony says yes.
+1. **Release v38.26 + v38.27** to `main` and `beta` when CI is green, Tony has added the secret `OWNER_EMAIL`,
+   and he says yes.
 2. **Move day**, when Tony says ("I'll let you know"). Follow "MOVE DAY CHECKLIST" below, step by
    step. My steps, from this environment:
    - Survey:
@@ -235,7 +242,7 @@ work* · *Conventions* · *Decisions that must not be silently reverted* ·
 ## What this is
 
 A single-file vanilla-JS PWA recipe manager, owned and used daily by Tony
-(rozinante2004@gmail.com). Family members also have write access. The collection
+(his Google account — the address is the GitHub secret OWNER_EMAIL, never written in the repository). Family members also have write access. The collection
 is bilingual **English + Hebrew**, and bidi correctness is a recurring
 requirement, not a nice-to-have.
 
@@ -385,6 +392,11 @@ found only because a test was written first and disagreed with the code.
 
 ## Traps this codebase has already sprung
 
+- **NO E-MAIL ADDRESS IS WRITTEN IN THE REPOSITORY (v38.27).** It is public and harvested for addresses — and so
+  are its Actions logs. The owner is `APP_CONFIG.ownerKey` (a salted fingerprint) and the GitHub secret
+  `OWNER_EMAIL`; the contact address is `supportMailbox` (two halves) and `.mkn-mail` links on the legal pages.
+  A test that needs the owner uses `stAsOwner()` and `ST_OWNER`, never a real address; sample data uses
+  example domains. `owner_by_fingerprint` and the Worker test scan for slips.
 - **AN E-MAIL ADDRESS IS NEVER A PHRASE (v38.26).** The translations are published as files in a PUBLIC
   repository, and the page walk collects every visible text and tooltip — so a tooltip that named a member
   ("Send <address> a note about the app") put family members' addresses into every language's file.
@@ -986,6 +998,37 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.27 + Worker v74 — no e-mail address written out in the public source (13 Oct 2026).** Tony: "bots and
+    hackers scan the web looking for email addresses … Is there a (legal) way to hide such open-text addresses";
+    then "Yes, go ahead with v38.27". The privacy statement must stay public and readable (GDPR art. 13, Israel's
+    Amendment 13, the stores), so the address is SHOWN to people but never WRITTEN in a file:
+    - **contact@** → `APP_CONFIG.supportMailbox` = two halves (the test/beta builds re-serialise the config, so a
+      joining expression would come out written in full — an array survives); `appSupportEmail()` joins them
+      (feedback, Contact us, About). Legal pages: `<a class="mkn-mail" data-u data-d>contact [at] …</a>`, made a
+      real mailto: link by legal-i18n.js (now also loaded by privacy.html and privacy-extension.html; corrections
+      still find the link through `data-k-text`; tools/legal-keys.py re-run). extension/PRIVACY.md: "[at]" (the
+      store zip leaves .md out, so no new extension version). The Firefox job joins the halves for AMO's support
+      e-mail.
+    - **The owner** → `APP_CONFIG.ownerKey` = 'sha256:' + SHA-256('mkn-owner|' + lower-cased address) (salted, so
+      it matches no list of hashed addresses); `isOwnerAddress` / `ownerKeyOf` / `mknSha256Hex` (synchronous —
+      isAppOwner is asked from synchronous code; checked on 2,010 texts against Node and in the browser against
+      crypto.subtle). Show rules fills {{APP_ADMINS}} from the owner's own sign-in. Worker v74: no default owner —
+      `OWNER_EMAILS` or the secret `OWNER_EMAIL`, none = nobody is the owner (refused, never opened); health
+      `owner`; the sender alerts@ joined too. deploy-worker.yml sets the secret OWNER_EMAIL from the GitHub secret
+      BEFORE publishing and refuses to publish without it (v73 stays live); its live check needs `"owner":true`.
+      publish-rules.mjs takes OWNER_EMAIL from the secret (refuses without it; no longer prints it — job logs of a
+      public repository are public); move-family.yml likewise. **Tony must add the GitHub secret OWNER_EMAIL (his
+      Google address) before this release** — https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new
+    - Tests: the self-tests play the owner with a stand-in address and its fingerprint (`ST_OWNER`, `stAsOwner()`,
+      put back in each finally) — five used his real address as sample data, one an address at his employer's
+      domain; new `owner_by_fingerprint` (vectors, owner check, and a scan of index.html and manage.js for any
+      written-out address); the legal tests check no address is written and the opened page shows the link.
+      e2e: a stand-in owner, the page served with its fingerprint. Worker: 4 v74 checks, the test owner from
+      env. Also out of the notes: his second address and a stranger's (the "CWS's Kitchen Notes" account — likely
+      a Chrome Web Store reviewer, 6 Oct). Left alone: the Firefox add-on ids (…@rozinante2004-hash.github.io —
+      ids, not mailboxes, and fixed by AMO). The git history keeps the old text.
+    - Tony's own step (a minute): https://github.com/settings/emails → "Keep my email addresses private" and
+      "Block command line pushes that expose my email" (56 commits carry his Gmail as their author).
   - **v38.26 — the Help brought up to date; the reconstruction prompt's §1b; addresses out of the translations
     (13 Oct 2026).** Tony: "please update the reconstruction prompt and, if needed, the Help … prepare a summary
     of what we did so far and what is yet to be done". (1) HELP_SYSTEM_PROMPT: the app's name, method scaling and
@@ -1091,7 +1134,7 @@ found only because a test was written first and disagreed with the code.
     table owner_devices (email, device from the app's random `mkn_owner_device`, ua) — the first use of the owner's
     tools on a device and every destructive op are e-mailed (`ownerAlert`, send_email binding ALERTS in
     worker/wrangler.jsonc, no address there; secret ALERT_TO set by deploy-worker.yml from GitHub secret
-    ALERT_EMAIL; from alerts@mykitchennotes.community; health `alerts`). App: `workerBody` adds `device` to every
+    ALERT_EMAIL; from alerts [at] the app's domain; health `alerts`). App: `workerBody` adds `device` to every
     meter-admin request; `mfaResolve` (the authenticator's 6 digits when Firebase says
     auth/multi-factor-auth-required — Google sign-in, both popup paths, re-sign-in); `ownerFresh` (a Google
     sign-in under 13 minutes old, or a re-sign-in now — skipped in Self Test runs unless `_ownerFreshUnderTest`);
@@ -1159,7 +1202,7 @@ found only because a test was written first and disagreed with the code.
     project my-kitchen-notes-beta).** "As I am the one acting as the main 'seller' of the application, testers
     should be able to join my live and synced set of recipes." Conditions: every capability and privilege he has
     as admin in the family app is kept. He asked for B's risks against A and how to protect the admin identity
-    (today: the verified e-mail rozinante2004@gmail.com in three places — ownerEmail in the app, {{APP_ADMINS}}
+    (today: his verified Google address in three places — ownerEmail in the app, {{APP_ADMINS}}
     in the rules, the Worker's owner checks). The beta has NOT been given to testers yet (planned next week);
     Tony is the only one who would reinstall — so install-time things (status-bar style, home-screen name and
     icon) can change now. Family-only today (must move to the community copy for the owner): the 💬 Feedback
@@ -1266,7 +1309,7 @@ found only because a test was written first and disagreed with the code.
       https://mykitchennotes.community/__/auth/handler; the browser key's website list if it has one;
       (4) Cloudflare Email Routing on the domain: contact@ → his Gmail (+ optional catch-all). The release
       waits for these — without 1–3 sign-in on the new address fails.
-    - **Contact:** `APP_CONFIG.supportEmail` = contact@mykitchennotes.community (Send feedback, About,
+    - **Contact:** `APP_CONFIG.supportEmail` (v38.27: `supportMailbox`, two halves) = contact [at] mykitchennotes.community (Send feedback, About,
       ✉️ Contact us); the privacy statement in all 11 languages (every address; plus "Website:
       mykitchennotes.community" after the first; tools/legal-keys.py re-keyed), privacy-extension.html,
       extension/PRIVACY.md (the Firefox job now UPDATES the policy text and the homepage on AMO when they
@@ -1650,7 +1693,7 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.97 (8 Oct 2026, Tony's yes, CI green on 8c5b320; Pages: success). Worker v67 published by GitHub (run 37836089721, live check with database and storage: success); rules republished (37836089715: success). Extension 1.7: Tony uploads it to the Chrome Web Store by hand (new permission); store auto-publish proposed (CWS API v2, service account `store-publisher`, secret CWS_KEY, waiting for his Publisher ID).**
   - **v37.97 + Worker v67 + extension 1.7 (8 Oct 2026).** Tony found a
     stranger's household in the family app ("CWS's Kitchen Notes",
-    cwsacn07@gmail.com, founded 6 Oct, no share link, $0.01 of AI; he is
+    a stranger's account, founded 6 Oct, no share link, $0.01 of AI; he is
     deleting it) and asked:
     - **The family's copy gets an allowance: $10 a month per household,
       changeable, with Pause AI.** Worker v67: `AI_CAP_BY_PROJECT` (JSON,
@@ -2447,7 +2490,7 @@ found only because a test was written first and disagreed with the code.
     GITHUB_TOKEN push starts none). This note's commit runs CI on test =
     v37.47 + the published languages; main is fast-forwarded to it when green.
   - **v37.47 — Shortcuts and extensions; Tony's contact.** Tony (3 Oct):
-    contact = tony.schvekher@gmail.com "whenever necessary … also Send
+    contact = his second address "whenever necessary … also Send
     feedback" (until a domain): `APP_CONFIG.supportEmail`, the extension's
     privacy page and PRIVACY.md (ownerEmail unchanged — it is the owner's
     sign-in identity). Send feedback now goes through `shareMessage` (Gmail /

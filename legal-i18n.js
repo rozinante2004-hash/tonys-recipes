@@ -7,15 +7,27 @@
 // over its own dictionary (it has the correction the moment it is saved);
 // opened on its own, the page reads the published i18n/<lang>.json.
 // legalApplyDict in index.html is the same rule for the kitchen-rules page.
+// v38.27 — it also writes out the contact address. The pages do not (they are public, and
+// harvested for addresses): <a class="mkn-mail" data-u data-d> holds the two halves and reads
+// "contact [at] …" until this joins them into a real mailto: link.
 (function () {
   function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
+  function mail(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('a.mkn-mail[data-u][data-d]'), function (a) {
+      var addr = a.getAttribute('data-u') + '@' + a.getAttribute('data-d');
+      // The words the passage's key was made from, so a correction can still find this link.
+      if (!a.hasAttribute('data-k-text')) a.setAttribute('data-k-text', norm(a.textContent));
+      a.setAttribute('href', 'mailto:' + addr);
+      a.textContent = addr;
+    });
+  }
   // The new words replace the block's; its bold names, links and isolated
   // English names are put back around the same words wherever they still are.
   function rewrite(el, text) {
     var marks = Array.prototype.filter.call(el.children, function (c) { return c.tagName !== 'BR'; });
     var parts = [text];
     marks.forEach(function (m) {
-      var w = norm(m.textContent);
+      var w = norm(m.getAttribute('data-k-text') || m.textContent);
       if (!w) return;
       for (var i = 0; i < parts.length; i++) {
         if (typeof parts[i] !== 'string') continue;
@@ -36,9 +48,12 @@
       if (typeof t !== 'string' || !norm(t) || norm(t) === norm(el.textContent)) return;
       rewrite(el, norm(t)); n++;
     });
+    mail(document);
     return n;
   }
   window.mknLegalApply = apply;
+  window.mknLegalMail = mail;
+  mail(document);
   var inApp = false;
   try { inApp = window.parent !== window && typeof window.parent.legalFile === 'function'; } catch (e) {}
   if (inApp) return;

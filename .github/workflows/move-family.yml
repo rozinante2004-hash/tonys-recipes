@@ -99,11 +99,10 @@ jobs:
           MARK: ${{ inputs.mark }}
           I18N: ${{ inputs.i18n }}
           RESUME: ${{ inputs.resume }}
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — only to say whether the owner's account was already there
         run: |
           npm init -y >/dev/null 2>&1 || true
           npm install --no-audit --no-fund google-auth-library@9 >/dev/null
-          OWNER_EMAIL=$(node -e "const s=require('fs').readFileSync('index.html','utf8');const m=/ownerEmail:\s*'([^']+)'/.exec(s);process.stdout.write(m?m[1]:'')")
-          export OWNER_EMAIL
           SITE=$(node -e "const e=require('./tools/environments.json');process.stdout.write(e.beta.siteOrigin+'/')")
           ARGS="--from recipes-f379d --to $TARGET --mode $MODE"
           [ "$MARK" = "true" ] && ARGS="$ARGS --mark-moved $SITE"

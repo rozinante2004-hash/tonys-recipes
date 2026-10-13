@@ -15,7 +15,11 @@ import { readFileSync } from 'node:fs';
 const root = new URL('..', import.meta.url);
 const html = readFileSync(new URL('index.html', root), 'utf8');
 const envs = JSON.parse(readFileSync(new URL('tools/environments.json', root), 'utf8'));
-const owner = (/ownerEmail:\s*'([^']+)'/.exec(html) || [])[1];
+// v38.27 — the owner's address is not in the repository (it is public, and harvested for
+// addresses): it is the GitHub secret OWNER_EMAIL. A dry run without it uses a stand-in.
+const DRY = process.argv.includes('--dry-run');
+const owner = String(process.env.OWNER_EMAIL || (DRY ? 'owner@example.invalid' : '')).trim().toLowerCase();
+if (!owner) throw new Error('OWNER_EMAIL is not set (Settings → Secrets and variables → Actions) — nothing was published: without it the owner would lose the admin\'s rules');
 const version = (/var APP_VERSION = '([^']+)'/.exec(html) || [])[1];
 const live = (/projectId:\s*'([^']+)'/.exec(html) || [])[1];
 const projects = [live, envs.test && envs.test.firebase && envs.test.firebase.projectId, envs.beta && envs.beta.firebase && envs.beta.firebase.projectId].filter(Boolean);
@@ -29,8 +33,8 @@ let rules = readFileSync(new URL('firestore.rules', root), 'utf8')
 rules = /^rules_version = '2';/m.test(rules) ? rules.replace(/^(rules_version = '2';)/m, '$1\n' + stamp) : stamp + '\n' + rules;
 if (/\{\{[A-Z_]+\}\}/.test(rules)) throw new Error('a placeholder is left: ' + rules.match(/\{\{[A-Z_]+\}\}/)[0]);
 
-console.log('rules from ' + version + ' for ' + projects.join(', ') + ' (' + rules.length + ' characters, owner ' + owner + ')');
-if (process.argv.includes('--dry-run')) process.exit(0);
+console.log('rules from ' + version + ' for ' + projects.join(', ') + ' (' + rules.length + ' characters)');   // never the address: the log is public
+if (DRY) process.exit(0);
 
 const key = process.env.FIREBASE_RULES_KEY;
 if (!key) throw new Error('FIREBASE_RULES_KEY is not set');
