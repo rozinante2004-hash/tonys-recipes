@@ -1065,6 +1065,9 @@ found only because a test was written first and disagreed with the code.
     languages: section 2's feature-counts row lists the new counts; its purpose adds planning) say so. Tests:
     `more_statistics`, `manage_errors_and_use` (the trends and the fallback), worker-cors v76 (trends owner-only,
     sums, 24 months; recipes a number).
+  - **Released to the family app and the beta: v38.30 + Worker v76 (13 Oct 2026, Tony's "Yes, go ahead and release
+    v38.30 once CI is green", CI green on 44f56f7).** Pages, Cloudflare Pages, Deploy the Worker (live v76),
+    Translate new phrases, Publish languages, Self Tests on main: success.
   - **Released to the family app and the beta: v38.29 + Worker v75 (13 Oct 2026, Tony's "Yes, go ahead and release
     v38.29" — with his change made first: notes, replies and statistics are kept; CI green on eb54cf7).** Pages,
     Cloudflare Pages (beta and test), Deploy the Worker (owner + spare set, alerts set, live v75 checked), Publish
