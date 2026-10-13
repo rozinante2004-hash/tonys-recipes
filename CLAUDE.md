@@ -60,13 +60,11 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 **Where things are now**
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
   **v38.25**, released 12 Oct.
-- `test` is at **v38.27**, waiting for CI and then Tony's yes (v38.26 and v38.27 go together). v38.27 + Worker
-  v74 take every e-mail address out of the public source (see its note below). **Before releasing it, Tony adds
-  the GitHub secret `OWNER_EMAIL`** (his Google address):
-  https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new — without it the Worker job
-  refuses to publish (v73 stays live) and nothing breaks; with it, check that "Deploy the Worker" ends
-  "database, storage and the owner's address connected". His other step: https://github.com/settings/emails
-  (keep his address private). v38.26 brings:
+- `test` is at **v38.28** = v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md).
+  **Tony said yes to releasing them once CI is green** (13 Oct). He added the secrets `OWNER_EMAIL` and
+  `OWNER_SECONDARY_EMAIL` (the second is not used — ask what it is for). After the release check that "Deploy the
+  Worker" ends "database, storage and the owner's address connected", that "Translate new phrases" took the
+  addresses out, and the Firefox listing job ran. v38.26 brings:
   - the in-app Help's knowledge brought up to date: link requests, saving from other apps, About and
     contact, the farm visitors, Read-only invitations, Open in Bring!, the Self Test's place;
   - `RECONSTRUCTION_PROMPT.md` §1b;
@@ -116,8 +114,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - Skipped by Tony: a hardware security key.
 
 **What is left, in order**
-1. **Release v38.26 + v38.27** to `main` and `beta` when CI is green, Tony has added the secret `OWNER_EMAIL`,
-   and he says yes.
+1. **Release v38.26 – v38.28** to `main` and `beta` as soon as CI is green (Tony's yes is given), then check the
+   jobs and record it. Then the open points of AUDIT-2026-10-privacy.md, for Tony to decide.
 2. **Move day**, when Tony says ("I'll let you know"). Follow "MOVE DAY CHECKLIST" below, step by
    step. My steps, from this environment:
    - Survey:
@@ -998,6 +996,28 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.28 — the privacy audit (13 Oct 2026; report: AUDIT-2026-10-privacy.md).** Tony: "In view of your
+    findings, I think we should run a full privacy audit on the applications, workers and everything else. Please
+    do it now … once done and fixed, please move these changes to the family and Beta apps once possible" (his yes
+    for v38.26–v38.28, once CI is green). Fixed here (v38.26/27 did the addresses):
+    - **The device log** shortens every address to first letter + domain (`logMaskAddresses`, in `syncLog` and in
+      `syncLogReportText` for older entries) — it travels with notes and reports and had recorded OTHER people's
+      addresses (link-request targets, the new owner). Self-test `log_masks_addresses`.
+    - **Account deletion** also removes `homes/<uid>` and `users/<uid>/prefs/{legal,offers,ui}` (e2e check).
+    - **The WhatsApp link classifier** no longer lists one person's card company, insurers, clinics, parking,
+      appointments and employer (a profile, partly health-related, in a public file): generic entries instead.
+      The `wa_link_classify` samples (real rows of his harvest) had a live group INVITATION, location pins, a
+      voucher code, a ChatGPT share and share ids — made-up codes now. A real-looking phone number in
+      `wa_system_noise` → a fiction-range one.
+    - **Privacy statement 1.3** (13 Oct, all 11 languages, same lines in each; legal-keys re-run): the daily
+      encrypted backups (GitHub "Pages and Actions"; retention), Gmail, the end-of-beta answers, fonts/code from
+      Google and Cloudflare, the 2-minute IP rate limit and Cloudflare's short request log, WhatsApp excerpts to
+      the AI, photo libraries see the IP (thumbnails load directly), a deleted household's sent messages stay,
+      deleting an account does not delete notes sent to us. TERMS_VERSION unchanged (nobody asked to agree again).
+      The in-app panel (`privacyEntries`) likewise: two new entries, the photo and AI lines corrected.
+    - The Firefox job no longer prints the support address; Family Access's placeholder no longer holds his name.
+    - **Open, for Tony** (in the report): the git history; self-hosting fonts and libraries; a fixed retention for
+      notes/errors/summaries; clearing the old family data after the move; what OWNER_SECONDARY_EMAIL is for (unused).
   - **v38.27 + Worker v74 — no e-mail address written out in the public source (13 Oct 2026).** Tony: "bots and
     hackers scan the web looking for email addresses … Is there a (legal) way to hide such open-text addresses";
     then "Yes, go ahead with v38.27". The privacy statement must stay public and readable (GDPR art. 13, Israel's

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.27 -->
+<!-- Tony's Recipes Collection v38.28 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -791,6 +791,15 @@ function pruneSyncLog(now) {
 
 // The recorder. Newest first, so the viewer and the cap agree on which end is
 // old without re-sorting.
+// v38.28 — the privacy audit: the log is sent along with notes and reports, and it had
+// recorded OTHER people's addresses (whom a link request went to, the household's new owner).
+// Every address is shortened to its first letter and its domain — enough to tell a work
+// address from a Gmail one, not enough to write to anyone. New entries are shortened as they
+// are written, and the report shortens any entry written before this release.
+function logMaskAddresses(t) {
+  return String(t).replace(/([^\s@<>()"'`:,;=\/\\[\]{}|])[^\s@<>()"'`:,;=\/\\[\]{}|]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g, '$1\u2026@$2');
+}
+window.logMaskAddresses = logMaskAddresses;
 function syncLog(kind, message, data) {
   // v38.15 — a fault the app notes is reported where `insights` is on (the beta,
   // the test copy), whether or not the log is kept on this device.
@@ -805,7 +814,7 @@ function syncLog(kind, message, data) {
       // becomes an ERROR, which is a trap: a routine message logged under a
       // kind that does not exist is counted as a fault. Say so in debug.
       k: LOG_KINDS.indexOf(kind) === -1 ? (dlog('[syncLog] unknown kind "' + kind + '"'), 'error') : kind,
-      m: String(message == null ? '' : message).slice(0, LOG_MSG_MAX)
+      m: logMaskAddresses(String(message == null ? '' : message)).slice(0, LOG_MSG_MAX)
     };
     // v36.3 — events the SELF TEST SUITE caused are marked and excluded from the
     // analysis. Half of what the suite does is fail on purpose: "boom", "AI
@@ -816,7 +825,7 @@ function syncLog(kind, message, data) {
     // use for it — they just are not evidence about the app.
     if (typeof _selfTestRunning !== 'undefined' && _selfTestRunning) entry.t = 1;
     if (data !== undefined && data !== null) {
-      entry.d = String(typeof data === 'string' ? data : JSON.stringify(data)).slice(0, LOG_MSG_MAX);
+      entry.d = logMaskAddresses(String(typeof data === 'string' ? data : JSON.stringify(data))).slice(0, LOG_MSG_MAX);
     }
     var list = readSyncLog();
     list.unshift(entry);
@@ -999,7 +1008,7 @@ function syncLogReportText() {
     L.push('  ' + new Date(e.at).toISOString() + '  ' + (e.t ? '[test] ' : '') + (e.k + '        ').slice(0,9) + e.m
          + (e.d ? '  ' + e.d : ''));
   });
-  return L.join('\n');
+  return logMaskAddresses(L.join('\n'));   // v38.28 — also entries written before addresses were shortened
 }
 window.syncLogReportText = syncLogReportText;
 
@@ -5813,6 +5822,12 @@ async function accountDelete(opts) {
       kept.forEach(function(d){ krefs.push(d.ref); });
       for (var k = 0; k < krefs.length; k++) await krefs[k].delete();
     }
+    // v38.28 — the privacy audit: the account's own small records went on existing after it —
+    // which household it last opened (homes/<uid>) and its settings (users/<uid>/prefs: the
+    // terms it agreed to, the offers it was shown, display choices). Gone with it now.
+    var ownRefs = [hhDb().collection('homes').doc(user.uid)];
+    ['legal', 'offers', 'ui'].forEach(function(p){ ownRefs.push(hhDb().collection('users').doc(user.uid).collection('prefs').doc(p)); });
+    for (var o = 0; o < ownRefs.length; o++) { try { await ownRefs[o].delete(); } catch(e) {} }
     syncLog('auth', 'Deleting the account: its collections and places are done', user.email);
     progressStep(2, 'Your sign-in…');
     try { await user.delete(); }
@@ -7160,7 +7175,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.27';
+var APP_VERSION = 'v38.28';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9997,7 +10012,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.27</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.28</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10712,7 +10727,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.27</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.28</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -28114,12 +28129,12 @@ var WA_NOISE_DOMAINS = new RegExp('^(' + [
   // Our own app, and the plumbing under it.
   'rozinante2004-hash\\.github\\.io','api\\.github\\.com','github\\.com',
   'firestore\\.googleapis\\.com','.*\\.firebaseapp\\.com','.*\\.netlify\\.app','.*\\.vercel\\.app',
-  // Banking, insurance, government, health, parking, post.
-  '.*isracard.*','buyme\\.co\\.il','clalbit\\.co\\.il','.*menoramivt\\.co\\.il','migdal\\.co\\.il',
-  'ps\\.btl\\.gov\\.il','.*\\.gov\\.il','go\\.gov\\.il','my\\.gov\\.il','ecom\\.gov\\.il',
-  'l5k\\.me','postil\\.co\\.il','.*sbparking.*','mar-ltd\\.com','geffenmedical\\.co\\.il',
-  'goodbyepain\\.co\\.il','sleeplessness\\.org\\.il','metabolix\\.co\\.il','.*shekelgroup.*',
-  'amat\\.service-now\\.com','urldefense\\.com','tor4you\\.co\\.il','4u\\.isracard\\.co\\.il',
+  // Government, post, gift vouchers, work IT. v38.28 — the privacy audit: this line used to
+  // name the card company, insurers, clinics, parking and employer found in one person's chats
+  // (the source is public). Such links are now hidden only when the words around them say
+  // sale or sign-up (WA_PROMO_TEXT); otherwise they are listed, and hiding one is a checkbox.
+  'buyme\\.co\\.il','ps\\.btl\\.gov\\.il','.*\\.gov\\.il','go\\.gov\\.il','my\\.gov\\.il','ecom\\.gov\\.il',
+  'postil\\.co\\.il','.*\\.service-now\\.com','urldefense\\.com',
   // Shopping. Marketplaces first, then the shops this chat actually links to.
   '.*aliexpress\\.com','a\\.co','amzn\\.to','.*amazon\\..*','.*temu\\.com','.*ebay\\..*',
   'ksp\\.co\\.il','zap\\.co\\.il','ivory\\.co\\.il','ace\\.co\\.il','.*iherb\\..*','wisebuy\\.co\\.il',
@@ -30301,15 +30316,22 @@ function privacyEntries() {
     { who: 'Google Sign-in', when: signedIn ? 'always, while signed in' : 'only when you sign in', on: true,
       sends: 'Your e-mail address, so the app knows who you are. Nothing else.' },
     { who: 'Anthropic (Claude, the AI)', when: 'only when you use an AI feature', on: true,
-      sends: 'The text of what you asked about \u2014 a recipe to translate, a page to import, a question to the help assistant. '
-           + 'Not your photos.' },
+      sends: 'The text of what you asked about \u2014 a recipe to translate, a page to import, a question to the help assistant'
+           + (featureOn('whatsapp') ? ', the parts of your WhatsApp chats that answer a question you asked them' : '')
+           + '. Not your photos \u2014 only a picture of a recipe you ask it to read.' },
+    // v38.28 — the privacy audit: these were missing. Loading the app at all asks Google and
+    // Cloudflare for its fonts and code libraries; a video import goes to Google's Gemini.
+    { who: 'Google and Cloudflare (the app\u2019s fonts and code libraries)', when: 'every time the app opens', on: true,
+      sends: 'Nothing of yours \u2014 like any website you visit, they see your device\u2019s internet address when the app loads its fonts and code from them.' },
+    { who: 'Google Gemini and YouTube', when: 'only when you import a recipe from a video', on: true,
+      sends: 'The video\u2019s address, or the video you chose. Google may use what it is sent under its own terms.' },
     { who: 'The app\u2019s own server', when: 'when you import, search for a photo, use the AI, or send a note'
         + (insightsOn() ? ' \u2014 and, in this test copy, now and then by itself' : ''), on: true,
       sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.'
         // v38.15 — the beta and the test copy report by themselves (Worker v69).
         + (insightsOn() ? ' In this test copy it also sends, by itself, the app\u2019s own error messages and how many times each feature was used \u2014 names and numbers, never your recipes.' : '') },
     { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Openverse)', when: 'only when you search for a photo', on: true,
-      sends: 'The search words. Not your recipes, and not who you are.' },
+      sends: 'The search words, never your recipes. Your device then loads the pictures it shows from them, so they see its internet address, as any website does.' },
     { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,
       sends: 'The address of the page you are importing \u2014 nothing about you.' },
   ].concat(
@@ -32918,7 +32940,7 @@ window.onHeaderScroll = onHeaderScroll;
                  this the owner's name was catalogued like a button label and sat
                  in the dictionary as an orphan for ever — nothing translates a
                  name, and a model asked to try will transliterate it. -->
-            <div class="access-name" id="ownerName" data-no-i18n>Tony Schvekher</div>
+            <div class="access-name" id="ownerName" data-no-i18n>—</div>
             <div class="access-email" id="ownerEmail" data-no-i18n>—</div>
           </div>
           <div class="access-badge access-badge-full">Full access</div>

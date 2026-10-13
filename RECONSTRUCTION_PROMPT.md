@@ -39,7 +39,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKey`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.27` — app. **Worker: v74**, deployed separately and versioned separately
+**Current version:** `v38.28` — app. **Worker: v74**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -393,6 +393,11 @@ under its plain path only (a `?url=` request goes network-first).
   holds them. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
   and publish jobs strip any): the files are public, and a member's address once reached them through a
   tooltip.
+- **Privacy by default (v38.26–v38.28; AUDIT-2026-10-privacy.md):** no e-mail address is written in any public
+  file or job log (§1b.5); the device log shortens every address (`logMaskAddresses`); deleting an account also
+  deletes `homes/<uid>` and `users/<uid>/prefs/*`; test data is made up, never copied from real chats or
+  accounts; the privacy statement (1.3, 11 languages) and the in-app panel name every service that receives
+  anything, including what loads on every open (fonts and code from Google and Cloudflare).
 - **Sign-in options per copy** (`APP_CONFIG.signIn`): Google (all), password + e-mail link
   (community, test); Microsoft and Apple built but off. Sign-in runs on each copy's own address
   (`authDomain` = the site; Firebase's helper files served at `/__/auth/`).
@@ -434,7 +439,7 @@ his live recipes (households link only within one copy), keeping every owner cap
 ### 1b.11 Files added in this era
 
 `manage.js` (the owner's 📊 Households) · `privacy*.html`, `terms*.html`, `legal-i18n.js`,
-`privacy-extension.html` · `extension/` (content.js, content.css, background.js, appmark.js, shared.js,
+`privacy-extension.html` · `AUDIT-2026-10-privacy.md` · `extension/` (content.js, content.css, background.js, appmark.js, shared.js,
 config.js, options.html, options.js, STORE.md, PRIVACY.md, store/) and `downloads/` (zips +
 `extension-version.json`) · `worker/wrangler.jsonc` · `i18n/<lang>.json`, `i18n/index.json`,
 `i18n/archive/` · `tools/`: build.js, environments.json, build-extension.mjs, publish-extension.mjs,

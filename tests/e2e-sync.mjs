@@ -603,11 +603,18 @@ try {
     ok('…and the new owner can hand it back', ((await restDoc('households/' + HID)) || {}).ownerUid === aUid
        && ((await restDoc('households/' + HID + '/members/' + bUid)) || {}).role === 'admin');
     const nHid = nh.hid, nUid = await uidOnPage(N);
+    // v38.28 — the account's own small records (its home pointer, its settings), made while it is still
+    // in its household (the rules allow a home only there), must be gone once the account is.
+    await inPage(N, async (a) => { await hhDb().collection('users').doc(a.u).collection('prefs').doc('ui').set({ theme: 'dark' });
+      await hhDb().collection('homes').doc(a.u).set({ hid: a.h }); }, { u: nUid, h: nHid });
+    const hadOwn = !!(await restDoc('homes/' + nUid)) && !!(await restDoc('users/' + nUid + '/prefs/ui'));
     const gone = await inPage(N, async () => { window.backupSave = async () => {}; return householdDelete({ yes: true, noReopen: true }); });
     ok('an owner deletes their household, with everything in it', gone > 0 && !(await restDoc('households/' + nHid))
        && !(await restDoc('households/' + nHid + '/members/' + nUid)), JSON.stringify(gone));
     const acc = await inPage(N, () => accountDelete({ yes: true, noReload: true }));
     ok('…and then their account', acc === true && await inPage(N, () => !firebase.auth().currentUser), JSON.stringify(acc));
+    ok('…with its own records: which household it opened, and its settings (v38.28)', hadOwn
+       && !(await restDoc('homes/' + nUid)) && !(await restDoc('users/' + nUid + '/prefs/ui')), String(hadOwn));
     // v37.06 — Tony's case: an UNCONFIRMED password account deletes itself,
     // its own household with it (the search for kept places stopped it).
     const pwHid = await inPage(PW, () => (householdOf() || {}).hid), pwUid = await uidOnPage(PW);

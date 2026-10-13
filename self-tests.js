@@ -3622,6 +3622,28 @@ window.SELF_TESTS = [
       if(bad.length) throw new Error(bad.length+' problem(s): '+bad.slice(0,8).join(' · '));
     } },
 
+  { id:'log_masks_addresses', group:'Security', name:'The log shortens every e-mail address to its first letter and domain — it travels with notes and reports (v38.28)',
+    test: async()=>{
+      if(logMaskAddresses('asked anna.cohen@gmail.com and {"to":"bob@work.co.il"}')!=='asked a\u2026@gmail.com and {"to":"b\u2026@work.co.il"}')
+        throw new Error('masked as: '+logMaskAddresses('asked anna.cohen@gmail.com and {"to":"bob@work.co.il"}'));
+      if(logMaskAddresses('5 recipes, 2@3 photos, https://example.com/a')!=='5 recipes, 2@3 photos, https://example.com/a') throw new Error('it changed text with no address');
+      var was=null; try{ was=localStorage.getItem(LOG_KEY); }catch(e){}
+      var on=logEnabled();
+      try{
+        setLogEnabled(true);
+        syncLog('save', 'Asked to link with a household, by e-mail', 'someone.else@example.com');
+        syncLog('save', 'Handed the household over', { to: 'new.owner@example.com' });
+        var raw=localStorage.getItem(LOG_KEY)||'';
+        if(/someone\.else@|new\.owner@/.test(raw)) throw new Error('a full address was written to the log');
+        if(raw.indexOf('s\u2026@example.com')===-1 && raw.indexOf('s\\u2026@example.com')===-1) throw new Error('the shortened address is not in the log');
+        // An entry written before this release is shortened in the report too.
+        var list=JSON.parse(raw); list.unshift({ at:Date.now(), k:'save', m:'old entry', d:'old.style@example.com' }); localStorage.setItem(LOG_KEY, JSON.stringify(list));
+        if(syncLogReportText().indexOf('old.style@')!==-1) throw new Error('the report still carries an old entry\u2019s full address');
+      } finally {
+        try{ if(was===null) localStorage.removeItem(LOG_KEY); else localStorage.setItem(LOG_KEY, was); }catch(e){}
+        setLogEnabled(on);
+      }
+    } },
   { id:'owner_by_fingerprint', group:'Security', name:'No e-mail address is written out in the app: the owner is known by a salted fingerprint, the contact address by its two halves (v38.27)',
     test: async()=>{
       // SHA-256, done by the app itself (synchronously), agrees with the browser's own.
@@ -8810,7 +8832,8 @@ window.SELF_TESTS = [
   { id:'wa_link_classify', group:'WhatsApp', name:'Shops, sign-ups and invites are hidden; recipes are not (5f.11)',
     test: async()=>{
       if(typeof waClassifyLink!=='function') throw new Error('waClassifyLink not defined');
-      // Every one of these is a real row from Tony's own 969-link harvest. The
+      // Every one of these is modelled on a row of Tony's own 969-link harvest (v38.28: the codes in
+      // invitations, vouchers, shares and places replaced — the file is public). The
       // first version flagged only invites and maps, so the top of his list was
       // workshop sign-ups, AliExpress gadgets and bank notices — 62 dismissed by
       // hand before he asked for this.
@@ -8819,30 +8842,30 @@ window.SELF_TESTS = [
         ['https://tidycal.com/drormamalia/grillworkshop',''],
         ['https://popup.fm/dror-mamalia?event_id=deTVLPQR5IRrZyCMxXXC','לא לשכוח להירשם לשידור החי'],
         ['https://meatbalcony.co.il/product/%d7%a1%d7%93%d7%a0%d7%aa/','הזדמנות אחרונה להירשם'],
-        ['https://a.aliexpress.com/_c417uxSl','I just found this on AliExpress: ₪6.41 | Meat Shredder Claws'],
-        ['https://a.co/d/gQFAUIS','מיטר פלוס ב-70 דולר'],
+        ['https://a.aliexpress.com/_aBcDeFgH','I just found this on AliExpress: ₪6.41 | Meat Shredder Claws'],
+        ['https://a.co/d/aBcDeFg','מיטר פלוס ב-70 דולר'],
         ['https://inkbird.com/products/wifi-bluetooth-meat-thermometer-int-14-bw',''],
         ['https://ksp.co.il/item/16697-338588',''],
-        ['https://chat.whatsapp.com/LKOj6yh6dRN6Yq80w1559m?mode=gi_t',''],
+        ['https://chat.whatsapp.com/AbCdEfGhIjKlMnOpQrStUv?mode=gi_t',''],
         ['https://t.me/haregakaniti','בחצי מחיר'],
-        ['https://maps.app.goo.gl/5naJpB4ttxMSPg2G8','הוד השרון'],
-        ['https://waze.com/ul/hsvc43hq9s','drive here using Waze'],
+        ['https://maps.app.goo.gl/AbCdEfGhIjKlMnOp9','תל אביב'],
+        ['https://waze.com/ul/hsv0000000','drive here using Waze'],
         ['https://rozinante2004-hash.github.io/tonys-recipes',''],
         ['https://api.github.com/repos/rozinante2004-hash/tonys-recipes/contents/whatsapp/',''],
-        ['https://buyme.co.il/W2i8qm57ko988j','זכית בשובר BUYME בשווי 75 ₪'],
+        ['https://buyme.co.il/AbCdEfGh123456','זכית בשובר BUYME בשווי 75 ₪'],
         ['https://go.gov.il/Hodaot','ממתינה לך הודעה ברשות המסים'],
         ['https://askubuntu.com/questions/38566/hard-drive',''],
-        ['https://chatgpt.com/share/6929c061-c664-8010-8882-b6860b369330',''],
-        ['https://www.instagram.com/the.knife.dr?igsh=NXlqbXF2OXV6Z3hw',''],
+        ['https://chatgpt.com/share/00000000-0000-4000-8000-000000000000',''],
+        ['https://www.instagram.com/the.knife.dr?igsh=AbCdEfGhIjKl',''],
         ['https://youtube.com/@crazebiltongandsausages','שלום חברים, שמי רז'],
-        ['https://share.temu.com/uOtE5fgjckA',''],
+        ['https://share.temu.com/aBcDeFgHiJk',''],
         ['https://x.com/rainmaker1973/status/1631317449768329217',''],
         ['https://docs.google.com/forms/d/e/1FAIpQLSd9/viewform','למילוי הסקר'],
-        ['https://amzn.to/4vkuaj6','ב-42 ש"ח בלבד כולל משלוח חינם'],
+        ['https://amzn.to/4aBcDeF','ב-42 ש"ח בלבד כולל משלוח חינם'],
         // These two are caught by the MESSAGE alone — bit.ly and an unknown shop
         // are not on any domain list, and could be anything. Without them the
         // promo rule was dead code that no test could see.
-        ['http://bit.ly/4j62UQP','התפנה מקום אחד בסדנת גריל גז הערב 19:00 תל מונד, לפרטים והרשמה'],
+        ['http://bit.ly/4aBcDeF','התפנה מקום אחד בסדנת גריל גז הערב 19:00 תל מונד, לפרטים והרשמה'],
         ['https://someshop.example/x/1','קופון בשווי 800 ₪ לרכישת גריל גז 3 מבערים, מבצע לזמן מוגבל']
       ];
       var KEEP=[
@@ -8856,7 +8879,7 @@ window.SELF_TESTS = [
         ['https://www.instagram.com/reel/DPyJb51CPHV/','לחמניית עוף'],
         ['https://youtube.com/shorts/DssxlU_qCMU?si=iRa',''],
         ['https://www.facebook.com/reel/642531595088907','מיונז ביצים קשות'],
-        ['https://share.google/4wf6jGt1ps21tcjFX','Source: גולאש הונגרי קלאסי | השולחן']
+        ['https://share.google/aBcDeFgHiJkLmNoPq','Source: גולאש הונגרי קלאסי | השולחן']
       ];
       var wrong=[];
       NOISE.forEach(function(c){ if(!waClassifyLink(c[0],c[1]).noise) wrong.push('kept noise: '+c[0].slice(0,60)); });
@@ -16709,7 +16732,7 @@ window.SELF_TESTS = [
     test: async()=>{
       var t=[
         '[27/05/2024, 9:35:09] Group: ‎Messages and calls are end-to-end encrypted.',
-        '[21/10/2025, 18:57:08] +972 52-452-9054: ‎+972 52-452-9054 joined using a group link',
+        '[21/10/2025, 18:57:08] +1 202-555-0143: ‎+1 202-555-0143 joined using a group link',   // v38.28 — a number reserved for fiction
         '[21/10/2025, 18:58:00] Dana: You want 55C in the centre for medium rare, then rest it.',
         '[21/10/2025, 18:59:00] Roni: ‎Roni left',
         '[21/10/2025, 19:00:00] Tony: I left the brisket in the oven overnight at 90C and it was the best one yet, genuinely worth the wait.'

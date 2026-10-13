@@ -110,8 +110,9 @@ async function listing() {
   const mailNow = tr(a.d.support_email) || '';
   if (contact && (mailNow !== contact || supNow !== home)) {
     const r = await amo('addons/addon/' + id + '/', { method: 'PATCH', json: { support_email: { 'en-US': contact }, support_url: { 'en-US': home } } });
-    console.log(r.status < 300 ? 'support: ' + contact + ', ' + home + (mailNow ? ' (was ' + mailNow + ')' : '') : '::warning::support e-mail and site not set (' + r.status + '): ' + say(r));
-  } else if (contact) console.log('support: ' + contact + ', ' + home);
+    // v38.28 — the log of a public repository's job is public: no address in it.
+    console.log(r.status < 300 ? 'support: the app\'s contact address, ' + home + (mailNow ? ' (the address was changed)' : '') : '::warning::support e-mail and site not set (' + r.status + '): ' + say(r));
+  } else if (contact) console.log('support: the app\'s contact address, ' + home);
 }
 
 // 1. Is the add-on there yet, and does it already have this version?
