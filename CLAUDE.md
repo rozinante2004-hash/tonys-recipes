@@ -86,7 +86,20 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.33** (on `test`, not released): (1) turning a household's Extra on in 📊 Households applies at once to the
+- **v38.34** (on `test`): **the iPhone Safari tab breaks the database SDK's device copy.** Tony, using the iPhone
+  shortcut (move day, 18:54 UTC): "FIRESTORE (12.19.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: b815) …
+  Attempt to get a record from database without an in-progress transaction" ×279, "…open a cursor…" ×56+19 —
+  from the moment the Safari tab opened (UA: Safari tab, not the installed app). A known Firestore/WebKit IndexedDB
+  fault (several tabs — each shortcut use opens one — or a tab put away). Now: `fsMemoryOnly()` — an iPhone/iPad
+  Safari tab (`fsAppleTab(ua, touch, installed)`) or a tab where it already broke (sessionStorage
+  `mkn_fs_memory`) starts WITHOUT enablePersistence (online only); `fsBroken(msg)` (from the error and
+  unhandledrejection handlers, `fsIsIdbBreak` by wording) sets that flag and offers ONE "🔄 Reload the app"
+  instead of a toast per repeat. The installed app keeps its device copy. Self-test `firestore_ios_safari_copy`.
+  Also seen in that log: the Safari tab opened Tony's OLD beta test household ("Read 6 recipe(s)") — Safari keeps
+  its own HOUSEHOLD_KEY; with two households he owns, a fresh context picks the first owner one. He switches once
+  in Safari (or deletes the test household).
+- **Released: v38.33 (13 Oct 2026, Tony's "Yes, release v38.33 once CI is green", CI green on e105ee0).**
+- **v38.33**: (1) turning a household's Extra on in 📊 Households applies at once to the
   household open on this device (Tony: Gmail on, but no 📧 Gmail Setup until a reload). (2) **Gmail on the
   iPhone** — Tony: "stuck on 'Requesting Gmail access…'" (the PC worked, after he enabled the Gmail API in the
   family project 313792199018 = recipes-f379d, whose OAuth client he uses; keep that project when the old data is

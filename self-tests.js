@@ -10356,6 +10356,27 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'firestore_ios_safari_copy', group:'Sync', name:'🍏 iPhone Safari tabs work online only (the database SDK’s device copy breaks there); once it breaks anywhere: one Reload offer, not an error per repeat, and the next start is online-only (v38.34)',
+    test: async()=>{
+      var iph='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';
+      var ipad='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
+      if(!fsAppleTab(iph, 5, false) || !fsAppleTab(ipad, 5, false)) throw new Error('an iPhone or iPad Safari tab is not recognised');
+      if(fsAppleTab(iph, 5, true)) throw new Error('the installed app lost its device copy too');
+      if(fsAppleTab(ipad, 0, false) || fsAppleTab('Mozilla/5.0 (Windows NT 10.0) Chrome/140 Safari/537.36', 0, false)) throw new Error('a computer was taken for an iPhone');
+      var m='FIRESTORE (12.19.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: b815) CONTEXT: {"tl":"Attempt to get a record from database without an in-progress transaction"}';
+      if(!fsIsIdbBreak(m) || !fsIsIdbBreak('Attempt to open a cursor in database without an in-progress transaction') || fsIsIdbBreak('Failed to fetch'))
+        throw new Error('the broken device copy is not recognised by its wording');
+      var kept=null; try{ kept=sessionStorage.getItem(FS_MEMORY_KEY); }catch(e){}
+      try{
+        sessionStorage.removeItem(FS_MEMORY_KEY);
+        if(fsMemoryOnly()) throw new Error('this computer’s browser started online-only');
+        if(fsBroken('Failed to fetch')!==false || fsMemoryOnly()) throw new Error('an ordinary error was taken for the broken copy');
+        if(fsBroken(m)!==true || !fsMemoryOnly()) throw new Error('after the copy broke, the next start would use it again');
+        if(!/if \(!\(typeof window\.fsMemoryOnly === 'function' && window\.fsMemoryOnly\(\)\)\) \{\s*_fbDb\.enablePersistence/.test(document.documentElement.innerHTML)) throw new Error('the start does not ask fsMemoryOnly before keeping a device copy');
+      } finally {
+        try{ if(kept===null) sessionStorage.removeItem(FS_MEMORY_KEY); else sessionStorage.setItem(FS_MEMORY_KEY, kept); }catch(e){}
+      }
+    } },
   { id:'gmail_iphone_tap', group:'Sharing', name:'📧 Gmail on an iPhone: the e-mail window fetches Google’s script first, so the tap on Send reaches Google at once; a tap before it arrives asks for a second tap, never hangs (v38.33)',
     test: async()=>{
       var real={ g:window.google, id:window._gmailOAuthClientId, load:window.loadScriptOnce, send:window.sendViaGmailApi, toast:window.toast, ov:Object.assign({}, window._featureOverride), rec:recipes };

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.33 -->
+<!-- Tony's Recipes Collection v38.34 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -559,10 +559,18 @@
         else if (n < 50) setTimeout(function(){ finishLink(n + 1); }, 100);
       })(0);
 
-      _fbDb.enablePersistence({synchronizeTabs: true}).catch(function(e) {
-        if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
-          console.warn('Persistence error:', e.code);
-      });
+      // v38.34 — Tony's iPhone, move day: "Firestore (12.19.0) INTERNAL ASSERTION FAILED: Unexpected state
+      // (ID: b815) … Attempt to get a record from database without an in-progress transaction" ×494, from a
+      // Safari tab the iPhone shortcut opened. The SDK's IndexedDB copy breaks in iOS Safari tabs (several of
+      // them open — each shortcut opens one — or one put away and brought back) and the client stops working.
+      // A Safari tab on an iPhone or iPad (not the installed app) now works online only; and once the copy
+      // has broken anywhere, this tab's next start is online-only too (fsMemoryOnly, fsBroken below).
+      if (!(typeof window.fsMemoryOnly === 'function' && window.fsMemoryOnly())) {
+        _fbDb.enablePersistence({synchronizeTabs: true}).catch(function(e) {
+          if (e.code !== 'failed-precondition' && e.code !== 'unimplemented')
+            console.warn('Persistence error:', e.code);
+        });
+      }
 
       // v37.57 — the sign-in token the Worker checks for AI per household,
       // kept fresh (Firebase renews it hourly and says so here).
@@ -7367,7 +7375,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.33';
+var APP_VERSION = 'v38.34';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -7930,6 +7938,40 @@ function recordError(kind, message, where) {
 }
 window.recentErrors = function(){ return _recentErrors.slice(); };
 
+// v38.34 — the database SDK's own device copy (IndexedDB) broken under it (an iOS Safari fault): see
+// enablePersistence. Recognised by its wording; met once, this tab offers one reload, which starts
+// without the device copy — instead of an error message for every one of hundreds of repeats.
+var FS_MEMORY_KEY = 'mkn_fs_memory';
+function fsIsIdbBreak(msg) { return /INTERNAL ASSERTION FAILED|without an in-progress transaction|Unexpected state \(ID: b815\)/.test(String(msg || '')); }
+// An iPhone's or iPad's Safari tab — not the app installed on the home screen.
+window.fsAppleTab = function (ua, touch, installed) {
+  ua = String(ua || '');
+  var apple = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (touch || 0) > 1);
+  return apple && !installed;
+};
+window.fsMemoryOnly = function () {
+  try { if (sessionStorage.getItem(FS_MEMORY_KEY) === '1') return true; } catch(e) {}
+  var installed = false;
+  try { installed = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; } catch(e) {}
+  return window.fsAppleTab(navigator.userAgent, navigator.maxTouchPoints, installed);
+};
+var _fsBrokenShown = false;
+function fsBroken(msg) {
+  if (!fsIsIdbBreak(msg)) return false;
+  try { sessionStorage.setItem(FS_MEMORY_KEY, '1'); } catch(e) {}
+  if (_fsBrokenShown || (typeof _selfTestRunning !== 'undefined' && _selfTestRunning)) return true;
+  _fsBrokenShown = true;
+  setTimeout(function(){
+    if (typeof askConfirm !== 'function') return;
+    askConfirm({ icon: '\u{1F504}', title: 'Reload the app',
+      message: 'This browser lost the app\u2019s copy of your recipes on this device (a known iPhone Safari problem). '
+        + 'Nothing is lost \u2014 your recipes are in the cloud. Reload, and the app carries on without that copy.',
+      okLabel: 'Reload', cancelLabel: 'Later' }).then(function(ok){ if (ok === true) location.reload(); });
+  }, 300);
+  return true;
+}
+window.fsBroken = fsBroken; window.fsIsIdbBreak = fsIsIdbBreak;
+
 // Global error handler — catch silent JS errors and show them
 window.addEventListener('error', function(e) {
   // v36.98 — "Script error." is all a browser says about an error inside a
@@ -7941,6 +7983,7 @@ window.addEventListener('error', function(e) {
     msg = 'Script error. (inside a script from another site — the browser hides the details)';
   console.error('[Global error]', msg, e.filename, e.lineno, e.error && e.error.stack);
   recordError('error', msg, (e.filename || '') + (e.lineno ? ':' + e.lineno : ''));
+  if (fsBroken(msg)) return;   // v38.34 — one Reload offer, not a toast per repeat
   if (typeof toast === 'function') toast('⚠️ Error: ' + msg);
 });
 // A rejected promise never reaches the handler above, and most of this app's
@@ -7950,6 +7993,7 @@ window.addEventListener('unhandledrejection', function(e) {
   var m = (e && e.reason && (e.reason.message || e.reason)) || 'unknown';
   console.error('[Unhandled rejection]', m);
   recordError('unhandled-rejection', m, '');
+  fsBroken(m);   // v38.34
 });
 
 </script>
@@ -10231,7 +10275,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.33</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.34</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10946,7 +10990,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.33</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.34</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
