@@ -90,7 +90,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.37** (on `test`): **the ONE iPhone shortcut.** Tony fixed his "Save to My Kitchen Notes" (the Text is
+- **Released: v38.37 (14 Oct 2026, 01:37 Israel time, Tony's "Sure. Please go ahead", CI green on 46bad8d).**
+  All jobs success (Pages, Translate new phrases, Publish languages, Cloudflare Pages beta + test, Self Tests on
+  main at 01:48). Then the authenticator, spare first: iPhone Safari says "Private Browsing unavailable" (iOS
+  27.0.1; not the Screen Time web filter — his Content & Privacy Restrictions has no Web Content row). NOT a
+  normal tab with the spare: `signInCloudSync` uploads the device's cached recipes when the signed-in account's
+  household is empty (>5 recipes) — the family's 62 could land in the spare's household (task: tie local data to
+  its account). Route given: Chrome Incognito on his PC + the setup key typed into iPhone Passwords → Codes → +.
+- **v38.37**: **the ONE iPhone shortcut.** Tony fixed his "Save to My Kitchen Notes" (the Text is
   now only `https://mykitchennotes.community/?url=` + URL Encoded Text) — "The shortcut works now" — and shared
   its iCloud link: https://www.icloud.com/shortcuts/3dfda89e7d04454496d0acc527284190. It is `iosShortcutUrl` for
   the beta (tools/environments.json) AND the family copy (index.html; it forwards anyway), replacing the family's
