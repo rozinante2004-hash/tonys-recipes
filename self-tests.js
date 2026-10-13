@@ -10356,6 +10356,46 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'owner_totp_rest', group:'Sharing', name:'🔐 The owner’s authenticator works with the app’s Firebase library (its compat layer has no TOTP): set-up, enrolment and sign-in steps go to Google’s Identity Toolkit, in the library’s own shape (v38.35)',
+    test: async()=>{
+      if(!window.TOTP_REST || totpApi()!==(window._totpApiOverride || (firebase.auth && firebase.auth.TotpMultiFactorGenerator) || TOTP_REST)) throw new Error('no authenticator API');
+      if(!window._totpApiOverride && !(firebase.auth && firebase.auth.TotpMultiFactorGenerator) && totpApi()!==TOTP_REST) throw new Error('the stand-in is not used where the library lacks TOTP');
+      var real=window.fetch, sent=[], answer=null;
+      try{
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push({ url:String(u), body:b });
+          return new Response(JSON.stringify(answer.body), { status:answer.status }); };
+        // 1. Start: the ID token in the enrolment session goes to mfaEnrollment:start.
+        answer={ status:200, body:{ totpSessionInfo:{ sharedSecretKey:'JBSWY3DPEHPK3PXP', verificationCodeLength:6, hashingAlgorithm:'SHA1', periodSec:30, sessionInfo:'SESS-1', finalizeEnrollmentTime:'2026-10-13T20:00:00Z' } } };
+        var secret=await TOTP_REST.generateSecret({ type:'enroll', credential:'ID-TOKEN-1' });
+        var c=sent[0];
+        if(!/identitytoolkit\.googleapis\.com\/v2\/accounts\/mfaEnrollment:start\?key=/.test(c.url) || c.body.idToken!=='ID-TOKEN-1' || !c.body.totpEnrollmentInfo) throw new Error('start: '+JSON.stringify(c));
+        if(secret.secretKey!=='JBSWY3DPEHPK3PXP') throw new Error('the setup key: '+secret.secretKey);
+        var url=secret.generateQrCodeUrl('owner@example.com', 'My Kitchen Notes');
+        if(url!=='otpauth://totp/My%20Kitchen%20Notes:owner%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=My%20Kitchen%20Notes&algorithm=SHA1&digits=6') throw new Error('the authenticator link: '+url);
+        // 2. Enrol: Firebase calls _process(auth, enrol session, name); the code and the session's sessionInfo go to finalize.
+        answer={ status:200, body:{ idToken:'NEW-ID', refreshToken:'NEW-REFRESH' } };
+        var a=TOTP_REST.assertionForEnrollment(secret, '123456');
+        if(a.factorId!=='totp' || typeof a._process!=='function') throw new Error('the enrolment assertion has not the library’s shape');
+        var r=await a._process({}, { type:'enroll', credential:'ID-TOKEN-2' }, 'Authenticator app');
+        c=sent[1];
+        if(!/mfaEnrollment:finalize/.test(c.url) || c.body.idToken!=='ID-TOKEN-2' || c.body.displayName!=='Authenticator app'
+          || c.body.totpVerificationInfo.sessionInfo!=='SESS-1' || c.body.totpVerificationInfo.verificationCode!=='123456') throw new Error('finalize enrolment: '+JSON.stringify(c));
+        if(r.idToken!=='NEW-ID' || r.refreshToken!=='NEW-REFRESH') throw new Error('the new tokens are not handed back to the library');
+        // 3. Sign-in: the pending credential, the enrolment id and the code go to mfaSignIn:finalize.
+        var b=TOTP_REST.assertionForSignIn('ENROLL-ID', '654321');
+        await b._process({}, { type:'signin', credential:'PENDING-CRED' });
+        c=sent[2];
+        if(!/mfaSignIn:finalize/.test(c.url) || c.body.mfaPendingCredential!=='PENDING-CRED' || c.body.mfaEnrollmentId!=='ENROLL-ID' || c.body.totpVerificationInfo.verificationCode!=='654321')
+          throw new Error('finalize sign-in: '+JSON.stringify(c));
+        // 4. A wrong code: Firebase's own error code, so the app asks for the newest one.
+        answer={ status:400, body:{ error:{ code:400, message:'INVALID_CODE' } } };
+        var code=''; try{ await b._process({}, { type:'signin', credential:'PENDING-CRED' }); }catch(e){ code=e.code; }
+        if(code!=='auth/invalid-verification-code') throw new Error('a wrong code came back as '+code);
+        answer={ status:400, body:{ error:{ code:400, message:'OPERATION_NOT_ALLOWED' } } };
+        code=''; try{ await TOTP_REST.generateSecret({ type:'enroll', credential:'X' }); }catch(e){ code=e.code; }
+        if(code!=='auth/operation-not-allowed') throw new Error('TOTP switched off came back as '+code);
+      } finally { window.fetch=real; }
+    } },
   { id:'firestore_ios_safari_copy', group:'Sync', name:'🍏 iPhone Safari tabs work online only (the database SDK’s device copy breaks there); once it breaks anywhere: one Reload offer, not an error per repeat, and the next start is online-only (v38.34)',
     test: async()=>{
       var iph='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';

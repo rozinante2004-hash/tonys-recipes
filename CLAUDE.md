@@ -86,7 +86,22 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.34** (on `test`): **the iPhone Safari tab breaks the database SDK's device copy.** Tony, using the iPhone
+- **v38.35** (on `test`): **the owner's authenticator could never start.** Tony, with the spare account: "This
+  browser's sign-in library has no authenticator support." The app loads Firebase's COMPAT library, and
+  @firebase/auth-compat 0.6.11 registers only PhoneMultiFactorGenerator — never TotpMultiFactorGenerator — so
+  `totpApi()` was always null outside the Self Test's stand-in (v38.23's two-step never worked for real; not a
+  v38.29 regression — the vendored file equals the npm package, which is what gstatic serves). Now `TOTP_REST`:
+  generateSecret → POST identitytoolkit /v2/accounts/mfaEnrollment:start {idToken, totpEnrollmentInfo:{}};
+  assertionForEnrollment / assertionForSignIn → objects with factorId 'totp' and `_process(auth, session,
+  displayName)` — the hook the library calls from user.multiFactor.enroll and resolver.resolveSignIn (session
+  .type 'enroll' → credential = ID token → /v2/accounts/mfaEnrollment:finalize {idToken, displayName,
+  totpVerificationInfo:{sessionInfo, verificationCode}}; 'signin' → credential = mfaPendingCredential →
+  /v2/accounts/mfaSignIn:finalize {mfaPendingCredential, mfaEnrollmentId, totpVerificationInfo:{verificationCode}});
+  the {idToken, refreshToken} returned is stored by the library itself. Errors mapped to Firebase's codes
+  (INVALID_CODE → auth/invalid-verification-code, …). The same requests the modular SDK makes. Not testable
+  against Google from here: Tony's first set-up is the real check. Self-test `owner_totp_rest`.
+- **Released: v38.34 (13 Oct 2026, Tony's "Yes. Please do", CI green on 7c18e42).** All jobs success.
+- **v38.34**: **the iPhone Safari tab breaks the database SDK's device copy.** Tony, using the iPhone
   shortcut (move day, 18:54 UTC): "FIRESTORE (12.19.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: b815) …
   Attempt to get a record from database without an in-progress transaction" ×279, "…open a cursor…" ×56+19 —
   from the moment the Safari tab opened (UA: Safari tab, not the installed app). A known Firestore/WebKit IndexedDB

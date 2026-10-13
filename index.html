@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.34 -->
+<!-- Tony's Recipes Collection v38.35 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7375,7 +7375,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.34';
+var APP_VERSION = 'v38.35';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10275,7 +10275,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.34</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.35</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10990,7 +10990,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.34</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.35</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14973,7 +14973,62 @@ function ownerDeviceId() {
   } catch(e) { return 'unknown'; }
 }
 window.ownerDeviceId = ownerDeviceId;
-function totpApi() { return window._totpApiOverride || (window.firebase && firebase.auth && firebase.auth.TotpMultiFactorGenerator) || null; }
+function totpApi() { return window._totpApiOverride || (window.firebase && firebase.auth && firebase.auth.TotpMultiFactorGenerator) || TOTP_REST; }
+// v38.35 — Tony, setting up the spare owner's authenticator: "This browser's sign-in library has no
+// authenticator support." Firebase's COMPAT library (the one this app loads, @firebase/auth-compat 0.6.11)
+// never exposed TotpMultiFactorGenerator — only the phone one — so the owner's two-step (v38.23) could not
+// start anywhere. The three steps it needs are made here against Identity Toolkit's own endpoints, as the
+// modular SDK makes them (startEnrollTotpMfa, finalizeEnrollTotpMfa, finalizeSignInTotpMfa), and handed to
+// the library in its own shape: it calls an assertion's `_process(auth, session, displayName)` with a session
+// of type 'enroll' (credential = the ID token) or 'signin' (credential = the pending MFA credential), and
+// stores the idToken/refreshToken that comes back. Everything else (enrol, resolve, unenrol) stays Firebase's.
+var TOTP_REST = (function () {
+  function call(path, body) {
+    var key = window.APP_CONFIG && APP_CONFIG.firebase && APP_CONFIG.firebase.apiKey;
+    return fetch('https://identitytoolkit.googleapis.com' + path + '?key=' + encodeURIComponent(key || ''), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) {
+        if (r.ok) return d;
+        var m = String((d && d.error && d.error.message) || ('HTTP ' + r.status)), e = new Error(m);
+        e.code = /CODE/.test(m) ? 'auth/invalid-verification-code' : /CREDENTIAL_TOO_OLD|TOKEN_EXPIRED/.test(m) ? 'auth/requires-recent-login'
+          : /OPERATION_NOT_ALLOWED|NOT_ENABLED|not enabled/i.test(m) ? 'auth/operation-not-allowed' : 'auth/internal-error';
+        throw e;
+      }); });
+  }
+  function assertion(finishEnroll, finishSignIn) {
+    return { factorId: 'totp', _process: function (auth, session, displayName) {
+      return session && session.type === 'enroll' ? finishEnroll(session.credential, displayName) : finishSignIn(session && session.credential);
+    } };
+  }
+  return {
+    FACTOR_ID: 'totp', _rest: true,
+    generateSecret: function (session) {
+      return call('/v2/accounts/mfaEnrollment:start', { idToken: session && session.credential, totpEnrollmentInfo: {} }).then(function (d) {
+        var i = (d && d.totpSessionInfo) || {};
+        if (!i.sharedSecretKey || !i.sessionInfo) throw new Error('Google did not start the authenticator set-up.');
+        return { secretKey: i.sharedSecretKey, hashingAlgorithm: i.hashingAlgorithm || 'SHA1', codeLength: i.verificationCodeLength || 6,
+          codeIntervalSeconds: i.periodSec || 30, enrollmentCompletionDeadline: i.finalizeEnrollmentTime || '', sessionInfo: i.sessionInfo,
+          generateQrCodeUrl: function (account, issuer) {
+            return 'otpauth://totp/' + encodeURIComponent(issuer) + ':' + encodeURIComponent(account) + '?secret=' + this.secretKey
+              + '&issuer=' + encodeURIComponent(issuer) + '&algorithm=' + this.hashingAlgorithm + '&digits=' + this.codeLength;
+          } };
+      });
+    },
+    assertionForEnrollment: function (secret, code) {
+      return assertion(function (idToken, displayName) {
+        return call('/v2/accounts/mfaEnrollment:finalize', { idToken: idToken, displayName: displayName || null,
+          totpVerificationInfo: { sessionInfo: secret.sessionInfo, verificationCode: String(code) } });
+      }, function () { return Promise.reject(new Error('An enrolment code was used to sign in.')); });
+    },
+    assertionForSignIn: function (enrollmentId, code) {
+      return assertion(function () { return Promise.reject(new Error('A sign-in code was used to enrol.')); }, function (pending) {
+        return call('/v2/accounts/mfaSignIn:finalize', { mfaPendingCredential: pending, mfaEnrollmentId: enrollmentId,
+          totpVerificationInfo: { verificationCode: String(code) } });
+      });
+    }
+  };
+})();
+window.TOTP_REST = TOTP_REST;
 // Firebase asks for the second step: the 6-digit code from the authenticator app.
 async function mfaResolve(err) {
   var resolver = err && err.resolver;
