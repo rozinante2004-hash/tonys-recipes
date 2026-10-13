@@ -2721,9 +2721,10 @@ window.SELF_TESTS = [
         // v37.40 — each copy offers its OWN shortcut (Tony's links, 2 Oct 2026).
         delete window._iosShortcutOverride;
         // v37.72 — the beta's own (Tony's link, 5 Oct 2026).
-        var own = { live:'https://www.icloud.com/shortcuts/439a17a812d446aeab0ecdfd8a7a5cd6',
+        // v38.37 — since the move one shortcut (Tony, 14 Oct 2026): the family copy and the community copy offer the same.
+        var own = { live:'https://www.icloud.com/shortcuts/3dfda89e7d04454496d0acc527284190',
                     test:'https://www.icloud.com/shortcuts/411eaddfe44243a180cbafdcc0638bdf',
-                    beta:'https://www.icloud.com/shortcuts/d207d5c07d9049bfb311aa13cccef43e' }[String(APP_CONFIG.environment||'live')];
+                    beta:'https://www.icloud.com/shortcuts/3dfda89e7d04454496d0acc527284190' }[String(APP_CONFIG.environment||'live')];
         if(iosShortcutUrl()!==own) throw new Error('this copy offers the wrong shortcut: '+iosShortcutUrl());
         window._iosShortcutOverride='https://www.icloud.com/shortcuts/abc123';
         Object.defineProperty(navigator, 'userAgent', { value:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)', configurable:true });

@@ -90,6 +90,12 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
+- **v38.37** (on `test`): **the ONE iPhone shortcut.** Tony fixed his "Save to My Kitchen Notes" (the Text is
+  now only `https://mykitchennotes.community/?url=` + URL Encoded Text) — "The shortcut works now" — and shared
+  its iCloud link: https://www.icloud.com/shortcuts/3dfda89e7d04454496d0acc527284190. It is `iosShortcutUrl` for
+  the beta (tools/environments.json) AND the family copy (index.html; it forwards anyway), replacing the family's
+  v37.40 link and the beta's v37.72 one. The test copy keeps its own. Self-test `import_ios_share_menu_offer`.
+  This is move-day step 6 done (MOVE DAY CHECKLIST).
 - **Released: v38.36 (14 Oct 2026, 01:04 Israel time, Tony's "Yes, please release it", CI green on 3cedfae).**
   All jobs success (Pages, Translate new phrases, Publish languages, Cloudflare Pages beta + test, Self Tests on
   main at 01:15).
