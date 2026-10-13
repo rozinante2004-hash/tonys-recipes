@@ -82,6 +82,12 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Next: release v38.31 (Tony was unsure — ask), then Tony's steps 5–7 of the MOVE DAY CHECKLIST, and the
   clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
+- **v38.32** (on `test`): Tony, move day — "I would prefer the Beta ribbon to be removed from the Family app, or
+  even better replaced by a different Admin ribbon, in a different color". `envRibbonUpdate()` (from
+  applyOwnerOnlyItems): the app's owner → 👑 ADMIN on green (#1E6B57), title "[ADMIN]"; anyone in a household
+  whose owner is the app's owner (isOwnerAddress(_household.ownerEmail) — the family) → no mark (the strip keeps
+  its height in the header's brown: the iPhone top edge stays as measured), no title prefix; testers → β BETA.
+  Self-test `env_ribbon_admin_family`.
 - Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
   the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
   used — Tony to say what it is for). v38.26 brought:

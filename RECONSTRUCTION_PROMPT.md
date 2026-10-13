@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.31` — app. **Worker: v76**, deployed separately and versioned separately
+**Current version:** `v38.32` — app. **Worker: v76**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -391,6 +391,8 @@ under its plain path only (a `?url=` request goes network-first).
 - **Feedback:** the floating 💬 (community and test) and ⚙️ → ✉️ Send feedback open one form (note,
   optional screenshot, the log), sent to the Worker's inbox; "📨 Answers to my notes" shows replies.
   "📤 Transmit report to admin" and a failed Self Test's "Send to admin?" use the same route.
+- **The community copy's strip (v38.32):** 👑 ADMIN (green) for the app's owner; no mark for the family
+  (members of a household the owner runs — the strip keeps its height); β BETA for everyone else.
 - **Testers' copies only (`insights`):** errors report themselves (no addresses, e-mails masked) and
   names-and-numbers counts per household and month (how recipes arrive; which features are used);
   nothing is counted during a Self Test. **v38.30 (Worker v76) — "all kinds of stats" (the owner, to

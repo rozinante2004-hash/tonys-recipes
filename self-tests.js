@@ -3886,6 +3886,30 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'env_ribbon_admin_family', group:'UI', name:'🎗 The community copy’s strip: 👑 ADMIN for the app’s owner, no mark for the family (a household the owner runs), β BETA for testers — the same height each way (v38.31)',
+    test: async()=>{
+      var rib=document.getElementById('envRibbon');
+      if(String(APP_CONFIG.environment)!=='beta'){ if(typeof envRibbonUpdate!=='function' || envRibbonUpdate()!=='') throw new Error('only the beta strip changes'); return; }
+      if(!rib || !rib.classList.contains('env-beta')) throw new Error('no β BETA strip in the beta');
+      var real={ user:window._fbUser, hh:window._household, title:document.title }, back=stAsOwner();
+      try{
+        var h0=rib.getBoundingClientRect().height, span=rib.querySelector('span');
+        window._fbUser={ uid:'uO', email:ST_OWNER, emailVerified:true };
+        window._household={ hid:'hF', name:'Family', ownerEmail:ST_OWNER };
+        if(envRibbonUpdate()!=='admin' || !rib.classList.contains('env-admin') || !/ADMIN/.test(span.textContent) || !/^\[ADMIN\] /.test(document.title))
+          throw new Error('the owner: '+rib.className+' “'+span.textContent+'” '+document.title);
+        if(getComputedStyle(rib).backgroundImage===getComputedStyle(document.createElement('div')).backgroundImage) throw new Error('the ADMIN strip has no colour of its own');
+        window._fbUser={ uid:'uM', email:'member@example.com', emailVerified:true };
+        if(envRibbonUpdate()!=='quiet' || getComputedStyle(span).visibility!=='hidden' || rib.getAttribute('aria-hidden')!=='true' || /^\[/.test(document.title))
+          throw new Error('the family: '+rib.className+' '+getComputedStyle(span).visibility+' '+document.title);
+        if(Math.abs(rib.getBoundingClientRect().height-h0)>0.5) throw new Error('the strip changed height: '+h0+' → '+rib.getBoundingClientRect().height);
+        window._household={ hid:'hT', name:'Tester', ownerEmail:'tester@example.com' };
+        if(envRibbonUpdate()!=='beta' || rib.classList.contains('env-admin') || rib.classList.contains('env-quiet') || span.textContent!=='β BETA' || !/^\[BETA\] /.test(document.title))
+          throw new Error('a tester: '+rib.className+' “'+span.textContent+'”');
+      } finally {
+        back(); window._fbUser=real.user; window._household=real.hh; envRibbonUpdate(); document.title=real.title;
+      }
+    } },
   { id:'ui_test_copy_marker_covers_nothing', group:'UI', name:'The TEST COPY marking covers no control (v36.76)',
     test: async()=>{
       // v36.72's strip was fixed over the top of the screen; on Tony's iPhone
