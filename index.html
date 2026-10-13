@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.25 -->
+<!-- Tony's Recipes Collection v38.26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4039,7 +4039,7 @@ function renderAccessMembers() {
         ['read','write','admin'].map(function(r){ return '<option value="'+r+'"'+(m.role===r?' selected':'')+'>'+roleLabels[r]+'</option>'; }).join('') +
       '</select>' +
       // v37.09 — send the note again whenever it is needed (Tony: one try is not enough)
-      '<button class="access-role-btn" title="Send ' + escA(m.email) + ' a note about the app" onclick="notifyAccessMember(' + i + ')" style="margin-right:4px;">✉️ Notify</button>' +
+      '<button class="access-role-btn" title="Send this person a note about the app" onclick="notifyAccessMember(' + i + ')" style="margin-right:4px;">✉️ Notify</button>' +
       '<button class="access-remove-btn" onclick="removeAccessMember(' + i + ')">✕</button>' +
       '</div>';
   }).join('');
@@ -7148,7 +7148,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.25';
+var APP_VERSION = 'v38.26';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9985,7 +9985,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.25</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.26</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10700,7 +10700,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.25</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.26</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12489,6 +12489,7 @@ function i18nByteLen(s) {
   }
   return n;
 }
+var I18N_ADDRESS = /[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/;   // v38.26 — see below
 function i18nTranslatable(s) {
   s = String(s == null ? '' : s).trim();
   if (!s || s.length > I18N_MAX_LEN) return false;
@@ -12499,6 +12500,12 @@ function i18nTranslatable(s) {
   // cheerfully rewrite the path. This is also the recipe's `source` field,
   // which is content and must never be touched.
   if (/^(https?:\/\/|www\.)\S+$/i.test(s)) return false;
+  // v38.26 — and so is an e-mail address, anywhere in the text. The ✉️ Notify
+  // button's tooltip named the member ("Send <their address> a note about the
+  // app"), the page walk collected it, and family members' addresses ended up in
+  // the shared translations — which are published as files in a PUBLIC
+  // repository. A sentence that must carry an address puts it in its own element.
+  if (I18N_ADDRESS.test(s)) return false;
   return true;
 }
 
@@ -27223,7 +27230,7 @@ async function useSelectedSearchPhoto() {
 
 // ─── HELP ASSISTANT ───────────────────────────────────────────────────────────
 var HELP_SYSTEM_PROMPT = [
-  "You are the built-in help assistant for Tony's Recipes Collection — a personal recipe manager web app.",
+  "You are the built-in help assistant for My Kitchen Notes — a recipe app for a household (the family's own copy is called Tony's Recipes Collection; the header shows the household's own name).",
   "Answer questions clearly, practically, and in the same language the user writes in (Hebrew or English).",
   "",
   "=== APP OVERVIEW ===",
@@ -27275,13 +27282,13 @@ var HELP_SYSTEM_PROMPT = [
   "- Hebrew recipes: method steps are right-aligned with step numbers on the right",
   "- Tap the photo to change it (upload from device or search web)",
   "- Action buttons: Edit, Translate, Excel, Word, Print, Share, Send to Bring!, Calculate nutrition",
+  "- Scaling also changes the amounts written in the method (\"add 2 eggs\" becomes \"add 4 eggs\" at ×2) — shown in bold; the recipe itself is not changed",
+  "- On a computer, drag the recipe window's bottom-right corner to make it bigger; click the corner once for full size, again for the usual size",
   "",
   "=== SEND TO BRING! ===",
   "- Open a recipe → tap 🛒 Send to Bring!",
   "- Select which ingredients to send (all checked by default)",
-  "- Tap 'Send to Bring!' — ingredients are added to your Bring! shopping list",
-  "- If token expired: a modal guides you to refresh it via web.getbring.com",
-  "- Token needs refreshing approximately every 7 days via the bookmarklet",
+  "- Tap 📲 Open in Bring! — Bring!'s own page opens with those ingredients; choose your list there",
   "",
   "=== FAVOURITES & CLIPS ===",
   "- Tap the ❤ heart on any recipe card to favourite it",
@@ -27316,8 +27323,8 @@ var HELP_SYSTEM_PROMPT = [
   "- Bidirectional: enter either field to convert",
   "",
   "=== SELF TEST ===",
-  "- Click ··· More → 🧪 Self Test",
-  "- Runs 24+ automated tests across UI, Core, CRUD, Modals, Network, Storage, Backup, CSS",
+  "- ⚙️ → 🔧 Troubleshooting → 🧪 Self Test (where it is shown)",
+  "- Runs several hundred automated checks of how the app works on this device",
   "- Select/deselect individual tests or entire groups",
   "- Failed tests show error details, impact, suggested fix, and runtime auto-fix where possible",
   "- All data changes made during tests are reverted",
@@ -27329,18 +27336,39 @@ var HELP_SYSTEM_PROMPT = [
   "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching Pixabay photo for every recipe that has none",
   "- 📏 Scaling memory: the app remembers the last serving size multiplier you used for each recipe",
   "- 🌙 Screen stay-on (Wake Lock): when you open a recipe, the screen stays on automatically so your hands can stay clean while cooking. It goes back to normal sleep when you close the recipe. Works in Chrome and Edge on Android; not supported in Safari.",
-  "- ⏳ Skeleton loading: when the app first loads, animated placeholder cards appear briefly while your recipes render — no more blank white flash",
+  "- ⏳ Placeholder cards appear briefly while your recipes load",
   "",
   "=== YOUR COLLECTION, SHARED (households) ===",
   "- Your recipes live in a household — the name shown at the top of the app. Everyone in it sees the same recipes.",
   "- RENAME it (and so the app's header): ⚙️ → 🏠 My household → 👥 Family Access → ✏️ Rename (the owner, or someone with full access).",
-  "- ADD SOMEONE: Family Access → type their e-mail address, choose a role, Add Member. They join the moment they sign in with that address.",
+  "- ADD SOMEONE: Family Access → type their e-mail address, Add Member. They join (as Read only) the moment they sign in with that address; change their role with the menu next to their name.",
   "- The app sends them nothing by itself: after adding, choose how to tell them (Gmail, Outlook, your mail app, WhatsApp, or copy). ✉️ Notify next to each person sends the note again.",
-  "- INVITATION LINK: Family Access → 🔗 Invitation link… — anyone with it can join for 14 days, with the role chosen.",
+  "- INVITATION LINK: Family Access → 🔗 Invitation link… — anyone with it can join for 14 days, always as Read only.",
+  "- Someone with Read only can tap ✋ Ask to add and change recipes; the owner (or someone with full access) sees it in Family Access and taps ✅ Allow or Decline.",
   "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked the next time they open the app: Accept, Reject or Remind me later. A refusal is never shown to the sender.",
   "- Once linked, each household sees the other's recipes, read-only, under a 🤝 filter with that household's name; 📥 Save a copy to my recipes makes one your own. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
+  "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there (💬 Conversation) — only the household's name is shown, never a person's. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
+  "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
+  "",
+  "=== SAVING RECIPES FROM OTHER APPS ===",
+  "- ⚙️ → 📥 Saving recipes from other apps shows only what fits this device:",
+  "- iPhone: 📱 Save from the iPhone’s Share menu — adds 'Save to My Kitchen Notes' to the Share menu: in Facebook, Instagram, TikTok or Safari tap Share → Save to My Kitchen Notes and the recipe lands here",
+  "- Android: 📱 Save from the phone’s Share menu — installs the app, which then appears in the phone's Share menu",
+  "- Computer: 🧩 Browser extension (Save-recipe button) — adds a Save-recipe button under Facebook, Instagram and TikTok posts and on recipe sites (Chrome, Edge, Firefox)",
+  "- Imports also read Facebook and TikTok links, screenshots (several at once), PDFs and recipe videos; a page with several recipes lets you pick which to keep",
+  "",
+  "=== ABOUT, CONTACT AND FEEDBACK ===",
+  "- ? → ℹ️ About: the version (and Update now when a newer one is out), ✨ What can this app do, ✉️ Contact us, the Privacy Statement and the Terms of Use",
+  "- ✉️ Contact us: write to us by e-mail, or leave a note inside the app",
+  "- Where a 💬 button shows (bottom-left), it sends a note about the app with a screenshot; answers arrive in the app (⚙️ → 💬 Help and feedback → 📨 Answers to my notes)",
+  "- 📲 The share icon next to the language picker sends a link to the app to someone else",
+  "",
+  "=== THE FARM VISITORS ===",
+  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns and says something; then it vanishes in a puff of smoke",
+  "- You can pick an animal up and move it (press and drag)",
+  "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",
   "=== SIGNING IN AND YOUR ACCOUNT ===",
   "- Sign in with Google, or with any e-mail address (a password, or a sign-in link sent to it) where that is offered.",
@@ -27356,7 +27384,8 @@ var HELP_SYSTEM_PROMPT = [
   "- Recipe names are always right-aligned regardless of language",
   "- Method steps in Hebrew recipes are right-aligned with step numbers on the right",
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
-  "- The Self Test button (··· More → 🧪 Self Test) is useful for diagnosing if something stops working",
+  "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
+  "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written",
   "- The sort and filter settings reset when you tap 'All'"
 ].join("\n");
 

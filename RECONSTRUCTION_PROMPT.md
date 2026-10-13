@@ -6,10 +6,10 @@
 > specified."* It is written to be self‑contained: every file, data shape, external service,
 > secret placeholder, and UX behaviour is described so the app can be recreated to parity.
 >
-> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~25,300
+> **Golden rule for the rebuild:** the app is a **single, self‑contained `index.html`** (~33,000
 > lines) plus a handful of supporting files. No framework, no bundler, no npm dependencies in the
 > app. The family's copy IS `index.html`, served as committed; a small plain-Node build
-> (`tools/build.js`) exists only to make the **test copy** from the same file (§1a).
+> (`tools/build.js`) exists only to make the **test and community copies** from the same file (§1a, §1b).
 > Plain ES5‑flavoured vanilla JavaScript (mostly `var`/`function`, some template literals and
 > `async/await`), inline `<style>`, and CDN `<script>` tags. Keep it that way.
 
@@ -30,13 +30,15 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 
 **Live URL:** `https://rozinante2004-hash.github.io/tonys-recipes/`
 **Test copy:** `https://tonys-recipes-test.pages.dev/` (Cloudflare Pages, own Firebase project — §1a)
+**Community app ("My Kitchen Notes", the beta, later the public app):** `https://mykitchennotes.community/`
+(Cloudflare Pages, Firebase project `my-kitchen-notes-beta`, branch `beta` — §1b)
 **Repo:** `https://github.com/rozinante2004-hash/tonys-recipes`
 **Site root repo:** `https://github.com/rozinante2004-hash/rozinante2004-hash.github.io` — serves
 `/__/auth/` (the family app's Google sign-in pages) and a `404.html` that forwards to the app (§1a)
 **Worker:** `https://lively-bread-273a.rozinante2004.workers.dev`
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher", email `rozinante2004@gmail.com`.
-**Current version:** `v38.25` — app. **Worker: v73**, deployed separately and versioned separately
+**Current version:** `v38.26` — app. **Worker: v73**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -99,11 +101,349 @@ slide‑up modal animation.
   added since stay) — or takes a backup / languages file. Every backup carries them (§10).
   Export languages was removed in v36.93 (the repository does its job).
 
+## 1b. The household era, the community app and the owner's tools (v36.84 – v38.26)
+
+Everything in this section came after the single-collection design described in the rest of the
+file. Where the two disagree, **this section wins**. The working notes (`CLAUDE.md`, the bullet
+"WP-D — HOUSEHOLDS" and the release notes under it) hold the long version of each item.
+
+### 1b.1 Three copies, three branches, three Firebase projects
+
+| Copy | Branch | Address | Firebase project | Hosting |
+|---|---|---|---|---|
+| **Family** (`environment: 'live'`) | `main` | `https://rozinante2004-hash.github.io/tonys-recipes/` | `recipes-f379d` | GitHub Pages (`deploy.yml`) |
+| **Test** | `test` | `https://tonys-recipes-test.pages.dev/` | `tonys-recipes-test` | Cloudflare Pages project `tonys-recipes-test` |
+| **Community / beta** | `beta` | `https://mykitchennotes.community/` (old `my-kitchen-notes-beta.pages.dev` and `www.` forward to it) | `my-kitchen-notes-beta` | Cloudflare Pages project `my-kitchen-notes-beta` |
+
+- One `index.html` for all three. The family copy IS the committed file (`node tools/build.js live`
+  must produce a byte-identical `dist/index.html` — CI checks it with `cmp`). The other two are
+  built: `SKIP_AUTH_HELPERS=1 node tools/build.js test|beta --out <dir>`. **Build live first**, then
+  the others (live also writes `dist/`).
+- `tools/environments.json` lists only what differs per copy: `environment`, `firebase{}`,
+  `siteOrigin`, `oldOrigins` (addresses that forward), `sitePath`, `iosShortcutUrl`, `dataLayout`,
+  `extensionStores`, `features{}`, `diagnostics{}`, `signIn{}`, `manifest{name, short_name}`,
+  `homeScreen{title, statusBar}` (rewrites `apple-mobile-web-app-title` and
+  `apple-mobile-web-app-status-bar-style`; refuses a value it does not know), `brand` (test only:
+  teal icons with an orange TEST band). Every `_why_*` key explains its neighbour — keep them.
+  `tools/build.js` refuses a non-live build that still names the live project anywhere except
+  inside `languageSource`, and refuses `FILL-IN` values.
+- **The community copy is the public app** ("My Kitchen Notes", home-screen label "Kitchen Notes",
+  normal icons, a small in-app "β BETA" strip — a gradient: the header's brown, then violet). The
+  family copy keeps the name "Tony's Recipes Collection". New households are named
+  "<first name>'s Kitchen Notes" (`APP_CONFIG.brandName` = "My Kitchen Notes").
+- **Delivery:** all work goes to `test` (CI + the test copy). Only on the owner's explicit yes for
+  that release, with CI green, are `main` AND `beta` fast-forwarded to the same commit:
+  `git push origin <sha>:refs/heads/main <sha>:refs/heads/beta` (check
+  `git merge-base --is-ancestor origin/main <sha>` and the same for beta first). After every release,
+  check each job that ran (below) and record the release in `CLAUDE.md`.
+- **Version strings (five places + one):** line 1 of index.html, `var APP_VERSION`, the two `>vX<`
+  badges, `version.json`, and the "Current version" line of this file (which also names the Worker's
+  version). Edit those lines; never find-and-replace.
+
+**GitHub Actions jobs (`.github/workflows/`)**
+
+| Job | When | What |
+|---|---|---|
+| `self-tests.yml` | every push | the in-app suite on the live, test and beta builds; `tests/worker-cors.mjs`; both rules suites and the e2e sync on the emulators; the extension in real Chromium; the family-move rehearsal (emulator); the live-build `cmp` |
+| `deploy.yml` "Deploy to GitHub Pages" | push to main | the family copy. A failed deploy cannot be re-run ("Multiple artifacts") — dispatch a fresh run |
+| `deploy-worker.yml` | push to main touching the Worker or `worker/wrangler.jsonc` | `tests/worker-cors.mjs`, `wrangler deploy --config worker/wrangler.jsonc`, then checks the live `health` reports the file's `WORKER_VERSION` with database and storage connected. Sets the Worker secret `ALERT_TO` from the GitHub secret `ALERT_EMAIL` |
+| `deploy-rules.yml` | push to main touching `firestore.rules` | both rules suites on the emulator, then `tools/publish-rules.mjs` publishes to all three projects (placeholders filled: `{{APP_ADMINS}}` = the owner) and reads them back |
+| `translate-languages.yml` "Translate new phrases" | push to main touching index.html (push-only: the Anthropic federation rule allows only push) | `tools/translate-new.mjs`: a hidden Chromium opens the app, harvests every phrase, finds each language's gaps against the central translations and translates them with the app's own code (only `aiCall` is replaced, answered by Anthropic through **Workload Identity Federation** — no API key stored). Adds new phrases only, with an update-time precondition; then starts Publish languages |
+| `publish-languages.yml` | every 10 min + by hand | writes `i18n/<lang>.json` + `i18n/index.json` to main when the central translations changed, merges main into test, starts the Pages deploy |
+| `deploy-extension.yml` | push to main touching `extension/` or its builder + by hand | Chrome Web Store (`tools/publish-extension.mjs`) and Firefox AMO (`tools/publish-extension-firefox.mjs`, also keeps the listing's homepage, support e-mail and privacy text current) |
+| `backup-beta.yml` | 02:17 UTC daily + by hand | `tools/backup-firestore.mjs`: every document of the community project, gzip + AES-256-GCM (scrypt key from `BACKUP_PASSPHRASE`, ≥ 16 characters), kept 30 days as the run's artifact. `tools/restore-firestore.mjs` (`--list`, `--json`, `--restore [--only] [--write]`) |
+| `move-family.yml` | by hand | the family's move (§1b.10) |
+| `owner-two-step.yml` | by hand | `tools/enable-totp.mjs`: switches TOTP multi-factor on for a project (Identity Platform) |
+
+Job summaries are posted as `::notice::` annotations (counts only — the repository is public).
+
+**Secrets live only in GitHub** (never in the repository, never pasted into a chat):
+`CLOUDFLARE_API_TOKEN`, `FIREBASE_RULES_KEY` (JSON key of `rules-publisher@recipes-f379d`; roles:
+Firebase Rules Admin in each project; Cloud Datastore User on the family and community projects;
+Firebase Authentication Viewer/Admin for the move; Cloud Datastore Viewer on the community project
+for backups), `BACKUP_PASSPHRASE`, `ALERT_EMAIL`, `CWS_KEY` (Chrome store), `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox). The Anthropic
+federation IDs (rule, organization, service account) are not secrets and sit in the translate
+job's `env`. The Worker's own API keys (Anthropic, Gemini, YouTube, Pexels…) stay in Cloudflare.
+
+### 1b.2 The household data model (`APP_CONFIG.dataLayout: 'households'` in every copy)
+
+Each household is its own space; nothing is guarded by e-mails typed into the rules any more.
+
+- `households/<hid>` — `{name, ownerUid, code, appRequests, referredBy, features{gmail?, whatsapp?},
+  movedTo?, deleting?}`; `hid` matches `^[A-Za-z0-9]{1,64}$`.
+  - `members/<uid>` — `{uid, email, name, role: owner|admin|editor|viewer, lastSeen, termsAt,
+    termsVersion}`; a member may update only their own `lastSeen`/`termsAt`/`termsVersion`.
+  - `recipes/`, `photos/`, `chats/`, `state/` (e.g. `state/move`), `requests/<uid>` (a viewer asks to
+    write), `requestLog/<otherHid>` (link history: accepted|rejected|blocked|revoked), `links/<otherHid>`.
+- Top level: `codes/<MKN-XXXX-XXXX>` = {hid, at} (identifier; 31-letter alphabet without O/0/I/1/L;
+  never changes once given; anyone signed in may look one up), `homes/<uid>` = {hid} (lets a rule
+  find someone's household), `linkRequests/<id>`, `linkTalk/<a>_<b>/messages`, `invites/<code>`
+  (36 hex, 14 days, ALWAYS viewer), `pending/<hid>:<email>` (a place kept for an address),
+  `pendingNotice/<email>`, `config/founding` {open}, `config/security` {ownerTwoStep}, `i18n/<lang>`
+  + `i18n/_index` + `i18n/_farm` (app-wide; public read, owner write), `users/<uid>/prefs/{legal,
+  offers, ui}`, legacy `feedback/` (notes now go to the Worker).
+- **Every cloud read/write goes through `cloudDoc(name)` / `cloudRange(lo, hi)`**, which take the
+  first layout's names (`recipe_12`, `photo_12`, `meta`, `chat_…`, `i18n_he`) and resolve them for
+  `_cloudLayout`. Never write `collection('shared')` again; `shared` stays only as the old layout.
+- `householdMemberships()` is a collection-GROUP query on `members` by `uid`: **each project needs a
+  collection-group single-field exemption** (Firestore → Indexes → Automatic → `members`/`uid`,
+  ascending). The emulator never asks for it.
+- The rules (`firestore.rules`, HOUSEHOLDS part) and their reasoning: `tests/firestore-households-
+  rules.test.mjs` (several hundred checks). Key helpers: `memberOf`, `roleIn`, `linkedReader(hid)`
+  (recipes and photos only, read-only), `beingDeleted(hid)`, `foundingOpen()`, `appAdmin()`,
+  `ownerTwoStepOk()`, `recentSignIn()`, `okFeatures()`. The rules NEVER let the owner read another
+  household's recipes, photos or chats (except while deleting a household he marked).
+
+### 1b.3 The household's life
+
+- **First visit** (`householdEnter` → `householdWelcome`): an invitation (`?join=CODE`, kept across
+  sign-in) → existing memberships → places kept for my confirmed address (`householdClaimKept`, at
+  EVERY sign-in) → otherwise ask: "Start my own collection" (named) or "I have an invitation".
+  Founding is refused where `config/founding.open` is false (the family copy is invitation-only;
+  the welcome then offers the community app) — the owner may always found. A new device starts
+  empty, with a first-run panel (website / paste / photo / type / the 5 examples) and the one
+  Share-menu offer that fits the device; then a tour (`startTour`). On the community copy a
+  **testers' welcome** replaces the tour offer.
+- **The kitchen rules** (`legalGate`, before sync): a hand-written notebook page (lined paper, Caveat /
+  Patrick Hand; Playpen Sans Hebrew/Arabic and Varela Round for RTL) with the Terms; "I agree" →
+  `users/<uid>/prefs/legal` {termsVersion, at} and the membership's `termsAt`; a new `TERMS_VERSION`
+  asks again; "not for me" signs out.
+- **Members:** Family Access lists them (owner/admin manage; others read-only). Adding an address
+  keeps a Read-only place; invitations are Read only; a viewer can "✋ Ask to add and change recipes"
+  (✅ Allow / Decline). Roles via the role menu. "👑 Hand over…" and "🗑 Delete this household…"
+  (typed name; content, places, members, then the household and its code in one batch).
+- **Account deletion** (⚙️ → 🗑 Delete my account…): ONE process through to Firebase's own user
+  list — fresh sign-in first (pop-up, password, or an e-mailed link that resumes the delete), refuses
+  while others are in a household you own (or deletes it with everyone's access if you choose and type
+  DELETE), removes places and requests, then `user.delete()`. The device's log survives.
+- **Unconfirmed addresses:** never treated as theirs (`email_verified` in the rules); told once
+  (`pendingNotice`, says nothing about who); confirmation e-mails retried by themselves; the ID token
+  is refreshed when its claim lags.
+- **Identifiers and links between households (same copy only):** ⚙️ → 🪪 the household's
+  identifier; 🤝 Connect (owner/admin) by identifier or by the e-mail of ANY member (passed on unseen
+  to that person's household when they sign in), with an optional note. The other household's
+  owner/admins get a pop-up and red dots: Accept / Reject / Remind me later / 🚫 Block (silent).
+  ⚙️ → 🏠 My household → **📬 Link requests**: the allow/block switch, Waiting, Sent (Withdraw), Linked
+  now (Revoke access), Answered (Unblock), and a **💬 conversation** per pair (`linkTalk`: household
+  names only; personal details warned about, never blocked). A link shows a 🤝 chip in the filter bar;
+  their recipes are read-only (`#linkedViewOverlay`) with 📥 Save a copy. A household's identifier
+  means nothing in another copy: the owner is told so (`hhCodeNotHereMsg`).
+- **Red dots** follow the whole path (⚙️ → section → item) for link requests, messages, answers to
+  notes and (owner) new notes.
+- **Extras per household** (`households/<hid>.features` {gmail, whatsapp}; only the app's owner writes
+  it, with a recent sign-in) — `featureOn` honours them for gmail and whatsapp only.
+- **A moved household** (`movedTo` set) shows "Your kitchen has moved" over everything and does nothing
+  else in that copy.
+
+### 1b.4 Feature switches (`APP_CONFIG.features`, per copy)
+
+`whatsapp`, `bring` (Bring!'s official token-free import — the only Bring! route left; Worker
+`bring-recipe-page`), `bringDirect` (retired: Worker answers 410), `gmail`, `feedbackButton`
+(floating 💬), `selfTestForAll`, `insights` (errors and feature counts sent to the Worker),
+`testerWelcome`, `testerSurvey`. Family: whatsapp + bring + gmail. Community: whatsapp, bring,
+feedbackButton, selfTestForAll, insights, testerWelcome, testerSurvey (gmail per household via
+Extras). Test: as the community copy. `feat_switches_off_means_off` holds every switch to
+hidden / refuses / silent / privacy text.
+
+### 1b.5 The owner (`APP_CONFIG.ownerEmail`; rules `{{APP_ADMINS}}`; Worker `OWNER_EMAILS`)
+
+- ⚙️ is in sections: 🎨 How it looks · 🏠 My household · 📥 Saving recipes from other apps · 💾 Backups
+  and photos · 💬 Help and feedback · 🔧 Troubleshooting · 👑 App owner (owner only) · then 🗑 Delete my
+  account. Every "⚙️ → X" the app prints names the section (a test checks it).
+- **📊 Households (management)** — `manage.js`, loaded on demand (`openManagement` →
+  `mknManage.open()`), full screen, the owner only. Tabs:
+  - **Households** — every household in this copy, and (in the family and community copies,
+    `allCopiesHere`) the other copies' from their daily reports to the Worker: name + identifier,
+    owner, members (role, last opened, terms agreed), this month's AI against its allowance, the two
+    months before, links, referrals, last active; search, sort, CSV; a details panel (allowance: Save /
+    Pause AI / default; private notes; "What they use"; **Extras for this household**; 🗑 Delete this
+    household — typed name; deleted ones stay listed, struck through, with who/how). Header: "New
+    households in this copy: 🔒 Invitation only / 🔓 Let anyone start one", and in the community
+    copy "📦 Bring the family app's allowances and AI history here" (Worker `copy-from`).
+  - **💬 Feedback** — every copy's notes (Worker D1): filter, screenshot zoom, the log, 👀 Seen,
+    ✅ Done, 🗑, ✉️ Reply in Gmail / 📨 E-mail app / **📲 Reply in app** (arrives in the sender's app
+    like a link request, with red dots; "✓ read" shown), ☑ select + 📋 Copy reports.
+  - **⚠️ Errors** (testers' copies report their own errors) and **📈 Use** (feature counts per copy
+    and month), each with 📋 Copy.
+  - **📝 Beta question** — the end-of-beta survey (`end-of-beta-1`): Preview, Send to testers, Stop,
+    answers counted and in their words. Prepared, never sent yet.
+- 👑 App owner also holds: Gmail setup (OAuth client ID, per device), Bring! connection, 🔑 Check the
+  app's key (tests the page's Firebase key against Identity Toolkit, Token Service and Firestore and
+  says "not on the key's API list" / "blocked for this website" apart from a normal refusal),
+  🌐 language tools, 🐄 The farm visitors, the translation editor, **🔐 Two-step sign-in for the owner**.
+- **The owner's powers are protected (v38.23, Worker v73)** — in the rules AND the Worker:
+  1. `appAdmin()` = the verified address in APP_ADMINS **and** `sign_in_provider == 'google.com'`
+     (mailbox access alone — an e-mail link or a password reset — opens nothing);
+  2. `ownerTwoStepOk()`: once `config/security.ownerTwoStep` is true, the token must carry
+     `sign_in_second_factor == 'totp'`; the switch can be turned ON only from such a sign-in, so it
+     can never lock the owner out;
+  3. `recentSignIn()` (auth_time ≤ 15 min) for deleting a household, extras, `config/founding` and
+     `config/security`; the Worker answers 401 `reauth` to destructive owner operations
+     (forget, mark-deleted, set-cap, survey-open/close, note-delete, error-delete, copy-from) when the
+     sign-in is older than 900 s, and the app re-signs-in (`ownerFresh`) and retries once;
+  4. alerts: the Worker e-mails the owner's second address (secret `ALERT_TO`, from GitHub
+     `ALERT_EMAIL`; sender `alerts@mykitchennotes.community`, `send_email` binding `ALERTS`) on the
+     first use of the owner's tools on a new device (`mkn_owner_device`, table `owner_devices`) and on
+     every destructive operation. The Worker reads `config/security` with the owner's own token and
+     fails CLOSED (502).
+  App side: `mfaResolve` asks for the authenticator's 6 digits whenever Firebase says
+  `auth/multi-factor-auth-required` (every Google sign-in and re-sign-in path); `openOwnerTwoStep` sets
+  it up (`TotpMultiFactorGenerator.generateSecret`, an `otpauth://` link for the iPhone's Passwords
+  app, the setup key for any authenticator), requires / stops requiring / removes it. TOTP must be
+  enabled on the project (Identity Platform) — `owner-two-step.yml`.
+
+### 1b.6 The Worker, v60 → v73 (`cloudflare-worker.js`, `worker/wrangler.jsonc`)
+
+Bindings: `BRING_KV` (KV), `METER_DB` (D1), `ALERTS` (send_email); vars `ALLOWED_ORIGINS`,
+`APP_SHARED_KEY` (plus `AI_CAP_BY_PROJECT` etc. when set in the dashboard: `keep_vars`). Any binding added in the
+dashboard must also be added to `wrangler.jsonc` or the next deploy drops it.
+
+- **v60 metering** — before any Anthropic call, `meterStart` verifies the Firebase ID token (RS256
+  against Google's keys; `aud` in `METER_PROJECTS`) and reads the caller's membership + household
+  from Firestore REST **with that token** (no service account). D1 tables `ai_spend`
+  (project/hid/month, USD) and `ai_households`. Allowance: $4 in a household's first month then $2
+  (test and community copies, strict: refuse when counting fails); the family copy $10 a month per
+  household (`AI_CAP_BY_PROJECT`), carries on if counting fails for a proven member. Refusal
+  `AI_ALLOWANCE: …` (429), never retried, never read as a bad key. `meter-me`, `meter-admin`
+  (owner: list / set-cap / set-note / …). The app adds `idToken`/`hid` only when health says
+  `metering`; `aiPrepare()` (health, household, fresh token) precedes every AI call.
+- **v61** one inbox for notes from every copy (`feedback-send`, table `feedback`); **v62**
+  `household-report` (a member's app reports its household once a day: name, code, members, links —
+  never recipes; table `hh_reports`); **v63** deleted households kept and marked; **v64**
+  `notes-import`; **v65** terms per member in reports; **v66** no AI without a verified sign-in and
+  membership on ANY copy; models must start `claude-sonnet-`/`claude-haiku-`, `max_tokens` ≤ 32000;
+  Bring! direct routes 410; **v67** per-project caps; **v68** replies to notes (`note-reply`,
+  `feedback-replies`, table `feedback_replies`); **v69** `app-signals` (tables `app_errors`,
+  `usage_counts`; owner ops errors / errors-new / error-status / error-delete); **v70** the
+  community domain allowed and capped; **v71** surveys (`survey-status`, `survey-answer`, owner
+  `survey-open/close/list`; tables `surveys`, `survey_answers`); **v72** `copy-from` (INSERT OR IGNORE
+  of ai_households, ai_spend, hh_reports, usage_counts from another project; a household without its
+  own allowance takes the source copy's); **v73** the owner protections above (`needGoogle`,
+  `ownerTwoStepOn`, `OWNER_DESTRUCTIVE`, `ownerWatch`, `ownerAlert`; health `alerts`).
+- Import helpers added in this era: `video-recipe` (a YouTube video read by Gemini; model found, not
+  assumed; busy → next model), `video-file` (an uploaded recipe video, ≤ 50 MB, Gemini Files API,
+  deleted afterwards), `video-from-url` (only fbcdn.net / cdninstagram.com), `facebook-fetch` (the
+  post's whole caption from the page's own data — `probeBestText`; oEmbed and embeds as fallbacks),
+  `bring-recipe-page` + `GET /bring-recipe/<code>`.
+- Tests: `node tests/worker-cors.mjs` (no network; node:sqlite stands in for D1; real RS256 tokens;
+  a fake Firestore with `security`).
+
+### 1b.7 Getting recipes in (THE CASCADE)
+
+Try every route without asking; ask the person last, with ONE action. Website → schema.org /
+relays / AI; Facebook/Instagram/TikTok → caption from the page → the video → screenshots or the
+extension; YouTube → description → the video itself (Gemini); screenshots several at once
+(transcribed, overlaps removed, then the pasted-text reader); several recipes on one page → pick
+which to keep. A link shared in runs the NEWEST app first (`newestAppThen`), and `sw.js` caches the app
+under its plain path only (a `?url=` request goes network-first).
+
+- **iPhone Share menu:** one shortcut, "Save to My Kitchen Notes" (Get URLs from Input → URL Encode →
+  `<app>/?url=` + encoded → Open URLs; Show in Share Sheet), offered by its iCloud link
+  (`APP_CONFIG.iosShortcutUrl`, per copy; only `https://www.icloud.com/shortcuts/…` accepted), never
+  offered twice (`users/<uid>/prefs/offers`).
+- **Android:** the installed app is in the Share menu itself (manifest `share_target`).
+- **Browser extension** (`extension/`, MV3; `node tools/build-extension.mjs live|test|beta`, Chromium +
+  Firefox packages, reproducible zips in `downloads/`): a "📘 Save recipe" button under Facebook /
+  Instagram / TikTok posts, the toolbar button (Alt+Shift+S) and a right-click menu on any site
+  (selection → schema.org Recipe → article text), opening the app with `#share-text=…&share-url=…`.
+  The store build sends to the community app, or to the family app for whoever opened that in the
+  browser (`mknFamily`). Listed on the Chrome Web Store (unlisted) and Firefox AMO; Edge, Brave, Opera
+  and Vivaldi use the Chrome listing. The app offers the right install per browser (⚙️ → 📥) and a
+  new version when `downloads/extension-version.json` is newer than the installed one.
+
+### 1b.8 Other features of this era
+
+- **The farm visitors** — now and then one of 14 hand-drawn farm animals walks across the app
+  (three looks: 3D cartoon, Storybook, Pixel art — the pixel art sampled from the SVG at run time);
+  tapped, it turns, speaks a saying in a British voice (Male / Female / Child / random), then
+  vanishes in a puff of smoke; it can be grabbed and moved. The owner chooses the sayings, animals,
+  look, voice and how often (`i18n/_farm`, read by every copy); everyone has "🐑 Farm guests?" on
+  their device. Never while typing, never in a Self Test.
+- **Recipes:** scaling multiplies the method's amounts too; on a computer the recipe window can be
+  enlarged (a corner grip); a source with words and a link opens the link.
+- **About** (ℹ️, at the bottom of the ? window): version and update check, ✨ What can this app do
+  (`appFeatureSections`), ✉️ Contact us (`APP_CONFIG.supportEmail` = contact@mykitchennotes.community),
+  🔒 What leaves this device, the **Privacy Statement** and **Terms of Use** — `privacy.html` /
+  `terms.html` plus 10 translations each (`privacy.<lang>.html`, `legal-i18n.js`,
+  `tools/legal-keys.py`). The Terms are between the user and the "My Kitchen Notes Team"; the privacy
+  statement names the data controller and every service data goes to (a test checks the list).
+  About says "© 2026 My Kitchen Notes".
+- **Feedback:** the floating 💬 (community and test) and ⚙️ → ✉️ Send feedback open one form (note,
+  optional screenshot, the log), sent to the Worker's inbox; "📨 Answers to my notes" shows replies.
+  "📤 Transmit report to admin" and a failed Self Test's "Send to admin?" use the same route.
+- **Testers' copies only (`insights`):** errors report themselves (no addresses, e-mails masked) and
+  names-and-numbers feature counts per household (how recipes arrive; which features are used);
+  the privacy statement (1.2) says so. Nothing is counted during a Self Test.
+- **Languages:** the central translations are in ONE project (`APP_CONFIG.languageSource`, today
+  `recipes-f379d` `i18n/…`; it becomes `my-kitchen-notes-beta` on the family's move), read by every
+  copy and signed-out visitors over plain REST, published as files in the repository, and new
+  phrases are translated by the job after each release. The owner edits them only in the copy that
+  holds them. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
+  and publish jobs strip any): the files are public, and a member's address once reached them through a
+  tooltip.
+- **Sign-in options per copy** (`APP_CONFIG.signIn`): Google (all), password + e-mail link
+  (community, test); Microsoft and Apple built but off. Sign-in runs on each copy's own address
+  (`authDomain` = the site; Firebase's helper files served at `/__/auth/`).
+
+### 1b.9 The iPhone's top edge (iOS 26/27 "Liquid Glass")
+
+An installed web app under a `black-translucent` status bar gets a system blur over the clock's strip
+AND about 29 pt below it; nothing turns it off. `--top-safe` (`<style id="topSafeCss">`) =
+`env(safe-area-inset-top)`; on iOS (`@supports (-webkit-touch-callout: none)`)
+`min(inset*100, inset + 24px)`; and `html.ios-standalone` (set from `navigator.standalone` before
+the first paint), in portrait, `inset + 24px`. Used by the header, the copy's ribbon, every full-screen
+window and overlay, the banners, the pull hint, `safeAreaTopPx()` and `dropPlacement(…, topMin)`.
+A card in a window is capped at `min(its own limit, 100%)`. Measured on an iPhone 15, iOS 27.0.1:
+sharp from 88 pt down. All copies use `black-translucent` (a solid `default` bar was tried: grey,
+and still blurred below). An empty household no longer stays on placeholder cards (redrawn when the
+sync ends; the first-paint placeholders give way after 6 s).
+
+### 1b.10 The family's move into the community copy (decided 11 Oct 2026; NOT yet run)
+
+The owner chose to move the family's household into the community copy so that testers can link with
+his live recipes (households link only within one copy), keeping every owner capability there.
+
+- `tools/move-family.mjs --from recipes-f379d --to <project> --mode survey|copy|remove|unmark`:
+  copies the **accounts with the same user ids** (Identity Toolkit batchGet → batchCreate, Google
+  identity kept), and every document of households/ (recursively), codes/, homes/, linkRequests/,
+  linkTalk/, pending/, pendingNotice/, invites/, users/<uid>/prefs/ (+ i18n/ with `--i18n`); NOT
+  shared/, feedback/, config/. Every document is read back and compared. An address that already has
+  an account in the target keeps it (ids remapped in paths, values and keys). `--mark-moved <url>`
+  marks every family household `movedTo` first and takes the mark off again if anything fails;
+  `--resume` copies again over the first copy; `unmark` (`--confirm unmark`) is the way back.
+  Paths with ':' are encoded and never listed under. Rehearsed on the emulators
+  (`tests/move-family.test.mjs`, a CI step). Run through `move-family.yml` (copying into the
+  community project needs `confirm` = "move the family").
+- The app: `APP_CONFIG.movedTo` (empty today) — set in the family copy on move day, every visit
+  forwards with its path, `?url=` and `#share-text` (`appCopyMovedTo`). The owner's Feedback inbox and
+  the all-copies list already work in the community copy (`feedbackInboxHere`, `allCopiesHere`).
+- **Move-day checklist** — in `CLAUDE.md` ("MOVE DAY CHECKLIST"); follow that one.
+
+### 1b.11 Files added in this era
+
+`manage.js` (the owner's 📊 Households) · `privacy*.html`, `terms*.html`, `legal-i18n.js`,
+`privacy-extension.html` · `extension/` (content.js, content.css, background.js, appmark.js, shared.js,
+config.js, options.html, options.js, STORE.md, PRIVACY.md, store/) and `downloads/` (zips +
+`extension-version.json`) · `worker/wrangler.jsonc` · `i18n/<lang>.json`, `i18n/index.json`,
+`i18n/archive/` · `tools/`: build.js, environments.json, build-extension.mjs, publish-extension.mjs,
+publish-extension-firefox.mjs, publish-rules.mjs, publish-languages.mjs, translate-new.mjs,
+backup-firestore.mjs, restore-firestore.mjs, move-family.mjs, enable-totp.mjs, legal-keys.py,
+make-test-icons.mjs · `tests/`: firestore-households-rules.test.mjs, e2e-sync.mjs (`--layout
+households`), extension.mjs, publish-languages.test.mjs, move-family.test.mjs, phone-chrome.js,
+axe-scan.js · `AUDIT-2026-10-security.md`.
+
+**State on 13 Oct 2026 (v38.26):** Worker v73; the rules with the owner protections published to
+all three projects; TOTP enabled on the community project; alerts on; daily encrypted backups of the
+community database running. Next: the family's move (§1b.10), then the extension's update pop-up that
+closes itself once the new version is installed.
+
+---
+
 ## 2. File inventory (recreate all of these)
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire app — HTML + CSS + JS in one file. ~25,300 lines. |
+| `index.html` | The entire app — HTML + CSS + JS in one file. ~33,000 lines. |
 | `self-tests.js` | The Self Test suite (§13), loaded on first use so everyday visits do not download it. |
 | `ARCHITECTURE.md` | Deployments and connections: every component, where it lives, who deploys it, what depends on what. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
@@ -111,7 +451,7 @@ slide‑up modal animation.
 | `version.json` | `{"version": "v36.93"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | ~~`bring-relay.html`~~ | Removed in v37.95: sending straight to a Bring! list was retired (Worker v66 answers 410); Bring!'s official import remains. |
-| `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published **by hand** in the Firebase console. |
+| `firestore.rules` | **Canonical** Firestore security rules (5.5) — see §4d for the full file and the reasoning. The app fetches this and substitutes `{{READ}}`/`{{WRITE}}`/`{{ADMIN}}` from the member list; edit the structure here, not in `index.html`. Published to all three projects by `deploy-rules.yml` when it reaches `main` (§1b.1). |
 | `tests/worker-cors.mjs` | The **Worker's** test suite. Imports `cloudflare-worker.js` as an ES module and drives it with ordinary `Request` objects — no wrangler, no network. It exists because the Worker had zero tests until v36 and a CORS regression in it took every server-side feature down for two releases (§4). 24 checks. **CORS-only tests could not see the v37 outage** — see §4a1. |
 | `whatsapp/` | Folder the app **lists** over the GitHub contents API (5f.7); `index.json` holds group labels only. **It must contain no chat exports — see §2a.** `index.json` is `[]`. `UPLOAD-FROM-IPHONE.md` documents the Share-sheet Shortcut, `upload.html` is the no-Shortcut alternative, `upload-guide.html` is the offline/printable guide (generated — see `tools/`). Everything here needs GitHub to be reachable; where it is not, chats travel through Firestore instead (5f.8). |
 | `filename-test.html` | Standalone bench for the four non‑ASCII‑filename download routes (2.6). Not part of the app; not linked from it. Carries a `PAGE_BUILD` stamp, shown in the header and the results box — bump it on every edit, because this page has no update banner of its own. |

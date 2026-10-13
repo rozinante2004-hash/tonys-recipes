@@ -101,6 +101,24 @@ if (!force && !requested && signature(idx.langs) === signature(had.langs) && fs.
 }
 
 fs.mkdirSync(outDir, { recursive: true });
+// v38.26 — an e-mail address never goes into a published file (the repository is
+// public). Members' addresses reached the translations through the ✉️ Notify
+// button's tooltip; the app no longer collects them and the translate job takes
+// them out of the database. This keeps them out of the files whatever the database
+// holds, and takes them out of the versions already kept here too.
+const ADDRESS = /[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/;
+const noAddresses = o => { let n = 0; for (const k of Object.keys(o)) if (ADDRESS.test(k) || ADDRESS.test(String(o[k]))) { delete o[k]; n++; } return n; };
+let scrubbedFiles = 0;
+for (const code of Object.keys(arch.langs || {})) {
+  for (const v of arch.langs[code] || []) {
+    const f = path.join(archDir, v.file), d = readJson(f);
+    if (!d || !d.strings || !noAddresses(d.strings)) continue;
+    d.count = Object.keys(d.strings).length; v.count = d.count;
+    fs.writeFileSync(f, JSON.stringify(d, null, 1) + '\n');
+    scrubbedFiles++;
+  }
+}
+if (scrubbedFiles) console.log(`::notice::Languages: e-mail addresses taken out of ${scrubbedFiles} kept version(s)`);
 const written = {};
 const now = Date.now();
 const stamp = new Date(now).toISOString().replace(/:/g, '');   // 2026-09-27T205412.345Z
@@ -125,6 +143,8 @@ for (const code of langs) {
   if (!d || !d.strings || typeof d.strings !== 'object') { console.log(`  ${code}: no document — skipped`); continue; }
   const strings = {};
   for (const [k, v] of Object.entries(d.strings)) if (typeof v === 'string') strings[k] = v;
+  const dropped = noAddresses(strings);
+  if (dropped) console.log(`::warning::${code}: ${dropped} entr${dropped === 1 ? 'y' : 'ies'} holding an e-mail address left out of the file`);
   const count = Object.keys(strings).length;
   if (!count) { console.log(`  ${code}: empty — skipped`); continue; }
   const doc = { lang: code, updatedAt: d.updatedAt || (idx.langs[code] || {}).at || 0, count, strings: stable(strings) };

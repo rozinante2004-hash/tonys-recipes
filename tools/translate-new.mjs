@@ -158,6 +158,37 @@ try {
   const idx = await readDoc(indexPath);
   const langs = Object.keys((idx && idx.data && idx.data.langs) || {}).filter(c => /^[a-z]{2,3}$/.test(c) && c !== 'en').sort();
   if (!langs.length) { console.log('no languages in ' + indexPath + ' — nothing to do'); process.exit(0); }
+
+  // 2a. v38.26 — no e-mail address belongs in the translations. Members' addresses
+  // got in through the ✉️ Notify button's tooltip ("Send <address> a note about the
+  // app"), and the translations are published as files in a PUBLIC repository. The
+  // app no longer collects such text (i18nTranslatable); this takes out what is
+  // already there, in every language, the same way the new phrases go in: the whole
+  // map written back only if nothing changed meanwhile. Counts only in the log.
+  const ADDRESS = /[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/;
+  const scrubbed = [];
+  for (const lang of langs) {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      const d = await readDoc(prefix + lang);
+      const strings = (d && d.data && d.data.strings) || null;
+      if (!strings) break;
+      const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])));
+      if (!bad.length) break;
+      if (DRY) { scrubbed.push(lang + ' ' + bad.length + ' (dry run: kept)'); break; }
+      const kept = Object.assign({}, strings);
+      bad.forEach(k => { delete kept[k]; });
+      const at = Date.now();
+      const fields = { strings: { mapValue: { fields: Object.fromEntries(Object.entries(kept).map(([k, v]) => [k, fsString(v)])) } },
+        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses taken out)') };
+      const w = await patchDoc(prefix + lang, fields, d.updateTime);
+      if (w === 'changed') { console.log(`  ${lang}: changed meanwhile — reading it again`); continue; }
+      await patchDoc(indexPath, { langs: { mapValue: { fields: { [lang]: { mapValue: { fields: { at: fsInt(at), count: fsInt(Object.keys(kept).length) } } } } } } }, null, ['langs.' + lang]);
+      scrubbed.push(lang + ' ' + bad.length);
+      break;
+    }
+  }
+  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address taken out — ' + scrubbed.join(', '));
+
   const plan = [];
   for (const lang of langs) {
     const d = await readDoc(prefix + lang);

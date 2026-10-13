@@ -81,6 +81,21 @@ const kept = fs.readdirSync(path.join(out, 'archive', 'he'));
 ok('at most 12 versions are kept, and the oldest files are deleted', arch().langs.he.length === 12 && kept.length === 12
   && (read('archive/' + arch().langs.he[0].file) || { strings: {} }).strings.Save === 'שמור 12', kept.length + ' files');
 
+// v38.26 — an e-mail address never reaches a published file, nor a kept version.
+const oldest = arch().langs.he[0];                       // still kept after the next run (the oldest would just be deleted)
+const oldDoc = read('archive/' + oldest.file);
+oldDoc.strings['Send member@example.com a note about the app'] = 'x'; oldDoc.strings['member@example.com'] = 'member@example.com';
+fs.writeFileSync(path.join(out, 'archive', oldest.file), JSON.stringify(oldDoc));
+await seed(async db => {
+  await setDoc(doc(db, 'i18n/he'), { strings: { Save: 'שמור', 'Send member@example.com a note about the app': 'שלחו ל-member@example.com הערה', 'their@gmail.com': 'their@gmail.com' }, count: 3, updatedAt: 500 });
+  await setDoc(doc(db, 'i18n/_index'), { langs: { he: { at: 500, count: 3 } }, probed: true });
+});
+log = run();
+const heNow = read('he.json') || { strings: {} };
+ok('an entry holding an e-mail address is left out of the file', heNow.strings.Save === 'שמור' && !JSON.stringify(heNow).includes('@') && heNow.count === 1, JSON.stringify(heNow));
+ok('…and out of the newest kept version', !JSON.stringify(read('archive/' + arch().langs.he[0].file)).includes('@'));
+ok('…and taken out of a version kept before', !fs.readdirSync(path.join(out, 'archive', 'he')).some(f => fs.readFileSync(path.join(out, 'archive', 'he', f), 'utf8').includes('@')), log);
+
 await env.cleanup();
 console.log(failures ? failures + ' publishing check(s) FAILED' : 'all publishing checks passed');
 process.exit(failures ? 1 : 0);

@@ -13666,6 +13666,11 @@ window.SELF_TESTS = [
       if(i18nTranslatable('42')) throw new Error('a bare number is offered for translation');
       if(i18nTranslatable('🍲')) throw new Error('an emoji on its own is offered for translation');
       if(!i18nTranslatable('Add ingredient')) throw new Error('a real label is not translatable');
+      // v38.26 — an address is personal data, and the translations are published.
+      if(i18nTranslatable('Send someone.else@example.com a note about the app')) throw new Error('a sentence carrying an e-mail address is offered for translation');
+      if(i18nTranslatable('someone.else@example.com')) throw new Error('an e-mail address is offered for translation');
+      if(i18nKeepable('rozinante{1}@gmail.com')) throw new Error('an address with a number taken out is kept for translation');
+      if(!i18nTranslatable('Send this person a note about the app')) throw new Error('the Notify tooltip is not translatable');
     } },
 
   { id:'ui_hebrew_recipe_reads_right', group:'UI', name:'A Hebrew recipe\u2019s labels sit on the right too (v36.30)',

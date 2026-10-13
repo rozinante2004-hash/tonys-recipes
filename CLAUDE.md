@@ -3,6 +3,150 @@
 Read this before changing anything. It records decisions that are easy to
 accidentally undo, and conventions that keep the app deliverable.
 
+## START HERE — where things stand (13 Oct 2026)
+
+Read this section first in a new session. Then read the rest of this file as needed. The long
+history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, newest first.
+`RECONSTRUCTION_PROMPT.md` §1b has the same era as a specification.
+
+**Setting up a new session**
+1. A cloud session may open in `rozinante2004-hash.github.io` (the site-root repository). Attach
+   `rozinante2004-hash/tonys-recipes` with push access (`add_repo`), clone it to
+   `/home/user/tonys-recipes`, then `git checkout test`. All work happens on `test`.
+2. Recreate `/root/.claude/settings.json`: bypassPermissions plus the allow-list (see *Decisions*:
+   "Never ask Tony for permission").
+3. Tests, locally:
+   - Builds: `node tools/build.js live && cmp dist/index.html index.html`, then
+     `SKIP_AUTH_HELPERS=1 node tools/build.js test --out <dir>` (and the same with `beta`).
+   - Self tests: serve each build with `python3 -m http.server <port> --bind 127.0.0.1`. Then run
+     `NODE_PATH=<kit>/node_modules node tests/run-self-tests.js --port <port>`.
+     - The kit: `npm i playwright@1.56.1 axe-core@4.10.2` in a scratch folder. Chromium is
+       preinstalled; never run `playwright install`.
+     - Last result: 365 pass on each of the three builds.
+   - `node tests/worker-cors.mjs` needs no network.
+   - The rules suites and the family-move rehearsal run on the Firebase emulators (Java is
+     installed). Copy the exact steps from `.github/workflows/self-tests.yml`.
+4. What this environment can reach:
+   - `gh api` works for this repository: dispatching workflows, reading runs and jobs.
+   - Job LOGS cannot be read (GitHub's log redirect is blocked). The tools post their summaries as
+     `::notice::` annotations; read those instead:
+     `gh api repos/rozinante2004-hash/tonys-recipes/check-runs/<job id>/annotations`.
+   - Listing secrets is blocked.
+   - workers.dev, github.io and mykitchennotes.community are NOT reachable from here, so trust the
+     jobs' own live checks. googleapis.com is reachable.
+
+**Tony's standing rules**
+- Permissions: "Please stop asking for permissions. This is slowing the work significantly. The only
+  permission you need from me is to move the build to the family and Beta app. For anything else,
+  assume permission is granted."
+  - A release means pushing one commit to BOTH `main` and `beta`:
+    `git push origin <sha>:refs/heads/main <sha>:refs/heads/beta`.
+  - It needs his yes for THAT release, and CI must be green on that commit.
+  - Before pushing, check `git merge-base --is-ancestor origin/main <sha>`, and the same for
+    `origin/beta`.
+  - `origin/test` can move under you (the languages job merges into it), so
+    `git pull --no-rebase origin test` before pushing.
+- Secrets:
+  - They live only in GitHub. Never print one, and never ask him to paste one into the chat.
+  - His second address exists only in the secret `ALERT_EMAIL`, never in the repository.
+- "I do not like my name appearing much": app texts name nobody.
+- After each release:
+  - Check every job that ran: Deploy to GitHub Pages, Deploy the Worker, Publish the database rules,
+    Translate new phrases, Publish languages, Self Tests on main.
+  - A failed Pages deploy is fixed by dispatching a fresh run, not by re-running it.
+  - Record the release here.
+- No model names in commits.
+
+**Where things are now**
+- The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
+  **v38.25**, released 12 Oct.
+- `test` is at **v38.26**, waiting for CI and then Tony's yes. It brings:
+  - the in-app Help's knowledge brought up to date: link requests, saving from other apps, About and
+    contact, the farm visitors, Read-only invitations, Open in Bring!, the Self Test's place;
+  - `RECONSTRUCTION_PROMPT.md` §1b;
+  - this section;
+  - **family members' e-mail addresses out of the published translations** (see the v38.26 note below).
+    After the release, check the "Translate new phrases" run: its annotations should say
+    "entries holding an e-mail address taken out — …". Then the "Publish languages" commit should
+    show `i18n/*.json` and `i18n/archive/` without them.
+- Worker **v73** is live.
+- The rules with the owner protections are published to all three projects.
+- The community project:
+  - TOTP is enabled, but Tony has NOT yet set up his authenticator (move-day step 5);
+  - alerts to his second address are on;
+  - the encrypted backup runs daily (first one on 12 Oct).
+- Extension: 1.7.3.
+
+**Done since 10 Oct (details in the release notes below)**
+- **v38.20**:
+  - The iPhone's Liquid Glass top edge.
+  - The owner is told why a family identifier is not found from the community copy: households
+    link only within one copy.
+- **Tony's decision, option B:** the family moves into the community copy, keeping every owner
+  capability, before testers are invited (next week).
+- **v38.21 / v38.24 / v38.25**:
+  - The community copy installs as "Kitchen Notes" with the normal icon.
+  - Status bar: `black-translucent`.
+  - The band below the clock is 24px, measured on his iPhone 15 with iOS 27.0.1.
+  - An empty household no longer stays on placeholder cards.
+- **v38.22 + Worker v72** — the move tooling:
+  - `tools/move-family.mjs` and `move-family.yml`;
+  - the emulator rehearsal;
+  - the `movedTo` notice and forward;
+  - per-household Extras;
+  - the owner's inbox and the all-copies list in the community copy;
+  - `copy-from`.
+- **v38.23 + Worker v73** — the owner's powers protected:
+  - Google-only owner;
+  - the TOTP switch;
+  - a recent sign-in for destructive actions;
+  - e-mail alerts.
+- **Tony's set-up steps** (all done): BACKUP_PASSPHRASE (≥ 16 characters), the service-account
+  roles, ALERT_EMAIL, Identity Platform, and Gmail's OAuth origin.
+- **Survey, 12 Oct**, from the family to the community project:
+  - 3 family accounts: 2 to create, plus his own address, which already has a beta account;
+  - 143 documents, ONE household;
+  - nothing in the way.
+- Skipped by Tony: a hardware security key.
+
+**What is left, in order**
+1. **Release v38.26** to `main` and `beta` when CI is green and Tony says yes.
+2. **Move day**, when Tony says ("I'll let you know"). Follow "MOVE DAY CHECKLIST" below, step by
+   step. My steps, from this environment:
+   - Survey:
+     `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/workflows/move-family.yml/dispatches -f ref=main -f 'inputs[mode]=survey' -f 'inputs[target]=my-kitchen-notes-beta'`
+   - Copy WITHOUT the mark: the same with `-f 'inputs[mode]=copy' -f 'inputs[confirm]=move the family'`.
+   - After Tony has checked the household: copy again with
+     `-f 'inputs[resume]=true' -f 'inputs[mark]=true' -f 'inputs[i18n]=true'`.
+   - The way back, if needed: `-f 'inputs[mode]=unmark' -f 'inputs[confirm]=unmark'`.
+   - Results: the run's job → its annotations.
+   - Then a release (Tony's yes) with these changes in index.html's `#appConfig`, building and
+     testing all three copies:
+     - `movedTo: 'https://mykitchennotes.community/'`;
+     - `languageSource` → `my-kitchen-notes-beta`. The translate and publish jobs read it from
+       index.html.
+   - Then Tony's steps 5–7 (allowances, Gmail, authenticator, the ONE iPhone shortcut, the family
+     re-signing in). His shortcut's iCloud link becomes `iosShortcutUrl` for the beta (and the
+     family copy) in the next release.
+3. **After the move** (task, Tony 12 Oct): the "new version of the extension" pop-up should close
+   itself, with a ✅, once the newer version is installed. Watch appmark.js's
+   `data-mkn-extension-<tag>` version and `visibilitychange`.
+4. **The addresses in the git history** — earlier versions of `i18n/*.json` hold family members'
+   addresses. Only a rewrite of the public repository's history removes them, and copies may already
+   exist. It is Tony's call; ask him once, and do not do it unasked.
+5. **Testers** are invited by Tony next week, after the move. The end-of-beta question is prepared
+   and NOT sent.
+6. **Tony's own account security** (suggested; his to do):
+   - an Apple recovery contact;
+   - a personal trusted phone number (his iPhone is a work phone);
+   - Google backup codes, kept offline;
+   - a passkey or two-step sign-in for GitHub and Cloudflare.
+7. **Later, optional:**
+   - Restrict the community app's browser key in two stages (APIs first, then websites). Check with
+     🔑 Check the app's key after each stage.
+   - Update the Chrome Web Store listing's homepage.
+   - Gmail "Send mail as" contact@.
+
 ## Index (v36.82)
 
 The file is long on purpose — each entry under *Traps* is a mistake that was
@@ -240,6 +384,12 @@ found only because a test was written first and disagreed with the code.
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 
 ## Traps this codebase has already sprung
+
+- **AN E-MAIL ADDRESS IS NEVER A PHRASE (v38.26).** The translations are published as files in a PUBLIC
+  repository, and the page walk collects every visible text and tooltip — so a tooltip that named a member
+  ("Send <address> a note about the app") put family members' addresses into every language's file.
+  `i18nTranslatable` now refuses any text holding an address; a sentence that must show one puts the address
+  in its own element (or `data-no-i18n`). The translate and publish jobs strip any that get in.
 
 - **THE LANGUAGES ARE FILES IN THE REPO, PUBLISHED BY A BOT (v36.91).** Tony:
   "move the languages to Git sooner", plus a button for an immediate
@@ -836,13 +986,35 @@ found only because a test was written first and disagreed with the code.
   - **Released to the family app and the beta: v37.89 + v37.90 (7 Oct 2026, Tony's yes, CI green on afabe50; the family's Pages deploy checked: success).** Style gallery for the farm visitors (3D cartoon after Tony's cow pictures, and 7 sheep styles): https://claude.ai/artifact/Mf9kz51NKmb6GfvjGanY9f — Tony's pick: all three looks below (v37.91).
   - **Released to the family app and the beta: v38.13 (9 Oct 2026, Tony's yes, CI green on 8e2727f; Pages: success).**
   - **Released to the family app and the beta: v38.14 (9 Oct 2026, Tony's yes, CI green on ca00997; Pages: success). "Translate new phrases" ran: keys not there yet (warning, nothing done). Tony sets up Anthropic (Workload Identity Federation, see below) and the Cloud Datastore User role on 10 Oct — then RE-RUN the job's last run (Actions → Translate new phrases → the run → Re-run jobs; `gh api -X POST repos/rozinante2004-hash/tonys-recipes/actions/runs/<id>/rerun`) for the ~21 phrases waiting — never "Run workflow": the rule allows only push.**
+  - **v38.26 — the Help brought up to date; the reconstruction prompt's §1b; addresses out of the translations
+    (13 Oct 2026).** Tony: "please update the reconstruction prompt and, if needed, the Help … prepare a summary
+    of what we did so far and what is yet to be done". (1) HELP_SYSTEM_PROMPT: the app's name, method scaling and
+    the resize grip, 📲 Open in Bring!, the Self Test's place (⚙️ → 🔧 Troubleshooting), Read-only invitations and
+    ✋ Ask, 📬 Link requests, the one-copy rule for identifiers, saving from other apps, About/contact/feedback, the
+    farm visitors, the interface language. (2) RECONSTRUCTION_PROMPT.md §1b — the whole household era (copies,
+    data model, lifecycle, owner tools and protections, Worker v60–v73, imports, the move). (3) START HERE at the
+    top of this file. (4) **Found while checking: family members' e-mail addresses were in the PUBLISHED
+    translations** (i18n/*.json and the kept versions, all languages; a public repository): the ✉️ Notify button's
+    tooltip was "Send <their address> a note about the app", and the page walk collected it (also the bare
+    addresses and the owner's address from the sync chip, with its digits turned into {1}). Now:
+    `i18nTranslatable` refuses any text holding an address (`I18N_ADDRESS`), so nothing collects, keeps or
+    translates one (the editor counts the old ones as unusable); the tooltip is "Send this person a note about the
+    app"; tools/translate-new.mjs takes such entries out of every language in the central store at the next run
+    (step 2a, whole map written back under the update-time precondition, index `at` moved so the files are
+    published again; counts only, as a ::notice::); tools/publish-languages.mjs leaves them out of the files and
+    takes them out of the versions already kept in i18n/archive/. Lost: three example placeholders
+    ("their@gmail.com" …) that read the same in every language. Checked: the job against the stand-in store
+    seeded with the real he/de files (he 12, de 7 taken out; an admin's edit made meanwhile kept), the publishing
+    test (3 new checks; failing with the clean-up switched off), self-test i18n_never_touches_a_recipe (4 new assertions).
+    **The git history still holds them** — only rewriting the public repository's history would remove them, and
+    copies may exist already; that is Tony's call (not recommended unless he wants it).
   - **TO DO after the family's move (Tony, 12 Oct 2026):** "When an extension is updated, a pop up window appears
     suggesting to update to the newer version. Once it is installed, can we close the pop up automatically? Otherwise,
     when I get back to the App tab, the popup is still open, which might confuse the user." → while the offer is
     open, watch the extension's own mark (appmark.js `data-mkn-extension-<tag>-version`, and visibilitychange when
     he comes back to the tab) and close it with a ✅ once the newer version is there.
   - **Tony's set-up steps done (12 Oct 2026):** BACKUP_PASSPHRASE; the roles for rules-publisher@ (move + backups);
-    ALERT_EMAIL (tony.schvekher@gmail.com was already a verified Email Routing destination); the community project
+    ALERT_EMAIL (his second address was already a verified Email Routing destination); the community project
     upgraded to Identity Platform; Gmail's OAuth client allows https://mykitchennotes.community. His Google account
     already has a passkey (iCloud Keychain); "a passkey can't be created on this device" on his computer.
   - **Released to the family app and the beta: v38.25 (12 Oct 2026, Tony's yes "when we're in the green", CI green on
@@ -927,7 +1099,7 @@ found only because a test was written first and disagreed with the code.
     extras and founding; ⚙️ → 👑 → 🔐 Two-step sign-in for the owner (`openOwnerTwoStep`: set up —
     `TotpMultiFactorGenerator.generateSecret`, an otpauth:// link for the iPhone's Passwords and the setup key
     for any authenticator — require / stop requiring / remove). Needs (Tony) for the authenticator: the
-    community project upgraded to Identity Platform with TOTP switched on; for alerts: tony.schvekher@gmail.com
+    community project upgraded to Identity Platform with TOTP switched on; for alerts: his second address
     verified as a destination address in Cloudflare Email Routing + GitHub secret ALERT_EMAIL. Tests: 15 rules
     checks, 16 Worker checks, self-test `owner_protections`.
   - **v38.22 + Worker v72 — everything the family's move needs, ready but not yet run (11 Oct 2026).**
@@ -972,7 +1144,7 @@ found only because a test was written first and disagreed with the code.
   - **v38.21 — the community copy installs as the app itself (11 Oct 2026).** Tony: "1 yes" (a solid status bar;
     "My Kitchen Notes" with the normal icon), "2 delete it" (his beta test household, on move day), "3 yes" (the
     family moves BEFORE the testers are invited, next week), "4 yes" (build admin protections 4–7; his second
-    address for alerts: tony.schvekher@gmail.com). tools/environments.json beta: manifest name "My Kitchen Notes",
+    address for alerts, kept only in the GitHub secret ALERT_EMAIL). tools/environments.json beta: manifest name "My Kitchen Notes",
     short_name "Kitchen Notes"; NEW `homeScreen` {title "Kitchen Notes", statusBar "default"} — tools/build.js
     rewrites `apple-mobile-web-app-title` and `-status-bar-style` (refuses a value it does not know, and a page
     without the tags); `brand` dropped (no violet tab icon, no icons/beta — deleted). An iPhone keeps label, icon
