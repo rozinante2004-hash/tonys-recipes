@@ -65,8 +65,17 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   **v38.29** with **Worker v75** (released 13 Oct; see the release note below): the spare owner key, the
   daily sweep (logs and names go after six months; notes, replies and statistics stay — Tony's correction),
   the fonts and libraries served by the app itself, privacy statement 1.4.
-- `test` is at **v38.30 + Worker v76** — "all kinds of stats" (Tony, 13 Oct) and the 📈 Use tab's month-by-
-  month Trends; privacy statement 1.5. Waiting for CI, then Tony's yes for the release.
+- **v38.30 + Worker v76** released 13 Oct (Tony's yes): "all kinds of stats" and the 📈 Use tab's Trends;
+  privacy statement 1.5.
+- **MOVE DAY — 13 Oct 2026.** The family's household is in the community project (my-kitchen-notes-beta):
+  copied (141 documents, 0 different; 2 accounts created with the same ids; Tony's own account was already
+  there, so his place went to it — he did NOT delete his beta account: Tony, "I'd rather not delete anything
+  before I am certain nothing was lost"), checked by Tony ("everything is there"), then copied again with
+  --resume --mark --i18n (153 documents incl. 12 translation files, 0 different; the family household marked
+  moved). `test` has **v38.31** — the family copy's `movedTo` = https://mykitchennotes.community/ and
+  `languageSource` → my-kitchen-notes-beta; the forward never runs on 127.0.0.1/localhost (the suites).
+  NOTHING in recipes-f379d was deleted; `unmark` is the way back. Next: release v38.31 (Tony's yes), then
+  Tony's steps 5–7 of the MOVE DAY CHECKLIST, and the clearing a week later (step 9, with his OK).
 - Released 13 Oct: v38.26 + v38.27 (+ Worker v74) + v38.28 (the privacy audit, AUDIT-2026-10-privacy.md) — see
   the release note below. The GitHub secrets now include `OWNER_EMAIL` (used) and `OWNER_SECONDARY_EMAIL` (not
   used — Tony to say what it is for). v38.26 brought:
@@ -78,7 +87,7 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
     After the release, check the "Translate new phrases" run: its annotations should say
     "entries holding an e-mail address taken out — …". Then the "Publish languages" commit should
     show `i18n/*.json` and `i18n/archive/` without them.
-- Worker **v75** is live (with its daily cron).
+- Worker **v76** is live (with its daily cron).
 - The rules with the owner protections are published to all three projects.
 - The community project:
   - TOTP is enabled, but Tony has NOT yet set up his authenticator (move-day step 5);

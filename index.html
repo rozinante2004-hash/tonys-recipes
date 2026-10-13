@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.30 -->
+<!-- Tony's Recipes Collection v38.31 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -155,7 +155,8 @@
     oldOrigins:          Object.freeze([]),
     // v38.22 — this whole copy moved (Tony, 11 Oct 2026: the family into the
     // community copy). Empty until move day; then every visit is sent there.
-    movedTo:             '',
+    // v38.31 — move day, 13 Oct 2026: the family's household is in the community copy.
+    movedTo:             'https://mykitchennotes.community/',
     testCopy: Object.freeze({
       siteUrl:           'https://tonys-recipes-test.pages.dev/',
       pagesProject:      'tonys-recipes-test',
@@ -184,8 +185,10 @@
     // before signing in — so every translated language is in every picker
     // from the first visit, with nothing to import or translate again. Only
     // the app's admins write it (from the family's copy).
+    // v38.31 — since move day the languages live in the community copy's project
+    // (the move copied i18n/ there); the translate and publish jobs follow this.
     languageSource: Object.freeze({
-      projectId:         'recipes-f379d',
+      projectId:         'my-kitchen-notes-beta',
       index:             'i18n/_index',
       prefix:            'i18n/'
     }),
@@ -275,6 +278,9 @@
     } catch (e) { return ''; }
   };
   (function () {
+    // v38.31 — never from this machine's own address: the Self Test and the end-to-end
+    // runs serve each copy at 127.0.0.1, and the moved family copy must still be tested.
+    if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) return;
     var to = window.appMovedTo(location.href, window.APP_CONFIG.oldOrigins, window.APP_CONFIG.siteOrigin)
           || window.appCopyMovedTo(location.href, window.APP_CONFIG.movedTo, window.APP_CONFIG.sitePath);
     if (to) { window._appMoving = true; location.replace(to); }
@@ -7356,7 +7362,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.30';
+var APP_VERSION = 'v38.31';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10197,7 +10203,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.30</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.31</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10912,7 +10918,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.30</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.31</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

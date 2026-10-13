@@ -4525,7 +4525,8 @@ window.SELF_TESTS = [
       });
       var src=window.APP_CONFIG.languageSource;
       if(!src||!src.projectId||!src.prefix||!src.index) throw new Error('APP_CONFIG.languageSource does not say where the languages are');
-      if(src.projectId!=='recipes-f379d') throw new Error('the central languages are not the family project\u2019s ('+src.projectId+')');
+      // v38.31 — since move day the central languages are in the community copy's project.
+      if(src.projectId!=='my-kitchen-notes-beta') throw new Error('the central languages are not the community project\u2019s ('+src.projectId+')');
       var v=i18nRestValue({ mapValue:{ fields:{ strings:{ mapValue:{ fields:{ Save:{ stringValue:'שמור' } } } }, count:{ integerValue:'1' },
                                               langs:{ mapValue:{ fields:{ he:{ mapValue:{ fields:{ at:{ integerValue:'5' } } } } } } } } } });
       if(v.strings.Save!=='שמור'||v.count!==1||v.langs.he.at!==5) throw new Error('the central answer is misread: '+JSON.stringify(v));
@@ -7611,8 +7612,9 @@ window.SELF_TESTS = [
     }},
   { id:'family_move', group:'Sharing', name:'🏠 The family’s move into the community copy: no copy forwards until move day; then every visit goes to the new address with its path, shared link and text; a moved household says so and stops; one household’s own Gmail/WhatsApp; the owner’s inbox in the community copy too (v38.22)',
     test: async()=>{
-      // Nothing forwards today (move day sets the family copy's movedTo).
-      if(APP_CONFIG.movedTo!=='') throw new Error('movedTo is set in the '+APP_CONFIG.environment+' copy: '+APP_CONFIG.movedTo);
+      // v38.31 — move day: the family copy forwards to the community copy; no other copy forwards.
+      var wantMoved=APP_CONFIG.environment==='live' ? 'https://mykitchennotes.community/' : '';
+      if(APP_CONFIG.movedTo!==wantMoved) throw new Error('movedTo in the '+APP_CONFIG.environment+' copy: '+APP_CONFIG.movedTo);
       var M='https://new.example/';
       var cases=[
         ['https://old.example/tonys-recipes/?url=https%3A%2F%2Fa.b%2Fr#share-text=hi', M+'?url=https%3A%2F%2Fa.b%2Fr#share-text=hi'],
