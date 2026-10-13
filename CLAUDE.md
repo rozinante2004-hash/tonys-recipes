@@ -79,8 +79,12 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   after a hard reload it worked (cap $10, spend carried). The 📊 page then showed every family household twice
   (FAMILY = the original, BETA = the moved one): v38.31 also greys a family row whose household id is in the
   beta ("📦 Moved to the beta — the old copy, kept until it is cleared") and leaves it out of the counts.
-  Next: release v38.31 (Tony was unsure — ask), then Tony's steps 5–7 of the MOVE DAY CHECKLIST, and the
-  clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
+  **Released to the family app and the beta: v38.31 (13 Oct 2026, Tony's "Go ahead with releasing v38.31", CI
+  green on 1341809).** Pages, Cloudflare Pages (beta, test), Translate new phrases and Publish languages (now from
+  my-kitchen-notes-beta — nothing new to publish: the files equal the copied translations), Self Tests on main:
+  success. The family address forwards to https://mykitchennotes.community/ (checked locally with a mapped host:
+  path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
+  CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
 - **v38.32** (on `test`): Tony, move day — "I would prefer the Beta ribbon to be removed from the Family app, or
   even better replaced by a different Admin ribbon, in a different color". `envRibbonUpdate()` (from
