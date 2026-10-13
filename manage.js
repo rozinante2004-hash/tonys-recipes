@@ -1129,6 +1129,9 @@
       try { await window._fbDb.collection('households').doc(r.hid).update({ features: f }); }
       catch (e) { showServiceError('Could not change it: ' + ((e && e.message) || e)); render(); return false; }
       r.features = f;
+      // v38.33 — Tony: Gmail on for the family, yet no 📧 Gmail Setup until a reload. The household open
+      // here takes the change at once (the app reads a household's extras when it opens it).
+      if (window._household && window._household.hid === r.hid) { window._hhFeatures = f; if (typeof applyFeatureFlags === 'function') applyFeatureFlags(); }
       toast(on ? '✅ On for ' + (r.name || 'this household') : 'Off for ' + (r.name || 'this household'));
       render();
       return true;
