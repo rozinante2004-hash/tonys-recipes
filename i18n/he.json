@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791917976071,
- "count": 2733,
+ "updatedAt": 1791919017595,
+ "count": 2736,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1024,6 +1024,8 @@
   "Reginald the rooster": "רג'ינלד, התרנגול",
   "Reject": "דחייה",
   "Rejected. They are not told.": "נדחה. הם לא יקבלו הודעה.",
+  "Reload": "רענון",
+  "Reload the app": "רענון האפליקציה",
   "Reload the app once so it pulls the current collection down before making further changes.": "טען מחדש את האפליקציה פעם אחת כדי שתמשוך את האוסף הנוכחי לפני שממשיכים בשינויים.",
   "Remember me on this device": "זכור אותי במכשיר הזה",
   "Remind me later": "הזכירו לי מאוחר יותר",
@@ -1432,6 +1434,7 @@
   "This bookmarklet refreshes your Bring! connection in one click.": "הסימנייה הזו מרעננת את החיבור שלכם ל-Bring! בלחיצה אחת.",
   "This browser cannot be given a folder to write into — that needs Chrome or Edge on a computer. {1}: once a folder is chosen there, it saves a snapshot of the whole family collection every week, and this device’s reminder follows that. As long as the computer is used now and then, nothing here needs doing.{2}{3}Back up now still works here, and saves to this device’s downloads.": "לדפדפן הזה אי אפשר לתת תיקייה לכתוב אליה — לשם כך צריך Chrome או Edge במחשב. {1}: ברגע שנבחרת תיקייה שם, הוא שומר תמונת מצב של כל אוסף המשפחה כל שבוע, והתזכורת של המכשיר הזה עוקבת אחרי זה. כל עוד המחשב בשימוש מדי פעם, אין צורך לעשות כאן כלום.{2}{3}גיבוי עכשיו עדיין עובד כאן, ונשמר להורדות של המכשיר הזה.",
   "This browser cannot speak": "הדפדפן הזה לא יכול לדבר",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "הדפדפן הזה מחק את העותק של המתכונים שלך במכשיר הזה (תקלה מוכרת בספארי באייפון). שום דבר לא אבד - המתכונים שלך נמצאים בענן. רעננו, והאפליקציה תמשיך לפעול כרגיל.",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "לדפדפן הזה אין גישה ללוח. הנה השמות להעתקה ידנית: {1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "לדפדפן הזה אין גישה ללוח. הנה הרשימה להעתקה ידנית: {1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "לספריית ההתחברות של הדפדפן הזה אין תמיכה באימות. טענו מחדש את האפליקציה ונסו שוב.",

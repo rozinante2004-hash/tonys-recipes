@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1791917976071,
- "count": 2192,
+ "updatedAt": 1791919017595,
+ "count": 2195,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -783,6 +783,8 @@
   "Reginald the rooster": "رجينالد الديك",
   "Reject": "رفض",
   "Rejected. They are not told.": "تم الرفض. لن يُبلَّغوا بذلك.",
+  "Reload": "إعادة تحميل",
+  "Reload the app": "إعادة تحميل التطبيق",
   "Reload the app once so it pulls the current collection down before making further changes.": "أعد تحميل التطبيق مرة واحدة ليجلب المجموعة الحالية قبل إجراء أي تغييرات أخرى.",
   "Remember me on this device": "تذكرني على هذا الجهاز",
   "Remind me later": "ذكّرني لاحقاً",
@@ -1104,6 +1106,7 @@
   "This bookmarklet refreshes your Bring! connection in one click.": "يحدّث هذا الرابط اتصالك بـ Bring! بنقرة واحدة.",
   "This browser cannot be given a folder to write into — that needs Chrome or Edge on a computer. {1}: once a folder is chosen there, it saves a snapshot of the whole family collection every week, and this device’s reminder follows that. As long as the computer is used now and then, nothing here needs doing.{2}{3}Back up now still works here, and saves to this device’s downloads.": "هذا المتصفح لا يمكن منحه صلاحية الكتابة في مجلد — هذا يحتاج Chrome أو Edge على كمبيوتر. {1}: بعد اختيار مجلد هناك، يحفظ نسخة من كل مجموعة العائلة أسبوعيًا، وتذكير هذا الجهاز يتبع ذلك. ما دام الكمبيوتر يُستخدم من وقت لآخر، لا شيء هنا يحتاج للفعل.{2}{3}النسخ الاحتياطي الآن لا يزال يعمل هنا، ويحفظ في تنزيلات هذا الجهاز.",
   "This browser cannot speak": "هذا المتصفح لا يدعم النطق",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "فقد هذا المتصفح نسخة التطبيق من وصفاتك على هذا الجهاز (مشكلة معروفة في سفاري آيفون). لا شيء مفقود — وصفاتك محفوظة في السحابة. أعد التحميل، وسيواصل التطبيق العمل دون تلك النسخة.",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "هذا المتصفح لا يتيح الوصول إلى الحافظة. إليك الأسماء لنسخها يدويًا: {1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "هذا المتصفح لا يتيح الوصول إلى الحافظة. إليك القائمة لنسخها يدويًا: {1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "مكتبة تسجيل الدخول في هذا المتصفح لا تدعم المصادقة. أعد تحميل التطبيق وحاول مجددًا.",

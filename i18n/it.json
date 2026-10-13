@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1791917976071,
- "count": 2071,
+ "updatedAt": 1791919017595,
+ "count": 2074,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -736,6 +736,8 @@
   "Reginald the rooster": "Reginald il gallo",
   "Reject": "Rifiuta",
   "Rejected. They are not told.": "Rifiutato. Non viene avvisato.",
+  "Reload": "Ricarica",
+  "Reload the app": "Ricarica l'app",
   "Reload the app once so it pulls the current collection down before making further changes.": "Ricarica l'app una volta così scarica la raccolta attuale prima di fare altre modifiche.",
   "Remember me on this device": "Ricordami su questo dispositivo",
   "Remind me later": "Ricordamelo più tardi",
@@ -1042,6 +1044,7 @@
   "Third photo source for “Search web for photo”. Demo tier {1} requests/hour ({2}/hour once approved for production).": "Terza fonte di foto per “Cerca foto sul web”. Livello demo: {1} richieste/ora ({2}/ora una volta approvato per la produzione).",
   "This bookmarklet refreshes your Bring! connection in one click.": "Questo bookmarklet aggiorna la tua connessione a Bring! con un clic.",
   "This browser cannot speak": "Questo browser non supporta la sintesi vocale",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "Questo browser ha perso la copia delle tue ricette su questo dispositivo (un problema noto di Safari su iPhone). Non hai perso nulla: le tue ricette sono nel cloud. Ricarica e l'app continua a funzionare senza quella copia.",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "Questo browser non consente l'accesso agli appunti. Ecco i nomi da copiare a mano: {1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "Questo browser non consente l'accesso agli appunti. Ecco l'elenco da copiare a mano: {1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "Questo browser non supporta l'authenticator per l'accesso. Ricarica l'app e riprova.",

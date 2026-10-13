@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1791917976071,
- "count": 2533,
+ "updatedAt": 1791919017595,
+ "count": 2536,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -969,6 +969,8 @@
   "Reginald the rooster": "雄鶏のレジナルド",
   "Reject": "拒否",
   "Rejected. They are not told.": "拒否されました。相手には通知されません。",
+  "Reload": "再読み込み",
+  "Reload the app": "アプリを再読み込み",
   "Reload the app once so it pulls the current collection down before making further changes.": "さらに変更を加える前に、アプリを一度再読み込みして最新のコレクションを取得してください。",
   "Remember me on this device": "この端末でログイン情報を記憶",
   "Remind me later": "あとで",
@@ -1360,6 +1362,7 @@
   "This bookmarklet refreshes your Bring! connection in one click.": "このブックマークレットはワンクリックでBring!との接続を更新します。",
   "This browser cannot be given a folder to write into — that needs Chrome or Edge on a computer. {1}: once a folder is chosen there, it saves a snapshot of the whole family collection every week, and this device’s reminder follows that. As long as the computer is used now and then, nothing here needs doing.{2}{3}Back up now still works here, and saves to this device’s downloads.": "このブラウザには書き込み用フォルダを指定できません — それにはパソコン版のChromeかEdgeが必要です。{1}：そちらでフォルダを選択すると、毎週家族のコレクション全体のスナップショットを保存し、この端末のリマインダーもそれに従います。パソコンを時々使ってさえいれば、ここでは何もする必要はありません。{2}{3}「今すぐバックアップ」はここでも使え、この端末のダウンロードフォルダに保存されます。",
   "This browser cannot speak": "このブラウザは音声出力に対応していません",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "このブラウザが端末内のレシピのコピーを失ってしまいました（iPhoneのSafariでよく起きる不具合です）。でも心配いりません — レシピはクラウドに保存されています。再読み込みすれば、そのコピーなしでアプリは続けて使えます。",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "このブラウザはクリップボードにアクセスできません。以下の名前を手動でコピーしてください：{1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "このブラウザはクリップボードにアクセスできません。以下のリストを手動でコピーしてください：{1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "このブラウザのサインインライブラリは認証アプリに対応していません。アプリを再読み込みしてもう一度お試しください。",

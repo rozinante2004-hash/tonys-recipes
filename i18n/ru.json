@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791917976071,
- "count": 2523,
+ "updatedAt": 1791919017595,
+ "count": 2526,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -967,6 +967,8 @@
   "Reginald the rooster": "Петух Реджинальд",
   "Reject": "Отклонить",
   "Rejected. They are not told.": "Отклонено. Им не сообщается.",
+  "Reload": "Обновить",
+  "Reload the app": "Обновить приложение",
   "Reload the app once so it pulls the current collection down before making further changes.": "Перезагрузите приложение один раз, чтобы оно подтянуло текущую коллекцию, прежде чем вносить дальнейшие изменения.",
   "Remember me on this device": "Запомнить меня на этом устройстве",
   "Remind me later": "Напомнить позже",
@@ -1357,6 +1359,7 @@
   "This bookmarklet refreshes your Bring! connection in one click.": "Этот букмарклет обновляет подключение к Bring! в один клик.",
   "This browser cannot be given a folder to write into — that needs Chrome or Edge on a computer. {1}: once a folder is chosen there, it saves a snapshot of the whole family collection every week, and this device’s reminder follows that. As long as the computer is used now and then, nothing here needs doing.{2}{3}Back up now still works here, and saves to this device’s downloads.": "Этот браузер нельзя настроить на запись в папку — для этого нужен Chrome или Edge на компьютере. {1}: как только там выбрана папка, каждую неделю туда сохраняется снимок всей семейной коллекции, и напоминание на этом устройстве ориентируется на это. Если компьютер используется время от времени, здесь ничего делать не нужно.{2}{3}Сделать резервную копию сейчас всё равно работает и здесь — файл сохранится в загрузки этого устройства.",
   "This browser cannot speak": "Этот браузер не поддерживает озвучивание",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "Браузер потерял на этом устройстве локальную копию ваших рецептов (известная проблема Safari на iPhone). Ничего не пропало — рецепты хранятся в облаке. Обновите страницу, и приложение продолжит работать без этой копии.",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "Этот браузер не даёт доступа к буферу обмена. Вот названия для копирования вручную: {1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "Этот браузер не даёт доступа к буферу обмена. Вот список для копирования вручную: {1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "Библиотека входа в этом браузере не поддерживает аутентификатор. Перезагрузите приложение и попробуйте снова.",

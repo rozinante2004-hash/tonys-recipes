@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1791917976071,
- "count": 2219,
+ "updatedAt": 1791919017595,
+ "count": 2222,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -788,6 +788,8 @@
   "Reginald the rooster": "公鸡雷金纳德",
   "Reject": "拒绝",
   "Rejected. They are not told.": "已拒绝，对方不会收到通知。",
+  "Reload": "重新加载",
+  "Reload the app": "重新加载应用",
   "Reload the app once so it pulls the current collection down before making further changes.": "请先重新加载应用一次，同步最新数据后再继续操作。",
   "Remember me on this device": "记住我",
   "Remind me later": "稍后提醒我",
@@ -1109,6 +1111,7 @@
   "This bookmarklet refreshes your Bring! connection in one click.": "这个书签小工具能一键刷新你的 Bring! 连接。",
   "This browser cannot be given a folder to write into — that needs Chrome or Edge on a computer. {1}: once a folder is chosen there, it saves a snapshot of the whole family collection every week, and this device’s reminder follows that. As long as the computer is used now and then, nothing here needs doing.{2}{3}Back up now still works here, and saves to this device’s downloads.": "此浏览器无法被授权写入文件夹——这需要在电脑上使用 Chrome 或 Edge。{1}：在那里选好文件夹后，它每周都会保存一次整个家庭合集的快照，本设备的提醒也会随之进行。只要电脑时不时被使用，这里就不需要做任何事。{2}{3}现在备份在这里仍然可用，会保存到本设备的下载文件夹。",
   "This browser cannot speak": "此浏览器不支持朗读",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "此浏览器丢失了本设备上应用保存的食谱副本（iPhone Safari 的已知问题）。别担心，食谱都在云端，没有丢失。重新加载后，应用会在没有该副本的情况下继续运行。",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "此浏览器不支持剪贴板访问，请手动复制以下名称：{1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "此浏览器不支持剪贴板访问，请手动复制以下列表：{1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "此浏览器的登录库不支持验证码功能。请重新加载应用后再试。",

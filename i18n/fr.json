@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1791917976071,
- "count": 2191,
+ "updatedAt": 1791919017595,
+ "count": 2194,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -782,6 +782,8 @@
   "Reginald the rooster": "Reginald le coq",
   "Reject": "Refuser",
   "Rejected. They are not told.": "Refusé. Ils ne sont pas prévenus.",
+  "Reload": "Recharger",
+  "Reload the app": "Recharger l'app",
   "Reload the app once so it pulls the current collection down before making further changes.": "Recharge l'application une fois pour récupérer la collection actuelle avant de continuer.",
   "Remember me on this device": "Se souvenir de moi sur cet appareil",
   "Remind me later": "Me le rappeler plus tard",
@@ -1103,6 +1105,7 @@
   "This bookmarklet refreshes your Bring! connection in one click.": "Ce bookmarklet actualise votre connexion Bring! en un clic.",
   "This browser cannot be given a folder to write into — that needs Chrome or Edge on a computer. {1}: once a folder is chosen there, it saves a snapshot of the whole family collection every week, and this device’s reminder follows that. As long as the computer is used now and then, nothing here needs doing.{2}{3}Back up now still works here, and saves to this device’s downloads.": "Ce navigateur ne permet pas de choisir un dossier où écrire — il faut Chrome ou Edge sur un ordinateur. {1} : une fois un dossier choisi là-bas, une sauvegarde de toute la collection familiale est faite chaque semaine, et le rappel de cet appareil suit ça. Tant que l'ordinateur est utilisé de temps en temps, il n'y a rien à faire ici.{2}{3}Sauvegarder maintenant fonctionne quand même ici, et enregistre dans les téléchargements de cet appareil.",
   "This browser cannot speak": "Ce navigateur ne peut pas lire à voix haute",
+  "This browser lost the app’s copy of your recipes on this device (a known iPhone Safari problem). Nothing is lost — your recipes are in the cloud. Reload, and the app carries on without that copy.": "Ce navigateur a perdu la copie locale de vos recettes sur cet appareil (un problème connu de Safari sur iPhone). Rien n'est perdu : vos recettes sont dans le cloud. Rechargez, et l'app continue sans cette copie.",
   "This browser offers no clipboard access. Here are the names to copy by hand: {1}": "Ce navigateur n'offre pas d'accès au presse-papiers. Voici les noms à copier à la main : {1}",
   "This browser offers no clipboard access. Here is the list to copy by hand: {1}": "Ce navigateur n'offre pas d'accès au presse-papiers. Voici la liste à copier à la main : {1}",
   "This browser’s sign-in library has no authenticator support. Reload the app and try again.": "La bibliothèque de connexion de ce navigateur ne prend pas en charge l'authentificateur. Rechargez l'application et réessayez.",
