@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1791919017595,
- "count": 2192,
+ "updatedAt": 1791929107381,
+ "count": 2195,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -471,6 +471,7 @@
   "Ingredients you have (Enter or comma to add)": "Zutaten, die du hast (Enter oder Komma zum Hinzufügen)",
   "Install": "Installieren",
   "Install Tony's Recipes": "Tony's Recipes installieren",
+  "Install the app": "App installieren",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "Installiert die App — dann Rezepte aus Facebook, Instagram oder jeder anderen App teilen.",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "Installiert die App, damit sie im Teilen-Menü deines Handys erscheint. Tippe dann bei jedem Rezept-Post oder jeder Website auf Teilen und wähle diese App — das Rezept landet hier, ganz ohne Kopieren oder Einfügen.",
   "Interface language": "Oberflächensprache",
@@ -1700,7 +1701,9 @@
   "✅ Gmail Client ID saved!": "✅ Gmail-Client-ID gespeichert!",
   "✅ Imported {1} chat{2}": "✅ {1} Chat{2} importiert",
   "✅ Imported {1} of {2}": "✅ {1} von {2} importiert",
+  "✅ Installed as an app!": "✅ Als App installiert!",
   "✅ Installing Tony's Recipes...": "✅ Tony's Recipes wird installiert …",
+  "✅ Installing the app…": "✅ App wird installiert…",
   "✅ Nutrition calculated": "✅ Nährwerte berechnet",
   "✅ Offline changes merged with cloud data": "✅ Offline-Änderungen mit Cloud-Daten zusammengeführt",
   "✅ Original photo removed": "✅ Originalfoto entfernt",

@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1791919017595,
- "count": 2536,
+ "updatedAt": 1791929107381,
+ "count": 2539,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -614,6 +614,7 @@
   "Instagram fetch (test post)": "Instagram取得（テスト投稿）",
   "Install": "インストール",
   "Install Tony's Recipes": "Tony's Recipesをインストール",
+  "Install the app": "アプリをインストール",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "アプリをインストールすると、Facebook、Instagram、他のアプリからレシピを共有できます。",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "アプリをインストールすると、スマホの共有メニューに表示されます。レシピの投稿やサイトで共有をタップしてこのアプリを選ぶだけで、コピペ不要でレシピが届きます。",
   "Interface language": "表示言語",
@@ -2032,7 +2033,9 @@
   "✅ Gmail Client ID saved!": "✅ Gmail クライアントIDを保存しました！",
   "✅ Imported {1} chat{2}": "✅ {1}件のチャット{2}をインポートしました",
   "✅ Imported {1} of {2}": "✅ {2}件中{1}件をインポートしました",
+  "✅ Installed as an app!": "✅ アプリをインストールしました！",
   "✅ Installing Tony's Recipes...": "✅ Tony's Recipesをインストール中...",
+  "✅ Installing the app…": "✅ アプリをインストール中…",
   "✅ Nutrition calculated": "✅ 栄養価を計算しました",
   "✅ Offline changes merged with cloud data": "✅ オフラインの変更をクラウドデータと統合しました",
   "✅ Original photo removed": "✅ 元の写真を削除しました",

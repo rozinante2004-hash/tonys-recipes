@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1791919017595,
- "count": 2190,
+ "updatedAt": 1791929107381,
+ "count": 2193,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -470,6 +470,7 @@
   "Ingredients you have (Enter or comma to add)": "Ingredientes que tienes (Enter o coma para añadir)",
   "Install": "Instalar",
   "Install Tony's Recipes": "Instalar Tony's Recipes",
+  "Install the app": "Instalar la app",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "Instala la app y después comparte recetas desde Facebook, Instagram o cualquier app.",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "Instala la app para que aparezca en el menú Compartir de tu teléfono. Luego, en cualquier publicación o web de recetas, toca Compartir, elige esta app y la receta llega aquí, sin copiar ni pegar.",
   "Interface language": "Idioma de la interfaz",
@@ -1699,7 +1700,9 @@
   "✅ Gmail Client ID saved!": "✅ ¡ID de cliente de Gmail guardado!",
   "✅ Imported {1} chat{2}": "✅ Se importó {1} chat{2}",
   "✅ Imported {1} of {2}": "✅ Se importaron {1} de {2}",
+  "✅ Installed as an app!": "✅ ¡Instalada como app!",
   "✅ Installing Tony's Recipes...": "✅ Instalando Tony's Recipes...",
+  "✅ Installing the app…": "✅ Instalando la app…",
   "✅ Nutrition calculated": "✅ Nutrición calculada",
   "✅ Offline changes merged with cloud data": "✅ Cambios sin conexión combinados con los datos en la nube",
   "✅ Original photo removed": "✅ Foto original eliminada",

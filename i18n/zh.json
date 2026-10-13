@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1791919017595,
- "count": 2222,
+ "updatedAt": 1791929107381,
+ "count": 2225,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -475,6 +475,7 @@
   "Ingredients you have (Enter or comma to add)": "你已有的食材（按 Enter 或逗号添加）",
   "Install": "安装",
   "Install Tony's Recipes": "安装 Tony's Recipes",
+  "Install the app": "安装应用",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "安装应用——然后就能从Facebook、Instagram或其他应用分享食谱。",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "安装此应用后，它会出现在手机的分享菜单中。之后在任意菜谱帖子或网站上，点击分享并选择本应用，菜谱就会直接存入这里 — 无需复制粘贴。",
   "Interface language": "界面语言",
@@ -1716,7 +1717,9 @@
   "✅ Gmail Client ID saved!": "✅ Gmail 客户端 ID 已保存！",
   "✅ Imported {1} chat{2}": "✅ 已导入 {1} 个聊天{2}",
   "✅ Imported {1} of {2}": "✅ 已导入 {2} 个中的 {1} 个",
+  "✅ Installed as an app!": "✅ 已安装为应用！",
   "✅ Installing Tony's Recipes...": "✅ 正在安装 Tony's Recipes...",
+  "✅ Installing the app…": "✅ 正在安装应用…",
   "✅ Nutrition calculated": "✅ 营养已计算",
   "✅ Offline changes merged with cloud data": "✅ 离线修改已与云端数据合并",
   "✅ Original photo removed": "✅ 原图已删除",

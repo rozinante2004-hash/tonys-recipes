@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791919017595,
- "count": 2736,
+ "updatedAt": 1791929107381,
+ "count": 2739,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -647,6 +647,7 @@
   "Instagram fetch (test post)": "שליפה מאינסטגרם (פוסט בדיקה)",
   "Install": "התקנה",
   "Install Tony's Recipes": "התקנת Tony's Recipes",
+  "Install the app": "התקנת האפליקציה",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "מתקין את האפליקציה — ואז אפשר לשתף מתכונים מפייסבוק, אינסטגרם או כל אפליקציה אחרת.",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "מתקין את האפליקציה כך שתופיע בתפריט השיתוף של הטלפון. אחר כך, בכל פוסט או אתר עם מתכון, הקישו על שיתוף ובחרו באפליקציה הזו, והמתכון ינחת כאן — בלי להעתיק ולהדביק.",
   "Interface language": "שפת ממשק",
@@ -2226,7 +2227,9 @@
   "✅ Hebrew saved and shared with everyone": "✅ העברית נשמרה ושותפה עם כולם",
   "✅ Imported {1} chat{2}": "✅ יובא {1} צ׳אט{2}",
   "✅ Imported {1} of {2}": "✅ יובאו {1} מתוך {2}",
+  "✅ Installed as an app!": "✅ הותקן כאפליקציה!",
   "✅ Installing Tony's Recipes...": "✅ מתקין את Tony's Recipes...",
+  "✅ Installing the app…": "✅ מתקין את האפליקציה…",
   "✅ Nutrition calculated": "✅ הערכים התזונתיים חושבו",
   "✅ Offline changes merged with cloud data": "✅ שינויים לא מקוונים מוזגו עם הנתונים בענן",
   "✅ Original photo removed": "✅ התמונה המקורית הוסרה",

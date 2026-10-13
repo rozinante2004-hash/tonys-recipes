@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791919017595,
- "count": 2526,
+ "updatedAt": 1791929107381,
+ "count": 2529,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -613,6 +613,7 @@
   "Instagram fetch (test post)": "Загрузка из Instagram (тестовый пост)",
   "Install": "Установить",
   "Install Tony's Recipes": "Установить Tony's Recipes",
+  "Install the app": "Установить приложение",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "Устанавливает приложение — потом делитесь рецептами из Facebook, Instagram или любого другого приложения.",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "Устанавливает приложение, чтобы оно появилось в меню «Поделиться» на телефоне. Затем на любом рецепте или сайте нажмите «Поделиться» и выберите это приложение — рецепт попадёт сюда без копирования и вставки.",
   "Interface language": "Язык интерфейса",
@@ -2026,7 +2027,9 @@
   "✅ Gmail Client ID saved!": "✅ ID клиента Gmail сохранён!",
   "✅ Imported {1} chat{2}": "✅ Импортирован{2} {1} чат",
   "✅ Imported {1} of {2}": "✅ Импортировано {1} из {2}",
+  "✅ Installed as an app!": "✅ Установлено как приложение!",
   "✅ Installing Tony's Recipes...": "✅ Устанавливаем Tony's Recipes...",
+  "✅ Installing the app…": "✅ Установка приложения…",
   "✅ Nutrition calculated": "✅ Пищевая ценность рассчитана",
   "✅ Offline changes merged with cloud data": "✅ Офлайн-изменения объединены с данными в облаке",
   "✅ Original photo removed": "✅ Оригинал фото удалён",

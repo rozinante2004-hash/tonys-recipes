@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1791919017595,
- "count": 2074,
+ "updatedAt": 1791929107381,
+ "count": 2077,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -447,6 +447,7 @@
   "Ingredients you have (Enter or comma to add)": "Ingredienti che hai (Invio o virgola per aggiungere)",
   "Install": "Installa",
   "Install Tony's Recipes": "Installa Tony's Recipes",
+  "Install the app": "Installa l'app",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "Installa l'app, così appare nel menu Condividi del telefono. Poi, su qualsiasi post o sito con una ricetta, tocca Condividi e scegli questa app: la ricetta arriva qui — niente copia-incolla.",
   "Interface language": "Lingua dell'interfaccia",
   "Interface language: English": "Lingua dell'interfaccia: Italiano",
@@ -1605,7 +1606,9 @@
   "✅ Gmail Client ID saved!": "✅ Client ID di Gmail salvato!",
   "✅ Imported {1} chat{2}": "✅ Importate {1} chat{2}",
   "✅ Imported {1} of {2}": "✅ Importati {1} di {2}",
+  "✅ Installed as an app!": "✅ Installata come app!",
   "✅ Installing Tony's Recipes...": "✅ Installazione di Tony's Recipes...",
+  "✅ Installing the app…": "✅ Installazione dell'app…",
   "✅ Nutrition calculated": "✅ Valori nutrizionali calcolati",
   "✅ Offline changes merged with cloud data": "✅ Modifiche offline unite ai dati del cloud",
   "✅ Original photo removed": "✅ Foto originale rimossa",

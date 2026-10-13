@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1791919017595,
- "count": 2195,
+ "updatedAt": 1791929107381,
+ "count": 2198,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -472,6 +472,7 @@
   "Ingredients you have (Enter or comma to add)": "المكوّنات المتوفرة لديك (اضغط Enter أو فاصلة للإضافة)",
   "Install": "تثبيت",
   "Install Tony's Recipes": "تثبيت Tony's Recipes",
+  "Install the app": "تثبيت التطبيق",
   "Installs the app — then share recipes from Facebook, Instagram or any app.": "يثبّت التطبيق — ثم شارك الوصفات من Facebook أو Instagram أو أي تطبيق آخر.",
   "Installs the app, so it appears in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": "يثبّت التطبيق ليظهر في قائمة المشاركة بهاتفك. بعدها، من أي منشور وصفة أو موقع، اضغط على مشاركة واختر هذا التطبيق، لتصل الوصفة هنا مباشرة — بلا نسخ أو لصق.",
   "Interface language": "لغة الواجهة",
@@ -1701,7 +1702,9 @@
   "✅ Gmail Client ID saved!": "✅ تم حفظ معرّف عميل Gmail!",
   "✅ Imported {1} chat{2}": "✅ تم استيراد {1} محادثة{2}",
   "✅ Imported {1} of {2}": "✅ تم استيراد {1} من {2}",
+  "✅ Installed as an app!": "✅ تم التثبيت كتطبيق!",
   "✅ Installing Tony's Recipes...": "✅ جارٍ تثبيت Tony's Recipes...",
+  "✅ Installing the app…": "✅ جارٍ تثبيت التطبيق…",
   "✅ Nutrition calculated": "✅ تم حساب القيم الغذائية",
   "✅ Offline changes merged with cloud data": "✅ تم دمج التغييرات غير المتصلة مع بيانات السحابة",
   "✅ Original photo removed": "✅ تمت إزالة الصورة الأصلية",
