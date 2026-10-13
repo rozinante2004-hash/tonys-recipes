@@ -86,8 +86,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
-- **v38.33** (on `test`, not released): turning a household's Extra on in 📊 Households applies at once to the
-  household open on this device (Tony: Gmail on, but no 📧 Gmail Setup until a reload).
+- **v38.33** (on `test`, not released): (1) turning a household's Extra on in 📊 Households applies at once to the
+  household open on this device (Tony: Gmail on, but no 📧 Gmail Setup until a reload). (2) **Gmail on the
+  iPhone** — Tony: "stuck on 'Requesting Gmail access…'" (the PC worked, after he enabled the Gmail API in the
+  family project 313792199018 = recipes-f379d, whose OAuth client he uses; keep that project when the old data is
+  cleared). v38.29 fetched Google's GSI script on the Send tap; Safari opens Google's window only as the direct
+  answer to a tap, and the wait broke that, so iOS blocked it silently. Now `gmailPreload()` fetches GSI when the
+  e-mail window opens (Gmail on and a client ID set); getGmailToken waits only if it is not there; a tap before it
+  arrives fetches it and asks for a second tap ("📧 Ready — press to send"). Self-test `gmail_iphone_tap`.
 - **Released to the family app and the beta: v38.32 (13 Oct 2026, Tony's "Yes, please", CI green on ef9f765).**
   Pages, Cloudflare Pages, Translate, Publish languages, Self Tests on main: success. Tony: "The green ADMIN strip
   is showing now". Move-day step 5: allowances brought (5a), Gmail on for the family (5b); next the Gmail client

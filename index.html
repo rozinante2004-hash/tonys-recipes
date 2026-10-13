@@ -7606,11 +7606,22 @@ function rHtml(r) {
   return html;
 }
 
+// v38.33 — Tony, move day: on his iPhone "stuck on 'Requesting Gmail access…'". Since v38.29 Google's
+// script was fetched only when Send was pressed, and Safari opens Google's permission window only as the
+// direct answer to a tap — the wait for the script came between them, and iOS blocked the window without
+// a word. Now the script is fetched when this window opens, so the tap reaches Google at once.
+function gmailPreload() {
+  if (typeof featureOn !== 'function' || !featureOn('gmail') || !window._gmailOAuthClientId) return null;
+  if (window.google && window.google.accounts) return null;
+  return loadScriptOnce(GSI_CLIENT_URL, 'google').catch(function(){});
+}
+window.gmailPreload = gmailPreload;
 function showEmailModal(id) {
   // findRecipeRef — see doWhatsApp. `id` may be a part reference, and this
   // returned silently for every one of them (v36.13).
   var r = findRecipeRef(id);
   if(!r) return;
+  gmailPreload();   // v38.33
   var htmlBody = rHtml(r);
   var plainText = rText(r);
 
@@ -7686,6 +7697,16 @@ function showEmailModal(id) {
     var subject = subjectInput.value.trim();
     if(!to) { toast('⚠️ Please enter a recipient email address'); toInput.focus(); return; }
     if(!subject) subject = r.name;
+    // v38.33 — Google's script not here yet (a very quick tap, a slow line): fetch it, then ask for a
+    // second tap — on an iPhone only a tap may open Google's window, and the wait used up this one.
+    if (featureOn('gmail') && window._gmailOAuthClientId && !(window.google && window.google.accounts)) {
+      gmailBtn.textContent = '⏳ Getting ready…'; gmailBtn.disabled = true;
+      try { await loadScriptOnce(GSI_CLIENT_URL, 'google'); } catch(e) {}
+      gmailBtn.disabled = false;
+      gmailBtn.textContent = (window.google && window.google.accounts) ? '📧 Ready — press to send' : '📧 Send Email';
+      if (!(window.google && window.google.accounts)) toast('⚠️ Google could not be reached — check the connection, then try again.');
+      return;
+    }
     gmailBtn.textContent = '🔐 Requesting Gmail access…';
     gmailBtn.disabled = true;
     try {
@@ -7788,7 +7809,9 @@ async function getGmailToken() {
   if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
   // v38.29 — Google's script is fetched only now, when a recipe is sent by Gmail (it used to load
   // with every opening of the app). A failure falls through to the message below.
-  try { await loadScriptOnce(GSI_CLIENT_URL, 'google'); } catch (e) {}
+  // v38.33 — and only when it is not here yet: no wait between the tap and Google's window when it is
+  // (the e-mail window fetched it — gmailPreload), or an iPhone blocks that window.
+  if (!(window.google && window.google.accounts)) { try { await loadScriptOnce(GSI_CLIENT_URL, 'google'); } catch (e) {} }
   return new Promise(function(resolve, reject) {
     if(!window.google || !window.google.accounts) {
       reject(new Error('Google Identity Services not loaded. Please refresh the page.'));

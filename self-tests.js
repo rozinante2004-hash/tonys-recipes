@@ -10356,6 +10356,38 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'gmail_iphone_tap', group:'Sharing', name:'📧 Gmail on an iPhone: the e-mail window fetches Google’s script first, so the tap on Send reaches Google at once; a tap before it arrives asks for a second tap, never hangs (v38.33)',
+    test: async()=>{
+      var real={ g:window.google, id:window._gmailOAuthClientId, load:window.loadScriptOnce, send:window.sendViaGmailApi, toast:window.toast, ov:Object.assign({}, window._featureOverride), rec:recipes };
+      var loads=[], sent=[];
+      try{
+        window.toast=function(){};
+        window._featureOverride.gmail=true; applyFeatureFlags();
+        window._gmailOAuthClientId='123-test.apps.googleusercontent.com';
+        window.google=undefined;
+        window.loadScriptOnce=function(url){ loads.push(url); return new Promise(function(res){ setTimeout(function(){ window.google={ accounts:{ oauth2:{} } }; res(); }, 30); }); };
+        window.sendViaGmailApi=async function(to){ sent.push(to); return true; };
+        recipes=[normalizeRecipe({ id:777002, name:'Gmail probe', ingredients:[], steps:['x'] })];
+        showEmailModal(777002);
+        if(loads.length!==1 || !/accounts\.google\.com\/gsi\/client/.test(loads[0])) throw new Error('opening the e-mail window did not fetch Google’s script: '+JSON.stringify(loads));
+        // A tap before the script is here: it is fetched, and a second tap is asked for — nothing sent, nothing stuck.
+        window.google=undefined;
+        var ov=document.getElementById('emailModalOverlay'), btn=ov && ov.querySelector('button[data-feature="gmail"]'), to=ov && ov.querySelector('input[type="email"]');
+        if(!btn || !to) throw new Error('no Send Email button or To field');
+        to.value='someone@example.com';
+        await btn.onclick();
+        if(sent.length || btn.disabled || !/press to send/.test(btn.textContent)) throw new Error('a tap before the script: sent='+sent.length+' “'+btn.textContent+'” disabled='+btn.disabled);
+        // The second tap goes straight through.
+        await btn.onclick();
+        if(sent.length!==1 || !/Sent/.test(btn.textContent)) throw new Error('the second tap: sent='+sent.length+' “'+btn.textContent+'”');
+        // And getGmailToken waits for nothing when the script is already here.
+        if(String(getGmailToken).indexOf('if (!(window.google && window.google.accounts))')===-1) throw new Error('getGmailToken waits for the script even when it is there');
+      } finally {
+        var o=document.getElementById('emailModalOverlay'); if(o) o.remove();
+        window.google=real.g; window._gmailOAuthClientId=real.id; window.loadScriptOnce=real.load; window.sendViaGmailApi=real.send; window.toast=real.toast; recipes=real.rec;
+        window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
+      }
+    } },
   { id:'safe_restore_confirms', group:'Backup', name:'Restore asks before replacing everything (audit v31.0)',
     test: async()=>{
       var src=String(backupRestoreFile);
