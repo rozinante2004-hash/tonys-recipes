@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1791934153684,
- "count": 2199,
+ "updatedAt": 1791996396563,
+ "count": 2202,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -937,6 +937,7 @@
   "Sign out?": "تسجيل الخروج؟",
   "Signed in as": "مسجَّل الدخول باسم",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "تم تسجيل الدخول، لكن تعذّر فتح أسرتك: {1} كل شيء على هذا الجهاز آمن. حاول مرة أخرى عندما يتحسن الاتصال.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "تم تسجيل الدخول، لكن تعذّر فتح منزلك: {1} كل شيء على هذا الجهاز آمن. حاول مرة أخرى عندما يتحسن الاتصال.{2}",
   "Signed out": "تم تسجيل الخروج",
   "Signing in...": "جارٍ تسجيل الدخول...",
   "Skills & Methods": "المهارات والطرق",
@@ -1562,6 +1563,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ أُضيفت إلى المفضلة{2}🤍 أُزيلت من المفضلة",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 يستمع…{2}🎤 صوت",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 وضع التصحيح مفعّل — راجع طرفية المتصفح{2}وضع التصحيح متوقف",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 نسخ السجل{2}📤 إرسال إلى المسؤول",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 نسخ التقرير ({2} فاشلة){3}📋 نسخ التقرير",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 جاهز — اضغط للإرسال{2}📧 إرسال بريد إلكتروني",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 إظهار الأصل{2}📸 إخفاء الأصل",
@@ -1618,6 +1620,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ جارٍ جلب أحدث إصدار من التطبيق أولاً…",
   "⏳ One moment…": "⏳ لحظة واحدة…",
   "⏳ Opening share…": "⏳ جارٍ فتح المشاركة…",
+  "⏳ Opening your household…": "⏳ جارٍ فتح منزلك…",
   "⏳ Running...": "⏳ جارٍ التشغيل...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ تسجيل الدخول تلقائيًا خلال {1} ثانية…",
   "⏳ Unzipping the extension…": "⏳ جارٍ فك ضغط الإضافة…",

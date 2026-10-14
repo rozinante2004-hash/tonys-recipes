@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1791934153684,
- "count": 2198,
+ "updatedAt": 1791996396563,
+ "count": 2201,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -936,6 +936,7 @@
   "Sign out?": "Se déconnecter ?",
   "Signed in as": "Connecté en tant que",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "Connecté, mais ton foyer n'a pas pu être ouvert : {1} Tout est en sécurité sur cet appareil. Réessaie quand la connexion sera meilleure.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "Connecté, mais impossible d'ouvrir votre foyer : {1} Tout ce qui se trouve sur cet appareil est en sécurité. Réessayez quand la connexion sera meilleure.{2}",
   "Signed out": "Déconnecté",
   "Signing in...": "Connexion...",
   "Skills & Methods": "Techniques & Méthodes",
@@ -1561,6 +1562,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ Ajouté aux favoris{2}🤍 Retiré des favoris",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Écoute…{2}🎤 Voix",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Mode débogage activé — voir la console du navigateur{2}Mode débogage désactivé",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 Copier le journal{2}📤 Envoyer à l'admin",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Copier le rapport ({2} en échec){3}📋 Copier le rapport",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Prêt — appuyez pour envoyer{2}📧 Envoyer l'e-mail",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Afficher l'original{2}📸 Masquer l'original",
@@ -1617,6 +1619,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ Récupération de la dernière version de l'app…",
   "⏳ One moment…": "⏳ Un instant…",
   "⏳ Opening share…": "⏳ Ouverture du partage…",
+  "⏳ Opening your household…": "⏳ Ouverture de votre foyer…",
   "⏳ Running...": "⏳ En cours...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ Connexion automatique dans {1} secondes…",
   "⏳ Unzipping the extension…": "⏳ Décompression de l'extension…",

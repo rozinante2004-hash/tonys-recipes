@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1791934153684,
- "count": 2078,
+ "updatedAt": 1791996396563,
+ "count": 2081,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -887,6 +887,7 @@
   "Sign out?": "Uscire?",
   "Signed in as": "Accesso effettuato come",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "Accesso effettuato, ma non è stato possibile aprire la tua famiglia: {1} Tutto ciò che è su questo dispositivo è al sicuro. Riprova quando la connessione sarà migliore.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "Accesso effettuato, ma non è stato possibile aprire la tua famiglia: {1} Tutto quello che c'è su questo dispositivo è al sicuro. Riprova quando la connessione sarà migliore.{2}",
   "Signed out": "Disconnesso",
   "Signing in...": "Accesso in corso...",
   "Skills & Methods": "Tecniche e metodi",
@@ -1473,6 +1474,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ Aggiunto ai preferiti{2}🤍 Rimosso dai preferiti",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 In ascolto…{2}🎤 Voce",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Modalità debug attiva — guarda la console del browser{2}Modalità debug disattivata",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 Copia log{2}📤 Invia all'admin",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Copia report ({2} falliti){3}📋 Copia report",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Pronto — premi per inviare{2}📧 Invia email",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Mostra originale{2}📸 Nascondi originale",
@@ -1527,6 +1529,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ Recupero prima l'ultima versione dell'app…",
   "⏳ One moment…": "⏳ Un momento…",
   "⏳ Opening share…": "⏳ Apertura condivisione…",
+  "⏳ Opening your household…": "⏳ Apertura della tua famiglia…",
   "⏳ Running...": "⏳ In esecuzione...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ Accesso automatico tra {1} secondi…",
   "⏳ Unzipping the extension…": "⏳ Estrazione dell'estensione…",

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1791934153684,
- "count": 2530,
+ "updatedAt": 1791996396563,
+ "count": 2533,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1147,6 +1147,7 @@
   "Sign out?": "Выйти?",
   "Signed in as": "Вы вошли как",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "Вход выполнен, но не удалось открыть домохозяйство: {1} Всё на этом устройстве в безопасности. Попробуйте снова при лучшем соединении.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "Вы вошли, но не удалось открыть вашу семью: {1} Всё на этом устройстве в безопасности. Попробуйте снова, когда связь будет лучше.{2}",
   "Signed out": "Вы вышли",
   "Signing in...": "Вход...",
   "Skills & Methods": "Навыки и методы",
@@ -1862,6 +1863,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ Добавлено в избранное{2}🤍 Удалено из избранного",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Слушаю…{2}🎤 Голос",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Режим отладки включён — смотрите консоль браузера{2}Режим отладки выключен",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 Скопировать лог{2}📤 Отправить администратору",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Скопировать отчёт ({2} с ошибками){3}📋 Скопировать отчёт",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Готово — нажмите, чтобы отправить{2}📧 Отправить письмо",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Показать оригинал{2}📸 Скрыть оригинал",
@@ -1938,6 +1940,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ Получаем последнюю версию приложения…",
   "⏳ One moment…": "⏳ Секунду…",
   "⏳ Opening share…": "⏳ Открываем «Поделиться»…",
+  "⏳ Opening your household…": "⏳ Открываем вашу семью…",
   "⏳ Running...": "⏳ Выполняется...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ Автовход через {1} сек…",
   "⏳ Unzipping the extension…": "⏳ Распаковка расширения…",

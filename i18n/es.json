@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1791934153684,
- "count": 2194,
+ "updatedAt": 1791996396563,
+ "count": 2197,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -935,6 +935,7 @@
   "Sign out?": "¿Cerrar sesión?",
   "Signed in as": "Conectado como",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "Sesión iniciada, pero no se pudo abrir tu hogar: {1} Todo en este dispositivo está a salvo. Vuelve a intentarlo cuando la conexión sea mejor.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "Sesión iniciada, pero no se pudo abrir tu hogar: {1} Todo en este dispositivo está a salvo. Vuelve a intentarlo cuando la conexión sea mejor.{2}",
   "Signed out": "Sesión cerrada",
   "Signing in...": "Iniciando sesión...",
   "Skills & Methods": "Habilidades y técnicas",
@@ -1560,6 +1561,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ Añadido a favoritos{2}🤍 Eliminado de favoritos",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Escuchando…{2}🎤 Voz",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Modo depuración activado — mira la consola del navegador{2}Modo depuración desactivado",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 Copiar registro{2}📤 Enviar al administrador",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Copiar informe ({2} fallando){3}📋 Copiar informe",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Listo — pulsa para enviar{2}📧 Enviar correo",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Mostrar original{2}📸 Ocultar original",
@@ -1616,6 +1618,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ Obteniendo primero la versión más reciente de la app…",
   "⏳ One moment…": "⏳ Un momento…",
   "⏳ Opening share…": "⏳ Abriendo para compartir…",
+  "⏳ Opening your household…": "⏳ Abriendo tu hogar…",
   "⏳ Running...": "⏳ Ejecutando...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ Iniciando sesión automáticamente en {1} segundos…",
   "⏳ Unzipping the extension…": "⏳ Descomprimiendo la extensión…",

@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1791934153684,
- "count": 2196,
+ "updatedAt": 1791996396563,
+ "count": 2199,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -936,6 +936,7 @@
   "Sign out?": "Abmelden?",
   "Signed in as": "Angemeldet als",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "Angemeldet, aber dein Haushalt konnte nicht geöffnet werden: {1} Alles auf diesem Gerät ist sicher. Versuch es noch mal, wenn die Verbindung besser ist.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "Angemeldet, aber dein Haushalt konnte nicht geöffnet werden: {1} Alles auf diesem Gerät ist sicher. Versuch es einfach erneut, wenn die Verbindung besser ist.{2}",
   "Signed out": "Abgemeldet",
   "Signing in...": "Anmeldung läuft...",
   "Skills & Methods": "Fähigkeiten & Methoden",
@@ -1561,6 +1562,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ Zu Favoriten hinzugefügt{2}🤍 Aus Favoriten entfernt",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 Höre zu…{2}🎤 Sprache",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 Debug-Modus AN — siehe Browser-Konsole{2}Debug-Modus aus",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 Protokoll kopieren{2}📤 An Admin senden",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 Bericht kopieren ({2} fehlgeschlagen){3}📋 Bericht kopieren",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 Bereit — zum Senden antippen{2}📧 E-Mail senden",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 Original anzeigen{2}📸 Original ausblenden",
@@ -1617,6 +1619,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ Hole zuerst die neueste Version der App…",
   "⏳ One moment…": "⏳ Einen Moment…",
   "⏳ Opening share…": "⏳ Teilen wird geöffnet…",
+  "⏳ Opening your household…": "⏳ Haushalt wird geöffnet …",
   "⏳ Running...": "⏳ Läuft...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ Automatische Anmeldung in {1} Sekunden…",
   "⏳ Unzipping the extension…": "⏳ Erweiterung wird entpackt…",

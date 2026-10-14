@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1791934153684,
- "count": 2740,
+ "updatedAt": 1791996396563,
+ "count": 2743,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1214,6 +1214,7 @@
   "Sign out?": "להתנתק?",
   "Signed in as": "מחוברים בתור",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "מחובר, אך לא ניתן היה לפתוח את משק הבית שלך: {1} הכל שמור בבטחה במכשיר הזה. נסה שוב כשהחיבור יהיה טוב יותר.",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "מחובר/ת, אבל לא הצלחנו לפתוח את משק הבית שלך: {1} הכול בטוח על המכשיר הזה. נסו שוב כשהחיבור יהיה טוב יותר.{2}",
   "Signed out": "מנותק",
   "Signing in...": "מתחבר...",
   "Skills & Methods": "כישורים ושיטות",
@@ -2042,6 +2043,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ נוסף למועדפים{2}🤍 הוסר מהמועדפים",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 מקשיב…{2}🎤 קול",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 מצב דיבוג פעיל — ראה קונסולת דפדפן{2}מצב דיבוג כבוי",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 העתקת יומן{2}📤 שליחה למנהל",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 העתקת דו״ח ({2} נכשלו){3}📋 העתקת דו״ח",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 מוכן — לחץ לשליחה{2}📧 שליחת אימייל",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 הצגת המקור{2}📸 הסתרת המקור",
@@ -2137,6 +2139,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ מביאים קודם את הגרסה החדשה ביותר של האפליקציה…",
   "⏳ One moment…": "⏳ רגע אחד…",
   "⏳ Opening share…": "⏳ פותח שיתוף…",
+  "⏳ Opening your household…": "⏳ פותחים את משק הבית שלך…",
   "⏳ Running...": "⏳ פועל...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ מתחברים אוטומטית בעוד {1} שניות…",
   "⏳ Unzipping the extension…": "⏳ מחלץ את התוסף…",

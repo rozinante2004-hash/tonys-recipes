@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1791934153684,
- "count": 2540,
+ "updatedAt": 1791996396563,
+ "count": 2543,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1149,6 +1149,7 @@
   "Sign out?": "サインアウトしますか？",
   "Signed in as": "サインイン中：",
   "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.": "サインインしましたが、世帯を開けませんでした：{1} このデバイス上のデータは安全です。接続状態が良くなったら再度お試しください。",
+  "Signed in, but your household could not be opened: {1} Everything on this device is safe. Try again when the connection is better.{2}": "サインインしましたが、世帯を開けませんでした：{1} このデバイス上のデータはすべて安全です。接続状態が良くなったら、もう一度お試しください。{2}",
   "Signed out": "サインアウトしました",
   "Signing in...": "サインイン中...",
   "Skills & Methods": "スキル＆テクニック",
@@ -1868,6 +1869,7 @@
   "{1}❤️ Added to favourites{2}🤍 Removed from favourites": "{1}❤️ お気に入りに追加しました{2}🤍 お気に入りから削除しました",
   "{1}🎤 Listening…{2}🎤 Voice": "{1}🎤 聞き取り中…{2}🎤 音声",
   "{1}🐞 Debug mode ON — see browser console{2}Debug mode off": "{1}🐞 デバッグモードON — ブラウザのコンソールを確認{2}デバッグモードOFF",
+  "{1}📋 Copy log{2}📤 Send to admin": "{1}📋 ログをコピー{2}📤 管理者に送信",
   "{1}📋 Copy report ({2} failing){3}📋 Copy report": "{1}📋 レポートをコピー（{2}件失敗）{3}📋 レポートをコピー",
   "{1}📧 Ready — press to send{2}📧 Send Email": "{1}📧 準備完了 — 押して送信{2}📧 メールを送信",
   "{1}📸 Show Original{2}📸 Hide Original": "{1}📸 元の画像を表示{2}📸 元の画像を隠す",
@@ -1944,6 +1946,7 @@
   "⏳ Getting the newest version of the app first…": "⏳ 最新バージョンを取得しています…",
   "⏳ One moment…": "⏳少々お待ちください…",
   "⏳ Opening share…": "⏳ 共有を開いています…",
+  "⏳ Opening your household…": "⏳ 世帯を開いています…",
   "⏳ Running...": "⏳ 実行中...",
   "⏳ Signing in automatically in {1} seconds…": "⏳ {1}秒後に自動でサインインします…",
   "⏳ Unzipping the extension…": "⏳ 拡張機能を展開中…",
