@@ -104,6 +104,37 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Then sign in with Google alone, ⚙️ → 👑 → 🔐 set up a new authenticator, and require it again. Needs only his
   GitHub account (its own two-step and recovery codes matter for that reason).
   Move step 7: Tony sent the family the new address and the icon steps (14 Oct 2026).
+- **Owner recovery job released** (15 Oct 2026, 00:01 Israel time, Tony's "Yes, please release it now"; 1074726 to main and
+  beta, app unchanged): all jobs success; GitHub lists "Owner recovery (no authenticator)" as an active workflow.
+- **v38.40** (on `test`): (1) **whose copy this device holds** (task, found 14 Oct): `mkn_local_scope` {uid, hid}
+  written after a sign-in has loaded; `localCopyForAccount` in the auth handler (before the first draw) and in
+  `signInCloudSync` (after householdEnter): another account or household → `localCopyClear` (the keys "Reset this
+  device" clears + IndexedDB photos + page state), unsent changes kept aside (`mkn_local_setaside`) for their own
+  account and household and given back there (`localSetAsideRestore`); a copy of unknown owner (before v38.40, or
+  made signed out) is sent only after "Recipes already on this device — Add them / Leave them out"; the Sign out
+  button clears the device's copy unless changes are unsent. Proven on the emulator (an iPhone-sized browser,
+  account A with 8 recipes, A's session ending, B founding a household on the same browser): before, B's page
+  showed A's 8 recipes; now none, and nothing reaches B's household. Self-test `local_copy_belongs_to_its_account`.
+  (2) **The recipe counter, a badge of honour** (Tony: "make it distinctive, as a badge of honor"): a 20-point
+  rosette with ribbon tails beside the household's name (#recipeBadge in .header-brand), the count in the middle
+  (a collection counts as its recipes, test fixtures never), its metal by rank — First steps <10, Bronze 10,
+  Silver 25, Gold 50, Platinum 100, Ruby 250, Diamond 500, Legendary 1000 (RECIPE_RANKS); a new rank is
+  celebrated once per device and household (`mkn_rank_seen`; never the first look, never downwards, never in the
+  Self Test): the rosette spins up and a toast "🎉 100 recipes — 💠 Platinum!", counted as rank.<key>; a tap opens
+  the ranks (#rankOverlay: the big rosette, the count, the household, a bar to the next rank, the ladder ✅).
+  Self-test `recipe_badge_of_honour`. (3) **Move step 9 ready:** tools/move-family.mjs `clear-check` (counts:
+  the same / changed since / not in the community copy, and shared/) and `clear-source` (--confirm "clear the
+  family app"; deletes from recipes-f379d what the community copy holds; a household is cut to {movedTo, movedAt}
+  so an old app still forwards; --all also what is not there; --shared also shared/; i18n/, config/, feedback/ and
+  the accounts stay); move-family.yml modes + inputs all/shared, target must be my-kitchen-notes-beta; emulator
+  checks in tests/move-family.test.mjs. (4) **Task closed without a change: the extension's update pop-up cannot
+  close itself.** A reloaded or updated extension is not injected into tabs already open, so the page never sees
+  the new version; re-injecting needs host permission for the app's pages, which Chrome treats as a NEW
+  permission and disables the extension until each user approves it. And the pop-up only shows for folder
+  installs — the store copies update themselves. Not worth it.
+  Phone chrome budget (tests/phone-chrome.js, CI runs it on the LIVE copy): live with the badge passes; the BETA
+  build is at 38.2% of a 390×844 screen (limit 36%) WITH OR WITHOUT the badge — its env strip (β BETA / 👑 ADMIN)
+  adds the height. Known, not new; the strip can go when the beta ends.
 - **Released: v38.39 (14 Oct 2026, 19:44 Israel time, Tony's "Please move it to the Family and beta when green",
   CI green on 9435df5).** All jobs success (beta live 19:47; Self Tests on main 19:55).
 - **v38.39**: (1) **the first read after signing in waits for the database.** Tony, signing out and

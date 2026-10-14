@@ -8066,6 +8066,104 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'local_copy_belongs_to_its_account', group:'Sync', name:'🔒 This device\u2019s recipes belong to the account that loaded them: another account (or household) signing in sets them aside before anything is drawn or sent; unsent changes wait for their own account; a copy of unknown owner is sent only when asked; Sign out leaves nothing behind (v38.40)',
+    test: async()=>{
+      var KEYS=[STORAGE_KEY, NEXTID_KEY, 'tonys_offline_queue', CLOUD_DELETES_KEY, CLOUD_META_AT_KEY, CLOUD_BASE_KEY, LOCAL_SCOPE_KEY, LOCAL_SETASIDE_KEY];
+      var keep={}; KEYS.forEach(function(k){ keep[k]=localStorage.getItem(k); });
+      var real={ recipes:recipes, nextId:nextId, offline:_offlineQueue, deletes:_pendingCloudDeletes, base:_cloudRecipeBase, stamp:_cloudRecipeStamp, metaAt:_lastCloudMetaAt,
+                 idb:window.idbClearAll, ask:window.askConfirm, out:window.signOutNow, toast:window.toast, log:window.syncLog };
+      var wiped=0;
+      function deviceHas(list, scope, unsent){
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); localStorage.setItem(NEXTID_KEY, '77');
+        if(scope) localStorage.setItem(LOCAL_SCOPE_KEY, JSON.stringify(scope)); else localStorage.removeItem(LOCAL_SCOPE_KEY);
+        if(unsent) localStorage.setItem('tonys_offline_queue','1'); else localStorage.removeItem('tonys_offline_queue');
+        localStorage.removeItem(LOCAL_SETASIDE_KEY);
+        recipes=JSON.parse(JSON.stringify(list)); _offlineQueue=!!unsent; _pendingCloudDeletes={};
+      }
+      var A=[{ id:12, uid:'u12', name:'A\u2019s soup', ingredients:[], steps:[] }, { id:13, uid:'u13', name:'A\u2019s cake', ingredients:[], steps:[] }];
+      try{
+        window._localScopeTest=true; window.toast=function(){}; window.syncLog=function(){};
+        window.idbClearAll=async function(){ wiped++; };   // (never this device's real photos)
+        // 1. Another ACCOUNT: cleared before anything is drawn, photos too.
+        deviceHas(A, { uid:'uA', hid:'h1' });
+        if(await localCopyForAccount({ uid:'uB' }, null)!=='cleared' || recipes.length || localStorage.getItem(STORAGE_KEY) || !wiped) throw new Error('another account\u2019s copy was kept: '+recipes.length);
+        // 2. The same account, another HOUSEHOLD: the same.
+        deviceHas(A, { uid:'uA', hid:'h1' }); wiped=0;
+        if(await localCopyForAccount({ uid:'uA' }, 'h2')!=='cleared' || recipes.length || !wiped) throw new Error('another household\u2019s copy was kept');
+        // 3. Its own: kept (household not yet known, or the same).
+        deviceHas(A, { uid:'uA', hid:'h1' });
+        if(await localCopyForAccount({ uid:'uA' }, null)!=='own' || await localCopyForAccount({ uid:'uA' }, 'h1')!=='own' || recipes.length!==2) throw new Error('its own copy was touched');
+        // 4. Owner not known: said so, nothing done.
+        deviceHas(A, null);
+        if(await localCopyForAccount({ uid:'uB' }, 'h9')!=='unknown' || recipes.length!==2) throw new Error('a copy of unknown owner was not left for asking');
+        // 5. Unsent changes of account A, B signs in: kept aside for A, given back to A (and only to A, in h1).
+        deviceHas(A, { uid:'uA', hid:'h1' }, true);
+        await localCopyForAccount({ uid:'uB' }, null);
+        var aside=JSON.parse(localStorage.getItem(LOCAL_SETASIDE_KEY)||'null');
+        if(!aside || aside.uid!=='uA' || recipes.length || localStorage.getItem('tonys_offline_queue')) throw new Error('unsent changes were not kept aside for their account');
+        if(localSetAsideRestore({ uid:'uB' }, 'h9') || localSetAsideRestore({ uid:'uA' }, 'h2')) throw new Error('kept-aside changes were given to the wrong account or household');
+        if(!localSetAsideRestore({ uid:'uA' }, 'h1') || recipes.length!==2 || localStorage.getItem('tonys_offline_queue')!=='1' || !_offlineQueue || localStorage.getItem(LOCAL_SETASIDE_KEY))
+          throw new Error('kept-aside changes did not come back to be sent: '+recipes.length);
+        // 6. Unknown owner, about to be sent: asked. "Leave them out" clears; "Add them" keeps.
+        var asked=[]; window.askConfirm=async function(o){ asked.push(o); return false; };
+        deviceHas(A, null);
+        if(await localCopyAskUnknown(2)!==false || recipes.length || !/before you signed in/.test(asked[0].message) || asked[0].okLabel!=='Add them') throw new Error('leaving them out did not clear them');
+        window.askConfirm=async function(){ return true; }; deviceHas(A, null);
+        if(await localCopyAskUnknown(2)!==true || recipes.length!==2) throw new Error('adding them did not keep them');
+        // 7. Sign out with the button: nothing left behind — unless unsent.
+        window.signOutNow=function(){};
+        deviceHas(A, { uid:'uA', hid:'h1' }); await signOut(); await wait(50);
+        if(recipes.length || localStorage.getItem(STORAGE_KEY)) throw new Error('signing out left the recipes on this device');
+        deviceHas(A, { uid:'uA', hid:'h1' }, true); await signOut(); await wait(50);
+        if(recipes.length!==2 || !localStorage.getItem(STORAGE_KEY)) throw new Error('signing out threw away changes not yet sent');
+        // 8. Wired where it matters: before the first draw after a sign-in, and around the first cloud load.
+        if(String(signInCloudSync).indexOf('localCopyForAccount')===-1 || String(signInCloudSync).indexOf('localScopeNote')===-1) throw new Error('the sign-in load does not check whose copy it is');
+      } finally {
+        delete window._localScopeTest;
+        KEYS.forEach(function(k){ if(keep[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); });
+        recipes=real.recipes; nextId=real.nextId; _offlineQueue=real.offline; _pendingCloudDeletes=real.deletes;
+        _cloudRecipeBase=real.base; _cloudRecipeStamp=real.stamp; _lastCloudMetaAt=real.metaAt;
+        window.idbClearAll=real.idb; window.askConfirm=real.ask; window.signOutNow=real.out; window.toast=real.toast; window.syncLog=real.log;
+        try{ renderFilters(); renderGrid(); }catch(e){}
+      }
+    } },
+
+  { id:'recipe_badge_of_honour', group:'UI', name:'🏅 The recipe counter: a rosette beside the household\u2019s name, a collection counting as its recipes (never the Self Test\u2019s), its metal rising with the count, a celebration once per new rank, and the ranks on a tap (v38.40)',
+    test: async()=>{
+      var list=[{ id:1, name:'a' }, { id:2, name:'b' }, { id:3, name:'c', parts:[{ name:'x' },{ name:'y' },{ name:'z' }] }, { id:TEST_ID_MIN+5, name:'fixture' }];
+      if(recipeHonourCount(list)!==5) throw new Error('counted '+recipeHonourCount(list)+', not 5 (a collection of 3 counts as 3; a test fixture not at all)');
+      var want={ 0:'start', 9:'start', 10:'bronze', 24:'bronze', 25:'silver', 50:'gold', 99:'gold', 100:'platinum', 250:'ruby', 500:'diamond', 1000:'legendary', 5000:'legendary' };
+      Object.keys(want).forEach(function(k){ if(recipeRankOf(+k).key!==want[k]) throw new Error(k+' recipes: '+recipeRankOf(+k).key+', not '+want[k]); });
+      var el=document.getElementById('recipeBadge');
+      if(!el) throw new Error('no badge in the header');
+      if(!el.closest('.header-brand')) throw new Error('the badge is not beside the household\u2019s name');
+      var n=recipeBadgeUpdate(), mine=recipeHonourCount(recipes);
+      if(n!==mine || (mine && (el.hidden || el.getAttribute('data-n')!==String(mine) || !el.querySelector('svg text') || el.querySelector('svg text').textContent!==String(mine))))
+        throw new Error('the badge does not show the collection\u2019s count ('+mine+'): '+el.getAttribute('data-n'));
+      // Celebration: once per new rank, never for the first look, never downwards.
+      var real={ user:window._fbUser, hid:_cloudHid, sync:_lastSyncOkAt, toast:window.toast, seen:localStorage.getItem(RANK_SEEN_KEY) }, told=[];
+      try{
+        window._rankTest=true; window._fbUser=real.user||{ uid:'uR' }; _cloudHid='hRankTest'; _lastSyncOkAt=Date.now(); window.toast=function(m){ told.push(m); };
+        localStorage.removeItem(RANK_SEEN_KEY);
+        var fake=document.createElement('button');
+        if(recipeRankCelebrate(recipeRankOf(30), 30, fake)) throw new Error('the first look at a collection was celebrated');
+        if(!recipeRankCelebrate(recipeRankOf(50), 50, fake) || !fake.classList.contains('rb-celebrate') || !/50/.test(told[0]||'') || !/Gold/.test(told[0]||'')) throw new Error('reaching Gold was not celebrated: '+told.join(' | '));
+        if(recipeRankCelebrate(recipeRankOf(60), 60, fake)) throw new Error('the same rank was celebrated twice');
+        if(recipeRankCelebrate(recipeRankOf(30), 30, fake)) throw new Error('going down a rank was celebrated');
+      } finally {
+        delete window._rankTest; window._fbUser=real.user; _cloudHid=real.hid; _lastSyncOkAt=real.sync; window.toast=real.toast;
+        if(real.seen===null) localStorage.removeItem(RANK_SEEN_KEY); else localStorage.setItem(RANK_SEEN_KEY, real.seen);
+      }
+      // A tap: the count, the rank, how far the next is, and all the ranks.
+      var ov=openRecipeBadge();
+      try{
+        var rows=ov.querySelectorAll('.rb-ladder li');
+        if(rows.length!==RECIPE_RANKS.length-1) throw new Error('the ranks are not all listed: '+rows.length);
+        if(ov.querySelectorAll('.rb-ladder li.rb-got').length!==RECIPE_RANKS.filter(function(x){ return x.at>0 && mine>=x.at; }).length) throw new Error('the ranks reached are not marked');
+        var big=ov.querySelector('.rb-big svg'); if(!big || big.getBoundingClientRect().width>100) throw new Error('the big rosette is not its size');
+      } finally { ov.remove(); }
+    } },
+
   { id:'household_first_read_waits', group:'Sync', name:'Signed in, the first read of the household is asked again while the database still refuses it (another tab catching up), with a fresh token — other faults at once (v38.39)',
     test: async()=>{
       var real=window.householdMemberships, refused=0, refreshed=0, logWas=window.syncLog;

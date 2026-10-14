@@ -10,6 +10,10 @@ name: Move the family into the community copy
 #             copy; "mark" also marks the family households as moved, so the
 #             family app stops and points to the new address.
 #   remove  — takes a rehearsal out of the test copy again.
+#   clear-check / clear-source — (v38.40, move-day step 9, a week after the move and
+#             with Tony's OK) count, then delete from the FAMILY's database what the
+#             community copy holds; "all" also what it does not hold, "shared" also the
+#             first layout's shared/. Needs  clear the family app  in confirm.
 #
 # Copying into the community copy needs the words "move the family" in
 # `confirm`; removing needs "remove". The log shows counts only (the repository
@@ -24,11 +28,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "survey, copy, remove — or unmark (the way back: the family app works again)"
+        description: "survey, copy, remove — or unmark (the way back: the family app works again); clear-check / clear-source (step 9)"
         required: true
         default: survey
         type: choice
-        options: [survey, copy, remove, unmark]
+        options: [survey, copy, remove, unmark, clear-check, clear-source]
       target:
         description: "where to"
         required: true
@@ -50,8 +54,18 @@ on:
         required: false
         default: false
         type: boolean
+      all:
+        description: "clear-source: also what the community copy does not hold"
+        required: false
+        default: false
+        type: boolean
+      shared:
+        description: "clear-source: also the first layout's shared/ collection"
+        required: false
+        default: false
+        type: boolean
       confirm:
-        description: "copy into my-kitchen-notes-beta: type  move the family   ·   remove: type  remove   ·   unmark: type  unmark"
+        description: "copy into my-kitchen-notes-beta: type  move the family   ·   remove: type  remove   ·   unmark: type  unmark   ·   clear-source: type  clear the family app"
         required: false
         default: ""
 
@@ -89,6 +103,10 @@ jobs:
             echo "::error::removing needs  remove  in confirm"; exit 1; fi
           if [ "$MODE" = "unmark" ] && [ "$CONFIRM" != "unmark" ]; then
             echo "::error::unmarking needs  unmark  in confirm"; exit 1; fi
+          if [ "$MODE" = "clear-source" ] && [ "$CONFIRM" != "clear the family app" ]; then
+            echo "::error::clearing the family's database needs  clear the family app  in confirm"; exit 1; fi
+          if [ "${MODE#clear-}" != "$MODE" ] && [ "$TARGET" != "my-kitchen-notes-beta" ]; then
+            echo "::error::the family's database is cleared only against the community copy it moved into"; exit 1; fi
           if [ "$MARK" = "true" ] && [ "$TARGET" != "my-kitchen-notes-beta" ]; then
             echo "::error::the family is marked as moved only when it moves into the community copy"; exit 1; fi
 
@@ -99,6 +117,9 @@ jobs:
           MARK: ${{ inputs.mark }}
           I18N: ${{ inputs.i18n }}
           RESUME: ${{ inputs.resume }}
+          ALL: ${{ inputs.all }}
+          SHARED: ${{ inputs.shared }}
+          CONFIRM: ${{ inputs.confirm }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — only to say whether the owner's account was already there
         run: |
           npm init -y >/dev/null 2>&1 || true
@@ -108,6 +129,8 @@ jobs:
           [ "$MARK" = "true" ] && ARGS="$ARGS --mark-moved $SITE"
           [ "$I18N" = "true" ] && ARGS="$ARGS --i18n"
           [ "$RESUME" = "true" ] && ARGS="$ARGS --resume"
+          [ "$ALL" = "true" ] && ARGS="$ARGS --all"
+          [ "$SHARED" = "true" ] && ARGS="$ARGS --shared"
           [ "$MODE" = "remove" ] && ARGS="$ARGS --confirm remove"
           [ "$MODE" = "unmark" ] && ARGS="$ARGS --confirm unmark"
-          node tools/move-family.mjs $ARGS
+          if [ "$MODE" = "clear-source" ]; then node tools/move-family.mjs $ARGS --confirm "$CONFIRM"; else node tools/move-family.mjs $ARGS; fi

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.39 -->
+<!-- Tony's Recipes Collection v38.40 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -488,16 +488,26 @@
     if (typeof cloudLayout === 'function' && cloudLayout() === 'households') {
       if (!await householdEnter(window._fbUser)) return;
     }
-    var localRecipeCount = recipes.length;
+    // v38.40 — whose copy this device holds (see "WHOSE COPY THIS DEVICE HOLDS"): another household's is
+    // set aside; changes kept aside for this one come back; one of unknown owner is sent only when asked.
+    var user = window._fbUser, hid = (typeof _cloudHid !== 'undefined') ? _cloudHid : null;
+    var scope = (typeof localCopyForAccount === 'function') ? await localCopyForAccount(user, hid) : 'test';
+    if (typeof localSetAsideRestore === 'function') localSetAsideRestore(user, hid);
+    var localRecipeCount = recipes.length, asked = false;
+    if (scope === 'unknown' && localRecipeCount > 0 && localUnsent()) {
+      asked = true;
+      if (!(await localCopyAskUnknown(localRecipeCount))) localRecipeCount = 0;
+    }
     var loaded = await withSyncWatchdog(loadFromFirestore(), 'read');
     if (!loaded) {
       // Nothing in Firestore yet for this user. Only push if there is something
       // real to push — the 5 seed recipes are not worth creating a cloud copy for.
-      if (localRecipeCount > 5) {
+      if (localRecipeCount > 5 && (scope !== 'unknown' || asked || await localCopyAskUnknown(localRecipeCount))) {
         toast('Saving your local recipes to cloud...');
         if (typeof saveToFirestore === 'function') await withSyncWatchdog(saveToFirestore(), 'write');
       }
     }
+    if (scope !== 'test' && user && typeof localScopeNote === 'function') localScopeNote(user.uid, hid);
     if (typeof renderFilters === 'function') renderFilters();
     if (typeof renderGrid    === 'function') renderGrid();
   }
@@ -609,6 +619,8 @@
             if (notice2) notice2.style.display = 'none';
             // v37.83 — the kitchen rules, agreed to once, before anything else.
             if (typeof legalGate === 'function' && !(await legalGate(user))) { _autoLoginTimer = null; return; }
+            // v38.40 — another account's copy on this device is set aside before anything is drawn or sent.
+            if (typeof localCopyForAccount === 'function') { try { await localCopyForAccount(user, null); } catch(e) {} }
             if (typeof setDriveStatus === 'function') setDriveStatus('syncing', '☁️ Syncing…');
             if (typeof renderFilters === 'function') renderFilters();
             if (typeof renderGrid    === 'function') renderGrid();
@@ -5731,6 +5743,98 @@ async function householdReopen() {
   location.reload();
   return true;
 }
+// ─── WHOSE COPY THIS DEVICE HOLDS (v38.40) ──────────────────────────────────
+// Tony, before inviting testers (14 Oct 2026): found while he set up the spare owner account — a
+// browser where one account had used the app kept that account's recipes; another account signing in
+// there, with an empty household, had them UPLOADED into its own ("Saving your local recipes to
+// cloud…"), and an offline-changes merge could do the same into a household with recipes. Shared
+// family computers and tablets make that a privacy fault, not a curiosity. So the device's copy now
+// carries whose it is (`mkn_local_scope`: the account and the household, written after a sign-in has
+// loaded) and:
+//  · another ACCOUNT signing in: the copy is set aside before anything is drawn or sent — wiped, as
+//    "Reset this device" does; if it held changes never sent, the text is kept aside for that account
+//    (`mkn_local_setaside`) and given back, to be sent, when that account and household sign in here
+//    again (its photos are not: they are kept by recipe number, which the other household reuses);
+//  · the same account in another HOUSEHOLD: the same;
+//  · a copy whose owner is not known (from before this version, or made signed out) is never sent
+//    without asking: "Add them to …?" — Leave them out wipes it;
+//  · signing out with the button wipes this device's copy (nothing unsent), as the question promises:
+//    "Your recipes stay safe in the cloud and come back when you sign in again."
+var LOCAL_SCOPE_KEY = 'mkn_local_scope', LOCAL_SETASIDE_KEY = 'mkn_local_setaside';
+function localScopeRead() {
+  try { var v = JSON.parse(localStorage.getItem(LOCAL_SCOPE_KEY) || 'null'); return (v && v.uid) ? v : null; } catch(e) { return null; }
+}
+function localScopeNote(uid, hid) {
+  if (!uid) return;
+  try { localStorage.setItem(LOCAL_SCOPE_KEY, JSON.stringify({ uid: uid, hid: hid || '', at: Date.now() })); } catch(e) {}
+}
+function localUnsent() {
+  return !!((typeof _offlineQueue !== 'undefined' && _offlineQueue)
+    || localStorage.getItem('tonys_offline_queue') === '1'
+    || Object.keys((typeof _pendingCloudDeletes === 'object' && _pendingCloudDeletes) || {}).length);
+}
+// The device's copy and its sync bookkeeping, gone — the keys "Reset this device" and a household
+// switch clear — and the page's own state with them, without a reload.
+async function localCopyClear(why) {
+  try {
+    [STORAGE_KEY, NEXTID_KEY, 'tonys_offline_queue', CLOUD_DELETES_KEY, CLOUD_META_AT_KEY, CLOUD_BASE_KEY, LOCAL_SCOPE_KEY]
+      .forEach(function(k){ localStorage.removeItem(k); });
+  } catch(e) {}
+  try { await idbClearAll(); } catch(e) {}
+  recipes = []; nextId = 10; _offlineQueue = false; _pendingCloudDeletes = {};
+  _cloudRecipeBase = {}; _cloudRecipeStamp = {}; _lastCloudMetaAt = null;
+  if (typeof renderFilters === 'function' && document.getElementById('filterBar')) try { renderFilters(); renderGrid(); } catch(e) {}
+  syncLog('load', 'This device\u2019s copy of the recipes was cleared', why || '');
+}
+// Before a signed-in account's recipes are drawn or sent: is what this device holds its own?
+// `hid` is null while the household is not known yet (the account is checked then, the household later).
+async function localCopyForAccount(user, hid) {
+  if (!user || !user.uid) return 'none';
+  if (window._selfTestRunning && !window._localScopeTest) return 'test';
+  var sc = localScopeRead();
+  if (!sc) return 'unknown';
+  if (sc.uid === user.uid && (hid == null || !sc.hid || sc.hid === hid)) return 'own';
+  var hasCopy = false; try { hasCopy = !!localStorage.getItem(STORAGE_KEY); } catch(e) {}
+  if (localUnsent() && hasCopy) {
+    try { localStorage.setItem(LOCAL_SETASIDE_KEY, JSON.stringify({ uid: sc.uid, hid: sc.hid || '', at: Date.now(),
+      recipes: localStorage.getItem(STORAGE_KEY), nextId: localStorage.getItem(NEXTID_KEY) || '',
+      deletes: localStorage.getItem(CLOUD_DELETES_KEY) || '' })); } catch(e) {}
+    syncLog('load', 'Changes not yet sent by another account were kept aside for it', '');
+  }
+  await localCopyClear(sc.uid === user.uid ? 'another household' : 'another account');
+  return 'cleared';
+}
+// The changes kept aside for THIS account and household, back in place to be sent now.
+function localSetAsideRestore(user, hid) {
+  if (!user || (window._selfTestRunning && !window._localScopeTest)) return false;
+  var a = null; try { a = JSON.parse(localStorage.getItem(LOCAL_SETASIDE_KEY) || 'null'); } catch(e) {}
+  if (!a || a.uid !== user.uid || (a.hid && a.hid !== hid) || !a.recipes) return false;
+  try {
+    localStorage.setItem(STORAGE_KEY, a.recipes);
+    if (a.nextId) localStorage.setItem(NEXTID_KEY, a.nextId);
+    if (a.deletes) localStorage.setItem(CLOUD_DELETES_KEY, a.deletes);
+    localStorage.setItem('tonys_offline_queue', '1');
+    localStorage.removeItem(LOCAL_SETASIDE_KEY);
+  } catch(e) { return false; }
+  loadLocal(); _offlineQueue = true;
+  try { loadPendingCloudDeletes(); } catch(e) {}
+  syncLog('load', 'Changes kept aside on this device were given back, to be sent now', '');
+  return true;
+}
+// A copy whose owner is not known, about to be sent into this household: asked, never assumed.
+async function localCopyAskUnknown(n) {
+  var name = (typeof _household === 'object' && _household && _household.name) || 'your collection';
+  var ok = await askConfirm({ icon: '\u{1F4F1}', title: 'Recipes already on this device',
+    message: 'This device holds ' + n + ' recipe' + (n === 1 ? '' : 's') + ' saved here before you signed in \u2014 perhaps by someone else who used this browser.\n\n'
+      + 'Add ' + (n === 1 ? 'it' : 'them') + ' to \u201c' + name + '\u201d?',
+    okLabel: 'Add them', cancelLabel: 'Leave them out' });
+  if (ok === true) { syncLog('load', 'Recipes found on this device were added, as asked', String(n)); return true; }
+  await localCopyClear('left out when asked');
+  return false;
+}
+window.localScopeRead = localScopeRead; window.localScopeNote = localScopeNote; window.localCopyClear = localCopyClear;
+window.localCopyForAccount = localCopyForAccount; window.localSetAsideRestore = localSetAsideRestore; window.localCopyAskUnknown = localCopyAskUnknown;
+
 // Family Access, household layout: a place kept by e-mail (claimed at their
 // first sign-in), a role changed, or someone removed — all at once, no rules.
 async function householdAddMember(email, accessRole) {
@@ -7487,7 +7591,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.39';
+var APP_VERSION = 'v38.40';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8441,6 +8545,24 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .header-row { padding: 8px 1.5rem; display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; flex-wrap: wrap; }
 .logo { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 19px; color: #FAF7F2; white-space: nowrap; }
 .logo span { color: var(--gold); font-style: italic; }
+/* v38.40 — the recipe counter, a badge of honour (Tony: "make it distinctive, as a badge of honor"):
+   a rosette beside the household's name, its metal rising with the collection. */
+.recipe-badge { position: relative; flex-shrink: 0; width: 34px; height: 38px; padding: 0; margin-inline-start: 2px;
+  border: none; background: none; cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
+.recipe-badge[hidden] { display: none; }
+.recipe-badge svg { width: 34px; height: 38px; overflow: visible; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.recipe-badge:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 50%; }
+.recipe-badge.rb-celebrate svg { animation: rbCelebrate 1.6s ease-out 1; }
+@keyframes rbCelebrate { 0% { transform: scale(1) rotate(0); } 25% { transform: scale(1.35) rotate(-12deg); }
+  50% { transform: scale(1.2) rotate(10deg); filter: drop-shadow(0 0 10px #FFE08A); } 100% { transform: scale(1) rotate(0); } }
+@media (prefers-reduced-motion: reduce) { .recipe-badge.rb-celebrate svg { animation: none; } }
+.rb-ladder { list-style: none; margin: 10px 0 0; padding: 0; text-align: start; }
+.rb-ladder li { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-top: 1px solid var(--border); font-size: 14px; color: var(--ink); }
+.rb-ladder li.rb-got { font-weight: 600; }
+.rb-ladder li.rb-next { color: var(--muted); }
+.rb-ladder li.rb-later { color: var(--muted); opacity: .6; }
+.rb-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; margin-top: 6px; }
+.rb-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--terracotta-fill)); }
 .header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .header-actions .btn { height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0 13px; }
 @media (max-width: 600px) {
@@ -10390,7 +10512,8 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.39</div>
+      <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.40</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11105,7 +11228,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.39</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.40</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16882,6 +17005,7 @@ function hlMatch(text, q) {
 window.matchReason = matchReason; window.hlMatch = hlMatch;
 
 function renderGrid() {
+  if (typeof recipeBadgeUpdate === 'function') try { recipeBadgeUpdate(); } catch(e) {}   // v38.40
   const q = document.getElementById('searchInput').value.toLowerCase();
   if (_linkedShow) return renderLinkedGrid(q);                    // v37.53 — a linked household's, read-only
   // Apply sort
@@ -23857,6 +23981,127 @@ function slimRecipeForCloud(r) {
 // Every fixture id in the suite is far above this. Real ids come from `nextId`,
 // which counts up from 1.
 var TEST_ID_MIN = 700000;
+// ─── THE RECIPE COUNTER, A BADGE OF HONOUR (v38.40) ─────────────────────────
+// Tony, on move day: "Would be nice to have a recipe counter at the top"; then "make it distinctive, as
+// a badge of honor". A rosette beside the household's name: the number of recipes (a collection counts as
+// its recipes; the Self Test's own never), its metal rising with the collection — and, the first time a
+// device sees a new rank, a moment of celebration. A tap shows the ranks and how far the next one is.
+var RECIPE_RANKS = [
+  { at: 0,    key: 'start',     name: 'First steps', icon: '\u{1F37D}', c: ['#FFF8EA', '#E8D9BC', '#BFA678', '#5C3D2E'] },
+  { at: 10,   key: 'bronze',    name: 'Bronze',      icon: '\u{1F949}', c: ['#F6D0A8', '#C47E46', '#7E4520', '#FFFFFF'] },
+  { at: 25,   key: 'silver',    name: 'Silver',      icon: '\u{1F948}', c: ['#FFFFFF', '#CDD2DA', '#858E9C', '#2F343C'] },
+  { at: 50,   key: 'gold',      name: 'Gold',        icon: '\u{1F947}', c: ['#FFF3BF', '#E6B83E', '#9C6E12', '#4A2E10'] },
+  { at: 100,  key: 'platinum',  name: 'Platinum',    icon: '\u{1F4A0}', c: ['#F5FCFF', '#B4D6EA', '#5F8BA6', '#16323F'] },
+  { at: 250,  key: 'ruby',      name: 'Ruby',        icon: '\u2764\uFE0F', c: ['#FFC6CD', '#D3354C', '#7F0D24', '#FFFFFF'] },
+  { at: 500,  key: 'diamond',   name: 'Diamond',     icon: '\u{1F48E}', c: ['#ECFFFF', '#7DDAEA', '#2E8FA6', '#0B3540'] },
+  { at: 1000, key: 'legendary', name: 'Legendary',   icon: '\u{1F451}', c: ['#F4DDFF', '#A25DD6', '#4E1F7A', '#FFFFFF'] }
+];
+function recipeHonourCount(list) {
+  var n = 0;
+  (list || []).forEach(function(r) {
+    if (!r || isTestFixture(r)) return;
+    var parts = recipeParts(r).length;
+    n += parts > 1 ? parts : 1;
+  });
+  return n;
+}
+function recipeRankOf(n) {
+  var r = RECIPE_RANKS[0];
+  RECIPE_RANKS.forEach(function(x) { if (n >= x.at) r = x; });
+  return r;
+}
+function recipeRankNext(n) { return RECIPE_RANKS.filter(function(x) { return x.at > n; })[0] || null; }
+// The rosette: twenty points round a disc in the rank's metal, two ribbon tails, the number in the middle.
+function recipeBadgeSvg(n, rank) {
+  var c = rank.c, pts = [], N = 20;
+  for (var i = 0; i < N * 2; i++) {
+    var a = Math.PI * i / N - Math.PI / 2, rr = (i % 2) ? 14.2 : 16;
+    pts.push((17 + rr * Math.cos(a)).toFixed(2) + ',' + (17 + rr * Math.sin(a)).toFixed(2));
+  }
+  var txt = n > 9999 ? '9999+' : String(n), fs = txt.length <= 2 ? 13 : txt.length === 3 ? 11 : txt.length === 4 ? 9 : 7.5;
+  var id = 'rbg' + rank.key;
+  return '<svg viewBox="0 0 34 38" aria-hidden="true">'
+    + '<defs><radialGradient id="' + id + '" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="' + c[0] + '"/>'
+    + '<stop offset=".55" stop-color="' + c[1] + '"/><stop offset="1" stop-color="' + c[2] + '"/></radialGradient></defs>'
+    + '<path d="M10 26 L6 37 L10.5 34.5 L13 38 L16 28 Z" fill="#C1440E"/>'
+    + '<path d="M24 26 L28 37 L23.5 34.5 L21 38 L18 28 Z" fill="#D4A843"/>'
+    + '<polygon points="' + pts.join(' ') + '" fill="' + c[2] + '"/>'
+    + '<circle cx="17" cy="17" r="12.6" fill="url(#' + id + ')" stroke="rgba(255,255,255,.55)" stroke-width=".8"/>'
+    + '<circle cx="17" cy="17" r="10.4" fill="none" stroke="' + c[2] + '" stroke-opacity=".45" stroke-width=".6" stroke-dasharray="1.2 1.4"/>'
+    + '<text x="17" y="17" text-anchor="middle" dominant-baseline="central" font-family="DM Sans,Heebo,sans-serif" font-weight="800" font-size="' + fs + '" fill="' + c[3] + '">' + txt + '</text>'
+    + '</svg>';
+}
+var RANK_SEEN_KEY = 'mkn_rank_seen';
+function recipeBadgeUpdate() {
+  var el = document.getElementById('recipeBadge');
+  if (!el) return null;
+  var n = recipeHonourCount(recipes);
+  if (!n) { el.hidden = true; return 0; }
+  var rank = recipeRankOf(n), next = recipeRankNext(n);
+  if (el.getAttribute('data-n') !== String(n)) {
+    el.innerHTML = recipeBadgeSvg(n, rank);
+    el.setAttribute('data-n', String(n));
+    el.setAttribute('data-rank', rank.key);
+    var _p = function(t){ return typeof i18nPhrase === 'function' ? i18nPhrase(t) : t; };
+    var label = n + ' ' + _p(n === 1 ? 'recipe' : 'recipes') + ' \u00b7 ' + rank.icon + ' ' + _p(rank.name)
+      + (next ? ' \u00b7 ' + _p('next') + ': ' + next.icon + ' ' + next.at : '');
+    el.setAttribute('title', label); el.setAttribute('aria-label', label); el.setAttribute('data-no-i18n', '');
+  }
+  el.hidden = false;
+  recipeRankCelebrate(rank, n, el);
+  return n;
+}
+// Once per device and household for each new rank — never for the first look at a collection that is
+// already there (a member's new phone is not an achievement), never during the Self Test.
+function recipeRankCelebrate(rank, n, el) {
+  if (window._selfTestRunning && !window._rankTest) return false;
+  if (!window._fbUser || typeof _cloudHid === 'undefined' || !_cloudHid || typeof _lastSyncOkAt === 'undefined' || !_lastSyncOkAt) return false;
+  var seen = {}; try { seen = JSON.parse(localStorage.getItem(RANK_SEEN_KEY) || '{}') || {}; } catch(e) {}
+  var was = seen[_cloudHid];
+  seen[_cloudHid] = rank.key;
+  try { localStorage.setItem(RANK_SEEN_KEY, JSON.stringify(seen)); } catch(e) {}
+  if (!was || was === rank.key) return false;
+  var order = RECIPE_RANKS.map(function(x){ return x.key; });
+  if (order.indexOf(rank.key) <= order.indexOf(was)) return false;
+  el.classList.remove('rb-celebrate'); void el.offsetWidth; el.classList.add('rb-celebrate');
+  setTimeout(function(){ el.classList.remove('rb-celebrate'); }, 1800);
+  var _p = function(t){ return typeof i18nPhrase === 'function' ? i18nPhrase(t) : t; };
+  toast('\u{1F389} ' + n + ' ' + _p('recipes') + ' \u2014 ' + rank.icon + ' ' + _p(rank.name) + '!', 6000);
+  if (typeof insightCount === 'function') try { insightCount('rank.' + rank.key); } catch(e) {}
+  return true;
+}
+function openRecipeBadge() {
+  var n = recipeHonourCount(recipes), rank = recipeRankOf(n), next = recipeRankNext(n);
+  var _p = function(t){ return typeof i18nPhrase === 'function' ? i18nPhrase(t) : t; };
+  var where = (typeof _household === 'object' && _household && _household.name) ? _household.name : '';
+  var prev = document.getElementById('rankOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'rankOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '1290';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  var rows = RECIPE_RANKS.filter(function(x){ return x.at > 0; }).map(function(x) {
+    var cls = n >= x.at ? 'rb-got' : (next && x.key === next.key) ? 'rb-next' : 'rb-later';
+    return '<li class="' + cls + '"><span style="font-size:20px;width:26px;text-align:center;">' + x.icon + '</span>'
+      + '<span style="flex:1;">' + escH(_p(x.name)) + '</span><span dir="ltr">' + x.at + '</span>'
+      + '<span style="width:20px;text-align:center;">' + (n >= x.at ? '\u2705' : '') + '</span></li>';
+  }).join('');
+  var pct = next ? Math.max(4, Math.round(100 * (n - rank.at) / (next.at - rank.at))) : 100;
+  ov.innerHTML = '<div class="modal" role="dialog" aria-label="' + escA(_p('Recipes in this collection')) + '" style="max-width:380px;padding:20px;text-align:center;" data-no-i18n>'
+    + '<div class="rb-big" style="width:76px;height:85px;margin:4px auto 10px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.3));">' + recipeBadgeSvg(n, rank).replace('<svg ', '<svg width="76" height="85" ') + '</div>'
+    + '<div style="font-family:\'Playfair Display\',\'Frank Ruhl Libre\',serif;font-size:22px;color:var(--heading);"><bdi>' + n + '</bdi> ' + escH(_p(n === 1 ? 'recipe' : 'recipes')) + '</div>'
+    + (where ? '<div style="font-size:13px;color:var(--muted);margin-top:2px;" dir="auto">' + escH(where) + '</div>' : '')
+    + '<div style="margin-top:10px;font-size:15px;font-weight:600;color:var(--ink);">' + rank.icon + ' ' + escH(_p(rank.name)) + '</div>'
+    + (next ? '<div class="rb-bar" aria-hidden="true"><i style="width:' + pct + '%"></i></div>'
+        + '<div style="font-size:12.5px;color:var(--muted);margin-top:6px;">' + escH(_p('{1} more for {2}').replace('{1}', next.at - n).replace('{2}', _p(next.name))) + ' ' + next.icon + '</div>'
+      : '<div style="font-size:12.5px;color:var(--muted);margin-top:6px;">' + escH(_p('The highest rank there is.')) + '</div>')
+    + '<ul class="rb-ladder">' + rows + '</ul>'
+    + '<button class="btn btn-primary" style="margin-top:14px;width:100%;" onclick="document.getElementById(\'rankOverlay\').remove()">' + escH(_p('Close')) + '</button>'
+    + '</div>';
+  document.body.appendChild(ov);
+  if (typeof insightCount === 'function') try { insightCount('rank.look'); } catch(e) {}
+  return ov;
+}
+window.recipeHonourCount = recipeHonourCount; window.recipeRankOf = recipeRankOf; window.recipeBadgeUpdate = recipeBadgeUpdate;
+window.openRecipeBadge = openRecipeBadge; window.recipeRankCelebrate = recipeRankCelebrate; window.RECIPE_RANKS = RECIPE_RANKS;
 function isTestFixture(r) {
   var id = r && r.id;
   return typeof id === 'number' && id >= TEST_ID_MIN;
@@ -26502,7 +26747,12 @@ window.legalNoteOnMembership = legalNoteOnMembership; window.legalLeave = legalL
 async function signOut() {
   if (!await askConfirm({ icon:'👋', title:'Sign out?',
       message:'Your recipes stay safe in the cloud and come back when you sign in again.', okLabel:'Sign out' })) return;
+  // v38.40 — and they are not left on this device for whoever uses it next (a shared computer or tablet),
+  // unless changes made here have not reached the cloud yet: those stay, kept for this account.
+  var keep = typeof localUnsent === 'function' && localUnsent();
   signOutNow();
+  if (!keep && typeof localCopyClear === 'function' && (!window._selfTestRunning || window._localScopeTest)) localCopyClear('signed out').catch(function(){});
+  else if (keep) toast('Changes not yet sent stay on this device until you sign in again.', 7000);
 }
 // v37.96 — the same without asking (a newcomer the family's copy cannot take).
 function signOutNow() {

@@ -115,5 +115,43 @@ ok(tu2.length === 1 && tu2[0].localId === 'uOWNERcom', 'the account it created i
 await users(T, [{ localId: 'uKIDfam000', email: 'stranger@example.com', emailVerified: true }]);
 r = run(['--from', F, '--to', T, '--mode', 'copy']);
 ok(r.code === 1 && /belong to someone else — nothing was copied/.test(r.out), 'an id taken by someone else stops the copy');
+// v38.40 — move-day step 9: clearing the FAMILY's database a week later, only what the community copy holds.
+{
+  const F2 = 'demo-family2', T2 = 'demo-community2';
+  await users(F2, [{ localId: 'uMOMfam', email: 'mom@example.com', emailVerified: true, providerUserInfo: [{ providerId: 'google.com', rawId: 'g-333', email: 'mom@example.com' }] }]);
+  await put(F2, 'households/H9', { name: sv('Kitchen'), ownerUid: sv('uMOMfam'), code: sv('MKN-EEEE-FFFF') });
+  await put(F2, 'households/H9/members/uMOMfam', { role: sv('owner'), email: sv('mom@example.com') });
+  for (let i = 0; i < 4; i++) await put(F2, 'households/H9/recipes/r' + i, { name: sv('Dish ' + i) });
+  await put(F2, 'codes/MKN-EEEE-FFFF', { hid: sv('H9') });
+  await put(F2, 'homes/uMOMfam', { hid: sv('H9') });
+  await put(F2, 'shared/recipe_1', { r: sv('old layout') });
+  await put(F2, 'i18n/he', { v: sv('shalom') });
+  await put(F2, 'config/founding', { open: { booleanValue: false } });
+  let c = run(['--from', F2, '--to', T2, '--mode', 'copy', '--mark-moved', 'https://new.example/']);
+  ok(c.code === 0, 'step 9 set-up: the copy runs');
+  // A week of cooking in the community copy: one recipe changed, one deleted.
+  await put(T2, 'households/H9/recipes/r2', { name: sv('Dish 2, improved') });
+  await fetch(FS + 'projects/' + T2 + '/databases/(default)/documents/households/H9/recipes/r3', { method: 'DELETE', headers: H });
+  c = run(['--from', F2, '--to', T2, '--mode', 'clear-check']);
+  console.log(c.out);
+  ok(c.code === 0 && /the same: 6, changed since: 1 \(households 1\), not there: 1 \(households 1\); the first layout's shared\/: 1/.test(c.out), 'clear-check counts the same, the changed and the missing');
+  ok(!!(await get(F2, 'households/H9/recipes/r0')), 'clear-check changes nothing');
+  c = run(['--from', F2, '--to', T2, '--mode', 'clear-source']);
+  ok(c.code === 2 && !!(await get(F2, 'households/H9/recipes/r0')), 'clear-source needs --confirm "clear the family app"');
+  c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--confirm', 'clear the family app']);
+  console.log(c.out);
+  ok(c.code === 0 && /— 0 still there/.test(c.out), 'clear-source runs');
+  ok(!(await get(F2, 'households/H9/recipes/r0')) && !(await get(F2, 'households/H9/recipes/r2')) && !(await get(F2, 'households/H9/members/uMOMfam'))
+    && !(await get(F2, 'codes/MKN-EEEE-FFFF')) && !(await get(F2, 'homes/uMOMfam')), 'what the community copy holds is gone from the family database (the same, and the changed since)');
+  ok(!!(await get(F2, 'households/H9/recipes/r3')), 'a recipe the community copy does not hold is kept');
+  const tomb = await get(F2, 'households/H9');
+  ok(tomb && Object.keys(tomb.fields).sort().join(',') === 'movedAt,movedTo', 'the household is cut down to its moved mark (an old app still sends people on)');
+  ok(!!(await get(F2, 'shared/recipe_1')) && !!(await get(F2, 'i18n/he')) && !!(await get(F2, 'config/founding')), 'shared/ (without --shared), i18n/ and config/ stay');
+  ok((await allUsers(F2)).length === 1, 'the accounts stay');
+  ok(!!(await get(T2, 'households/H9/recipes/r0')) && (await get(T2, 'households/H9/recipes/r2')).fields.name.stringValue === 'Dish 2, improved', 'the community copy is untouched');
+  ok(!/example\.com|uMOM|MKN-|Dish /.test(c.out), 'clear prints no address, id, identifier or recipe');
+  c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--all', '--shared', '--confirm', 'clear the family app']);
+  ok(c.code === 0 && !(await get(F2, 'households/H9/recipes/r3')) && !(await get(F2, 'shared/recipe_1')) && !!(await get(F2, 'i18n/he')), '--all and --shared clear the rest (never i18n/)');
+}
 console.log(fails ? fails + ' FAILED' : 'all move checks passed');
 process.exit(fails ? 1 : 0);

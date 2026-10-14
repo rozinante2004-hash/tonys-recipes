@@ -20,6 +20,17 @@
  *           documents and the accounts it created. Needs --confirm remove.
  *   unmark  takes the movedTo mark off the family households again — the family
  *           app works as before (the way back on move day). --confirm unmark.
+ *   clear-check   (v38.40, move-day step 9 — "a week after we move … in case something is
+ *           missing") reads the family's documents and the community copy's, and counts
+ *           which the community copy holds the same, holds changed since (the family has
+ *           kept cooking), and does not hold. Changes nothing.
+ *   clear-source  deletes from the FAMILY's database (never the target) every document the
+ *           community copy holds — the same or changed since; one it does NOT hold stays,
+ *           unless --all. A family household's own document is not deleted but cut down to
+ *           its moved mark (movedTo, movedAt), so an old copy of the app still sends people
+ *           on. --shared also deletes the first layout's shared/ collection. The shared
+ *           translations (i18n/), the settings (config/), the notes (feedback/) and the
+ *           accounts stay until the family copy is retired. Needs --confirm "clear the family app".
  *
  * What moves: households (and everything under them), their identifiers
  * (codes/), homes/, linkRequests/, linkTalk/, places kept (pending/,
@@ -49,7 +60,9 @@ const FROM = arg('from', ''), TO = arg('to', ''), MODE = arg('mode', 'survey');
 const MARK = arg('mark-moved', ''), WITH_I18N = has('i18n'), RESUME = has('resume');
 const OWNER = String(process.env.OWNER_EMAIL || '').toLowerCase();
 if (!/^[a-z0-9-]{4,40}$/.test(FROM) || !/^[a-z0-9-]{4,40}$/.test(TO) || FROM === TO) { console.error('usage: --from <project> --to <project> --mode survey|copy|remove'); process.exit(2); }
-if (['survey', 'copy', 'remove', 'unmark'].indexOf(MODE) === -1) { console.error('--mode survey, copy, remove or unmark'); process.exit(2); }
+if (['survey', 'copy', 'remove', 'unmark', 'clear-check', 'clear-source'].indexOf(MODE) === -1) { console.error('--mode survey, copy, remove, unmark, clear-check or clear-source'); process.exit(2); }
+if (MODE === 'clear-source' && arg('confirm', '') !== 'clear the family app') { console.error('clear-source deletes from ' + FROM + ': add --confirm "clear the family app"'); process.exit(2); }
+const CLEAR_ALL = has('all'), CLEAR_SHARED = has('shared');
 if (MODE === 'unmark' && arg('confirm', '') !== 'unmark') { console.error('unmark lets the family app work again: add --confirm unmark'); process.exit(2); }
 if (MODE === 'remove' && arg('confirm', '') !== 'remove') { console.error('remove takes documents and accounts away from ' + TO + ': add --confirm remove'); process.exit(2); }
 if (MARK && !/^https:\/\/[a-z0-9.-]+\/[^\s"']*$/.test(MARK)) { console.error('--mark-moved wants the new address, https://…/'); process.exit(2); }
@@ -269,6 +282,46 @@ async function main() {
     + (personalThere.length ? '; ' + personalThere.length + ' personal settings of people already there (kept as they are)' : ''));
 
   if (MODE === 'survey') { say('survey only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
+
+  if (MODE === 'clear-check' || MODE === 'clear-source') {
+    // Each family document beside what the community copy holds under its (mapped) name.
+    const pairs = src.docs.map((d, i) => ({ from: d.path, to: docs[i].path, fields: docs[i].fields }))
+      .filter(x => !/^i18n\//.test(x.from));
+    const held = await batchGet(TO, pairs.map(x => x.to));
+    const sameL = [], changedL = [], missingL = [];
+    pairs.forEach(x => { if (!held[x.to]) missingL.push(x); else if (same(held[x.to], x.fields)) sameL.push(x); else changedL.push(x); });
+    const shared = src.top.indexOf('shared') > -1 ? await walk(FROM, 'shared', []) : [];
+    const asList = l => l.map(x => ({ path: x.from }));
+    say('in ' + FROM + ': ' + pairs.length + ' documents of the moved households and their people — in ' + TO
+      + ' the same: ' + sameL.length + ', changed since: ' + changedL.length + ' (' + table(count(asList(changedL))) + ')'
+      + ', not there: ' + missingL.length + (missingL.length ? ' (' + table(count(asList(missingL))) + ')' : '')
+      + '; the first layout\'s shared/: ' + shared.length);
+    if (MODE === 'clear-check') { say('check only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
+    const gone = sameL.concat(changedL).concat(CLEAR_ALL ? missingL : []);
+    const isHH = rel => /^households\/[^/]+$/.test(rel);
+    const writes = [];
+    gone.forEach(x => {
+      if (isHH(x.from)) {
+        const f = (src.docs.find(d => d.path === x.from) || {}).fields || {};
+        const keep = {}; if (f.movedTo) keep.movedTo = f.movedTo; if (f.movedAt) keep.movedAt = f.movedAt;
+        writes.push(Object.keys(keep).length ? { update: { name: docName(FROM, x.from), fields: keep } } : { delete: docName(FROM, x.from) });
+      } else writes.push({ delete: docName(FROM, x.from) });
+    });
+    if (CLEAR_SHARED) shared.forEach(d => writes.push({ delete: docName(FROM, d.path) }));
+    await commit(FROM, writes);
+    // Read back: what was deleted is gone; a household is its moved mark and nothing else.
+    const asked = writes.map(w => (w.delete || w.update.name)).map(n => n.slice(n.indexOf('/documents/') + '/documents/'.length));
+    const left = await batchGet(FROM, asked);
+    const wrong = Object.keys(left).filter(rel => !(isHH(rel) && Object.keys(left[rel]).every(k => k === 'movedTo' || k === 'movedAt')));
+    const marks = Object.keys(left).length - wrong.length;
+    say('cleared from ' + FROM + ': ' + (asked.length - marks) + ' documents deleted (' + table(count(asList(gone).filter(d => !isHH(d.path)).concat(CLEAR_SHARED ? shared : []))) + ')'
+      + ', ' + marks + ' household(s) cut down to the moved mark'
+      + (CLEAR_ALL ? '' : ', ' + missingL.length + ' not in ' + TO + ' kept (--all deletes them too)')
+      + (CLEAR_SHARED ? '' : ', shared/ kept (' + shared.length + '; --shared deletes it)')
+      + ' — ' + wrong.length + ' still there');
+    if (wrong.length) throw new Error(wrong.length + ' document(s) could not be cleared');
+    return;
+  }
 
   if (MODE === 'remove') {
     // Everything the copy wrote — the shared translations never; and of the
