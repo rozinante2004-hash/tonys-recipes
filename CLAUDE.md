@@ -90,6 +90,26 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   path, ?url= and #share-text kept; the test copy does not forward). Next: Tony's steps 5–7 of the MOVE DAY
   CHECKLIST, and the clearing a week later (step 9, with his OK). Tony's spare account started a household of its own in the beta
   when it first signed in (and his old beta test household is still there) — his to keep or delete.
+- **Authenticator, 14 Oct 2026 (Israel time 16:00–19:30):** Tony keeps the codes in **Ente Auth** (iPhone + his Linux PC,
+  one Ente account, E2E-encrypted sync — the work iPhone may go, the next phone may be Android), paper copies of
+  both setup keys and Ente's 24-word recovery key at home. The spare was moved from iPhone Passwords to Ente
+  (removed, set up again) and signs in with Ente's code; then the main account, and **Require is ON** ("my
+  owner's tools now need the code"). An "Owner recovery" GitHub job (tools/owner-recovery.mjs: Require off and/or
+  one owner account's second step removed, typed confirmation, tested on the emulators) was written but NOT
+  added: the session's safety check stopped it (it can switch the protection off) — left uncommitted, Tony to decide.
+- **v38.39** (on `test`): (1) **the first read after signing in waits for the database.** Tony, signing out and
+  straight back in on his PC: "Signed in, but your household could not be opened: Missing or insufficient
+  permissions" — twice (16:18 before any authenticator, 16:22), fine half a minute later. The log shows each
+  sign-out twice and the next sign-in ~30 s late: a second app tab in the background. Firestore's multi-tab
+  persistence lets ONE tab talk to the server; when that is the background tab it still asks as the signed-out
+  person until Chrome's slowed background timers let it see the new sign-in. Not reproduced with one tab on the
+  emulator (6 quick sign-out/in rounds, all fine). Now `householdFirstRead`: the first read (householdMemberships)
+  is asked again on permission-denied — 1.5, 3, 6, 12, 20, 30 s, a fresh token each time, "⏳ Opening your
+  household…" in the status; other faults at once; the final error adds "if the app is open in another tab,
+  close that one and reload". Self-test `household_first_read_waits`. (2) **The owner copies the log** (Tony:
+  "when signed in as Admin, I should not get the option 'Transmit report to Admin'. I should get the 'Copy log'
+  button instead"): `logOwnerCopies()` — the log panel's #logCopyBtn "📋 Copy log", the 🪵 pop-up's "📋 Copy
+  log", and no "send the Self Test's report to the admin?" for him. Self-test `reports_reach_the_admin`.
 - **Released: v38.38 (14 Oct 2026, 02:27 Israel time, Tony's "Please move it to the Family and beta when green",
   CI green on 8e35dcf).** All jobs success (beta live 02:29; Self Tests on main 02:38). Next: Tony signs the spare
   in again (the SIGN-IN half of TOTP_REST, untested against Google until then), then his main account, then Require.

@@ -8066,6 +8066,26 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'household_first_read_waits', group:'Sync', name:'Signed in, the first read of the household is asked again while the database still refuses it (another tab catching up), with a fresh token — other faults at once (v38.39)',
+    test: async()=>{
+      var real=window.householdMemberships, refused=0, refreshed=0, logWas=window.syncLog;
+      var user={ uid:'uX', getIdToken:async function(force){ if(force) refreshed++; return 'tok'; } };
+      function denied(){ var e=new Error('Missing or insufficient permissions.'); e.code='permission-denied'; return e; }
+      try{
+        window.syncLog=function(){};
+        window.householdMemberships=async function(){ if(refused<2){ refused++; throw denied(); } return [{ hid:'h1', role:'owner' }]; };
+        var got=await householdFirstRead(user, [5,5,5]);
+        if(!got || got[0].hid!=='h1' || refused!==2 || refreshed!==2) throw new Error('refused twice, then fine: '+JSON.stringify([got, refused, refreshed]));
+        window.householdMemberships=async function(){ throw denied(); };
+        var threw=null; try{ await householdFirstRead(user, [5,5]); }catch(e){ threw=e; }
+        if(!threw || threw.code!=='permission-denied') throw new Error('a refusal that lasts is not reported');
+        var calls=0; window.householdMemberships=async function(){ calls++; var e=new Error('offline'); e.code='unavailable'; throw e; };
+        threw=null; try{ await householdFirstRead(user, [5,5]); }catch(e){ threw=e; }
+        if(!threw || calls!==1) throw new Error('another fault was asked again ('+calls+')');
+        if(String(householdEnter).indexOf('householdFirstRead(user)')===-1) throw new Error('opening the household does not use it');
+      } finally { window.householdMemberships=real; window.syncLog=logWas; }
+    } },
+
   { id:'reports_reach_the_admin', group:'UI', name:'A failed Self Test offers to send its report to the admin; deleting an account explains the handover (v37.75)',
     test: async()=>{
       var real={ ask:window.askConfirm, fetch:window.fetch, user:window._fbUser, toast:window.toast }, asked=[], sent=[];
@@ -8078,6 +8098,22 @@ window.SELF_TESTS = [
         window.askConfirm=async function(o){ return true; };
         if(await selfTestOfferSend(2)!==true || !sent.length || sent[0].action!=='feedback-send' || !/Self Test: 2 failing/.test(sent[0].note.text) || !/SELF TEST REPORT/.test(sent[0].note.log))
           throw new Error('the report did not go to the admin: '+JSON.stringify(sent[0] && sent[0].note && sent[0].note.text));
+        // v38.39 — Tony: as the admin, "Copy log" instead of "Transmit report to Admin" — and no offer to send
+        // the Self Test's report to himself.
+        var ownerWas=window.isAppOwner; window.isAppOwner=function(){ return true; }; asked=[]; sent=[];
+        window.askConfirm=async function(o){ asked.push(o); return true; };
+        try{
+          if(await selfTestOfferSend(2)!==false || asked.length || sent.length) throw new Error('the owner was offered to send the report to himself');
+          renderLoggingPanel();
+          var lb=document.getElementById('loggingBody');
+          if(!lb || !lb.querySelector('#logCopyBtn') || lb.querySelector('#logSendBtn')) throw new Error('the owner\u2019s log panel does not offer Copy log');
+          showLogNudge([{ title:'Something' }]);
+          var nb=Array.prototype.slice.call(document.querySelectorAll('#logNudge button')).map(function(b){ return b.textContent; });
+          dismissLogNudge();
+          if(!nb.some(function(t){ return /Copy log/.test(t); }) || nb.some(function(t){ return /Send to admin/.test(t); })) throw new Error('the owner\u2019s log pop-up: '+nb.join(' | '));
+        } finally { window.isAppOwner=ownerWas; renderLoggingPanel(); }
+        var lb2=document.getElementById('loggingBody');
+        if(lb2 && !isAppOwner() && !lb2.querySelector('#logSendBtn')) throw new Error('everyone else lost Transmit report to admin');
       } finally { window.askConfirm=real.ask; window.fetch=real.fetch; window._fbUser=real.user; window.toast=real.toast; }
       var ad=String(accountDelete);
       if(!/Why this is needed/.test(ad) || !/always has an owner/.test(ad)) throw new Error('deleting an account does not explain why a handover is needed');

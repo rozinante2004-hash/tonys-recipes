@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.38 -->
+<!-- Tony's Recipes Collection v38.39 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1142,8 +1142,11 @@ function showLogNudge(bad) {
   var copy = document.createElement('button');
   copy.style.cssText = 'flex:1;padding:9px;background:var(--terracotta-fill);color:#fff;border:none;'
     + 'border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
-  copy.textContent = '📤 Send to admin';   // v37.75 — to the one inbox, not the clipboard
-  copy.onclick = function(){ dismissLogNudge(); sendLogReportToAdmin(); };
+  // v38.39 — Tony: "when signed in as Admin, I should not get the option 'Transmit report to Admin'. I should
+  // get the 'Copy log' button instead" — the admin is the one the report would go to.
+  var ownerCopies = logOwnerCopies();
+  copy.textContent = ownerCopies ? '📋 Copy log' : '📤 Send to admin';   // v37.75 — to the one inbox, not the clipboard
+  copy.onclick = function(){ dismissLogNudge(); if (ownerCopies) copySyncLogReport(); else sendLogReportToAdmin(); };
 
   var open = document.createElement('button');
   open.style.cssText = 'padding:9px 12px;background:rgba(255,255,255,0.15);color:#fff;'
@@ -1250,12 +1253,15 @@ function renderLoggingPanel() {
 
   // 5 — the buttons
   h += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
-     + '<button id="logSendBtn" onclick="sendLogReportToAdmin()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📤 Transmit report to admin</button>'
+     + (logOwnerCopies()
+        ? '<button id="logCopyBtn" onclick="copySyncLogReport()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📋 Copy log</button>'
+        : '<button id="logSendBtn" onclick="sendLogReportToAdmin()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">📤 Transmit report to admin</button>')
      + '<button onclick="purgeSyncLogUI()" style="flex:1;min-width:150px;padding:11px 16px;background:var(--card-bg);color:var(--danger);border:1px solid var(--bad-border);border-radius:8px;font-size:14px;font-weight:600;min-height:44px;cursor:pointer;font-family:\'DM Sans\',\'Heebo\',sans-serif;">🗑 Purge logs</button>'
      + '</div>'
      + '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;">'
      + 'The report is the findings above plus every event — recipe names and ids, never their contents. '
-     + 'It never leaves this device on its own: Transmit sends it, with your e-mail address, to the app\u2019s admin.</div>';
+     + (logOwnerCopies() ? 'It never leaves this device on its own: Copy puts it on the clipboard, to paste where it is needed.</div>'
+        : 'It never leaves this device on its own: Transmit sends it, with your e-mail address, to the app\u2019s admin.</div>');
 
   // 6 — debug mode, which lives here now
   h += '<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;">'
@@ -1311,6 +1317,9 @@ async function sendReportToAdmin(subject, report, opts) {
   if (!opts.quiet) toast('\u{1F4E4} Sent to the admin \u2014 thank you.', 6000);
   return true;
 }
+// v38.39 — the app's owner copies a report; everyone else sends it to him.
+function logOwnerCopies() { return typeof isAppOwner === 'function' && isAppOwner(); }
+window.logOwnerCopies = logOwnerCopies;
 function sendLogReportToAdmin() {
   return sendReportToAdmin('\u{1FAB5} Log report', syncLogReportText());
 }
@@ -2743,6 +2752,7 @@ async function runSelfTests() {
   if (failed && !navigator.webdriver && fbSignedInUser()) selfTestOfferSend(failed);
 }
 async function selfTestOfferSend(failed) {
+  if (logOwnerCopies()) return false;   // v38.39 — the owner has 📋 Copy in the summary; nobody to send it to
   var go = await askConfirm({ icon: '\u{1F9EA}', title: failed + ' check' + (failed === 1 ? '' : 's') + ' did not pass',
     message: 'Send the details to the app\u2019s admin, so it can be fixed? They include the app\u2019s version, this device, '
       + 'what failed, and your e-mail address \u2014 no recipes.', okLabel: '\u{1F4E4} Send to admin', cancelLabel: 'Not now' });
@@ -4312,6 +4322,32 @@ function householdDefaultName(user) {
   var brand = String(APP_CONFIG.brandName || 'My Kitchen Notes');
   return n ? n.charAt(0).toUpperCase() + n.slice(1) + '\u2019s ' + brand.replace(/^My\s+/i, '') : brand;
 }
+// v38.39 — Tony, signing out and straight back in on his PC: "Signed in, but your household could not be
+// opened: Missing or insufficient permissions" — twice, and fine half a minute later each time. Each time the
+// log shows the sign-out twice and the next sign-in late: a second tab of the app, in the background. The
+// database's copy on the computer is shared by the tabs and one of them talks to the server for all; when that
+// is the background tab, it still asks as the signed-OUT person until a browser that slows background tabs lets
+// it notice the new sign-in. So the first read after signing in is asked again for a while (with a fresh token),
+// instead of giving up on the first refusal.
+var HH_FIRST_READ_WAITS = [1500, 3000, 6000, 12000, 20000, 30000];
+async function householdFirstRead(user, waits) {
+  waits = waits || HH_FIRST_READ_WAITS;
+  var told = false;
+  for (var i = 0; ; i++) {
+    try { return await householdMemberships(user); }
+    catch (e) {
+      if (!(e && e.code === 'permission-denied') || i >= waits.length) throw e;
+      if (!told) {
+        told = true;
+        syncLog('load', 'The database refused the first read after signing in \u2014 asking again', '');
+        if (typeof setDriveStatus === 'function') setDriveStatus('syncing', '\u23F3 Opening your household\u2026');
+      }
+      try { await user.getIdToken(true); } catch(e2) {}
+      await new Promise(function(r){ setTimeout(r, waits[i]); });
+    }
+  }
+}
+window.householdFirstRead = householdFirstRead;
 async function householdMemberships(user) {
   var q = await hhDb().collectionGroup('members').where('uid', '==', user.uid).get();
   var out = [];
@@ -5373,7 +5409,7 @@ async function householdEnter(user) {
       try { var tok = await user.getIdTokenResult(); if (tok && tok.claims && tok.claims.email_verified === false) await user.getIdToken(true); } catch(e) {}
     }
     if (user.emailVerified === false && !_selfTestRunning) await householdUnconfirmedNotice(user);
-    var list = await householdMemberships(user);
+    var list = await householdFirstRead(user);
     if (await householdClaimKept(user)) {
       list = await householdMemberships(user);
       if (_hhClaimedHid) try { localStorage.setItem(HOUSEHOLD_KEY, _hhClaimedHid); } catch(e) {}
@@ -5399,7 +5435,8 @@ async function householdEnter(user) {
     syncLog('error', 'Could not open the household', String(e && e.message).slice(0, 160));
     if (typeof showServiceError === 'function')
       showServiceError('Signed in, but your household could not be opened:\n\n' + (e && e.message ? e.message : String(e))
-        + '\n\nEverything on this device is safe. Try again when the connection is better.');
+        + '\n\nEverything on this device is safe. Try again when the connection is better.'
+        + (e && e.code === 'permission-denied' ? ' If the app is also open in another tab or window, close that one and reload this page.' : ''));
     return false;
   }
 }
@@ -7450,7 +7487,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.38';
+var APP_VERSION = 'v38.39';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10353,7 +10390,7 @@ body.banner-shown .header {
         <path d="M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z" fill="#D4A843"/>
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.38</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.39</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11068,7 +11105,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.38</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.39</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
