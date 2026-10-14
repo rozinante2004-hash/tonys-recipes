@@ -229,6 +229,16 @@ jobs:
           cp "$GITHUB_WORKSPACE/tests/move-family.test.mjs" .
           /tmp/hh/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-family "node move-family.test.mjs $GITHUB_WORKSPACE/tools/move-family.mjs"
 
+      # 14 Oct 2026 — the owner's way back in without the authenticator (tools/owner-recovery.mjs,
+      # the "Owner recovery" job): Require switched off, one owner account's second step removed,
+      # nothing without the typed confirmation, no address or id in the log.
+      - name: Owner recovery (emulator)
+        run: |
+          mkdir -p /tmp/rec && cd /tmp/rec
+          echo '{"emulators":{"firestore":{"port":8086},"auth":{"port":9099},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.json
+          cp "$GITHUB_WORKSPACE/tests/owner-recovery.test.mjs" .
+          /tmp/hh/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-family "node owner-recovery.test.mjs $GITHUB_WORKSPACE/tools/owner-recovery.mjs"
+
       # v36.91 — the job that publishes the languages into i18n/*.json, run
       # against the emulator with the real rules (translations are public).
       - name: Language publishing job (emulator)

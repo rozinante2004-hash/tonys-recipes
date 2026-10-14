@@ -1,0 +1,62 @@
+name: Owner recovery (no authenticator)
+
+# Tony, 14 Oct 2026: the phone with the authenticator is a work phone, and the
+# next one may be an Android. If the codes are ever out of reach, this is the way back in,
+# needing only his GitHub account (Actions → Owner recovery → Run workflow):
+#   stop-requiring        the owner's tools no longer need the code;
+#   remove-authenticator  one owner account (main or spare) signs in with Google alone,
+#                         so a new authenticator can be set up in the app;
+#   both                  the two together (the usual choice in an emergency).
+# Then: sign in, ⚙️ → 👑 → 🔐 Two-step sign-in → set up the new authenticator, and
+# require it again. The log names no address (they come from the GitHub secrets).
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "what to do"
+        required: true
+        default: both
+        type: choice
+        options: [both, stop-requiring, remove-authenticator]
+      who:
+        description: "whose authenticator to remove (main = your usual address, spare = the second one)"
+        required: true
+        default: main
+        type: choice
+        options: [main, spare]
+      project:
+        description: "which copy"
+        required: true
+        default: my-kitchen-notes-beta
+        type: choice
+        options: [my-kitchen-notes-beta, tonys-recipes-test]
+      confirm:
+        description: 'type: recover the owner'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+      OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+      OWNER_SECONDARY_EMAIL: ${{ secrets.OWNER_SECONDARY_EMAIL }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Recover
+        env:
+          ACTION: ${{ inputs.action }}
+          WHO: ${{ inputs.who }}
+          PROJECT: ${{ inputs.project }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund google-auth-library@9 >/dev/null
+          node tools/owner-recovery.mjs --project "$PROJECT" --action "$ACTION" --who "$WHO" --confirm "$CONFIRM"

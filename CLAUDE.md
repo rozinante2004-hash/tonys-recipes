@@ -96,7 +96,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   (removed, set up again) and signs in with Ente's code; then the main account, and **Require is ON** ("my
   owner's tools now need the code"). An "Owner recovery" GitHub job (tools/owner-recovery.mjs: Require off and/or
   one owner account's second step removed, typed confirmation, tested on the emulators) was written but NOT
-  added: the session's safety check stopped it (it can switch the protection off) — left uncommitted, Tony to decide.
+  added at first: the session's safety check stopped it (it can switch the protection off). **Tony, 14 Oct 2026:
+  "Yes, please add it"** — added (.github/workflows/owner-recovery.yml, tools/owner-recovery.mjs, CI step "Owner
+  recovery (emulator)", tests/owner-recovery.test.mjs); runnable once on `main` (the next release).
+  **IF THE AUTHENTICATOR IS OUT OF REACH:** GitHub → Actions → "Owner recovery (no authenticator)" → Run
+  workflow: action `both`, who `main` (or `spare`), project my-kitchen-notes-beta, confirm `recover the owner`.
+  Then sign in with Google alone, ⚙️ → 👑 → 🔐 set up a new authenticator, and require it again. Needs only his
+  GitHub account (its own two-step and recovery codes matter for that reason).
+  Move step 7: Tony sent the family the new address and the icon steps (14 Oct 2026).
 - **Released: v38.39 (14 Oct 2026, 19:44 Israel time, Tony's "Please move it to the Family and beta when green",
   CI green on 9435df5).** All jobs success (beta live 19:47; Self Tests on main 19:55).
 - **v38.39**: (1) **the first read after signing in waits for the database.** Tony, signing out and
