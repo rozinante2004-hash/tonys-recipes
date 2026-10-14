@@ -93,6 +93,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - **Released: v38.38 (14 Oct 2026, 02:27 Israel time, Tony's "Please move it to the Family and beta when green",
   CI green on 8e35dcf).** All jobs success (beta live 02:29; Self Tests on main 02:38). Next: Tony signs the spare
   in again (the SIGN-IN half of TOTP_REST, untested against Google until then), then his main account, then Require.
+  → **Verified, 14 Oct 2026:** the spare signed in from the sign-in screen with Google (Google's own SMS check
+  first) + the authenticator's code, and got the 👑 ADMIN strip — both halves of TOTP_REST (enrol, sign in) work
+  against Google. Next: his main account (set up from inside the app), then Require.
 - **v38.38**: **the authenticator's code box was behind the sign-in screen.** Tony set up the
   spare's authenticator (PC, Chrome Incognito; Passwords on the iPhone) — the ENROLMENT half of v38.35's
   TOTP_REST works against Google. Then signing the spare in again: Google's own SMS check (its account, not
