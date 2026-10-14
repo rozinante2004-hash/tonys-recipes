@@ -97,7 +97,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   owner's tools now need the code"). An "Owner recovery" GitHub job (tools/owner-recovery.mjs: Require off and/or
   one owner account's second step removed, typed confirmation, tested on the emulators) was written but NOT
   added: the session's safety check stopped it (it can switch the protection off) — left uncommitted, Tony to decide.
-- **v38.39** (on `test`): (1) **the first read after signing in waits for the database.** Tony, signing out and
+- **Released: v38.39 (14 Oct 2026, 19:44 Israel time, Tony's "Please move it to the Family and beta when green",
+  CI green on 9435df5).** All jobs success (beta live 19:47; Self Tests on main 19:55).
+- **v38.39**: (1) **the first read after signing in waits for the database.** Tony, signing out and
   straight back in on his PC: "Signed in, but your household could not be opened: Missing or insufficient
   permissions" — twice (16:18 before any authenticator, 16:22), fine half a minute later. The log shows each
   sign-out twice and the next sign-in ~30 s late: a second app tab in the background. Firestore's multi-tab
