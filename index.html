@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.40 -->
+<!-- Tony's Recipes Collection v38.41 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7591,7 +7591,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.40';
+var APP_VERSION = 'v38.41';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10513,7 +10513,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.40</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.41</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10717,6 +10717,10 @@ body.banner-shown .header {
   </button>
   <button class="mobile-dropdown-btn" id="mobileMealBtn" onclick="toggleMobilePanel('mobileMealPanel', 'mobileMealBtn')">🍽 Meal ▾</button>
   <button class="mobile-dropdown-btn" id="mobileDietBtn" onclick="toggleMobilePanel('mobileDietPanel', 'mobileDietBtn')">🥗 Diet ▾</button>
+  <!-- v38.41 — Tony: "I cannot, on my mobile, filter by Collection or Recent". The computer's first row has
+       them (and No photo, One item away); the phone's had no room, so they live here. Filled by renderFilters.
+       Not "More": the header's ⋯ More is another thing (Tony: "I'm not sure 2 More buttons is a good idea"). -->
+  <button class="mobile-dropdown-btn" id="mobileMoreBtn" onclick="toggleMobilePanel('mobileMorePanel', 'mobileMoreBtn')">🗂 Show ▾</button>
   <!-- v37.53 — linked households' recipes (filled by renderFilters) -->
   <span id="mobileLinkedBtns" style="display:contents;"></span>
   <!-- The phone's copy of the Select frame. #filterBar is hidden below 700px,
@@ -10739,6 +10743,13 @@ body.banner-shown .header {
   <label class="mobile-check-item"><input type="checkbox" value="Dessert" onchange="mobileCatChange()">🍰 Dessert</label>
   <label class="mobile-check-item"><input type="checkbox" value="Soup" onchange="mobileCatChange()">🍜 Soup</label>
   <button class="mobile-panel-done" onclick="toggleMobilePanel('mobileMealPanel','mobileMealBtn')">Done</button>
+</div>
+
+<!-- Mobile "Show" Panel (v38.41) -->
+<div class="mobile-dropdown-panel" id="mobileMorePanel">
+  <div class="panel-title">Show only</div>
+  <div id="mobileMoreItems"></div>
+  <button class="mobile-panel-done" onclick="toggleMobilePanel('mobileMorePanel','mobileMoreBtn')">Done</button>
 </div>
 
 <!-- Mobile Diet Panel -->
@@ -11228,7 +11239,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.40</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.41</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11982,6 +11993,18 @@ function renderFilters() {
   if (mob) mob.innerHTML = hhLinks().map(function(l) {
     return '<button class="mobile-filter-toggle linked-btn' + (_linkedShow === l.hid ? ' active' : '') + '" onclick="toggleLinkedFilter(' + jsA(l.hid) + ')"'
       + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('');
+  // v38.41 — the phone's 🗂 Show: the same filters as the computer's first row, beyond All, Fav and Clips.
+  var more = document.getElementById('mobileMoreItems');
+  if (more) {
+    var noPhoto = recipes.filter(function(r){ return !r.photo; }).length, away = oneAwayCount();
+    var item = function(on, fn, label) {
+      return '<label class="mobile-check-item"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + fn + '()">' + label + '</label>';
+    };
+    more.innerHTML = (recentIds.length ? item(showRecentOnly, 'toggleRecentFilter', '🕐 Recent') : '')
+      + item(showCollectionsOnly, 'toggleCollectionsFilter', '📚 Collections')
+      + (noPhoto ? item(showNoPhotoOnly, 'toggleNoPhotoFilter', '📷 No photo (<span data-no-i18n>' + noPhoto + '</span>)') : '')
+      + (away ? item(showOneAwayOnly, 'toggleOneAwayFilter', '🛒 One item away (<span data-no-i18n>' + away + '</span>)') : '');
+  }
   if (typeof updateMobileButtons === 'function') updateMobileButtons();
   // Update sticky top position after render
   if (typeof updateFilterBarTop === 'function') updateFilterBarTop();
@@ -32921,6 +32944,7 @@ function mobileResetFilters() {
   activeDiets.clear();
   showFavOnly = false;
   showClipsOnly = false;
+  showCollectionsOnly = showRecentOnly = showNoPhotoOnly = showOneAwayOnly = false;   // v38.41 — 🗂 Show's too
   // Uncheck all mobile checkboxes
   document.querySelectorAll('.mobile-dropdown-panel input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
   updateMobileButtons();
@@ -32934,7 +32958,13 @@ function updateMobileButtons() {
   var clipBtn = document.getElementById('mobileClipBtn');
   var mealBtn = document.getElementById('mobileMealBtn');
   var dietBtn = document.getElementById('mobileDietBtn');
-  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly || !!_linkedShow;
+  var moreBtn = document.getElementById('mobileMoreBtn');
+  var moreOn = [showRecentOnly && '🕐 Recent', showCollectionsOnly && '📚 Collections', showNoPhotoOnly && '📷 No photo', showOneAwayOnly && '🛒 One away'].filter(Boolean);
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly || !!_linkedShow || moreOn.length > 0;
+  if (moreBtn) {
+    moreBtn.classList.toggle('has-selection', moreOn.length > 0);
+    moreBtn.textContent = moreOn.length === 1 ? moreOn[0] + ' ▾' : moreOn.length ? '🗂 Show (' + moreOn.length + ') ▾' : '🗂 Show ▾';
+  }
   if (allBtn)  allBtn.classList.toggle('active', !hasSelection);
   if (favBtn)  { favBtn.classList.remove('active','fav-active'); if(showFavOnly) favBtn.classList.add('fav-active'); }
   if (clipBtn) { clipBtn.classList.remove('active','clip-active'); if(showClipsOnly) clipBtn.classList.add('clip-active'); }

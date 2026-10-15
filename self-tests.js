@@ -8164,6 +8164,37 @@ window.SELF_TESTS = [
       } finally { ov.remove(); }
     } },
 
+  { id:'mobile_more_filters', group:'UI', name:'📱 On a phone, 🗂 Show filters by Recent, Collections, No photo and One item away, as the computer\u2019s first row does; its button says what is on, and ✦ All clears it (v38.41)',
+    test: async()=>{
+      var real={ coll:showCollectionsOnly, recent:showRecentOnly, nophoto:showNoPhotoOnly, away:showOneAwayOnly, rv:localStorage.getItem('recent_views') };
+      try{
+        localStorage.setItem('recent_views', JSON.stringify([recipes.length ? recipes[0].id : 1]));
+        showCollectionsOnly=showRecentOnly=showNoPhotoOnly=showOneAwayOnly=false;
+        renderFilters();
+        var btn=document.getElementById('mobileMoreBtn'), box=document.getElementById('mobileMoreItems');
+        if(!btn || !box || !document.getElementById('mobileMorePanel')) throw new Error('no 🗂 Show on the phone\u2019s filter row');
+        if(!btn.closest('#mobileFilterBar')) throw new Error('🗂 Show is not in the phone\u2019s filter row');
+        var labels=Array.prototype.map.call(box.querySelectorAll('label'), function(l){ return l.textContent; });
+        if(!labels.some(function(t){ return /Collections/.test(t); }) || !labels.some(function(t){ return /Recent/.test(t); })) throw new Error('🗂 Show lacks Collections or Recent: '+labels.join(' | '));
+        var coll=Array.prototype.filter.call(box.querySelectorAll('label'), function(l){ return /Collections/.test(l.textContent); })[0].querySelector('input');
+        coll.checked=true; coll.dispatchEvent(new Event('change'));
+        if(!showCollectionsOnly) throw new Error('ticking Collections did not filter by it');
+        if(!/Collections/.test(document.getElementById('mobileMoreBtn').textContent) || !document.getElementById('mobileMoreBtn').classList.contains('has-selection')) throw new Error('the button does not say what is on: '+document.getElementById('mobileMoreBtn').textContent);
+        if(document.getElementById('mobileAllBtn').classList.contains('active')) throw new Error('✦ All still looks on');
+        var again=Array.prototype.filter.call(document.querySelectorAll('#mobileMoreItems label'), function(l){ return /Collections/.test(l.textContent); })[0].querySelector('input');
+        if(!again.checked) throw new Error('the panel forgot the tick');
+        toggleRecentFilter();
+        if(!/Show \(2\)/.test(document.getElementById('mobileMoreBtn').textContent)) throw new Error('two on: '+document.getElementById('mobileMoreBtn').textContent);
+        mobileResetFilters();
+        if(showCollectionsOnly || showRecentOnly || !/🗂 Show ▾/.test(document.getElementById('mobileMoreBtn').textContent)) throw new Error('✦ All did not clear 🗂 Show');
+        if(Array.prototype.filter.call(document.querySelectorAll('button'), function(b){ return /More/.test(b.textContent) && b.offsetParent; }).length>1) throw new Error('two More buttons on screen');
+      } finally {
+        showCollectionsOnly=real.coll; showRecentOnly=real.recent; showNoPhotoOnly=real.nophoto; showOneAwayOnly=real.away;
+        if(real.rv===null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', real.rv);
+        renderFilters(); renderGrid();
+      }
+    } },
+
   { id:'household_first_read_waits', group:'Sync', name:'Signed in, the first read of the household is asked again while the database still refuses it (another tab catching up), with a fresh token — other faults at once (v38.39)',
     test: async()=>{
       var real=window.householdMemberships, refused=0, refreshed=0, logWas=window.syncLog;

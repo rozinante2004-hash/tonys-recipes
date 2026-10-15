@@ -106,6 +106,15 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Move step 7: Tony sent the family the new address and the icon steps (14 Oct 2026).
 - **Owner recovery job released** (15 Oct 2026, 00:01 Israel time, Tony's "Yes, please release it now"; 1074726 to main and
   beta, app unchanged): all jobs success; GitHub lists "Owner recovery (no authenticator)" as an active workflow.
+- **v38.41** (on `test`): **the phone filters by Recent and Collections.** Tony: "I cannot, on my mobile, filter by
+  Collection or Recent". The computer's first filter row has 🕐 Recent, 📚 Collections, 📷 No photo, 🛒 One item
+  away; the phone's row (#mobileFilterBar) had only All, Fav, Clips, Meal, Diet. Now **🗂 Show ▾** (#mobileMoreBtn,
+  panel #mobileMorePanel "Show only", filled by renderFilters with the same toggles; the button names what is on,
+  "🗂 Show (2)" for two; ✦ All clears them). Named "Show", not "More" — Tony: "I'm not sure 2 More buttons is a good
+  idea" (the header has ⋯ More). It sits on the row's second line beside ☑ Select: the bar stays 89 px, the phone
+  chrome budget passes (35.2% on live). Self-test `mobile_more_filters`. Also 14–15 Oct: Tony did key stage 1? — no:
+  he did step 1 (Cloudflare destination addresses) and asked about the key's 25 APIs: told to keep only Identity
+  Toolkit, Token Service and Cloud Firestore, then 🔑 Check the app's key.
 - **Released: v38.40 (16 Oct 2026, 00:43 Israel time, Tony's "Yes, please release v38.40", CI green on 9408884).**
   All jobs success (beta live 00:45; Self Tests on main 00:54).
 - **v38.40**: (1) **whose copy this device holds** (task, found 14 Oct): `mkn_local_scope` {uid, hid}
