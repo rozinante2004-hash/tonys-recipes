@@ -112,9 +112,17 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   panel #mobileMorePanel "Show only", filled by renderFilters with the same toggles; the button names what is on,
   "🗂 Show (2)" for two; ✦ All clears them). Named "Show", not "More" — Tony: "I'm not sure 2 More buttons is a good
   idea" (the header has ⋯ More). It sits on the row's second line beside ☑ Select: the bar stays 89 px, the phone
-  chrome budget passes (35.2% on live). Self-test `mobile_more_filters`. Also 14–15 Oct: Tony did key stage 1? — no:
-  he did step 1 (Cloudflare destination addresses) and asked about the key's 25 APIs: told to keep only Identity
-  Toolkit, Token Service and Cloud Firestore, then 🔑 Check the app's key.
+  chrome budget passes (35.2% on live). Self-test `mobile_more_filters`.
+- **Released: v38.41 (16 Oct 2026, 01:17 Israel time, Tony's "Please move it to the Family and beta when green", CI
+  green on 2abe320).**
+- **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
+  (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
+  Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
+  website restrictions = https://mykitchennotes.community/*, https://my-kitchen-notes-beta.pages.dev/*,
+  https://*.my-kitchen-notes-beta.pages.dev/*. 🔑 Check the app's key: all clear after each stage; sign-in works.
+  Left: (3) the Chrome Web Store listing's homepage/support URL; (4) 📊 Households — founding open, the $2/$4
+  allowance confirmed. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
+  codes, Cloudflare two-step, Apple recovery contact).
 - **Released: v38.40 (16 Oct 2026, 00:43 Israel time, Tony's "Yes, please release v38.40", CI green on 9408884).**
   All jobs success (beta live 00:45; Self Tests on main 00:54).
 - **v38.40**: (1) **whose copy this device holds** (task, found 14 Oct): `mkn_local_scope` {uid, hid}
