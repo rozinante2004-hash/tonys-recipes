@@ -122,7 +122,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   https://*.my-kitchen-notes-beta.pages.dev/*. 🔑 Check the app's key: all clear after each stage; sign-in works.
   (3) the Chrome Web Store listing's homepage/support URL → mykitchennotes.community, submitted for review; (4) 📊
   Households — founding open, the $2/$4 allowance: done (16 Oct). Given next: Gmail Send mail as contact@ (with the SPF
-  record: v=spf1 include:_spf.mx.cloudflare.net include:_spf.google.com ~all), account safety, a tester invitation. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
+  record: v=spf1 include:_spf.mx.cloudflare.net include:_spf.google.com ~all), account safety, a tester invitation
+  (English and Hebrew). **Done 16 Oct:** Gmail sends as contact@ (SPF PASS, inbox); Thunderbird identity steps given;
+  **GitHub two-step moved to Ente** (it was a passkey in the iPhone's Passwords; Google Password Manager asked for a
+  PIN he never set — skipped the PC passkey; recovery codes on paper), test sign-in fine. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
   codes, Cloudflare two-step, Apple recovery contact).
 - **Released: v38.40 (16 Oct 2026, 00:43 Israel time, Tony's "Yes, please release v38.40", CI green on 9408884).**
   All jobs success (beta live 00:45; Self Tests on main 00:54).
