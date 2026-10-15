@@ -106,7 +106,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Move step 7: Tony sent the family the new address and the icon steps (14 Oct 2026).
 - **Owner recovery job released** (15 Oct 2026, 00:01 Israel time, Tony's "Yes, please release it now"; 1074726 to main and
   beta, app unchanged): all jobs success; GitHub lists "Owner recovery (no authenticator)" as an active workflow.
-- **v38.40** (on `test`): (1) **whose copy this device holds** (task, found 14 Oct): `mkn_local_scope` {uid, hid}
+- **Released: v38.40 (16 Oct 2026, 00:43 Israel time, Tony's "Yes, please release v38.40", CI green on 9408884).**
+  All jobs success (beta live 00:45; Self Tests on main 00:54).
+- **v38.40**: (1) **whose copy this device holds** (task, found 14 Oct): `mkn_local_scope` {uid, hid}
   written after a sign-in has loaded; `localCopyForAccount` in the auth handler (before the first draw) and in
   `signInCloudSync` (after householdEnter): another account or household → `localCopyClear` (the keys "Reset this
   device" clears + IndexedDB photos + page state), unsent changes kept aside (`mkn_local_setaside`) for their own
