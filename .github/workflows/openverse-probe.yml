@@ -32,19 +32,18 @@ jobs:
             return '';
           }
           const H = { 'User-Agent': 'TonysRecipes/1.0 (personal recipe app)' };
-          for (const q of ['chocolate cake', 'shakshuka', 'lentil soup']) {
-            const s = await timed('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=9&page=1&license_type=all-cc&mature=false', { headers: H });
+          const base = q => 'https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=9&page=1&license_type=all-cc&mature=false';
+          const med = a => { const x = a.slice().sort((p, q) => p - q); return x.length ? x[Math.floor(x.length / 2)] : 0; };
+          const runs = [['apple crumble', ''], ['beef stew', ''], ['falafel', ''], ['pumpkin soup', '&filter_dead=false'], ['banana bread', '&filter_dead=false'], ['hummus', '&filter_dead=false']];
+          for (const [q, extra] of runs) {
+            const s = await timed(base(q) + extra, { headers: H });
             let d = {}; try { d = JSON.parse(Buffer.from(s.body).toString()); } catch (e) {}
             const res = d.results || [];
-            console.log(`::notice title=search ${q}::${s.status} in ${s.ms} ms, ${res.length} results`);
+            const th = await Promise.all(res.map(r => timed(r.thumbnail)));
+            const sm = await Promise.all(res.map(r => { const u = small(r.url, r.width); return u ? timed(u) : null; }));
+            const thMs = th.map(x => x.ms), smOk = sm.filter(x => x && x.status === 200), smMs = smOk.map(x => x.ms);
             const prov = {}; res.forEach(r => prov[r.provider] = (prov[r.provider] || 0) + 1);
-            console.log(`::notice title=providers ${q}::${JSON.stringify(prov)}`);
-            const all = await Promise.all(res.map(async r => {
-              const [th, full] = await Promise.all([timed(r.thumbnail), timed(r.url)]);
-              const sm = small(r.url, r.width); const sml = sm ? await timed(sm) : null;
-              return `${r.provider}: thumb ${th.status} ${th.ms}ms ${th.kb}KB | original ${full.status} ${full.ms}ms ${full.kb}KB` + (sml ? ` | small ${sml.status} ${sml.ms}ms ${sml.kb}KB` : ' | small n/a');
-            }));
-            all.forEach((line, i) => console.log(`::notice title=${q} #${i + 1}::${line}`));
+            console.log(`::notice title=${q}${extra ? ' (filter_dead=false)' : ' (default)'}::search ${s.status} ${s.ms} ms, ${res.length} results ${JSON.stringify(prov)} | Openverse thumbs median ${med(thMs)} ms, max ${Math.max(0, ...thMs)} ms, failed ${th.filter(x => x.status !== 200).length} | direct small ${smOk.length}/${res.length}, median ${med(smMs)} ms, max ${Math.max(0, ...smMs)} ms`);
           }
           JS
           node probe.mjs
