@@ -172,6 +172,16 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Commons (Wikimedia Foundation) for Openverse (WordPress Foundation); `python3 tools/legal-keys.py` re-keyed.
   The Worker deploys with the release (deploy-worker.yml on main). Until then the test copy's 'wikimedia' asks
   answer "Unknown photo source" (the shared Worker is still v76) and are passed over.
+- **Released: v38.45 + Worker v77 (16 Oct 2026, 18:08 Israel time, Tony's "Yes, please move it to the Family and
+  beta when green", CI green on 05b16fe).** All jobs success: Deploy the Worker 18:09 (v77 live — Wikimedia Commons
+  answers now), Pages, Cloudflare Pages (beta 18:10, test), Translate new phrases, Publish languages, Self Tests on
+  main 18:19.
+- **v38.46** (on `test`): the Help assistant's guide and ✨ What can this app do brought up to date (the filter rows
+  and 🗂 Show, the Steps buttons on several lines, the photo libraries, the recipe counter's ranks, the shared-link
+  resume, Google's account chooser and Use another account, Sign out and the device's copy, a section for the
+  owner); RECONSTRUCTION_PROMPT.md §1b to v38.45 (the move marked done, step 9's tools, new §1b.12, the services
+  table and photo-search spec). Self-test `tester_survey` restates `_workerHealth` before each question — a health
+  check started before it could land mid-test and record "no server" (it failed when suites ran side by side).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
