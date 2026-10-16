@@ -7701,8 +7701,10 @@ window.SELF_TESTS = [
         if(real.prov && (!cp || cp.prompt!=='select_account')) throw new Error('Google sign-in does not show its account chooser: '+JSON.stringify(cp));
         var outBox=null; window.askConfirm=async function(o){ outBox=o; return null; };
         var out=null; try{ await mfaResolve(err); }catch(e){ out=e; }
-        if(!outBox || outBox.cancelLabel!=='Use another account' || !out || !out.otherAccount || out.code!=='auth/popup-closed-by-user') throw new Error('the code box has no way to another account: '+JSON.stringify([outBox && outBox.cancelLabel, out && out.code]));
+        if(!outBox || outBox.cancelLabel!=='Use another account' || !out || !out.otherAccount || !out.cancelled || out.code!=='auth/popup-closed-by-user') throw new Error('the code box has no way to another account: '+JSON.stringify([outBox && outBox.cancelLabel, out && out.code]));
         if(String(startGoogleSignIn).indexOf('otherAccount')===-1) throw new Error('the sign-in screen does not say to choose the other account');
+        // v38.43 — and it is not logged as a failure (Tony's report: "[BAD] 4 errors", all four this button).
+        if(!/if \(!err\.cancelled\)/.test(String(startGoogleSignIn)) || !/err\.cancelled/.test(String(authFailed))) throw new Error('a cancelled code box is still logged as "Sign-in failed"');
         window.askConfirm=async function(o){ asked.push(o.title); return o.input!==undefined ? ' 123 456 ' : true; };
         var other={ code:'auth/multi-factor-auth-required', resolver:{ hints:[{ factorId:'phone', uid:'p1' }] } };
         var threw=false; try{ await mfaResolve(other); }catch(e){ threw=(e===other); }
@@ -8319,7 +8321,17 @@ window.SELF_TESTS = [
           var nb=Array.prototype.slice.call(document.querySelectorAll('#logNudge button')).map(function(b){ return b.textContent; });
           dismissLogNudge();
           if(!nb.some(function(t){ return /Copy log/.test(t); }) || nb.some(function(t){ return /Send to admin/.test(t); })) throw new Error('the owner\u2019s log pop-up: '+nb.join(' | '));
-        } finally { window.isAppOwner=ownerWas; renderLoggingPanel(); }
+          // v38.43 — the pop-up came up before the owner signed in; he signed in and pressed it: copied, not sent to himself.
+          window.isAppOwner=function(){ return false; };
+          showLogNudge([{ title:'Something' }]);
+          if(!/Send to admin/.test(document.getElementById('logNudgeCopy').textContent)) throw new Error('signed out: the pop-up does not offer Send to admin');
+          window.isAppOwner=function(){ return true; }; applyOwnerOnlyItems();
+          if(!/Copy log/.test(document.getElementById('logNudgeCopy').textContent)) throw new Error('signed in as the owner: the pop-up still says '+document.getElementById('logNudgeCopy').textContent);
+          var did=[], cw=window.copySyncLogReport, sw=window.sendLogReportToAdmin;
+          window.copySyncLogReport=function(){ did.push('copy'); }; window.sendLogReportToAdmin=function(){ did.push('send'); };
+          try{ document.getElementById('logNudgeCopy').click(); } finally { window.copySyncLogReport=cw; window.sendLogReportToAdmin=sw; }
+          if(did.join()!=='copy') throw new Error('pressed after the owner signed in: '+did.join());
+        } finally { window.isAppOwner=ownerWas; dismissLogNudge(); applyOwnerOnlyItems(); renderLoggingPanel(); }
         var lb2=document.getElementById('loggingBody');
         if(lb2 && !isAppOwner() && !lb2.querySelector('#logSendBtn')) throw new Error('everyone else lost Transmit report to admin');
       } finally { window.askConfirm=real.ask; window.fetch=real.fetch; window._fbUser=real.user; window.toast=real.toast; }

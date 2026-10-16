@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.42 -->
+<!-- Tony's Recipes Collection v38.43 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1161,9 +1161,12 @@ function showLogNudge(bad) {
     + 'border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;';
   // v38.39 — Tony: "when signed in as Admin, I should not get the option 'Transmit report to Admin'. I should
   // get the 'Copy log' button instead" — the admin is the one the report would go to.
-  var ownerCopies = logOwnerCopies();
-  copy.textContent = ownerCopies ? '📋 Copy log' : '📤 Send to admin';   // v37.75 — to the one inbox, not the clipboard
-  copy.onclick = function(){ dismissLogNudge(); if (ownerCopies) copySyncLogReport(); else sendLogReportToAdmin(); };
+  // v38.43 — and decided when it is pressed, not when it appeared: on 16 Oct it came up before Tony had
+  // signed in, he signed in as the owner and pressed it — and his report was sent to himself. The label
+  // follows a sign-in too (applyOwnerOnlyItems).
+  copy.id = 'logNudgeCopy';
+  logNudgeLabel(copy);   // v37.75 — to the one inbox, not the clipboard
+  copy.onclick = function(){ dismissLogNudge(); if (logOwnerCopies()) copySyncLogReport(); else sendLogReportToAdmin(); };
 
   var open = document.createElement('button');
   open.style.cssText = 'padding:9px 12px;background:rgba(255,255,255,0.15);color:#fff;'
@@ -1337,6 +1340,10 @@ async function sendReportToAdmin(subject, report, opts) {
 // v38.39 — the app's owner copies a report; everyone else sends it to him.
 function logOwnerCopies() { return typeof isAppOwner === 'function' && isAppOwner(); }
 window.logOwnerCopies = logOwnerCopies;
+function logNudgeLabel(btn) {
+  btn = btn || document.getElementById('logNudgeCopy');
+  if (btn) btn.textContent = logOwnerCopies() ? '📋 Copy log' : '📤 Send to admin';
+}
 function sendLogReportToAdmin() {
   return sendReportToAdmin('\u{1FAB5} Log report', syncLogReportText());
 }
@@ -7596,7 +7603,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.42';
+var APP_VERSION = 'v38.43';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10554,7 +10561,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.42</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.43</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11282,7 +11289,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.42</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.43</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15351,7 +15358,9 @@ async function mfaResolve(err) {
       input: '', placeholder: '123 456', okLabel: 'Continue', cancelLabel: 'Use another account' });
     if (typeof code !== 'string') {
       syncLog('auth', 'Another account chosen instead of typing the authenticator\u2019s code');
-      var c = new Error('The sign-in was not finished.'); c.code = 'auth/popup-closed-by-user'; c.otherAccount = true; throw c;
+      // v38.43 — a choice, not a fault: logged above, not again as "Sign-in failed" (Tony's report of 16 Oct
+      // said "[BAD] 4 errors" — all four were this button).
+      var c = new Error('The sign-in was not finished.'); c.code = 'auth/popup-closed-by-user'; c.otherAccount = true; c.cancelled = true; throw c;
     }
     try {
       var done = await resolver.resolveSignIn(totpApi().assertionForSignIn(hint.uid, code.replace(/\D+/g, '')));
@@ -15507,6 +15516,7 @@ function applyOwnerOnlyItems() {
   var mine = isAppOwner();
   document.querySelectorAll('[data-owner-only]').forEach(function(el){ el.style.display = mine ? '' : 'none'; });
   envRibbonUpdate();
+  if (typeof logNudgeLabel === 'function') logNudgeLabel();   // v38.43
 }
 // v38.31 — Tony, on move day: "I would prefer the Beta ribbon to be removed from the Family app, or even
 // better replaced by a different Admin ribbon, in a different color". In the community copy: the app's
@@ -25126,7 +25136,7 @@ async function startGoogleSignIn() {
     // rather than starting from nothing. The code matters more than the text:
     // auth/network-request-failed is what a blocked API key looks like from here.
     _lastAuthError = (err.code || 'no code') + ' — ' + (err.message || '');
-    try { syncLog('error', 'Sign-in failed', _lastAuthError.slice(0, 200)); } catch(e) {}
+    if (!err.cancelled) try { syncLog('error', 'Sign-in failed', _lastAuthError.slice(0, 200)); } catch(e) {}   // v38.43
     if (errDiv) {
       errDiv.textContent = msg;
       errDiv.style.display = 'block';
@@ -25243,8 +25253,8 @@ function authReady() {
 function authFailed(err, what) {
   window._justSignedIn = false;
   _lastAuthError = (err && err.code || 'no code') + ' — ' + (err && err.message || '');
-  try { syncLog('error', what + ' failed', _lastAuthError.slice(0, 200)); } catch(e) {}
-  loginSay(authErrorText(err));
+  if (!(err && err.cancelled)) try { syncLog('error', what + ' failed', _lastAuthError.slice(0, 200)); } catch(e) {}   // v38.43
+  loginSay(err && err.otherAccount ? 'Sign in again and choose the other account.' : authErrorText(err));
 }
 async function startProviderSignIn(kind) {
   if (!signInOn(kind) || !authReady()) return null;
