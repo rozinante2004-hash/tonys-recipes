@@ -233,6 +233,21 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   "anyone may start one" ("Done"); sent the FIRST invitation with ✉️ Invite testers — Gmail, From "My Kitchen Notes
   <contact@…>" (the Gmail API is on in my-kitchen-notes-beta, send-as works). One browser profile = one signed-in
   person per site: the tester uses its own Chrome profile.
+- **v38.48** (Tony as Tester 1, Firefox on Linux, 1819×995, 16 Oct): "Start my own recipe collection" then "the
+  Import Free-hand Recipe modal" opened by itself. It was a **double-click**: "Let's cook! 🍳" (the name box) sits on
+  the very spot of "✍️ Paste the text" in the empty kitchen behind it; the first click founded the household, the
+  second opened Free-hand (reproduced on the emulator, `$S/e2e/newtester.mjs`, MODE=dbl; a single click never does).
+  Fix: a window-capture click guard (`_clickLayer`, `clickLayerOf`, `clickIsGhost`) — a real click with detail ≥ 2
+  within 700 ms counts only in the layer (#askOverlay / #termsGate / .modal-overlay, or the page) of the first; both
+  ways (a box closing or opening under the mouse). Untrusted clicks never held. **tests/double-click.js** (real
+  Playwright mouse, in CI after the phone check) fails 3 of 6 on v38.47, passes on v38.48. Tony's Tester 1 Self Test
+  also showed: the suite run signed in for real left `_driveMode` off and closed the live listener (terms_gate's
+  "Get me out of here!" → legalLeave) — `_selfTestPark` now puts the sign-in and `_firestoreUnsubscribe` aside and
+  `_selfTestSignInBack` restores them (unless really signed out); `key_check` stubs `fbSignedInUser` (it refreshed the
+  REAL token through its fake fetch: "auth/nope"); `stor_firebase` passes a new collection with no meta when its
+  household reads. New self-tests `double_click_stays_put`, `selftest_keeps_sign_in` (383 pass). Terms: shown once per
+  ACCOUNT (users/<uid>/prefs/legal), skipped only when agreed; 📊 Households shows "agreed to the terms (v…) <date>".
+- **Released: v38.48 (16 Oct 2026, 22:04 Israel time, CI green on c6847e2).** All jobs success (Pages deploy, Cloudflare beta and test, Self Tests on main and test, languages).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
