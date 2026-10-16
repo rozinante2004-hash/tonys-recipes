@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.45 -->
+<!-- Tony's Recipes Collection v38.46 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7602,7 +7602,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.45';
+var APP_VERSION = 'v38.46';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10560,7 +10560,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.45</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.46</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11288,7 +11288,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.45</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.46</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -27039,10 +27039,11 @@ function appFeatureSections(all) {
     { icon: '✨', title: 'Smart help', items: [
       'Translate a recipe into another language.',
       'What can I make? Ideas from what is in your pantry.',
-      'Find a photo for a recipe.',
+      'Find a photo for a recipe in free photo libraries.',
       'Ask the help assistant how to do anything in the app.' ] },
     { icon: '\u{1F5C2}', title: 'Keep it tidy', items: [
       'Categories, diets, favourites, collections and a quick search.',
+      'A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.',
       'Every change is kept: go back to an earlier version of a recipe.' ]
       .concat(on('bring') ? ['Send the ingredients to your Bring! shopping list.'] : [])
       .concat(['Print a recipe, or export recipes to Word.']) },
@@ -28408,8 +28409,8 @@ var HELP_SYSTEM_PROMPT = [
   "=== BROWSING & FILTERING ===",
   "- Recipes are shown in List or Grid view (toggle top-right)",
   "- Search bar in the header searches recipe names, ingredients, and steps",
-  "- Filter bar has 3 frames on desktop: All/Favourites/Clips | Meal type | Diet type",
-  "- On mobile: compact All/Fav/Clips buttons + Meal ▾ and Diet ▾ dropdown panels",
+  "- On a computer, the filter bar's first row: All, Favourites, Clips, 🕐 Recent, 📚 Collections, 📷 No photo, 🛒 One item away (recipes you could cook with one more thing); then Meal type and Diet type",
+  "- On a phone: All / Fav / Clips buttons, Meal ▾ and Diet ▾ panels, and 🗂 Show ▾ — tick 🕐 Recent, 📚 Collections, 📷 No photo or 🛒 One item away; the button then names what is on (or 'Show (2)' for two); ✦ All clears them",
   "- Meal filters: Breakfast, Lunch, Dinner, Snack, Dessert, Soup, Skills \u0026 Methods (multi-select)",
   "- Diet filters: Keto, Carnivore, Vegetarian, Vegan, Omnivore (multi-select)",
   "- Omnivore in the filter shows all recipes regardless of diet",
@@ -28423,6 +28424,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags: tap Keto/Carnivore/Vegetarian/Vegan/Omnivore; Omnivore cancels others",
   "- Notes field: personal tips, variations — shown as amber panel in view mode if not empty",
   "- Ingredients are a drag-and-drop table; use Tab to move between amount/name fields",
+  "- Steps — one per line. The buttons above the Steps box: ▸ Sub-title (a heading line, no step number), ⇥ indent, ⇤ outdent. They act on the line your cursor is in — or on every line you select (select several lines first, then press). The lines stay selected, so you can press another button straight away. Sub-titles are never indented; ▸ Sub-title on lines that are all sub-titles turns them back into steps",
   "",
   "=== IMPORTING RECIPES ===",
   "Via ⇅ Imp/Exp → Import section:",
@@ -28448,7 +28450,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Scale ingredients: use the ×0.5–×6 multiplier buttons (×0.5 halves a recipe)",
   "- Toggle metric/imperial units",
   "- Hebrew recipes: method steps are right-aligned with step numbers on the right",
-  "- Tap the photo to change it (upload from device or search web)",
+  "- Tap the photo to change it: upload one from the device, or 🔍 search the web — the free photo libraries Pexels, Unsplash and Pixabay, then Wikimedia Commons; 🔄 See more shows the next library at once. Where a photo's licence asks for it, the photographer's credit is kept with it and shown under the photo",
   "- Action buttons: Edit, Translate, Excel, Word, Print, Share, Send to Bring!, Calculate nutrition",
   "- Scaling also changes the amounts written in the method (\"add 2 eggs\" becomes \"add 4 eggs\" at ×2) — shown in bold; the recipe itself is not changed",
   "- On a computer, drag the recipe window's bottom-right corner to make it bigger; click the corner once for full size, again for the usual size",
@@ -28501,7 +28503,8 @@ var HELP_SYSTEM_PROMPT = [
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
   "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
   "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
-  "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching Pixabay photo for every recipe that has none",
+  "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; Undo puts things back",
+  "- 🏅 The recipe counter: the rosette next to your household's name counts its recipes (a collection counts as its recipes). Its metal rises with the count — First steps, then Bronze at 10, Silver 25, Gold 50, Platinum 100, Ruby 250, Diamond 500 and Legendary at 1000 — and each new rank is celebrated once. Tap it to see all the ranks and how far the next one is",
   "- 📏 Scaling memory: the app remembers the last serving size multiplier you used for each recipe",
   "- 🌙 Screen stay-on (Wake Lock): when you open a recipe, the screen stays on automatically so your hands can stay clean while cooking. It goes back to normal sleep when you close the recipe. Works in Chrome and Edge on Android; not supported in Safari.",
   "- ⏳ Placeholder cards appear briefly while your recipes load",
@@ -28526,6 +28529,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Android: 📱 Save from the phone’s Share menu — installs the app, which then appears in the phone's Share menu",
   "- Computer: 🧩 Browser extension (Save-recipe button) — adds a Save-recipe button under Facebook, Instagram and TikTok posts and on recipe sites (Chrome, Edge, Firefox)",
   "- Imports also read Facebook and TikTok links, screenshots (several at once), PDFs and recipe videos; a page with several recipes lets you pick which to keep",
+  "- On an iPhone, if the phone puts the app away while a shared recipe is being read (and reloads the page), the app picks the shared link up again when you come back (within 20 minutes)",
   "",
   "=== ABOUT, CONTACT AND FEEDBACK ===",
   "- ? → ℹ️ About: the version (and Update now when a newer one is out), ✨ What can this app do, ✉️ Contact us, the Privacy Statement and the Terms of Use",
@@ -28540,11 +28544,19 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== SIGNING IN AND YOUR ACCOUNT ===",
   "- Sign in with Google, or with any e-mail address (a password, or a sign-in link sent to it) where that is offered.",
+  "- Google sign-in always shows Google's list of accounts, so you choose which one — even when the phone already knows another account. If a code from an authenticator app is asked for an account you did not mean, press 'Use another account' and sign in again.",
+  "- 'Sign out' (in the header, next to the sync status) also removes this device's copy of the recipes — unless some changes have not reached the cloud yet; they come back when you sign in. Another account signing in on the same device never sees, or receives, the first account's recipes; recipes made on the device before signing in are added only if you choose 'Add them'.",
   "- An address used with a password must be CONFIRMED from the e-mail sent to it; until then, places kept for that address do not open (invitation links still work). ⚙️ → ✉️ Confirm my e-mail address sends it again.",
   "- ⚙️ → 💾 Backups and photos → 💾 Backups saves a file with everything (every recipe and photo). ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone.",
   "- ⚙️ → 🔧 Troubleshooting → 🧽 Reset this device… erases only this device's copy; nothing in the cloud is deleted.",
   "- ⚙️ Settings is in sections — 🎨 How it looks, 🏠 My household, 📥 Saving recipes from other apps, 💾 Backups and photos, 💬 Help and feedback, 🔧 Troubleshooting (and 👑 App owner, for the app's owner). Tap a section to open it. 🗑 Delete my account… is the last item, on its own. 🔒 What leaves this device (who receives what) is at the bottom of the ? window.",
   "- Every item in ⚙️ explains itself when you point at it.",
+  "",
+  "=== FOR THE APP'S OWNER ===",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
+  "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
+  "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
+  "- The owner's log panel and its pop-up offer 📋 Copy log (everyone else's send the report to the owner)",
   "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",

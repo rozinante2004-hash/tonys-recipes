@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.45` — app. **Worker: v77**, deployed separately and versioned separately
+**Current version:** `v38.46` — app. **Worker: v77**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -104,7 +104,7 @@ slide‑up modal animation.
   added since stay) — or takes a backup / languages file. Every backup carries them (§10).
   Export languages was removed in v36.93 (the repository does its job).
 
-## 1b. The household era, the community app and the owner's tools (v36.84 – v38.26)
+## 1b. The household era, the community app and the owner's tools (v36.84 – v38.45)
 
 Everything in this section came after the single-collection design described in the rest of the
 file. Where the two disagree, **this section wins**. The working notes (`CLAUDE.md`, the bullet
@@ -390,7 +390,9 @@ under its plain path only (a `?url=` request goes network-first).
   About says "© 2026 My Kitchen Notes".
 - **Feedback:** the floating 💬 (community and test) and ⚙️ → ✉️ Send feedback open one form (note,
   optional screenshot, the log), sent to the Worker's inbox; "📨 Answers to my notes" shows replies.
-  "📤 Transmit report to admin" and a failed Self Test's "Send to admin?" use the same route.
+  "📤 Transmit report to admin" and a failed Self Test's "Send to admin?" use the same route. The app's
+  owner gets "📋 Copy log" instead (the report would go to him; `logOwnerCopies()`, decided when the
+  button is pressed — v38.39, v38.43) and is never offered to send the Self Test's report.
 - **The community copy's strip (v38.32):** 👑 ADMIN (green) for the app's owner; no mark for the family
   (members of a household the owner runs — the strip keeps its height); β BETA for everyone else.
 - **Testers' copies only (`insights`):** errors report themselves (no addresses, e-mails masked) and
@@ -446,7 +448,7 @@ sharp from 88 pt down. All copies use `black-translucent` (a solid `default` bar
 and still blurred below). An empty household no longer stays on placeholder cards (redrawn when the
 sync ends; the first-paint placeholders give way after 6 s).
 
-### 1b.10 The family's move into the community copy (decided 11 Oct 2026; NOT yet run)
+### 1b.10 The family's move into the community copy (decided 11 Oct 2026; done 13 Oct 2026)
 
 The owner chose to move the family's household into the community copy so that testers can link with
 his live recipes (households link only within one copy), keeping every owner capability there.
@@ -466,6 +468,16 @@ his live recipes (households link only within one copy), keeping every owner cap
   forwards with its path, `?url=` and `#share-text` (`appCopyMovedTo`). The owner's Feedback inbox and
   the all-copies list already work in the community copy (`feedbackInboxHere`, `allCopiesHere`).
 - **Move-day checklist** — in `CLAUDE.md` ("MOVE DAY CHECKLIST"); follow that one.
+- **Done on 13 Oct 2026 (v38.31):** the family household, its accounts (same user ids) and the translations
+  are in the community project; the family copy has `movedTo` = https://mykitchennotes.community/ (every
+  visit forwards, never on 127.0.0.1/localhost so the suites still run) and `languageSource` =
+  my-kitchen-notes-beta. The owner's 📊 page greys a family row whose household id is in the beta
+  ("📦 Moved to the beta"). Nothing in the old project has been deleted yet: **step 9**, a week later and only
+  with the owner's OK — `move-family.yml` mode `clear-check` (read-only counts: the same / changed since / not
+  in the community copy, and shared/), then `clear-source` (`--confirm "clear the family app"`; deletes from
+  recipes-f379d what the community copy holds; a household is cut to {movedTo, movedAt} so an old app still
+  forwards; `--all` / `--shared` widen it; i18n/, config/, feedback/ and the accounts stay). Keep recipes-f379d
+  itself: its Google Cloud OAuth client is the one the family's Gmail sending uses.
 
 ### 1b.11 Files added in this era
 
@@ -475,15 +487,81 @@ config.js, options.html, options.js, STORE.md, PRIVACY.md, store/) and `download
 `extension-version.json`) · `worker/wrangler.jsonc` · `i18n/<lang>.json`, `i18n/index.json`,
 `i18n/archive/` · `tools/`: build.js, environments.json, build-extension.mjs, publish-extension.mjs,
 publish-extension-firefox.mjs, publish-rules.mjs, publish-languages.mjs, translate-new.mjs,
-backup-firestore.mjs, restore-firestore.mjs, move-family.mjs, enable-totp.mjs, legal-keys.py,
+backup-firestore.mjs, restore-firestore.mjs, move-family.mjs, enable-totp.mjs, owner-recovery.mjs, legal-keys.py,
 make-test-icons.mjs · `tests/`: firestore-households-rules.test.mjs, e2e-sync.mjs (`--layout
-households`), extension.mjs, publish-languages.test.mjs, move-family.test.mjs, phone-chrome.js,
+households`), extension.mjs, publish-languages.test.mjs, move-family.test.mjs, owner-recovery.test.mjs, phone-chrome.js,
 axe-scan.js · `AUDIT-2026-10-security.md`.
 
-**State on 13 Oct 2026 (v38.26):** Worker v73; the rules with the owner protections published to
+**State on 13 Oct 2026 (v38.26)** (history — see §1b.12 for 16 Oct): Worker v73; the rules with the owner protections published to
 all three projects; TOTP enabled on the community project; alerts on; daily encrypted backups of the
 community database running. Next: the family's move (§1b.10), then the extension's update pop-up that
 closes itself once the new version is installed.
+
+### 1b.12 After the move (v38.32 – v38.45, 13–16 Oct 2026)
+
+Each item names the function or key to look for; `CLAUDE.md` has the long story of each.
+
+- **The iPhone Safari tab (v38.34):** Firestore's IndexedDB copy breaks there ("INTERNAL ASSERTION FAILED …
+  b815" by the hundred — several tabs, or a tab put away). `fsMemoryOnly()`: an iPhone/iPad Safari TAB
+  (`fsAppleTab(ua, touch, installed)`) or a tab where it already broke (sessionStorage `mkn_fs_memory`) starts
+  without `enablePersistence` (online only); `fsBroken(msg)` offers ONE "🔄 Reload the app". The installed app
+  keeps its device copy.
+- **The owner's authenticator (v38.35, v38.38):** the COMPAT auth library never registers
+  `TotpMultiFactorGenerator`, so `TOTP_REST` makes the modular SDK's requests itself
+  (`/v2/accounts/mfaEnrollment:start|finalize`, `/v2/accounts/mfaSignIn:finalize`) behind objects with
+  `_process(auth, session)` that `user.multiFactor.enroll` and `resolver.resolveSignIn` call. The code box
+  (`mfaResolve`) opens above the sign-in screen (`askConfirm({ z: 10070 })` — #loginScreen is 9999) and says a
+  wrong code itself. Both owner accounts keep their codes in Ente Auth; "Require" is on.
+- **Owner recovery (GitHub job, 14 Oct):** `.github/workflows/owner-recovery.yml` + `tools/owner-recovery.mjs`
+  — "Require" off (`config/security.ownerTwoStep`) and/or one owner account's second steps removed
+  (Identity Toolkit `accounts:update {mfa:{}}`), typed confirmation "recover the owner", nothing about the
+  person in the log; tested on the emulators (`tests/owner-recovery.test.mjs`, a CI step). Needs only the
+  owner's GitHub account.
+- **A shared link survives the iPhone (v38.36):** `sharePendingSave` keeps the shared link (sessionStorage
+  `mkn_share_pending`) until the import window closes (`closeM` of urlImportOverlay/freehandOverlay); a page
+  opened with nothing in its address picks it up again (`sharePendingResume`, once, within 20 minutes).
+  `maybeNudgeAboutLog` waits while an import window is open; the install hints hide while any window is open
+  (`body:has(.modal-overlay.open)`). **One iPhone shortcut** for everyone (`iosShortcutUrl`, v38.37).
+- **The first read after signing in waits (v38.39):** `householdFirstRead` asks the household list again on
+  permission-denied — 1.5, 3, 6, 12, 20, 30 s, a fresh token each time (a second app tab may still be signed out
+  in Firestore's multi-tab mode).
+- **Whose copy this device holds (v38.40):** `mkn_local_scope` {uid, hid}; `localCopyForAccount` (auth handler,
+  before the first draw; `signInCloudSync`, after `householdEnter`) clears another account's or household's copy
+  (`localCopyClear`), keeps unsent changes aside for their own account (`mkn_local_setaside`,
+  `localSetAsideRestore`), and asks "Add them / Leave them out" about a copy of unknown owner. Sign out clears
+  the device's copy unless changes are unsent.
+- **The recipe badge (v38.40):** a 20-point rosette by the household's name (#recipeBadge), the count inside (a
+  collection counts as its parts; fixtures never), its metal from `RECIPE_RANKS` (First steps, Bronze 10,
+  Silver 25, Gold 50, Platinum 100, Ruby 250, Diamond 500, Legendary 1000); a new rank celebrated once per
+  device and household (`mkn_rank_seen`); a tap opens the ladder (#rankOverlay).
+- **The phone's 🗂 Show (v38.41):** #mobileMoreBtn / #mobileMorePanel ("Show only") — Recent, Collections, No
+  photo, One item away, as the computer's first row; the button names what is on; ✦ All clears it. Not "More"
+  (the header has ⋯ More).
+- **Google sign-in (v38.42, v38.43):** `_fbProvider.setCustomParameters({ prompt: 'select_account' })` — without
+  it Google signed in the account the browser knew, and the owner's phone went straight to the owner's code. The
+  code box has "Use another account" (`err.cancelled`, `err.otherAccount`); a cancelled code box is not logged
+  as "Sign-in failed".
+- **✉️ Invite testers (v38.42, the owner's):** ⚙️ → 👑 App owner — `INVITE_TEXTS` (English, Hebrew),
+  `inviteLink()` = the copy's siteUrl + `?ref=<household code>`, edits kept per language (`mkn_invite_drafts`,
+  the link stored as {link}); 📧 Send with Gmail = one e-mail per address (`sendViaGmailApi(…, {from, replyTo,
+  owner})`; From "My Kitchen Notes <contact@…>", which Gmail keeps only for an account that may send as it);
+  the already-invited are asked about (`mkn_invite_sent`, this device only); the log gets counts only. Also mail
+  app (Bcc), WhatsApp, Copy. Gmail: owner use in any copy; `gmailClientIdFind()` reads the copy's Google client ID
+  from `accounts:createAuthUri` when none is set; `error_callback` (a closed Google window no longer waits for
+  ever). The copy's Google Cloud project needs the Gmail API enabled once.
+- **The Method's buttons act on every selected line (v38.44):** `stepLineRange` covers the lines a selection
+  touches (one ending at the very start of a line leaves it out); `_stepCaretEnd` with `_stepCaret`, also from
+  `selectionchange`; `replaceStepLines` keeps several lines selected.
+- **Photos from Wikimedia Commons (v38.45, Worker v77):** see §3 and the `photo-search` spec; the app's order is
+  `PHOTO_SOURCES` = pexels, unsplash, pixabay, wikimedia (`PHOTO_KEYLESS`); `photoFetch` keeps one request per
+  source, page and search and asks the next source while one is shown; `_photoGen` keeps an older search's answer
+  from replacing a newer one; a thumbnail not arrived in 8 s gives way to the next copy. Privacy statement 1.6
+  (16 Oct 2026, all 11 languages) names Wikimedia Commons (Wikimedia Foundation) instead of Openverse.
+
+**State on 16 Oct 2026 (v38.45, Worker v77):** the family copy forwards to the community copy; the owner's
+two-step is required (Ente Auth, both owner accounts; Owner recovery job ready); the browser key is restricted
+(Identity Toolkit, Token Service, Firestore; the copy's addresses); the tester invitation is ready to send. Next:
+move step 9 (clearing the old family data, with the owner's OK), then the testers.
 
 ---
 
@@ -609,8 +687,8 @@ Rules for a rebuild:
 | **Anthropic Claude API** | All AI (import/extract, translate, suggest, explore, nutrition, help, diet auto‑tag) | Worker secret `ANTHROPIC_API_KEY` |
 | **Firebase** (Auth + Firestore) | Google sign‑in + shared cloud recipe doc | Public web config (safe to ship) |
 | **Cloudflare Worker** | Single POST endpoint proxying everything | The Worker itself |
-| **Openverse** | Food photo search — **first source, and needs NO key**, so it cannot be knocked out when the shared key hits its rate limit. Federates Flickr, Wikimedia, NASA and museum collections. | none |
-| **Pixabay / Pexels / Unsplash** | Food photo search / auto‑fetch (app cycles sources via "See more") | Worker secrets `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY` (any subset; unset sources are skipped) |
+| **Pexels / Unsplash / Pixabay** | Food photo search / auto‑fetch, asked in that order (the app cycles sources via "See more") | Worker secrets `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY`, `PIXABAY_API_KEY` (any subset; unset sources are skipped) |
+| **Wikimedia Commons** | Food photo search — the **last** source, and needs **NO key** (v38.45, Worker v77). It replaced **Openverse**, which was first until then: measured 16 Oct 2026, Openverse's search took 12.6–27.8 s every time; Commons answers in 0.3–0.6 s, thumbnails ~0.1 s, the same openly licensed works (CC0 / BY / BY‑SA — the creator and licence are stored with the photo). | none (a User‑Agent naming the app's address) |
 | **YouTube Data API** | Fetch video description for recipe extraction | Worker secret `YOUTUBE_API_KEY` |
 | **Bring!** | Push ingredients to a shopping list | Worker KV `BRING_KV` (key `accessToken`), else env `BRING_TOKEN`; plus env `BRING_API_KEY`, `BRING_LIST_UUID`, `BRING_USER_UUID` — **no Bring! values in source** |
 | **GitHub Pages** | Hosting — the family's copy (`tonys-recipes`) and the site root with the sign-in pages (`rozinante2004-hash.github.io`) | n/a |
@@ -660,7 +738,8 @@ Rules for a rebuild:
 > **`https://web.getbring.com`**, because the Bring! bookmarklet calls the Worker from Bring!'s
 > own page. Neither is optional; both were outages.
 >
-> **`photo-search` returns per-image `license` and `sourceLabel`.** Openverse serves Creative
+> **`photo-search` returns per-image `license` and `sourceLabel`.** (Since v38.45 the open‑licence source is
+> Wikimedia Commons, not Openverse — the same rule applies.) Openverse serves Creative
 > Commons work where CC-BY makes attribution a licence *condition*, so the app stores
 > `r.photoCredit` and renders it — a picker that shows credit and then discards it on apply
 > puts every recipe using one in breach.
@@ -756,6 +835,13 @@ default was committed to a public repo, so it was never a secret.
    failures return HTTP 200 with an `{error}` field so one bad source never breaks the others.
    The app cycles sources via a **"See more"** button (`PHOTO_SOURCES`/`photoSearchMore`).
    Each source returns `{source, page, images:[{url,thumb,credit,creditUrl}], total}`.
+   **`wikimedia` (Worker v77):** `commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6`
+   `&gsrsearch=filetype:bitmap <query>&gsrlimit=9&gsroffset=(page-1)*9&prop=imageinfo&iiprop=url|size|mime|extmetadata`
+   `&iiextmetadatafilter=LicenseShortName|Artist&iiurlwidth=330`; jpeg/png/webp only, in the search's order
+   (`index`); `thumb` = the 330px thumburl, `url` = the 960px copy of an original wider than 960 (else the
+   original), `credit` = Artist as plain text (or "Wikimedia Commons"), `license` = LicenseShortName,
+   `creditUrl` = the file page, `sourceLabel` "Wikimedia Commons". `openverse` is still answered, for apps not
+   yet updated; the app no longer asks it.
 6. **(default, no action)** — forward the whole body to
    `https://api.anthropic.com/v1/messages` with headers `x-api-key: env.ANTHROPIC_API_KEY`,
    `anthropic-version: 2023-06-01`; return the JSON response with `Access-Control-Allow-Origin: *`.
@@ -1229,7 +1315,7 @@ must be checked against the empty string, because most character-class predicate
   cookLog: [{ id, at, rating, note }],  // 3.5 — one entry per cook, capped at 50
   history: [{...}],           // 3.4 — last 3 revisions. Travels in recipe_<id> (5.4), never in the legacy doc
   isClip: Boolean,            // "clip"/bookmark (no full recipe). The ONLY clip flag (2.3)
-  photoCredit: null | { name, url, license, source },  // v30.3 — REQUIRED for Openverse
+  photoCredit: null | { name, url, license, source },  // v30.3 — REQUIRED for open-licence photos (Wikimedia Commons; Openverse before v38.45)
                               // photos: CC-BY makes attribution a licence condition, not a
                               // courtesy. Rendered under the hero by photoCreditHtml().
   updatedAt: Number           // ms timestamp — used for offline-merge conflict resolution
