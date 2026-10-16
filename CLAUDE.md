@@ -139,6 +139,17 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - **Released: v38.42 (16 Oct 2026, 03:52 Israel time, Tony's "Please include both the invitation and the fix in the
   upcoming version and release it to family and Beta once it clears CI", CI green on f620221).** All jobs success (beta
   live 03:54; Self Tests on main 04:03).
+- **v38.43** (from Tony's log report of 16 Oct, v38.42 on his iPhone): what it showed — 03:17–04:21 four tries on
+  the old version, each closing the code box; 04:23 a sign-in with a code into a 5-recipe household (most likely the
+  spare owner account, which has its own authenticator); 04:25 v38.42's **Use another account**, then 04:26 his work
+  address by e-mail sign-in, no code (a new account: confirmation e-mail sent, terms accepted). Two faults fixed:
+  (1) closing the code box was logged as "Sign-in failed" ("[BAD] 4 errors") — now `c.cancelled` and not logged
+  again as an error (startGoogleSignIn, authFailed); (2) the log pop-up decided "Send to admin" or "Copy log" when it
+  appeared — shown before the sign-in, pressed after it as the owner, it sent his report to himself (04:24). Now
+  decided when pressed (`logOwnerCopies()` in the click), the label `#logNudgeCopy` follows a sign-in
+  (`logNudgeLabel`, from applyOwnerOnlyItems). Self-tests owner_protections and reports_reach_the_admin extended.
+- **Released: v38.43 (16 Oct 2026, 05:28 Israel time, Tony's "Yes, please move it to the Family and beta when green",
+  CI green on 032a3a3).** All jobs success (beta live 05:29; Self Tests on main 05:40).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
