@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792161559500,
- "count": 2554,
+ "updatedAt": 1792163384065,
+ "count": 2557,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -877,6 +877,7 @@
   "Photo (optional)": "Фото (необязательно)",
   "Photo hydrate/offload functions present": "Функции загрузки/выгрузки фото есть",
   "Photo libraries (Pixabay, Pexels, Unsplash, Openverse)": "Фотобанки (Pixabay, Pexels, Unsplash, Openverse)",
+  "Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)": "Фотобиблиотеки (Pixabay, Pexels, Unsplash, Wikimedia Commons)",
   "Photo search (Pixabay)": "Поиск фото (Pixabay)",
   "Photo search wires multiple sources": "Поиск фото подключает несколько источников",
   "Photo services (Pixabay, Pexels, Unsplash, Openverse)": "Сервисы фото (Pixabay, Pexels, Unsplash, Openverse)",
@@ -1686,6 +1687,7 @@
   "mm — millimetres": "mm — миллиметры",
   "never": "никогда",
   "nextId never regresses": "nextId никогда не уменьшается",
+  "no key needed · free · the photographer is credited": "ключ не нужен · бесплатно · указывается автор фото",
   "no visible differences": "видимых отличий нет",
   "none": "нет",
   "not checked yet": "ещё не проверено",
@@ -2494,6 +2496,7 @@
   "🛡 Full (incl. delete)": "🛡 Полный (включая удаление)",
   "🛡 Full access": "🛡 Полный доступ",
   "🟢 Pixabay — get API key": "🟢 Pixabay — получить API-ключ",
+  "🟣 Wikimedia Commons — asked last": "🟣 Wikimedia Commons — спрашивается последним",
   "🤍 Favourite": "🤍 Избранное",
   "🤔 Loading...": "🤔 Загрузка...",
   "🤔 Thinking...": "🤔 Думаю...",

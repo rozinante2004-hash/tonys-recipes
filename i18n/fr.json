@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1792161559500,
- "count": 2222,
+ "updatedAt": 1792163384065,
+ "count": 2225,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -712,6 +712,7 @@
   "Pexels API": "API Pexels",
   "Photo (optional)": "Photo (facultatif)",
   "Photo libraries (Pixabay, Pexels, Unsplash, Openverse)": "Banques de photos (Pixabay, Pexels, Unsplash, Openverse)",
+  "Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)": "Bibliothèques de photos (Pixabay, Pexels, Unsplash, Wikimedia Commons)",
   "Photo services (Pixabay, Pexels, Unsplash, Openverse)": "Services de photos (Pixabay, Pexels, Unsplash, Openverse)",
   "Photo sync reported local photos that the cloud does not have, or that differ from it. The cloud copy wins on every load, so a photo that only exists here can be replaced by an older one.": "La synchronisation des photos a signalé des photos locales absentes du cloud, ou différentes de celui-ci. La version du cloud est toujours prioritaire au chargement : une photo qui n'existe qu'ici peut donc être remplacée par une version plus ancienne.",
   "Photo updated!": "Photo mise à jour !",
@@ -1397,6 +1398,7 @@
   "ml — millilitres": "ml — millilitres",
   "mm — millimetres": "mm — millimètres",
   "never": "jamais",
+  "no key needed · free · the photographer is credited": "aucune clé requise · gratuit · le photographe est crédité",
   "none": "aucun",
   "not checked yet": "pas encore vérifié",
   "not in use — you are signed out": "non utilisé — vous êtes déconnecté",
@@ -2162,6 +2164,7 @@
   "🛡 Full (incl. delete)": "🛡 Complet (suppression incluse)",
   "🛡 Full access": "🛡 Accès complet",
   "🟢 Pixabay — get API key": "🟢 Pixabay — obtenir une clé API",
+  "🟣 Wikimedia Commons — asked last": "🟣 Wikimedia Commons — demandé en dernier",
   "🤔 Loading...": "🤔 Chargement...",
   "🤔 Thinking...": "🤔 Réflexion...",
   "🤖 Anthropic": "🤖 Anthropic",

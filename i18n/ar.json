@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792161559500,
- "count": 2223,
+ "updatedAt": 1792163384065,
+ "count": 2226,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -713,6 +713,7 @@
   "Pexels API": "واجهة Pexels API",
   "Photo (optional)": "صورة (اختياري)",
   "Photo libraries (Pixabay, Pexels, Unsplash, Openverse)": "مكتبات الصور (Pixabay، Pexels، Unsplash، Openverse)",
+  "Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)": "مكتبات الصور (Pixabay, Pexels, Unsplash, Wikimedia Commons)",
   "Photo services (Pixabay, Pexels, Unsplash, Openverse)": "خدمات الصور (Pixabay وPexels وUnsplash وOpenverse)",
   "Photo sync reported local photos that the cloud does not have, or that differ from it. The cloud copy wins on every load, so a photo that only exists here can be replaced by an older one.": "أبلغت مزامنة الصور عن صور محلية غير موجودة في السحابة، أو مختلفة عنها. نسخة السحابة هي التي تُعتمد في كل تحميل، لذا قد تُستبدل صورة موجودة هنا فقط بنسخة أقدم.",
   "Photo updated!": "تم تحديث الصورة!",
@@ -1398,6 +1399,7 @@
   "ml — millilitres": "مل — مليلتر",
   "mm — millimetres": "مم — مليمتر",
   "never": "أبدًا",
+  "no key needed · free · the photographer is credited": "بدون مفتاح · مجانية · مع ذكر اسم المصوّر",
   "none": "بدون",
   "not checked yet": "لم يُفحص بعد",
   "not in use — you are signed out": "غير مستخدم — تم تسجيل خروجك",
@@ -2164,6 +2166,7 @@
   "🛡 Full (incl. delete)": "🛡 كامل (بما فيه الحذف)",
   "🛡 Full access": "🛡 وصول كامل",
   "🟢 Pixabay — get API key": "🟢 Pixabay — احصل على مفتاح API",
+  "🟣 Wikimedia Commons — asked last": "🟣 Wikimedia Commons — آخر مصدر تم سؤاله",
   "🤔 Loading...": "🤔 جارٍ التحميل...",
   "🤔 Thinking...": "🤔 جارٍ التفكير...",
   "🤖 Anthropic": "🤖 Anthropic",
