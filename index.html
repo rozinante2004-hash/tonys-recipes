@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.49 -->
+<!-- Tony's Recipes Collection v38.50 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4716,10 +4716,13 @@ window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetApp
 var LINK_LATER_KEY = 'mkn_link_later_';
 var _linkCache = {};          // hid → { at, list, photos: {id: src}, error }
 // v38.49 — Tony: "If a user connects to several remote households, he should be able to select one or more of them
-// to be displayed." The households whose recipes show — this one and any linked ones, chosen like meal types (several
-// at once); none chosen: all of them. (It replaced v37.53's one-household-at-a-time view, `_linkedShow`.)
-var activeHouseholds = new Set();
-function hhShown(hid) { return !activeHouseholds.size || activeHouseholds.has(hid); }
+// to be displayed." v38.50 — "a chip for each will become messy very fast. I would rather have it as a menu item, in
+// the same place as the other filters, in which I could select (checkbox) all the kitchens I would like to display.
+// The other filters will act only on the displayed kitchens … Do not close this selection menu after the first click
+// … with each selection, the relevant recipes … will appear (or disappear if unchecked)." 🏠 Kitchens ▾: this
+// household and every linked one, each with a tick — all ticked to begin with; ✦ All ticks them all again.
+var hiddenHouseholds = new Set();       // the kitchens UNticked in 🏠 Kitchens
+function hhShown(hid) { return !hiddenHouseholds.has(hid); }
 function ownShown() { return !_household || hhShown(_household.hid); }
 var _linkedViewing = null;    // the linked recipe open in the read-only view
 var _homeSet = '';
@@ -4737,7 +4740,7 @@ async function hhLoadLinks() {
     catch(e) {}
   }
   _household.links = out; _household.asking = asking;
-  Array.from(activeHouseholds).forEach(function(h){ if (h !== _household.hid && !out.some(function(l){ return l.hid === h; })) activeHouseholds.delete(h); });
+  Array.from(hiddenHouseholds).forEach(function(h){ if (h !== _household.hid && !out.some(function(l){ return l.hid === h; })) hiddenHouseholds.delete(h); });
   return out;
 }
 // The rules let a linked household's members read only while `homes/<uid>`
@@ -4910,7 +4913,7 @@ function linkNewCount() {
   var seen = linkSeen();
   return _linkState.pending.filter(function(r){ return seen.indexOf(r.id) === -1; }).length;
 }
-function linkDotRefresh() { pathDots({ links: linkNewCount() + talkNewCount() }); }
+function linkDotRefresh() { var t = talkNewCount(); pathDots({ links: linkNewCount() + t, chats: t }); }
 async function hhLog(other, name, code, status, at, note) {
   var doc = { hid: other, name: String(name || '').slice(0, 80), code: String(code || '').slice(0, 20), status: status,
               at: at || Date.now(), decidedAt: Date.now(), by: _fbUser.uid };
@@ -5239,8 +5242,8 @@ function talkSeenShown() {
     if (talkNewIn(o) === 1 && last && last.from === o) talkMarkSeen(o, true);
   });
 }
-async function talkSend(other) {
-  var box = document.getElementById('talkIn-' + other), text = box ? box.value.trim() : '';
+async function talkSend(other, given) {
+  var box = document.getElementById('talkIn-' + other), text = String(given != null ? given : (box ? box.value : '')).trim();   // v38.50 — or from the chat window
   if (!text || !_household || !window._fbUser) return false;
   if (!await talkPrivacyOk(text)) { if (box) box.focus(); return false; }
   var pair = talkPair(_household.hid, other);
@@ -5252,11 +5255,123 @@ async function talkSend(other) {
     return false;
   }
   (_talk[pair] = _talk[pair] || []).push(m);
-  talkMarkSeen(other);
+  if (box && given == null) box.value = '';      // v38.50 — sent: not kept in the box by the redraw (v38.49 keeps what is typed)
+  talkMarkSeen(other, given != null);
   syncLog('save', 'Wrote to a household about linking', { chars: m.text.length });
   renderLinkRequestsPage();
+  if (typeof renderKitchenChats === 'function' && document.getElementById('kcBody2')) renderKitchenChats();
   return true;
 }
+// ─── CHATS WITH LINKED KITCHENS (v38.50) ─────────────────────────────────────
+// Tony: "Do we have a way to chat with a joined household? … Please remind me, where can I find the chats I already
+// had? I can't seem to find them." They were there — under ⚙️ → 🏠 My household → 📬 Link requests, one fold per
+// household — but nobody looks for a chat in a page about requests. Now a window of their own, like a messaging app:
+// ⋯ More → 💬 Chats with linked kitchens (and 💬 Chat beside a linked kitchen's name in the list and in Family
+// Access). Every conversation with its last line and what is new; one opens to the whole thread and a box to write
+// (Enter sends). The same conversations as on 📬 Link requests (linkTalk), live (v38.49), signed with the
+// household's name only — never a person's.
+var _chatWith = null;
+function talkOtherName(other) {
+  var l = hhLinks().filter(function(x){ return x.hid === other; })[0];
+  if (l) return hhLinkName(l);
+  var r = (_linkState.pending || []).concat(_linkState.declined || []).filter(function(x){ return x.d.from === other; })[0];
+  if (r) return r.d.fromName || r.d.fromCode || 'A household';
+  var a = ((_household && _household.asking) || []).filter(function(x){ return x.to === other; })[0];
+  if (a && a.label) return a.label;
+  var msgs = _household ? (_talk[talkPair(_household.hid, other)] || []) : [];
+  for (var i = msgs.length - 1; i >= 0; i--) if (msgs[i].from === other && msgs[i].name) return msgs[i].name;
+  return 'A household';
+}
+function talkOtherState(other) {
+  if (hhLinks().some(function(l){ return l.hid === other; })) return '\u{1F91D} linked with your kitchen';
+  if ((_linkState.pending || []).some(function(r){ return r.d.from === other; })) return '\u{1F4EC} asked to link with your kitchen';
+  if (((_household && _household.asking) || []).some(function(a){ return a.to === other; })) return '⏳ your request is waiting for them';
+  return '';
+}
+async function openKitchenChats(other) {
+  if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return null; }
+  _chatWith = other || null;
+  var ov = document.getElementById('kitchenChatOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'kitchenChatOverlay'; ov.className = 'modal-overlay open';
+    ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="kchTitle" style="max-width:540px;width:94%;text-align:start;max-height:88vh;overflow-y:auto;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="kchTitle" style="margin:0;">\u{1F4AC} Chats with linked kitchens</div>'
+      + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="closeKitchenChats()">✕</button></div>'
+      + '<div id="kcBody2"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Opening the conversations…</div></div></div>';
+    ov.onclick = function(e){ if (e.target === ov) closeKitchenChats(); };
+    document.body.appendChild(ov);
+  }
+  if (_linkState.loadedFor !== _household.hid) { await hhLoadLinks(); await hhLoadIncoming(); }
+  await talkLoad();
+  renderKitchenChats(true);
+  return ov;
+}
+function closeKitchenChats() { var o = document.getElementById('kitchenChatOverlay'); if (o) o.remove(); _chatWith = null; }
+function kitchenChatKey(e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); kitchenChatSend(); } }
+function renderKitchenChats(focus) {
+  var body = document.getElementById('kcBody2');
+  if (!body || !_household) return;
+  var me = _household.hid, when = function(t){ return t ? new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''; };
+  var others = talkPairsNow();
+  if (!_chatWith && others.length === 1 && focus) _chatWith = others[0];   // one conversation: straight into it
+  if (!_chatWith) {
+    var rows = others.map(function(o){
+      var msgs = _talk[talkPair(me, o)] || [], last = msgs[msgs.length - 1];
+      return { o: o, last: last, n: talkNewIn(o), at: last ? (last.at || 0) : 0 };
+    }).sort(function(a, b){ return b.at - a.at; });
+    body.innerHTML = '<div style="font-size:12.5px;color:var(--muted);margin:6px 0 10px;line-height:1.5;">The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.</div>'
+      + (rows.length ? rows.map(function(x){
+          var txt = x.last ? String(x.last.text || '') : '';
+          return '<button type="button" class="kc-row" onclick="openKitchenChats(' + jsA(x.o) + ')" style="display:block;width:100%;text-align:start;background:var(--card-bg);border:1px solid var(--border);'
+            + (x.n ? 'border-inline-start:4px solid var(--danger);' : '') + 'border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:var(--ink);">'
+            + '<span style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><b data-no-i18n dir="auto">' + escH(talkOtherName(x.o)) + '</b>'
+            + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">' + escH(when(x.at)) + (x.n ? ' <b style="color:var(--danger);">• ' + x.n + ' new</b>' : '') + '</span></span>'
+            + '<span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;">' + escH(talkOtherState(x.o)) + '</span>'
+            + (txt ? '<span data-no-i18n dir="auto" style="display:block;font-size:13px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (x.last.from === me ? '↪ ' : '') + escH(txt) + '</span>'
+                   : '<span style="display:block;font-size:12.5px;color:var(--muted);margin-top:4px;">No messages yet — say hello.</span>')
+            + '</button>';
+        }).join('')
+        : '<div style="font-size:13px;line-height:1.6;padding:6px 0 4px;">No conversations yet. Link your kitchen with another household — ⋯ More → \u{1F91D} Connect with another household — or answer one that asks you, and you can write to each other here.</div>');
+    return;
+  }
+  var other = _chatWith, msgs = _talk[talkPair(me, other)] || [];
+  var keep = document.getElementById('kcIn'), typed = keep ? keep.value : '', hadFocus = !!keep && document.activeElement === keep;
+  var list = msgs.map(function(m){
+    var mine = m.from === me;
+    return '<div style="display:flex;justify-content:' + (mine ? 'flex-end' : 'flex-start') + ';margin:5px 0;">'
+      + '<div style="max-width:84%;padding:7px 10px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;'
+      + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
+      + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div>'
+      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || talkOtherName(other)) + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
+      + '</div></div>';
+  }).join('');
+  body.innerHTML = (others.length > 1 ? '<button type="button" onclick="_chatWith=null;renderKitchenChats()" style="background:none;border:none;color:var(--terracotta);font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;font-family:inherit;">‹ All chats</button>' : '')
+    + '<div style="margin:4px 0 8px;"><b data-no-i18n dir="auto" style="font-size:15px;color:var(--heading);">' + escH(talkOtherName(other)) + '</b>'
+    + '<div style="font-size:12px;color:var(--muted);">' + escH(talkOtherState(other)) + '</div></div>'
+    + '<div id="kcMsgs" style="max-height:48vh;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px 10px;">'
+    + (list || '<div style="font-size:13px;color:var(--muted);padding:10px 0;text-align:center;">No messages yet — say hello. \u{1F44B}</div>') + '</div>'
+    + '<div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;">'
+    + '<textarea id="kcIn" rows="2" maxlength="500" dir="auto" onkeydown="kitchenChatKey(event)" aria-label="Your message" placeholder="Write a message… (Enter sends, Shift+Enter for a new line)" '
+    + 'style="flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--ink);font:inherit;font-size:13.5px;resize:vertical;"></textarea>'
+    + '<button type="button" id="kcSend" onclick="kitchenChatSend()" style="padding:10px 14px;border-radius:10px;border:none;background:var(--terracotta-fill);color:#fff;font-weight:700;cursor:pointer;min-height:42px;font-family:inherit;">Send</button></div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-top:5px;">Everyone in both households can read this.</div>';
+  var box = document.getElementById('kcIn');
+  if (box) { box.value = typed; if (focus || hadFocus) box.focus(); }
+  var ml = document.getElementById('kcMsgs'); if (ml) ml.scrollTop = ml.scrollHeight;
+  if (talkNewIn(other)) talkMarkSeen(other, true);              // on the screen: read
+}
+async function kitchenChatSend() {
+  var box = document.getElementById('kcIn'), text = box ? box.value.trim() : '';
+  if (!text || !_chatWith) return false;
+  var btn = document.getElementById('kcSend'); if (btn) btn.disabled = true;
+  var ok = false;
+  try { ok = await talkSend(_chatWith, text); } finally { if (btn) btn.disabled = false; }
+  if (ok) { box = document.getElementById('kcIn'); if (box) { box.value = ''; box.focus(); } renderKitchenChats(); }
+  return ok;
+}
+window.openKitchenChats = openKitchenChats; window.closeKitchenChats = closeKitchenChats; window.renderKitchenChats = renderKitchenChats;
+window.kitchenChatSend = kitchenChatSend; window.kitchenChatKey = kitchenChatKey; window.talkOtherName = talkOtherName;
 window.talkSend = talkSend; window.talkMarkSeen = talkMarkSeen; window.talkReply = talkReply; window.talkLastFrom = talkLastFrom; window.talkLoad = talkLoad; window.talkPersonal = talkPersonal;
 window.talkNewCount = talkNewCount; window.talkPair = talkPair; window.talkPrivacyOk = talkPrivacyOk; window.talkHtml = talkHtml;
 async function linkReqAct(i, what) {
@@ -5283,7 +5398,8 @@ var _pathDots = { links: 0, feedback: 0, replies: 0 };
 var PATH_DOTS = {
   links:    ['.set-group[data-group="household"] > .set-head', '#linkRequestsItem'],
   feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]'],
-  replies:  ['.set-group[data-group="help"] > .set-head', '#fbRepliesItem']      // v38.00 — an answer to my note
+  replies:  ['.set-group[data-group="help"] > .set-head', '#fbRepliesItem'],     // v38.00 — an answer to my note
+  chats:    ['[onclick="toggleDrop(\'moreDrop\')"]', '#kitchenChatsItem']        // v38.50 — a new message, by this way too
 };
 function pathDots(counts) {
   Object.keys(counts || {}).forEach(function(k){ _pathDots[k] = Math.max(0, +counts[k] || 0); });
@@ -5356,12 +5472,14 @@ function linkLiveTalk() {
 }
 function linkLiveTalkArrived(other, fresh) {
   var theirs = (fresh || []).filter(function(m){ return _household && m.from !== _household.hid; });
+  var chat = !!document.getElementById('kcBody2'), page = !!document.getElementById('lrBody');
+  if (chat) renderKitchenChats();                                 // v38.50 — the chat window, as it arrives
+  if (page) renderLinkRequestsPage();
   linkDotRefresh();
-  if (document.getElementById('lrBody')) { renderLinkRequestsPage(); return; }
-  if (!theirs.length) return;
+  if (chat || page || !theirs.length) return;
   var m = theirs[theirs.length - 1], text = String(m.text || '');
   toastAction('\u{1F4AC} ' + (m.name || 'A linked household') + ': “' + (text.length > 70 ? text.slice(0, 70) + '…' : text) + '”',
-    'Open', function(){ openLinkRequests(); }, 9000);
+    'Open', function(){ openKitchenChats(other); }, 9000);
 }
 async function linkLiveRequests() {
   await hhCheckLinkRequests();
@@ -5408,7 +5526,7 @@ async function hhRemoveLink(i) {
   b.delete(hhRef(l.hid).collection('links').doc(_household.hid));
   try { await b.commit(); } catch(e) { showServiceError('Could not remove the link: ' + (e && e.message)); return false; }
   delete _linkCache[l.hid];
-  activeHouseholds.delete(l.hid);
+  hiddenHouseholds.delete(l.hid);
   await hhLoadLinks();
   if (typeof renderFilters === 'function') { renderFilters(); renderGrid(); }
   householdRenderBar();
@@ -5434,6 +5552,7 @@ function hhLinksHtml() {
         return '<div class="access-row" style="margin-top:6px;"><div class="access-avatar">\u{1F91D}</div>'
           + '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(hhLinkName(l)) + '</div>'
           + '<div class="access-email" data-no-i18n dir="ltr">' + escH(l.code || '') + '</div></div>'
+          + '<button class="access-remove-btn" style="color:var(--heading);border-color:var(--border);margin-inline-end:6px;" onclick="openKitchenChats(' + jsA(l.hid) + ')">\u{1F4AC} Chat</button>'   // v38.50
           + (manage ? '<button class="access-remove-btn" onclick="hhRemoveLink(' + i + ')">Remove the link</button>' : '') + '</div>';
       }).join('')
     + asking.map(function(a, i) {
@@ -5445,10 +5564,7 @@ function hhLinksHtml() {
     + '</div>';
 }
 // ─── A linked household's recipes, in the grid (read-only) ───────────────────
-function toggleLinkedFilter(hid) {
-  if (activeHouseholds.has(hid)) activeHouseholds.delete(hid); else activeHouseholds.add(hid);   // v38.49 — several at once
-  renderFilters(); renderGrid();
-}
+function toggleLinkedFilter(hid) { return toggleKitchen(hid); }
 async function hhFetchLinked(hid) {
   var c = _linkCache[hid] = _linkCache[hid] || { at: 0, list: [], photos: {} };
   if (c.loading) return c.loading;
@@ -5550,7 +5666,8 @@ function renderLinkedInAll(q) {
     var sec = document.createElement('section');
     sec.className = 'linked-all'; sec.setAttribute('data-hid', l.hid);
     sec.innerHTML = '<div class="linked-all-head"><b>\u{1F91D} <bdi data-no-i18n>' + escH(hhLinkName(l)) + '</bdi></b>'
-      + '<span>their recipes — read-only, linked with your kitchen</span></div><div class="linked-all-cards"></div>';
+      + '<span>their recipes — read-only, linked with your kitchen</span>'
+      + '<button type="button" class="linked-chat-btn" onclick="openKitchenChats(' + jsA(l.hid) + ')">\u{1F4AC} Chat</button></div><div class="linked-all-cards"></div>';   // v38.50
     box.appendChild(sec);
     linkedCardsInto(sec.querySelector('.linked-all-cards'), list, c, l.hid, true, hhLinkName(l));
   });
@@ -6717,6 +6834,46 @@ function firstRunShareOfferHtml() {
   return '';
 }
 window.firstRunShareOfferHtml = firstRunShareOfferHtml;
+// v38.50 — Tony: "before the houses merged, Tester1 had only 5 demo recipes. Now he has 10. Each recipe has doubled."
+// The five examples are nobody's own work. An UNTOUCHED copy of one already in the collection goes (the first one
+// added stays, or the one something was done to); anything changed — a heart moved, cooked, a photo, a note, edited —
+// is kept. Said in the log with the ids, so how the copies came is visible next time.
+function exampleSig(r) {
+  return JSON.stringify([String(r.name || ''), String(r.category || ''),
+    (r.ingredients || []).map(function(i){ return [String(i && i.a || ''), String(i && i.n || '')]; }),
+    (r.steps || []).map(function(st){ return typeof stepText === 'function' ? stepText(st) : String(st); })]);
+}
+var _exampleSigs = null;
+function exampleSigs() {
+  if (!_exampleSigs) { _exampleSigs = {}; SAMPLE_RECIPES.forEach(function(x){ _exampleSigs[exampleSig(normalizeRecipe(JSON.parse(JSON.stringify(x))))] = x; }); }
+  return _exampleSigs;
+}
+function exampleUntouched(r, ex) {
+  return !r.photo && !r._ph && !(r.cookCount > 0) && !(r.cookLog && r.cookLog.length) && !String(r.notes || '').trim()
+    && !!r.fav === !!ex.fav && !(r.parts && r.parts.length);
+}
+function exampleTwinsRemove() {
+  if ((_selfTestRunning && !window._exampleTwinsUnderTest) || !recipes.length) return 0;
+  if (_household && _household.role === 'viewer') return 0;      // someone who only reads changes nothing
+  var sigs = exampleSigs(), groups = {}, gone = [];
+  recipes.forEach(function(r){ var k = exampleSig(r); if (sigs[k]) (groups[k] = groups[k] || []).push(r); });
+  Object.keys(groups).forEach(function(k){
+    var g = groups[k], ex = sigs[k];
+    if (g.length < 2) return;
+    g.sort(function(a, b){ return (exampleUntouched(a, ex) - exampleUntouched(b, ex)) || ((+a.id || 0) - (+b.id || 0)); });
+    g.slice(1).forEach(function(r){ if (exampleUntouched(r, ex)) gone.push(r); });
+  });
+  if (!gone.length) return 0;
+  var ids = {};
+  gone.forEach(function(r){ ids[r.id] = 1; queueCloudDelete(r.id); });
+  recipes = recipes.filter(function(r){ return !ids[r.id]; });
+  saveData(); renderFilters(); renderGrid();
+  syncLog('save', 'Removed ' + gone.length + ' repeated example recipe(s)', { ids: gone.map(function(r){ return r.id; }),
+    uids: gone.map(function(r){ return String(r.uid || '').slice(0, 30); }) });
+  toast('\u{1F9F9} ' + gone.length + ' repeated example recipe' + (gone.length === 1 ? '' : 's') + ' removed', 6000);
+  return gone.length;
+}
+window.exampleTwinsRemove = exampleTwinsRemove;
 function addSampleRecipes() {
   var now = Date.now();
   var added = SAMPLE_RECIPES.map(function(r, i) {
@@ -6725,6 +6882,7 @@ function addSampleRecipes() {
   });
   recipes = recipes.concat(added);
   saveData(); renderFilters(); renderGrid();
+  if (!_selfTestRunning) syncLog('save', 'Added the ' + added.length + ' example recipes', { ids: added.map(function(r){ return r.id; }) });   // v38.50
   toast('\u{1F35D} ' + added.length + ' example recipes added — delete them whenever you like', 6000);
   return added;
 }
@@ -7894,7 +8052,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.49';
+var APP_VERSION = 'v38.50';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9962,6 +10120,16 @@ li.line-sub-indent { padding-inline-start: 22px; }
 /* v38.49 — a linked household's recipes, after your own: a faint blue, never taken for yours. */
 .recipe-card.linked-card, .recipe-list-item.linked-card { background: var(--linked-bg); border: 1.5px solid var(--linked-border); }
 .linked-all { margin-top: 28px; }
+.kitchen-filter { position: relative; display: inline-flex; }
+.kitchen-menu { position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 160; min-width: 240px; max-width: 320px; max-height: 60vh; overflow-y: auto;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 26px rgba(0,0,0,0.18); padding: 8px; }
+.kitchen-menu-title { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); padding: 4px 6px 6px; }
+.kitchen-item { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--ink); }
+.kitchen-item:hover { background: var(--bg); }
+.kitchen-item input { width: 18px; height: 18px; accent-color: var(--terracotta-fill); flex: none; margin: 0; }
+.kitchen-yours { color: var(--muted); font-size: 12px; }
+.kitchen-all { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--heading); font-weight: 600; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+.linked-chat-btn { margin-inline-start: auto; align-self: center; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--linked-border); background: var(--linked-bg); color: var(--heading); font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .filter-btn.linked-btn:not(.active), .mobile-filter-toggle.linked-btn:not(.active) { background: var(--linked-bg); border-color: var(--linked-border); }
 .linked-all-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0 0 12px; padding-top: 14px; border-top: 1.5px dashed var(--linked-border); }
 .linked-all-head b { font-family: 'Playfair Display','Frank Ruhl Libre',serif; font-size: 18px; color: var(--heading); }
@@ -10883,7 +11051,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.49</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.50</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11023,6 +11191,7 @@ body.banner-shown .header {
           <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make with what I have?</button>
           <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
+          <button class="drop-item" id="kitchenChatsItem" data-layout-only="households" onclick="closeDrop('moreDrop');openKitchenChats()">💬 Chats with linked kitchens</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> Share this app</button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
@@ -11115,6 +11284,13 @@ body.banner-shown .header {
   <label class="mobile-check-item"><input type="checkbox" value="Dessert" onchange="mobileCatChange()">🍰 Dessert</label>
   <label class="mobile-check-item"><input type="checkbox" value="Soup" onchange="mobileCatChange()">🍜 Soup</label>
   <button class="mobile-panel-done" onclick="toggleMobilePanel('mobileMealPanel','mobileMealBtn')">Done</button>
+</div>
+
+<!-- Mobile "Kitchens" Panel (v38.50) — filled by renderFilters -->
+<div class="mobile-dropdown-panel" id="mobileKitchenPanel">
+  <div class="panel-title">Kitchens to show</div>
+  <div id="mobileKitchenItems"></div>
+  <button class="mobile-panel-done" onclick="toggleMobilePanel('mobileKitchenPanel','mobileKitchenBtn')">Done</button>
 </div>
 
 <!-- Mobile "Show" Panel (v38.41) -->
@@ -11612,7 +11788,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.49</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.50</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12310,7 +12486,7 @@ var _bringTokenCheckInterval = null;
 // GRID
 // ═══════════════════════════════════
 function renderFilters() {
-  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || activeHouseholds.size > 0;
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || hiddenHouseholds.size > 0;
   var allInactive  = hasSelection ? ' inactive' : '';
 
   // Frame 1: All + Favourites + Clips
@@ -12322,13 +12498,7 @@ function renderFilters() {
     + (recentIds.length ? '<button class="filter-btn' + (showRecentOnly ? ' active' : '') + '" style="background:' + (showRecentOnly ? '#4F7AFF' : '#EEF2FF') + ';border-color:' + (showRecentOnly ? '#4F7AFF' : '#C0CAFF') + ';color:' + (showRecentOnly ? 'white' : '#3451CC') + ';" onclick="toggleRecentFilter()">🕐 Recent</button>' : '')
     + '<button class="filter-btn clip-btn' + (showClipsOnly ? ' active' : '') + '" onclick="toggleClipsFilter()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Clips</button>'
     + '<button class="filter-btn collection-btn' + (showCollectionsOnly ? ' active' : '') + '" onclick="toggleCollectionsFilter()">📚 Collections</button>'
-    // v37.53 — a linked household's recipes, one chip per link (its name is data)
-    // v38.49 — Tony: "add the ability to filter according to joined households names": with theirs in the main
-    // list, 🏠 this household's own name comes first — only your recipes — and each 🤝 chip shows only theirs.
-    + householdChipHtml('filter-btn')
-    + hhLinks().map(function(l) {
-        return '<button class="filter-btn linked-btn' + (activeHouseholds.has(l.hid) ? ' active' : '') + '" onclick="toggleLinkedFilter(' + jsA(l.hid) + ')"'
-          + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('')
+    + kitchenMenuHtml()                                          // v38.50 — 🏠 Kitchens ▾ (was a chip per household)
     + (function(){ var n = recipes.filter(function(r){ return !r.photo; }).length;
         return n ? '<button class="filter-btn' + (showNoPhotoOnly ? ' active' : '') + '" onclick="toggleNoPhotoFilter()" title="Recipes without a photo">📷 No photo (<span data-no-i18n>' + n + '</span>)</button>' : ''; })()
     // 5f.5 — only offered when it can answer: no pantry, or nothing one item
@@ -12366,9 +12536,10 @@ function renderFilters() {
 
   document.getElementById('filterBar').innerHTML = frame1 + frame2 + frame3 + frame4;
   var mob = document.getElementById('mobileLinkedBtns');
-  if (mob) mob.innerHTML = householdChipHtml('mobile-filter-toggle') + hhLinks().map(function(l) {
-    return '<button class="mobile-filter-toggle linked-btn' + (activeHouseholds.has(l.hid) ? ' active' : '') + '" onclick="toggleLinkedFilter(' + jsA(l.hid) + ')"'
-      + ' title="Their recipes, read-only">\u{1F91D} <span data-no-i18n>' + escH(hhLinkName(l)) + '</span></button>'; }).join('');
+  if (mob) mob.innerHTML = (hhLinks().length && _household)          // v38.50 — the phone: a 🏠 Kitchens ▾ panel
+    ? '<button class="mobile-dropdown-btn' + (hiddenHouseholds.size ? ' has-selection' : '') + '" id="mobileKitchenBtn" onclick="toggleMobilePanel(\'mobileKitchenPanel\', \'mobileKitchenBtn\')">\u{1F3E0} Kitchens' + kitchenCountHtml() + ' \u25BE</button>' : '';
+  var mki = document.getElementById('mobileKitchenItems');
+  if (mki) mki.innerHTML = kitchenItemsHtml();
   // v38.41 — the phone's 🗂 Show: the same filters as the computer's first row, beyond All, Fav and Clips.
   var more = document.getElementById('mobileMoreItems');
   if (more) {
@@ -12386,20 +12557,56 @@ function renderFilters() {
   if (typeof updateFilterBarTop === 'function') updateFilterBarTop();
 }
 
-function householdChipHtml(cls) {
+function kitchenList() {
+  if (!_household) return [];
+  return [{ hid: _household.hid, name: _household.name || 'My kitchen', own: true }]
+    .concat(hhLinks().map(function(l){ return { hid: l.hid, name: hhLinkName(l), own: false }; })
+      .sort(function(a, b){ return String(a.name).localeCompare(String(b.name)); }));
+}
+function kitchenCountHtml() {
+  var all = kitchenList(), on = all.filter(function(k){ return hhShown(k.hid); }).length;
+  return hiddenHouseholds.size ? ' (<span data-no-i18n>' + on + '/' + all.length + '</span>)' : '';
+}
+function kitchenItemsHtml() {
+  return kitchenList().map(function(k) {
+    return '<label class="mobile-check-item kitchen-item"><input type="checkbox" data-kitchen="' + escA(k.hid) + '"' + (hhShown(k.hid) ? ' checked' : '')
+      + ' onchange="toggleKitchen(' + jsA(k.hid) + ')">' + (k.own ? '\u{1F3E0} ' : '\u{1F91D} ') + '<span data-no-i18n dir="auto">' + escH(k.name) + '</span>'
+      + (k.own ? ' <span class="kitchen-yours">(yours)</span>' : '') + '</label>';
+  }).join('') + (hiddenHouseholds.size ? '<button type="button" class="kitchen-all" onclick="kitchensShowAll()">\u2611 Show all kitchens</button>' : '');
+}
+var _kitchenMenuOpen = false;
+function kitchenMenuHtml() {
   if (!hhLinks().length || !_household) return '';
-  return '<button class="' + cls + ' own-btn' + (activeHouseholds.has(_household.hid) ? ' active' : '') + '" onclick="toggleOwnFilter()" title="Your own recipes">'
-    + '\u{1F3E0} <span data-no-i18n>' + escH(_household.name || 'My kitchen') + '</span></button>';
+  return '<span class="kitchen-filter"><button type="button" class="filter-btn kitchen-btn' + (hiddenHouseholds.size ? ' active' : '') + '" aria-haspopup="true" aria-expanded="' + _kitchenMenuOpen
+    + '" onclick="toggleKitchenMenu(event)" title="Choose the kitchens whose recipes show">\u{1F3E0} Kitchens' + kitchenCountHtml() + ' \u25BE</button>'
+    + '<div class="kitchen-menu" id="kitchenMenu"' + (_kitchenMenuOpen ? '' : ' hidden') + '><div class="kitchen-menu-title">Kitchens to show</div>' + kitchenItemsHtml() + '</div></span>';
 }
-function toggleOwnFilter() {
-  if (!_household) return;
-  var h = _household.hid;
-  if (activeHouseholds.has(h)) activeHouseholds.delete(h); else activeHouseholds.add(h);
+function toggleKitchenMenu(e) {
+  if (e) e.stopPropagation();
+  _kitchenMenuOpen = !_kitchenMenuOpen;
+  var m = document.getElementById('kitchenMenu'), b = document.querySelector('.kitchen-btn');
+  if (m) m.hidden = !_kitchenMenuOpen;
+  if (b) b.setAttribute('aria-expanded', String(_kitchenMenuOpen));
+}
+// Open while ticking (Tony: "Do not close this selection menu after the first click"); a click elsewhere closes it.
+document.addEventListener('click', function(e) {
+  if (!_kitchenMenuOpen || (e.target && e.target.closest && e.target.closest('.kitchen-filter'))) return;
+  _kitchenMenuOpen = false;
+  var m = document.getElementById('kitchenMenu'), b = document.querySelector('.kitchen-btn');
+  if (m) m.hidden = true; if (b) b.setAttribute('aria-expanded', 'false');
+});
+function toggleKitchen(hid) {
+  if (hiddenHouseholds.has(hid)) hiddenHouseholds.delete(hid); else hiddenHouseholds.add(hid);
+  var a = document.activeElement, f = a && a.getAttribute && a.getAttribute('data-kitchen'), inMobile = !!(a && a.closest && a.closest('#mobileKitchenPanel'));
   renderFilters(); renderGrid();
+  if (f) { var el = Array.prototype.filter.call(document.querySelectorAll((inMobile ? '#mobileKitchenItems' : '#kitchenMenu') + ' [data-kitchen]'), function(x){ return x.getAttribute('data-kitchen') === f; })[0]; if (el) el.focus(); }
 }
-window.toggleOwnFilter = toggleOwnFilter;
+function kitchensShowAll() { hiddenHouseholds.clear(); renderFilters(); renderGrid(); }
+function toggleOwnFilter() { if (_household) toggleKitchen(_household.hid); }
+window.toggleOwnFilter = toggleOwnFilter; window.toggleKitchen = toggleKitchen; window.toggleKitchenMenu = toggleKitchenMenu;
+window.kitchensShowAll = kitchensShowAll; window.kitchenMenuHtml = kitchenMenuHtml;
 function resetFilters() {
-  activeHouseholds.clear();                                       // v37.53, v38.49
+  hiddenHouseholds.clear();                                       // v37.53, v38.49–50
   activeCategories.clear();
   activeDiets.clear();
   showFavOnly    = false;
@@ -17491,9 +17698,9 @@ function renderGrid() {
   if (showCollectionsOnly) labelParts.push('Collections');
   if (showNoPhotoOnly) labelParts.push('No photo');
   if (showOneAwayOnly) labelParts.push('One item away');
-  if (activeHouseholds.size && _household)                       // v38.49 — the households chosen, by name
+  if (hiddenHouseholds.size && _household)                       // v38.49–50 — the kitchens ticked, by name
     labelParts.push((showOwn ? ['\u{1F3E0} ' + (_household.name || 'My kitchen')] : [])
-      .concat(hhLinks().filter(function(l){ return activeHouseholds.has(l.hid); }).map(function(l){ return '\u{1F91D} ' + hhLinkName(l); })).join(', '));
+      .concat(hhLinks().filter(function(l){ return hhShown(l.hid); }).map(function(l){ return '\u{1F91D} ' + hhLinkName(l); })).join(', ') || 'No kitchen ticked');
   if (activeCategories.size) labelParts.push(Array.from(activeCategories).join(', '));
   if (activeDiets.size) labelParts.push(Array.from(activeDiets).join(', '));
   document.getElementById('sectionLabel').textContent = labelParts.length ? labelParts.join(' · ') : 'All Recipes';
@@ -17515,7 +17722,8 @@ function renderGrid() {
     g.className = '';
     g.innerHTML = '<div class="empty-state"><div style="font-size:32px;margin-bottom:10px;">' + (waiting ? '\u23F3' : failed ? '\u26A0\uFE0F' : q ? '\u{1F50D}' : '\u{1F37D}\uFE0F') + '</div>'
       + '<div style="font-family:Playfair Display,Frank Ruhl Libre,serif;font-size:18px;font-weight:700;color:var(--heading);margin-bottom:8px;">'
-      + escH(waiting ? 'Opening their recipes\u2026' : failed ? 'Could not open them' : q ? 'No recipes found' : 'No recipes here yet') + '</div>'
+      + escH(waiting ? 'Opening their recipes\u2026' : failed ? 'Could not open them' : q ? 'No recipes found'
+        : !kitchenList().some(function(k){ return hhShown(k.hid); }) ? 'No kitchen is ticked \u2014 choose one in \u{1F3E0} Kitchens' : 'No recipes here yet') + '</div>'
       + (failed && !waiting ? '<p style="font-size:13px;color:var(--muted);line-height:1.6;max-width:320px;margin:0 auto;">' + escH(failed) + '</p>' : '') + '</div>';
     return;
   }
@@ -24895,6 +25103,7 @@ function parseCloudRecipeDocs(docs) {
   syncLog('load', 'Read ' + list.length + ' recipe(s) from the cloud',
           { docs: docs.length, unreadable: Object.keys(_cloudUnreadable).length });
   saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
+  setTimeout(function(){ try { exampleTwinsRemove(); } catch(e) {} }, 2500);   // v38.50 — once the list has settled
   return list;
 }
 window.cloudUnreadableIds = function(){ return Object.keys(_cloudUnreadable); };
@@ -28909,7 +29118,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Omnivore in the filter shows all recipes regardless of diet",
   "- Clicking 'All' resets all filters",
   "- Favourites shows only hearted recipes; Clips shows only video bookmarks",
-  "- With linked households: 🏠 (your household's name) and 🤝 (each linked one) choose whose recipes show — one or several, like meal types; none chosen shows them all",
+  "- With linked households: 🏠 Kitchens ▾ in the filter bar lists your kitchen and each linked one, each with a tick — untick a kitchen to hide its recipes, tick it to bring them back (the menu stays open while you tick). The other filters act only on the kitchens ticked. ✦ All ticks them all again. On a phone: 🏠 Kitchens ▾ beside Meal and Diet",
   "",
   "=== ADDING & EDITING RECIPES ===",
   "- Click '+ Add Recipe ▾' → choose: Fill in manually, Paste free-hand text, Import from URL, Scan (camera)",
@@ -29014,8 +29223,9 @@ var HELP_SYSTEM_PROMPT = [
   "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. A refusal is never shown to the sender.",
-  "- Once linked, each household sees the other's recipes, read-only: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). The 🏠 and 🤝 chips in the filter bar choose whose recipes show — one or several. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
+  "- Once linked, each household sees the other's recipes, read-only: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
+  "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
   "=== SAVING RECIPES FROM OTHER APPS ===",
@@ -33776,7 +33986,7 @@ function mobileClipToggle() {
 }
 
 function mobileResetFilters() {
-  activeHouseholds.clear();                                       // v37.53, v38.49
+  hiddenHouseholds.clear();                                       // v37.53, v38.49–50
   activeCategories.clear();
   activeDiets.clear();
   showFavOnly = false;
@@ -33797,7 +34007,7 @@ function updateMobileButtons() {
   var dietBtn = document.getElementById('mobileDietBtn');
   var moreBtn = document.getElementById('mobileMoreBtn');
   var moreOn = [showRecentOnly && '🕐 Recent', showCollectionsOnly && '📚 Collections', showNoPhotoOnly && '📷 No photo', showOneAwayOnly && '🛒 One away'].filter(Boolean);
-  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly || activeHouseholds.size > 0 || moreOn.length > 0;
+  var hasSelection = activeCategories.size > 0 || activeDiets.size > 0 || showFavOnly || showClipsOnly || hiddenHouseholds.size > 0 || moreOn.length > 0;
   if (moreBtn) {
     moreBtn.classList.toggle('has-selection', moreOn.length > 0);
     moreBtn.textContent = moreOn.length === 1 ? moreOn[0] + ' ▾' : moreOn.length ? '🗂 Show (' + moreOn.length + ') ▾' : '🗂 Show ▾';

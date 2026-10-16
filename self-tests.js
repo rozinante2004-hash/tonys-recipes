@@ -2653,8 +2653,7 @@ window.SELF_TESTS = [
         // let the reader pass while every real linked recipe came out "Untitled recipe".
         store['households/hA/recipes/1']={ r:JSON.stringify({ id:1, name:'Soup from A', category:'Soup', ingredients:[{ a:'2', n:'onions' }], steps:['Cook slowly'], _ph:1 }), updatedAt:1, id:1 };
         renderFilters();
-        var chip=document.querySelector('#filterBar .linked-btn');
-        if(!chip || chip.textContent.indexOf('Kitchen A')===-1) throw new Error('no 🤝 Kitchen A filter');
+        if(!document.querySelector('#filterBar .kitchen-btn') || kitchenMenuHtml().indexOf('Kitchen A')===-1) throw new Error('no 🤝 Kitchen A in 🏠 Kitchens');
         // v38.49 — Tony: "Admin's recipes are not visible in Tester1's list." Now in the main list, after this
         // household's own: under its name, tinted, read-only, opened from there; Favourites stays yours alone.
         _linkCache={}; await hhFetchLinked('hA'); renderGrid();
@@ -2670,21 +2669,37 @@ window.SELF_TESTS = [
         document.getElementById('searchInput').value='no-such-dish-xyz'; renderGrid();
         var searchHides=document.getElementById('linkedAll').style.display==='none'; document.getElementById('searchInput').value=''; renderGrid();
         if(!searchHides) throw new Error('a search does not apply to their recipes');
-        // v38.49 — Tony: households chosen like meal types, "one or more of them" — 🏠 ours, 🤝 each linked one.
+        // v38.50 — Tony: not a chip per kitchen ("messy very fast") but 🏠 Kitchens ▾: a tick per kitchen, all ticked; it
+        // stays open while ticking; each tick shows or hides that kitchen's recipes at once; the other filters act on the ticked.
         renderFilters();
-        var ownChip=document.querySelector('#filterBar .own-btn');
-        if(!ownChip || ownChip.textContent.indexOf('Kitchen B')===-1) throw new Error('no 🏠 chip for this household\'s own recipes');
-        toggleOwnFilter();
-        if(document.getElementById('linkedAll').style.display!=='none' || !document.querySelector('#filterBar .own-btn.active')) throw new Error('🏠 alone still shows theirs');
-        toggleLinkedFilter('hA');
-        if(document.getElementById('linkedAll').textContent.indexOf('Soup from A')===-1 || !activeHouseholds.has('hB') || !activeHouseholds.has('hA')) throw new Error('two households chosen do not both show');
-        toggleOwnFilter();
+        var kb=document.querySelector('#filterBar .kitchen-btn');
+        if(!kb) throw new Error('no 🏠 Kitchens menu');
+        if(document.querySelector('#filterBar .linked-btn, #filterBar .own-btn')) throw new Error('still a chip per household');
+        kb.click();
+        var menu=document.getElementById('kitchenMenu'), boxes=menu ? menu.querySelectorAll('input[data-kitchen]') : [];
+        if(!menu || menu.hidden) throw new Error('🏠 Kitchens does not open');
+        if(boxes.length!==2 || !boxes[0].checked || !boxes[1].checked || boxes[0].getAttribute('data-kitchen')!=='hB' || menu.textContent.indexOf('Kitchen A')===-1)
+          throw new Error('the kitchens in the menu: '+menu.textContent);
+        boxes[0].click();                                   // ours off: theirs only
+        menu=document.getElementById('kitchenMenu');
+        if(!menu || menu.hidden) throw new Error('the menu closed after the first tick');
         var grid=document.getElementById('recipeGrid').textContent;
-        if(recipes.some(function(x){ return grid.indexOf(x.name)>-1 && x.name.length>8; })) throw new Error('🤝 alone still shows this household\'s own');
-        if(document.getElementById('linkedAll').textContent.indexOf('Soup from A')===-1 || !/Kitchen A/.test(document.getElementById('sectionLabel').textContent))
-          throw new Error('🤝 alone: '+document.getElementById('sectionLabel').textContent);
+        if(recipes.some(function(x){ return grid.indexOf(x.name)>-1 && x.name.length>8; })) throw new Error('unticked, this household\'s own recipes still show');
+        if(document.getElementById('linkedAll').textContent.indexOf('Soup from A')===-1) throw new Error('their recipes went with ours');
+        if(!/1\/2/.test(document.querySelector('#filterBar .kitchen-btn').textContent)) throw new Error('the button does not say how many are ticked');
+        menu.querySelector('input[data-kitchen="hA"]').click();   // theirs off too: nothing, and said why
+        if(document.getElementById('linkedAll').style.display!=='none' || !/No kitchen is ticked/.test(document.getElementById('recipeGrid').textContent)) throw new Error('with no kitchen ticked: '+document.getElementById('recipeGrid').textContent.slice(0,120));
+        document.getElementById('kitchenMenu').querySelector('input[data-kitchen="hB"]').click();   // ours back
+        if(document.getElementById('linkedAll').style.display!=='none') throw new Error('theirs came back unticked');
+        // The other filters act on what is ticked: a search finds nothing of theirs while they are unticked.
+        document.getElementById('searchInput').value='Soup from A'; renderGrid();
+        var none=document.getElementById('linkedAll').style.display==='none'; document.getElementById('searchInput').value=''; renderGrid();
+        if(!none) throw new Error('a search reached an unticked kitchen');
+        document.body.click();
+        if(!document.getElementById('kitchenMenu').hidden) throw new Error('a click elsewhere does not close the menu');
+        if(!document.getElementById('mobileKitchenItems') || document.querySelectorAll('#mobileKitchenItems input[data-kitchen]').length!==2) throw new Error('the phone has no 🏠 Kitchens panel');
         resetFilters(); renderGrid();
-        if(activeHouseholds.size) throw new Error('✦ All does not clear the household filters');
+        if(hiddenHouseholds.size) throw new Error('✦ All does not tick every kitchen again');
         if(!openLinkedRecipe(0, 'hA')) throw new Error('theirs could not be opened from the main list');
         var view=document.getElementById('linkedViewOverlay').textContent;
         if(view.indexOf('onions')===-1 || view.indexOf('Cook slowly')===-1 || !/From/.test(view)) throw new Error('the read-only view: '+view.slice(0,200));
@@ -2701,11 +2716,11 @@ window.SELF_TESTS = [
         // Removing the link takes both halves.
         _household.role='owner'; answers=[true];
         await hhRemoveLink(0);
-        if(store['households/hB/links/hA'] || store['households/hA/links/hB'] || hhLinks().length || activeHouseholds.has('hA')) throw new Error('removing the link');
+        if(store['households/hB/links/hA'] || store['households/hA/links/hB'] || hhLinks().length || hiddenHouseholds.has('hA')) throw new Error('removing the link');
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.saveData=real.save;
         window.toast=real.toast; window.showServiceError=real.err; window.shareMessage=real.share;
-        activeHouseholds.clear(); _linkCache={}; _homeSet='';
+        hiddenHouseholds.clear(); _kitchenMenuOpen=false; _linkCache={}; _homeSet='';
         var o=document.getElementById('askOverlay'); if(o) o.remove();
         var v=document.getElementById('linkedViewOverlay'); if(v) v.classList.remove('open');
         ['hA_hB','hC_hB'].forEach(function(k){ localStorage.removeItem(LINK_LATER_KEY+k); });
@@ -7343,6 +7358,7 @@ window.SELF_TESTS = [
         if(!asked.length || !/a phone number/.test(asked[0].message) || !/Send anyway/.test(asked[0].okLabel)) throw new Error('no warning about the phone number');
         window.askConfirm=async function(o){ return true; };
         if(await talkSend('hN')!==true || !added.length) throw new Error('"Send anyway" did not send');
+        if(document.getElementById('talkIn-hN') && document.getElementById('talkIn-hN').value) throw new Error('the message stays in the box after it was sent');
         var m=added[0][1];
         if(added[0][0]!=='hA_hN' || m.from!=='hA' || m.name!=='My Kitchen' || m.by!=='uA' || !/050-123-4567/.test(m.text) || m.email!==undefined) throw new Error('the message: '+JSON.stringify(added[0]));
         // 5. A request with a note: the note travels with it, and opens the conversation (one batch).
@@ -7409,6 +7425,80 @@ window.SELF_TESTS = [
         try{ if(real.seen===null) localStorage.removeItem(TALK_SEEN_KEY+'hL1'); else localStorage.setItem(TALK_SEEN_KEY+'hL1', real.seen); }catch(e){}
         _talk={}; _linkCache={}; pathDots(real.dots);
         try{ renderFilters(); renderGrid(); }catch(e){}
+      }
+    } },
+
+  { id:'kitchen_chats', group:'Sharing', name:'💬 Chats with linked kitchens: a window of their own (⋯ More, and 💬 beside a linked kitchen’s name) — every conversation with its last line and what is new, the whole thread, Enter sends, read when shown (v38.50)',
+    test: async()=>{
+      var real={ hh:window._household, user:window._fbUser, send:window.talkSend, load:window.talkLoad, links:window.hhLoadLinks, inc:window.hhLoadIncoming, st:_linkState, talk:_talk, dots:Object.assign({}, _pathDots), seen:null };
+      try{ real.seen=localStorage.getItem(TALK_SEEN_KEY+'hK1'); localStorage.removeItem(TALK_SEEN_KEY+'hK1'); }catch(e){}
+      var sent=[], now=Date.now();
+      try{
+        if(!document.getElementById('kitchenChatsItem') || document.getElementById('kitchenChatsItem').getAttribute('data-layout-only')!=='households') throw new Error('no 💬 Chats in ⋯ More');
+        window._fbUser={ uid:'uK1' };
+        window._household={ hid:'hK1', role:'viewer', name:'My Kitchen', links:[{ hid:'hK2', name:'Other Kitchen', code:'', at:1 }], asking:[] };
+        _linkState={ pending:[{ id:'hK3_hK1', d:{ from:'hK3', fromName:'Asking Kitchen', to:'hK1', at:now } }], declined:[], log:{}, loadedFor:'hK1' };
+        _talk={ 'hK1_hK2':[ { from:'hK1', name:'My Kitchen', text:'Hello there', at:now-9e4 }, { from:'hK2', name:'Other Kitchen', text:'Try my lasagne!', at:now-1e4 } ],
+                'hK1_hK3':[ { from:'hK3', name:'Asking Kitchen', text:'Shall we link?', at:now-5e4 } ] };
+        window.talkLoad=async function(){ return _talk; }; window.hhLoadLinks=async function(){ return _household.links; }; window.hhLoadIncoming=async function(){ return _linkState; };
+        window.talkSend=async function(o, t){ sent.push([o, t]); _talk[talkPair('hK1', o)].push({ from:'hK1', name:'My Kitchen', text:t, at:Date.now() }); return true; };
+        linkDotRefresh();
+        if(talkNewCount()!==2 || !document.querySelector('#kitchenChatsItem > .path-dot')) throw new Error('new messages do not light 💬 Chats');
+        // The list: both, newest first, with the last line and what is new.
+        await openKitchenChats();
+        var rows=document.querySelectorAll('#kitchenChatOverlay .kc-row');
+        if(rows.length!==2 || rows[0].textContent.indexOf('Other Kitchen')===-1 || rows[0].textContent.indexOf('Try my lasagne!')===-1 || !/1 new/.test(rows[0].textContent)) throw new Error('the list: '+Array.prototype.map.call(rows, function(r){ return r.textContent; }).join(' | '));
+        if(rows[1].textContent.indexOf('asked to link')===-1) throw new Error('the state of a household that asked is not said');
+        // A thread: everything in it, read when shown, Enter sends.
+        await openKitchenChats('hK2');
+        var t=document.getElementById('kcMsgs').textContent;
+        if(t.indexOf('Hello there')===-1 || t.indexOf('Try my lasagne!')===-1) throw new Error('the thread: '+t);
+        if(talkNewIn('hK2')!==0) throw new Error('a message on the screen still counts as new');
+        var box=document.getElementById('kcIn'); box.value='On my way!';
+        box.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true }));
+        await wait(30);
+        if(sent.length!==1 || sent[0][0]!=='hK2' || sent[0][1]!=='On my way!') throw new Error('Enter did not send: '+JSON.stringify(sent));
+        if(document.getElementById('kcIn').value || document.getElementById('kcMsgs').textContent.indexOf('On my way!')===-1) throw new Error('after sending: the box keeps it, or the thread lacks it');
+        box=document.getElementById('kcIn'); box.value='line one';
+        box.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', shiftKey:true, bubbles:true, cancelable:true }));
+        if(sent.length!==1) throw new Error('Shift+Enter sent instead of a new line');
+        // …and from the list of a linked kitchen's recipes, and from Family Access.
+        if(String(renderLinkedInAll).indexOf('openKitchenChats(')===-1 || hhLinksHtml().indexOf('openKitchenChats(')===-1) throw new Error('no 💬 Chat beside a linked kitchen');
+        if(String(linkLiveTalkArrived).indexOf('openKitchenChats(other)')===-1) throw new Error('the notice of a new message does not open the chat');
+      } finally {
+        closeKitchenChats();
+        window._household=real.hh; window._fbUser=real.user; window.talkSend=real.send; window.talkLoad=real.load; window.hhLoadLinks=real.links; window.hhLoadIncoming=real.inc;
+        _linkState=real.st; _talk=real.talk; pathDots(real.dots);
+        try{ if(real.seen===null) localStorage.removeItem(TALK_SEEN_KEY+'hK1'); else localStorage.setItem(TALK_SEEN_KEY+'hK1', real.seen); }catch(e){}
+      }
+    } },
+
+  { id:'example_twins_removed', group:'Sync', name:'🧹 The five example recipes, twice: an untouched copy goes, the first stays — and nothing anyone changed is ever taken (v38.50)',
+    test: async()=>{
+      var real={ recipes:recipes, save:window.saveData, del:window.queueCloudDelete, log:window.syncLog, toast:window.toast, hh:window._household };
+      var deleted=[], logged=[];
+      function ex(i, id, extra){ var c=JSON.parse(JSON.stringify(SAMPLE_RECIPES[i])); c.id=id; c.uid='sample-x-'+id; return normalizeRecipe(Object.assign(c, extra||{})); }
+      try{
+        window.saveData=function(){}; window.queueCloudDelete=function(id){ deleted.push(id); }; window.syncLog=function(k, m, d){ logged.push(m+' '+JSON.stringify(d||'')); }; window.toast=function(){};
+        window._household={ hid:'hX', role:'owner' }; window._exampleTwinsUnderTest=true;
+        var own=normalizeRecipe({ id:TEST_ID_MIN+9301, name:'Grandma’s soup', ingredients:[{ a:'1', n:'love' }], steps:['Stir'] });
+        recipes=[ ex(0, TEST_ID_MIN+9310), ex(1, TEST_ID_MIN+9311), ex(0, TEST_ID_MIN+9320), ex(1, TEST_ID_MIN+9321, { cookCount:2 }), own,
+                  ex(2, TEST_ID_MIN+9312), ex(2, TEST_ID_MIN+9322, { notes:'mine now' }), ex(3, TEST_ID_MIN+9313) ];
+        var n=exampleTwinsRemove();
+        var left=recipes.map(function(r){ return r.id-TEST_ID_MIN; }).join(',');
+        // Carbonara twice, untouched: the later goes. Greek salad: the cooked one stays (and the untouched first goes).
+        // Tikka twice, one with a note: the note stays, the untouched one goes. Avocado once: stays. The family's own: stays.
+        if(n!==3 || deleted.sort().join()!==[TEST_ID_MIN+9311, TEST_ID_MIN+9312, TEST_ID_MIN+9320].sort().join()) throw new Error('removed: '+deleted.map(function(d){ return d-TEST_ID_MIN; })+' left: '+left);
+        if(left!=='9310,9321,9301,9322,9313') throw new Error('kept: '+left);
+        if(!logged.some(function(l){ return /Removed 3 repeated example/.test(l) && /ids/.test(l); })) throw new Error('not said in the log with the ids: '+logged.join(' | '));
+        if(exampleTwinsRemove()!==0) throw new Error('a second pass removed more');
+        // Someone who only reads removes nothing.
+        recipes=[ ex(0, TEST_ID_MIN+9330), ex(0, TEST_ID_MIN+9331) ]; window._household.role='viewer'; deleted=[];
+        if(exampleTwinsRemove()!==0 || deleted.length) throw new Error('a read-only member changed the collection');
+        if(String(addSampleRecipes).indexOf("'Added the '")===-1) throw new Error('adding the examples is not said in the log');
+      } finally {
+        recipes=real.recipes; window.saveData=real.save; window.queueCloudDelete=real.del; window.syncLog=real.log; window.toast=real.toast; window._household=real.hh;
+        window._exampleTwinsUnderTest=false; try{ renderFilters(); renderGrid(); }catch(e){}
       }
     } },
 
@@ -8114,7 +8204,10 @@ window.SELF_TESTS = [
         // v37.99 — the voice chosen in the farm window: male, female, child — or a different one each time.
         if(window.speechSynthesis){
           var heard=[]; speechSynthesis.speak=function(u){ heard.push({ p:u.pitch, r:u.rate }); if(u.onstart) u.onstart(); };
-          farmSay('Hello', 1, 'male'); farmSay('Hello', 1, 'female'); farmSay('Hello', 1, 'child');
+          // v38.50 — one at a time: on Tony's Firefox a voice was still speaking from earlier in this test, and farmSay
+          // waits for it (cancel, then 80 ms) — three asked at once left only the last ("[{p:1.5,r:1.08}]").
+          try{ speechSynthesis.cancel(); }catch(e){} await wait(150);
+          farmSay('Hello', 1, 'male'); await wait(200); farmSay('Hello', 1, 'female'); await wait(200); farmSay('Hello', 1, 'child');
           await wait(250);
           if(heard.length<3 || !(heard[0].p<heard[1].p && heard[1].p<heard[2].p) || heard[2].p>1.8 || !(heard[2].r>heard[1].r))
             throw new Error('male, female and child do not sound different (and natural): '+JSON.stringify(heard));
@@ -12565,7 +12658,13 @@ window.SELF_TESTS = [
       // 🗂 Show, Google's account chooser, the owner's ✉️ Invite testers in two
       // languages) and the page reached 2006 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 2100) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      // Raised to 2200 in v38.50, the same way: v38.43–v38.50 added ~105 KB of
+      // real features (the household welcome and Remember me, the double-click
+      // guard, linked kitchens' recipes in the list with household filters, live
+      // requests and messages, the chat window, every ✕ kept in view, the Self
+      // Test's grinder and locks, the Ginger notice, the repeated-examples
+      // clean-up) and the page reached 2104 KB.
+      if(kb > 2200) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
