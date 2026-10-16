@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792163384065,
- "count": 2767,
+ "updatedAt": 1792164764791,
+ "count": 2769,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -78,6 +78,7 @@
   "A rate-limited source hands off instead of dead-ending (v{1})": "מקור עם הגבלת קצב מעביר הלאה במקום להיתקע (v{1})",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "קריאה או כתיבה לא הסתיימו בתוך חלון הזמן המוגדר. בדרך כלל זה חיבור איטי או שנותק, אבל תפוגת זמן חוזרת על אותה פעולה מצביעה על משהו גדול יותר מהרשת.",
   "A recipe can be dropped from a collection without keeping it (v{1})": "אפשר להסיר מתכון מאוסף בלי לשמור אותו (v{1})",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "מונה מתכונים שמעניק לך מדליות ככל שהאוסף גדל — מברונזה ב-10 מתכונים ועד אגדי ב-1,000.",
   "A recipe from a linked household": "מתכון ממשק בית מקושר",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "מתכון בתוך אוסף צריך מרכיבים, שלבים, או — עבור קליפ — קישור מקור. השתמשו ב-🗑 הסרה כדי להוציא אותו.",
   "A recipe keeps its source in and out of a collection (v{1})": "מתכון שומר על המקור שלו גם בתוך אוסף וגם מחוצה לו (v{1})",
@@ -504,6 +505,7 @@
   "Fill them in": "השלימו אותם",
   "Filter bar renders": "סרגל הסינון מוצג",
   "Filter functions work": "פונקציות הסינון עובדות",
+  "Find a photo for a recipe in free photo libraries.": "מצא תמונה למתכון בספריות תמונות חינמיות.",
   "Find a photo for a recipe.": "מצאו תמונה למתכון.",
   "Find the recipes hiding in your WhatsApp group chats.": "מצאו את המתכונים שמסתתרים בקבוצות הוואטסאפ שלכם.",
   "Finish the Hebrew translation?": "לסיים את התרגום לעברית?",

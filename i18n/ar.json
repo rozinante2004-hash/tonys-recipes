@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792163384065,
- "count": 2226,
+ "updatedAt": 1792164764791,
+ "count": 2228,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -40,6 +40,7 @@
   "A file you hold, independent of the cloud": "ملف تحتفظ به بنفسك، مستقل عن السحابة",
   "A heading that groups the lines below it, e.g. Brine option #{1}": "عنوان يجمع الأسطر التي تليه، مثل خيار المحلول رقم {1}",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "لم تكتمل عملية قراءة أو كتابة خلال المهلة المحددة. عادةً ما يكون هذا بسبب اتصال بطيء أو منقطع، لكن تكرار المهلة في العملية نفسها يشير إلى مشكلة أكبر من الشبكة.",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "عدّاد وصفات يمنحك أوسمة كلما كبرت مجموعتك — من البرونزية عند 10 وصفات إلى الأسطورية عند 1,000.",
   "A recipe from a linked household": "وصفة من منزل مرتبط",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "تحتاج الوصفة داخل المجموعة إلى مكوّنات أو خطوات، أو — في حالة المقتطف — رابط المصدر. استخدم 🗑 إزالة لحذفها.",
   "A record of what sync did, kept on this device only": "سجل بما قامت به المزامنة، محفوظ على هذا الجهاز فقط",
@@ -368,6 +369,7 @@
   "Fetch photos for {1} recipe{2}?": "جلب صور لـ {1} وصفة{2}؟",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "يجلب أوصاف الفيديوهات لاستخراج الوصفات من روابط YouTube. {1} وحدة/يوم مجانًا.",
   "Fill them in": "املأها",
+  "Find a photo for a recipe in free photo libraries.": "ابحث عن صورة للوصفة في مكتبات الصور المجانية.",
   "Find a photo for a recipe.": "ابحث عن صورة للوصفة.",
   "Find the recipes hiding in your WhatsApp group chats.": "اكتشف الوصفات المختبئة في محادثات WhatsApp الجماعية.",
   "Finish the {1} translation?": "إنهاء ترجمة {1}؟",

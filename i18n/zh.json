@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792163384065,
- "count": 2253,
+ "updatedAt": 1792164764791,
+ "count": 2255,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -40,6 +40,7 @@
   "A file you hold, independent of the cloud": "一个由你保存的文件，独立于云端",
   "A heading that groups the lines below it, e.g. Brine option #{1}": "用于给下方内容分组的标题，例如“腌料方案 #{1}”",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "读取或写入操作未能在监测时限内完成。这通常是网络较慢或连接中断导致的，但如果同一操作反复超时，问题可能不只是网络。",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "食谱计数器，随收藏增长获得奖章——从 10 道菜的铜牌到 1,000 道菜的传奇。",
   "A recipe from a linked household": "来自关联家庭的菜谱",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "合集中的食谱需要有食材、步骤，或者（如果是剪藏）来源链接。使用 🗑 移除 将其删除。",
   "A record of what sync did, kept on this device only": "记录同步操作内容，仅保存在本设备上",
@@ -370,6 +371,7 @@
   "Fetch photos for {1} recipe{2}?": "要为{1}个食谱{2}获取图片吗？",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "从YouTube网址获取视频描述以提取食谱。每天免费{1}个单位。",
   "Fill them in": "填写它们",
+  "Find a photo for a recipe in free photo libraries.": "在免费图库中为食谱寻找照片。",
   "Find a photo for a recipe.": "为食谱找一张照片。",
   "Find the recipes hiding in your WhatsApp group chats.": "从你的WhatsApp群聊里挖出藏着的食谱。",
   "Finish the {1} translation?": "完成{1}翻译？",

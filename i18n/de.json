@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1792163384065,
- "count": 2223,
+ "updatedAt": 1792164764791,
+ "count": 2225,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -40,6 +40,7 @@
   "A file you hold, independent of the cloud": "Eine Datei, die du selbst besitzt, unabhängig von der Cloud",
   "A heading that groups the lines below it, e.g. Brine option #{1}": "Eine Überschrift, die die Zeilen darunter gruppiert, z. B. Salzlake-Option Nr. {1}",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "Ein Lese- oder Schreibvorgang wurde nicht innerhalb des Watchdog-Zeitfensters abgeschlossen. Das liegt meist an einer langsamen oder unterbrochenen Verbindung, aber ein wiederholtes Timeout bei derselben Operation deutet auf mehr als nur ein Netzwerkproblem hin.",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "Ein Rezeptzähler, der mit wachsender Sammlung Medaillen verleiht – von Bronze ab 10 Rezepten bis Legendär ab 1.000.",
   "A recipe from a linked household": "Ein Rezept aus einem verknüpften Haushalt",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "Ein Rezept in einer Sammlung braucht Zutaten, Schritte oder — bei einem Clip — einen Quellenlink. Nutze 🗑 Entfernen, um es herauszunehmen.",
   "A record of what sync did, kept on this device only": "Ein Protokoll dessen, was die Synchronisierung getan hat, nur auf diesem Gerät gespeichert",
@@ -368,6 +369,7 @@
   "Fetch photos for {1} recipe{2}?": "Fotos für {1} Rezept{2} abrufen?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "Ruft Videobeschreibungen zur Rezeptextraktion aus YouTube-URLs ab. {1} Einheiten/Tag kostenlos.",
   "Fill them in": "Fülle sie aus",
+  "Find a photo for a recipe in free photo libraries.": "Finde ein Foto für ein Rezept in kostenlosen Fotobibliotheken.",
   "Find a photo for a recipe.": "Finde ein Foto für ein Rezept.",
   "Find the recipes hiding in your WhatsApp group chats.": "Finde die Rezepte, die sich in deinen WhatsApp-Gruppenchats verstecken.",
   "Finish the {1} translation?": "Die {1}-Übersetzung abschließen?",

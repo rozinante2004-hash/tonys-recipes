@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792163384065,
- "count": 2567,
+ "updatedAt": 1792164764791,
+ "count": 2569,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -69,6 +69,7 @@
   "A rate-limited source hands off instead of dead-ending (v{1})": "レート制限にかかったソースは、行き詰まらずに引き継ぐ (v{1})",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "読み書きがウォッチドッグの制限時間内に終わりませんでした。たいていは接続が遅いか切れているだけですが、同じ処理で何度もタイムアウトする場合はネットワーク以上の問題を示しています。",
   "A recipe can be dropped from a collection without keeping it (v{1})": "レシピはコレクションから外しても保持されずに削除できる（v{1}）",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "レシピの数に応じてメダルを獲得できるカウンター。10品でブロンズ、1,000品で伝説級になります。",
   "A recipe from a linked household": "連携した家族からのレシピ",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "コレクション内のレシピには材料・手順、またはクリップの場合は元リンクが必要です。取り除くには🗑削除を使ってください。",
   "A recipe keeps its source in and out of a collection (v{1})": "レシピはコレクションの内外で元リンクを保持する（v{1}）",
@@ -479,6 +480,7 @@
   "Fill them in": "入力してください",
   "Filter bar renders": "フィルターバーが表示される",
   "Filter functions work": "フィルター機能が動作する",
+  "Find a photo for a recipe in free photo libraries.": "無料の写真ライブラリからレシピの写真を探す。",
   "Find a photo for a recipe.": "レシピの写真を探す。",
   "Find the recipes hiding in your WhatsApp group chats.": "WhatsAppのグループチャットに埋もれたレシピを見つけます。",
   "Finish the {1} translation?": "{1}の翻訳を完了しますか?",

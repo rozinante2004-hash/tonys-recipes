@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792163384065,
- "count": 2557,
+ "updatedAt": 1792164764791,
+ "count": 2559,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -68,6 +68,7 @@
   "A rate-limited source hands off instead of dead-ending (v{1})": "Источник с ограничением скорости передаёт эстафету, а не заводит в тупик (v{1})",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "Чтение или запись не завершились в отведённое время. Обычно это медленное или оборвавшееся соединение, но повторяющийся таймаут на одной и той же операции говорит о проблеме серьёзнее, чем просто сеть.",
   "A recipe can be dropped from a collection without keeping it (v{1})": "Рецепт можно убрать из подборки, не удаляя его (v{1})",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "Счётчик рецептов начисляет медали по мере роста вашей коллекции — от «Бронзы» за 10 рецептов до «Легенды» за 1000.",
   "A recipe from a linked household": "Рецепт с другой связанной кухни",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "Рецепту внутри подборки нужны ингредиенты, шаги или — для клипа — ссылка на источник. Используйте 🗑 Удалить, чтобы убрать его.",
   "A recipe keeps its source in and out of a collection (v{1})": "Рецепт сохраняет источник и в подборке, и вне её (v{1})",
@@ -478,6 +479,7 @@
   "Fill them in": "Заполнить",
   "Filter bar renders": "Панель фильтров отображается",
   "Filter functions work": "Фильтры работают",
+  "Find a photo for a recipe in free photo libraries.": "Найдите фото для рецепта в бесплатных фотобанках.",
   "Find a photo for a recipe.": "Найти фото для рецепта.",
   "Find the recipes hiding in your WhatsApp group chats.": "Найдите рецепты, спрятанные в переписке WhatsApp.",
   "Finish the {1} translation?": "Завершить перевод на {1}?",

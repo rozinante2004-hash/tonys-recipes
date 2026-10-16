@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1792163384065,
- "count": 2225,
+ "updatedAt": 1792164764791,
+ "count": 2227,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -40,6 +40,7 @@
   "A file you hold, independent of the cloud": "Un fichier que vous gardez, indépendant du cloud",
   "A heading that groups the lines below it, e.g. Brine option #{1}": "Un titre qui regroupe les lignes en dessous, par ex. Option de saumure n°{1}",
   "A read or write did not finish inside the watchdog window. That is usually a slow or dropped connection, but a repeated timeout on the same operation points at something bigger than the network.": "Une lecture ou une écriture n'a pas abouti dans le délai imparti. C'est souvent une connexion lente ou coupée, mais un dépassement répété sur la même opération indique un problème plus important que le réseau.",
+  "A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.": "Un compteur de recettes qui débloque des médailles à mesure que ta collection s'agrandit — du Bronze à 10 recettes au Légendaire à 1 000.",
   "A recipe from a linked household": "Une recette d'un foyer relié",
   "A recipe inside a collection needs ingredients, steps, or — for a clip — a source link. Use 🗑 Remove to take it out.": "Une recette dans une collection a besoin d'ingrédients, d'étapes, ou — pour un clip — d'un lien source. Utilisez 🗑 Retirer pour l'enlever.",
   "A record of what sync did, kept on this device only": "Un historique de ce que la synchronisation a fait, gardé uniquement sur cet appareil",
@@ -368,6 +369,7 @@
   "Fetch photos for {1} recipe{2}?": "Récupérer les photos pour {1} recette{2} ?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "Récupère les descriptions des vidéos pour extraire les recettes depuis des URL YouTube. {1} unités/jour gratuites.",
   "Fill them in": "Remplissez-les",
+  "Find a photo for a recipe in free photo libraries.": "Trouve une photo pour une recette dans des banques d'images gratuites.",
   "Find a photo for a recipe.": "Trouvez une photo pour une recette.",
   "Find the recipes hiding in your WhatsApp group chats.": "Retrouvez les recettes cachées dans vos discussions de groupe WhatsApp.",
   "Finish the {1} translation?": "Terminer la traduction {1} ?",
