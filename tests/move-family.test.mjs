@@ -136,6 +136,8 @@ ok(r.code === 1 && /belong to someone else — nothing was copied/.test(r.out), 
   console.log(c.out);
   ok(c.code === 0 && /the same: 6, changed since: 1 \(households 1\), not there: 1 \(households 1\); the first layout's shared\/: 1/.test(c.out), 'clear-check counts the same, the changed and the missing');
   ok(!!(await get(F2, 'households/H9/recipes/r0')), 'clear-check changes nothing');
+  ok(/by kind — changed since: households\/\*\/recipes\/\* 1; not there: households\/\*\/recipes\/\* 1 \(last changed in demo-family2: (no date|\d{4}-\d\d-\d\d)\)/.test(c.out) && !/H9|r3|uMOMfam/.test(c.out.split('by kind')[1] || ''),
+    'clear-check says of what kind, with no ids');
   c = run(['--from', F2, '--to', T2, '--mode', 'clear-source']);
   ok(c.code === 2 && !!(await get(F2, 'households/H9/recipes/r0')), 'clear-source needs --confirm "clear the family app"');
   c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--confirm', 'clear the family app']);

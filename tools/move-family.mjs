@@ -296,6 +296,16 @@ async function main() {
       + ' the same: ' + sameL.length + ', changed since: ' + changedL.length + ' (' + table(count(asList(changedL))) + ')'
       + ', not there: ' + missingL.length + (missingL.length ? ' (' + table(count(asList(missingL))) + ')' : '')
       + '; the first layout\'s shared/: ' + shared.length);
+    // 16 Oct 2026 — and of what KIND, with the date each was last changed where it says: four "not there" needed
+    // a name before deciding. Ids become * (the log is public); the dates say nothing about anyone.
+    const kind = p => p.split('/').map((seg, i) => i % 2 ? '*' : seg).join('/');
+    const kinds = l => { const per = {}; l.forEach(x => { const k = kind(x.from); per[k] = (per[k] || 0) + 1; });
+      return Object.keys(per).sort().map(k => k + ' ' + per[k]).join(', ') || 'nothing'; };
+    const when = x => { const f = x.fields || {}, v = f.updatedAt || f.at || f.createdAt || {};
+      const ms = +v.integerValue || +v.doubleValue || Date.parse(v.timestampValue || '') || 0;
+      return ms ? new Date(ms).toISOString().slice(0, 10) : 'no date'; };
+    say('by kind — changed since: ' + kinds(changedL) + '; not there: ' + kinds(missingL)
+      + (missingL.length ? ' (last changed in ' + FROM + ': ' + missingL.map(when).sort().join(', ') + ')' : ''));
     if (MODE === 'clear-check') { say('check only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
     const gone = sameL.concat(changedL).concat(CLEAR_ALL ? missingL : []);
     const isHH = rel => /^households\/[^/]+$/.test(rel);
