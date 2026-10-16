@@ -227,6 +227,12 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   hint hides while a question is open (#askOverlay). Self-tests `newcomer_sees_the_app_name`, `remember_me_both_ways`,
   `wpo_first_visit` and `unconfirmed_is_told_and_offered` updated. Chrome Web Store: extension 1.7.3 published
   (16 Oct, Unlisted — the app links to it; Public when the testers go live).
+- **Released: v38.47 (16 Oct 2026, 19:43 Israel time — the first release under Tony's standing permission, CI green on
+  ef71b70).** All jobs success (beta live 19:45; Self Tests on main 19:55). Same evening, Tony: added
+  https://my-kitchen-notes-beta.firebaseapp.com/* to the key's website list ("Done"); switched 📊 Households back to
+  "anyone may start one" ("Done"); sent the FIRST invitation with ✉️ Invite testers — Gmail, From "My Kitchen Notes
+  <contact@…>" (the Gmail API is on in my-kitchen-notes-beta, send-as works). One browser profile = one signed-in
+  person per site: the tester uses its own Chrome profile.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
