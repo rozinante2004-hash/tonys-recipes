@@ -309,6 +309,12 @@ jobs:
       - name: Double-clicks stay where they began (real mouse)
         run: node tests/double-click.js --port 8137
 
+      # v38.49 — Tony: in many windows the ✕ "disappears when scrolling down". Every
+      # window is opened, made to scroll, scrolled to the end, and its ✕ must still
+      # be there to tap — at a computer's size and a phone's.
+      - name: Every window's close button stays in view
+        run: node tests/close-in-view.js --port 8137
+
       # v36.65 (audit block 6) — axe-core over the page, the recipe view and
       # every dialog opened in turn. A dialog's controls only exist to a
       # scanner while it is open; both findings the audit made were in places

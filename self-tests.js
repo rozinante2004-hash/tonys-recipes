@@ -2457,6 +2457,49 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'selftest_window_while_running', group:'UI', name:'🧪 While the Self Test runs: Cancel and ✕ wait for the end, the window says how long and to keep it open, and a meat grinder turns out a sausage as it goes (v38.49)',
+    test: async()=>{
+      var ov=document.getElementById('selfTestOverlay'), toastWas=window.toast, said=[];
+      var note=(document.getElementById('selfTestNote')||{}).textContent||'';
+      if(!/3 minutes/.test(note) || !/keep this window open/i.test(note) || !/farm-animal hallucinations/.test(note)) throw new Error('the note at the top: '+note);
+      var g0=selfTestGrinderHtml(0, 10, false), g5=selfTestGrinderHtml(5, 10, false), g10=selfTestGrinderHtml(10, 10, true);
+      var len=function(h){ return (h.match(/fill="#B5502F"/g)||[]).length; };
+      if(g5.indexOf('st-crank')===-1 || !(len(g10)>len(g5) && len(g5)>len(g0))) throw new Error('the sausage does not grow with the run: '+[len(g0),len(g5),len(g10)]);
+      if(g10.indexOf('st-grinder still')===-1 || g5.indexOf('st-grinder still')!==-1) throw new Error('the crank turns while paused, or stands still while running');
+      var runBtn=document.getElementById('selfTestRunBtn'), real=_selfTestRunning && runBtn && runBtn.disabled;   // a run from the window
+      var runWas=_selfTestRunning, wasOpen=ov.classList.contains('open');
+      try{
+        if(!real) selfTestLockClose(true);
+        _selfTestRunning=true;
+        ['selfTestCancelBtn','selfTestCloseX'].forEach(function(id){ var b=document.getElementById(id); if(!b || !b.disabled) throw new Error(id+' can stop the run half-way'); });
+        window.toast=function(m){ said.push(m); };
+        ov.classList.add('open'); closeM('selfTestOverlay');
+        if(!ov.classList.contains('open') || !/still running/.test(said.join(' '))) throw new Error('the window closed during a run, or said nothing');
+      } finally {
+        window.toast=toastWas; _selfTestRunning=runWas;
+        if(!real){ selfTestLockClose(false); if(!wasOpen) ov.classList.remove('open'); }
+      }
+      if(!real && document.getElementById('selfTestCancelBtn').disabled) throw new Error('Cancel stays locked after the run');
+      if(real && !document.querySelector('#selfTestProgress .st-grinder')) throw new Error('the grinder is not beside the counter');
+    } },
+
+  { id:'ginger_told_once', group:'UI', name:'🧩 The Ginger extension drawing white blocks over the recipe editor: noticed, and the person told once how to switch it off for this site; Help knows it (v38.49)',
+    test: async()=>{
+      var kept=null; try{ kept=localStorage.getItem(GINGER_TOLD_KEY); localStorage.removeItem(GINGER_TOLD_KEY); }catch(e){}
+      var askWas=window.askConfirm, logWas=window.syncLog, asked=[], fake=document.createElement('div');
+      try{
+        window.askConfirm=async function(o){ asked.push(o); return true; }; window.syncLog=function(){}; window._gingerUnderTest=true;
+        if(gingerCheck() || asked.length) throw new Error('told about Ginger without it there');
+        fake.className='ginger-module-highlighter ginger-module-highlighter-ghost'; document.body.appendChild(fake);
+        if(!gingerCheck() || asked.length!==1 || !/Ginger/.test(asked[0].title) || !/switch it off for this site/.test(asked[0].message)) throw new Error('Ginger there, nothing said: '+JSON.stringify(asked));
+        if(gingerCheck() || asked.length!==1) throw new Error('told twice');
+        if(!/WHITE BLOCKS[^"]*GINGER/.test(HELP_SYSTEM_PROMPT) || !/any computer/.test(HELP_SYSTEM_PROMPT)) throw new Error('Help does not explain the white blocks');
+      } finally {
+        fake.remove(); window.askConfirm=askWas; window.syncLog=logWas; window._gingerUnderTest=false;
+        try{ if(kept===null) localStorage.removeItem(GINGER_TOLD_KEY); else localStorage.setItem(GINGER_TOLD_KEY, kept); }catch(e){}
+      }
+    } },
+
   { id:'shortcut_not_offered_twice', group:'UI', name:'📱 The iPhone shortcut is not offered again: the account remembers, and a recipe arriving through it proves it is there (v37.69)',
     test: async()=>{
       var IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)';
@@ -2606,15 +2649,43 @@ window.SELF_TESTS = [
         asked=[]; await hhCheckLinkRequests(true);
         if(asked.length) throw new Error('a rejected request asked again');
         // Kitchen A's recipes: a chip, the grid, the read-only view, a copy.
-        store['households/hA/recipes/1']={ id:1, name:'Soup from A', category:'Soup', ingredients:[{ a:'2', n:'onions' }], steps:['Cook slowly'] };
+        // v38.49 — the shape a recipe really has in the cloud (saveRecipeDoc): its JSON under r. A plain object here
+        // let the reader pass while every real linked recipe came out "Untitled recipe".
+        store['households/hA/recipes/1']={ r:JSON.stringify({ id:1, name:'Soup from A', category:'Soup', ingredients:[{ a:'2', n:'onions' }], steps:['Cook slowly'], _ph:1 }), updatedAt:1, id:1 };
         renderFilters();
         var chip=document.querySelector('#filterBar .linked-btn');
         if(!chip || chip.textContent.indexOf('Kitchen A')===-1) throw new Error('no 🤝 Kitchen A filter');
-        toggleLinkedFilter('hA'); await hhFetchLinked('hA'); renderGrid();
+        // v38.49 — Tony: "Admin's recipes are not visible in Tester1's list." Now in the main list, after this
+        // household's own: under its name, tinted, read-only, opened from there; Favourites stays yours alone.
+        _linkCache={}; await hhFetchLinked('hA'); renderGrid();
+        var all=document.getElementById('linkedAll');
+        if(!all || all.style.display==='none' || all.textContent.indexOf('Soup from A')===-1 || !all.querySelector('.linked-card') || !/Kitchen A/.test(all.textContent))
+          throw new Error('their recipes are not in the main list: '+(all && all.textContent.slice(0,160)));
+        if(document.getElementById('recipeGrid').textContent.indexOf('Soup from A')!==-1) throw new Error('their recipe is drawn among this household\'s own');
+        if(!/A recipe from Kitchen A/.test(all.querySelector('.linked-card').title||'')) throw new Error('no tool tip naming their household: '+all.querySelector('.linked-card').title);
+        var ownCard=document.querySelector('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item');
+        if(ownCard && getComputedStyle(ownCard).backgroundColor===getComputedStyle(all.querySelector('.linked-card')).backgroundColor) throw new Error('their cards look just like yours');
+        showFavOnly=true; renderGrid(); var favHides=document.getElementById('linkedAll').style.display==='none'; showFavOnly=false; renderGrid();
+        if(!favHides) throw new Error('Favourites shows another household\'s recipes');
+        document.getElementById('searchInput').value='no-such-dish-xyz'; renderGrid();
+        var searchHides=document.getElementById('linkedAll').style.display==='none'; document.getElementById('searchInput').value=''; renderGrid();
+        if(!searchHides) throw new Error('a search does not apply to their recipes');
+        // v38.49 — Tony: households chosen like meal types, "one or more of them" — 🏠 ours, 🤝 each linked one.
+        renderFilters();
+        var ownChip=document.querySelector('#filterBar .own-btn');
+        if(!ownChip || ownChip.textContent.indexOf('Kitchen B')===-1) throw new Error('no 🏠 chip for this household\'s own recipes');
+        toggleOwnFilter();
+        if(document.getElementById('linkedAll').style.display!=='none' || !document.querySelector('#filterBar .own-btn.active')) throw new Error('🏠 alone still shows theirs');
+        toggleLinkedFilter('hA');
+        if(document.getElementById('linkedAll').textContent.indexOf('Soup from A')===-1 || !activeHouseholds.has('hB') || !activeHouseholds.has('hA')) throw new Error('two households chosen do not both show');
+        toggleOwnFilter();
         var grid=document.getElementById('recipeGrid').textContent;
-        if(grid.indexOf('Soup from A')===-1 || !/read-only/.test(document.getElementById('sectionLabel').textContent)) throw new Error('the grid does not show their recipes: '+grid.slice(0,200));
-        if(recipes.some(function(x){ return grid.indexOf(x.name)>-1 && x.name.length>8; })) throw new Error('the grid mixes in this household\'s own recipes');
-        if(!openLinkedRecipe(0)) throw new Error('could not open it');
+        if(recipes.some(function(x){ return grid.indexOf(x.name)>-1 && x.name.length>8; })) throw new Error('🤝 alone still shows this household\'s own');
+        if(document.getElementById('linkedAll').textContent.indexOf('Soup from A')===-1 || !/Kitchen A/.test(document.getElementById('sectionLabel').textContent))
+          throw new Error('🤝 alone: '+document.getElementById('sectionLabel').textContent);
+        resetFilters(); renderGrid();
+        if(activeHouseholds.size) throw new Error('✦ All does not clear the household filters');
+        if(!openLinkedRecipe(0, 'hA')) throw new Error('theirs could not be opened from the main list');
         var view=document.getElementById('linkedViewOverlay').textContent;
         if(view.indexOf('onions')===-1 || view.indexOf('Cook slowly')===-1 || !/From/.test(view)) throw new Error('the read-only view: '+view.slice(0,200));
         if(document.querySelector('#linkedViewOverlay [onclick*="edit"], #linkedViewOverlay [onclick*="delete"], #linkedViewOverlay [onclick*="toggleFav"]')) throw new Error('the read-only view offers changes');
@@ -2623,18 +2694,18 @@ window.SELF_TESTS = [
         var copy=recipes.filter(function(x){ return x.id===copyId; })[0];
         if(!copy || recipes.length!==before+1 || copy.name!=='Soup from A' || copy.uid==='legacy-1') throw new Error('the copy');
         recipes.splice(recipes.indexOf(copy),1); nextId=savedId;
-        _household.role='viewer'; openLinkedRecipe(0);
+        _household.role='viewer'; openLinkedRecipe(0, 'hA');
         if(saveLinkedCopy()!==false) throw new Error('someone who only reads saved a copy');
         closeM('linkedViewOverlay');
         if(hhLinksHtml().indexOf('Kitchen A')===-1) throw new Error('Family Access does not list the link');
         // Removing the link takes both halves.
         _household.role='owner'; answers=[true];
         await hhRemoveLink(0);
-        if(store['households/hB/links/hA'] || store['households/hA/links/hB'] || hhLinks().length || _linkedShow) throw new Error('removing the link');
+        if(store['households/hB/links/hA'] || store['households/hA/links/hB'] || hhLinks().length || activeHouseholds.has('hA')) throw new Error('removing the link');
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.saveData=real.save;
         window.toast=real.toast; window.showServiceError=real.err; window.shareMessage=real.share;
-        _linkedShow=null; _linkCache={}; _homeSet='';
+        activeHouseholds.clear(); _linkCache={}; _homeSet='';
         var o=document.getElementById('askOverlay'); if(o) o.remove();
         var v=document.getElementById('linkedViewOverlay'); if(v) v.classList.remove('open');
         ['hA_hB','hC_hB'].forEach(function(k){ localStorage.removeItem(LINK_LATER_KEY+k); });
@@ -7249,7 +7320,18 @@ window.SELF_TESTS = [
         // 3. The page: threads, signed with the households' names; the blocked one's message never shown.
         await openLinkRequests();
         var t=document.getElementById('linkReqOverlay').textContent;
-        ['Hi! We met at the market.','New Kitchen','1 new','Hello, it is us from the bakery','Conversation'].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
+        ['Hi! We met at the market.','New Kitchen','NEW','Hello, it is us from the bakery','Conversation'].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
+        // v38.49 — Tony: the last message shows, highlighted, outside the fold; the rest fold away; shown = seen.
+        var hl=document.querySelector('#linkReqOverlay .talk-last');
+        if(!hl || hl.textContent.indexOf('Hi! We met at the market.')===-1 || hl.closest('details')) throw new Error('the last message is not shown, highlighted, outside the fold');
+        if(talkNewCount()!==0) throw new Error('the message shown on the page still counts as new');
+        if(!talkReply('hN') || !document.getElementById('talkIn-hN').closest('details').open) throw new Error('↩ Reply does not open the box');
+        // …and what they wrote is in the request's own pop-up (Tony: "The note did not display … It should!").
+        var popped=null; window.askConfirm=async function(o){ popped=o; return null; };
+        try{ localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
+        await hhAnswerLinkRequest(store.reqs[0]);
+        if(!popped || popped.quote!=='Hi! We met at the market.' || !/note/i.test(popped.quoteLabel||'')) throw new Error('the request pop-up does not show their note: '+JSON.stringify(popped && popped.quote));
+        window.askConfirm=async function(o){ asked.push(o); return false; };
         if(t.indexOf('ANSWER ME')!==-1) throw new Error('a blocked household’s message is shown');
         if(/a@example\.com|uA/.test(t)) throw new Error('a person’s details are shown');
         talkMarkSeen('hN');
@@ -7274,6 +7356,59 @@ window.SELF_TESTS = [
         try{ localStorage.removeItem(TALK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_SEEN_KEY+'hA'); localStorage.removeItem(LINK_LATER_KEY+'hN_hA'); }catch(e){}
         var o=document.getElementById('linkReqOverlay'); if(o) o.remove();
         _linkState={ pending:[], declined:[], log:{}, loadedFor:'' }; _talk={}; _talkOpen={}; pathDots({ links:0 });
+      }
+    } },
+
+  { id:'link_live', group:'Sharing', name:'⚡ Live, without a reload: a new message lights the red dot and says who wrote; a new request asks at once; a link accepted on the other side is said and brings their recipes (v38.49)',
+    test: async()=>{
+      var subs={}, toasts=[], checked=0;
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, toastA:window.toastAction, toast:window.toast, check:window.hhCheckLinkRequests,
+                 load:window.hhLoadLinks, home:window.hhSetHome, dots:Object.assign({}, _pathDots), seen:null };
+      try{ real.seen=localStorage.getItem(TALK_SEEN_KEY+'hL1'); }catch(e){}
+      function snap(a){ return { forEach:function(f){ a.forEach(function(m,i){ f({ id:'m'+i, data:function(){ return m; } }); }); } }; }
+      function listen(key){ return function(f){ subs[key]=f; return function(){ delete subs[key]; }; }; }
+      var fake={ collection:function(c){
+        if(c==='linkRequests') return { where:function(){ return { onSnapshot:listen('req') }; } };
+        if(c==='linkTalk') return { doc:function(pair){ return { collection:function(){ return { orderBy:function(){ return { limit:function(){ return { onSnapshot:listen('talk:'+pair) }; } }; } }; } }; } };
+        if(c==='households') return { doc:function(){ return { collection:function(sub){ return { onSnapshot:listen(sub), get:async function(){ return snap([]); } }; } }; } };
+        return { get:async function(){ return snap([]); } }; } };
+      try{
+        linkLiveStop();
+        window._fbDb=fake; window._fbUser={ uid:'uL' };
+        window._household={ hid:'hL1', role:'owner', name:'Live Kitchen', links:[{ hid:'hL2', name:'Other Kitchen', code:'', at:1 }], asking:[] };
+        window.toastAction=function(m){ toasts.push(m); }; window.toast=function(m){ toasts.push(m); };
+        window.hhCheckLinkRequests=async function(){ checked++; return 0; };
+        window.hhSetHome=async function(){};
+        if(!linkLiveStart(true) || !subs.req || !subs.links || !subs['talk:hL1_hL2']) throw new Error('not listening: '+Object.keys(subs).join());
+        var pair='hL1_hL2', older={ from:'hL2', name:'Other Kitchen', text:'Hello', at:Date.now()-6e4 }, map={};
+        map[pair]=older.at; localStorage.setItem(TALK_SEEN_KEY+'hL1', JSON.stringify(map));
+        subs['talk:'+pair](snap([older]));
+        if(toasts.length) throw new Error('what was already there was announced');
+        subs['talk:'+pair](snap([older, { from:'hL2', name:'Other Kitchen', text:'Shall we cook together?', at:Date.now() }]));
+        if(talkNewCount()!==1 || !_pathDots.links) throw new Error('a new message does not light the dot: '+talkNewCount());
+        if(!toasts.some(function(t){ return /Other Kitchen.*Shall we cook together/.test(t); })) throw new Error('a new message is not said: '+JSON.stringify(toasts));
+        subs.req(snap([])); subs.req(snap([{}])); await wait(20);
+        if(checked!==1) throw new Error('a new request is not asked at once: '+checked);
+        // Their side accepted: said, and their recipes come with it.
+        window.hhLoadLinks=async function(){ _household.links=_household.links.concat([{ hid:'hL3', name:'Third Kitchen', code:'', at:2 }]); return _household.links; };
+        toasts=[]; subs.links(snap([])); subs.links(snap([{}])); await wait(30);
+        if(!toasts.some(function(t){ return /Third Kitchen accepted/.test(t); })) throw new Error('an accepted link is not said: '+JSON.stringify(toasts));
+        if(!subs['talk:hL1_hL3']) throw new Error('the new link’s conversation is not listened to');
+        // One's own accept is not news on one's own screen.
+        _live.mine.hL4=Date.now(); window.hhLoadLinks=async function(){ _household.links=_household.links.concat([{ hid:'hL4', name:'Fourth Kitchen', code:'', at:3 }]); return _household.links; };
+        toasts=[]; subs.links(snap([{},{}])); await wait(30);
+        if(toasts.some(function(t){ return /Fourth Kitchen accepted/.test(t); })) throw new Error('accepting it here was announced as their news');
+        linkLiveStop();
+        if(Object.keys(subs).length) throw new Error('listeners left behind: '+Object.keys(subs).join());
+        if(String(signOutNow).indexOf('linkLiveStop')===-1 || String(legalLeave).indexOf('linkLiveStop')===-1) throw new Error('signing out does not stop listening');
+        if(typeof livePoll!=='function' || livePoll.length!==1) throw new Error('answers and notes are not asked again while the app is open');
+      } finally {
+        linkLiveStop();
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.toastAction=real.toastA; window.toast=real.toast;
+        window.hhCheckLinkRequests=real.check; window.hhLoadLinks=real.load; window.hhSetHome=real.home;
+        try{ if(real.seen===null) localStorage.removeItem(TALK_SEEN_KEY+'hL1'); else localStorage.setItem(TALK_SEEN_KEY+'hL1', real.seen); }catch(e){}
+        _talk={}; _linkCache={}; pathDots(real.dots);
+        try{ renderFilters(); renderGrid(); }catch(e){}
       }
     } },
 
@@ -8485,6 +8620,9 @@ window.SELF_TESTS = [
         if(_firestoreUnsubscribe!==fresh || closed!==1) throw new Error('the new sign-in’s listener was replaced');
         if(String(_selfTestPark).indexOf('_firestoreUnsubscribe = null')===-1 || String(_selfTestUnpark).indexOf('_selfTestSignInBack(p.signInWas)')===-1)
           throw new Error('a run does not put the sign-in aside and back');
+        // v38.49 — nor the WhatsApp scan, its finds and the menu's count of chats (Tony's tester: "(1)" with no groups).
+        if(String(_selfTestPark).indexOf('waWas')===-1 || String(_selfTestUnpark).indexOf('updateWaMenuLabel')===-1)
+          throw new Error('a run leaves the WhatsApp scan or the menu\u2019s chat count as the tests left them');
       } finally {
         window._fbAuth=real.auth; window._fbUser=real.user; window._driveMode=real.drive; _firestoreUnsubscribe=real.unsub;
         if(ls) ls.style.display=lsWas;
@@ -10090,7 +10228,8 @@ window.SELF_TESTS = [
       window.waLoadAllMessages=function(){ return Promise.resolve({messages:bulk,problems:[],chats:[{id:'c1',group:'G',count:bulk.length}]}); };
       window.waHarvestSave=function(){ return Promise.resolve(true); };
       window._idbAvailable=false;
-      var painted=false, savedH=_waHarvest, savedS=_waScan;
+      // v38.49 — copies: the scan changes these objects in place, so keeping the objects kept the changes ("Stopped after 500 of 4,000").
+      var painted=false, savedH=Object.assign({}, _waHarvest), savedS=Object.assign({}, _waScan);
       try{
         setTimeout(function(){ painted=true; },0);
         await waRunHarvest(true);
@@ -10109,7 +10248,8 @@ window.SELF_TESTS = [
         if(_waScan.done>=bulk.length) throw new Error('stop was ignored — the scan ran to the end anyway');
       } finally {
         window.waLoadAllMessages=realLoad; window.waHarvestSave=realSave; window._idbAvailable=realIdb;
-        _waHarvest=savedH; _waScan=savedS;
+        [[_waHarvest, savedH], [_waScan, savedS]].forEach(function(x){ Object.keys(x[0]).forEach(function(k){ delete x[0][k]; }); Object.assign(x[0], x[1]); });
+        if(_waScan.status==='stopped' && _waScan.total===bulk.length) throw new Error('the test left its 4,000 made-up messages behind');
         var b=document.getElementById('waLinksBody'); if(b) b.innerHTML='';
       }
     } },
