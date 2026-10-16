@@ -126,7 +126,7 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   (English and Hebrew). **Done 16 Oct:** Gmail sends as contact@ (SPF PASS, inbox); Thunderbird identity steps given;
   **GitHub two-step moved to Ente** (it was a passkey in the iPhone's Passwords; Google Password Manager asked for a
   PIN he never set — skipped the PC passkey; recovery codes on paper), test sign-in fine. **Cloudflare two-step on Ente**
-  (17 Oct; his Cloudflare login was Google-only, so he set a password through Forgot password in an Incognito window
+  (16 Oct; his Cloudflare login was Google-only, so he set a password through Forgot password in an Incognito window
   — Cloudflare asks for it to enable two-step). Left (his): Google backup codes for both accounts; Apple recovery
   contact if his Apple account is personal; sending the tester invitation. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
   codes, Cloudflare two-step, Apple recovery contact).
