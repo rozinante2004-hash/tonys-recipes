@@ -182,6 +182,20 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   owner); RECONSTRUCTION_PROMPT.md §1b to v38.45 (the move marked done, step 9's tools, new §1b.12, the services
   table and photo-search spec). Self-test `tester_survey` restates `_workerHealth` before each question — a health
   check started before it could land mid-test and record "no server" (it failed when suites ran side by side).
+- **Released: v38.46 (16 Oct 2026, 18:31 Israel time, Tony's "Yes, please move it to the Family and beta when
+  green", CI green on 5e06e91).** All jobs success (beta live 18:33; Self Tests on main 18:43). Tony also asked for a
+  download card of RECONSTRUCTION_PROMPT.md as a backup — sent (v38.46, 16 Oct).
+- **Move step 9 preview (16 Oct 2026, 18:3x, `clear-check`, read-only, run 38924480037):** recipes-f379d holds 143
+  documents of the moved household and its people — 129 the same in my-kitchen-notes-beta, 10 changed since (households
+  8, users 2: the family's edits in the community app), 4 not there (households 4 — kind unknown: the report gives
+  counts only; make clear-check name the KIND of each, e.g. its collection, before the 20th); shared/ (the first
+  layout): 135. Accounts: 3 there, all already in the community project. Steps 1–8 done; the daily backups include the
+  family (16 Oct: 173 documents, households 148). Tony's part before Tuesday: the family checks nothing is missing.
+- **Tester accounts (16 Oct):** Google refused Tony a new account ("phone number used too many times"). Advised: Proton
+  Mail Free (CAPTCHA or e-mail check, no phone) or Tuta Free, then the app's ✉️ Use my e-mail address → Create an
+  account. Cloudflare Email Routing only forwards (it was his first choice — "I need it to be an independent e-mail
+  address"); a mailbox on mykitchennotes.community would need a paid host and an MX change that breaks contact@ and the
+  alerts.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
