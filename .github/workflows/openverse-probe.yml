@@ -1,0 +1,50 @@
+# 16 Oct 2026 — one-off measurement (Tony: "Getting pics back from Openverse takes ages"). Times the
+# Openverse search the Worker makes, the thumbnails the app loads from it, and the same pictures taken
+# straight from Flickr / Wikimedia in a small size. Results as notices on the run. Removed after use.
+name: Openverse probe
+on:
+  push:
+    branches: [test]
+    paths: ['.github/workflows/openverse-probe.yml']
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Measure
+        run: |
+          cat > probe.mjs <<'JS'
+          const t0 = () => performance.now();
+          async function timed(url, opts) {
+            const s = t0();
+            try {
+              const r = await fetch(url, Object.assign({ signal: AbortSignal.timeout(30000) }, opts || {}));
+              const b = await r.arrayBuffer();
+              return { ms: Math.round(t0() - s), status: r.status, kb: Math.round(b.byteLength / 1024), body: b };
+            } catch (e) { return { ms: Math.round(t0() - s), status: 'ERR ' + (e.name || e.message), kb: 0 }; }
+          }
+          function small(u, w) {
+            let m = /^(https:\/\/live\.staticflickr\.com\/\d+\/\d+_[0-9a-f]+)(?:_[a-z])?\.(jpg|jpeg|png)$/i.exec(u || '');
+            if (m && !/_o\./.test(u)) return m[1] + '_n.jpg';
+            m = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/([0-9a-f])\/([0-9a-f]{2})\/([^/]+\.(?:jpe?g|png|webp))$/i.exec(u || '');
+            if (m && (!w || w > 330)) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/' + m[1] + '/' + m[2] + '/' + m[3] + '/330px-' + m[3];
+            return '';
+          }
+          const H = { 'User-Agent': 'TonysRecipes/1.0 (personal recipe app)' };
+          for (const q of ['chocolate cake', 'shakshuka', 'lentil soup']) {
+            const s = await timed('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=9&page=1&license_type=all-cc&mature=false', { headers: H });
+            let d = {}; try { d = JSON.parse(Buffer.from(s.body).toString()); } catch (e) {}
+            const res = d.results || [];
+            console.log(`::notice title=search ${q}::${s.status} in ${s.ms} ms, ${res.length} results`);
+            const prov = {}; res.forEach(r => prov[r.provider] = (prov[r.provider] || 0) + 1);
+            console.log(`::notice title=providers ${q}::${JSON.stringify(prov)}`);
+            const all = await Promise.all(res.map(async r => {
+              const [th, full] = await Promise.all([timed(r.thumbnail), timed(r.url)]);
+              const sm = small(r.url, r.width); const sml = sm ? await timed(sm) : null;
+              return `${r.provider}: thumb ${th.status} ${th.ms}ms ${th.kb}KB | original ${full.status} ${full.ms}ms ${full.kb}KB` + (sml ? ` | small ${sml.status} ${sml.ms}ms ${sml.kb}KB` : ' | small n/a');
+            }));
+            all.forEach((line, i) => console.log(`::notice title=${q} #${i + 1}::${line}`));
+          }
+          JS
+          node probe.mjs
