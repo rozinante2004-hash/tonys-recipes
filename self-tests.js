@@ -4265,7 +4265,24 @@ window.SELF_TESTS = [
           var got=await householdWelcome({ uid:'u', email:'stranger@x.test', emailVerified:true });
           if(!offered || offered.indexOf('own')!==-1 || offered.indexOf('join')===-1) throw new Error('closed to newcomers, yet offered: '+offered);
           if(got!==null || named!==null || out!==1) throw new Error('closed to newcomers: a household was started, or they stayed signed in');
-          if(APP_CONFIG.betaCopy && opened!==APP_CONFIG.betaCopy.siteUrl) throw new Error('My Kitchen Notes was not opened: '+opened);
+          // v38.47 — My Kitchen Notes is offered (and opened) only from another copy, never from inside itself.
+          var ew=householdElsewhereUrl();
+          if(ew && opened!==ew) throw new Error('My Kitchen Notes was not opened: '+opened);
+          if(!ew && offered.indexOf('elsewhere')!==-1) throw new Error('the community app offers to go to itself');
+          if(ew && offered.indexOf('elsewhere')===-1) throw new Error('the way to My Kitchen Notes is not offered');
+          // v38.47 — Tony: friendly, short, and Cancel says what it does. Closed or open, the same promise.
+          var said=null; out=0;
+          window.askChoice=async function(msg, ch, o){ said={ msg:msg, o:o||{}, ch:ch }; return null; };
+          got=await householdWelcome({ uid:'u', email:'stranger@x.test', emailVerified:true });
+          if(got!==null || out!==1) throw new Error('Not now did not sign out (closed)');
+          if(/private family kitchen/i.test(said.msg) || said.msg.length>260) throw new Error('the closed welcome is not short and friendly: '+said.msg);
+          if(!/sign me out/i.test(said.o.cancelLabel||'') || !said.o.noBackdrop) throw new Error('Cancel does not say it signs out, or a tap beside the box decides: '+JSON.stringify(said.o));
+          window.householdMayFound=async function(){ return true; }; out=0; named=null;
+          var foundWas=window.householdFound; window.householdFound=async function(u,n){ named=n; return 'H-NOPE'; };
+          try{ got=await householdWelcome({ uid:'u', email:'stranger@x.test', emailVerified:true }); } finally { window.householdFound=foundWas; }
+          if(got!==null || out!==1 || named!==null) throw new Error('Not now started a collection, or did not sign out (open): '+got+' '+out+' '+named);
+          if(said.msg.length>200 || !/Pull up a chair/.test(said.msg)) throw new Error('the open welcome: '+said.msg);
+          if(!said.ch.every(function(c){ return /\S+ \S+ \S+/.test(c.label); })) throw new Error('a button does not say what it does: '+said.ch.map(function(c){ return c.label; }).join(' | '));
         } finally { window.householdMayFound=realMay; window.signOutNow=realOut; window.open=realOpen; }
         // An empty collection teaches, and the examples are offered, not imposed.
         recipes=[]; activeCat='All'; renderGrid();
@@ -4459,7 +4476,7 @@ window.SELF_TESTS = [
         window.askPrompt=async function(){ return 'Mine'; }; window.householdFound=async function(){ return 'H-X'; };
         await householdWelcome({ uid:'u', email:'new@example.com', emailVerified:false });
         _hhJustFounded=false;
-        if(!seen || seen.o.indexOf('confirm')===-1 || !/confirm/.test(seen.m)) throw new Error('an unconfirmed person is not told: '+JSON.stringify(seen));
+        if(!seen || seen.o.indexOf('confirm')===-1 || !/confirm/i.test(seen.m)) throw new Error('an unconfirmed person is not told: '+JSON.stringify(seen));
         await householdWelcome({ uid:'u', email:'ok@example.com', emailVerified:true }); _hhJustFounded=false;
         if(seen.o.indexOf('confirm')!==-1) throw new Error('a confirmed person is asked to confirm');
         // Kept places are taken up even by someone with a collection of their own.
@@ -8318,6 +8335,92 @@ window.SELF_TESTS = [
         window.gmailClientIdFind=real.find; window.insightCount=real.ins; window.getGmailToken=real.tok; window.fetch=real.fetch; _inviteLang=real.lang;
         if(real.drafts===null) localStorage.removeItem(INVITE_DRAFTS_KEY); else localStorage.setItem(INVITE_DRAFTS_KEY, real.drafts);
         if(real.sent===null) localStorage.removeItem(INVITE_SENT_KEY); else localStorage.setItem(INVITE_SENT_KEY, real.sent);
+      }
+    } },
+
+  { id:'newcomer_sees_the_app_name', group:'UI', name:'👋 A newcomer meets My Kitchen Notes: the sign-in screen and the window say the app\u2019s name (never the family\u2019s) outside the family copy; the welcome never offers to go where it already is; a wrong password says the way forward and is not an error (v38.47)',
+    test: async()=>{
+      var logo=document.querySelector('.login-logo'), env=APP_CONFIG.environment;
+      if(!logo) throw new Error('no sign-in heading');
+      if(env!=='live'){
+        if(/Tony/.test(logo.textContent) || logo.textContent.replace(/\s+/g,' ').trim()!==APP_CONFIG.brandName) throw new Error('the sign-in screen says: '+logo.textContent);
+        if(/Tony/.test(String(ENV_BASE_TITLE===null ? document.title : ENV_BASE_TITLE))) throw new Error('the window says: '+document.title);
+        if(/Tony/.test(HELP_SYSTEM_PROMPT.split('\n').filter(function(l){ return /single-page web app/.test(l); })[0]||'')) throw new Error('the Help assistant calls the app by the family\u2019s name');
+      }
+      var ew=householdElsewhereUrl();
+      if(ew && new URL(ew).origin===new URL(APP_CONFIG.siteOrigin).origin) throw new Error('the welcome would send people to the app they are in: '+ew);
+      // A wrong password (or Sign in before the account exists): a slip, not an error — and the way forward said.
+      var logWas=window.syncLog, kinds=[];
+      try{ window.syncLog=function(k){ kinds.push(k); }; authFailed({ code:'auth/invalid-credential', message:'x' }, 'Sign-in with a password'); }
+      finally{ window.syncLog=logWas; }
+      if(kinds.join()!=='auth') throw new Error('a wrong password is logged as: '+kinds.join());
+      if(!/Create an account/.test(authErrorText({ code:'auth/invalid-credential' }))) throw new Error('a newcomer is not told to create an account');
+    } },
+
+  { id:'remember_me_both_ways', group:'Security', name:'🔑 Remember me on this device: one setting, in the e-mail form too; ticked keeps the device signed in, unticked only until the browser closes — both ways; a remembered password is offered to the browser; the e-mailed link follows the choice; Enter signs in (v38.47)',
+    test: async()=>{
+      var real={ auth:window._fbAuth, pc:window.PasswordCredential, creds:navigator.credentials, a:(document.getElementById('rememberMe')||{}).checked };
+      var calls=[], stored=[];
+      try{
+        window._fbAuth={ setPersistence:function(p){ calls.push(p); return Promise.resolve(); } };
+        var P=firebase.auth.Auth.Persistence;
+        rememberSet(false); authReady();
+        if(rememberChoice()!==false || calls[calls.length-1]!==P.SESSION) throw new Error('unticked: not session-only');
+        rememberSet(true); authReady();
+        if(rememberChoice()!==true || calls[calls.length-1]!==P.LOCAL) throw new Error('ticked again: still forgets (it used to switch one way only)');
+        if(signInOn('password')){
+          var em=document.getElementById('emailRememberMe');
+          if(!em) throw new Error('the e-mail form has no Remember me');
+          em.checked=false; em.dispatchEvent(new Event('change'));
+          if(document.getElementById('rememberMe').checked!==false) throw new Error('the two checkboxes are not one setting');
+          rememberSet(true);
+          if(!em.checked) throw new Error('the e-mail form\u2019s box did not follow');
+        }
+        window.PasswordCredential=function(o){ this.o=o; };
+        try{ Object.defineProperty(navigator, 'credentials', { configurable:true, value:{ store:function(c){ stored.push(c.o); return Promise.resolve(); } } }); }catch(e){}
+        if(navigator.credentials && navigator.credentials.store && navigator.credentials.store.length===1){
+          rememberSet(true); rememberPassword('t@x.example', 'pw-123456');
+          rememberSet(false); rememberPassword('u@x.example', 'pw-123456');
+          if(stored.length!==1 || stored[0].id!=='t@x.example') throw new Error('the password offered to the browser: '+JSON.stringify(stored));
+        }
+        // v38.47 — Tony: Enter in the password signs in ("an industry standard UI"); in the address it goes on.
+        if(signInOn('password')){
+          var em2=document.getElementById('emailSignInEmail'), pw=document.getElementById('emailSignInPassword'), signed=[], realSign=window.emailSignIn;
+          var ls=document.getElementById('loginScreen'), fm=document.getElementById('emailSignInForm'), lsWas=ls && ls.style.display, fmWas=fm && fm.style.display;
+          window.emailSignIn=function(m){ signed.push(m); return Promise.resolve(null); };
+          if(ls) ls.style.display='flex'; if(fm) fm.style.display='block';   // (only a shown box takes the cursor)
+          try{
+            var key=function(el){ var ev=new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true }); el.dispatchEvent(ev); return ev.defaultPrevented; };
+            pw.value=''; em2.value='t@x.example';
+            var went=key(em2);
+            if(!went || signed.length || document.activeElement!==pw) throw new Error('Enter in the address did not go on to the password: '+JSON.stringify({ handled:went, signed:signed, active:document.activeElement && (document.activeElement.id||document.activeElement.tagName), shown:!!pw.offsetParent }));
+            pw.value='pw-123456';
+            if(!key(pw) || signed.join()!=='in') throw new Error('Enter in the password did not sign in: '+signed.join());
+            if(!key(em2) || signed.join()!=='in,in') throw new Error('Enter in the address, the password filled in, did not sign in');
+            if(pw.getAttribute('enterkeyhint')!=='go') throw new Error('the phone keyboard does not show Go');
+            // A real login form, so the browser's password keeper saves the password and fills it in next time.
+            if(fm.tagName!=='FORM' || em2.getAttribute('autocomplete')!=='username' || pw.getAttribute('autocomplete')!=='current-password' || !em2.name || !pw.name)
+              throw new Error('not a login form the browser recognises: '+fm.tagName+' '+em2.getAttribute('autocomplete')+' '+pw.getAttribute('autocomplete'));
+            var subs=Array.prototype.filter.call(fm.querySelectorAll('button'), function(b){ return b.type==='submit'; });
+            if(subs.length!==1 || subs[0].id!=='emailSignInBtn') throw new Error('only Sign in may submit the form: '+subs.map(function(b){ return b.textContent; }).join(' | '));
+            // A saved account (Chrome, Edge) is offered as the form opens: both boxes filled.
+            var credWas=navigator.credentials; window._rememberOfferUnderTest=true;
+            try{
+              Object.defineProperty(navigator, 'credentials', { configurable:true, value:{ get:function(){ return Promise.resolve({ type:'password', id:'saved@x.example', password:'pw-saved' }); }, store:function(){ return Promise.resolve(); } } });
+              em2.value=''; pw.value='';
+              if(rememberedOffer()!==true) throw new Error('the saved account is not asked for');
+              await new Promise(function(r){ setTimeout(r, 30); });
+              if(em2.value!=='saved@x.example' || pw.value!=='pw-saved') throw new Error('the saved account did not fill the form: '+em2.value);
+            } finally { window._rememberOfferUnderTest=false; try{ Object.defineProperty(navigator, 'credentials', { configurable:true, value:credWas }); }catch(e){} }
+          } finally { window.emailSignIn=realSign; pw.value=''; em2.value=''; if(ls) ls.style.display=lsWas; if(fm) fm.style.display=fmWas; }
+        }
+        var c=String(completeEmailLinkSignIn), l=String(emailSendLink);
+        if(c.indexOf('rememberApply')===-1 || l.indexOf('mkn_link_remember')===-1) throw new Error('the e-mailed link does not follow the choice');
+        if(String(startGoogleSignIn).indexOf('rememberApply(rememberChoice())')===-1) throw new Error('Google sign-in does not follow the choice both ways');
+      } finally {
+        window._fbAuth=real.auth; window.PasswordCredential=real.pc;
+        try{ Object.defineProperty(navigator, 'credentials', { configurable:true, value:real.creds }); }catch(e){}
+        rememberSet(real.a!==false);
       }
     } },
 

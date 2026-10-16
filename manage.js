@@ -703,10 +703,13 @@
       + '<button type="button" class="mg-btn" id="mgCopyFrom" style="min-height:28px;padding:3px 10px;" onclick="mknManage.copyFromFamily()">'
       + '📦 Bring the family app\u2019s allowances and AI history here</button> <span>(safe to press twice)</span></div>';
     // v37.96 — Tony (security audit, "b"): newcomers by invitation only, per copy.
+    // v38.47 — the button said the OTHER state ("🔒 Invitation only" while it was open), and the community copy was
+    // switched to invitation only by mistake on 15 Oct: a tester then could not get in at all. Now the state is
+    // shown with its sign, and the button says it CHANGES it, and what newcomers will meet.
     if (S.founding !== null) head += '<div class="mg-muted" id="mgFounding" style="margin:6px 0 2px;">New households in this copy: <b>'
-      + (S.founding ? 'anyone who signs in may start one' : 'by invitation only') + '</b> '
+      + (S.founding ? '🔓 anyone who signs in may start one' : '🔒 by invitation only — newcomers without an invitation cannot get in') + '</b> '
       + '<button type="button" class="mg-btn" id="mgFoundingBtn" style="min-height:28px;padding:3px 10px;" onclick="mknManage.setFounding(' + (S.founding ? 'false' : 'true') + ')">'
-      + (S.founding ? '🔒 Invitation only' : '🔓 Let anyone start one') + '</button></div>';
+      + (S.founding ? 'Change to: invitation only' : 'Change to: anyone may start one') + '</button></div>';
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
       + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
     var nc = newCount();

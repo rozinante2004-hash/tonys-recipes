@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.46 -->
+<!-- Tony's Recipes Collection v38.47 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -407,6 +407,21 @@
   // Anything but the live copy says so, on every screen, from the first paint.
   if (window.APP_CONFIG.environment !== 'live') {
     document.documentElement.setAttribute('data-env-copy', String(window.APP_CONFIG.environment));
+    // v38.47 — a newcomer's first look says the app's name, not the family's (Tony's screenshot as a tester: the
+    // sign-in screen said "Tony's Recipes" and the window "[BETA] Tony's Recipes Collection"). The family's own
+    // copy keeps its title; a household's name replaces this once it is open (householdBrand).
+    var brand = String(window.APP_CONFIG.brandName || '');
+    if (brand) {
+      document.title = brand;
+      document.addEventListener('DOMContentLoaded', function () {
+        var m = /^(.*?)(Kitchen Notes|Recipes)(.*)$/.exec(brand), esc = function (x) { return String(x).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); };
+        var html = m ? esc(m[1]) + '<span>' + esc(m[2]) + '</span>' + esc(m[3]) : esc(brand);
+        document.querySelectorAll('.login-logo, .header .logo').forEach(function (el) {
+          if (el.classList.contains('logo') && el.getAttribute('data-no-i18n') !== null) return;   // (a household's name already there)
+          el.setAttribute('data-no-i18n', ''); el.innerHTML = html;
+        });
+      });
+    }
     document.title = '[' + String(window.APP_CONFIG.environment).toUpperCase() + '] ' + document.title;
     document.addEventListener('DOMContentLoaded', function () {
       var r = document.createElement('div');
@@ -6313,7 +6328,12 @@ async function householdMayFound() {
   return await hhFoundingOpen();
 }
 // Closed to newcomers: say where to go instead, and sign out.
-function householdElsewhereUrl() { return String((APP_CONFIG.betaCopy && APP_CONFIG.betaCopy.siteUrl) || ''); }
+function householdElsewhereUrl() {
+  var u = String((APP_CONFIG.betaCopy && APP_CONFIG.betaCopy.siteUrl) || '');
+  // v38.47 — never "go to My Kitchen Notes" from inside it (the community copy carries the family's betaCopy too).
+  try { if (u && new URL(u).origin === new URL(APP_CONFIG.siteOrigin || location.origin).origin) return ''; } catch (e) {}
+  return u;
+}
 window.hhFoundingOpen = hhFoundingOpen; window.hhSetFoundingOpen = hhSetFoundingOpen; window.householdMayFound = householdMayFound;
 
 async function householdWelcome(user) {
@@ -6325,52 +6345,59 @@ async function householdWelcome(user) {
     // v37.10 — Tony: warn when something cannot work yet, and why. Someone
     // whose address is not confirmed cannot be let into a household that
     // added that address — so they are told, and offered the e-mail again.
+    // v38.47 — Tony, 16 Oct 2026, as a new tester: "As a new user, without an invitation, I would find it rather
+    // confusing, or even intimidating (This is a private family kitchen). Can we make this note shorter, friendly,
+    // even humoristic and make the titles on the buttons also more friendly … and self explanatory?" — and "Clicking
+    // the cancel button kick you out of the app. It does not say that that's what it'll do". Every button now says
+    // what it does; Cancel is "Not now — sign me out" and does exactly that (it used to start a collection with the
+    // default name in an open copy); a tap beside the box does nothing. A confirmation done meanwhile is noticed.
+    try { if (user && user.emailVerified === false && typeof user.reload === 'function') await user.reload(); } catch (e) {}
     var unconfirmed = user && user.emailVerified === false;
     var choices = mayFound ? [
-      { value: 'own',  label: '\u{1F3E0} Start my own collection' },
-      { value: 'join', label: '\u{1F517} I have an invitation' }
+      { value: 'own',  label: '\u{1F3E0} Start my own recipe collection' },
+      { value: 'join', label: '\u{1F517} I have an invitation link' }
     ] : [
-      { value: 'join', label: '\u{1F517} I have an invitation' }
-    ].concat(elsewhere ? [{ value: 'elsewhere', label: '\u{1F373} Keep my own recipes in My Kitchen Notes' }] : []);
-    if (unconfirmed) choices.push({ value: 'confirm', label: '\u2709\ufe0f Someone added my address \u2014 confirm it first' });
-    var v = await askChoice((mayFound ? 'Keep every recipe you love in one place \u2014 and share them with the people you cook with.'
-        : 'This is a private family kitchen: you come in with the invitation you were sent.'
-          + (elsewhere ? ' To keep recipes of your own, use My Kitchen Notes \u2014 free, and the same app.' : ''))
-      + (unconfirmed ? '\n\nWere you added to someone\u2019s collection by your address? It opens once you confirm ' + user.email
-          + ' from the e-mail we sent (look in spam too). An invitation link works right away.' : ''),
-      choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand });
+      { value: 'join', label: '\u{1F517} I have an invitation link' }
+    ].concat(elsewhere ? [{ value: 'elsewhere', label: '\u{1F373} Take me to My Kitchen Notes (my own recipes)' }] : []);
+    if (unconfirmed) choices.push({ value: 'confirm', label: '\u{1F4EC} Someone added my e-mail \u2014 let me confirm it' });
+    var v = await askChoice((mayFound ? 'Pull up a chair! \u{1F373} This is where your favourite recipes come to live \u2014 ready to cook from, and to share with the people you cook with.'
+        : elsewhere ? 'This kitchen is invitation-only \u2014 a bit like grandma\u2019s. \u{1F642} Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.'
+        : 'New kitchens open by invitation for now. \u{1F511} Got an invitation link? Come right in \u2014 if not, ask whoever told you about the app to send you one.')
+      + (unconfirmed ? '\n\nJoining someone\u2019s collection by your e-mail? Confirm it first \u2014 we sent a link to ' + user.email
+          + ' (peek in spam if it\u2019s shy).' : ''),
+      choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand, cancelLabel: '\u{1F44B} Not now \u2014 sign me out', noBackdrop: true });
     if (v === 'confirm') {
       await resendConfirmation();
-      await askConfirm({ icon: '\u2709\ufe0f', title: 'Then reload the app',
-        message: 'Open the e-mail sent to ' + user.email + ' (look in spam too) and press its link. Then come back and reload: '
-          + 'you will be in the collection that added you.', okLabel: 'OK' });
+      await askConfirm({ icon: '\u{1F4EC}', title: 'Check your inbox',
+        message: 'A fresh link is on its way to ' + user.email + '. Press it (peek in spam if it\u2019s hiding), then come back and reload \u2014 '
+          + 'the collection that added you will be waiting.', okLabel: 'Got it' });
       continue;
     }
     if (v === 'join') {
       var t = await askPrompt('Paste the invitation link you were sent (or just its code).', '',
-        { icon: '\u{1F517}', title: 'Join with an invitation', okLabel: 'Join', placeholder: 'https://…?join=…' });
+        { icon: '\u{1F517}', title: 'Your invitation', okLabel: 'Come in', cancelLabel: '\u2039 Back', placeholder: 'https://…?join=…' });
       if (typeof t !== 'string' || !t.trim()) continue;
       var code = householdCodeFrom(t);
       if (!code) {
-        await askConfirm({ icon: '⚠️', title: 'That is not an invitation',
-          message: 'An invitation is a link ending in “?join=” and a long code. Ask whoever invited you to send it again.', okLabel: 'OK' });
+        await askConfirm({ icon: '\u{1F914}', title: 'Hmm, that\u2019s not an invitation link',
+          message: 'An invitation link ends in \u201c?join=\u201d and a long code. Ask whoever invited you to send it again.', okLabel: 'Try again' });
         continue;
       }
       try { var hid = await householdJoinByInvite(user, code); try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
-            toast('✅ You have joined the household', 6000); return hid; }
+            toast('✅ You\u2019re in \u2014 welcome to the kitchen!', 6000); return hid; }
       catch(e) { await askConfirm({ icon: '⚠️', title: 'Could not join', message: e.message, okLabel: 'OK' }); continue; }
     }
-    // v37.96 — closed to newcomers: elsewhere (or dismissed) — signed out here.
-    if (!mayFound) {
-      if (v === 'elsewhere' && elsewhere) { try { window.open(elsewhere, '_blank', 'noopener'); } catch(e) {} }
-      if (v !== 'elsewhere' && v != null) continue;
+    // Not now (Cancel, Escape) — signed out, as the button says. Closed to newcomers: My Kitchen Notes is opened first.
+    if (v === 'elsewhere' && elsewhere) { try { window.open(elsewhere, '_blank', 'noopener'); } catch(e) {} }
+    if (v == null || v === 'elsewhere' || !mayFound) {
+      if (!mayFound && v !== 'elsewhere' && v != null) continue;
       signOutNow();
       return null;
     }
-    // Their own — named as they like (or, dismissed, as it always was).
+    // Their own — named as they like (or, the name box closed, the suggested name).
     var name = v === 'own'
-      ? await askPrompt('What should your collection be called? You can change it any time.', householdDefaultName(user),
-          { icon: '\u{1F3E0}', title: 'Your collection', okLabel: 'Start' })
+      ? await askPrompt('What shall we call your recipe collection? You can change it any time.', householdDefaultName(user),
+          { icon: '\u{1F3E0}', title: 'Name your kitchen', okLabel: 'Let\u2019s cook! \u{1F373}', cancelLabel: 'Use the suggested name' })
       : null;
     var hid2 = await householdFound(user, (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 60) : householdDefaultName(user));
     _hhJustFounded = true;
@@ -7602,7 +7629,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.46';
+var APP_VERSION = 'v38.47';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9094,7 +9121,7 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .modal-overlay.open { display: flex; }
 /* v38.36 — the install hint never sits on an open window: on an iPhone it covered
    "✓ Add to My Collection" in the import window. */
-body:has(.modal-overlay.open) #pwaIosBanner, body:has(.modal-overlay.open) #pwaInstallBanner { display: none !important; }
+body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner, body:has(.modal-overlay.open) #pwaInstallBanner, body:has(#askOverlay) #pwaInstallBanner { display: none !important; }
 .modal { background: var(--cream); border-radius: 16px; width: calc(100vw - 16px); max-width: 600px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; position: relative; animation: slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .modal::-webkit-scrollbar { width: 6px; }
 .modal::-webkit-scrollbar-track { background: transparent; }
@@ -10560,7 +10587,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.46</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.47</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11288,7 +11315,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.46</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.47</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11332,7 +11359,7 @@ body.banner-shown .header {
       <span style="font-size:11px;opacity:0.7">(changes will sync to cloud when you sign in)</span>
     </button>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);">
-          <input type="checkbox" id="rememberMe" checked style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">
+          <input type="checkbox" id="rememberMe" checked onchange="rememberSet(this.checked)" style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">
           <label for="rememberMe" style="cursor:pointer;">Remember me on this device</label>
         </div>
         <!-- v36.25 — this used to end "Tony's Recipes never stores your data on
@@ -18013,7 +18040,8 @@ function askChoice(message, options, opts) {
       + options.map(function(o, i) {
           return '<button class="ask-btn ghost" data-i="' + i + '" dir="auto">' + escH(o.label) + '</button>';
         }).join('')
-      + '<button class="ask-btn ghost" id="askCancel">Cancel</button>'
+      // v38.47 — opts.cancelLabel: say what Cancel does (Tony: on the welcome it signed people out unannounced).
+      + '<button class="ask-btn ghost" id="askCancel" dir="auto">' + escH(opts.cancelLabel || 'Cancel') + '</button>'
       + '</div></div>';
     document.body.appendChild(ov);
     function done(v) { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); }
@@ -18022,7 +18050,7 @@ function askChoice(message, options, opts) {
       b.onclick = function(){ done(options[+b.getAttribute('data-i')].value); };
     });
     ov.querySelector('#askCancel').onclick = function(){ done(null); };
-    ov.onclick = function(e){ if (e.target === ov) done(null); };
+    ov.onclick = function(e){ if (e.target === ov && !opts.noBackdrop) done(null); };   // v38.47 — noBackdrop: only a button decides
     document.addEventListener('keydown', onKey, true);
   });
 }
@@ -25113,9 +25141,7 @@ async function startGoogleSignIn() {
     return;
   }
   if (errDiv) errDiv.style.display = 'none';
-  if (remember && !remember.checked) {
-    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
-  }
+  rememberApply(rememberChoice());   // v38.47 — both ways (not awaited: Google's window must open from the tap itself)
   window._justSignedIn = true;
   if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
   try {
@@ -25171,7 +25197,7 @@ function authErrorText(err) {
     'auth/missing-password': 'Please type your password.',
     'auth/weak-password': 'Please choose a longer password — at least 8 characters.',
     'auth/email-already-in-use': 'There is already an account with this address. Sign in instead — or, if you usually use Google or Microsoft with it, use that button.',
-    'auth/invalid-credential': 'That e-mail address and password do not match.',
+    'auth/invalid-credential': 'That e-mail address and password do not match. New here? Press \u201cCreate an account\u201d instead. Forgot it? \u201cForgot password?\u201d sends you a new one.',   // v38.47
     'auth/wrong-password': 'That e-mail address and password do not match.',
     'auth/user-not-found': 'That e-mail address and password do not match.',
     'auth/too-many-requests': 'Too many tries. Wait a few minutes, or use "Forgot password?".',
@@ -25197,23 +25223,34 @@ function renderSignInOptions() {
     + '<span aria-hidden="true" style="margin-inline-end:10px;font-size:17px;"></span>Sign in with Apple</button>';
   if (signInOn('password') || signInOn('emailLink')) {
     h += '<button ' + b + ' id="emailSignInToggle" onclick="toggleEmailSignIn()">✉️ Use my e-mail address</button>'
-      + '<div id="emailSignInForm" style="display:none;margin-top:10px;text-align:start;">'
+      // v38.47 — Tony: "It should remember the password as well and sign in the user when clicking the sign in button".
+      // A real login form (a <form>, a username and a current-password field, a submit button) is what the browser's
+      // password keeper recognises: it offers to save the password and fills both in next time. The app never keeps
+      // a password itself.
+      + '<form id="emailSignInForm" autocomplete="on" onsubmit="event.preventDefault(); emailSignIn(\'in\');" style="display:none;margin-top:10px;text-align:start;">'
       +   '<label for="emailSignInEmail" style="font-size:12px;color:var(--muted);">E-mail address</label>'
-      +   '<input id="emailSignInEmail" type="email" autocomplete="email" dir="ltr" class="ask-input" style="width:100%;box-sizing:border-box;margin:4px 0 8px;">'
+      // v38.47 — Tony: "After entering the password, please make Enter act as if I clicked the Sign in button. This is an
+      // industry standard UI." Enter in the address goes on to the password (or signs in when it is filled in).
+      +   '<input id="emailSignInEmail" name="username" type="email" autocomplete="username" dir="ltr" class="ask-input" enterkeyhint="next" onkeydown="emailFormEnter(event, \'email\')" style="width:100%;box-sizing:border-box;margin:4px 0 8px;">'
       +   (signInOn('password')
             ? '<label for="emailSignInPassword" style="font-size:12px;color:var(--muted);">Password</label>'
-              + '<input id="emailSignInPassword" type="password" autocomplete="current-password" dir="ltr" class="ask-input" style="width:100%;box-sizing:border-box;margin:4px 0 8px;">'
+              + '<input id="emailSignInPassword" name="password" type="password" autocomplete="current-password" dir="ltr" class="ask-input" enterkeyhint="go" onkeydown="emailFormEnter(event, \'password\')" style="width:100%;box-sizing:border-box;margin:4px 0 8px;">'
+              // v38.47 — Tony: "when using Use my e-mail address, also add a checkbox for 'Remember me on this device' so
+              // the user won't have to enter his password every time". The same setting as the one under Continue offline.
+              + '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);margin:0 0 9px;cursor:pointer;">'
+              +   '<input type="checkbox" id="emailRememberMe"' + (rememberChoice() ? ' checked' : '') + ' onchange="rememberSet(this.checked)" style="accent-color:var(--terracotta);width:15px;height:15px;cursor:pointer;">'
+              +   'Remember me on this device</label>'
               + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-              +   '<button class="ask-btn" onclick="emailSignIn(\'in\')">Sign in</button>'
-              +   '<button class="ask-btn ghost" onclick="emailSignIn(\'up\')">Create an account</button>'
+              +   '<button type="submit" class="ask-btn" id="emailSignInBtn">Sign in</button>'
+              +   '<button type="button" class="ask-btn ghost" onclick="emailSignIn(\'up\')">Create an account</button>'
               + '</div>'
-              + '<button onclick="emailResetPassword()" style="margin-top:6px;background:none;border:none;color:var(--terracotta);text-decoration:underline;font-size:12px;cursor:pointer;padding:0;">Forgot password?</button>'
+              + '<button type="button" onclick="emailResetPassword()" style="margin-top:6px;background:none;border:none;color:var(--terracotta);text-decoration:underline;font-size:12px;cursor:pointer;padding:0;">Forgot password?</button>'
             : '')
       +   (signInOn('emailLink')
-            ? '<div style="margin-top:8px;"><button class="ask-btn ghost" onclick="emailSendLink()">'
+            ? '<div style="margin-top:8px;"><button type="button" class="ask-btn ghost" onclick="emailSendLink()">'
               + (signInOn('password') ? 'No password — e-mail me a sign-in link instead' : 'E-mail me a sign-in link') + '</button></div>'
             : '')
-      + '</div>';
+      + '</form>';
   }
   host.innerHTML = h;
 }
@@ -25221,8 +25258,22 @@ function toggleEmailSignIn() {
   var f = document.getElementById('emailSignInForm');
   if (!f) return;
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
-  if (f.style.display === 'block') { var e = document.getElementById('emailSignInEmail'); if (e) e.focus(); }
+  if (f.style.display === 'block') { var e = document.getElementById('emailSignInEmail'); if (e) e.focus(); rememberedOffer(); }
 }
+// v38.47 — where the browser keeps passwords for the app (Chrome, Edge), a saved account is offered as the form
+// opens: chosen, both boxes are filled and Sign in is one tap. Nothing is shown when none was saved.
+function rememberedOffer() {
+  if ((window._selfTestRunning && !window._rememberOfferUnderTest) || !window.PasswordCredential || !navigator.credentials || !navigator.credentials.get) return false;
+  var e = document.getElementById('emailSignInEmail'), p = document.getElementById('emailSignInPassword');
+  if (!e || !p || e.value || p.value) return false;
+  navigator.credentials.get({ password: true, mediation: 'optional' }).then(function (c) {
+    if (!c || c.type !== 'password' || !c.id) return;
+    e.value = c.id; if (c.password) p.value = c.password;
+    var b = document.getElementById('emailSignInBtn'); if (b && p.value) b.focus();
+  }).catch(function () {});
+  return true;
+}
+window.rememberedOffer = rememberedOffer;
 function loginSay(text, good) {
   var el = document.getElementById('loginError');
   if (!el) { toast(text, 8000); return; }
@@ -25242,17 +25293,35 @@ function signedInCloseLogin() {
   var l = document.getElementById('loginScreen'); if (l) l.style.display = 'none';
   var f = document.getElementById('emailSignInPassword'); if (f) f.value = '';
 }
+// v38.47 — "Remember me on this device": ONE setting, shown under Continue offline and in the e-mail form. Ticked:
+// this device stays signed in (until Sign out); not ticked: until the browser closes. It used to switch only one
+// way (unticked, then ticked again, still forgot), and the e-mailed sign-in link did not ask it.
+function rememberChoice() {
+  var a = document.getElementById('rememberMe');
+  return a ? !!a.checked : true;
+}
+function rememberSet(on) {
+  ['rememberMe', 'emailRememberMe'].forEach(function (id) { var el = document.getElementById(id); if (el) el.checked = !!on; });
+}
+function rememberApply(on) {
+  if (!window._fbAuth || typeof firebase === 'undefined') return Promise.resolve();
+  var P = firebase.auth.Auth.Persistence;
+  return _fbAuth.setPersistence(on ? P.LOCAL : P.SESSION).catch(function(){});
+}
+window.rememberChoice = rememberChoice; window.rememberSet = rememberSet; window.rememberApply = rememberApply;
 function authReady() {
   if (typeof firebase === 'undefined' || !window._fbAuth) { loginSay('No connection to the sign-in service yet — check the connection and try again.'); return false; }
   loginSay('');
-  var remember = document.getElementById('rememberMe');
-  if (remember && !remember.checked) _fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+  rememberApply(rememberChoice());
   return true;
 }
 function authFailed(err, what) {
   window._justSignedIn = false;
   _lastAuthError = (err && err.code || 'no code') + ' — ' + (err && err.message || '');
-  if (!(err && err.cancelled)) try { syncLog('error', what + ' failed', _lastAuthError.slice(0, 200)); } catch(e) {}   // v38.43
+  // v38.43 — a cancelled code box is a choice; v38.47 — a mistyped password (or Sign in before the account exists,
+  // as Tony did as a new tester) is a slip, not a fault: kept in the log, not counted as an error.
+  var slip = err && /auth\/(invalid-credential|wrong-password|user-not-found|invalid-email|missing-password|weak-password)/.test(err.code || '');
+  if (!(err && err.cancelled)) try { syncLog(slip ? 'auth' : 'error', what + (slip ? ' refused' : ' failed'), _lastAuthError.slice(0, 200)); } catch(e) {}
   loginSay(err && err.otherAccount ? 'Sign in again and choose the other account.' : authErrorText(err));
 }
 async function startProviderSignIn(kind) {
@@ -25280,6 +25349,36 @@ function emailFormValues() {
 }
 function emailLooksValid(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e || '')); }
 function continueUrl() { return APP_CONFIG.siteOrigin + APP_CONFIG.sitePath; }
+// v38.47 — Enter, as everywhere: in the password it signs in; in the address it goes on to the password, or
+// signs in when the password is filled in (or sends the sign-in link where there are no passwords).
+function emailFormEnter(e, field) {
+  if (!e || e.key !== 'Enter' || e.isComposing || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return false;
+  e.preventDefault();
+  var pw = document.getElementById('emailSignInPassword');
+  var submit = function () {
+    var f = document.getElementById('emailSignInForm'), b = document.getElementById('emailSignInBtn');
+    if (f && f.requestSubmit && b) f.requestSubmit(b); else emailSignIn('in');
+  };
+  if (field === 'password') { submit(); return true; }
+  if (!pw) { if (signInOn('emailLink')) emailSendLink(); return true; }
+  if (!pw.value) { pw.focus(); return true; }
+  submit();
+  return true;
+}
+window.emailFormEnter = emailFormEnter;
+// v38.47 — remembered: the browser is offered the password to keep (Chrome's own "Save password?"; Safari
+// and others notice the form by themselves). Never when Remember me is not ticked.
+function rememberPassword(email, password) {
+  if (!rememberChoice() || !email || !password) return false;
+  try {
+    if (window.PasswordCredential && navigator.credentials && navigator.credentials.store) {
+      navigator.credentials.store(new window.PasswordCredential({ id: email, password: password, name: email })).catch(function(){});
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+window.rememberPassword = rememberPassword;
 async function emailSignIn(mode) {
   if (!signInOn('password') || !authReady()) return null;
   var v = emailFormValues();
@@ -25291,11 +25390,12 @@ async function emailSignIn(mode) {
   // moment and nothing on screen changed, so he pressed "Continue offline" —
   // and the account arrived behind it. The button now says it is working, and
   // the sign-in screen closes the moment the account is there.
-  var btn = document.querySelector('#emailSignInForm button[onclick="emailSignIn(\'' + mode + '\')"]');
+  var btn = mode === 'in' ? document.getElementById('emailSignInBtn') : document.querySelector('#emailSignInForm button[onclick="emailSignIn(\'' + mode + '\')"]');
   var done = busyButton(btn, mode === 'up' ? 'Creating your account…' : 'Signing in…');
   try {
     if (mode === 'up') {
       var cred = await _fbAuth.createUserWithEmailAndPassword(v.email, v.password);
+      rememberPassword(v.email, v.password);   // v38.47
       done(); signedInCloseLogin();
       if (typeof insightSignedIn === 'function') insightSignedIn('password', cred && cred.user);   // v38.30
       var sentOk = false, again = false;
@@ -25310,6 +25410,7 @@ async function emailSignIn(mode) {
       return cred;
     }
     var c2 = await _fbAuth.signInWithEmailAndPassword(v.email, v.password);
+    rememberPassword(v.email, v.password);   // v38.47
     done(); signedInCloseLogin();
     if (typeof insightSignedIn === 'function') insightSignedIn('password', c2 && c2.user);   // v38.30
     return c2;
@@ -25334,7 +25435,7 @@ async function emailSendLink() {
   try {
     await _fbAuth.sendSignInLinkToEmail(v.email, { url: continueUrl(), handleCodeInApp: true });
     done();
-    try { localStorage.setItem(SIGNIN_EMAIL_KEY, v.email); } catch(e) {}
+    try { localStorage.setItem(SIGNIN_EMAIL_KEY, v.email); localStorage.setItem('mkn_link_remember', rememberChoice() ? '1' : '0'); } catch(e) {}   // v38.47
     loginSay('✉️ A sign-in link is on its way to ' + v.email + '. Open it on this device (and look in spam too).', true);
     return true;
   } catch(e) { authFailed(e, 'Sending a sign-in link'); return null; }
@@ -25355,9 +25456,11 @@ async function completeEmailLinkSignIn() {
     if (typeof email !== 'string' || !email.trim()) return null;
   }
   window._justSignedIn = true;
+  var keep = '1'; try { keep = localStorage.getItem('mkn_link_remember') || '1'; } catch(e) {}
+  await rememberApply(keep !== '0');   // v38.47 — as chosen when the link was asked for
   try {
     var cred = await _fbAuth.signInWithEmailLink(email.trim().toLowerCase(), location.href);
-    try { localStorage.removeItem(SIGNIN_EMAIL_KEY); } catch(e) {}
+    try { localStorage.removeItem(SIGNIN_EMAIL_KEY); localStorage.removeItem('mkn_link_remember'); } catch(e) {}
     if (typeof insightSignedIn === 'function') insightSignedIn('email-link', cred && cred.user);   // v38.30
     history.replaceState(null, '', location.pathname);
     if (window._resumingDelete) {
@@ -25680,6 +25783,10 @@ async function openKeyCheck() {
     + res.map(function (r) { return '<div style="margin:5px 0;">' + (r.ok ? '✅' : r.ok === false ? '❌' : '⚠️') + ' <b>' + escH(r.name) + '</b><br><span style="color:var(--muted);font-size:12px;">' + escH(r.why) + '</span></div>'; }).join('')
     + '<div style="margin-top:10px;">' + (bad ? '<b>Something the app needs is refused.</b> Undo the last change to the key in Google Cloud (it can take up to 5 minutes), then press Check again.'
       : unknown ? 'Some could not be reached from this network — try again on another connection.' : '<b>All clear.</b> Everything the app needs from the key works.') + '</div>';
+  // v38.47 — what this check cannot see from here: the page that confirms e-mail addresses and resets passwords runs on
+  // Google's own address for the project. Left out of the key's website list (16 Oct 2026), every confirmation failed.
+  body.innerHTML += '<div style="margin-top:10px;color:var(--muted);font-size:12px;">Also on the key\u2019s website list: <code>https://'
+    + escH(APP_CONFIG.firebase.projectId) + '.firebaseapp.com/*</code> \u2014 the page that confirms e-mail addresses and resets passwords runs there, and this check cannot see it.</div>';
   return res;
 }
 window.checkAppKey = checkAppKey; window.openKeyCheck = openKeyCheck; window.keyAnswer = keyAnswer; window.KEY_SERVICES = KEY_SERVICES;
@@ -28403,7 +28510,7 @@ var HELP_SYSTEM_PROMPT = [
   "Answer questions clearly, practically, and in the same language the user writes in (Hebrew or English).",
   "",
   "=== APP OVERVIEW ===",
-  "Tony's Recipes Collection is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
+  (APP_CONFIG.environment === 'live' ? "Tony's Recipes Collection" : (APP_CONFIG.brandName || 'My Kitchen Notes')) + " is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
   "It stores recipes in Firebase Firestore (cloud) and localStorage (offline). All AI features route through a Cloudflare Worker.",
   "",
   "=== BROWSING & FILTERING ===",

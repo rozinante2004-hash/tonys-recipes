@@ -42,6 +42,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   - A release means pushing one commit to BOTH `main` and `beta`:
     `git push origin <sha>:refs/heads/main <sha>:refs/heads/beta`.
   - It needs his yes for THAT release, and CI must be green on that commit.
+    **Changed 16 Oct 2026 (until the beta testers go live):** Tony: "Please feel free to move all the new versions
+    to the family/beta version when they are ready until we indeed go live with the beta testers. For now, it is
+    still development, as I have only now started my own Alpha testing." So: release each version once the local
+    suites and CI are green, without asking; tell him after. Ask again once the testers are in.
   - Before pushing, check `git merge-base --is-ancestor origin/main <sha>`, and the same for
     `origin/beta`.
   - `origin/test` can move under you (the languages job merges into it), so
@@ -196,6 +200,33 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   account. Cloudflare Email Routing only forwards (it was his first choice — "I need it to be an independent e-mail
   address"); a mailbox on mykitchennotes.community would need a paid host and an MX change that breaks contact@ and the
   alerts.
+- **v38.47** (Tony's own alpha test with a new tester account, 16 Oct): (1) **the welcome** (householdWelcome) —
+  "This is a private family kitchen…" was "confusing, or even intimidating": short, friendly, playful wording, every
+  button saying what it does (🏠 Start my own recipe collection / 🔗 I have an invitation link / 📬 Someone added my
+  e-mail — let me confirm it); Cancel is "👋 Not now — sign me out" (askChoice `opts.cancelLabel`; it used to sign
+  out unannounced when closed, and quietly found a household when open); a tap beside the box does nothing
+  (`opts.noBackdrop`); `user.reload()` first, so a confirmation done meanwhile counts; the name box "Name your kitchen"
+  / "Let's cook!" / "Use the suggested name". (2) **No "Keep my own recipes in My Kitchen Notes" inside My Kitchen
+  Notes** (householdElsewhereUrl is '' when betaCopy is this copy) — it opened the same app and signed out. (3) **The
+  community copy was switched to "invitation only" by mistake** (Tony's log: "New households: by invitation only",
+  15 Oct 01:23): the 📊 switch's button named the OTHER state; now the state with 🔓/🔒 and "Change to: …". Tony to
+  press it back (only he can). (4) **The app's name for newcomers** outside the family copy: the sign-in screen, the
+  header before a household opens and the window title say My Kitchen Notes (they said "Tony's Recipes"); the Help
+  assistant calls the app by it. (5) **Remember me** in the e-mail form too (`rememberChoice/rememberSet/
+  rememberApply`, one setting, both ways — it used to switch to session-only and never back); the e-mailed link follows
+  the choice (`mkn_link_remember`); the e-mail form is a real login `<form>` (username + current-password, one submit
+  button) so the browser's password keeper saves and fills the password; `rememberPassword` (PasswordCredential, when
+  ticked) and `rememberedOffer` (a saved account offered as the form opens). The app never stores a password. (6)
+  **Enter** in the password signs in (requestSubmit), in the address goes on (`emailFormEnter`); enterkeyhint go/next.
+  (7) A wrong password says "New here? Press Create an account…" and is logged as a slip, not an error.
+  (7b) **The key's website list lacked https://my-kitchen-notes-beta.firebaseapp.com/*** — the page that confirms
+  e-mail addresses and resets passwords runs there; since Tony's stage-2 restriction (16 Oct) every confirmation
+  failed silently (proved: Identity Toolkit "Requests from referer https://my-kitchen-notes-beta.firebaseapp.com/ are
+  blocked"; from mykitchennotes.community OK). My restriction steps had left it out. Tony adds it; 🔑 Check the app's
+  key now says so under its result. (8) The install
+  hint hides while a question is open (#askOverlay). Self-tests `newcomer_sees_the_app_name`, `remember_me_both_ways`,
+  `wpo_first_visit` and `unconfirmed_is_told_and_offered` updated. Chrome Web Store: extension 1.7.3 published
+  (16 Oct, Unlisted — the app links to it; Public when the testers go live).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
