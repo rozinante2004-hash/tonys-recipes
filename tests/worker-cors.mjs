@@ -1439,6 +1439,41 @@ console.log('\nAI per household (v60):');
   else failures.push(`the last line is not the end marker for ${code}: ${JSON.stringify(last.slice(0, 60))}`);
 }
 
+console.log('\nWikimedia Commons for photos (v77):');
+{
+  // Tony, 16 Oct 2026: Openverse "takes ages" (12–28 s a search, measured). Commons answers in under a second.
+  const realFetch = globalThis.fetch; let asked = null, ua = '';
+  globalThis.fetch = async (url, init) => {
+    asked = String(url); ua = (init && init.headers && init.headers['User-Agent']) || '';
+    return new Response(JSON.stringify({ query: { pages: {
+      '11': { index: 2, title: 'File:Small.png', imageinfo: [{ url: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Small.png', mime: 'image/png', width: 300,
+        thumburl: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Small.png', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Small.png',
+        extmetadata: { Artist: { value: '' }, LicenseShortName: { value: 'CC0' } } }] },
+      '10': { index: 1, title: 'File:Shakshuka.jpg', imageinfo: [{ url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Shakshuka.jpg', mime: 'image/jpeg', width: 4000,
+        thumburl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Shakshuka.jpg/330px-Shakshuka.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Shakshuka.jpg',
+        extmetadata: { Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:Cook">Cook &amp; Co</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } } }] },
+      '12': { index: 3, title: 'File:Plan.tif', imageinfo: [{ url: 'https://upload.wikimedia.org/wikipedia/commons/2/2b/Plan.tif', mime: 'image/tiff', width: 2000 }] }
+    } } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const r = await worker.fetch(post({ action: 'photo-search', query: 'shakshuka', source: 'wikimedia', page: 2 }), env);
+    const d = await r.json();
+    check('wikimedia answer carries CORS', r);
+    expect('asks Commons for pictures, page 2 as an offset', /commons\.wikimedia\.org\/w\/api\.php/.test(asked) && /gsroffset=9\b/.test(asked) && /filetype%3Abitmap%20shakshuka/.test(asked), asked);
+    expect('introduces itself with the app\'s address', /mykitchennotes\.community/.test(ua), ua);
+    const im = d.images || [];
+    expect('photos only, in Commons\' order', im.length === 2 && /Shakshuka/.test(im[0].thumb) && /Small/.test(im[1].url), JSON.stringify(im.map(i => i.url)));
+    expect('a big original is kept as its 960-pixel copy', im[0] && im[0].url === 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Shakshuka.jpg/960px-Shakshuka.jpg', im[0] && im[0].url);
+    expect('a small one as it is', im[1] && im[1].url === 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Small.png', im[1] && im[1].url);
+    expect('the creator as plain text, with the licence and the file page', im[0] && im[0].credit === 'Cook & Co' && im[0].license === 'CC BY-SA 4.0'
+      && im[0].creditUrl === 'https://commons.wikimedia.org/wiki/File:Shakshuka.jpg' && im[0].sourceLabel === 'Wikimedia Commons', JSON.stringify(im[0]));
+    expect('no creator named: the source is', im[1] && im[1].credit === 'Wikimedia Commons', im[1] && im[1].credit);
+    globalThis.fetch = async () => new Response('Too many requests', { status: 429 });
+    const lim = await (await worker.fetch(post({ action: 'photo-search', query: 'x', source: 'wikimedia' }), env)).json();
+    expect('a refusal is an error the app moves past', lim.rateLimited === true && /Wikimedia Commons/.test(lim.error || ''), JSON.stringify(lim));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

@@ -5942,15 +5942,17 @@ window.SELF_TESTS = [
     test: async()=>{
       if(typeof photoSearchMore!=='function') throw new Error('photoSearchMore not defined');
       if(!Array.isArray(PHOTO_SOURCES)||PHOTO_SOURCES.length<4) throw new Error('expected at least 4 photo sources');
-      ['openverse','pixabay','pexels','unsplash'].forEach(function(s){
+      ['wikimedia','pixabay','pexels','unsplash'].forEach(function(s){
         if(PHOTO_SOURCES.indexOf(s)<0) throw new Error('missing photo source: '+s);
         if(!PHOTO_SOURCE_LABELS[s]) throw new Error('missing label for: '+s);
       });
       if(!document.getElementById('photoSearchMoreBtn')) throw new Error('#photoSearchMoreBtn (See more) missing from photo modal');
-      // The keyless source must be tried FIRST. Every other source shares one
-      // API key across the whole family, so they are the ones that 429; leading
-      // with Openverse means a rate limit is a slower search, not a dead end.
-      if(PHOTO_SOURCES[0]!=='openverse') throw new Error('the keyless source is not tried first');
+      // v38.45 — Openverse is gone: measured 16 Oct 2026, its search took 12–28 s every time (Tony: "takes
+      // ages … Perhaps we do not want to use Openverse at all?"). Wikimedia Commons, searched directly, took
+      // under a second; it is the keyless fallback, last (a failing source is passed over, v30.3).
+      if(PHOTO_SOURCES.indexOf('openverse')!==-1) throw new Error('Openverse (12–28 s a search) is still asked');
+      if(PHOTO_SOURCES[PHOTO_SOURCES.length-1]!=='wikimedia' || PHOTO_KEYLESS!=='wikimedia') throw new Error('Wikimedia Commons is not the last, keyless source: '+PHOTO_SOURCES.join());
+      if(PHOTO_SOURCE_LABELS.wikimedia!=='Wikimedia Commons') throw new Error('its label: '+PHOTO_SOURCE_LABELS.wikimedia);
     } },
 
   { id:'wa_harvest_links', group:'WhatsApp', name:'Links are found, de-duplicated and matched to what I already have (5f.9)',
@@ -6250,6 +6252,45 @@ window.SELF_TESTS = [
         if(st.indexOf('⚠')===-1)
           throw new Error('a failed translation was not reported — the user would think English was searched');
       } finally { window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
+    } },
+
+  { id:'photo_search_fast_first', group:'Features', name:'📷 Photo search: one request per source, kept — See more shows the next source at once (it is asked while you look); an older search\u2019s answer never replaces a newer one; a slow picture gives way (v38.45)',
+    test: async()=>{
+      var input=document.getElementById('photoSearchInput'), status=document.getElementById('photoSearchStatus');
+      var realFetch=window.fetch, realVal=input.value, calls=[];
+      function tick(ms){ return new Promise(function(r){ setTimeout(r, ms||20); }); }
+      try{
+        window.fetch=function(url, opt){
+          var b=JSON.parse(opt.body); calls.push(b.source+':'+b.page);
+          return Promise.resolve({ json:function(){ return Promise.resolve({ images:[{ url:'https://x.example/'+b.source+'.jpg', thumb:'https://x.example/'+b.source+'-t.jpg', credit:'B' }] }); } });
+        };
+        input.value='chicken soup';
+        await searchPhotos();
+        if(calls[0]!==PHOTO_SOURCES[0]+':1') throw new Error('the first source asked: '+calls.join());
+        if(!/from Pexels/.test(status.textContent)) throw new Error('the first results: '+status.textContent);
+        if(calls.indexOf('unsplash:1')===-1) throw new Error('the next source was not asked ahead: '+calls.join());
+        await photoSearchMore();
+        if(calls.filter(function(c){ return c==='unsplash:1'; }).length!==1) throw new Error('See more asked Unsplash again instead of using its answer: '+calls.join());
+        if(!/from Unsplash/.test(status.textContent)) throw new Error('See more did not show Unsplash: '+status.textContent);
+        await photoSearchMore(); await photoSearchMore();
+        if(!/from Wikimedia Commons/.test(status.textContent)) throw new Error('Wikimedia Commons was not reached: '+status.textContent);
+        if(calls.some(function(c){ return /^openverse/.test(c); })) throw new Error('Openverse was asked: '+calls.join());
+        // An answer to an older search is not drawn over a newer one.
+        var late=null; window.fetch=function(url, opt){ var b=JSON.parse(opt.body); calls.push(b.source+':'+b.page);
+          if(b.query==='old dish') return new Promise(function(res){ late=function(){ res({ json:function(){ return Promise.resolve({ images:[{ url:'https://x.example/old.jpg', credit:'C' }] }); } }); }; });
+          return Promise.resolve({ json:function(){ return Promise.resolve({ images:[{ url:'https://x.example/new.jpg', credit:'D' }] }); } }); };
+        input.value='old dish'; var first=searchPhotos(); await tick();
+        input.value='new dish'; await searchPhotos();
+        if(late) late(); await first;
+        if(_photoSearchResults[0].url!=='https://x.example/new.jpg') throw new Error('the older search\u2019s answer replaced the newer one');
+        // A refusal is not kept: asked again next time.
+        var n=0; window.fetch=function(url, opt){ n++; return Promise.resolve({ json:function(){ return Promise.resolve(n===1 ? { error:'Pixabay error 500: x' } : { images:[{ url:'https://x.example/p.jpg' }] }); } }); };
+        _photoCache={}; _photoQuery='retry';
+        var d1=await photoFetch('pixabay', 1), d2=await photoFetch('pixabay', 1);
+        if(!d1.error || !d2.images || n!==2) throw new Error('a refusal was kept instead of asked again: '+n);
+        var g=String(renderPhotoSearchGrid);
+        if(g.indexOf('8000')===-1 || g.indexOf('nextTry')===-1) throw new Error('a slow picture does not give way to the next');
+      } finally { window.fetch=realFetch; input.value=realVal; _photoCache={}; }
     } },
 
   { id:'sec_no_local_save_helper', group:'Network', name:'Exports go straight to the browser, with no local helper (v35.0)',
@@ -7453,7 +7494,7 @@ window.SELF_TESTS = [
           if(!shown || shown.getAttribute('href')!=='mailto:'+appSupportEmail() || shown.textContent!==appSupportEmail())
             throw new Error('opened, the privacy statement does not show the address as a link: '+(shown ? shown.outerHTML.slice(0,160) : 'no link'));
         } finally { pf.remove(); }
-        ['Tony Schvekher','mykitchennotes.community/','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Openverse','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
+        ['Tony Schvekher','mykitchennotes.community/','Protection of Privacy Law','GDPR','16','Firebase','Anthropic','Cloudflare','Gemini','Pixabay','Pexels','Unsplash','Wikimedia Commons','allorigins','corsproxy','codetabs','Bring!','extension','Effective date'].forEach(function(w){
           if(priv.indexOf(w)===-1) throw new Error('the privacy statement does not mention '+w); });
         // v37.90 — the agreement is with the My Kitchen Notes Team; the privacy statement still names who answers for the data.
         if(terms.indexOf('Tony Schvekher')!==-1 || priv.indexOf('acts for the Team')===-1) throw new Error('the terms still name a person, or the privacy statement no longer names who answers for the data');
@@ -9206,7 +9247,7 @@ window.SELF_TESTS = [
       var plan=photoAttemptPlan('chicken soup','Dinner');
       if(!plan.length) throw new Error('no attempts are planned at all');
       if(plan[0].source!==PHOTO_SOURCES[0])
-        throw new Error('the first attempt is not the keyless source, so an unconfigured key kills every search');
+        throw new Error('the ladder does not follow the sources’ order (v38.45: the quick ones first)');
       var srcs={}; plan.forEach(function(p){ srcs[p.source]=1; });
       PHOTO_SOURCES.forEach(function(sname){
         if(!srcs[sname]) throw new Error('source '+sname+' is never tried, so its pictures are unreachable');

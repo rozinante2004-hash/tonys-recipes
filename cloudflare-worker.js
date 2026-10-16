@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v76
+// Tony's Recipes — Cloudflare Worker v77
+// v77: WIKIMEDIA COMMONS FOR PHOTOS (Tony, 16 Oct 2026: "Getting pics back from Openverse takes ages …
+// Perhaps we do not want to use Openverse at all?"). Measured that day from GitHub's servers: Openverse's
+// search took 12.6–27.8 s every time; Wikimedia Commons searched directly took 0.26–0.55 s, with every
+// thumbnail in ~0.1 s, the same openly licensed works and no key. photo-search source `wikimedia`; the
+// creator and licence come with each picture (CC BY / BY-SA require them). `openverse` stays for apps
+// not yet updated. photo-fetch introduces itself with the app's address (Wikimedia's rule for callers).
 // v76: TRENDS (Tony, 13 Oct 2026: "I'd like to understand trends and foresee needs before they arise").
 // meter-admin `trends`: every copy's counts added up by month and name (and in how many households each
 // was counted), for up to 24 months — the owner's 📈 Use tab draws its month-by-month tables from it.
@@ -338,7 +344,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v76';
+const WORKER_VERSION = 'v77';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -725,6 +731,7 @@ async function handleRequest(request, env) {
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
+          wikimedia: true,      // v77
           pixabay: !!env.PIXABAY_API_KEY,
           pexels: !!env.PEXELS_API_KEY,
           unsplash: !!env.UNSPLASH_ACCESS_KEY,
@@ -1035,7 +1042,7 @@ async function handleRequest(request, env) {
       let r;
       try {
         r = await fetch(target.toString(), {
-          headers: { 'Accept': 'image/*', 'User-Agent': 'TonysRecipes/1.0' },
+          headers: { 'Accept': 'image/*', 'User-Agent': 'MyKitchenNotes/1.0 (https://mykitchennotes.community)' },   // v77
           signal: AbortSignal.timeout(15000),
         });
       } catch (e) {
@@ -1160,6 +1167,35 @@ async function handleRequest(request, env) {
             sourceLabel: 'Openverse'
           })).filter(i => i.url);
           return jsonResp({ source, page, images, total: data.result_count });
+        }
+        // ── Wikimedia Commons (v77) — no key; 0.3–0.6 s a search where Openverse took 12–28 s. The same
+        // openly licensed works (Openverse gathers them from here, among others). The creator comes from
+        // Commons as HTML and goes out as plain text; licence and file page go with it, for the credit.
+        if (source === 'wikimedia') {
+          const url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6'
+            + '&gsrlimit=' + perPage + '&gsroffset=' + ((page - 1) * perPage)
+            + '&gsrsearch=' + encodeURIComponent('filetype:bitmap ' + query)
+            + '&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiextmetadatafilter=LicenseShortName|Artist&iiurlwidth=330';
+          const resp = await fetch(url, { headers: { 'User-Agent': 'MyKitchenNotes/1.0 (https://mykitchennotes.community; recipe photo search)' },
+            signal: AbortSignal.timeout(15000) });
+          const raw = await resp.text();
+          let data; try { data = JSON.parse(raw); } catch(e) { return photoFail(source, 'Wikimedia Commons', resp, raw); }
+          if (!resp.ok || data.error) return photoFail(source, 'Wikimedia Commons', resp, (data.error && data.error.info) || raw);
+          const plain = v => String(v || '').replace(/<[^>]*>/g, ' ').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+          const pages = Object.values((data.query && data.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+          const images = pages.map(pg => {
+            const ii = (pg.imageinfo || [])[0] || {}, md = ii.extmetadata || {};
+            if (!ii.url || !/^image\/(jpeg|png|webp)$/.test(ii.mime || '')) return null;
+            // What is kept: a 960-pixel copy of a big original (a size Commons keeps ready), else the original.
+            const keep = ii.thumburl && ii.width > 960 && /\/330px-/.test(ii.thumburl) ? ii.thumburl.replace('/330px-', '/960px-') : ii.url;
+            return { url: keep, thumb: ii.thumburl || ii.url,
+              credit: plain(md.Artist && md.Artist.value).slice(0, 120) || 'Wikimedia Commons',
+              creditUrl: ii.descriptionurl || ii.url,
+              license: plain(md.LicenseShortName && md.LicenseShortName.value).slice(0, 40),
+              sourceLabel: 'Wikimedia Commons' };
+          }).filter(Boolean);
+          return jsonResp({ source, page, images });
         }
         return jsonResp({ source, error: 'Unknown photo source: ' + source, images: [] });
       } catch(err) {
@@ -2611,4 +2647,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v76 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v77 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

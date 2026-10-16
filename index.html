@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.44 -->
+<!-- Tony's Recipes Collection v38.45 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3455,9 +3455,8 @@ async function photoSearchOnce(query, source) {
     return (data && data.images) || [];
   } catch (e) { return []; }
 }
-// The ladder: the dish term across the keyless source first, then the keyed ones,
-// then one broader attempt. Ordering matters — Openverse needs no API key, so it
-// is the one that still works when nothing is configured.
+// The ladder: the dish term across every source, in PHOTO_SOURCES order (v38.45: the stock libraries
+// first, the keyless Wikimedia Commons last), then one broader attempt on the first.
 function photoAttemptPlan(term, category) {
   var broad = String(term || '').split(/\s+/).slice(-1)[0] || '';
   var plan = [];
@@ -3671,7 +3670,7 @@ async function autoFetchMissingPhotos() {
         undoItems.push({ id: r.id, name: r.name, photo: r.photo || '',
                          originalPhoto: r.originalPhoto || '', credit: r.photoCredit || null });
         r.photo = photoUrl;
-        // Openverse is Creative Commons: attribution is a licence CONDITION, not
+        // Wikimedia Commons (Openverse before v38.45) is Creative Commons: attribution is a licence CONDITION, not
         // a courtesy, so the credit travels with the photo (v30.3).
         var credit = photoCreditOf(images[0]);
         if (credit) r.photoCredit = credit; else delete r.photoCredit;
@@ -7603,7 +7602,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.44';
+var APP_VERSION = 'v38.45';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10561,7 +10560,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.44</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.45</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11289,7 +11288,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.44</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.45</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14680,7 +14679,7 @@ function i18nPrompt(lang, batch) {
     + (L.en || lang) + '. Never translate the braces or the digits.\n'
     + '5. Leave untranslated: brand and product names (Tony\'s Recipes, Bring!, Firebase, '
     + 'Firestore, Cloudflare, Anthropic, WhatsApp, Gmail, Google, GitHub, Claude, Pixabay, '
-    + 'Pexels, Unsplash, Openverse), file extensions, URLs, and units of measurement.\n'
+    + 'Pexels, Unsplash, Wikimedia Commons), file extensions, URLs, and units of measurement.\n'
     + '6. Keep the register consistent and plain. This app speaks to its user directly and '
     + 'without ceremony; match that rather than making it formal.\n'
     + '7. If a string is already a proper noun or has no meaningful translation, return it '
@@ -28137,15 +28136,36 @@ window.stepLineRange = stepLineRange;
 var _photoSearchSelected = null;
 var _photoSearchResults  = [];
 // Photo search cycles through these free sources via the "See more" button.
-// Openverse first: it needs no API key, so it is the one source that cannot be
-// taken out by a shared key hitting its rate limit — which is exactly what put
-// "Pixabay: invalid JSON (429)" in front of Tony. It federates Flickr, Wikimedia,
-// NASA and museum collections, so it is broad rather than a token extra.
-var PHOTO_SOURCES = ['openverse', 'pixabay', 'pexels', 'unsplash'];
-var PHOTO_SOURCE_LABELS = { openverse: 'Openverse', pixabay: 'Pixabay', pexels: 'Pexels', unsplash: 'Unsplash' };
+// v38.45 — Openverse REPLACED by Wikimedia Commons, searched directly (Worker v77), and last. Tony, 16 Oct
+// 2026: "Getting pics back from Openverse takes ages … Perhaps we do not want to use Openverse at all?"
+// Measured that day from GitHub's servers: Openverse's search took 12.6–27.8 s every time (with or without
+// its dead-link check) and some of its thumbnails 3–30 s; Commons answered in 0.26–0.55 s with every
+// thumbnail in ~0.1 s — the same openly licensed works (Openverse gathers them from Commons, among others),
+// no key. Last, because the stock libraries' pictures look better; a source that fails or has no key is
+// passed over (v30.3), so the keyless one no longer needs to be first.
+var PHOTO_SOURCES = ['pexels', 'unsplash', 'pixabay', 'wikimedia'];
+var PHOTO_KEYLESS = 'wikimedia';
+var PHOTO_SOURCE_LABELS = { wikimedia: 'Wikimedia Commons', pixabay: 'Pixabay', pexels: 'Pexels', unsplash: 'Unsplash' };
 // Sources whose licences REQUIRE attribution, not merely appreciate it.
-var PHOTO_SOURCES_NEEDING_CREDIT = ['openverse'];
+var PHOTO_SOURCES_NEEDING_CREDIT = ['wikimedia', 'openverse'];   // (Openverse: photos chosen before v38.45)
 var _photoSrcIdx = 0, _photoPage = 1, _photoQuery = '', _photoOriginal = '';
+// v38.45 — one request per source, page and search: started early, kept for See more.
+var _photoCache = {}, _photoGen = 0;
+function photoFetch(source, page) {
+  var k = _photoQuery + '|' + source + '|' + page;
+  if (!_photoCache[k]) {
+    _photoCache[k] = fetch(WORKER_ENDPOINT, {
+      method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'photo-search', query: _photoQuery, source: source, page: page }),
+      signal: AbortSignal.timeout(20000)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.error) delete _photoCache[k];   // a refusal is asked again next time
+      return d;
+    }, function (e) { delete _photoCache[k]; throw e; });
+  }
+  return _photoCache[k];
+}
+window.photoFetch = photoFetch;
 
 function openPhotoSearch(recipeName) {
   if (typeof insightCount === 'function') insightCount('photo-search');
@@ -28174,7 +28194,7 @@ async function searchPhotos() {
   if (isHeb && status) status.textContent = '🌐 Finding the English term…';
   var r = await photoQueryForSearch(query);
 
-  _photoQuery = r.query; _photoSrcIdx = 0; _photoPage = 1;
+  _photoQuery = r.query; _photoSrcIdx = 0; _photoPage = 1; _photoCache = {};
   // Held as state, not written to the status line here: doPhotoSearch overwrites
   // that line when results land, so a note written now would vanish exactly when
   // the user has results to make sense of.
@@ -28196,7 +28216,7 @@ async function searchPhotos() {
 function photoSearchMore() {
   _photoSrcIdx++;
   if (_photoSrcIdx >= PHOTO_SOURCES.length) { _photoSrcIdx = 0; _photoPage++; }
-  doPhotoSearch();
+  return doPhotoSearch();
 }
 
 function updatePhotoMoreBtn() {
@@ -28216,6 +28236,7 @@ async function doPhotoSearch() {
   document.getElementById('photoSearchUseBtn').style.display = 'none';
   _photoSearchSelected = null;
   if (moreWrap) moreWrap.style.display = 'none';
+  var gen = ++_photoGen;   // v38.45 — an answer for an older search (or source) is not drawn over a newer one
 
   // v30.3 — a source that ERRORS used to end the search, so a rate-limited
   // Pixabay blocked photo search entirely while Pexels and Unsplash sat there
@@ -28227,11 +28248,8 @@ async function doPhotoSearch() {
     var label  = PHOTO_SOURCE_LABELS[source] || source;
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching ' + label + '…</div>';
     try {
-      var resp = await fetch(WORKER_ENDPOINT, {
-        method: 'POST', headers: workerHeaders(),
-        body: workerBody({ action: 'photo-search', query: _photoQuery, source: source, page: _photoPage })
-      });
-      var data = await resp.json();
+      var data = await photoFetch(source, _photoPage);
+      if (gen !== _photoGen) return;
       if (data.notConfigured) {
         // No API key for this source — skip to the next one automatically
         tried++;
@@ -28253,10 +28271,14 @@ async function doPhotoSearch() {
       }
       _photoSearchResults = data.images;
       renderPhotoSearchGrid(data.images);
+      // v38.45 — the next source is asked now, so See more shows it at once.
+      var nx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
+      photoFetch(PHOTO_SOURCES[nx], nx === 0 ? _photoPage + 1 : _photoPage).catch(function () {});
       status.textContent = data.images.length + ' from ' + label + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select'
         + (_photoOriginal ? '  ·  ' + _photoOriginal : '');
       updatePhotoMoreBtn(); return;
     } catch(err) {
+      if (gen !== _photoGen) return;
       failures.push({ label: label, why: photoErrText(err.message) });
       tried++;
       _photoSrcIdx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
@@ -28306,11 +28328,14 @@ function renderPhotoSearchGrid(images) {
     div.onclick=function(){ selectSearchPhoto(i,div); };
     var image=document.createElement('img'); image.alt='Photo '+(i+1);
     image.style.cssText='width:100%;height:100%;object-fit:cover;background:#f0ebe4;';
-    image.onerror=function(){ if(image.src!==img.url) image.src=img.url; else div.style.display='none'; };
+    // v38.45 — the source's thumbnail, then the original; one that has not arrived in 8 s gives way to the next.
+    var tries=[img.thumb, img.url].filter(function(u,k,a){ return u && a.indexOf(u)===k; }), at=0, slow=null;
+    function nextTry(){ clearTimeout(slow); at++; if(at<tries.length){ image.src=tries[at]; slow=setTimeout(nextTry, 8000); } else div.style.display='none'; }
+    image.onerror=nextTry;
     div.style.cssText='aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s;position:relative;background:#f0ebe4;display:flex;align-items:center;justify-content:center;';
     div.innerHTML='<div style="color:var(--muted);font-size:10px;">Loading...</div>';
-    image.onload=function(){ div.innerHTML=''; div.appendChild(image); if(img.credit){var c=document.createElement('div');c.style.cssText='position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';c.textContent='© '+img.credit;div.appendChild(c);} };
-    image.src=img.thumb||img.url; grid.appendChild(div);
+    image.onload=function(){ clearTimeout(slow); div.innerHTML=''; div.appendChild(image); if(img.credit){var c=document.createElement('div');c.style.cssText='position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';c.textContent='© '+img.credit;div.appendChild(c);} };
+    image.src=tries[0]; if(tries.length>1) slow=setTimeout(nextTry, 8000); grid.appendChild(div);
   });
 }
 
@@ -31386,7 +31411,7 @@ function privacyEntries() {
       sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.'
         // v38.15 — the beta and the test copy report by themselves (Worker v69).
         + (insightsOn() ? ' In this test copy it also sends, by itself, the app\u2019s own error messages and how the app is used \u2014 which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.' : '') },
-    { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Openverse)', when: 'only when you search for a photo', on: true,
+    { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)', when: 'only when you search for a photo', on: true,
       sends: 'The search words, never your recipes. Your device then loads the pictures it shows from them, so they see its internet address, as any website does.' },
     { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,
       sends: 'The address of the page you are importing \u2014 nothing about you.' },
@@ -33896,6 +33921,8 @@ window.onHeaderScroll = onHeaderScroll;
         <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener noreferrer" class="deploy-link">🟢 Pixabay — get API key <span class="deploy-hint">secret: PIXABAY_API_KEY · free</span></a>
         <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer" class="deploy-link">🔵 Pexels — get API key <span class="deploy-hint">secret: PEXELS_API_KEY · free</span></a>
         <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" class="deploy-link">⚫ Unsplash — get Access Key <span class="deploy-hint">secret: UNSPLASH_ACCESS_KEY · free</span></a>
+        <!-- v38.45 — in place of Openverse (12–28 s a search, measured 16 Oct 2026) -->
+        <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer" class="deploy-link">🟣 Wikimedia Commons — asked last <span class="deploy-hint">no key needed · free · the photographer is credited</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
