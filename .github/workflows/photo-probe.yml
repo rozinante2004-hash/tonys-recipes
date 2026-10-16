@@ -1,0 +1,38 @@
+# 16 Oct 2026 — one-off measurement: Wikimedia Commons searched directly, as a quicker keyless
+# source than Openverse (12–28 s a search). Time, results and the first titles per search, as notices.
+# Removed after use.
+name: Photo probe
+on:
+  push:
+    branches: [test]
+    paths: ['.github/workflows/photo-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Measure
+        run: |
+          cat > probe.mjs <<'JS'
+          const H = { 'User-Agent': 'MyKitchenNotes/1.0 (https://mykitchennotes.community; recipe app photo search)' };
+          const med = a => { const x = a.slice().sort((p, q) => p - q); return x.length ? x[Math.floor(x.length / 2)] : 0; };
+          async function timed(url) {
+            const s = performance.now();
+            try { const r = await fetch(url, { headers: H, signal: AbortSignal.timeout(30000) }); const b = await r.arrayBuffer();
+              return { ms: Math.round(performance.now() - s), status: r.status, body: b }; }
+            catch (e) { return { ms: Math.round(performance.now() - s), status: 'ERR' }; }
+          }
+          for (const q of ['chocolate cake', 'shakshuka', 'lentil soup', 'beef stew', 'banana bread', 'hummus', 'apple crumble', 'chicken schnitzel', 'pumpkin soup']) {
+            const u = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=9'
+              + '&gsrsearch=' + encodeURIComponent('filetype:bitmap ' + q) + '&prop=imageinfo&iiprop=url|size|extmetadata&iiextmetadatafilter=LicenseShortName|Artist&iiurlwidth=330';
+            const s = await timed(u);
+            let d = {}; try { d = JSON.parse(Buffer.from(s.body).toString()); } catch (e) {}
+            const pages = Object.values((d.query && d.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+            const th = await Promise.all(pages.map(p => p.imageinfo && p.imageinfo[0] && p.imageinfo[0].thumburl ? timed(p.imageinfo[0].thumburl) : null));
+            const ok = th.filter(x => x && x.status === 200).map(x => x.ms);
+            const lic = {}; pages.forEach(p => { const l = (((p.imageinfo || [])[0] || {}).extmetadata || {}).LicenseShortName; const k = l ? l.value : '?'; lic[k] = (lic[k] || 0) + 1; });
+            const titles = pages.slice(0, 5).map(p => String(p.title || '').replace(/^File:/, '').slice(0, 38)).join(' · ');
+            console.log(`::notice title=Commons: ${q}::search ${s.status} ${s.ms} ms, ${pages.length} results | thumbs ${ok.length}/${pages.length} median ${med(ok)} ms max ${Math.max(0, ...ok)} ms | ${JSON.stringify(lic)} | ${titles}`);
+          }
+          JS
+          node probe.mjs
