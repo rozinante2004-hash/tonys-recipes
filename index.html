@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.47 -->
+<!-- Tony's Recipes Collection v38.48 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2605,9 +2605,37 @@ async function _selfTestPark() {
   // …and so does the folder the extension was unzipped into (remembered per copy):
   // with it, the offer rightly says "It is in <folder>" instead of the download.
   var _extFolderWas = window._extFolder; window._extFolder = null;
+  // …and the sign-in (v38.48). Tony ran the suite as a new tester, signed in for real: the terms test pressed
+  // "Get me out of here!" against a stand-in sign-out, yet the page's own state went with it — sync switched off
+  // and the live listener on the household closed — and Sync Health then said "signed out" while Firebase still
+  // had the tester. The listener is put aside for the run (no test can close the real one), and the sign-in goes
+  // back afterwards, unless the account really was signed out meanwhile.
+  var _signInWas = { auth: window._fbAuth, user: window._fbUser, drive: window._driveMode, unsub: _firestoreUnsubscribe,
+                     outBtn: (document.getElementById('signOutBtn') || {}).style, inBtn: (document.getElementById('signInHeaderBtn') || {}).style };
+  _signInWas.outShow = _signInWas.outBtn ? _signInWas.outBtn.display : undefined;
+  _signInWas.inShow = _signInWas.inBtn ? _signInWas.inBtn.display : undefined;
+  var _ds = document.getElementById('driveStatus'), _dsT = document.getElementById('dsText');
+  _signInWas.status = (_ds && _dsT) ? { state: _ds.className, text: _dsT.textContent } : null;
+  _firestoreUnsubscribe = null;
   return { langWas: _langWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
            backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas,
-           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas };
+           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas, signInWas: _signInWas };
+}
+function _selfTestSignInBack(s) {
+  if (!s) return;
+  if (s.unsub) {
+    // Something signed in again during the run and opened its own listener: that one is current.
+    if (_firestoreUnsubscribe && _firestoreUnsubscribe !== s.unsub) { try { s.unsub(); } catch(e) {} }
+    else _firestoreUnsubscribe = s.unsub;
+  }
+  window._fbAuth = s.auth;
+  var still = s.auth && s.auth.currentUser;
+  if (!s.user || !still || still.uid !== s.user.uid) return;    // really signed out (or another account): left as it is
+  window._fbUser = s.user; window._driveMode = s.drive;
+  if (s.outBtn && s.outShow !== undefined) s.outBtn.display = s.outShow;
+  if (s.inBtn && s.inShow !== undefined) s.inBtn.display = s.inShow;
+  var ls = document.getElementById('loginScreen'); if (ls) ls.style.display = 'none';
+  if (s.status && typeof setDriveStatus === 'function') try { setDriveStatus(s.status.state, s.status.text); } catch(e) {}
 }
 function _selfTestUnpark(p) {
   if (!p) return;
@@ -2616,6 +2644,7 @@ function _selfTestUnpark(p) {
     Object.keys(p.extMarks).forEach(function(n){ document.documentElement.setAttribute(n, p.extMarks[n]); });
   }
   if ('extFolderWas' in p) window._extFolder = p.extFolderWas;
+  try { _selfTestSignInBack(p.signInWas); } catch(e) {}
   // The real connection back BEFORE anything else can save. A test that
   // swapped in its own fake and restored "the previous one" restored the
   // guard, which is why this assigns rather than trusting the chain.
@@ -2675,7 +2704,7 @@ function _selfTestCloseDialogs(ids) {
     el.classList.remove('open');
   });
 }
-window._selfTestPark = _selfTestPark; window._selfTestUnpark = _selfTestUnpark;
+window._selfTestPark = _selfTestPark; window._selfTestUnpark = _selfTestUnpark; window._selfTestSignInBack = _selfTestSignInBack;
 
 // v38.02 — Tony ran the Self Test in three tabs at once: "the tests run only when the
 // page is active. If I switch to a different tab in the browser, they stop." Right: a
@@ -7629,7 +7658,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.47';
+var APP_VERSION = 'v38.48';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10587,7 +10616,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.47</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.48</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11315,7 +11344,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.47</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.48</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18022,6 +18051,30 @@ async function addSelectedToCollection() {
 }
 window.collectSelectedInto = collectSelectedInto;
 window.addSelectedToCollection = addSelectedToCollection;
+
+// v38.48 — Tony, as a new tester (Firefox, 16 Oct 2026): after "Start my own recipe collection" the Free-hand
+// window "automatically opened". Nothing opened it by itself: it was the second half of a double-click. The first
+// click on "Let's cook! 🍳" closed the box, and the second landed on "✍️ Paste the text", right under it (at
+// 1819×995 the two sit on the same spot). A double-click now counts only where its first click was: in the same
+// window, or on the page when that is where it began. A box that closes, or opens, under the mouse between the
+// two clicks no longer takes the second one. Real clicks only — what the app clicks for itself is never held back.
+var _clickLayer = { at: 0, layer: null };
+var CLICK_LAYERS = '#askOverlay, #termsGate, .modal-overlay';
+function clickLayerOf(el) { return (el && el.closest) ? el.closest(CLICK_LAYERS) : null; }
+function clickIsGhost(detail, layer, now) {
+  return detail >= 2 && now - _clickLayer.at < 700 && layer !== _clickLayer.layer;
+}
+window.addEventListener('click', function(e) {
+  if (!e.isTrusted) return;
+  var layer = clickLayerOf(e.target), now = Date.now();
+  if (clickIsGhost(e.detail, layer, now)) {
+    e.preventDefault(); e.stopImmediatePropagation();
+    dlog('[click] the second half of a double-click, held back: it began in another window');
+    return;          // the first click's window stays the reference, for a triple-click too
+  }
+  _clickLayer = { at: now, layer: layer };
+}, true);
+window.clickIsGhost = clickIsGhost; window.clickLayerOf = clickLayerOf;
 
 // A one-of-many chooser, in the same shape as askConfirm/askPrompt.
 function askChoice(message, options, opts) {

@@ -302,6 +302,13 @@ jobs:
       - name: Phone chrome budget (390x844)
         run: node tests/phone-chrome.js --port 8137
 
+      # v38.48 — Tony, as a new tester: a double-click on "Let's cook!" opened the
+      # Free-hand window, its second click landing on "Paste the text" under the box.
+      # The guard only holds back REAL clicks, which no self-test can make — so a
+      # real mouse proves it here, at Tony's screen size.
+      - name: Double-clicks stay where they began (real mouse)
+        run: node tests/double-click.js --port 8137
+
       # v36.65 (audit block 6) — axe-core over the page, the recipe view and
       # every dialog opened in turn. A dialog's controls only exist to a
       # scanner while it is open; both findings the audit made were in places

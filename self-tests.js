@@ -375,7 +375,13 @@ window.SELF_TESTS = [
       const where=cloudDocPath('meta').join('/');
       const snap=await cloudDoc('meta').get();
       if(!snap) throw new Error('Firestore read returned nothing');
-      if(!snap.exists) throw new Error(where+' is missing — either nothing has been saved to this collection yet, or the rules refuse this account');
+      if(!snap.exists){
+        // v38.48 — Tony's new tester: a collection just started has saved nothing, so it has no meta yet. When the
+        // household itself can be read, the rules let this account in, and "missing" only means "nothing saved yet".
+        var hid=(_cloudLayout==='households' && _cloudHid && _cloudHid!=='self-test') ? _cloudHid : null;
+        var hh=null; if(hid && typeof hhRef==='function'){ try{ hh=await hhRef(hid).get(); }catch(e){} }
+        if(!(hh && hh.exists)) throw new Error(where+' is missing — either nothing has been saved to this collection yet, or the rules refuse this account');
+      }
     }
   },
 
@@ -7350,9 +7356,11 @@ window.SELF_TESTS = [
       if(rules.ok!==true || badToken.ok!==true) throw new Error('a normal refusal (the rules, a made-up token) taken for a blocked key');
       if(KEY_SERVICES.map(function(s){ return s.api; }).join()!=='Identity Toolkit API,Token Service API,Cloud Firestore API') throw new Error('the services checked: '+KEY_SERVICES.map(function(s){ return s.api; }));
       // The window: all clear, then one refused.
-      var real={ fetch:window.fetch, user:window._fbUser }, asked=[], blockFirestore=false;
+      var real={ fetch:window.fetch, user:window._fbUser, who:window.fbSignedInUser }, asked=[], blockFirestore=false;
       try{
-        window._fbUser=null;
+        // v38.48 — signed in for real (Tony's tester), the check also asked FIREBASE's own user for a fresh token —
+        // through the stand-in fetch below, so it read "auth/nope". Nobody is signed in for this test.
+        window._fbUser=null; window.fbSignedInUser=function(){ return null; };
         window.fetch=async function(u, init){ asked.push(String(u));
           if(blockFirestore && /firestore\.googleapis/.test(u)) return new Response('{"error":{"code":403,"message":"Requests to this API firestore.googleapis.com are blocked.","details":[{"reason":"API_KEY_SERVICE_BLOCKED"}]}}', { status:403 });
           return new Response('{"error":{"code":400,"message":"nope"}}', { status:400 }); };
@@ -7366,7 +7374,7 @@ window.SELF_TESTS = [
         if(!/Cloud Firestore API[^✅]*not on the key/.test(t) || !/Undo the last change/.test(t)) throw new Error('a refused service: '+t);
         var item=document.querySelector('[onclick*="openKeyCheck"]');
         if(!item || !item.closest('.set-group[data-group="owner"]')) throw new Error('🔑 is not under 👑 App owner');
-      } finally { window.fetch=real.fetch; window._fbUser=real.user; var o=document.getElementById('keyCheckOverlay'); if(o) o.remove(); }
+      } finally { window.fetch=real.fetch; window._fbUser=real.user; window.fbSignedInUser=real.who; var o=document.getElementById('keyCheckOverlay'); if(o) o.remove(); }
     } },
   { id:'tester_survey', group:'Sharing', name:'📝 The end-of-beta question: asked only once it is sent, once per tester, after other windows, “Later” waits a day; the answers go to the server; translated; never in the family app (v38.18)',
     test: async()=>{
@@ -7534,6 +7542,9 @@ window.SELF_TESTS = [
   { id:'terms_gate', group:'UI', name:'📝 The kitchen rules on first sign-in: a notebook page, "I agree" wakes "Let’s get cookin’!", "Get me out of here!" signs out; agreed once, recorded on the person and the membership (v37.83)',
     test: async()=>{
       var writes=[], realDb=window._fbDb, realAuth=window._fbAuth, realTest=window._selfTestRunning, realToast=window.toast, realHh=window._household, realUser=window._fbUser;
+      // v38.48 — "Get me out of here!" below switches sync off and closes the live listener: both are put back (Tony's tester run).
+      var realDrive=window._driveMode, realUnsub=_firestoreUnsubscribe, btnOut=document.getElementById('signOutBtn'), btnIn=document.getElementById('signInHeaderBtn');
+      var btnWas=[btnOut && btnOut.style.display, btnIn && btnIn.style.display];
       var stored={};
       var fake={ collection:function(c){ return { doc:function(id){ return {
           collection:function(sub){ return { doc:function(d){ var path=c+'/'+id+'/'+sub+'/'+d; return {
@@ -7581,7 +7592,9 @@ window.SELF_TESTS = [
         // "Get me out of here!": signed out, not let in.
         stored={}; try{ localStorage.removeItem(TERMS_OK_KEY+'uGate'); }catch(e){}
         _selfTestRunning=false; var p2=legalGate(user); await wait(100); _selfTestRunning=true;
+        var unsubbed=0; _firestoreUnsubscribe=function(){ unsubbed++; };
         document.getElementById('tgOut').click();
+        if(unsubbed!==1) throw new Error('leaving did not close the listener on the household');
         if(await p2!==false || signedOut!==1 || document.getElementById('termsGate')) throw new Error('"Get me out of here!" did not sign them out');
         if(getComputedStyle(document.getElementById('loginScreen')).display==='none') throw new Error('leaving did not return to the sign-in screen');
         // The terms page itself: no contact section (it is in the Privacy Statement).
@@ -7589,6 +7602,8 @@ window.SELF_TESTS = [
         if(/mailto:|<h2>\d+\. Contact<\/h2>/.test(terms)) throw new Error('the terms still carry a contact section');
       } finally {
         window._fbDb=realDb; window._fbAuth=realAuth; window._selfTestRunning=realTest; window.toast=realToast; window._household=realHh; window._fbUser=realUser;
+        window._driveMode=realDrive; _firestoreUnsubscribe=realUnsub;
+        if(btnOut) btnOut.style.display=btnWas[0]; if(btnIn) btnIn.style.display=btnWas[1];
         var o=document.getElementById('termsGate'); if(o) o.remove();
         var ls=document.getElementById('loginScreen'); if(ls) ls.style.display=lsWas;
         var ds=document.getElementById('driveStatus'); if(ds && statusWas!==undefined) ds.innerHTML=statusWas;
@@ -8421,6 +8436,58 @@ window.SELF_TESTS = [
         window._fbAuth=real.auth; window.PasswordCredential=real.pc;
         try{ Object.defineProperty(navigator, 'credentials', { configurable:true, value:real.creds }); }catch(e){}
         rememberSet(real.a!==false);
+      }
+    } },
+
+  { id:'double_click_stays_put', group:'UI', name:'🖱️ A double-click counts only where it began: a box that closes (or opens) under the mouse does not take its second click — the Free-hand window after “Let’s cook!” (v38.48)',
+    test: async()=>{
+      if(typeof clickIsGhost!=='function' || typeof clickLayerOf!=='function') throw new Error('the guard is missing');
+      var was={ at:_clickLayer.at, layer:_clickLayer.layer }, box=document.createElement('div');
+      try{
+        box.className='modal-overlay'; var btn=document.createElement('button'); box.appendChild(btn); document.body.appendChild(box);
+        if(clickLayerOf(btn)!==box || clickLayerOf(document.getElementById('recipeGrid'))!==null) throw new Error('which window a click is in');
+        var now=Date.now();
+        // Tony's: the first click closed the box, the second landed on "✍️ Paste the text" under it.
+        _clickLayer={ at:now, layer:box };
+        if(!clickIsGhost(2, null, now+150)) throw new Error('the second click, on the page once the box is gone, still counts');
+        if(clickIsGhost(1, null, now+150)) throw new Error('a new single click is held back');
+        if(clickIsGhost(2, box, now+150)) throw new Error('a double-click inside the same box is held back');
+        if(clickIsGhost(2, null, now+900)) throw new Error('a click long after is held back');
+        // …and the other way round: a box that opened under the mouse.
+        _clickLayer={ at:now, layer:null };
+        if(!clickIsGhost(2, box, now+150)) throw new Error('a box that opened under the mouse takes the second click');
+        if(clickIsGhost(2, null, now+150)) throw new Error('a double-click on the page is held back');
+        // What the app clicks for itself always counts.
+        var n=0; btn.onclick=function(){ n++; }; _clickLayer={ at:Date.now(), layer:null };
+        btn.dispatchEvent(new MouseEvent('click', { bubbles:true, cancelable:true, detail:2 }));
+        if(n!==1) throw new Error('a click the app makes itself was held back');
+      } finally { _clickLayer=was; box.remove(); }
+    } },
+
+  { id:'selftest_keeps_sign_in', group:'Sync', name:'🧪 The Self Test leaves the sign-in as it found it — sync on, the live listener open — unless the account really signed out meanwhile (v38.48)',
+    test: async()=>{
+      var real={ auth:window._fbAuth, user:window._fbUser, drive:window._driveMode, unsub:_firestoreUnsubscribe };
+      var ls=document.getElementById('loginScreen'), lsWas=ls && ls.style.display;
+      try{
+        var u={ uid:'uK' }, closed=0, listener=function(){ closed++; };
+        var s={ auth:{ currentUser:u }, user:u, drive:true, unsub:listener, status:null };
+        // Tony's tester run: a test signed the page out (not Firebase) and closed the listener.
+        window._fbUser=null; window._driveMode=false; _firestoreUnsubscribe=null;
+        _selfTestSignInBack(s);
+        if(window._fbUser!==u || window._driveMode!==true || _firestoreUnsubscribe!==listener) throw new Error('not put back: '+JSON.stringify({ user:!!window._fbUser, drive:window._driveMode }));
+        // Really signed out meanwhile: it stays signed out.
+        window._fbUser=null; window._driveMode=false; s.auth={ currentUser:null };
+        _selfTestSignInBack(s);
+        if(window._fbUser || window._driveMode) throw new Error('a real sign-out was undone');
+        // Signed in again during the run, with a listener of its own: that one stays, the old one is closed.
+        var fresh=function(){}; _firestoreUnsubscribe=fresh; s.auth={ currentUser:u };
+        _selfTestSignInBack(s);
+        if(_firestoreUnsubscribe!==fresh || closed!==1) throw new Error('the new sign-in’s listener was replaced');
+        if(String(_selfTestPark).indexOf('_firestoreUnsubscribe = null')===-1 || String(_selfTestUnpark).indexOf('_selfTestSignInBack(p.signInWas)')===-1)
+          throw new Error('a run does not put the sign-in aside and back');
+      } finally {
+        window._fbAuth=real.auth; window._fbUser=real.user; window._driveMode=real.drive; _firestoreUnsubscribe=real.unsub;
+        if(ls) ls.style.display=lsWas;
       }
     } },
 
