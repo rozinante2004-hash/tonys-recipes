@@ -127,8 +127,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   **GitHub two-step moved to Ente** (it was a passkey in the iPhone's Passwords; Google Password Manager asked for a
   PIN he never set — skipped the PC passkey; recovery codes on paper), test sign-in fine. **Cloudflare two-step on Ente**
   (16 Oct; his Cloudflare login was Google-only, so he set a password through Forgot password in an Incognito window
-  — Cloudflare asks for it to enable two-step). Left (his): Google backup codes for both accounts; Apple recovery
-  contact if his Apple account is personal; sending the tester invitation. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
+  — Cloudflare asks for it to enable two-step). Google backup codes for both accounts and an Apple recovery contact:
+  done (16 Oct). Left (his): sending the tester invitation. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
   codes, Cloudflare two-step, Apple recovery contact).
 - **Released: v38.40 (16 Oct 2026, 00:43 Israel time, Tony's "Yes, please release v38.40", CI green on 9408884).**
   All jobs success (beta live 00:45; Self Tests on main 00:54).
