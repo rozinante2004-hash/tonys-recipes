@@ -248,6 +248,38 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   household reads. New self-tests `double_click_stays_put`, `selftest_keeps_sign_in` (383 pass). Terms: shown once per
   ACCOUNT (users/<uid>/prefs/legal), skipped only when agreed; 📊 Households shows "agreed to the terms (v…) <date>".
 - **Released: v38.48 (16 Oct 2026, 22:04 Israel time, CI green on c6847e2).** All jobs success (Pages deploy, Cloudflare beta and test, Self Tests on main and test, languages).
+- **v38.49** (Tony as Tester 1 + Admin, 16 Oct night, a list of eleven): (1) **Linked households' recipes in the
+  main list** (`renderLinkedInAll`, `#linkedAll` after `#recipeGrid`, `linkedCardsInto`, `.linked-card` on
+  `--linked-bg/--linked-border`, title "A recipe from <name> (read-only)", photos lazily via IntersectionObserver
+  `linkedPhotoLoad`). Search, meal types, diets, Collections apply; Favourites/Recent/Clips/No photo/One away = own
+  only. **Bug found on the emulator: `hhFetchLinkedNow` never unpacked the recipe document's `r` JSON** — every
+  linked recipe read "Untitled recipe" (also in the old chip view); the self-test fixture now has the real shape.
+  (2) **Household filter, multi-select** (Tony: "select one or more of them"): `activeHouseholds` Set, 🏠 own chip
+  (`householdChipHtml`, `toggleOwnFilter`) + 🤝 per link (`toggleLinkedFilter` toggles); none chosen = all.
+  `_linkedShow`, `renderLinkedGrid`, `hhFetchLinkedPhotos` removed. (3) **Live** (`linkLiveStart/Stop/Talk`):
+  onSnapshot on linkRequests to=hid, households/<hid>/links, each linkTalk pair; first snapshot quiet; a request asks
+  at once (hhCheckLinkRequests, `_linkAgain` if one is being answered), a message → red dot + toastAction Open, a
+  link accepted elsewhere → toast + their recipes (`_live.mine` skips one's own accept). `livePoll` every 2 min while
+  visible + on visibilitychange: fbRepliesCheck and, for the owner, feedbackCountNew. Started after
+  hhCheckLinkRequests at household load; stopped in signOutNow/legalLeave; restarted after a Self Test run.
+  Emulator (REAL rules, `$S/e2e/linkflow.mjs`): request popup 0.5 s with the note, link + 5 recipes 0.5 s, message
+  0.5 s. (4) **Request note** in the pop-up (`quote` + new askConfirm `quoteLabel`, `talkLastFrom`). (5) **Link
+  requests page**: last message outside the fold, `.talk-last` highlighted, NEW, ↩ Reply (`talkReply`); shown =
+  seen when it is the only new one (`talkSeenShown`, `talkMarkSeen(other, quiet)`); typing survives a live redraw.
+  (6) **Every ✕ stays in view**: `.modal > .modal-close` sticky (margins keep layout); a first-child title row
+  holding a ✕ sticky whole (`:has`, -20px / ask-card -22px). **tests/close-in-view.js** (CI): 13 of 28 windows lost
+  their ✕ before, 0 after. (7) **Self Test**: Cancel/✕ disabled while running (`selfTestLockClose`, closeM guard
+  with a toast), note (3 minutes, keep open, farm-animal hallucinations), `selfTestGrinderHtml` meat grinder +
+  sausage beside the counter (crank still when paused), a farm visitor after a clean run. (8) **WhatsApp
+  leftovers**: the run parks `_waScan`/`_waHarvest` field by field and redraws `updateWaMenuLabel` ("(1)" with no
+  chats; "Stopped after 500 of 4,000" was wa_scan_engine's stand-in scan, its restore kept the mutated object).
+  (9) **Ginger**: `gingerCheck` on focus in #editOverlay, once per device (`mkn_ginger_told`); Help "IF SOMETHING
+  LOOKS WRONG" section. Not OS-specific: its ghost layer is placed from the viewport. (10) More menu: "⚖️
+  Measurement converter", "🥫 What can I make with what I have?". New self-tests `link_live`,
+  `selftest_window_while_running`, `ginger_told_once` (386). **Page 2089.6 KB of the 2100 KB budget** — the next
+  feature needs room (move a block out, or raise it with a reason).
+- **Released: v38.49 (17 Oct 2026, 00:27 Israel time, CI green on bee29fa).** All jobs success (Pages deploy,
+  Cloudflare beta and test, Self Tests on main and test, Translate new phrases, Publish languages).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
