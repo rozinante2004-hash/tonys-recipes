@@ -125,7 +125,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   record: v=spf1 include:_spf.mx.cloudflare.net include:_spf.google.com ~all), account safety, a tester invitation
   (English and Hebrew). **Done 16 Oct:** Gmail sends as contact@ (SPF PASS, inbox); Thunderbird identity steps given;
   **GitHub two-step moved to Ente** (it was a passkey in the iPhone's Passwords; Google Password Manager asked for a
-  PIN he never set — skipped the PC passkey; recovery codes on paper), test sign-in fine. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
+  PIN he never set — skipped the PC passkey; recovery codes on paper), test sign-in fine. **Cloudflare two-step on Ente**
+  (17 Oct; his Cloudflare login was Google-only, so he set a password through Forgot password in an Incognito window
+  — Cloudflare asks for it to enable two-step). Left (his): Google backup codes for both accounts; Apple recovery
+  contact if his Apple account is personal; sending the tester invitation. Optional: Gmail Send mail as contact@; account safety (GitHub recovery codes, Google backup
   codes, Cloudflare two-step, Apple recovery contact).
 - **Released: v38.40 (16 Oct 2026, 00:43 Israel time, Tony's "Yes, please release v38.40", CI green on 9408884).**
   All jobs success (beta live 00:45; Self Tests on main 00:54).
