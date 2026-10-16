@@ -16313,7 +16313,7 @@ window.SELF_TESTS = [
         throw new Error('a nested heading was counted as an ingredient: '+allIngredients(two).length);
     } },
 
-  { id:'sub_editor_round_trip', group:'UI', name:'Sub-titles and indents survive the editor (v36.4)',
+  { id:'sub_editor_round_trip', group:'UI', name:'Sub-titles and indents survive the editor (v36.4); the buttons act on every selected line (v38.44)',
     test: async()=>{
       // v36.32 — OPEN THE EDITOR FIRST. This test drives a real mouse drag, and
       // a drag is decided entirely by getBoundingClientRect(). Inside a closed
@@ -16465,6 +16465,28 @@ window.SELF_TESTS = [
         stepToolSub();
         if(ta.value.split('\n')[0]!=='# Boil water')
           throw new Error('the remembered line was lost when focus moved: '+ta.value.split('\n')[0]);
+
+        // v38.44 — Tony: "allow selecting several lines … and not only one at a time".
+        ta.value = 'Boil water\nAdd salt\n# Sauce\nStir\n\nServe';
+        ta.focus(); ta.setSelectionRange(ta.value.indexOf('oil'), ta.value.indexOf('Stir') + 2);
+        stepToolIndent(1);
+        if(ta.value!=='    Boil water\n    Add salt\n# Sauce\n    Stir\n\nServe') throw new Error('indenting the selected lines gave: '+JSON.stringify(ta.value));
+        if(ta.selectionStart!==0 || ta.selectionEnd!==ta.value.indexOf('Stir')+4) throw new Error('the lines are not still selected: '+ta.selectionStart+'–'+ta.selectionEnd);
+        stepToolIndent(-1);
+        if(ta.value!=='Boil water\nAdd salt\n# Sauce\nStir\n\nServe') throw new Error('outdenting them gave: '+JSON.stringify(ta.value));
+        ta.setSelectionRange(0, ta.value.indexOf('Add salt'));   // a whole line with its line break: that line only
+        stepToolIndent(1);
+        if(ta.value!=='    Boil water\nAdd salt\n# Sauce\nStir\n\nServe') throw new Error('a selection ending at the start of a line took that line in: '+JSON.stringify(ta.value));
+        ta.value = 'Boil water\nAdd salt\n\nServe';
+        ta.focus(); ta.setSelectionRange(2, ta.value.length);
+        stepToolSub();
+        if(ta.value!=='# Boil water\n# Add salt\n\n# Serve') throw new Error('sub-titles for the selected lines gave: '+JSON.stringify(ta.value));
+        ta.setSelectionRange(0, ta.value.length); stepToolSub();
+        if(ta.value!=='Boil water\nAdd salt\n\nServe') throw new Error('the sub-title button does not undo several: '+JSON.stringify(ta.value));
+        // The selection, too, is remembered when the button takes the focus (a phone's tap).
+        ta.setSelectionRange(0, ta.value.indexOf('Add salt') + 3); rememberStepCaret(); ta.blur();
+        stepToolIndent(1);
+        if(ta.value!=='    Boil water\n    Add salt\n\nServe') throw new Error('the remembered selection was lost when focus moved: '+JSON.stringify(ta.value));
       } finally { ta.value = old; loadIngsTable([]); }
       } finally {
         if(!overlayWasOpen){ ov.classList.remove('active'); ov.style.display=''; }

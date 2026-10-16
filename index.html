@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.43 -->
+<!-- Tony's Recipes Collection v38.44 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7603,7 +7603,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.43';
+var APP_VERSION = 'v38.44';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10561,7 +10561,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.43</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.44</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10966,10 +10966,10 @@ body.banner-shown .header {
       <div class="form-group">
         <label class="form-label">Steps — one per line</label>
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap;">
-          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolSub()" title="Make this line a sub-title (no step number)">&#9656; Sub-title</button>
-          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(1)" aria-label="Indent this line" title="Indent this line">&#8677;</button>
-          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line" title="Outdent this line">&#8676;</button>
-          <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in</span>
+          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolSub()" title="Make this line — or every selected line — a sub-title (no step number)">&#9656; Sub-title</button>
+          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(1)" aria-label="Indent this line, or the selected lines" title="Indent this line, or the selected lines">&#8677;</button>
+          <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line, or the selected lines" title="Outdent this line, or the selected lines">&#8676;</button>
+          <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in, or on every line you select</span>
         </div>
         <textarea class="form-textarea" id="f-steps" dir="auto" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
@@ -11289,7 +11289,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.43</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.44</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -28049,35 +28049,48 @@ window.reapplyLineStructure = reapplyLineStructure;
 // line into a heading, concluded it did not work, and typed "#" by hand for the
 // rest of the recipe. A toolbar that silently edits a line you did not choose
 // is worse than no toolbar.
-var _stepCaret = null;
+// v38.44 — Tony, 16 Oct 2026: "When editing the Method in a recipe, please allow selecting several lines
+// for justification and not only one at a time." The buttons act on every line the selection touches; its
+// end is remembered as well as its start, and followed as it changes (on a phone the selection handles raise
+// no key or click event).
+var _stepCaret = null, _stepCaretEnd = null;
 function rememberStepCaret() {
   var ta = document.getElementById('f-steps');
-  if (ta && document.activeElement === ta) _stepCaret = ta.selectionStart;
+  if (ta && document.activeElement === ta) { _stepCaret = ta.selectionStart; _stepCaretEnd = ta.selectionEnd; }
 }
 window.rememberStepCaret = rememberStepCaret;
+document.addEventListener('selectionchange', function () {
+  var ta = document.getElementById('f-steps');
+  if (ta && document.activeElement === ta) rememberStepCaret();
+});
 
-// Which line the cursor is in, as [start, end) offsets into the textarea.
+// Which lines the cursor or the selection is in, as [start, end) offsets into the textarea. A selection
+// that ends at the very start of a line (a whole line picked, with its line break) leaves that line out.
 function stepLineRange(ta) {
-  var v = ta.value;
-  var pos = (document.activeElement === ta && ta.selectionStart != null)
-    ? ta.selectionStart
-    : (_stepCaret == null ? null : _stepCaret);
+  var v = ta.value, live = document.activeElement === ta && ta.selectionStart != null;
+  var pos = live ? ta.selectionStart : _stepCaret;
   if (pos == null) return null;              // never placed — the caller must say so
+  var to = live ? ta.selectionEnd : _stepCaretEnd;
+  if (to == null || to < pos) to = pos;
   if (pos > v.length) pos = v.length;
+  if (to > v.length) to = v.length;
+  if (to > pos && v.charAt(to - 1) === '\n') to--;
   var start = v.lastIndexOf('\n', pos - 1) + 1;
-  var end = v.indexOf('\n', pos);
+  var end = v.indexOf('\n', to);
   if (end === -1) end = v.length;
   return [start, end];
 }
-function replaceStepLine(ta, line) {
+// Rewrites those lines with fn(lines). One line: the caret goes to its end, as before. Several: they stay
+// selected, so the next button acts on them too.
+function replaceStepLines(ta, fn) {
   var r = stepLineRange(ta);
   if (!r) return false;
-  var v = ta.value;
-  ta.value = v.slice(0, r[0]) + line + v.slice(r[1]);
-  var caret = r[0] + line.length;
-  _stepCaret = caret;
+  var v = ta.value, lines = v.slice(r[0], r[1]).split('\n'), block = fn(lines).join('\n');
+  ta.value = v.slice(0, r[0]) + block + v.slice(r[1]);
   ta.focus();
-  try { ta.setSelectionRange(caret, caret); } catch (e) {}
+  _stepCaretEnd = r[0] + block.length;
+  _stepCaret = lines.length > 1 ? r[0] : _stepCaretEnd;
+  try { ta.setSelectionRange(_stepCaret, _stepCaretEnd); } catch (e) {}
   return true;
 }
 // Say which line nothing happened to, rather than picking one.
@@ -28089,20 +28102,33 @@ function noStepLine() {
 }
 // Toggle, not "set": pressing it on a line that is already a sub-title turns it
 // back into an ordinary step, so the button can undo itself.
+// Several lines: all sub-titles already → all back to steps; otherwise every one becomes a sub-title.
+// A blank line among them stays blank.
 function stepToolSub() {
   var ta = document.getElementById('f-steps'); if (!ta) return false;
-  var r = stepLineRange(ta); if (!r) return noStepLine();
-  var line = ta.value.slice(r[0], r[1]);
-  var m = line.match(/^\s*#\s*(.*)$/);
-  return replaceStepLine(ta, m ? m[1] : ('# ' + line.trim()));
+  if (!stepLineRange(ta)) return noStepLine();
+  return replaceStepLines(ta, function (lines) {
+    var filled = lines.filter(function (l) { return l.trim(); });
+    var allSub = filled.length > 0 && filled.every(function (l) { return /^\s*#/.test(l); });
+    return lines.map(function (l) {
+      var m = l.match(/^\s*#\s*(.*)$/);
+      if (allSub) return m ? m[1] : l;
+      if (lines.length > 1 && !l.trim()) return l;
+      return m ? l : '# ' + l.trim();
+    });
+  });
 }
 function stepToolIndent(dir) {
   var ta = document.getElementById('f-steps'); if (!ta) return false;
   var r = stepLineRange(ta); if (!r) return noStepLine();
-  var line = ta.value.slice(r[0], r[1]);
-  if (/^\s*#/.test(line)) return false;     // a heading is never indented
-  return replaceStepLine(ta, dir > 0 ? ('    ' + line.replace(/^[ \t]+/, ''))
-                                     : line.replace(/^[ \t]+/, ''));
+  var lines = ta.value.slice(r[0], r[1]).split('\n');
+  if (lines.length === 1 && /^\s*#/.test(lines[0])) return false;     // a heading is never indented
+  return replaceStepLines(ta, function (ls) {
+    return ls.map(function (l) {
+      if (/^\s*#/.test(l) || (ls.length > 1 && !l.trim())) return l;   // (nor, among several, a blank line)
+      return dir > 0 ? '    ' + l.replace(/^[ \t]+/, '') : l.replace(/^[ \t]+/, '');
+    });
+  });
 }
 window.stepToolSub = stepToolSub; window.stepToolIndent = stepToolIndent;
 window.stepLineRange = stepLineRange;
