@@ -7357,6 +7357,10 @@ window.SELF_TESTS = [
       var later=SURVEY_LATER_KEY+'end-of-beta-1', kept=null; try{ kept=localStorage.getItem(later); }catch(e){}
       var server={ survey:null, answered:false }, sent=[], toasts=[];
       function gone(){ var o=document.getElementById('surveyOverlay'); if(o) o.remove(); }
+      // v38.46 — the server's answer restated before each question: a health check started before this test
+      // (at page load, say) can land in the middle of it and record "no server", which hides the survey.
+      // That made this test fail now and then when several suites ran side by side.
+      function ask(){ _workerHealth={ ok:true, survey:true }; return surveyMaybe({ noWait:true }); }
       try{
         if(APP_CONFIG.environment==='live' && APP_CONFIG.features.testerSurvey) throw new Error('the family app would ask it');
         window._insUnderTest=true; window.toast=function(m){ toasts.push(String(m)); };
@@ -7368,20 +7372,20 @@ window.SELF_TESTS = [
           if(b.action==='survey-answer') return new Response('{"ok":true}', { status:200 });
           return new Response('{}', { status:404 }); };
         window._featureOverride.testerSurvey=false;
-        if(await surveyMaybe({ noWait:true })!==false) throw new Error('asked where the feature is off');
+        if(await ask()!==false) throw new Error('asked where the feature is off');
         window._featureOverride.testerSurvey=true; localStorage.removeItem(later);
-        if(await surveyMaybe({ noWait:true })!==false || document.getElementById('surveyOverlay')) throw new Error('asked before it was sent');
+        if(await ask()!==false || document.getElementById('surveyOverlay')) throw new Error('asked before it was sent');
         server.survey={ id:'end-of-beta-1', openedAt:Date.now() };
-        if(await surveyMaybe({ noWait:true })!=='end-of-beta-1') throw new Error('not asked once sent');
+        if(await ask()!=='end-of-beta-1') throw new Error('not asked once sent');
         var ov=document.getElementById('surveyOverlay'), t=ov.textContent, q=surveyQuestions();
         [q.keepQ, q.changeQ, q.priceQ, q.otherQ, 'Yes, definitely', 'Up to $1'].forEach(function(x){ if(t.indexOf(x)===-1) throw new Error('the window lacks: '+x); });
         if(/Tony/.test(t)) throw new Error('names Tony');
         surveyPhrases().forEach(function(x){ if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
         // Later: not again for a day.
         document.getElementById('svLater').click(); gone();
-        if(await surveyMaybe({ noWait:true })!==false) throw new Error('asked again right after Later');
+        if(await ask()!==false) throw new Error('asked again right after Later');
         localStorage.setItem(later, String(Date.now()-2*864e5));
-        await surveyMaybe({ noWait:true });
+        await ask();
         ov=document.getElementById('surveyOverlay');
         // Empty: refused here; answered: sent with who and where.
         sent=[]; await ov.querySelector('#svSend').onclick();
@@ -7394,7 +7398,7 @@ window.SELF_TESTS = [
         if(!b || b.idToken!=='tokS' || b.survey!=='end-of-beta-1' || b.answers.keep!=='probably' || b.answers.price!=='1-3' || b.answers.change!=='Faster imports' || b.hid!=='hS' || b.version!==APP_VERSION) throw new Error('what was sent: '+JSON.stringify(b));
         if(document.getElementById('surveyOverlay') || !toasts.some(function(m){ return m===q.thanks; })) throw new Error('no thank-you');
         server.answered=true;
-        if(await surveyMaybe({ noWait:true })!==false) throw new Error('asked again after answering');
+        if(await ask()!==false) throw new Error('asked again after answering');
         // The preview sends nothing.
         sent=[]; var pv=openSurveyWindow({ preview:true });
         if(!/nothing is sent/.test(pv.textContent)) throw new Error('the preview does not say so');
