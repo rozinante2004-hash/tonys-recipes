@@ -150,6 +150,28 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   (`logNudgeLabel`, from applyOwnerOnlyItems). Self-tests owner_protections and reports_reach_the_admin extended.
 - **Released: v38.43 (16 Oct 2026, 05:28 Israel time, Tony's "Yes, please move it to the Family and beta when green",
   CI green on 032a3a3).** All jobs success (beta live 05:29; Self Tests on main 05:40).
+- **v38.44**: the Method's ▸ Sub-title, ⇥ and ⇤ act on every selected line (Tony: "please allow selecting several
+  lines for justification and not only one at a time"). stepLineRange covers the lines a selection touches (one ending
+  at the very start of a line leaves it out); `_stepCaretEnd` is remembered with `_stepCaret`, also through
+  `selectionchange` (a phone's handles raise no key or click); replaceStepLines keeps several lines selected; among
+  several, sub-titles are not indented and blank lines stay blank; Sub-title makes all sub-titles, or all back.
+  Self-test sub_editor_round_trip extended. (A Hebrew suite run beside another on one server failed tester_survey
+  once; alone it passed — run the suites one per server.)
+- **Released: v38.44 (16 Oct 2026, 17:37 Israel time, Tony's "Yes, please move it to the Family and beta when
+  green", CI green on c3f3f7e).** All jobs success (beta live 17:39; Self Tests on main 17:49).
+- **v38.45 + Worker v77** (on `test`): **photos from Wikimedia Commons in place of Openverse.** Tony: "Getting pics
+  back from Openverse takes ages" … "Perhaps we do not want to use Openverse at all?" Measured by one-off GitHub jobs
+  (Openverse and Commons can't be reached from the session's sandbox; results read as run annotations — at most
+  10 per step): Openverse's search 12.6–27.8 s every time (filter_dead=false no better), some thumbnails 3–30 s;
+  Commons directly 0.26–0.55 s, thumbnails ~0.1 s, relevant titles, CC0/BY/BY-SA. Worker v77 `wikimedia` source
+  (bitmap files, jpeg/png/webp; `url` a 960px copy of a big original, creator as plain text, licence, file page;
+  photo-fetch's User-Agent names the app's address; `openverse` kept for old apps). App: PHOTO_SOURCES pexels,
+  unsplash, pixabay, wikimedia (PHOTO_KEYLESS); `photoFetch` keeps one request per source/page/search and asks the
+  next source while one is shown (See more is instant); `_photoGen` keeps an older answer from replacing a newer;
+  a thumbnail not arrived in 8 s gives way. Privacy statement 1.6 (16 Oct 2026), all 11 languages: Wikimedia
+  Commons (Wikimedia Foundation) for Openverse (WordPress Foundation); `python3 tools/legal-keys.py` re-keyed.
+  The Worker deploys with the release (deploy-worker.yml on main). Until then the test copy's 'wikimedia' asks
+  answer "Unknown photo source" (the shared Worker is still v76) and are passed over.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
